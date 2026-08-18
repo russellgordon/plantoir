@@ -9,6 +9,7 @@ public static class ActivityTrail
     {
         AppOpened,
         Machine,
+        Helpers,
         WorkingFolderOpened,
         SettingsSaved,
         SettingsCouldNotBeSaved,
@@ -36,6 +37,7 @@ public static class ActivityTrail
     {
         Event.AppOpened => "app opened",
         Event.Machine => "machine described",
+        Event.Helpers => "helpers described",
         Event.WorkingFolderOpened => "working folder opened",
         Event.SettingsSaved => "settings saved",
         Event.SettingsCouldNotBeSaved => "settings could not be saved",

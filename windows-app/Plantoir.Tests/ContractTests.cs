@@ -213,6 +213,9 @@ public class ContractTests
             ["cloudflareToken"] = CredentialRequests.CloudflareToken,
             ["cloudflareAccountID"] = CredentialRequests.CloudflareAccountID,
             ["cloudflareAccountIDHelp"] = CredentialRequests.CloudflareAccountIDHelp,
+            ["teacherSurname"] = CredentialRequests.TeacherSurname,
+            ["siteName"] = CredentialRequests.SiteName,
+            ["siteNameConflict"] = CredentialRequests.SiteNameConflict,
         };
 
         foreach (var req in requests)

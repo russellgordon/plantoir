@@ -90,15 +90,67 @@ public static class CredentialRequests
         LinkTitle: "Open the Cloudflare dashboard",
         Steps: CloudflareAccountIDSteps);
 
+    public static readonly CredentialRequest TeacherSurname = new(
+        Name: "teacherSurname",
+        Title: "Teacher Surname",
+        Explanation: "Your surname is used to create a clear, recognizable web address for your students and families (such as mcv4u-s1-2026-gordon), " +
+                     "and to prevent naming conflicts with other classes. It is saved on this computer and only asked once.",
+        FieldLabel: "Surname",
+        IsSecret: false,
+        LinkAddress: "",
+        LinkTitle: "",
+        Steps:
+        [
+            "Type your surname below using letters only (for example, “Gordon”).",
+            "It will be combined with course codes and the school year to name your class websites."
+        ]);
+
+    public static readonly CredentialRequest SiteName = new(
+        Name: "siteName",
+        Title: "Choose a Website Address",
+        Explanation: "Every website published to Netlify (*.netlify.app) or Cloudflare Pages (*.pages.dev) needs a unique web address. " +
+                     "On Netlify, this name is shared globally with all users across the world.",
+        FieldLabel: "Website address",
+        IsSecret: false,
+        LinkAddress: "",
+        LinkTitle: "",
+        Steps:
+        [
+            "Standard address (recommended): <course>-s<section>-<year>-<surname> (e.g. mcv4u-s1-2026-gordon)",
+            "With school abbreviation: <school>-<course>-s<section>-<year>-<surname> (e.g. lcs-mcv4u-s1-2026-gordon)",
+            "Use only lowercase letters, numbers, and hyphens."
+        ]);
+
+    public static readonly CredentialRequest SiteNameConflict = new(
+        Name: "siteNameConflict",
+        Title: "Website Address Already Taken",
+        Explanation: "That website address is already in use by another site on Netlify. You can add a number suffix or include your school's initials to make it unique.",
+        FieldLabel: "Website address",
+        IsSecret: false,
+        LinkAddress: "",
+        LinkTitle: "",
+        Steps:
+        [
+            "Add a number suffix (such as -01, pre-filled below).",
+            "Or add your school's initials (e.g. lcs-mcv4u-s1-2026-gordon).",
+            "Use only lowercase letters, numbers, and hyphens."
+        ]);
+
     public static CredentialRequest? MatchPrompt(string prompt)
     {
         string lower = prompt.ToLowerInvariant();
-        if (lower.Contains("netlify token"))
+        if (lower.Contains("last name") || lower.Contains("surname"))
+            return TeacherSurname;
+        if (lower.Contains("choose a different netlify site name") || lower.Contains("different netlify site name"))
+            return SiteNameConflict;
+        if (lower.Contains("enter netlify site name") || lower.Contains("netlify site name") || lower.Contains("website name"))
+            return SiteName;
+        if (lower.Contains("netlify") && (lower.Contains("token") || lower.Contains("personal access")))
             return NetlifyToken;
-        if (lower.Contains("cloudflare token"))
-            return CloudflareToken;
-        if (lower.Contains("cloudflare account id"))
+        if (lower.Contains("cloudflare") && (lower.Contains("account id") || lower.Contains("account")))
             return CloudflareAccountID;
+        if (lower.Contains("cloudflare") && lower.Contains("token"))
+            return CloudflareToken;
         return null;
     }
 }
