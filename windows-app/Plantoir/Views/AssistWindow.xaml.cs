@@ -686,17 +686,31 @@ public sealed partial class AssistWindow : Window
             buttons.Visibility = Visibility.Collapsed;
             Say("You", "Enter class dates");
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            var xamlRoot = Root.XamlRoot ?? Content?.XamlRoot;
+            if (xamlRoot is null)
+            {
+                Say("Assistant", "Could not open class dates dialog.");
+                return;
+            }
             var dialog = new SectionScheduleDialog(_folder, _course, _section, hwnd)
             {
-                XamlRoot = Root.XamlRoot,
+                XamlRoot = xamlRoot,
             };
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary && dialog.SavedDates is { Count: > 0 } dates)
+            try
             {
-                Say("Assistant", $"Remembered {dates.Count} class {(dates.Count == 1 ? "date" : "dates")} for {_course.Code} Section {_section}.");
+                var result = await dialog.ShowAsync();
+                if (result == ContentDialogResult.Primary && dialog.SavedDates is { Count: > 0 } dates)
+                {
+                    Say("Assistant", $"Remembered {dates.Count} class {(dates.Count == 1 ? "date" : "dates")} for {_course.Code} Section {_section}.");
+                }
+                else
+                {
+                    Say("Assistant", "No class dates were recorded.");
+                }
             }
-            else
+            catch (Exception ex)
             {
+                App.LogDiagnostic($"SectionScheduleDialog ShowAsync exception: {ex.Message}");
                 Say("Assistant", "No class dates were recorded.");
             }
         };

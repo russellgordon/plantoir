@@ -129,6 +129,30 @@ public sealed partial class SectionDetailView : UserControl
         Preview.Visibility = previewShown ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private XamlRoot? EffectiveXamlRoot => XamlRoot ?? _window.Content?.XamlRoot;
+
+    private async Task<ContentDialogResult?> ShowDialogSafelyAsync(ContentDialog dialog)
+    {
+        if (EffectiveXamlRoot is { } root)
+        {
+            dialog.XamlRoot = root;
+            try
+            {
+                return await dialog.ShowAsync();
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"ShowDialogSafelyAsync for '{dialog.Title}' exception: {ex.Message}");
+                return null;
+            }
+        }
+        else
+        {
+            App.LogDiagnostic($"Cannot show dialog '{dialog.Title}': No XamlRoot available.");
+            return null;
+        }
+    }
+
     // ---- Preview ---------------------------------------------------------
 
     /// <summary>Smoke-test entry: the same path the Preview button takes.</summary>
@@ -142,20 +166,27 @@ public sealed partial class SectionDetailView : UserControl
     /// </summary>
     public void StartPreviewIfIdle()
     {
-        if (_previewRunner.IsRunning) return;
-        PreviewOrStop_Click(this, new RoutedEventArgs());
+        try
+        {
+            if (_previewRunner.IsRunning) return;
+            PreviewOrStop_Click(this, new RoutedEventArgs());
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"StartPreviewIfIdle exception: {ex}");
+        }
     }
 
     /// <summary>Stop the preview if one is up — the assistant's half of stop, edit, start again.</summary>
     public void StopPreviewIfRunning()
     {
-        if (_previewRunner.IsRunning) StopPreview();
+        if (_previewRunner.IsRunning || _lease is not null) StopPreview();
     }
 
     /// <summary>Asynchronously stop the preview if running, awaiting container process termination.</summary>
     public async Task StopPreviewIfRunningAsync()
     {
-        if (_previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null)
+        if (_previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null || _lease is not null)
         {
             await StopPreviewAsync();
         }
@@ -196,50 +227,56 @@ public sealed partial class SectionDetailView : UserControl
                       "same time would clash — both write to the same place. This usually takes a few " +
                       "seconds; try again when it finishes.",
             CloseButtonText = "OK",
-            XamlRoot = XamlRoot,
         };
-        await dialog.ShowAsync();
+        await ShowDialogSafelyAsync(dialog);
         RefreshChrome();
         return true;
     }
 
     private async void PreviewOrStop_Click(object sender, RoutedEventArgs e)
     {
-        if (_previewRunner.IsRunning) { StopPreview(); return; }
-        if (await TheAssistantIsBuilding()) return;
-        if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
-
         try
         {
-            _lease = PreviewLeases.Take(workspacePath, _course.Code, _sectionNumber);
-            // Say so on disk as well as in memory: an assistant is a separate
-            // process and cannot see the in-memory lease.
-            _previewWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Previewing);
-            // Dropped as soon as the server answers — see ReleaseBuildClaim.
-            _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
-        }
-        catch (PreviewLeases.LeaseRefusedException refusal)
-        {
-            var dialog = new ContentDialog
-            {
-                Title = "Cannot Preview Yet",
-                Content = refusal.Message,
-                CloseButtonText = "OK",
-                XamlRoot = XamlRoot,
-            };
-            await dialog.ShowAsync();
-            return;
-        }
+            if (_previewRunner.IsRunning) { StopPreview(); return; }
+            if (await TheAssistantIsBuilding()) return;
+            if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
 
-        _previewUrl = null;
-        _lastLoadedUrl = null;
-        _isWaitingForServer = true;
-        _previewRunner.Milestones = TaskMilestones.Preview;
-        _previewRunner.Run("preview.ps1",
-            new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
-            workspacePath);
-        RefreshChrome();
-        await WaitForPreviewServer(_lease.Port);
+            try
+            {
+                _lease = PreviewLeases.Take(workspacePath, _course.Code, _sectionNumber);
+                // Say so on disk as well as in memory: an assistant is a separate
+                // process and cannot see the in-memory lease.
+                _previewWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Previewing);
+                // Dropped as soon as the server answers — see ReleaseBuildClaim.
+                _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
+            }
+            catch (PreviewLeases.LeaseRefusedException refusal)
+            {
+                App.LogDiagnostic($"Preview refused for {_course.Code} Section {_sectionNumber}: {refusal.Message}");
+                var dialog = new ContentDialog
+                {
+                    Title = "Cannot Preview Yet",
+                    Content = refusal.Message,
+                    CloseButtonText = "OK",
+                };
+                await ShowDialogSafelyAsync(dialog);
+                return;
+            }
+
+            _previewUrl = null;
+            _lastLoadedUrl = null;
+            _isWaitingForServer = true;
+            _previewRunner.Milestones = TaskMilestones.Preview;
+            _previewRunner.Run("preview.ps1",
+                new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
+                workspacePath);
+            RefreshChrome();
+            await WaitForPreviewServer(_lease.Port);
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"PreviewOrStop_Click exception: {ex}");
+        }
     }
 
     /// <summary>
@@ -390,85 +427,90 @@ public sealed partial class SectionDetailView : UserControl
 
     private async void Deploy_Click(object sender, RoutedEventArgs e)
     {
-        if (IsBusy) return;
-        if (await TheAssistantIsBuilding()) return;
-        if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
-
-        // Folder publishing (rows 101–102): the save gate keeps the folder
-        // valid, but a hand-edited config could still slip a bad one in —
-        // decline plainly rather than let the launcher discover it.
-        bool toFolder = _course.Configuration.DeploysToLocalFolder;
-        string deployFolder = _course.Configuration.DeployFolderPath.Trim();
-        if (toFolder && CourseConfiguration.DeployFolderProblem(deployFolder) is { } folderProblem)
+        try
         {
-            var problemDialog = new ContentDialog
+            if (IsBusy) return;
+            if (await TheAssistantIsBuilding()) return;
+            if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+
+            // Folder publishing (rows 101–102): the save gate keeps the folder
+            // valid, but a hand-edited config could still slip a bad one in —
+            // decline plainly rather than let the launcher discover it.
+            bool toFolder = _course.Configuration.DeploysToLocalFolder;
+            string deployFolder = _course.Configuration.DeployFolderPath.Trim();
+            if (toFolder && CourseConfiguration.DeployFolderProblem(deployFolder) is { } folderProblem)
             {
-                Title = "The deploy folder needs attention",
-                Content = folderProblem + " Fix it in this course's settings, then deploy again.",
-                CloseButtonText = "OK",
-                XamlRoot = XamlRoot,
-            };
-            await problemDialog.ShowAsync();
-            return;
-        }
+                var problemDialog = new ContentDialog
+                {
+                    Title = "The deploy folder needs attention",
+                    Content = folderProblem + " Fix it in this course's settings, then deploy again.",
+                    CloseButtonText = "OK",
+                };
+                await ShowDialogSafelyAsync(problemDialog);
+                return;
+            }
 
-        // Cloudflare needs the teacher's account, and the launcher's console
-        // prompt for it can never be answered from here — so decline plainly
-        // and point at the setting that fixes it.
-        bool toCloudflare = _course.Configuration.DeploysToCloudflare;
-        string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
-        if (toCloudflare && CourseConfiguration.CloudflareAccountProblem(cloudflareAccount) is { } accountProblem)
-        {
-            var accountDialog = new ContentDialog
+            // Cloudflare needs the teacher's account, and the launcher's console
+            // prompt for it can never be answered from here — so decline plainly
+            // and point at the setting that fixes it.
+            bool toCloudflare = _course.Configuration.DeploysToCloudflare;
+            string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
+            if (toCloudflare && CourseConfiguration.CloudflareAccountProblem(cloudflareAccount) is { } accountProblem)
             {
-                Title = "Cloudflare needs your Account ID",
-                Content = accountProblem + " Add it in this course's settings, under Deploying, then deploy again.",
-                CloseButtonText = "OK",
-                XamlRoot = XamlRoot,
-            };
-            await accountDialog.ShowAsync();
-            return;
-        }
+                var accountDialog = new ContentDialog
+                {
+                    Title = "Cloudflare needs your Account ID",
+                    Content = accountProblem + " Add it in this course's settings, under Deploying, then deploy again.",
+                    CloseButtonText = "OK",
+                };
+                await ShowDialogSafelyAsync(accountDialog);
+                return;
+            }
 
-        bool needsBuild = BuildFreshness.NeedsRebuild(_course, _sectionNumber);
-        _deployRunner.Milestones = toFolder
-            ? (needsBuild ? TaskMilestones.BuildAndDeployToFolder : TaskMilestones.DeployToFolder)
-            : toCloudflare
-                ? (needsBuild ? TaskMilestones.BuildAndDeployToCloudflare : TaskMilestones.DeployToCloudflare)
-                : (needsBuild ? TaskMilestones.BuildAndDeploy : TaskMilestones.Deploy);
-        string customDomain = CourseConfiguration.NormalizedCustomDomain(
-            _course.Configuration.CustomDomain(_sectionNumber));
-        _deployRunner.CustomDomainForLinks = customDomain.Length == 0 ? null : customDomain;
+            bool needsBuild = BuildFreshness.NeedsRebuild(_course, _sectionNumber);
+            _deployRunner.Milestones = toFolder
+                ? (needsBuild ? TaskMilestones.BuildAndDeployToFolder : TaskMilestones.DeployToFolder)
+                : toCloudflare
+                    ? (needsBuild ? TaskMilestones.BuildAndDeployToCloudflare : TaskMilestones.DeployToCloudflare)
+                    : (needsBuild ? TaskMilestones.BuildAndDeploy : TaskMilestones.Deploy);
+            string customDomain = CourseConfiguration.NormalizedCustomDomain(
+                _course.Configuration.CustomDomain(_sectionNumber));
+            _deployRunner.CustomDomainForLinks = customDomain.Length == 0 ? null : customDomain;
 
-        // The publish is on the books for its WHOLE life — the quiet build
-        // included — and comes off them on every exit path (EndPublish runs
-        // from the runner-stopped transition in RefreshChrome).
-        _publishActivity?.Dispose();
-        _publishActivity = CourseActivity.BeginPublish(workspacePath, _course.Code, _sectionNumber);
-        _publishWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Publishing);
-        // A deploy builds and then uploads, and both end together, so the
-        // build claim can simply run its whole length.
-        _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
+            // The publish is on the books for its WHOLE life — the quiet build
+            // included — and comes off them on every exit path (EndPublish runs
+            // from the runner-stopped transition in RefreshChrome).
+            _publishActivity?.Dispose();
+            _publishActivity = CourseActivity.BeginPublish(workspacePath, _course.Code, _sectionNumber);
+            _publishWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Publishing);
+            // A deploy builds and then uploads, and both end together, so the
+            // build claim can simply run its whole length.
+            _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
 
-        if (needsBuild)
-        {
-            // Build quietly first; a failed build stops before publishing —
-            // the failure and its output are already on screen.
-            _deployRunner.Run("preview.ps1",
-                new[] { _course.Code, _sectionNumber.ToString(), "--build-only" }, workspacePath);
+            if (needsBuild)
+            {
+                // Build quietly first; a failed build stops before publishing —
+                // the failure and its output are already on screen.
+                _deployRunner.Run("preview.ps1",
+                    new[] { _course.Code, _sectionNumber.ToString(), "--build-only" }, workspacePath);
+                RefreshChrome();
+                if (!await _deployRunner.WaitUntilFinished()) { EndPublishActivity(); return; }
+            }
+            var deployArguments = toFolder
+                ? new[] { _course.Code, _sectionNumber.ToString(), "--to-folder", deployFolder }
+                : toCloudflare
+                    ? new[] { _course.Code, _sectionNumber.ToString(), "--target", "cloudflare", "--account", cloudflareAccount }
+                    : new[] { _course.Code, _sectionNumber.ToString() };
+            _deployRunner.Run("deploy.ps1", deployArguments, workspacePath,
+                keepTranscript: needsBuild);
             RefreshChrome();
-            if (!await _deployRunner.WaitUntilFinished()) { EndPublishActivity(); return; }
+            await _deployRunner.WaitUntilFinished();   // outcome already on screen
+            EndPublishActivity();
         }
-        var deployArguments = toFolder
-            ? new[] { _course.Code, _sectionNumber.ToString(), "--to-folder", deployFolder }
-            : toCloudflare
-                ? new[] { _course.Code, _sectionNumber.ToString(), "--target", "cloudflare", "--account", cloudflareAccount }
-                : new[] { _course.Code, _sectionNumber.ToString() };
-        _deployRunner.Run("deploy.ps1", deployArguments, workspacePath,
-            keepTranscript: needsBuild);
-        RefreshChrome();
-        await _deployRunner.WaitUntilFinished();   // outcome already on screen
-        EndPublishActivity();
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"Deploy_Click exception: {ex}");
+        }
     }
 
     private void EndPublishActivity()

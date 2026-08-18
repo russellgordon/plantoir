@@ -576,7 +576,6 @@ public sealed partial class SidebarPane : UserControl
             PrimaryButtonText = "Schedule",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
-            XamlRoot = XamlRoot,
         };
 
         // Checked as they choose, not after they commit — and the SAME check
@@ -600,7 +599,7 @@ public sealed partial class SidebarPane : UserControl
         time.TimeChanged += (_, _) => Recheck();
         Recheck();
 
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (Chosen() is not { } when) return;
 
         if (Workspace.WorkspacePath is not { } folder) return;
@@ -632,9 +631,8 @@ public sealed partial class SidebarPane : UserControl
             PrimaryButtonText = "Cancel It",
             CloseButtonText = "Leave It Scheduled",
             DefaultButton = ContentDialogButton.Close,
-            XamlRoot = XamlRoot,
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
 
         if (TaskScheduling.Cancel(TaskScheduling.NameFor(course.Code, number)) is { } problem)
         {
@@ -784,9 +782,8 @@ public sealed partial class SidebarPane : UserControl
             PrimaryButtonText = "Remove",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
-            XamlRoot = XamlRoot,
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
 
         try
         {
@@ -832,9 +829,8 @@ public sealed partial class SidebarPane : UserControl
                       "Restoring it later brings the whole course back to exactly this moment. " +
                       "Anything you add from now on won't be in this backup.",
             CloseButtonText = "OK",
-            XamlRoot = XamlRoot,
         };
-        await dialog.ShowAsync();
+        await ShowDialogSafelyAsync(dialog);
         _ = when;
     }
 
@@ -860,9 +856,8 @@ public sealed partial class SidebarPane : UserControl
             PrimaryButtonText = "Restore",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
-            XamlRoot = XamlRoot,
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
 
         try
         {
@@ -905,9 +900,8 @@ public sealed partial class SidebarPane : UserControl
             PrimaryButtonText = "Delete",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
-            XamlRoot = XamlRoot,
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         try
         {
             CourseRestorer.DeleteBackup(item);
@@ -938,9 +932,8 @@ public sealed partial class SidebarPane : UserControl
             PrimaryButtonText = "Delete",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
-            XamlRoot = XamlRoot,
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         try
         {
             CourseRestorer.DeleteArchive(item);
@@ -967,9 +960,8 @@ public sealed partial class SidebarPane : UserControl
             PrimaryButtonText = "Restore",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
-            XamlRoot = XamlRoot,
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
 
         try
         {
@@ -987,6 +979,30 @@ public sealed partial class SidebarPane : UserControl
         }
     }
 
+    private XamlRoot? EffectiveXamlRoot => XamlRoot ?? _window.Content?.XamlRoot;
+
+    private async Task<ContentDialogResult?> ShowDialogSafelyAsync(ContentDialog dialog)
+    {
+        if (EffectiveXamlRoot is { } root)
+        {
+            dialog.XamlRoot = root;
+            try
+            {
+                return await dialog.ShowAsync();
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"SidebarPane ShowDialogSafelyAsync for '{dialog.Title}' exception: {ex.Message}");
+                return null;
+            }
+        }
+        else
+        {
+            App.LogDiagnostic($"SidebarPane cannot show dialog '{dialog.Title}': No XamlRoot available.");
+            return null;
+        }
+    }
+
     private async Task ShowError(string title, string message)
     {
         var dialog = new ContentDialog
@@ -994,9 +1010,8 @@ public sealed partial class SidebarPane : UserControl
             Title = title,
             Content = message,
             CloseButtonText = "OK",
-            XamlRoot = XamlRoot,
         };
-        await dialog.ShowAsync();
+        await ShowDialogSafelyAsync(dialog);
     }
 
     private void Filter_TextChanged(object sender, TextChangedEventArgs e)
@@ -1009,9 +1024,18 @@ public sealed partial class SidebarPane : UserControl
 
     public async Task OpenNewCourseWizard(string? autoCreateCode = null, string? autoSections = null)
     {
-        var wizard = new NewCourseDialog(_window) { XamlRoot = XamlRoot };
+        if (EffectiveXamlRoot is null) return;
+        var wizard = new NewCourseDialog(_window) { XamlRoot = EffectiveXamlRoot };
         if (autoCreateCode is not null) wizard.AutoCreate(autoCreateCode, autoSections);
-        await wizard.ShowAsync();
+        try
+        {
+            await wizard.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"OpenNewCourseWizard exception: {ex.Message}");
+            return;
+        }
         Workspace.Reload();
         _window.ApplyState();
         if (wizard.CreatedCourseCode is { } code)
@@ -1035,8 +1059,17 @@ public sealed partial class SidebarPane : UserControl
                 "preview or deploy of this course is still using them. Try again when it finishes.");
             return;
         }
-        var dialog = new AddSectionDialog(course) { XamlRoot = XamlRoot };
-        await dialog.ShowAsync();
+        if (EffectiveXamlRoot is null) return;
+        var dialog = new AddSectionDialog(course) { XamlRoot = EffectiveXamlRoot };
+        try
+        {
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"OpenAddSectionDialog exception: {ex.Message}");
+            return;
+        }
         if (dialog.AddedNumber is { } number)
         {
             Workspace.Reload();
@@ -1095,7 +1128,6 @@ public sealed partial class SidebarPane : UserControl
             PrimaryButtonText = "Rename",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
-            XamlRoot = XamlRoot,
         };
 
         void Validate()
@@ -1110,7 +1142,7 @@ public sealed partial class SidebarPane : UserControl
         codeBox.TextChanged += (_, _) => Validate();
         Validate();
 
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
 
         string requestedCode = codeBox.Text.Trim();
         string newNormalized = CourseCodeValidator.Normalize(requestedCode);
@@ -1125,9 +1157,8 @@ public sealed partial class SidebarPane : UserControl
                 PrimaryButtonText = "Close Obsidian and Rename",
                 CloseButtonText = "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = XamlRoot,
             };
-            if (await obsidianDialog.ShowAsync() != ContentDialogResult.Primary) return;
+            if (await ShowDialogSafelyAsync(obsidianDialog) != ContentDialogResult.Primary) return;
 
             await FolderActions.QuitObsidianAndWait();
         }
@@ -1155,9 +1186,8 @@ public sealed partial class SidebarPane : UserControl
                     Title = notice.Title,
                     Content = notice.Message,
                     CloseButtonText = "OK",
-                    XamlRoot = XamlRoot,
                 };
-                _ = noticeDialog.ShowAsync();
+                _ = ShowDialogSafelyAsync(noticeDialog);
             }
         }
         catch (Exception ex)

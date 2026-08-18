@@ -200,8 +200,15 @@ public sealed partial class MainWindow : Window
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
-            if (DetailHost.Content is SectionDetailView detail) detail.StartPreviewIfIdle();
+            try
+            {
+                Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                if (DetailHost.Content is SectionDetailView detail) detail.StartPreviewIfIdle();
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"ShowPreviewFor exception: {ex}");
+            }
         });
     }
 
@@ -214,8 +221,15 @@ public sealed partial class MainWindow : Window
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
-            if (DetailHost.Content is SectionDetailView detail) detail.StartDeployForAutomation();
+            try
+            {
+                Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                if (DetailHost.Content is SectionDetailView detail) detail.StartDeployForAutomation();
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"DeployFor exception: {ex}");
+            }
         });
     }
 
@@ -228,6 +242,10 @@ public sealed partial class MainWindow : Window
             {
                 Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
                 if (DetailHost.Content is SectionDetailView detail) detail.StartDeployForAutomation();
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"DeployForAsync exception: {ex}");
             }
             finally
             {
@@ -255,8 +273,15 @@ public sealed partial class MainWindow : Window
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
-            if (DetailHost.Content is SectionDetailView detail) detail.StopPreviewIfRunning();
+            try
+            {
+                Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                if (DetailHost.Content is SectionDetailView detail) detail.StopPreviewIfRunning();
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"StopPreviewFor exception: {ex}");
+            }
         });
     }
 
