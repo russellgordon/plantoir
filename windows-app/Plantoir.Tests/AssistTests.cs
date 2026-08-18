@@ -1146,6 +1146,94 @@ public class AssistWorkspaceTests : IDisposable
             p => p.EndsWith("Astronomical Phenomena.md", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// A class page that nothing links to is a class page, not an orphan.
+    ///
+    /// Classes are the ROOTS of a section: everything else must be reachable
+    /// FROM one, and a class is reached through the site's own navigation of
+    /// All Classes. Reporting them made a healthy course look broken — ICD2O
+    /// Section 1 said "83 visible pages are linked from nowhere" and listed
+    /// its lessons, 83 of the 85 it has. The mac has never done this.
+    /// </summary>
+    [Fact]
+    public void ClassPagesAreRootsRatherThanOrphans()
+    {
+        Class("ICS3U", "Unit 1, Day 1", "2026-09-08");
+        Class("ICS3U", "Unit 1, Day 2", "2026-09-09");
+        Page("ICS3U", "Concepts/Astronomical Phenomena.md", draftSection1: false);
+
+        var workspace = Open();
+        var course = workspace.Course("ICS3U");
+        var (graph, _) = workspace.Inspect(course, 1);
+        var classPages = workspace.ClassPages(course, 1)
+            .Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Nothing links to either class — which is the normal state.
+        Assert.Contains(graph.Unreferenced(), p => p.EndsWith("Unit 1, Day 1.md", StringComparison.Ordinal));
+
+        var reported = graph.Unreferenced(classPages: classPages);
+        Assert.DoesNotContain(reported, p => p.EndsWith("Unit 1, Day 1.md", StringComparison.Ordinal));
+        Assert.DoesNotContain(reported, p => p.EndsWith("Unit 1, Day 2.md", StringComparison.Ordinal));
+
+        // And a genuinely stranded page is still reported, or the exclusion
+        // would have bought silence rather than accuracy.
+        Assert.Contains(reported, p => p.EndsWith("Astronomical Phenomena.md", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The same thing through the tool a teacher actually reaches, because
+    /// the defect was in what <c>check_section</c> SAID, not in the graph.
+    /// </summary>
+    [Fact]
+    public void CheckSectionDoesNotCallEveryLessonStranded()
+    {
+        Class("ICS3U", "Unit 1, Day 1", "2026-09-08");
+        Class("ICS3U", "Unit 1, Day 2", "2026-09-09");
+
+        // check_section says the same thing to both audiences, so it returns
+        // plain text rather than two halves.
+        string said = new Plantoir.Mcp.PlantoirTools(Open()).CheckSection("ICS3U", 1);
+
+        Assert.DoesNotContain("linked from nowhere", said);
+        Assert.DoesNotContain("Unit 1, Day 1", said);
+    }
+
+    /// <summary>
+    /// What the preview is doing is read off the LEASE FILES, because this
+    /// runs in plantoir-mcp and PreviewLeases is an in-memory static
+    /// belonging to the app. Reading that one meant "Nothing is being
+    /// previewed at the moment" was said every time, whatever was on screen —
+    /// including to a teacher who had pressed Preview thirty seconds earlier.
+    /// </summary>
+    [Fact]
+    public void CheckSectionReadsThePreviewStateAcrossProcesses()
+    {
+        Class("ICS3U", "Unit 1, Day 1", "2026-09-08");
+        var tools = new Plantoir.Mcp.PlantoirTools(Open());
+
+        // Nothing running: the offer to look it over.
+        Assert.Contains("Nothing is being previewed", tools.CheckSection("ICS3U", 1));
+
+        using var child = StartALongRunningChild();
+        try
+        {
+            // Building: say so, rather than that nothing is happening.
+            WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
+            WriteWorkLease("ICS3U", WorkLease.Building, child.Id, child.ProcessName);
+            string building = tools.CheckSection("ICS3U", 1);
+            Assert.Contains("The preview is building now", building);
+            Assert.DoesNotContain("Nothing is being previewed", building);
+
+            // Showing: nothing at all. They are looking at it.
+            File.Delete(Path.Combine(_folder, "courses", ".internal", "activity",
+                                     $"ICS3U.{WorkLease.Building}.{child.Id}.lease"));
+            string showing = tools.CheckSection("ICS3U", 1);
+            Assert.DoesNotContain("Nothing is being previewed", showing);
+            Assert.DoesNotContain("is building now", showing);
+        }
+        finally { try { child.Kill(entireProcessTree: true); } catch { } }
+    }
+
     // ---- Choosing classes by date ----------------------------------------
 
     [Fact]

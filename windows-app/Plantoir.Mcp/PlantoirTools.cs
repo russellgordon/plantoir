@@ -206,7 +206,15 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var (graph, isHidden) = workspace.Inspect(found, number);
 
             var dangling = graph.DanglingLinks(isHidden);
-            var orphans = graph.Unreferenced().Where(p => !isHidden(p)).ToList();
+
+            // A class page reached from nothing is a class page, not an
+            // orphan — see LinkGraph.Unreferenced for what leaving this out
+            // did to a real course.
+            var classPages = workspace.ClassPages(found, number)
+                .Select(Path.GetFullPath)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var orphans = graph.Unreferenced(classPages: classPages)
+                .Where(p => !isHidden(p)).ToList();
 
             int visible = graph.Pages.Count(p => !isHidden(p));
             string pageWord = visible == 1 ? "page" : "pages";
@@ -247,15 +255,34 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 paragraphs.Add(string.Join("\n", lines));
             }
 
-            bool isShowing = PreviewLeases.Active.Any(l =>
-                l.FolderPath == workspace.FolderPath &&
-                string.Equals(l.CourseCode, found.Code, StringComparison.OrdinalIgnoreCase) &&
-                l.SectionNumber == number);
+            // What the preview is DOING decides which of three things is worth
+            // saying — and for one of them, that nothing is.
+            //
+            // Read off the LEASE FILES, not PreviewLeases. That list is an
+            // in-memory static belonging to the app, and this code runs in
+            // plantoir-mcp, a separate process where it is permanently empty —
+            // so a teacher who had just pressed Preview was told "Nothing is
+            // being previewed at the moment", every time, whatever was on
+            // screen. The app already writes the cross-process leases for
+            // precisely this (SectionDetailView: "an assistant is a separate
+            // process and cannot see the in-memory lease"); nothing here was
+            // reading them.
+            //
+            // The build lease is dropped the moment the server answers, so
+            // build-then-preview reads as two states rather than one, which is
+            // the distinction the sentences turn on.
+            var doing = WorkLease.HeldBy(workspace.FolderPath, found.Code);
+            string these = visible == 1 ? "this page" : $"these {visible} pages";
 
-            if (!isShowing)
+            if (doing.Contains(WorkLease.Building))
+            {
+                paragraphs.Add($"The preview is building now, and will show {these} when it finishes.");
+            }
+            else if (!doing.Contains(WorkLease.Previewing))
             {
                 paragraphs.Add("Nothing is being previewed at the moment. Say “Preview” if you would like to look the section over.");
             }
+            // Nothing when a preview is showing: they are looking at it.
 
             return string.Join("\n\n", paragraphs);
         });

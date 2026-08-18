@@ -141,13 +141,39 @@ public sealed class LinkGraph
     /// a link-following rule can never act on, so they have to be visible
     /// somewhere.
     ///
-    /// Per shared-rules.json -> followingLinks: landing pages (index.md),
-    /// curriculum pages, and Key Links / its targets do not count as referrers
-    /// or unreferenced orphans.
+    /// <para><b>A CLASS PAGE IS NEVER ONE OF THESE.</b> Class pages are the
+    /// ROOTS of a section, not its leaves: the rule the example content is
+    /// built to is that every page must be reachable FROM a class, and a class
+    /// is reached through the site's own navigation of All Classes. So
+    /// "nothing links to this" is the ordinary, correct state for a class
+    /// page. Counting them made a healthy course look broken — ICD2O Section 1
+    /// reported <b>83 pages "linked from nowhere", every one of them a
+    /// lesson</b>, out of 85 class pages. The mac has excluded them since it
+    /// hit the same thing on an 86-period credit; this side had not, and that
+    /// difference was the whole of the bug.</para>
+    ///
+    /// <para>Which pages those are is the COURSE's own answer, not a guess
+    /// from the folder name: <c>per_section_folders</c> in
+    /// <c>course_config.json</c> is what a section calls its class folders,
+    /// which is why <paramref name="classPages"/> is passed in rather than
+    /// worked out here.</para>
+    ///
+    /// <para>Per shared-rules.json → followingLinks, landing pages (index.md),
+    /// curriculum pages and Key Links / its targets are excluded too. Note
+    /// that list answers a DIFFERENT question — what unpublishing must never
+    /// sweep up — and a class page is very much swept. The two exclusions
+    /// happen to be applied in one place; do not merge them.</para>
     /// </summary>
-    public List<string> Unreferenced(IReadOnlySet<string>? keyLinksTargets = null) =>
+    /// <param name="keyLinksTargets">Pages this section's Key Links points at.</param>
+    /// <param name="classPages">
+    /// The section's own class pages, full paths — from
+    /// <c>AssistWorkspace.ClassPages</c>.
+    /// </param>
+    public List<string> Unreferenced(IReadOnlySet<string>? keyLinksTargets = null,
+                                     IReadOnlySet<string>? classPages = null) =>
         Pages.Where(p => SourcesOf(p).Count == 0)
              .Where(p => !IsExcludedFromSweep(p, keyLinksTargets))
+             .Where(p => classPages is null || !classPages.Contains(Path.GetFullPath(p)))
              .ToList();
 }
 

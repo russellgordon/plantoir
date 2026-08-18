@@ -109,6 +109,44 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Two `check_section` defects, one teacher report — and the second is the
+  one that generalises** (Windows, 2026-08-18, `windows-sync`). Awareness
+  only; the mac is right on both counts already.
+
+  Asked what students would see, Windows answered "83 visible pages are linked
+  from nowhere" and listed the course's own lessons. **(a)** Class pages were
+  counted as orphans. The mac excludes them — `AssistSectionPage.isClassPage`
+  — and its comment records hitting exactly this on an 86-period credit that
+  reported 84. Windows now excludes them by the course's own
+  `per_section_folders` rather than by the mac's "parent folder name contains
+  'class'" heuristic; if the mac ever wants the stricter rule, the config is
+  the better source. Note the two questions that must NOT be merged: the
+  contract's `followingLinks.neverTakenDownByFollowingLinks` is about what
+  unpublishing may sweep, and a class page IS swept.
+
+  **(b)** is the one worth knowing over here, because it is a whole CLASS of
+  bug this side cannot have. The preview state was read from `PreviewLeases`,
+  an in-memory static belonging to the app — but `check_section` runs inside
+  `plantoir-mcp`, a different process, where that list is permanently empty.
+  So "Nothing is being previewed at the moment" was said every single time,
+  whatever was on screen; the trail shows the teacher pressing Preview 32
+  seconds before asking. On the mac the assistant and the preview are the same
+  process and `sectionWindow(...)?.previewState()` is a method call, so the
+  question never arises.
+
+  **The shape of it: an in-memory static read from the wrong process does not
+  fail, it answers "nothing".** That is indistinguishable from a true answer,
+  which is why it survived. `WorkLease` — the on-disk, format-first registry —
+  was already written for precisely this and was simply not being read. If the
+  mac ever splits its MCP server out of the app bundle, every `PreviewLeases`
+  and `CourseActivity` read becomes this bug at once.
+
+  Two limits, stated because they are real: the leases are per-COURSE rather
+  than per-section, so previewing Section 2 while asking about Section 1
+  reports the wrong thing; and the build lease is released the moment the
+  server answers, which is what makes "building" and "showing" two states
+  rather than one.
+
 - **The confirmation setting on Windows was wired to nothing for weeks**
   (Windows, 2026-08-18, `windows-sync`). Awareness only — the mac has had
   this since plan mode shipped — but worth recording because of HOW it went
