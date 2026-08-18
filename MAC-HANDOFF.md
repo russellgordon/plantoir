@@ -264,6 +264,17 @@ is what happened to the test-race item, sitting here for three days with
 "worth ten minutes to check" in the middle of it.
 
 
+- **WSL2 / Container-Internal ext4 Build Acceleration Prototype** (Windows + shared, 2026-08-18, branch `perf/wsl2-ext4-build-acceleration`).
+  Tested and developed an acceleration architecture on branch `perf/wsl2-ext4-build-acceleration` to eliminate the 9P/virtiofs DrvFs cross-mount I/O bottleneck on Windows:
+  - **The Problem**: On Windows with WSL2, staging the 15,000+ files of Quartz's scaffold and `node_modules` in `courses/<COURSE>/.merged_output/section<N>` meant that all TypeScript transpilation, esbuild bundling, and markdown AST parsing traversed the 9P virtual mount layer. On a 15W Intel U-series CPU, an initial build took 2–4 minutes and incremental builds took 20–30s.
+  - **The Solution**:
+    1. Pre-bake `npm install` inside the container image in `/opt/quartz` (`Dockerfile`).
+    2. In `scripts/build_site.py`, stage the Quartz workspace on native Linux ext4 storage (`/tmp/quartz-builds/<COURSE>/section<N>`), symlinking `/opt/quartz/node_modules` instantly.
+    3. `scripts/build_site.py` runs differential `rsync -a --delete` to mirror `public/` and `course_config.json` back to `/teaching/courses/<COURSE>/.merged_output/section<N>/public/` upon build completion (and via a daemon thread in `--serve` mode), preserving 100% compatibility with `BuildFreshness`, `SectionDetailView`, `ScheduledDeploy`, and `deploy.py`.
+    4. Updated `preview.ps1` and `preview.sh` `--stop` scripts so `PreviewStopper` checks `/tmp/quartz-builds/...` PIDs in addition to `.merged_output/...`.
+    5. Updated `deploy.py` to support container-internal rebuilds.
+  - **Results**: Initial scaffold copy dropped from 45s to < 0.1s; `npm install` over 9P dropped to 0s; site builds run at native NVMe/ext4 speeds. All 570 unit tests pass.
+
 - **Arrow-key prompt history navigation in Windows assist chat** (Windows, 2026-08-18).
   Windows now supports Terminal-style Up/Down arrow key history navigation in `AssistWindow.xaml.cs`.
   - **Behavior & Contract**: Follows `contracts/assist-cases.json` → `promptHistory`. Up recalls earlier prompts (newest first), Down recalls later prompts, half-typed draft is preserved and restored when walking back down past newest, Up at oldest or Down when not walking passes the key through to the `TextBox` (letting caret move to start/end), typing/editing ends the walk, and multi-line text passes arrow keys through to allow vertical caret movement.
