@@ -3389,9 +3389,8 @@ def _ensure_netlify_link(output_dir: Path, course_dir: Path):
     for src in candidates:
         if src.exists() and src.is_dir():
             try:
-                rel = os.path.relpath(src, start=output_dir)
-                os.symlink(rel, dst)
-                print(f"🔗 Linked .netlify → {rel}")
+                os.symlink(str(src.resolve()), dst)
+                print(f"🔗 Linked .netlify → {src}")
                 return
             except Exception as e:
                 print(f"ℹ️ Symlink failed ({e}); attempting a copy...")

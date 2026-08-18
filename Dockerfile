@@ -7,7 +7,7 @@ RUN pip install python-frontmatter Pillow
 
 # Install Node.js (needed for Quartz) and other tools (incl. dos2unix)
 # fonts-noto-color-emoji: the colour emoji drawn onto social cards.
-RUN apt-get update && apt-get install -y curl git lsof dos2unix fonts-noto-color-emoji \
+RUN apt-get update && apt-get install -y curl git lsof dos2unix fonts-noto-color-emoji rsync \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
