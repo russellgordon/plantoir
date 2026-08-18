@@ -103,5 +103,6 @@ public partial class App : Application
         WorkspaceViewModel.IsTerminating = true;
         FolderContainers.ReleaseEverythingAtQuit(
             Settings.RememberedWindows.Select(w => w.Path).Distinct().ToList());
+        Current.Exit();
     }
 }
