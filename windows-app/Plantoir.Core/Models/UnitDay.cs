@@ -7,7 +7,7 @@ namespace Plantoir.Core.Models;
 /// </summary>
 public readonly record struct UnitDay(int Unit, int Day) : IComparable<UnitDay>
 {
-    private static readonly Regex UnitDayRegex = new(@"^Unit\s+(\d+),\s*Day\s+(\d+)$", RegexOptions.Compiled);
+    private static readonly Regex UnitDayRegex = new(@"^Unit\s+(\d+),\s*Day\s+(\d+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public string Title => $"Unit {Unit}, Day {Day}";
 
