@@ -89,7 +89,7 @@ public sealed class ReDatePlan
             lines.Add($"{Overflowing} {(Overflowing == 1 ? "class has" : "classes have")} no day " +
                       $"of {(Overflowing == 1 ? "its" : "their")} own this year, so " +
                       $"{(Overflowing == 1 ? "it goes" : "they all go")} on " +
-                      $"{last:yyyy-MM-dd} with the last one. Move or delete " +
+                      $"{last:yyyy-MM-dd} with the last one as {(Overflowing == 1 ? "a draft" : "drafts")}. Move, publish or delete " +
                       $"{(Overflowing == 1 ? "it" : "them")} when you have decided what to do.");
         }
         lines.Add("");
@@ -97,7 +97,7 @@ public sealed class ReDatePlan
         var moves = Moves.Count > 0
             ? Moves
             : Dates.Concat(Materials).Concat(Reference).Where(d => d.WillChange).Select(d =>
-                new ReDateMove(d.Title, d.RelativePath, d.Current, d.New, ReDateReason.AClass)).ToList();
+                new ReDateMove(d.Title, d.RelativePath, d.Current, d.New, ReDateReason.AClass, Unpublishes: d.Unpublishes)).ToList();
 
         string word = moves.Count == 1 ? "page" : "pages";
         lines.Add($"{moves.Count} {word} would move:");
@@ -112,7 +112,14 @@ public sealed class ReDatePlan
             switch (move.Reason)
             {
                 case ReDateReason.AClass:
-                    lines.Add($"“{move.Title}” moves to {move.To:yyyy-MM-dd}.");
+                    if (move.Unpublishes)
+                    {
+                        lines.Add($"“{move.Title}” moves to {move.To:yyyy-MM-dd} and becomes a draft because it has no class date.");
+                    }
+                    else
+                    {
+                        lines.Add($"“{move.Title}” moves to {move.To:yyyy-MM-dd}.");
+                    }
                     break;
                 case ReDateReason.BroughtBy:
                     lines.Add($"“{move.Title}” moves to {move.To:yyyy-MM-dd}, with “{move.ClassTitle}”.");

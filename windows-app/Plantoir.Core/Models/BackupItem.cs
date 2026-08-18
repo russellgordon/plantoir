@@ -12,8 +12,44 @@ namespace Plantoir.Core.Models;
 /// &lt;timestamp&gt;.zip alone. Each parser accepts only its own form, so the
 /// three kinds can never appear in each other's lists.
 /// </summary>
-public sealed record BackupItem(string CourseCode, DateTime BackedUpAt, string FilePath)
+public abstract record BackupMaker
 {
+    public sealed record Teacher : BackupMaker
+    {
+        public override string Description => "made by you";
+        public override string NameSuffix => "";
+    }
+
+    public sealed record Assistant(int SectionNumber) : BackupMaker
+    {
+        public override string Description => $"before an assistant chat about Section {SectionNumber}";
+        public override string NameSuffix => $"_assistant-section{SectionNumber}";
+    }
+
+    public abstract string Description { get; }
+    public abstract string NameSuffix { get; }
+
+    public static readonly BackupMaker DefaultTeacher = new Teacher();
+
+    public static BackupMaker? Reading(string piece)
+    {
+        const string assistantPrefix = "assistant-section";
+        if (piece.StartsWith(assistantPrefix, StringComparison.Ordinal))
+        {
+            if (int.TryParse(piece[assistantPrefix.Length..], out int sectionNumber))
+                return new Assistant(sectionNumber);
+        }
+        return null;
+    }
+}
+
+public sealed record BackupItem(string CourseCode, DateTime BackedUpAt, string FilePath, BackupMaker Maker)
+{
+    public BackupItem(string courseCode, DateTime backedUpAt, string filePath)
+        : this(courseCode, backedUpAt, filePath, BackupMaker.DefaultTeacher)
+    {
+    }
+
     public string Id => FilePath;
 
     public string Title => CourseCode;
@@ -25,12 +61,19 @@ public sealed record BackupItem(string CourseCode, DateTime BackedUpAt, string F
     public string WhenDescription =>
         BackedUpAt.ToString("d MMMM yyyy 'at' h:mm tt", CultureInfo.CurrentCulture);
 
-    public string Subtitle => "Backed up " + WhenDescription;
+    public string Subtitle => $"Backed up {WhenDescription} · {Maker.Description}";
+
+    public string KeptDescription => Maker switch
+    {
+        BackupMaker.Assistant => "The assistant made this one; its five most recent are kept.",
+        _ => "You made this one, so it is kept until you delete it.",
+    };
 
     /// <summary>
-    /// Reads a backup's name, which is &lt;CODE&gt;_backup_&lt;timestamp&gt;.zip.
-    /// Returns null for anything else — archives and the wizard's automatic
-    /// zips included.
+    /// Reads a backup's name: &lt;CODE&gt;_backup_&lt;timestamp&gt;.zip for one the
+    /// teacher made, and &lt;CODE&gt;_backup_&lt;timestamp&gt;_assistant-section&lt;N&gt;.zip
+    /// for one the assistant made. Returns null for anything else — archives
+    /// and the wizard's automatic zips included.
     /// </summary>
     public static BackupItem? From(string filePath, string courseCode)
     {
@@ -38,10 +81,24 @@ public sealed record BackupItem(string CourseCode, DateTime BackedUpAt, string F
         string name = Path.GetFileNameWithoutExtension(filePath);
         string expectedPrefix = courseCode + "_backup_";
         if (!name.StartsWith(expectedPrefix, StringComparison.Ordinal)) return null;
-        string stamp = name[expectedPrefix.Length..];
+
+        string remainder = name[expectedPrefix.Length..];
+        string[] pieces = remainder.Split('_');
+        if (pieces.Length < 2 || pieces.Length > 3) return null;
+
+        string stamp = pieces[0] + "_" + pieces[1];
         if (!DateTime.TryParseExact(stamp, ArchivedItem.StampFormat, CultureInfo.InvariantCulture,
                                     DateTimeStyles.None, out DateTime backedUpAt))
             return null;
-        return new BackupItem(courseCode, backedUpAt, filePath);
+
+        BackupMaker maker = BackupMaker.DefaultTeacher;
+        if (pieces.Length == 3)
+        {
+            if (BackupMaker.Reading(pieces[2]) is not { } namedMaker)
+                return null;
+            maker = namedMaker;
+        }
+
+        return new BackupItem(courseCode, backedUpAt, filePath, maker);
     }
 }

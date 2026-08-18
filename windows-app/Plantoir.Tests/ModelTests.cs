@@ -739,8 +739,8 @@ public class CourseRenamerTests
         Assert.False(outcome.IsQuiet);
         var notice = CourseRenamer.NoticeAfterRenaming(outcome);
         Assert.NotNull(notice);
-        Assert.Equal("Scheduled publishing turned off", notice.Title);
-        Assert.Contains("Section 1, Section 2", notice.Message);
+        Assert.Equal("Scheduled publishing was turned off", notice.Title);
+        Assert.Contains("Sections 1 and 2", notice.Message);
     }
 
     [Fact]
@@ -750,7 +750,7 @@ public class CourseRenamerTests
         Assert.False(outcome.IsQuiet);
         var notice = CourseRenamer.NoticeAfterRenaming(outcome);
         Assert.NotNull(notice);
-        Assert.Equal("Scheduled publishing could not be cancelled", notice.Title);
+        Assert.Equal("A scheduled publish may still run", notice.Title);
         Assert.Contains("Section 3", notice.Message);
     }
 

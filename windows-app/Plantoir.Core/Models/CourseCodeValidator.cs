@@ -28,9 +28,6 @@ public static class CourseCodeValidator
         if (trimmed.Contains("  "))
             return ("A course code can’t have two spaces in a row.", "No double spaces");
 
-        if (trimmed.Length > MostCharacters)
-            return ("A course code can be at most 12 characters.", "12 characters at most");
-
         foreach (char c in trimmed)
         {
             bool isAsciiLetter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
@@ -39,6 +36,9 @@ public static class CourseCodeValidator
             if (!isAsciiLetter && !isDigit && !isSpace)
                 return ("A course code can only use letters, numbers and spaces.", "Letters, numbers, spaces");
         }
+
+        if (trimmed.Length > MostCharacters)
+            return ("A course code can be at most 12 characters.", "12 characters at most");
 
         string normalized = Normalize(trimmed);
         string? currentNormalized = currentCode is not null ? Normalize(currentCode) : null;

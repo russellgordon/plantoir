@@ -131,6 +131,113 @@ public class ContractTests
     }
 
     [Fact]
+    public void CourseManagement_SectionNumbers_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("course-management.json");
+        var sectionNumbers = doc["sectionNumbers"]!.AsObject();
+
+        // suggested
+        var suggested = sectionNumbers["suggested"]!.AsArray();
+        foreach (var s in suggested)
+        {
+            var existing = s!["existing"]!.AsArray().Select(x => x!.GetValue<int>()).ToList();
+            int expect = s["expect"]!.GetValue<int>();
+            Assert.Equal(expect, SectionAdder.SuggestedNumber(existing));
+        }
+
+        // addable
+        var addable = sectionNumbers["addable"]!.AsArray();
+        foreach (var a in addable)
+        {
+            string entry = a!["entry"]!.ToString();
+            var existing = a["existing"]!.AsArray().Select(x => x!.GetValue<int>()).ToList();
+            bool expect = a["expect"]!.GetValue<bool>();
+            Assert.Equal(expect, SectionAdder.EntryIsAddable(entry, existing));
+        }
+
+        // entryProblems
+        var entryProblems = sectionNumbers["entryProblems"]!.AsArray();
+        foreach (var ep in entryProblems)
+        {
+            string entry = ep!["entry"]!.ToString();
+            var existing = ep["existing"]!.AsArray().Select(x => x!.GetValue<int>()).ToList();
+            string? expect = ep["expectProblem"]?.ToString();
+            Assert.Equal(expect, SectionAdder.EntryProblem(entry, existing, "ICS3U"));
+        }
+    }
+
+    [Fact]
+    public void CourseManagement_ZipNames_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("course-management.json");
+        var zipNames = doc["zipNames"]!.AsObject();
+        string courseCode = zipNames["courseCode"]!.ToString();
+        var cases = zipNames["cases"]!.AsArray();
+
+        foreach (var c in cases)
+        {
+            string kind = c!["kind"]!.ToString();
+            string name = c["name"]!.ToString();
+            string filePath = $@"C:\folder\_backups\{courseCode}\{name}";
+
+            var backup = BackupItem.From(filePath, courseCode);
+            var archive = ArchivedItem.From(filePath, courseCode);
+
+            switch (kind)
+            {
+                case "backup":
+                    Assert.NotNull(backup);
+                    Assert.Null(archive);
+                    string expectedMaker = c["maker"]?.ToString() ?? "teacher";
+                    if (expectedMaker == "teacher")
+                    {
+                        Assert.IsType<BackupMaker.Teacher>(backup!.Maker);
+                    }
+                    else if (expectedMaker == "assistant")
+                    {
+                        Assert.IsType<BackupMaker.Assistant>(backup!.Maker);
+                        int expectedSection = c["section"]!.GetValue<int>();
+                        Assert.Equal(expectedSection, ((BackupMaker.Assistant)backup.Maker).SectionNumber);
+                    }
+                    break;
+                case "archive":
+                    Assert.NotNull(archive);
+                    Assert.Null(backup);
+                    if (c["section"] is JsonNode secNode)
+                    {
+                        Assert.Equal(secNode.GetValue<int>(), archive!.SectionNumber);
+                    }
+                    else
+                    {
+                        Assert.Null(archive!.SectionNumber);
+                    }
+                    break;
+                case "neither":
+                    Assert.Null(backup);
+                    Assert.Null(archive);
+                    break;
+            }
+        }
+    }
+
+    [Fact]
+    public void SharedRules_FollowingLinks_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("shared-rules.json");
+        var following = doc["followingLinks"]!.AsObject();
+
+        Assert.True(following["publishing"]!["takesLinkedPages"]!.GetValue<bool>());
+        Assert.True(following["publishing"]!["transitive"]!.GetValue<bool>());
+        Assert.True(following["publishing"]!["disclosedInThePlan"]!.GetValue<bool>());
+
+        Assert.True(following["unpublishing"]!["takesALinkedPageOnlyWhenNothingElseNeedsIt"]!.GetValue<bool>());
+        Assert.True(following["unpublishing"]!["aReferrerCountsOnlyWhenVisible"]!.GetValue<bool>());
+
+        var exclusions = following["neverTakenDownByFollowingLinks"]!.AsArray();
+        Assert.Equal(3, exclusions.Count);
+    }
+
+    [Fact]
     public void SharedRules_ActivityTrailEvents_Exist()
     {
         var doc = ContractLoader.LoadJson("shared-rules.json");

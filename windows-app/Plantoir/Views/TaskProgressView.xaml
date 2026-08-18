@@ -41,10 +41,12 @@
                  straight from the folder will not look right. -->
             <StackPanel x:Name="FolderResult" Visibility="Collapsed" Spacing="6"
                         AutomationProperties.AutomationId="publishedFolderResult">
-                <TextBlock Text="Your website was copied to its deploy folder." />
+                <TextBlock Text="Your website was deployed to a folder — upload it to your web host whenever you're ready." />
                 <Button x:Name="FolderResultButton" Content="Show in File Explorer"
+                        AutomationProperties.AutomationId="publishedFolderButton"
                         Click="FolderResult_Click" />
                 <TextBlock Opacity="0.7" FontSize="12" TextWrapping="Wrap"
+                           AutomationProperties.AutomationId="publishedFolderRenderNote"
                            Text="Opened straight from the folder, the pages won't look right — the site only displays properly once it's on your web host." />
             </StackPanel>
             <StackPanel x:Name="AwaitingNotice" Orientation="Horizontal" Spacing="6" Visibility="Collapsed"

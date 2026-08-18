@@ -21,21 +21,49 @@ public static class CourseRenamer
     public static Notice? NoticeAfterRenaming(Outcome outcome)
     {
         if (outcome.IsQuiet) return null;
-        if (outcome.StoppedScheduledSections.Count > 0 && outcome.UnstoppedScheduledSections.Count == 0)
+
+        var sentences = new List<string>();
+        if (outcome.StoppedScheduledSections.Count > 0)
         {
-            string sections = string.Join(", ", outcome.StoppedScheduledSections.Select(s => $"Section {s}"));
-            return new Notice(
-                "Scheduled publishing turned off",
-                $"Scheduled publishing for {sections} was turned off because the course code changed. Turn it back on in Course Settings if you would like it to continue.");
+            string sections = Listed(outcome.StoppedScheduledSections);
+            bool isOne = outcome.StoppedScheduledSections.Count == 1;
+            sentences.Add(
+                $"{sections} of {outcome.NewCode} {(isOne ? "was" : "were")} set to publish on " +
+                $"{(isOne ? "its" : "their")} own. Renaming turned that off — set " +
+                $"{(isOne ? "it" : "them")} again from the section’s menu if you still want " +
+                $"{(isOne ? "it" : "them")}.");
         }
         if (outcome.UnstoppedScheduledSections.Count > 0)
         {
-            string sections = string.Join(", ", outcome.UnstoppedScheduledSections.Select(s => $"Section {s}"));
-            return new Notice(
-                "Scheduled publishing could not be cancelled",
-                $"Scheduled publishing for {sections} could not be turned off automatically. Check your task scheduler so it does not run against a missing course.");
+            string sections = Listed(outcome.UnstoppedScheduledSections);
+            bool isOne = outcome.UnstoppedScheduledSections.Count == 1;
+            sentences.Add(
+                $"{sections} {(isOne ? "was" : "were")} also set to publish on " +
+                $"{(isOne ? "its" : "their")} own, and Plantoir could not turn that off. " +
+                $"{(isOne ? "It" : "They")} may still try to publish under the old name.");
         }
-        return null;
+
+        string title = outcome.UnstoppedScheduledSections.Count == 0
+            ? "Scheduled publishing was turned off"
+            : "A scheduled publish may still run";
+        return new Notice(title, string.Join("\n\n", sentences));
+    }
+
+    public static string ObsidianQuestion(int openVaultCount)
+    {
+        string ending = openVaultCount > 1 ? "open your vaults again" : "open it again";
+        return "Renaming moves this course’s folder, and Obsidian would keep showing files that are no longer there.\n\n" +
+               $"Plantoir can close Obsidian, rename the course, and {ending}.";
+    }
+
+    public static string Listed(IReadOnlyList<int> sectionNumbers)
+    {
+        if (sectionNumbers.Count == 0) return "Section ";
+        if (sectionNumbers.Count == 1) return $"Section {sectionNumbers[0]}";
+
+        var leading = sectionNumbers.Take(sectionNumbers.Count - 1);
+        int last = sectionNumbers[^1];
+        return $"Sections {string.Join(", ", leading)} and {last}";
     }
 
     public static Outcome Rename(
