@@ -15,11 +15,40 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+        UnhandledException += (sender, e) =>
+        {
+            LogDiagnostic($"App.UnhandledException: {e.Message}\n{e.Exception}");
+        };
+        AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+        {
+            LogDiagnostic($"AppDomain.UnhandledException: {e.ExceptionObject}");
+        };
+    }
+
+    public static void LogDiagnostic(string message)
+    {
+        try
+        {
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "startup.log"), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}\n");
+        }
+        catch { }
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        Settings = AppSettings.Load();
+        LogDiagnostic("App.OnLaunched starting");
+        try
+        {
+            Settings = AppSettings.Load();
+            LogDiagnostic($"Settings loaded. WorkspacePath={Settings.WorkspacePath}, RememberedWindows={Settings.RememberedWindows.Count}");
+        }
+        catch (Exception ex)
+        {
+            LogDiagnostic($"Error loading settings: {ex}");
+            Settings = new AppSettings();
+        }
 
         string rawArgs = args.Arguments ?? "";
         string[] cmdArgs = Environment.GetCommandLineArgs();
@@ -61,10 +90,12 @@ public partial class App : Application
 
     public static MainWindow OpenWindow(string? folderPath, RememberedWindow? frame)
     {
+        LogDiagnostic($"App.OpenWindow for folderPath='{folderPath}'");
         var window = new MainWindow(folderPath, frame);
         _windows.Add(window);
         window.Closed += (_, _) =>
         {
+            LogDiagnostic($"MainWindow.Closed. Remaining windows count={_windows.Count - 1}");
             _windows.Remove(window);
             // A mid-session close updates the remembered list; the LAST
             // close reads as quitting and must NOT shrink it — the list
@@ -74,6 +105,7 @@ public partial class App : Application
             else RememberOpenWindows();
         };
         window.Activate();
+        LogDiagnostic($"MainWindow.Activate called. Total windows={_windows.Count}");
         RememberOpenWindows();
         return window;
     }
@@ -100,6 +132,7 @@ public partial class App : Application
 
     private static void QuitTime()
     {
+        LogDiagnostic("QuitTime called");
         WorkspaceViewModel.IsTerminating = true;
         FolderContainers.ReleaseEverythingAtQuit(
             Settings.RememberedWindows.Select(w => w.Path).Distinct().ToList());

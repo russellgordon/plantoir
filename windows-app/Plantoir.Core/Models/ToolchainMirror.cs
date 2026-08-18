@@ -28,6 +28,11 @@ public static class ToolchainMirror
 
     public static readonly IReadOnlyList<string> RecipeFolders = new[] { "patches", "scripts", "support" };
 
+    private static readonly HashSet<string> FoldersWithFreshToolchain = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Testing hook to force re-mirroring.</summary>
+    public static void ResetFreshToolchains() => FoldersWithFreshToolchain.Clear();
+
     /// <summary>
     /// Refreshes any launcher that ALREADY exists in the folder and differs
     /// byte for byte from the bundled copy. A folder with no launchers has
@@ -41,11 +46,22 @@ public static class ToolchainMirror
         {
             string destination = Path.Combine(workspacePath, name);
             string source = Path.Combine(bundledRoot, name);
-            if (!File.Exists(destination) || !File.Exists(source)) continue;
+            var srcInfo = new FileInfo(source);
+            var dstInfo = new FileInfo(destination);
+            if (!srcInfo.Exists || !dstInfo.Exists) continue;
             try
             {
-                if (File.ReadAllBytes(source).AsSpan().SequenceEqual(File.ReadAllBytes(destination))) continue;
+                if (srcInfo.Length == dstInfo.Length)
+                {
+                    byte[] srcBytes = File.ReadAllBytes(source);
+                    if (srcBytes.AsSpan().SequenceEqual(File.ReadAllBytes(destination)))
+                    {
+                        CopyModificationDate(srcInfo, dstInfo);
+                        continue;
+                    }
+                }
                 File.Copy(source, destination, overwrite: true);
+                CopyModificationDate(srcInfo, new FileInfo(destination));
                 refreshed.Add(name);
             }
             catch { }   // a read-only folder is unusual but not fatal
@@ -61,6 +77,9 @@ public static class ToolchainMirror
     public static int RefreshToolchain(string workspacePath, string bundledRoot)
     {
         if (!File.Exists(Path.Combine(workspacePath, Workspace.MarkerLauncher))) return 0;
+        if (FoldersWithFreshToolchain.Contains(workspacePath)) return 0;
+        FoldersWithFreshToolchain.Add(workspacePath);
+
         string toolchainRoot = Path.Combine(workspacePath, ".toolchain");
         int changed = 0;
         foreach (string name in RecipeRootFiles)
@@ -75,15 +94,29 @@ public static class ToolchainMirror
     {
         try
         {
-            if (!File.Exists(source)) return 0;
-            byte[] sourceBytes = File.ReadAllBytes(source);
-            if (File.Exists(destination) && sourceBytes.AsSpan().SequenceEqual(File.ReadAllBytes(destination)))
-                return 0;
+            var srcInfo = new FileInfo(source);
+            if (!srcInfo.Exists) return 0;
+            var dstInfo = new FileInfo(destination);
+            if (dstInfo.Exists && srcInfo.Length == dstInfo.Length)
+            {
+                byte[] sourceBytes = File.ReadAllBytes(source);
+                if (sourceBytes.AsSpan().SequenceEqual(File.ReadAllBytes(destination)))
+                {
+                    CopyModificationDate(srcInfo, dstInfo);
+                    return 0;
+                }
+            }
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             File.Copy(source, destination, overwrite: true);
+            CopyModificationDate(srcInfo, new FileInfo(destination));
             return 1;
         }
         catch { return 0; }
+    }
+
+    private static void CopyModificationDate(FileInfo src, FileInfo dst)
+    {
+        try { File.SetLastWriteTimeUtc(dst.FullName, src.LastWriteTimeUtc); } catch { }
     }
 
     /// <summary>A true mirror: copy what differs AND delete what should not be there.</summary>

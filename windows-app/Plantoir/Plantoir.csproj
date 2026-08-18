@@ -23,6 +23,7 @@
     <WindowsPackageType>None</WindowsPackageType>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <DefineConstants>DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <!-- The exe's own icon: Explorer, taskbar, Alt-Tab. Derived from the mac
          Icon Composer art (see AboutDialog for the in-app copy). -->
     <ApplicationIcon>Assets\Plantoir.ico</ApplicationIcon>

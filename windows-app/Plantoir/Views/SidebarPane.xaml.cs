@@ -35,7 +35,7 @@ public sealed class SidebarRow
     /// Friday had no way to be reminded on Monday except by remembering. The
     /// row it belongs to is the row that says it.
     /// </summary>
-    public DateTime? ScheduledDeploy { get; init; }
+    public DateTime? ScheduledDeploy { get; set; }
 
     public string BadgeGlyph => Glyphs.Clock;
     public Visibility BadgeVisibility =>
