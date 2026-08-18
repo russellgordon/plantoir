@@ -19,6 +19,7 @@ public sealed partial class CourseSettingsView : UserControl
 {
     private readonly MainWindow _window;
     private readonly Course _course;
+    public string CourseCode => _course.Code;
     private CourseConfiguration Config => _course.Configuration;
 
     public CourseSettingsView(MainWindow window, Course course)

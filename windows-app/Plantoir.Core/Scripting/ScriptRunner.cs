@@ -279,9 +279,17 @@ public sealed class ScriptRunner : INotifyPropertyChanged
 
     public void Terminate() => _process?.Kill();
 
-    public async Task<bool> WaitUntilFinished()
+    public async Task<bool> WaitUntilFinished(int timeoutMs = 5000)
     {
-        while (IsRunning) await Task.Delay(300);
+        var start = DateTime.UtcNow;
+        while (IsRunning && (DateTime.UtcNow - start).TotalMilliseconds < timeoutMs)
+        {
+            await Task.Delay(100);
+        }
+        if (IsRunning)
+        {
+            FinishRun(-1);
+        }
         return LastExitCode == 0;
     }
 

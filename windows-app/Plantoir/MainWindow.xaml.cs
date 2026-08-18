@@ -203,7 +203,7 @@ public sealed partial class MainWindow : Window
             try
             {
                 if (DetailHost.Content is not SectionDetailView existing ||
-                    !string.Equals(existing.Course.Code, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
                     existing.SectionNumber != section)
                 {
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
@@ -229,7 +229,7 @@ public sealed partial class MainWindow : Window
             try
             {
                 if (DetailHost.Content is not SectionDetailView existing ||
-                    !string.Equals(existing.Course.Code, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
                     existing.SectionNumber != section)
                 {
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
@@ -251,7 +251,7 @@ public sealed partial class MainWindow : Window
             try
             {
                 if (DetailHost.Content is not SectionDetailView existing ||
-                    !string.Equals(existing.Course.Code, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
                     existing.SectionNumber != section)
                 {
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
@@ -291,7 +291,7 @@ public sealed partial class MainWindow : Window
             try
             {
                 if (DetailHost.Content is not SectionDetailView existing ||
-                    !string.Equals(existing.Course.Code, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
                     existing.SectionNumber != section)
                 {
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
@@ -313,7 +313,7 @@ public sealed partial class MainWindow : Window
             try
             {
                 if (DetailHost.Content is not SectionDetailView existing ||
-                    !string.Equals(existing.Course.Code, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
                     existing.SectionNumber != section)
                 {
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
@@ -323,7 +323,8 @@ public sealed partial class MainWindow : Window
                 {
                     await detail.StopPreviewIfRunningAsync();
                 }
-                else if (Workspace.WorkspacePath is { } wp)
+
+                if (Workspace.WorkspacePath is { } wp)
                 {
                     await PreviewStopper.StopSectionProcessesAsync(wp, courseCode, section);
                     PreviewLeases.Release(wp, courseCode, section);
@@ -445,7 +446,7 @@ public sealed partial class MainWindow : Window
             case SidebarSelection.SectionItem(var code, var number)
                 when Workspace.Courses.FirstOrDefault(c => c.Code == code) is { } course:
                 if (DetailHost.Content is SectionDetailView current &&
-                    string.Equals(current.Course.Code, code, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(current.CourseCode, code, StringComparison.OrdinalIgnoreCase) &&
                     current.SectionNumber == number)
                 {
                     break;
@@ -457,7 +458,7 @@ public sealed partial class MainWindow : Window
             case SidebarSelection.CourseItem(var code)
                 when Workspace.Courses.FirstOrDefault(c => c.Code == code) is { } course:
                 if (DetailHost.Content is CourseSettingsView currentSettings &&
-                    string.Equals(currentSettings.Course.Code, code, StringComparison.OrdinalIgnoreCase))
+                    string.Equals(currentSettings.CourseCode, code, StringComparison.OrdinalIgnoreCase))
                 {
                     break;
                 }

@@ -94,9 +94,13 @@ public static class PreviewStopper
             process.Exited += (_, _) =>
             {
                 tcs.TrySetResult();
-                process.Dispose();
+                try { process.Dispose(); } catch { }
             };
-            await tcs.Task;
+            if (process.HasExited)
+            {
+                tcs.TrySetResult();
+            }
+            await Task.WhenAny(tcs.Task, Task.Delay(5000));
         }
         catch
         {

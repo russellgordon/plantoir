@@ -45,6 +45,8 @@ public sealed partial class SectionDetailView : UserControl
     private bool _isWaitingForServer;
     private CancellationTokenSource? _serverWait;
 
+    public string CourseCode => _course.Code;
+    public int SectionNumber => _sectionNumber;
     internal bool IsBusy => _previewRunner.IsRunning || _deployRunner.IsRunning;
     private string TitleText => $"{_course.Code}-S{_sectionNumber}";
 
@@ -159,10 +161,6 @@ public sealed partial class SectionDetailView : UserControl
     public void StartPreviewForAutomation() => PreviewOrStop_Click(this, new RoutedEventArgs());
 
     /// <summary>
-    /// Start this section's preview unless one is already serving — the
-    /// assistant's "come and look" path. Guarded, because the click handler
-    /// is a toggle: calling it blind against a running preview would STOP the
-    /// <summary>
     /// Start the preview if nothing is currently previewing. If a preview
     /// is already serving, starting is skipped — live reload will catch the
     /// edit on its own, and starting again would tear down and rebuild the
@@ -173,16 +171,50 @@ public sealed partial class SectionDetailView : UserControl
         try
         {
             if (_previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null) return;
-            if (_window.Workspace.WorkspacePath is { } wp)
-            {
-                PreviewLeases.Release(wp, _course.Code, _sectionNumber);
-            }
-            _lease = null;
-            PreviewOrStop_Click(this, new RoutedEventArgs());
+            StartAutomatedPreview();
         }
         catch (Exception ex)
         {
             App.LogDiagnostic($"StartPreviewIfIdle exception: {ex}");
+        }
+    }
+
+    private async void StartAutomatedPreview()
+    {
+        try
+        {
+            if (_previewRunner.IsRunning) { StopPreview(); return; }
+            if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+
+            // Clear any prior lease for this section before starting anew
+            PreviewLeases.Release(workspacePath, _course.Code, _sectionNumber);
+            _lease = null;
+
+            try
+            {
+                _lease = PreviewLeases.Take(workspacePath, _course.Code, _sectionNumber);
+                _previewWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Previewing);
+                _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
+            }
+            catch (PreviewLeases.LeaseRefusedException refusal)
+            {
+                App.LogDiagnostic($"StartAutomatedPreview refused for {_course.Code} Section {_sectionNumber}: {refusal.Message}");
+                return;
+            }
+
+            _previewUrl = null;
+            _lastLoadedUrl = null;
+            _isWaitingForServer = true;
+            _previewRunner.Milestones = TaskMilestones.Preview;
+            _previewRunner.Run("preview.ps1",
+                new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
+                workspacePath);
+            RefreshChrome();
+            await WaitForPreviewServer(_lease.Port);
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"StartAutomatedPreview exception: {ex}");
         }
     }
 
