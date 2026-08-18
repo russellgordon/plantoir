@@ -106,6 +106,15 @@ public class LocalModelTests : IDisposable
     }
 
     [Fact]
+    public void BuildArguments_CpuFallbackUsesDeviceNone()
+    {
+        var args = LocalModel.BuildArguments("C:\\models\\test.gguf", port: 8099, threads: 4, ctxSize: 8192, useGpu: false);
+        Assert.Contains("--device", args);
+        Assert.Contains("none", args);
+        Assert.DoesNotContain("--n-gpu-layers", args);
+    }
+
+    [Fact]
     public void Fetching_CalculatesPercentageAndClamps()
     {
         var unknown = new LocalModel.Fetching(500 * 1024 * 1024, 0);

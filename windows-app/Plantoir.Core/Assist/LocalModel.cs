@@ -47,8 +47,24 @@ public sealed class LocalModel : IChatModel, IDisposable
     public static AssistModelTier DetermineDefaultTier()
     {
         var choice = Plantoir.Core.Models.AppSettings.Current.AssistantModelChoice;
-        if (choice == "small") return AssistModelTier.Small;
-        if (choice == "large") return AssistModelTier.Large;
+        if (string.Equals(choice, "small", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(choice, "smaller", StringComparison.OrdinalIgnoreCase))
+            return AssistModelTier.Small;
+        if (string.Equals(choice, "large", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(choice, "larger", StringComparison.OrdinalIgnoreCase))
+            return AssistModelTier.Large;
+
+        // If automatic, prefer any model that is already fully installed on disk
+        string smallPath = Path.Combine(ModelDirectory, AssistModelTier.Small.FileName());
+        string legacyPath = Path.Combine(ModelDirectory, LegacyModelFileName);
+        string largePath = Path.Combine(ModelDirectory, AssistModelTier.Large.FileName());
+
+        if (File.Exists(largePath) && new FileInfo(largePath).Length == AssistModelTier.Large.DownloadBytes())
+            return AssistModelTier.Large;
+        if ((File.Exists(smallPath) && new FileInfo(smallPath).Length == AssistModelTier.Small.DownloadBytes()) ||
+            (File.Exists(legacyPath) && new FileInfo(legacyPath).Length == AssistModelTier.Small.DownloadBytes()))
+            return AssistModelTier.Small;
+
         return new AssistHardwareBudget().Tier;
     }
 
@@ -167,21 +183,31 @@ public sealed class LocalModel : IChatModel, IDisposable
     /// <summary>
     /// Builds arguments passed to llama-server.exe.
     /// </summary>
-    public static List<string> BuildArguments(string modelPath, int port, int threads, int ctxSize = 8192)
+    public static List<string> BuildArguments(string modelPath, int port, int threads, int ctxSize = 8192, bool useGpu = true)
     {
-        return new List<string>
+        var args = new List<string>
         {
             "--model", modelPath,
             "--port", port.ToString(),
             "--host", "127.0.0.1",
             "--ctx-size", ctxSize.ToString(),
             "--threads", threads.ToString(),
-            "--n-gpu-layers", "999",
             "--reasoning", "off",
             "--reasoning-budget", "0",
             "--jinja",
             "--parallel", "1"
         };
+        if (useGpu)
+        {
+            args.Add("--n-gpu-layers");
+            args.Add("999");
+        }
+        else
+        {
+            args.Add("--device");
+            args.Add("none");
+        }
+        return args;
     }
 
     /// <summary>
@@ -283,9 +309,22 @@ public sealed class LocalModel : IChatModel, IDisposable
         }
 
         Port = GetFreePort();
-
         int threads = Math.Max(2, Environment.ProcessorCount / 2);
-        var args = BuildArguments(modelPath, Port, threads, ctxSize: ContextSize);
+
+        // Try GPU offloading first; fall back to multi-threaded CPU if GPU initialization fails (e.g. Vulkan OutOfDeviceMemory on Intel integrated GPUs)
+        bool started = await TryStartServerProcessAsync(serverExe, modelPath, threads, useGpu: true, cancellation).ConfigureAwait(false);
+        if (!started && !cancellation.IsCancellationRequested)
+        {
+            started = await TryStartServerProcessAsync(serverExe, modelPath, threads, useGpu: false, cancellation).ConfigureAwait(false);
+        }
+
+        return started;
+    }
+
+    private async Task<bool> TryStartServerProcessAsync(string serverExe, string modelPath, int threads, bool useGpu, CancellationToken cancellation)
+    {
+        Stop();
+        var args = BuildArguments(modelPath, Port, threads, ctxSize: ContextSize, useGpu: useGpu);
 
         var startInfo = new ProcessStartInfo
         {
@@ -311,7 +350,7 @@ public sealed class LocalModel : IChatModel, IDisposable
             return false;
         }
 
-        for (int i = 0; i < 120 && !cancellation.IsCancellationRequested; i++)
+        for (int i = 0; i < 60 && !cancellation.IsCancellationRequested; i++)
         {
             if (_serverProcess.HasExited)
             {
