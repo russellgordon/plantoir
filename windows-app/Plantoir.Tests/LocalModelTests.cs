@@ -28,19 +28,24 @@ public class LocalModelTests : IDisposable
     [Fact]
     public void ModelConstants_MatchVerifiedSpecifications()
     {
-        Assert.Equal("qwen2.5-1.5b-instruct-q4_k_m.gguf", LocalModel.ModelFileName);
-        Assert.Equal(1_117_320_736L, LocalModel.ExpectedDownloadBytes);
-        Assert.Contains("qwen2.5-1.5b-instruct-q4_k_m.gguf", LocalModel.ModelUrl, StringComparison.OrdinalIgnoreCase);
+        var small = new LocalModel(AssistModelTier.Small);
+        Assert.Equal("qwen2.5-1.5b-instruct-q4_k_m.gguf", small.ModelFileName);
+        Assert.Equal(1_117_320_736L, small.ExpectedDownloadBytes);
+        Assert.Contains("qwen2.5-1.5b-instruct-q4_k_m.gguf", small.ModelUrl, StringComparison.OrdinalIgnoreCase);
+
+        var large = new LocalModel(AssistModelTier.Large);
+        Assert.Equal("qwen3-4b-q4_k_m.gguf", large.ModelFileName);
+        Assert.Equal(2_497_280_256L, large.ExpectedDownloadBytes);
     }
 
     [Fact]
     public void IsInstalled_ReturnsFalseWhenMissingOrIncomplete()
     {
-        var model = new LocalModel();
+        var model = new LocalModel(AssistModelTier.Small);
         Assert.False(model.IsInstalled());
 
         // Partial or empty file must fail
-        string path = Path.Combine(_tempDir, LocalModel.ModelFileName);
+        string path = Path.Combine(_tempDir, model.ModelFileName);
         File.WriteAllBytes(path, new byte[100]);
         Assert.False(model.IsInstalled());
     }
@@ -48,29 +53,29 @@ public class LocalModelTests : IDisposable
     [Fact]
     public void IsInstalled_ReturnsTrueWhenExactFileSizeMatches()
     {
-        var model = new LocalModel();
-        string path = Path.Combine(_tempDir, LocalModel.ModelFileName);
+        var model = new LocalModel(AssistModelTier.Small);
+        string path = Path.Combine(_tempDir, model.ModelFileName);
         using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write))
         {
-            fs.SetLength(LocalModel.ExpectedDownloadBytes);
+            fs.SetLength(model.ExpectedDownloadBytes);
         }
 
         Assert.True(model.IsInstalled());
-        Assert.Equal(path, LocalModel.GetModelPath());
+        Assert.Equal(path, LocalModel.GetModelPath(AssistModelTier.Small));
     }
 
     [Fact]
     public void IsInstalled_AcceptsLegacyCasingIfPresent()
     {
-        var model = new LocalModel();
+        var model = new LocalModel(AssistModelTier.Small);
         string legacyPath = Path.Combine(_tempDir, LocalModel.LegacyModelFileName);
         using (var fs = new FileStream(legacyPath, FileMode.Create, FileAccess.Write))
         {
-            fs.SetLength(LocalModel.ExpectedDownloadBytes);
+            fs.SetLength(model.ExpectedDownloadBytes);
         }
 
         Assert.True(model.IsInstalled());
-        Assert.True(File.Exists(LocalModel.GetModelPath()));
+        Assert.True(File.Exists(LocalModel.GetModelPath(AssistModelTier.Small)));
     }
 
     [Fact]

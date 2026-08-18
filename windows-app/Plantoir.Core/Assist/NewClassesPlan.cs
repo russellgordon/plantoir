@@ -30,6 +30,9 @@ public sealed class NewClassesPlan
     /// <summary>How many of these pages have no class date of their own and are sharing the last one.</summary>
     public int SharingTheLastDay { get; init; }
 
+    /// <summary>Where the dates came from.</summary>
+    public string TimetableSource { get; init; } = "";
+
     public bool ChangesNothing => Classes.Count == 0;
 
     /// <summary>The proposal, as a teacher would read it.</summary>
@@ -63,7 +66,7 @@ public sealed class NewClassesPlan
         lines.Add("");
         // Said plainly because it is the difference between a teacher seeing
         // their new pages in the preview and wondering where they went.
-        lines.Add("They start unpublished, so they stay out of the site until you publish them — " +
+        lines.Add("They start unpublished, so they stay off the site until you publish them — " +
                   "write them first, publish when they are ready.");
 
         if (SharingTheLastDay > 0)
@@ -76,8 +79,11 @@ public sealed class NewClassesPlan
         }
         else
         {
+            string sourceNote = string.IsNullOrEmpty(TimetableSource)
+                ? ""
+                : $", out of the timetable recorded from {TimetableSource}";
             lines.Add($"{SpareDatesLeft} more class date{(SpareDatesLeft == 1 ? "" : "s")} " +
-                      $"{(SpareDatesLeft == 1 ? "is" : "are")} spare after these.");
+                      $"{(SpareDatesLeft == 1 ? "is" : "are")} spare after these{sourceNote}.");
         }
 
         return string.Join("\n", lines);

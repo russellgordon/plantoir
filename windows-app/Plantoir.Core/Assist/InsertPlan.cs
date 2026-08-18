@@ -79,7 +79,10 @@ public sealed class InsertPlan
             lines.Add("");
             lines.Add($"Moved to later class days — {Moves.Count}:");
             foreach (var move in Moves.Take(MostShown))
-                lines.Add($"  {move.Title}  {move.From:yyyy-MM-dd} → {move.To:yyyy-MM-dd}");
+            {
+                string fromText = move.From.HasValue ? move.From.Value.ToString("yyyy-MM-dd") : "no date";
+                lines.Add($"  {move.Title}  {fromText} → {move.To:yyyy-MM-dd}");
+            }
             if (Moves.Count > MostShown)
                 lines.Add($"  …and {Moves.Count - MostShown} more.");
         }
@@ -95,4 +98,4 @@ public sealed class InsertPlan
 public sealed record Rename(string From, string To, string FromPath, string ToPath);
 
 /// <summary>A class that keeps its name but moves to a different day.</summary>
-public sealed record DateMove(string Title, string RelativePath, DateOnly From, DateOnly To);
+public sealed record DateMove(string Title, string RelativePath, DateOnly? From, DateOnly To);

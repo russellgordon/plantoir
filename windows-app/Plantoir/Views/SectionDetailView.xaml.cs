@@ -62,7 +62,7 @@ public sealed partial class SectionDetailView : UserControl
         // The empty-state invitation follows the course's destination —
         // "to Netlify" would be wrong twice over for a folder-publishing course.
         NoPreviewDetail.Text = course.Configuration.DeploysToLocalFolder
-            ? "Click Preview to build this section's website and see it here, or Deploy to copy it to your publishing folder."
+            ? "Click Preview to build this section's website and see it here, or Deploy to copy it to your deploy folder."
             : "Click Preview to build this section's website and see it here, or Deploy to put it online.";
 
         // Each runner is bound to the progress view exactly once — its

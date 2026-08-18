@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 
-namespace Plantoir.Services;
+namespace Plantoir.Core.Assist;
 
 /// <summary>
 /// Starting a Claude Code session already connected to this working folder's
@@ -169,7 +169,7 @@ public static class ClaudeCodeLauncher
     /// the teacher first — and an assistant that starts by reading is far more
     /// useful than one that starts by asking what to do.
     /// </summary>
-    private static string Greeting(string courseCode, string courseName)
+    internal static string Greeting(string courseCode, string courseName)
     {
         var text = new StringBuilder();
         text.Append($"I'm a teacher working on {courseCode}");
@@ -187,7 +187,7 @@ public static class ClaudeCodeLauncher
     /// One file per course so two sessions on different courses do not
     /// overwrite each other's configuration mid-launch.
     /// </summary>
-    private static string WriteConfig(string workspacePath, string courseCode, string server)
+    internal static string WriteConfig(string workspacePath, string courseCode, string server)
     {
         string directory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

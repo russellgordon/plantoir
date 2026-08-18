@@ -380,4 +380,115 @@ public static class SectionScheduleSource
         }
         return null;
     }
+
+    /// <summary>
+    /// A .csv or .ics file, read by what it is rather than by asking.
+    /// </summary>
+    public static ScheduleOutcome ReadFromFile(string filePath, ColumnOrdering? ordering = null)
+    {
+        string name = Path.GetFileName(filePath);
+        string ext = Path.GetExtension(filePath).ToLowerInvariant();
+        if (ext != ".csv" && ext != ".ics" && ext != ".txt")
+        {
+            throw new AssistRefusal($"“{name}” isn’t a file Plantoir can read a timetable from. A comma-separated file (.csv) or an iCalendar export (.ics) from your calendar app always works.");
+        }
+
+        string text;
+        try
+        {
+            text = File.ReadAllText(filePath);
+        }
+        catch (Exception ex)
+        {
+            throw new AssistRefusal($"Could not read {name}: {ex.Message}");
+        }
+
+        if (ext == ".ics" || text.Contains("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase))
+        {
+            var column = ColumnFromCalendarExport(text, name);
+            return Read(column, name, name, ordering);
+        }
+        else
+        {
+            var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            var column = lines.Select(FirstFieldInCSVRow).ToList();
+            return Read(column, name, name, ordering);
+        }
+    }
+
+    /// <summary>
+    /// A calendar export: every DTSTART, and nothing else in the file.
+    /// </summary>
+    public static List<string> ColumnFromCalendarExport(string text, string place)
+    {
+        var result = new List<string>();
+        foreach (var line in Unfolded(text))
+        {
+            string upper = line.ToUpperInvariant();
+            if (!upper.StartsWith("DTSTART")) continue;
+            int colon = line.IndexOf(':');
+            if (colon < 0) continue;
+            string val = line[(colon + 1)..].Trim();
+            result.Add(CalendarDayText(val));
+        }
+        if (result.Count == 0)
+        {
+            throw new AssistRefusal($"No start dates were found in {place}.");
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 20260908T090000Z and 20260908 both begin with the day.
+    /// </summary>
+    public static string CalendarDayText(string value)
+    {
+        if (value.Length < 8) return value;
+        for (int i = 0; i < 8; i++)
+        {
+            if (!char.IsAsciiDigit(value[i])) return value;
+        }
+        string year = value.Substring(0, 4);
+        string month = value.Substring(4, 2);
+        string day = value.Substring(6, 2);
+        return $"{year}-{month}-{day}";
+    }
+
+    /// <summary>
+    /// A calendar file wraps long lines, continuing them with a leading space or tab.
+    /// </summary>
+    public static List<string> Unfolded(string text)
+    {
+        var result = new List<string>();
+        var rawLines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        foreach (var raw in rawLines)
+        {
+            string line = raw.Replace("\r", "");
+            if (line.StartsWith(' ') || line.StartsWith('\t'))
+            {
+                if (result.Count == 0) continue;
+                string continuation = line[1..];
+                result[^1] += continuation;
+                continue;
+            }
+            if (line.Length > 0)
+                result.Add(line);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// The first field on a comma-separated row that has anything in it.
+    /// </summary>
+    public static string FirstFieldInCSVRow(string row)
+    {
+        if (string.IsNullOrWhiteSpace(row)) return "";
+        var parts = row.Split(',');
+        foreach (var part in parts)
+        {
+            string trimmed = part.Trim().Trim('"', '\'');
+            if (!string.IsNullOrEmpty(trimmed)) return trimmed;
+        }
+        return "";
+    }
 }

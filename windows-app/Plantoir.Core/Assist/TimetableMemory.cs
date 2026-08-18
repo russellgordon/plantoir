@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Plantoir.Core.Models;
@@ -68,9 +69,15 @@ public sealed class TimetableMemory
             if (stored?.Dates is not { Count: > 0 }) return null;
 
             var dates = new List<DateOnly>();
+            var unreadable = new List<string>();
             foreach (string text in stored.Dates)
-                if (DateOnly.TryParse(text, out var date)) dates.Add(date);
-            if (dates.Count == 0) return null;
+            {
+                if (DateOnly.TryParse(text, CultureInfo.InvariantCulture, out var date))
+                    dates.Add(date);
+                else
+                    unreadable.Add(text);
+            }
+            if (unreadable.Count > 0 || dates.Count == 0) return null;
 
             dates.Sort();
             return new TimetableMemory

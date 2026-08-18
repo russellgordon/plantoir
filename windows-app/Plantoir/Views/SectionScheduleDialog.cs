@@ -328,8 +328,7 @@ public sealed class SectionScheduleDialog : ContentDialog
                     _statusBlock.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
                     return false;
                 }
-                var lines = await File.ReadAllLinesAsync(_pickedFilePath);
-                outcome = SectionScheduleSource.Read(lines, Path.GetFileName(_pickedFilePath), Path.GetFileName(_pickedFilePath), _chosenOrdering);
+                outcome = SectionScheduleSource.ReadFromFile(_pickedFilePath, _chosenOrdering);
             }
             else
             {

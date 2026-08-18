@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Models;
 using Plantoir.Services;
 
 namespace Plantoir.Views;

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 
-namespace Plantoir.Services;
+namespace Plantoir.Core.Models;
 
 /// <summary>
 /// One remembered window: its folder, frame, and sidebar state (row 99).
@@ -23,6 +23,13 @@ public sealed record RememberedWindow(string Path, double X, double Y, double Wi
 /// </summary>
 public sealed class AppSettings
 {
+    private static AppSettings? _current;
+    public static AppSettings Current
+    {
+        get => _current ??= Load();
+        set => _current = value;
+    }
+
     public string? WorkspacePath { get; set; }
 
     /// <summary>

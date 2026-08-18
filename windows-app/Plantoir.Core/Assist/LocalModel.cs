@@ -27,17 +27,30 @@ namespace Plantoir.Core.Assist;
 /// </summary>
 public sealed class LocalModel : IChatModel, IDisposable
 {
-    /// <summary>The measured winner. 1,117,320,736 bytes — about 1.04 GiB.</summary>
-    public const string ModelFileName = "qwen2.5-1.5b-instruct-q4_k_m.gguf";
+    public AssistModelTier Tier { get; }
 
-    /// <summary>Legacy file name from initial container build, accepted if present.</summary>
+    public string ModelFileName => Tier.FileName();
+
     public const string LegacyModelFileName = "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf";
 
-    public const long ExpectedDownloadBytes = 1_117_320_736L;
+    public long ExpectedDownloadBytes => Tier.DownloadBytes();
 
-    public const string ModelUrl =
-        "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/" +
-        "qwen2.5-1.5b-instruct-q4_k_m.gguf";
+    public string ModelUrl => Tier.DownloadUrl();
+
+    public int ContextSize => Tier == AssistModelTier.Large ? 16384 : 8192;
+
+    public LocalModel(AssistModelTier? tier = null)
+    {
+        Tier = tier ?? DetermineDefaultTier();
+    }
+
+    public static AssistModelTier DetermineDefaultTier()
+    {
+        var choice = Plantoir.Core.Models.AppSettings.Current.AssistantModelChoice;
+        if (choice == "small") return AssistModelTier.Small;
+        if (choice == "large") return AssistModelTier.Large;
+        return new AssistHardwareBudget().Tier;
+    }
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(2) };
 
@@ -57,13 +70,17 @@ public sealed class LocalModel : IChatModel, IDisposable
     private Process? _serverProcess;
 
     /// <summary>Find the model path on disk, supporting current and legacy naming.</summary>
-    public static string GetModelPath()
+    public static string GetModelPath(AssistModelTier? tier = null)
     {
-        string primary = Path.Combine(ModelDirectory, ModelFileName);
+        var effectiveTier = tier ?? DetermineDefaultTier();
+        string primary = Path.Combine(ModelDirectory, effectiveTier.FileName());
         if (File.Exists(primary)) return primary;
 
-        string legacy = Path.Combine(ModelDirectory, LegacyModelFileName);
-        if (File.Exists(legacy)) return legacy;
+        if (effectiveTier == AssistModelTier.Small)
+        {
+            string legacy = Path.Combine(ModelDirectory, LegacyModelFileName);
+            if (File.Exists(legacy)) return legacy;
+        }
 
         return primary;
     }
@@ -71,7 +88,7 @@ public sealed class LocalModel : IChatModel, IDisposable
     /// <summary>True when the model file has already been fetched and matches expected size.</summary>
     public bool IsInstalled()
     {
-        string path = GetModelPath();
+        string path = GetModelPath(Tier);
         if (!File.Exists(path)) return false;
         try
         {
@@ -259,7 +276,7 @@ public sealed class LocalModel : IChatModel, IDisposable
             return false;
         }
 
-        string modelPath = GetModelPath();
+        string modelPath = GetModelPath(Tier);
         if (!IsInstalled())
         {
             return false;
@@ -268,7 +285,7 @@ public sealed class LocalModel : IChatModel, IDisposable
         Port = GetFreePort();
 
         int threads = Math.Max(2, Environment.ProcessorCount / 2);
-        var args = BuildArguments(modelPath, Port, threads, ctxSize: 8192);
+        var args = BuildArguments(modelPath, Port, threads, ctxSize: ContextSize);
 
         var startInfo = new ProcessStartInfo
         {
@@ -294,7 +311,7 @@ public sealed class LocalModel : IChatModel, IDisposable
             return false;
         }
 
-        for (int i = 0; i < 60 && !cancellation.IsCancellationRequested; i++)
+        for (int i = 0; i < 120 && !cancellation.IsCancellationRequested; i++)
         {
             if (_serverProcess.HasExited)
             {
