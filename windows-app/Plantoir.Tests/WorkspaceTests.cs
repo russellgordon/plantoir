@@ -83,6 +83,7 @@ public class ToolchainMirrorTests
             Directory.CreateDirectory(dest);
             File.WriteAllText(Path.Combine(source, "keep.txt"), "new");
             File.WriteAllText(Path.Combine(dest, "keep.txt"), "old");
+            File.SetLastWriteTimeUtc(Path.Combine(dest, "keep.txt"), DateTime.UtcNow.AddMinutes(-10));
             File.WriteAllText(Path.Combine(dest, "stale.txt"), "remove me");   // changes the hash for nothing
 
             int changed = ToolchainMirror.SyncDirectory(source, dest);
@@ -93,6 +94,7 @@ public class ToolchainMirrorTests
         }
         finally { try { Directory.Delete(root, true); } catch { } }
     }
+
 
     [Fact]
     public void RefreshLaunchersOnlyTouchesExistingDifferingFiles()

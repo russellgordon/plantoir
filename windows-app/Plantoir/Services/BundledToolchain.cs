@@ -19,11 +19,19 @@ public static class BundledToolchain
     /// </summary>
     public static void RefreshWorkspace(string workspacePath)
     {
+        App.LogDiagnostic($"BundledToolchain.RefreshWorkspace starting for '{workspacePath}'");
         try
         {
+            App.LogDiagnostic("BundledToolchain.RefreshWorkspace: calling RefreshLaunchers");
             ToolchainMirror.RefreshLaunchers(workspacePath, Root);
+            App.LogDiagnostic("BundledToolchain.RefreshWorkspace: calling RefreshToolchain");
             ToolchainMirror.RefreshToolchain(workspacePath, Root);
+            App.LogDiagnostic("BundledToolchain.RefreshWorkspace: done");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"BundledToolchain.RefreshWorkspace EXCEPTION: {ex}");
+        }
     }
+
 }

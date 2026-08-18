@@ -26,9 +26,13 @@ public sealed partial class MainWindow : Window
 
     public MainWindow(string? folderPath, RememberedWindow? frame)
     {
+        App.LogDiagnostic("MainWindow ctor: starting InitializeComponent");
         InitializeComponent();
+        App.LogDiagnostic("MainWindow ctor: InitializeComponent done");
         try { SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop(); } catch { }
+        App.LogDiagnostic("MainWindow ctor: creating WorkspaceViewModel");
         Workspace = new WorkspaceViewModel(App.Settings);
+        App.LogDiagnostic("MainWindow ctor: WorkspaceViewModel created");
 
         // A remembered window restores exactly; a first run opens at a share of
         // the display's work area, not a fixed pixel count. AppWindow sizes are
@@ -85,11 +89,20 @@ public sealed partial class MainWindow : Window
         Workspace.IsShowingArchived = frame?.ShowsArchived ?? false;
         Workspace.IsShowingBackups = frame?.ShowsBackups ?? false;
         if (folderPath is not null && Directory.Exists(folderPath))
+        {
+            App.LogDiagnostic($"MainWindow ctor: AdoptRestoredPath('{folderPath}') starting");
             Workspace.AdoptRestoredPath(folderPath);
+            App.LogDiagnostic("MainWindow ctor: AdoptRestoredPath done");
+        }
+        App.LogDiagnostic("MainWindow ctor: ApplyState starting");
         ApplyState();
+        App.LogDiagnostic("MainWindow ctor: ApplyState done; RestoreRememberedSelection starting");
         RestoreRememberedSelection(frame?.Selection);
+        App.LogDiagnostic("MainWindow ctor: RestoreRememberedSelection done; RunAutomationHooks starting");
         RunAutomationHooks();
+        App.LogDiagnostic("MainWindow ctor: complete");
     }
+
 
     /// <summary>
     /// Test hooks: "--auto-select CODE N" selects a section on launch;

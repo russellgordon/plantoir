@@ -91,24 +91,34 @@ public partial class App : Application
     public static MainWindow OpenWindow(string? folderPath, RememberedWindow? frame)
     {
         LogDiagnostic($"App.OpenWindow for folderPath='{folderPath}'");
-        var window = new MainWindow(folderPath, frame);
-        _windows.Add(window);
-        window.Closed += (_, _) =>
+        try
         {
-            LogDiagnostic($"MainWindow.Closed. Remaining windows count={_windows.Count - 1}");
-            _windows.Remove(window);
-            // A mid-session close updates the remembered list; the LAST
-            // close reads as quitting and must NOT shrink it — the list
-            // keeps the configuration from before the exit began, which is
-            // what relaunch should bring back.
-            if (_windows.Count == 0) QuitTime();
-            else RememberOpenWindows();
-        };
-        window.Activate();
-        LogDiagnostic($"MainWindow.Activate called. Total windows={_windows.Count}");
-        RememberOpenWindows();
-        return window;
+            var window = new MainWindow(folderPath, frame);
+            _windows.Add(window);
+            window.Closed += (_, _) =>
+            {
+                LogDiagnostic($"MainWindow.Closed. Remaining windows count={_windows.Count - 1}");
+                _windows.Remove(window);
+                // A mid-session close updates the remembered list; the LAST
+                // close reads as quitting and must NOT shrink it — the list
+                // keeps the configuration from before the exit began, which is
+                // what relaunch should bring back.
+                if (_windows.Count == 0) QuitTime();
+                else RememberOpenWindows();
+            };
+            LogDiagnostic("App.OpenWindow: calling window.Activate()");
+            window.Activate();
+            LogDiagnostic($"MainWindow.Activate called. Total windows={_windows.Count}");
+            RememberOpenWindows();
+            return window;
+        }
+        catch (Exception ex)
+        {
+            LogDiagnostic($"CRITICAL EXCEPTION in OpenWindow: {ex}");
+            throw;
+        }
     }
+
 
     /// <summary>Ctrl+N: inherit the key window's folder; alone → the picker.</summary>
     public static MainWindow OpenNewWindow()

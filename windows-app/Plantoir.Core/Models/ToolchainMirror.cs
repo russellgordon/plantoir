@@ -89,6 +89,14 @@ public static class ToolchainMirror
         return changed;
     }
 
+    /// <summary>Whether two files can be taken for the same file without reading them.</summary>
+    internal static bool FilesLookIdentical(FileInfo srcInfo, FileInfo dstInfo)
+    {
+        if (!srcInfo.Exists || !dstInfo.Exists) return false;
+        if (srcInfo.Length != dstInfo.Length) return false;
+        return Math.Abs((srcInfo.LastWriteTimeUtc - dstInfo.LastWriteTimeUtc).TotalSeconds) < 0.002;
+    }
+
     /// <summary>Copy when missing or byte-different; never touch an identical file.</summary>
     internal static int SyncFile(string source, string destination)
     {
@@ -97,13 +105,17 @@ public static class ToolchainMirror
             var srcInfo = new FileInfo(source);
             if (!srcInfo.Exists) return 0;
             var dstInfo = new FileInfo(destination);
-            if (dstInfo.Exists && srcInfo.Length == dstInfo.Length)
+            if (dstInfo.Exists)
             {
-                byte[] sourceBytes = File.ReadAllBytes(source);
-                if (sourceBytes.AsSpan().SequenceEqual(File.ReadAllBytes(destination)))
+                if (FilesLookIdentical(srcInfo, dstInfo)) return 0;
+                if (srcInfo.Length == dstInfo.Length)
                 {
-                    CopyModificationDate(srcInfo, dstInfo);
-                    return 0;
+                    byte[] sourceBytes = File.ReadAllBytes(source);
+                    if (sourceBytes.AsSpan().SequenceEqual(File.ReadAllBytes(destination)))
+                    {
+                        CopyModificationDate(srcInfo, dstInfo);
+                        return 0;
+                    }
                 }
             }
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
@@ -126,24 +138,30 @@ public static class ToolchainMirror
         var sourceRelatives = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (Directory.Exists(sourceRoot))
         {
-            foreach (string file in Directory.EnumerateFiles(sourceRoot, "*", SearchOption.AllDirectories))
+            var srcDir = new DirectoryInfo(sourceRoot);
+            foreach (var fileInfo in srcDir.EnumerateFiles("*", SearchOption.AllDirectories))
             {
-                string relative = Path.GetRelativePath(sourceRoot, file);
+                string relative = Path.GetRelativePath(sourceRoot, fileInfo.FullName);
                 sourceRelatives.Add(relative);
-                changed += SyncFile(file, Path.Combine(destinationRoot, relative));
+                string destFile = Path.Combine(destinationRoot, relative);
+                var dstInfo = new FileInfo(destFile);
+                if (dstInfo.Exists && FilesLookIdentical(fileInfo, dstInfo)) continue;
+                changed += SyncFile(fileInfo.FullName, destFile);
             }
         }
         if (Directory.Exists(destinationRoot))
         {
-            foreach (string file in Directory.EnumerateFiles(destinationRoot, "*", SearchOption.AllDirectories))
+            var dstDir = new DirectoryInfo(destinationRoot);
+            foreach (var fileInfo in dstDir.EnumerateFiles("*", SearchOption.AllDirectories))
             {
-                string relative = Path.GetRelativePath(destinationRoot, file);
+                string relative = Path.GetRelativePath(destinationRoot, fileInfo.FullName);
                 if (sourceRelatives.Contains(relative)) continue;
-                try { File.Delete(file); changed++; } catch { }
+                try { fileInfo.Delete(); changed++; } catch { }
             }
         }
         return changed;
     }
+
 
     /// <summary>
     /// Sets an empty folder up as a working folder: launchers copied in,

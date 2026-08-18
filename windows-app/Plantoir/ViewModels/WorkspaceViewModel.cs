@@ -141,10 +141,18 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
 
     public void AdoptRestoredPath(string path)
     {
-        if (string.IsNullOrEmpty(path) || !Directory.Exists(path) || path == _workspacePath) return;
+        App.LogDiagnostic($"AdoptRestoredPath called with '{path}'");
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path) || path == _workspacePath)
+        {
+            App.LogDiagnostic($"AdoptRestoredPath early return: empty/not exists/already path");
+            return;
+        }
         _workspacePath = path;
+        App.LogDiagnostic("AdoptRestoredPath calling Reload()");
         Reload();
+        App.LogDiagnostic("AdoptRestoredPath Reload() finished, calling Notify(WorkspacePath)");
         Notify(nameof(WorkspacePath));
+        App.LogDiagnostic("AdoptRestoredPath Notify(WorkspacePath) finished");
     }
 
     /// <summary>New window inherits the key window's folder; first window shows the picker.</summary>
@@ -184,6 +192,7 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
 
     public void Reload()
     {
+        App.LogDiagnostic("WorkspaceViewModel.Reload starting");
         Courses = new List<Course>();
         ArchivedItems = new List<ArchivedItem>();
         BackupItems = new List<BackupItem>();
@@ -191,21 +200,29 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         State = null;
         if (_workspacePath is null) { NotifyLoaded(); return; }
 
+        App.LogDiagnostic("WorkspaceViewModel.Reload: RefreshWorkspace starting");
         BundledToolchain.RefreshWorkspace(_workspacePath);
+        App.LogDiagnostic("WorkspaceViewModel.Reload: RefreshWorkspace finished, Classify starting");
         State = Workspace.Classify(_workspacePath);
+        App.LogDiagnostic($"WorkspaceViewModel.Reload: State is {State}");
         if (State == WorkspaceState.Ready)
         {
             if (!Directory.Exists(Workspace.CoursesDirectory(_workspacePath)))
                 WorkspaceProblem = "There are no courses in this folder yet. Click New Course to create your first one.";
             else
             {
+                App.LogDiagnostic("WorkspaceViewModel.Reload: DiscoverCourses starting");
                 Courses = Workspace.DiscoverCourses(_workspacePath);
+                App.LogDiagnostic($"WorkspaceViewModel.Reload: DiscoverCourses found {Courses.Count} courses");
                 ArchivedItems = Workspace.FindArchivedItems(_workspacePath);
                 BackupItems = Workspace.FindBackups(_workspacePath);
             }
         }
+        App.LogDiagnostic("WorkspaceViewModel.Reload: calling NotifyLoaded()");
         NotifyLoaded();
+        App.LogDiagnostic("WorkspaceViewModel.Reload: NotifyLoaded() done");
     }
+
 
     public void InitializeWorkspace()
     {
