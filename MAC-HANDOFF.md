@@ -109,6 +109,13 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Whole Unit Publish / Unpublish and MCP Tool Parameter Binding on Windows**
+  (Windows, 2026-08-18). Awareness only; Windows now matches macOS behavior for whole unit operations.
+  - **What was fixed**:
+    1. Prompt shelf and card commands for "Unpublish Unit 4" generated tool calls missing `includeLinked`, causing ModelContextProtocol.NET binding errors on tools with non-optional parameters. Added default values (`includeLinked = false`, `progress = null!`, `cancellation = default`) across MCP tool declarations in `PlantoirTools.cs` and populated defaults in `AssistCardCommand.cs`.
+    2. Implemented `PublishPlan.UnitNamed` and `AssistWorkspace.PlanWholeUnit` / `ApplyWholeUnit` matching `AssistToolRunner.swift:598-790`. Whole units step through class pages in order (Day N down to 1 for unpublishing, Day 1 up to N for publishing), batch all file edits into a single undo entry, and trigger a single preview rebuild.
+  - **Testing**: Added whole unit unit tests in `ToolAnswerTests.cs` covering plan description, whole unit unpublish, whole unit publish, and whole unit single-step undo. All 522 tests pass.
+
 - **Assist Plan Formatting & Graph Sweep Parity Completed on Windows**
   (Windows, 2026-08-18). Awareness only; Windows was brought into 100% byte-for-byte
   parity with macOS for all assist tool plans and suggestions (`PublishPlan`, `ReDatePlan`,

@@ -999,7 +999,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("True to also publish every page these pages link to. Choose deliberately; there is no default.")]
-        bool includeLinked,
+        bool includeLinked = false,
         [Description("The page titles, for example [\"Unit 2, Day 3\"]. May be empty if you give dates instead.")]
         string[]? pages = null,
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
@@ -1017,7 +1017,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("True to also unpublish every page these pages link to. Choose deliberately; there is no default.")]
-        bool includeLinked,
+        bool includeLinked = false,
         [Description("The page titles, for example [\"Unit 2, Day 3\"]. May be empty if you give dates instead.")]
         string[]? pages = null,
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
@@ -1026,9 +1026,30 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     private CallToolResult Plan(string course, int section, string[]? pages, bool includeLinked,
                                 bool draft, string onOrAfter, string before)
-        => Guarded(() => Proposing(workspace.PlanPublish(
+    {
+        if (WholeUnitPlan(course, section, pages, publishing: !draft) is { } whole)
+            return whole;
+
+        return Guarded(() => Proposing(workspace.PlanPublish(
             course, section, pages ?? Array.Empty<string>(), includeLinked, draft,
             publishes: !draft, onOrAfter: ParseDate(onOrAfter, "onOrAfter"), before: ParseDate(before, "before"))));
+    }
+
+    private CallToolResult? WholeUnitPlan(string course, int section, string[]? pages, bool publishing)
+    {
+        if (pages == null || pages.Length != 1) return null;
+        int? unit = PublishPlan.UnitNamed(pages[0]);
+        if (unit == null) return null;
+
+        var result = workspace.PlanWholeUnit(course, section, unit.Value, publishing);
+        if (result.ErrorMessage != null)
+            return Answering(result.ErrorMessage);
+        if (result.AlreadyDoneSentence != null)
+            return Answering(result.AlreadyDoneSentence);
+        if (result.PlanText != null)
+            return Proposing(result.PlanText);
+        return null;
+    }
 
 
     private static DateOnly? ParseDate(string raw, string which)
@@ -1210,9 +1231,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public Task<CallToolResult> PublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("True to also publish every page these pages link to.")] bool includeLinked,
-        IProgress<ProgressNotificationValue> progress,
-        CancellationToken cancellation,
+        [Description("True to also publish every page these pages link to.")] bool includeLinked = false,
+        IProgress<ProgressNotificationValue> progress = null!,
+        CancellationToken cancellation = default,
         [Description("The page titles to publish. May be empty if you give dates instead.")]
         string[]? pages = null,
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
@@ -1232,9 +1253,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public Task<CallToolResult> UnpublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("True to also unpublish every page these pages link to.")] bool includeLinked,
-        IProgress<ProgressNotificationValue> progress,
-        CancellationToken cancellation,
+        [Description("True to also unpublish every page these pages link to.")] bool includeLinked = false,
+        IProgress<ProgressNotificationValue> progress = null!,
+        CancellationToken cancellation = default,
         [Description("The page titles to unpublish. May be empty if you give dates instead.")]
         string[]? pages = null,
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
@@ -1286,6 +1307,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     {
         try
         {
+            if (await WholeUnitRequested(course, section, pages, publishing: !draft, preview, progress, cancellation) is { } whole)
+                return whole;
+
             var plan = workspace.PlanPublish(
                 course, section, pages ?? Array.Empty<string>(), includeLinked, draft, publishes: !draft,
                 ParseDate(onOrAfter, "onOrAfter"), ParseDate(before, "before"));
@@ -1308,6 +1332,21 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
+    }
+
+    private async Task<CallToolResult?> WholeUnitRequested(
+        string course, int section, string[]? pages, bool publishing, bool preview,
+        IProgress<ProgressNotificationValue> progress, CancellationToken cancellation)
+    {
+        if (pages == null || pages.Length != 1) return null;
+        int? unit = PublishPlan.UnitNamed(pages[0]);
+        if (unit == null) return null;
+
+        var result = await workspace.ApplyWholeUnit(course, section, unit.Value, publishing, preview,
+                                                    Relay(progress), cancellation);
+        return result.Succeeded
+            ? Answering(result.Message, result.Message)
+            : Answering(result.Message);
     }
 
     /// <summary>

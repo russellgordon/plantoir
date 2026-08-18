@@ -269,6 +269,95 @@ public class ToolAnswerTests : IDisposable
             new Plantoir.Mcp.PlantoirTools(workspace).UndoLastChange().Summary());
     }
 
+    // ---- Whole Unit Planning, Publishing, Unpublishing, and Undoing -------
+
+    private void PublishedClass(string title, string date)
+    {
+        string full = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", title + ".md");
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        File.WriteAllText(full,
+            $"---\ndraft: false\ncreated: {date}T07:00:00.000-0400\n---\nBody of {title}.\n");
+    }
+
+    [Fact]
+    public void PlanUnpublishingAWholeUnitDescribesAccurately()
+    {
+        PublishedClass("Unit 1, Day 1", "2026-09-08");
+        PublishedClass("Unit 1, Day 2", "2026-09-10");
+        PublishedClass("Unit 1, Day 3", "2026-09-14");
+
+        var workspace = new AssistWorkspace(_folder, _launcher, undo: new UndoHistory());
+        var tools = new Plantoir.Mcp.PlantoirTools(workspace);
+
+        var result = tools.PlanUnpublishPages("ICS3U", 1, pages: new[] { "Unit 1" });
+        string plan = result.Summary();
+
+        Assert.Contains("ICS3U Section 1: unpublishing Unit 1.", plan);
+        Assert.Contains("classes would become hidden, starting from “Unit 1, Day 3”.", plan);
+        Assert.Contains("Pages only they use come down too; anything still needed stays.", plan);
+    }
+
+    [Fact]
+    public async Task UnpublishingAWholeUnitTakesEveryClassDownAndReportsOnce()
+    {
+        PublishedClass("Unit 1, Day 1", "2026-09-08");
+        PublishedClass("Unit 1, Day 2", "2026-09-10");
+        PublishedClass("Unit 1, Day 3", "2026-09-14");
+
+        var workspace = new AssistWorkspace(_folder, _launcher, undo: new UndoHistory());
+        var tools = new Plantoir.Mcp.PlantoirTools(workspace);
+
+        var outcome = await tools.UnpublishPages("ICS3U", 1, pages: new[] { "Unit 1" });
+        Assert.Equal("Unit 1 was unpublished.", outcome.Summary());
+
+        string day1 = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 1.md"));
+        string day2 = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 2.md"));
+        string day3 = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 3.md"));
+        Assert.True(day1.Contains("draft: true") || day1.Contains("publish: false"));
+        Assert.True(day2.Contains("draft: true") || day2.Contains("publish: false"));
+        Assert.True(day3.Contains("draft: true") || day3.Contains("publish: false"));
+    }
+
+    [Fact]
+    public async Task PublishingAWholeUnitPutsEveryClassUp()
+    {
+        var workspace = new AssistWorkspace(_folder, _launcher, undo: new UndoHistory());
+        var tools = new Plantoir.Mcp.PlantoirTools(workspace);
+
+        var outcome = await tools.PublishPages("ICS3U", 1, pages: new[] { "Unit 1" });
+        Assert.Equal("Unit 1 was published.", outcome.Summary());
+
+        string day1 = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 1.md"));
+        string day2 = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 2.md"));
+        string day3 = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 3.md"));
+        Assert.True(day1.Contains("draft: false") || day1.Contains("publish: true"));
+        Assert.True(day2.Contains("draft: false") || day2.Contains("publish: true"));
+        Assert.True(day3.Contains("draft: false") || day3.Contains("publish: true"));
+    }
+
+    [Fact]
+    public async Task UndoingAWholeUnitPutsAllOfItBack()
+    {
+        PublishedClass("Unit 1, Day 1", "2026-09-08");
+        PublishedClass("Unit 1, Day 2", "2026-09-10");
+        PublishedClass("Unit 1, Day 3", "2026-09-14");
+
+        var workspace = new AssistWorkspace(_folder, _launcher, undo: new UndoHistory());
+        var tools = new Plantoir.Mcp.PlantoirTools(workspace);
+
+        await tools.UnpublishPages("ICS3U", 1, pages: new[] { "Unit 1" });
+
+        var undone = tools.UndoLastChange();
+        Assert.Equal(AssistWording.Undid("unpublished Unit 1 in ICS3U Section 1"), undone.Summary());
+
+        string day1 = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 1.md"));
+        string day2 = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 2.md"));
+        string day3 = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 3.md"));
+        Assert.True(day1.Contains("draft: false") || day1.Contains("publish: true"));
+        Assert.True(day2.Contains("draft: false") || day2.Contains("publish: true"));
+        Assert.True(day3.Contains("draft: false") || day3.Contains("publish: true"));
+    }
+
     // ---- Nothing in front of a teacher names a tool ------------------------
 
     [Fact]

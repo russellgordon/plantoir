@@ -1231,6 +1231,202 @@ public sealed class AssistWorkspace
     }
 
     /// <summary>
+    /// Plan a publish or unpublish operation across a whole unit.
+    /// </summary>
+    public WholeUnitPlanResult PlanWholeUnit(string courseCode, int sectionNumber, int unit, bool publishing)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+
+        var allMarkdown = PagePaths.MarkdownPages(course.DirectoryPath, section);
+        var unitPages = new List<PlannedPage>();
+        foreach (var p in allMarkdown)
+        {
+            var planned = Plan(course, section, p, draft: !publishing, viaLink: false);
+            if (planned.IsClassPage && UnitDay.Parse(planned.Title) is { } ud && ud.Unit == unit)
+            {
+                unitPages.Add(planned);
+            }
+        }
+
+        if (unitPages.Count == 0)
+        {
+            return new WholeUnitPlanResult(
+                HasPages: false,
+                MovingCount: 0,
+                PlanText: null,
+                Summary: null,
+                AlreadyDoneSentence: null,
+                ErrorMessage: $"I can’t find any class pages in Unit {unit} of {course.Code} Section {section}.");
+        }
+
+        // Only the ones that would actually move, ordered highest day first (matching Swift)
+        unitPages = unitPages.OrderByDescending(p => UnitDay.Parse(p.Title)?.Day ?? 0).ToList();
+
+        var moving = new List<string>();
+        foreach (var p in unitPages)
+        {
+            if (p.IsVisibleToStudents != publishing)
+            {
+                moving.Add(p.DisplayTitle);
+            }
+        }
+
+        if (moving.Count == 0)
+        {
+            string already = publishing
+                ? $"Unit {unit} has already been published."
+                : $"Unit {unit} is already hidden.";
+            return new WholeUnitPlanResult(
+                HasPages: true,
+                MovingCount: 0,
+                PlanText: null,
+                Summary: null,
+                AlreadyDoneSentence: already,
+                ErrorMessage: null);
+        }
+
+        string word = moving.Count == 1 ? "class" : "classes";
+        string becoming = publishing ? "visible" : "hidden";
+        string startPage = publishing ? moving[^1] : moving[0];
+        string startingPhrase = publishing ? "starting at" : "starting from";
+
+        var lines = new List<string>();
+        lines.Add($"{course.Code} Section {section}: {(publishing ? "publishing" : "unpublishing")} Unit {unit}.");
+        lines.Add("");
+        lines.Add($"{moving.Count} {word} would become {becoming}, {startingPhrase} “{startPage}”.");
+        if (publishing)
+        {
+            lines.Add("Everything they link to becomes visible with them.");
+        }
+        else
+        {
+            lines.Add("Pages only they use come down too; anything still needed stays.");
+        }
+
+        string summary = $"Worked out what {(publishing ? "publishing" : "unpublishing")} Unit {unit} would do.";
+        string planText = string.Join("\n", lines);
+        return new WholeUnitPlanResult(
+            HasPages: true,
+            MovingCount: moving.Count,
+            PlanText: planText,
+            Summary: summary,
+            AlreadyDoneSentence: null,
+            ErrorMessage: null);
+    }
+
+    /// <summary>
+    /// Apply a publish or unpublish operation across a whole unit, one class page
+    /// at a time in order, recorded as a single batch on the undo list.
+    /// </summary>
+    public async Task<AssistResult> ApplyWholeUnit(
+        string courseCode, int sectionNumber, int unit, bool publishing, bool preview,
+        IProgress<string>? progress = null, CancellationToken cancellation = default)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+
+        var allMarkdown = PagePaths.MarkdownPages(course.DirectoryPath, section);
+        var unitPages = new List<PlannedPage>();
+        foreach (var p in allMarkdown)
+        {
+            var planned = Plan(course, section, p, draft: !publishing, viaLink: false);
+            if (planned.IsClassPage && UnitDay.Parse(planned.Title) is { Unit: var u } && u == unit)
+            {
+                unitPages.Add(planned);
+            }
+        }
+
+        if (unitPages.Count == 0)
+            return new AssistResult(false, $"I can’t find any class pages in Unit {unit} of {course.Code} Section {section}.", null);
+
+        // Highest day first to take a unit down; Day 1 first to put it up.
+        unitPages = publishing
+            ? unitPages.OrderBy(p => UnitDay.Parse(p.Title)?.Day ?? 0).ToList()
+            : unitPages.OrderByDescending(p => UnitDay.Parse(p.Title)?.Day ?? 0).ToList();
+
+        if (publishing) RefuseIfPlantoirIsBuilding(course);
+
+        string backup;
+        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder)); }
+        catch (Exception error)
+        {
+            throw new AssistRefusal($"{course.Code} couldn’t be backed up, so nothing was changed: {error.Message}");
+        }
+
+        string verb = publishing ? "published" : "unpublished";
+        _undo?.Begin($"{verb} Unit {unit} in {course.Code} Section {section}");
+
+        bool changedAnything = false;
+        var changed = new List<string>();
+
+        foreach (var page in unitPages)
+        {
+            var pagePlan = PlanPublish(
+                course.Code, section, new[] { page.Title }, includeLinked: true, draft: !publishing, publishes: publishing);
+
+            if (pagePlan.ChangesNothing) continue;
+
+            foreach (var change in pagePlan.Changing)
+            {
+                progress?.Report($"Editing “{change.Title}”…");
+                string full = PagePaths.ResolveInside(_folder, change.RelativePath);
+                string text = File.ReadAllText(full);
+                var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft);
+                if (!edit.Changed) continue;
+                Save(full, updated);
+                if (!changed.Contains(change.Title)) changed.Add(change.Title);
+                changedAnything = true;
+            }
+
+            string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+            foreach (var date in pagePlan.InheritedDates.Where(d => d.WillChange))
+            {
+                try
+                {
+                    string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+                    var (updated, moved) = PageFrontmatter.SetCreated(
+                        File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
+                    if (moved)
+                    {
+                        Save(full, updated);
+                        changedAnything = true;
+                    }
+                }
+                catch { }
+            }
+
+            if (pagePlan.Index is { WillChange: true } index)
+            {
+                ApplyIndexChange(index, tail);
+                changedAnything = true;
+            }
+        }
+
+        _undo?.End();
+
+        if (!changedAnything)
+        {
+            string already = publishing
+                ? $"Unit {unit} has already been published."
+                : $"Unit {unit} is already hidden.";
+            return new AssistResult(true, already, backup);
+        }
+
+        string summary = $"Unit {unit} was {verb}.";
+
+        if (!preview)
+            return new AssistResult(true, summary, backup);
+
+        progress?.Report($"Building a preview of Section {section} of {course.Code}…");
+        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
+                                        _folder, progress, cancellation);
+        return build.Succeeded
+            ? new AssistResult(true, summary, backup)
+            : new AssistResult(false, build.Message, backup);
+    }
+
+    /// <summary>
     /// Point the section's front page at its most recent published class, and
     /// give it that class's date.
     ///
@@ -2546,3 +2742,13 @@ public interface ILauncherRunner
 
 /// <summary>The result of one launcher run.</summary>
 public readonly record struct LaunchOutcome(bool Succeeded, string Message);
+
+/// <summary>The result of planning a whole unit publish/unpublish.</summary>
+public sealed record WholeUnitPlanResult(
+    bool HasPages,
+    int MovingCount,
+    string? PlanText,
+    string? Summary,
+    string? AlreadyDoneSentence,
+    string? ErrorMessage);
+

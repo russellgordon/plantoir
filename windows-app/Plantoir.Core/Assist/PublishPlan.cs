@@ -188,6 +188,19 @@ public sealed class PublishPlan
         quoted.RemoveAt(quoted.Count - 1);
         return string.Join(", ", quoted) + " and " + last;
     }
+
+    /// <summary>
+    /// The unit a teacher named, if that is what they named: "Unit 4", "unit 4",
+    /// "Unit 4." — but never "Unit 4, Day 3", which is one page.
+    /// </summary>
+    public static int? UnitNamed(string raw)
+    {
+        string tidied = raw.Trim().TrimEnd('.', '!').ToLowerInvariant();
+        if (!tidied.StartsWith("unit ")) return null;
+        string rest = tidied[5..].Trim();
+        if (string.IsNullOrEmpty(rest) || rest.Contains(',')) return null;
+        return int.TryParse(rest, out int unit) ? unit : null;
+    }
 }
 
 /// <summary>One page whose visibility would move.</summary>

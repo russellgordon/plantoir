@@ -147,11 +147,20 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
             ["course"] = course,
             ["section"] = section,
         };
+        if (ToolName == "publish_pages" || ToolName == "unpublish_pages" ||
+            ToolName == "plan_publish_pages" || ToolName == "plan_unpublish_pages")
+        {
+            obj["includeLinked"] = false;
+        }
         foreach (var (k, v) in Arguments)
         {
             if (k == "pages")
             {
                 obj[k] = new JsonArray(JsonValue.Create(v));
+            }
+            else if (k == "includeLinked" && bool.TryParse(v, out bool b))
+            {
+                obj[k] = b;
             }
             else
             {
