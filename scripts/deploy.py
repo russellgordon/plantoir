@@ -126,45 +126,56 @@ def safe_clean_public_dir(public_dir: Path):
 
 def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str):
     """
-    If quartz.config.ts in section_dir has a baseUrl that does not match target_domain,
+    If quartz.config.ts in section_dir or internal build dir has a baseUrl that does not match target_domain,
     update it and rebuild for production so OpenGraph and Twitter meta tags reflect
     the deployed site domain.
     """
-    config_path = section_dir / "quartz.config.ts"
-    if not config_path.is_file():
-        return
     clean_target = clean_base_url(target_domain)
     if not clean_target:
         return
-    try:
-        src = config_path.read_text(encoding="utf-8")
-        m = re.search(r'baseUrl\s*:\s*(["\'])([^"\']*)(\1)', src)
-        current_val = m.group(2) if m else None
-        if current_val == clean_target:
-            return
 
-        pattern = re.compile(r'(baseUrl\s*:\s*)(["\'][^"\']*["\']|undefined|null)')
-        def _repl(match: re.Match) -> str:
-            return f'{match.group(1)}"{clean_target}"'
-        new_src, count = pattern.subn(_repl, src, count=1)
+    course_name = section_dir.parent.parent.name
+    section_name = section_dir.name
+    internal_dir = Path(f"/tmp/quartz-builds/{course_name}/{section_name}")
 
-        if count > 0:
-            config_path.write_text(new_src, encoding="utf-8")
-            print(f" Updating Quartz baseUrl to '{clean_target}' and rebuilding for production…")
-            env = os.environ.copy()
-            env.setdefault("TZ", "UTC")
-            env.setdefault("SOURCE_DATE_EPOCH", "1704067200")
-            safe_clean_public_dir(section_dir / "public")
-            try:
-                subprocess.run(["npx", "quartz", "build", "--concurrency", "1"],
-                               cwd=section_dir, env=env, check=True)
-                print("✅ Production build updated with live site domain.")
-            except (subprocess.CalledProcessError, OSError) as e:
-                print(f"❌ Production rebuild failed: {e}")
-                sys.exit(1)
-    except Exception as e:
-        print(f"⚠️ Could not sync baseUrl into quartz.config.ts: {e}")
-        sys.exit(1)
+    config_paths = [p / "quartz.config.ts" for p in [section_dir, internal_dir] if (p / "quartz.config.ts").is_file()]
+    if not config_paths:
+        return
+
+    needs_rebuild = False
+    for config_path in config_paths:
+        try:
+            src = config_path.read_text(encoding="utf-8")
+            m = re.search(r'baseUrl\s*:\s*(["\'])([^"\']*)(\1)', src)
+            current_val = m.group(2) if m else None
+            if current_val != clean_target:
+                pattern = re.compile(r'(baseUrl\s*:\s*)(["\'][^"\']*["\']|undefined|null)')
+                def _repl(match: re.Match) -> str:
+                    return f'{match.group(1)}"{clean_target}"'
+                new_src, count = pattern.subn(_repl, src, count=1)
+                if count > 0:
+                    config_path.write_text(new_src, encoding="utf-8")
+                    needs_rebuild = True
+        except Exception:
+            pass
+
+    if needs_rebuild:
+        print(f" Updating Quartz baseUrl to '{clean_target}' and rebuilding for production…")
+        env = os.environ.copy()
+        env.setdefault("TZ", "UTC")
+        env.setdefault("SOURCE_DATE_EPOCH", "1704067200")
+        safe_clean_public_dir(section_dir / "public")
+        build_cwd = internal_dir if internal_dir.exists() else section_dir
+        try:
+            subprocess.run(["npx", "quartz", "build", "--concurrency", "1"],
+                           cwd=build_cwd, env=env, check=True)
+            if build_cwd != section_dir and (build_cwd / "public").exists():
+                shutil.rmtree(section_dir / "public", ignore_errors=True)
+                shutil.copytree(build_cwd / "public", section_dir / "public", symlinks=True)
+            print("✅ Production build updated with live site domain.")
+        except (subprocess.CalledProcessError, OSError) as e:
+            print(f"❌ Production rebuild failed: {e}")
+            sys.exit(1)
 
 # ---------- Teacher profile (unchanged) ----------
 COURSES_ROOT = Path("/teaching/courses")
@@ -883,9 +894,14 @@ def main():
         env.setdefault("TZ", "UTC")
         env.setdefault("SOURCE_DATE_EPOCH", "1704067200")  # match build_site.py
         safe_clean_public_dir(public_dir)
+        internal_dir = Path(f"/tmp/quartz-builds/{args.course}/section{args.section}")
+        build_cwd = internal_dir if internal_dir.exists() else section_dir
         try:
             subprocess.run(["npx", "quartz", "build", "--concurrency", "1"],
-                           cwd=section_dir, env=env, check=True)
+                           cwd=build_cwd, env=env, check=True)
+            if build_cwd != section_dir and (build_cwd / "public").exists():
+                shutil.rmtree(public_dir, ignore_errors=True)
+                shutil.copytree(build_cwd / "public", public_dir, symlinks=True)
         except (subprocess.CalledProcessError, OSError):
             print("❌ Could not rebuild the site for production, so this deploy would")
             print(" publish the preview's live-reload page. Run the preview again, then retry:")

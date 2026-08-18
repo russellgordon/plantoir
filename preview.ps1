@@ -353,6 +353,8 @@ import signal
 import time
 
 target = os.environ["TARGET_DIR"]
+alt_target = target.replace("/teaching/courses/", "/tmp/quartz-builds/").replace("/.merged_output/", "/")
+targets = [t for t in [target, alt_target] if t]
 own_pid = os.getpid()
 
 def preview_pids():
@@ -368,7 +370,7 @@ def preview_pids():
             cwd = os.readlink(f"/proc/{entry}/cwd")
         except OSError:
             continue
-        if cwd == target or cwd.startswith(target + "/"):
+        if any(cwd == t or cwd.startswith(t + "/") for t in targets):
             found.append(pid)
     return found
 

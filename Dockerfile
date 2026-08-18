@@ -26,6 +26,9 @@ RUN npm install -g wrangler@4.80.0 && npm cache clean --force
 WORKDIR /opt
 RUN git clone --branch v4.5.0 https://github.com/jackyzha0/quartz.git quartz
 
+# Pre-install dependencies inside the image so npm install does not run over slow 9P mounts
+RUN cd /opt/quartz && npm install --no-audit && npm cache clean --force
+
 # Copy patched Quartz components into place
 COPY patches/Explorer.tsx /opt/quartz/quartz/components/Explorer.tsx
 COPY patches/FolderContent.tsx /opt/quartz/quartz/components/pages/FolderContent.tsx

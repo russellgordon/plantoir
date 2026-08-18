@@ -10,6 +10,8 @@ import json
 import re
 from pathlib import Path
 from datetime import datetime, timezone
+import threading
+import time
 
 
 # ---- Host OS signaling (for example command rendering) ----------------------
@@ -3068,12 +3070,11 @@ def patch_folder_click_behavior(quartz_layout_path: Path, expand_on_name: bool):
 # --- NEW ADD: Media handling helpers -----------------------------------------
 def _ensure_media_symlink(content_root: Path, course_dir: Path):
     """
-    Ensure `content/Media` is a relative symlink to the course-level `Media` folder.
+    Ensure `content/Media` is a symlink to the course-level `Media` folder.
     Replaces any existing real folder with a symlink (to avoid duplication).
     """
     link_path = content_root / "Media"
-    target_abs = course_dir / "Media"
-    rel_target = os.path.relpath(target_abs, start=content_root)
+    target_abs = (course_dir / "Media").resolve()
 
     # If a file/dir already exists at link_path, remove it first (carefully)
     if link_path.exists() or link_path.is_symlink():
@@ -3088,10 +3089,64 @@ def _ensure_media_symlink(content_root: Path, course_dir: Path):
             print(f"⚠️ Could not remove existing 'Media' at {link_path}: {e}")
 
     try:
-        os.symlink(rel_target, link_path)
-        print(f"🔗 Created symlink: {link_path} -> {rel_target}")
+        os.symlink(str(target_abs), link_path)
+        print(f"🔗 Created symlink: {link_path} -> {target_abs}")
     except Exception as e:
         print(f"❌ Failed to create Media symlink at {link_path}: {e}")
+
+def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
+    """
+    Sync built static assets (public/) and course_config.json from internal
+    container ext4 storage to the host-mounted output directory.
+    """
+    src_public = output_dir / "public"
+    dst_public = host_output_dir / "public"
+    if src_public.exists() and (src_public / "index.html").exists():
+        dst_public.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            res = subprocess.run(
+                ["rsync", "-a", "--delete", f"{src_public}/", f"{dst_public}/"],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if res.returncode != 0:
+                if dst_public.exists():
+                    shutil.rmtree(dst_public)
+                shutil.copytree(src_public, dst_public, symlinks=True)
+        except Exception:
+            if dst_public.exists():
+                shutil.rmtree(dst_public)
+            shutil.copytree(src_public, dst_public, symlinks=True)
+
+    if (output_dir / "course_config.json").exists():
+        try:
+            shutil.copy2(output_dir / "course_config.json", host_output_dir / "course_config.json")
+        except Exception:
+            pass
+
+def _start_public_sync_watcher(output_dir: Path, host_output_dir: Path) -> threading.Thread:
+    """
+    Start a background daemon thread that periodically syncs public/ to host_output_dir
+    when files in public/ are updated.
+    """
+    def _watcher():
+        last_mtime = None
+        while True:
+            try:
+                index_path = output_dir / "public" / "index.html"
+                if index_path.exists():
+                    mtime = index_path.stat().st_mtime
+                    if mtime != last_mtime:
+                        last_mtime = mtime
+                        _sync_public_to_host(output_dir, host_output_dir)
+            except Exception:
+                pass
+            time.sleep(1)
+
+    t = threading.Thread(target=_watcher, daemon=True)
+    t.start()
+    return t
 
 def _filter_out_media(items: list[str]) -> list[str]:
     """Return a copy of items with 'Media' removed (case-sensitive)."""
@@ -3837,7 +3892,13 @@ def build_section_site(
         except Exception as e:
             print(f"⚠️ Migration failed (will continue using hidden target): {e}")
 
-    output_dir = hidden_output_root / section_name
+    host_output_dir = hidden_output_root / section_name
+    host_output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Use fast container-local ext4 storage (/tmp/quartz-builds/<COURSE>/section<N>)
+    # for the build workspace so that node_modules, AST walks, and esbuild run at native
+    # speed without crossing the slow 9P/virtiofs host bind mount.
+    output_dir = Path("/tmp/quartz-builds") / course_code / section_name
     config_file = course_dir / "course_config.json"
 
     if not course_dir.exists():
@@ -3893,13 +3954,18 @@ def build_section_site(
         if output_dir.exists():
             print(f"\n🧹 Full rebuild: clearing output directory at: {output_dir}")
             shutil.rmtree(output_dir)
-        output_dir.mkdir(parents=True)
-        print(f"📂 Created fresh (hidden) output directory: {output_dir}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"📂 Created fresh (internal) output directory: {output_dir}")
 
-        print(f"📦 Copying Quartz scaffold from {quartz_src}...")
+        print(f"📦 Staging Quartz scaffold on container storage from {quartz_src}...")
         for item in quartz_src.iterdir():
             dest = output_dir / item.name
-            if item.is_dir():
+            if item.name == "node_modules":
+                try:
+                    os.symlink(str(item), dest)
+                except Exception:
+                    shutil.copytree(item, dest, symlinks=True)
+            elif item.is_dir():
                 shutil.copytree(item, dest, symlinks=False)
                 print(f"  📁 Copied directory: {item.name}")
             else:
@@ -4206,21 +4272,31 @@ def build_section_site(
     except Exception as e:
         print(f"⚠️ Could not draw the social sharing card: {e}")
 
-    # Install npm dependencies if needed
+    # Ensure npm dependencies are present (linking pre-baked node_modules if available)
     node_modules_dir = output_dir / "node_modules"
     package_json = output_dir / "package.json"
     package_lock = output_dir / "package-lock.json"
 
     needs_install = (
         force_npm_install or
-        not node_modules_dir.exists() or
-        not package_lock.exists() or
-        package_lock.stat().st_mtime < package_json.stat().st_mtime
+        not node_modules_dir.exists()
     )
 
     if needs_install:
-        print("\n📦 Installing dependencies...")
-        subprocess.run(["npm", "install", "--no-audit", "--silent"], cwd=output_dir, check=True)
+        if Path("/opt/quartz/node_modules").exists() and not force_npm_install:
+            print("📦 Linking pre-baked dependencies from image...")
+            if node_modules_dir.exists() or node_modules_dir.is_symlink():
+                try:
+                    node_modules_dir.unlink()
+                except Exception:
+                    shutil.rmtree(node_modules_dir, ignore_errors=True)
+            try:
+                os.symlink("/opt/quartz/node_modules", node_modules_dir)
+            except Exception:
+                shutil.copytree("/opt/quartz/node_modules", node_modules_dir, symlinks=True)
+        else:
+            print("\n📦 Installing dependencies...")
+            subprocess.run(["npm", "install", "--no-audit", "--silent"], cwd=output_dir, check=True)
     else:
         print("✅ Skipping npm install (dependencies already present)")
 
@@ -4241,6 +4317,7 @@ def build_section_site(
         if not public_dir.exists():
             print("❌ Quartz build did not emit a 'public' directory — cannot deploy.")
             return
+        _sync_public_to_host(output_dir, host_output_dir)
         print("✅ Static build complete.")
     else:
         # Preview mode (default): do NOT pre-build. Build+serve once.
@@ -4252,6 +4329,7 @@ def build_section_site(
         kill_existing_quartz(ws_port)
         print(f"\n🚀 Launching Quartz preview on http://localhost:{port}\n")
         safe_clean_public_dir(output_dir / "public")
+        _start_public_sync_watcher(output_dir, host_output_dir)
         subprocess.run(["npx", "quartz", "build", "--concurrency", "1", "--serve", "--port", str(port), "--wsPort", str(ws_port)], cwd=output_dir, env=env, check=True)
 
 def main():
