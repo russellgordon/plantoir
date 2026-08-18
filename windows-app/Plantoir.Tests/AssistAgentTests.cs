@@ -62,6 +62,13 @@ public class AssistAgentTests
         public readonly List<(string Name, JsonObject Arguments)> Calls = new();
         public string Result = "Done.";
 
+        /// <summary>
+        /// What a plan_ twin says it WOULD do — or null when the twin
+        /// REFUSES, which comes back as an ordinary answer rather than a
+        /// proposal.
+        /// </summary>
+        public string? PlanResult = "This would change one page.";
+
         /// <summary>The teacher's one-line half, when a test is about the split.</summary>
         public string? Summary;
         public string[] Narration = Array.Empty<string>();
@@ -72,6 +79,13 @@ public class AssistAgentTests
         {
             Calls.Add((name, (JsonObject)arguments.DeepClone()));
             foreach (string line in Narration) progress?.Invoke(line);
+
+            // A plan_ twin answers with a PLAN, marked as one, the way the
+            // real server does. Without the mark the loop would read it as a
+            // refusal — which is the behaviour a refusal is supposed to get.
+            if (name.StartsWith("plan_", StringComparison.Ordinal) && PlanResult is { } proposal)
+                return Task.FromResult(new AssistToolAnswer(proposal, proposal, IsPlan: true));
+
             return Task.FromResult(Summary is null
                 ? AssistToolAnswer.Same(Result)
                 : new AssistToolAnswer(Summary, Result));
@@ -85,6 +99,14 @@ public class AssistAgentTests
         public readonly RecordingTools Tools = new();
         public readonly List<string> AppActions = new();
         public bool PreviewShowing;
+
+        /// <summary>
+        /// Whether the assistant shows what it is about to do and waits. TRUE
+        /// by default, because that is what a teacher who has changed nothing
+        /// in Settings gets.
+        /// </summary>
+        public bool Confirming = true;
+
         public readonly AssistAgent Agent;
 
         public Rig()
@@ -96,6 +118,7 @@ public class AssistAgentTests
                 StartDeployInApp = () => AppActions.Add("deploy"),
                 PreviewIsShowing = () => PreviewShowing,
                 OnToolProgress = line => AppActions.Add("narrate: " + line),
+                ConfirmationMode = () => Confirming,
             };
         }
 
@@ -119,7 +142,7 @@ public class AssistAgentTests
         // tool three trials out of three, so the shape is matched in code:
         // exact tool, exact arguments, server's build declined, restart
         // offered, and the model never consulted.
-        var rig = new Rig();
+        var rig = new Rig { Confirming = false };
         rig.Tools.Result = "Published “Unit 2, Day 3”.";
 
         var lines = rig.Say("Publish Unit 2, Day 3, and everything it links to");
@@ -134,12 +157,65 @@ public class AssistAgentTests
         Assert.False(lines[^1].NeedsApproval);
     }
 
+    /// <summary>
+    /// Skipping the MODEL is not skipping the TEACHER. A fixed phrasing is
+    /// matched in code because the router gets it wrong, which is no reason
+    /// to stop saying what it would do first.
+    /// </summary>
+    [Fact]
+    public void AFixedPhrasingStillShowsItsPlanWhenConfirmationIsOn()
+    {
+        var rig = new Rig();                    // confirming, as a teacher gets it
+        rig.Tools.PlanResult = "Publish “Unit 2, Day 3” and the 4 pages it links to.";
+        rig.Tools.Result = "Published 5 pages.";
+
+        var lines = rig.Say("Publish Unit 2, Day 3, and everything it links to");
+
+        Assert.Empty(rig.Model.Asked);
+        Assert.Equal("plan_publish_pages", Assert.Single(rig.Tools.Calls).Name);
+        Assert.Contains(lines, l => l.Text == "Publish “Unit 2, Day 3” and the 4 pages it links to.");
+        Assert.Equal(AssistWording.PlanQuestion, lines[^1].Text);
+        Assert.True(lines[^1].NeedsApproval);
+        Assert.True(rig.Agent.IsAwaitingApproval);
+
+        // The model is not asked a second time: the arguments it chose are
+        // carried through, so what runs on Go is what was described.
+        var done = rig.Approve();
+        var real = rig.Tools.Calls[^1];
+        Assert.Equal("publish_pages", real.Name);
+        Assert.Equal("Unit 2, Day 3", real.Arguments["pages"]![0]!.GetValue<string>());
+        Assert.Contains(done, l => l.Text == "Published 5 pages.");
+    }
+
+    /// <summary>
+    /// A plan twin can REFUSE — no such page, no such section — and a refusal
+    /// is an answer, not a proposal. Two buttons under it invite a teacher to
+    /// approve an explanation of why nothing can be done.
+    /// </summary>
+    [Fact]
+    public void APlanThatRefusedGetsNoButtons()
+    {
+        const string refusal = "There’s no page called “Unit 9, Day 9” in VVH2O Section 1.";
+        var rig = new Rig();
+        rig.Tools.PlanResult = null;                 // the twin refuses
+        rig.Tools.Result = refusal;
+        rig.Model.ThenCalls("publish_pages",
+            """{"course": "VVH2O", "section": 1, "pages": ["Unit 9, Day 9"]}""");
+
+        var lines = rig.Say("Put up Unit 9, Day 9");
+
+        Assert.Equal("plan_publish_pages", Assert.Single(rig.Tools.Calls).Name);
+        Assert.Contains(lines, l => l.Text == refusal);
+        Assert.False(rig.Agent.IsAwaitingApproval);
+        Assert.DoesNotContain(lines, l => l.NeedsApproval);
+    }
+
     [Fact]
     public void PublishingTomorrowsClassCarriesTheDateTheModelWasGiven()
     {
         // "Publish tomorrow's class, but not the linked pages" only works because
         // the dateline rides on the user turn — without it, every trial fabricated 2023-09-15.
-        var rig = new Rig();
+        var rig = new Rig { Confirming = false };
         rig.Model.ThenCalls("publish_class_on",
             """{"course": "VVH2O", "section": 1, "date": "2026-08-15"}""");
 
@@ -166,7 +242,7 @@ public class AssistAgentTests
     public void UnpublishingStopsTheShowingPreviewAndEdits()
     {
         // The stop-edit flow, in the order a person would do it.
-        var rig = new Rig { PreviewShowing = true };
+        var rig = new Rig { PreviewShowing = true, Confirming = false };
         rig.Tools.Result = "Unpublished “Unit 2, Day 3”.";
 
         var lines = rig.Say("Unpublish Unit 2, Day 3");
@@ -181,7 +257,7 @@ public class AssistAgentTests
     [Fact]
     public void AnEditWithNoPreviewShowingStopsNothing()
     {
-        var rig = new Rig { PreviewShowing = false };
+        var rig = new Rig { PreviewShowing = false, Confirming = false };
 
         var lines = rig.Say("Unpublish Unit 2, Day 3");
 
@@ -199,7 +275,7 @@ public class AssistAgentTests
         // round to summarise it (measured, the model routed this to the
         // wrong plan tool three trials out of three), and no button.
         var rig = new Rig();
-        rig.Tools.Result = "Would publish “Unit 3, Day 1” and the 3 pages it links to.";
+        rig.Tools.PlanResult = "Would publish “Unit 3, Day 1” and the 3 pages it links to.";
 
         var lines = rig.Say("What would publishing Unit 3, Day 1 change?");
 
@@ -399,7 +475,9 @@ public class AssistAgentTests
         // dateline and all, shown to the teacher who had just typed it.
         // A conversational phrasing, because the card's own shape is a
         // command that never reaches the model.
-        var rig = new Rig();
+        // Confirmation off, because what is under test is the parrot rather
+        // than the gate.
+        var rig = new Rig { Confirming = false };
         rig.Model.ThenCalls("unpublish_pages", """{"course": "VVH2O", "section": 1}""",
             alsoSays: "Unpublishing Unit 4, Day 5 (Today is 2026-08-14, a Friday.)");
         rig.Tools.Result = "Unpublished “Unit 4, Day 5”.";

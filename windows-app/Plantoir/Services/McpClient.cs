@@ -151,11 +151,13 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
             if (block?["text"]?.GetValue<string>() is { } piece) text.AppendLine(piece);
         string detail = text.ToString().TrimEnd();
 
-        string? summary = result["_meta"]?[Plantoir.Core.Assist.AssistToolAnswer.TeacherSummaryKey]
-            ?.GetValue<string>();
+        var meta = result["_meta"];
+        bool isPlan = meta?[Plantoir.Core.Assist.AssistToolAnswer.IsPlanKey]?.GetValue<bool>() == true;
+        string? summary = meta?[Plantoir.Core.Assist.AssistToolAnswer.TeacherSummaryKey]?.GetValue<string>();
+
         return string.IsNullOrWhiteSpace(summary)
-            ? Plantoir.Core.Assist.AssistToolAnswer.Same(detail)
-            : new Plantoir.Core.Assist.AssistToolAnswer(summary, detail);
+            ? Plantoir.Core.Assist.AssistToolAnswer.Same(detail) with { IsPlan = isPlan }
+            : new Plantoir.Core.Assist.AssistToolAnswer(summary, detail, isPlan);
     }
 
     // ---- JSON-RPC --------------------------------------------------------

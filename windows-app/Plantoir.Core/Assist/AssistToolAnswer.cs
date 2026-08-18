@@ -29,7 +29,17 @@ namespace Plantoir.Core.Assist;
 /// </summary>
 /// <param name="Summary">One line for the transcript, in the teacher's language.</param>
 /// <param name="Detail">What the model is told, at whatever length it needs.</param>
-public sealed record AssistToolAnswer(string Summary, string Detail)
+/// <param name="IsPlan">
+/// Whether this really IS a plan — something that WOULD happen if the teacher
+/// agreed.
+///
+/// A <c>plan_</c> tool can come back with a refusal instead: the page was not
+/// found, the section does not exist. Those must not be shown with "Shall I go
+/// ahead?" and two buttons underneath, which asks a teacher to approve an
+/// explanation of why nothing can be done — and in the mac transcript that
+/// prompted the rule, four times in a row.
+/// </param>
+public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan = false)
 {
     /// <summary>
     /// The <c>_meta</c> key the teacher's line travels under. Prefixed with
@@ -37,6 +47,13 @@ public sealed record AssistToolAnswer(string Summary, string Detail)
     /// collide with a key some other server or client means something else by.
     /// </summary>
     public const string TeacherSummaryKey = "plantoir.app/teacherSummary";
+
+    /// <summary>
+    /// The <c>_meta</c> key saying this answer is a proposal rather than a
+    /// report. Sent only when true, because a refusal from a <c>plan_</c> tool
+    /// is an ANSWER and must not get Go and Cancel underneath it.
+    /// </summary>
+    public const string IsPlanKey = "plantoir.app/isPlan";
 
     /// <summary>The same words to both, which is most tools.</summary>
     public static AssistToolAnswer Same(string both) => new(both, both);

@@ -146,7 +146,15 @@ dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 
 **Quit any running copy of Plantoir first**, or the build fails with
 `MSB3027 … locked by "Plantoir"`, which reads like a corrupt build rather than
-an open app.
+an open app. **You may do that without asking** — standing instruction, see
+`CLAUDE.md` § "Setting up on a new machine":
+
+```powershell
+Get-Process -Name Plantoir -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+Say that you closed it, do not close it out from under a build or deploy he can
+watch happening, and leave relaunching to him.
 
 Tests touching **preview leases or the publish registry** belong in the
 `SharedActivityState` serialized collection: they are process-wide statics and

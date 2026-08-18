@@ -210,6 +210,34 @@ public class ToolAnswerTests : IDisposable
         Assert.Contains("Show this to the teacher", answer.Detail());
     }
 
+    /// <summary>
+    /// A plan says it IS one, so the window knows to put Go and Cancel under
+    /// it. Without the mark the confirmation gate would read every plan as a
+    /// refusal and no write would ever run.
+    /// </summary>
+    [Fact]
+    public void APlanMarksItselfAsOne()
+    {
+        var answer = Tools().PlanPublishPages("ICS3U", 1, includeLinked: false,
+                                              pages: new[] { "Unit 1, Day 2" });
+        Assert.True(answer.Meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>());
+    }
+
+    /// <summary>
+    /// And a plan twin that REFUSED does not, because a refusal is an answer.
+    /// "Shall I go ahead?" under an explanation of why nothing can be done
+    /// invites a teacher to approve a dead end.
+    /// </summary>
+    [Fact]
+    public void APlanThatCouldNotBeMadeIsNotMarkedAsOne()
+    {
+        var answer = Tools().PlanPublishPages("ICS3U", 1, includeLinked: false,
+                                              pages: new[] { "Unit 9, Day 9" });
+
+        Assert.True(answer.Meta?[AssistToolAnswer.IsPlanKey] is null);
+        Assert.DoesNotContain("Show this to the teacher", answer.Detail());
+    }
+
     // ---- Taking it back ---------------------------------------------------
 
     /// <summary>

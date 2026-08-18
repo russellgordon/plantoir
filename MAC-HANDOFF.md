@@ -109,6 +109,25 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **The confirmation setting on Windows was wired to nothing for weeks**
+  (Windows, 2026-08-18, `windows-sync`). Awareness only — the mac has had
+  this since plan mode shipped — but worth recording because of HOW it went
+  unnoticed. `AssistAgent.ConfirmationMode` was set from
+  `AppSettings.AssistantAsksBeforeChanging` in `AssistWindow` and then never
+  read, so the switch in Settings did nothing; and the discoverability nudge
+  after fifteen accepted plans ("The assistant shows what it is about to do
+  before doing it. You can change that in Settings.") was firing and
+  describing behaviour the app did not have. A setting that is stored,
+  displayed and ignored looks exactly like a setting that works.
+
+  Now ported. Two Windows-specific pieces the mac may care about:
+  `AssistToolOutcome.isPlan` is an in-process field here and had to become a
+  second `_meta` key over MCP (`plantoir.app/isPlan`, sent only when true) so
+  the gate can tell a plan from a plan tool's REFUSAL; and
+  `AssistAgent.PlanTwins` deliberately omits `re_date_classes` even though the
+  contract lists a twin for it, because it is not a tool the local model is
+  shown and its twin does not mark its answer.
+
 - **Windows was chatty for one structural reason, and it was not wording**
   (Windows, 2026-08-18, `windows-sync`). Recorded because the mac's own
   design is what fixed it, and because the reasoning behind `AssistToolOutcome`

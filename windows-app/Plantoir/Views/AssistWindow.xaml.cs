@@ -259,7 +259,9 @@ public sealed partial class AssistWindow : Window
     private async void Approve_Click(object sender, RoutedEventArgs e)
     {
         if (_agent is null) return;
-        string word = ApproveButton.Content?.ToString() ?? (_agent.PendingTool == "deploy_section" ? AssistWording.DeployAccepted : AssistWording.PlanAccepted);
+        string word = ApproveButton.Content?.ToString()
+            ?? (AssistAgent.NeedsApproval(_agent.PendingTool ?? "")
+                ? AssistWording.DeployAccepted : AssistWording.PlanAccepted);
         HideApproval();
         Say("You", word);
         await Turn(async () =>
@@ -575,8 +577,12 @@ public sealed partial class AssistWindow : Window
 
     private void ShowApproval(string question)
     {
-        bool isDeploy = _agent?.PendingTool == "deploy_section";
-        ApproveButton.Content = isDeploy ? "Deploy" : "Go";
+        // A DEPLOY and a PLAN read differently to a teacher and should look
+        // different: a deploy puts work in front of students and cannot be
+        // taken back by us, while a plan is the assistant checking it
+        // understood. A deploy set for half six tomorrow is still a deploy.
+        bool isDeploy = AssistAgent.NeedsApproval(_agent?.PendingTool ?? "");
+        ApproveButton.Content = isDeploy ? AssistWording.DeployAccepted : AssistWording.PlanAccepted;
         ApprovalBar.Visibility = Visibility.Visible;
     }
 

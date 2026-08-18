@@ -280,7 +280,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "it will check whether they are actually PUBLISHED — a deploy that runs perfectly and ships a " +
                  "site without tomorrow's class is the failure worth catching while somebody is awake. " +
                  "Read the whole thing to the teacher, including what has to be true of their computer.")]
-    public string PlanScheduledDeploy(
+    public CallToolResult PlanScheduledDeploy(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(WhenHelp)] string when,
@@ -290,9 +290,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             if (!DateTime.TryParse(when, out var moment))
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
-            return workspace.PlanScheduledDeploy(course, section, moment,
+            return Proposing(workspace.PlanScheduledDeploy(course, section, moment,
                 classes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                .Describe();
+                .Describe());
         });
 
     [McpServerTool(Name = "schedule_deploy", Title = "Deploy at a set time",
@@ -500,14 +500,20 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("Work out what the next class page would be called and what date it would land on, " +
                  "changing nothing. Use this for \"add the next class\" or \"start a new unit for the next class\". " +
                  "The title continues the highest unit's count; the date is the next unused day in the section's timetable.")]
-    public string PlanAddNextClass(
+    public CallToolResult PlanAddNextClass(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("Pass \"next\" to start a new unit. Leave empty to continue the current unit.")]
         string unit = "",
         [Description("Pass a number to add that many days to the specified unit number. Leave 0 for a single class.")]
         int days = 0)
-        => Guarded(() => workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null).Describe());
+        => Guarded(() =>
+        {
+            var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
+            return plan.ChangesNothing
+                ? Answering("The next class page already exists.", plan.Describe())
+                : Proposing(plan.Describe());
+        });
 
     [McpServerTool(Name = "add_next_class", Title = "Add the next class page", Destructive = false, Idempotent = false)]
     [Description("Create the next class page, dated to the day the section next meets. " +
@@ -544,7 +550,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                    ReadOnly = true, Destructive = false)]
     [Description("Work out what remembering a section's class dates would do, changing nothing. " +
                  "Dates are YYYY-MM-DD, separated by commas or spaces.")]
-    public string PlanRememberTimetable(
+    public CallToolResult PlanRememberTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("Every date this section meets, as YYYY-MM-DD, separated by commas.")] string dates,
@@ -572,8 +578,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 throw new AssistRefusal("Nothing was recorded — no dates were given.");
 
             parsed.Sort();
-            return $"Would record {parsed.Count} class dates for {found.Code} Section {number}, " +
-                   $"{parsed[0]:yyyy-MM-dd} to {parsed[^1]:yyyy-MM-dd}, from {source}.";
+            return Proposing($"Would record {parsed.Count} class dates for {found.Code} Section {number}, " +
+                             $"{parsed[0]:yyyy-MM-dd} to {parsed[^1]:yyyy-MM-dd}, from {source}.");
         });
 
     [McpServerTool(Name = "read_remembered_timetable", Title = "What dates this section meets",
@@ -1366,7 +1372,31 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private static CallToolResult Proposing(PublishPlan plan) =>
         plan.NothingToDoSentence is { } already
             ? Answering(already)
-            : Answering(plan.Describe(), plan.Describe() + "\n\n" + AskBeforeGoingAhead);
+            : Proposing(plan.Describe());
+
+    /// <summary>
+    /// A PLAN: what WOULD happen, and nothing done yet.
+    ///
+    /// The plan itself is written for the teacher, because the teacher is who
+    /// decides — so it is the summary as well as the body of the detail. Only
+    /// the instruction to ask is added on the way out, and the answer is
+    /// MARKED as a plan so the window knows to put Go and Cancel under it.
+    ///
+    /// A <c>plan_</c> tool that REFUSED does not come through here, and that
+    /// is exactly what the mark is for: a refusal is an answer, not a
+    /// proposal, and "Shall I go ahead?" under an explanation of why nothing
+    /// can be done invites a teacher to approve a dead end. The mac transcript
+    /// that produced this rule shows them declining one four times in a row.
+    /// </summary>
+    private static CallToolResult Proposing(string plan) => new()
+    {
+        Content = [new TextContentBlock { Text = plan + "\n\n" + AskBeforeGoingAhead }],
+        Meta = new JsonObject
+        {
+            [AssistToolAnswer.TeacherSummaryKey] = plan,
+            [AssistToolAnswer.IsPlanKey] = true,
+        },
+    };
 
     /// <summary>Said to a caller that has no Go and Cancel of its own. Never to a teacher.</summary>
     private const string AskBeforeGoingAhead =

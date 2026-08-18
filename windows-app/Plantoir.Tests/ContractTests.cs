@@ -370,6 +370,42 @@ public class ContractTests
         Assert.Equal(expectedMcpOnly, mcpOnly);
     }
 
+    /// <summary>
+    /// Every write the LOCAL MODEL can reach and that has a plan_ twin must
+    /// be in <see cref="AssistAgent.PlanTwins"/>, or the confirmation setting
+    /// silently does nothing for it — a teacher who asked to be shown what
+    /// would happen is shown nothing, and only for some requests.
+    ///
+    /// Deliberately scoped to the local surface. The contract lists twins for
+    /// writes the local model is never offered (re_date_classes), and gating
+    /// one of those here would hold a write behind a proposal this loop never
+    /// asks for.
+    /// </summary>
+    [Fact]
+    public void PlanTwins_CoverEveryLocalWriteThatHasOne()
+    {
+        var tools = ContractLoader.LoadJson("assist-cases.json")!["tools"]!.AsObject();
+        var local = tools["local"]!.AsArray().Select(t => t!.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var twins = tools["planTwins"]!.AsObject();
+
+        foreach (var (write, twin) in twins)
+        {
+            if (!local.Contains(write)) continue;
+
+            // Deploying waits on its own button whatever the setting says, so
+            // its twin is never the thing a teacher is shown.
+            if (AssistAgent.NeedsApproval(write)) continue;
+
+            Assert.True(AssistAgent.PlanTwins.ContainsKey(write),
+                $"{write} is a local write with a plan twin, but the confirmation gate does not know it");
+            Assert.Equal(twin!.ToString(), AssistAgent.PlanTwins[write]);
+        }
+
+        // And nothing is gated behind a twin that is not in the contract.
+        foreach (var (write, twin) in AssistAgent.PlanTwins)
+            Assert.Equal(twin, twins[write]!.ToString());
+    }
+
     [Fact]
     public void AssistantConfirmation_MatchesContract()
     {

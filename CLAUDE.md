@@ -304,6 +304,24 @@ before building** — a running app holds `Plantoir.Core.dll` open and the build
 fails with `MSB3027 … file is locked by: "Plantoir"`, which reads like a corrupt
 build rather than the app simply being open.
 
+**An agent working on Windows may close a running Plantoir without asking, and
+should.** Standing instruction from Russell, 2026-08-18: stopping to ask about
+it every time has been a hassle, and the alternative — reporting a build failure
+that is only an open window — is worse. It is his own development copy, it holds
+no unsaved state of its own, and he relaunches it himself when he is ready.
+
+```powershell
+Get-Process -Name Plantoir -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+Two conditions on it, and only two. **Say that you closed it**, in the same
+message as the result, so he is not left wondering where his window went. And
+**do not close it out from under work he can see happening** — a build, a
+preview or a deploy running in the app's own console is work he is watching;
+wait for it, or ask. Relaunching afterwards is HIS, the same way it is on the
+mac (rule 10): a rebuild that reopens the app steals focus from whatever he has
+moved on to.
+
 ## App name vs. module name
 
 The user-facing name is **Plantoir** (bundle, binary, Dock, window title,

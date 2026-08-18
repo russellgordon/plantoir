@@ -218,7 +218,46 @@ public sealed class AssistAgent
         "deploy_section", "schedule_deploy",
     };
 
-    internal static bool NeedsApproval(string name) => DeploysToStudents.Contains(name);
+    /// <summary>
+    /// Whether this call waits for a button. Public because the WINDOW asks
+    /// it too: a deploy's card offers "Deploy" where a plan's offers "Go",
+    /// and a deploy set for half six tomorrow is still a deploy.
+    /// </summary>
+    public static bool NeedsApproval(string name) => DeploysToStudents.Contains(name);
+
+    /// <summary>
+    /// The <c>plan_</c> twin of each write the local model can reach — what
+    /// the assistant runs, and reads out, before it does the thing itself.
+    ///
+    /// This is the CONFIRMATION setting's machinery. Deploying always waits
+    /// for a button; everything else waits only while the teacher has "ask
+    /// before changing" on, which it is by default. What they see is the
+    /// PLAN, in words — "publishing Unit 2, Day 3 would also publish the four
+    /// pages it links to" — never a tool name and a blob of arguments. The
+    /// model is not asked a second time: the arguments it chose are carried
+    /// through to the real call, so what runs on Go is exactly what was
+    /// described.
+    ///
+    /// Four writes have no twin, deliberately: <c>rebuild_preview</c> changes
+    /// no page, <c>undo_last_change</c> IS the remedy, <c>deploy_section</c>
+    /// waits on its own button whatever this setting says, and a cancelled
+    /// scheduled deploy is remedied by scheduling it again.
+    ///
+    /// <c>re_date_classes</c> is in the contract's twin list and NOT here, and
+    /// the reason is worth keeping: it is not a tool the local model is shown
+    /// (see <see cref="ForTheLocalModel"/>), and its twin does not mark its
+    /// answer as a plan, so putting it here would gate a write behind a
+    /// proposal this loop would then read as a refusal. A test pins that this
+    /// map covers every twin the local model CAN reach.
+    /// </summary>
+    internal static readonly Dictionary<string, string> PlanTwins = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["publish_pages"] = "plan_publish_pages",
+        ["unpublish_pages"] = "plan_unpublish_pages",
+        ["publish_class_on"] = "plan_publish_class_on",
+        ["add_next_class"] = "plan_add_next_class",
+        ["remember_timetable"] = "plan_remember_timetable",
+    };
 
     /// <summary>
     /// How many tool calls one turn may make before the loop stops.
@@ -604,6 +643,14 @@ public sealed class AssistAgent
                                               CancellationToken cancellation)
     {
         var call = Synthesise(userText, tool, arguments);
+
+        // A fixed phrasing skips the MODEL, not the teacher's confirmation.
+        // "Publish Unit 2, Day 3, and everything it links to" is matched in
+        // code because the router gets it wrong, which is not a reason to
+        // stop showing what it would do.
+        if (ConfirmationMode() && PlanTwins.TryGetValue(tool, out string? twin))
+            return await ShowPlan(twin, call, cancellation);
+
         var lines = new List<Line>();
         var answer = await RunTool(call, lines, cancellation);
         lines.Add(new Line("tools", answer.Summary));
@@ -612,19 +659,102 @@ public sealed class AssistAgent
     }
 
     internal List<Line> AskFirst(string userText, string tool, JsonObject arguments)
+        => AskFirst(Synthesise(userText, tool, arguments));
+
+    /// <summary>
+    /// Hold a deploy behind the button, saying first what it is a deploy OF.
+    ///
+    /// A scheduled deploy used to get the bare question and nothing else — a
+    /// teacher was asked "Shall I go ahead?" about a time and a section
+    /// neither of them had said out loud. It gets the same treatment the
+    /// immediate deploy has always had: the fact, then the question.
+    /// </summary>
+    private List<Line> AskFirst(JsonObject call)
     {
-        _awaiting = Synthesise(userText, tool, arguments);
-        if (tool.Equals("deploy_section", StringComparison.OrdinalIgnoreCase))
-        {
-            return new List<Line>
-            {
-                new("assistant", AssistWording.DeployApproval),
-                new("assistant", AssistWording.DeployQuestion, NeedsApproval: true, Pending: tool),
-            };
-        }
+        _awaiting = call;
+        string tool = call["function"]?["name"]?.GetValue<string>() ?? "";
         return new List<Line>
         {
-            new("assistant", AssistWording.PlanQuestion, NeedsApproval: true, Pending: tool),
+            new("assistant", Explain(call)),
+            new("assistant", AssistWording.DeployQuestion, NeedsApproval: true, Pending: tool),
+        };
+    }
+
+    /// <summary>
+    /// What the card says above the two buttons.
+    ///
+    /// Neither of these restates the request. The act itself is named by the
+    /// question that follows, and the section is on the window's own title
+    /// bar; a card that describes a tool is a card describing machinery.
+    /// </summary>
+    private string Explain(JsonObject call)
+    {
+        string tool = call["function"]?["name"]?.GetValue<string>() ?? "";
+        if (!tool.Equals("schedule_deploy", StringComparison.OrdinalIgnoreCase))
+            return AssistWording.DeployApproval;
+
+        var arguments = ArgumentsOf(call);
+        string when = arguments["when"]?.GetValue<string>() ?? "";
+        string moment = DateTime.TryParse(when, out var parsed)
+            ? parsed.ToString("dddd d MMMM, h:mm tt")
+            : when;
+        return $"Set this computer to deploy {_courseCode} Section {_section} at {moment}. " +
+               "It has to be on and awake then — plugged in if it is a laptop, lid open. " +
+               "Plantoir cannot wake it up.";
+    }
+
+    /// <summary>A tool call's arguments, which arrive as a JSON string.</summary>
+    private static JsonObject ArgumentsOf(JsonObject call)
+    {
+        if (call["function"]?["arguments"]?.GetValue<string>() is not { } raw) return new JsonObject();
+        try { return JsonNode.Parse(raw) as JsonObject ?? new JsonObject(); }
+        catch { return new JsonObject(); }
+    }
+
+    /// <summary>
+    /// Run the <c>plan_</c> twin and hold the real call behind it.
+    ///
+    /// The plan is SAID, not shown on a card that is then taken away. It used
+    /// to live only in the approval card on the mac, which meant that the
+    /// moment a teacher pressed Go or Cancel the description of what they had
+    /// just agreed to disappeared — and with it the context for everything
+    /// after. A conversation you cannot scroll back through is not a
+    /// conversation. So the plan goes into the transcript like anything else
+    /// the assistant says, and the card below it is nothing but two buttons.
+    ///
+    /// Nothing is written to the message history here. The model's tool call
+    /// stays unanswered until the teacher decides, and then Approve or Decline
+    /// answers it — so the history never claims something happened that has
+    /// not.
+    /// </summary>
+    private async Task<List<Line>> ShowPlan(string twinName, JsonObject call, CancellationToken cancellation)
+    {
+        var answer = await _tools.CallTool(twinName, ArgumentsOf(call), OnToolProgress, cancellation);
+
+        // A plan twin can come back with a REFUSAL — no such page, no such
+        // section — and a refusal is an answer, not a proposal. "Shall I go
+        // ahead?" underneath one invites a teacher to approve an explanation
+        // of why nothing can be done.
+        if (!answer.IsPlan)
+        {
+            _messages.Add(new JsonObject
+            {
+                ["role"] = "tool",
+                ["tool_call_id"] = call["id"]?.DeepClone(),
+                ["content"] = answer.Detail,
+            });
+            return new List<Line> { new("assistant", answer.Summary) };
+        }
+
+        _awaiting = call;
+        return new List<Line>
+        {
+            new("assistant", answer.Summary),
+            // The question is a line too, so the card below can be nothing but
+            // the buttons. A card carrying its own heading is a second voice
+            // in a conversation that already has two.
+            new("assistant", AssistWording.PlanQuestion, NeedsApproval: true,
+                Pending: call["function"]?["name"]?.GetValue<string>()),
         };
     }
 
@@ -700,22 +830,28 @@ public sealed class AssistAgent
         string toolName = call["function"]?["name"]?.GetValue<string>() ?? "";
         _awaiting = null;
 
-        if (toolName.Equals("deploy_section", StringComparison.OrdinalIgnoreCase))
-        {
-            _messages.Add(new JsonObject
-            {
-                ["role"] = "assistant",
-                ["content"] = AssistWording.DeployWasCancelled,
-            });
-            return Task.FromResult(new List<Line> { new("assistant", AssistWording.DeployWasCancelled) });
-        }
-
+        // The model asked for a tool and is still waiting to hear what came
+        // of it. Answering as the TOOL rather than as the assistant is what
+        // keeps the history honest: a dangling call left unanswered is a hole
+        // the next turn reads across.
         _messages.Add(new JsonObject
         {
-            ["role"] = "assistant",
-            ["content"] = AssistWording.PlanWasCancelled,
+            ["role"] = "tool",
+            ["tool_call_id"] = call["id"]?.DeepClone(),
+            ["content"] = "The teacher decided not to. Nothing was done.",
         });
-        return Task.FromResult(new List<Line> { new("assistant", AssistWording.PlanWasCancelled) });
+
+        // A cancelled DEPLOY is answered with the fact and nothing else.
+        // "Left as it was — nothing was changed." is true, and reassuring
+        // about a thing nobody was worried about: somebody who has just
+        // pressed Cancel knows nothing was changed, and being told so reads
+        // as the assistant explaining itself. A cancelled PLAN keeps that
+        // wording, because there the reassurance IS the answer — the plan
+        // described changes to pages, and "nothing was changed" is the part
+        // in doubt.
+        bool wasDeploy = DeploysToStudents.Contains(toolName);
+        string said = wasDeploy ? AssistWording.DeployWasCancelled : AssistWording.PlanWasCancelled;
+        return Task.FromResult(new List<Line> { new("assistant", said) });
     }
 
     private async Task<List<Line>> Run(CancellationToken cancellation)
@@ -758,19 +894,19 @@ public sealed class AssistAgent
             string name = call["function"]?["name"]?.GetValue<string>() ?? "";
             if (NeedsApproval(name))
             {
-                // The one rule this loop owns. A plan the teacher has not read
-                // is not a confirmation, and the measurements say the model
-                // will occasionally reach for the opposite of what was asked.
-                _awaiting = call;
-                if (name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase))
-                {
-                    lines.Add(new Line("assistant", AssistWording.DeployApproval));
-                    lines.Add(new Line("assistant", AssistWording.DeployQuestion, NeedsApproval: true, Pending: name));
-                }
-                else
-                {
-                    lines.Add(new Line("assistant", AssistWording.PlanQuestion, NeedsApproval: true, Pending: name));
-                }
+                // The one rule this loop owns whatever the settings say. A
+                // plan the teacher has not read is not a confirmation, and the
+                // measurements say the model will occasionally reach for the
+                // opposite of what was asked.
+                lines.AddRange(AskFirst(call));
+                return lines;
+            }
+
+            // In confirmation mode, every other write is shown as a PLAN
+            // first — see PlanTwins.
+            if (ConfirmationMode() && PlanTwins.TryGetValue(name, out string? twin))
+            {
+                lines.AddRange(await ShowPlan(twin, call, cancellation));
                 return lines;
             }
 
