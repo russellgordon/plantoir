@@ -75,8 +75,8 @@ real `setup_course.py`, exit 0 with a full course scaffolded, using the same
 ## Spec coverage
 
 Tracked in one place only: the **Windows status** section of
-[`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md) (256 rows as of 2026-08-17,
-entries 1–255 assessed). Nothing here duplicates it, because a second copy is
+[`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md) (264 rows as of 2026-08-18,
+entries 1–264 assessed). Nothing here duplicates it, because a second copy is
 a copy that goes stale — that count itself had been reading "179 rows" for
 days after the log passed 250.
 
