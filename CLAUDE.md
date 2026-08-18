@@ -1,4 +1,4 @@
-# Working on Plantoir (containerized-quartz-for-teachers)
+# Working on Plantoir
 
 **Start here.** This file is the entry point for anyone — human or AI — working
 in this repository. It carries the rules that override default behaviour, the

@@ -195,7 +195,7 @@ This will:
 ## 🧼 File Structure
 
 ```
-containerized-quartz-for-teachers/
+plantoir/
 ├── .toolchain/                 # The image recipe and support files
 ├── courses/                    # Teacher-created content goes here
 │   └── ICS3U/

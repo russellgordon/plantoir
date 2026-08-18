@@ -131,7 +131,8 @@ public static class MarketingShotCapturer
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..")),
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..")),
             Directory.GetCurrentDirectory(),
-            @"C:\Users\lenov\Desktop\Developer\containerized-quartz-for-teachers"
+            @"C:\Users\lenov\Desktop\Developer\containerized-quartz-for-teachers",
+            @"C:\Users\lenov\Desktop\Developer\plantoir"
         };
         string? foundRoot = possibleRoots.FirstOrDefault(r => Directory.Exists(Path.Combine(r, "support", "example_content")));
         string exampleContentDir = foundRoot != null ? Path.Combine(foundRoot, "support", "example_content") : "";

@@ -17,11 +17,10 @@ the git tag must match.
 > to an asset that has never been published.
 
 > **Which repository?** plantoir.app's download links resolve against
-> `github.com/russellgordon/plantoir`, but this working copy's `origin` is
-> `github.com/russellgordon/containerized-quartz-for-teachers`. Settle that
-> before the first tag and pass `-R <owner/repo>` explicitly to every `gh`
-> command — a release published to the wrong repository leaves the site's
-> evergreen links serving nothing.
+> `github.com/russellgordon/plantoir`, which matches `origin`. Pass
+> `-R russellgordon/plantoir` explicitly to every `gh` command — a release
+> published to the wrong repository leaves the site's evergreen links serving
+> nothing.
 
 ## The short version
 

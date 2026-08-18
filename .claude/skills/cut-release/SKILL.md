@@ -32,20 +32,12 @@ this skill automates its steps 5–6 and the note-writing.
    in lockstep — one product, one version series — so a mismatch is a stop,
    not a note. (`project.yml` is the source; the Xcode project is generated
    from it, so edit `project.yml` and re-run `xcodegen`.)
-6. **Confirm WHICH REPOSITORY this release belongs in, before anything is
-   published.** These two do not currently agree:
-   - `git remote -v` here is `russellgordon/containerized-quartz-for-teachers`
-   - the site builds every download link against
-     `github.com/russellgordon/plantoir`
-     (`releases/latest/download/<asset-name>`), from `repo_url` in
-     `website/site.json`
-   A release published to the wrong one leaves plantoir.app's download
-   buttons pointing at a release that does not exist. Do NOT guess and do
-   NOT let the remote decide by default: ask the user which repository is
-   the release home, then pass it explicitly on every `gh` call as
-   `-R <owner/repo>`. Verify the target first with
-   `gh repo view <owner/repo>` — if that fails, stop and say so rather than
-   publishing.
+6. **Confirm the release target repository (`russellgordon/plantoir`).**
+   The remote `origin` and `website/site.json` (`repo_url`) both point to
+   `github.com/russellgordon/plantoir`. Confirm this with the user, then pass
+   `-R russellgordon/plantoir` explicitly on every `gh` call. Verify the target
+   first with `gh repo view russellgordon/plantoir` — if that fails, stop and
+   say so rather than publishing.
 
 ## Write the notes
 

@@ -75,7 +75,7 @@ Before you commit to this double-session – take some time to [explore the type
 
 ## Install software
 
-Please follow [the instructions given here](https://github.com/russellgordon/containerized-quartz-for-teachers?tab=readme-ov-file#-quick-start-for-teachers). 
+Please follow [the instructions given here](https://github.com/russellgordon/plantoir?tab=readme-ov-file#-quick-start-for-teachers). 
 
 > [!TIP] 
 > 
