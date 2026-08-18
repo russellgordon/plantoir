@@ -43,6 +43,9 @@ public sealed partial class AssistWindow : Window
     private McpClient? _tools;
     private AssistAgent? _agent;
     private readonly CancellationTokenSource _closing = new();
+    private AssistPromptHistory _history;
+    private string? _lastRecalled;
+    private string HistoryKey => $"AssistPromptHistory-{_course.Code}-{_section}";
 
     public AssistWindow(string workspacePath, Course course, int section, MainWindow? main = null)
     {
@@ -52,6 +55,15 @@ public sealed partial class AssistWindow : Window
         _course = course;
         _section = section;
         _main = main;
+
+        string? stored = null;
+        if (App.Settings.AssistPromptHistories.TryGetValue(HistoryKey, out var s))
+        {
+            stored = s;
+        }
+        _history = AssistPromptHistory.Read(stored);
+
+        Input.TextChanged += Input_TextChanged;
 
         Title = $"Revise {course.Code} Section {section}";
         Heading.Text = $"Revising {course.Code} Section {section}";
@@ -192,9 +204,8 @@ public sealed partial class AssistWindow : Window
         // Mount the prompt shelf at the top of the window with clickable cards.
         var shelf = new AssistPromptShelfView(phrasing =>
         {
-            Input.Text = phrasing;
-            Input.SelectionStart = phrasing.Length;
-            Input.SelectionLength = 0;
+            ShowRecalled(phrasing);
+            _history.StopBrowsing();
             Input.Focus(FocusState.Programmatic);
         });
         PromptShelfHost.Content = shelf;
@@ -238,11 +249,50 @@ public sealed partial class AssistWindow : Window
 
     private async void Send_Click(object sender, RoutedEventArgs e) => await SendWhatIsTyped();
 
+    private void Input_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_history.IsBrowsing && Input.Text != _lastRecalled)
+        {
+            _history.StopBrowsing();
+        }
+    }
+
+    private void ShowRecalled(string text)
+    {
+        _lastRecalled = text;
+        Input.Text = text;
+        Input.SelectionStart = text.Length;
+        Input.SelectionLength = 0;
+    }
+
     private async void Input_KeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key != VirtualKey.Enter) return;
-        e.Handled = true;
-        await SendWhatIsTyped();
+        if (e.Key == VirtualKey.Enter)
+        {
+            e.Handled = true;
+            await SendWhatIsTyped();
+            return;
+        }
+
+        if (e.Key == VirtualKey.Up)
+        {
+            if (Input.Text.Contains('\n')) return;
+            string? recalled = _history.Earlier(Input.Text);
+            if (recalled is null) return;
+            ShowRecalled(recalled);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == VirtualKey.Down)
+        {
+            if (Input.Text.Contains('\n')) return;
+            string? recalled = _history.Later();
+            if (recalled is null) return;
+            ShowRecalled(recalled);
+            e.Handled = true;
+            return;
+        }
     }
 
     private async Task SendWhatIsTyped()
@@ -250,6 +300,11 @@ public sealed partial class AssistWindow : Window
         if (_agent is null) return;
         string said = Input.Text.Trim();
         if (said.Length == 0) return;
+
+        _history.Remember(said);
+        App.Settings.AssistPromptHistories[HistoryKey] = _history.Stored;
+        try { App.Settings.Save(); } catch { }
+        _lastRecalled = null;
 
         Input.Text = "";
         Say("You", said);

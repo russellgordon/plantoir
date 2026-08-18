@@ -242,6 +242,12 @@ is what happened to the test-race item, sitting here for three days with
 "worth ten minutes to check" in the middle of it.
 
 
+- **Arrow-key prompt history navigation in Windows assist chat** (Windows, 2026-08-18).
+  Windows now supports Terminal-style Up/Down arrow key history navigation in `AssistWindow.xaml.cs`.
+  - **Behavior & Contract**: Follows `contracts/assist-cases.json` → `promptHistory`. Up recalls earlier prompts (newest first), Down recalls later prompts, half-typed draft is preserved and restored when walking back down past newest, Up at oldest or Down when not walking passes the key through to the `TextBox` (letting caret move to start/end), typing/editing ends the walk, and multi-line text passes arrow keys through to allow vertical caret movement.
+  - **Persistence**: Added `AssistPromptHistories` dictionary to `AppSettings.cs` (`%LOCALAPPDATA%\Plantoir\settings.json`), keyed per section (`$"AssistPromptHistory-{course.Code}-{section}"`) matching macOS `@AppStorage` convention.
+  - **Reference**: `AssistWindow.xaml.cs`, `Plantoir.Core.Assist.AssistPromptHistory`, and unit tests in `Plantoir.Tests.AssistPromptHistoryTests` (514 tests passing).
+
 - **Windows local assistant moved out of WSL2 to host process with Vulkan GPU acceleration** (Windows, 2026-08-17).
   Windows now runs `llama-server.exe` natively on the host instead of running a Linux container in WSL2.
   - **Why**: In WSL2 without GPU pass-through, a 3,400 token prompt prefix took ~175 seconds across 2 virtual CPU cores, necessitating an artificial progress countdown bar, a 98 MB disk prefix cache (`--slot-save-path`), and a background keep-awake hack (`_keepWslAwake`). Moving to a native Windows host process enables Direct3D12/Vulkan GPU acceleration across Intel/AMD/NVIDIA graphics and multi-threaded host CPU fallback.

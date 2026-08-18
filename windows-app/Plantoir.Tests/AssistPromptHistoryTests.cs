@@ -62,4 +62,47 @@ public class AssistPromptHistoryTests
             }
         }
     }
+
+    [Fact]
+    public void PromptHistory_SurvivesBeingStoredAndReadBack()
+    {
+        var history = new AssistPromptHistory();
+        history.Remember("Publish “Unit 2, Day 3”; and the rest");
+        history.Remember("What would students see in this section right now?");
+
+        var readBack = AssistPromptHistory.Read(history.Stored);
+
+        Assert.Equal(history.Entries, readBack.Entries);
+    }
+
+    [Fact]
+    public void PromptHistory_UnreadableStorageBecomesAnEmptyHistory()
+    {
+        var history = AssistPromptHistory.Read("{ not json");
+        Assert.Empty(history.Entries);
+    }
+
+    [Fact]
+    public void PromptHistory_NullOrWhitespaceStorageBecomesAnEmptyHistory()
+    {
+        var history1 = AssistPromptHistory.Read(null);
+        Assert.Empty(history1.Entries);
+
+        var history2 = AssistPromptHistory.Read("   ");
+        Assert.Empty(history2.Entries);
+    }
+
+    [Fact]
+    public void PromptHistory_OldestFallOffOnceItIsFull()
+    {
+        var history = new AssistPromptHistory();
+        for (int i = 1; i <= AssistPromptHistory.MostRemembered + 5; i++)
+        {
+            history.Remember($"Publish Unit 1, Day {i}");
+        }
+
+        Assert.Equal(AssistPromptHistory.MostRemembered, history.Entries.Count);
+        Assert.Equal("Publish Unit 1, Day 6", history.Entries[0]);
+        Assert.Equal($"Publish Unit 1, Day {AssistPromptHistory.MostRemembered + 5}", history.Entries[^1]);
+    }
 }

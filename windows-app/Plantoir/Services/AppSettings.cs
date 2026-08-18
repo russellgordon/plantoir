@@ -62,6 +62,11 @@ public sealed class AppSettings
     /// </summary>
     public string AssistPromptShelfOpenGroups { get; set; } = "";
 
+    /// <summary>
+    /// Stored prompt history per section, keyed by $"AssistPromptHistory-{course.Code}-{section}".
+    /// </summary>
+    public Dictionary<string, string> AssistPromptHistories { get; set; } = new();
+
     public static string DefaultPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                      "Plantoir", "settings.json");
