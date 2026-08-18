@@ -77,15 +77,81 @@ outstanding.
 
 ## Open — what the mac still owes
 
-**Nothing outstanding as of 2026-08-16.** Every item that arrived from the
-Windows side has been dealt with and moved to the ledger below; the last one —
-a test race around process-wide statics — was checked on 2026-08-16 and found
-not to apply here.
-
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+- **A contract case for the summary/detail split — the mac already passes it,
+  so this is a pin, not a request** (Windows, 2026-08-18, `windows-sync`).
+  Windows has just ported `AssistToolOutcome`'s two-audience split, having
+  shipped for weeks without it (see the awareness entry below for what that
+  looked like). The behaviour is now pinned on this side by
+  `windows-app/Plantoir.Tests/ToolAnswerTests.cs`, and it is NOT pinned by
+  anything shared — which is how the two apps came to differ on it in the
+  first place.
+
+  What is wanted is a case list both suites run: for each of the thirteen
+  tools the local model is shown, the sentence a TEACHER reads, against the
+  longer answer the model gets. It could not be proposed from here with any
+  confidence, and the reason is worth recording rather than re-deriving:
+  `scenarios` and `nearMisses` are the authored halves of
+  `assist-cases.json`, and both are shaped around the agent LOOP —
+  `given` / `when` / `expectReply: "wording.X"` — where this is about what
+  ONE tool returns, keyed to a course fixture the two suites do not share. A
+  new top-level key would be the honest shape, and whether the generator
+  preserves one is knowable only on the mac, where `--write-contracts` runs.
+  **Please decide the shape and add it**; the Windows tests will be rewritten
+  against whatever lands. The wordings to pin are in the awareness entry
+  below.
+
+  Rejected here: proposing it under `scenarios` anyway. A case the generator
+  might silently eat is worse than no case, because the next person reads a
+  green suite as proof.
+
 ## For awareness — no mac code needed
+
+- **Windows was chatty for one structural reason, and it was not wording**
+  (Windows, 2026-08-18, `windows-sync`). Recorded because the mac's own
+  design is what fixed it, and because the reasoning behind `AssistToolOutcome`
+  is not written anywhere the Windows side could have read it.
+
+  Every Windows tool returned ONE string, and it was shown to the teacher AND
+  fed to the model. So "read Unit 2, Day 3" put a lesson's entire Markdown in
+  the chat window; "what pages are in this section" put sixty file paths
+  there; a publish said "Published 4 pages (A, B, C, D) and rebuilt the
+  preview of ICS3U Section 1"; and every plan ended with "Show this to the
+  teacher and ask before going ahead" — a sentence addressed to the model,
+  directly above the two buttons that ARE the asking. Two earlier attempts at
+  this (log rows 263 and 264) shortened individual sentences and fixed the
+  turn-taking, and neither touched the split, so the chattiness survived both.
+
+  The mac's teacher-facing lines are now Windows' too, word for word:
+  `Read “Unit 2, Day 3”.` · `Found 42 pages in ICS3U Section 1.` ·
+  `Nothing matched in ICS3U Section 1.` · `Published 4 pages.` ·
+  `Unpublished 2 pages.` · `Published the class on 2026-09-10.` ·
+  `It's already been published.` · `Added Unit 2, Day 4, dated 2026-09-14.` ·
+  `ICS3U Section 1 meets on 75 recorded days.` ·
+  `Scheduled: ICS3U Section 1 deploys to Netlify at Tuesday 9 June, 6:30 AM.`
+  Undo now speaks the contract's sentences rather than its own.
+
+  **The one thing the mac may want to know for its own sake**: the split
+  costs the mac nothing because its runner is in-process, but Windows drives
+  the same `plantoir-mcp` Claude Code drives, so the summary needed a wire.
+  It rides in the tool result's `_meta`, under `plantoir.app/teacherSummary`,
+  and the text content is untouched — Claude Code sees exactly what it saw
+  before. Rejected: a second text content block (Claude Code would read both
+  and report the teacher's line as part of the answer), and
+  `structuredContent` (it is validated against a declared `outputSchema`, and
+  declaring one changes what every client sees of every tool). If the mac's
+  MCP server ever wants to hand a summary to a client of its own, that is the
+  channel, and `AssistToolAnswer.TeacherSummaryKey` is the frozen key.
+
+  Two smaller things found in the same sweep, both fixed on Windows and
+  neither present on the mac: the turn-ending list named `roll_over_course`
+  for a tool actually called `roll_over_section` (so that write got the model
+  a lap it should not have had, and the teacher a paragraph restating the line
+  above it), and `list_recent_changes` ended by telling a teacher that
+  "undo_last_change takes the most recent one back" — rule 1, in the one place
+  a teacher is most likely to be reading.
 
 - **Anything you build over there now owes a trail line** (mac, 2026-08-16).
   Plantoir keeps a breadcrumb trail so a problem reported next week can be

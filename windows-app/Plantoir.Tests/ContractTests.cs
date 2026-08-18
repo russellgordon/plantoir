@@ -398,8 +398,8 @@ public class ContractTests
 
     private sealed class DummyTools : IToolServer
     {
-        public Task<string> CallTool(string name, JsonObject arguments, Action<string>? progress = null, CancellationToken cancellation = default) =>
-            Task.FromResult("OK");
+        public Task<AssistToolAnswer> CallTool(string name, JsonObject arguments, Action<string>? progress = null, CancellationToken cancellation = default) =>
+            Task.FromResult(AssistToolAnswer.Same("OK"));
     }
 }
 

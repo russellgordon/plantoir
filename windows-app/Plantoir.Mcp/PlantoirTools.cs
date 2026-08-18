@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Text;
+using System.Text.Json.Nodes;
 using ModelContextProtocol;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
@@ -74,7 +76,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "Use this to find the exact title of a page before acting on it. " +
                  "Courses hold hundreds of pages, so pass `matching` to narrow the list — for example \"Unit 2\" " +
                  "for that unit's classes.")]
-    public string ListPages(
+    public CallToolResult ListPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("Only list pages whose path contains this text. Leave empty to list everything.")]
@@ -89,17 +91,23 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             if (filter.Length > 0)
                 pages = pages.Where(p => p.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToList();
 
+            string where = $"{found.Code} Section {number}";
             if (pages.Count == 0)
-                return filter.Length > 0
-                    ? $"No page in {found.Code} Section {number} matches “{filter}”."
-                    : $"{found.Code} Section {number} has no pages.";
+                return Answering($"Nothing matched in {where}.",
+                                 filter.Length > 0
+                                     ? $"No page in {where} matches “{filter}”."
+                                     : $"{where} has no pages.");
 
             var shown = pages.Take(MostPagesListed).ToList();
             var text = new StringBuilder(string.Join("\n", shown));
             if (pages.Count > shown.Count)
                 text.Append($"\n\n…and {pages.Count - shown.Count} more of {pages.Count}. " +
                             "Pass `matching` to narrow this down.");
-            return text.ToString();
+
+            // A list of paths is the MODEL's answer to "which page did they
+            // mean". What the teacher asked has a number for an answer.
+            string word = pages.Count == 1 ? "page" : "pages";
+            return Answering($"Found {pages.Count} {word} in {where}.", text.ToString());
         });
 
     [McpServerTool(Name = "read_page", Title = "Read a page", ReadOnly = true, Destructive = false)]
@@ -108,14 +116,21 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "page such as a Concept carries `publishForSection1:` and `publishForSection2:` — one flag per section. " +
                  "Older courses carry `draft:` and `draftSection1:` instead, which mean the OPPOSITE — `draft: true` is a " +
                  "page students cannot see. Both are understood; report what you find without rewriting it yourself.")]
-    public string ReadPage(
+    public CallToolResult ReadPage(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("The page title as it appears in the sidebar, for example \"Unit 2, Day 3\".")] string page)
         => Guarded(() =>
         {
             var found = workspace.Course(course);
-            return workspace.ReadPage(found, workspace.Section(found, section), page);
+            int number = workspace.Section(found, section);
+            string path = workspace.Page(found, number, page);
+
+            // The page itself is for the MODEL, which was asked a question
+            // about it. A lesson's whole Markdown in the chat window answers
+            // nothing the teacher asked and buries everything said before it.
+            return Answering($"Read “{Path.GetFileNameWithoutExtension(path)}”.",
+                             workspace.ReadPage(found, number, page));
         });
 
     [McpServerTool(Name = "deploy_section", Title = "Deploy a section's website",
@@ -288,7 +303,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "read it out — especially that the computer must be ON and AWAKE at that moment, plugged in " +
                  "if it is a laptop, with the lid open. Plantoir does not wake it. Replaces any deploy already " +
                  "scheduled for the same section. Use cancel_scheduled_deploy to call it off.")]
-    public string ScheduleDeploy(
+    public CallToolResult ScheduleDeploy(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(WhenHelp)] string when)
@@ -302,10 +317,14 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                                         plan.CourseCode, plan.SectionNumber, moment) is { } problem)
                 throw new AssistRefusal($"Nothing was scheduled. {problem}");
 
-            return $"Scheduled: {plan.CourseCode} Section {plan.SectionNumber} deploys to " +
-                   $"{plan.Destination} at {moment:dddd d MMMM, h:mm tt}.\n\n" +
-                   "Remember this computer has to be on and awake then — plugged in if it is a laptop, " +
-                   "lid open. Plantoir cannot wake it up. Say the word and I'll cancel it.";
+            // The caution about the computer being awake is on the card the
+            // teacher agreed to, before this ran. Repeating it afterwards is
+            // the assistant explaining itself to somebody who just read it.
+            string summary = $"Scheduled: {plan.CourseCode} Section {plan.SectionNumber} deploys to " +
+                             $"{plan.Destination} at {moment:dddd d MMMM, h:mm tt}.";
+            return Answering(summary, summary + "\n\n" +
+                             "Remember this computer has to be on and awake then — plugged in if it is a laptop, " +
+                             "lid open. Plantoir cannot wake it up. Say the word and I'll cancel it.");
         });
 
     [McpServerTool(Name = "cancel_scheduled_deploy", Title = "Call off a scheduled deploy",
@@ -313,7 +332,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("TEACHERS SAY: \"cancel that scheduled deploy\", \"don't send it in the morning after all\", " +
                  "\"call it off\". " +
                  "Call off a deploy that was scheduled for a section. Safe to call when nothing is scheduled.")]
-    public string CancelScheduledDeploy(
+    public CallToolResult CancelScheduledDeploy(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section)
         => Guarded(() =>
@@ -323,11 +342,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             string name = $"Plantoir deploy {found.Code} section {number}";
 
             if (!TaskScheduling.Exists(name))
-                return $"There is no deploy scheduled for {found.Code} Section {number}.";
+                return Answering($"There is no deploy scheduled for {found.Code} Section {number}.",
+                                 $"There is no deploy scheduled for {found.Code} Section {number}, " +
+                                 "so there was nothing to call off.");
 
             return TaskScheduling.Cancel(name) is { } problem
-                ? $"That could not be cancelled: {problem}"
-                : $"Cancelled the scheduled deploy for {found.Code} Section {number}.";
+                ? Answering($"That could not be cancelled: {problem}")
+                : Answering($"Cancelled the scheduled deploy for {found.Code} Section {number}.");
         });
 
     [McpServerTool(Name = "list_curriculum_expectations", Title = "List curriculum expectations",
@@ -493,7 +514,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "Call plan_add_next_class FIRST and show the teacher what it said. " +
                  "The page starts UNPUBLISHED — an empty skeleton for the teacher to write, which stays out of the site " +
                  "until they publish it. An existing page is never written over.")]
-    public string AddNextClass(
+    public CallToolResult AddNextClass(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("Pass \"next\" to start a new unit. Leave empty to continue the current unit.")]
@@ -503,7 +524,20 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         => Guarded(() =>
         {
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
-            return workspace.ApplyAddClasses(plan).Message;
+            if (plan.ChangesNothing)
+                return Answering("Nothing needed adding — that page already exists.",
+                                 plan.Describe() + "\n\nNothing was created, because the page is already " +
+                                 "there. A page with that name is never written over: it may be a lesson " +
+                                 "written months ago.");
+
+            var result = workspace.ApplyAddClasses(plan);
+            if (!result.Succeeded) return Answering(result.Message);
+
+            // The teacher asked for a page. Its name and its date are the
+            // whole answer; how it was worked out is the model's half.
+            var made = plan.Classes[0];
+            return Answering($"Added {made.Title}, dated {made.Date:yyyy-MM-dd}.",
+                             result.Message + "\n\n" + AssistWording.ACreatedPageCanBeTakenBack);
         });
 
     [McpServerTool(Name = "plan_remember_timetable", Title = "Plan remembering class dates",
@@ -548,7 +582,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "CALL THIS FIRST whenever you need to know when a section's classes fall — before asking the " +
                  "teacher for a timetable, and before any tool that needs dates. It is remembered from the last " +
                  "time they gave one.")]
-    public string ReadRememberedTimetable(
+    public CallToolResult ReadRememberedTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("Pass \"all\" to list every date on file.")] string scope = "",
@@ -561,22 +595,23 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
             if (string.Equals(revise, "yes", StringComparison.OrdinalIgnoreCase))
             {
-                return $"Here you are — the dates for {where} are open for editing. {AssistWording.MayIAskForYourDates}";
+                return Answering($"Here you are — the dates for {where} are open for editing. {AssistWording.MayIAskForYourDates}");
             }
 
             var remembered = TimetableMemory.Read(workspace.FolderPath, found.Code, number);
             if (remembered is null || remembered.Dates.Count == 0)
-                return $"I don’t know when {where} meets yet. {AssistWording.MayIAskForYourDates}";
+                return Answering($"I don’t know when {where} meets yet. {AssistWording.MayIAskForYourDates}");
 
             if (string.Equals(scope, "all", StringComparison.OrdinalIgnoreCase))
             {
-                var all = new StringBuilder();
-                all.AppendLine($"All {remembered.Dates.Count} dates for {where}.");
-                all.AppendLine();
-                all.AppendLine("Every date on file:");
+                // Taking up the offer at the end of the short answer is a
+                // follow-up, not a fresh question. They asked for the rest;
+                // they get the rest, without the count and the range and the
+                // provenance they have just read.
+                var all = new StringBuilder("Every date on file:");
                 foreach (var date in remembered.Dates)
-                    all.AppendLine($"  {date:dddd}, {date:yyyy-MM-dd}");
-                return all.ToString().TrimEnd();
+                    all.Append($"\n{date:dddd}, {date:yyyy-MM-dd}");
+                return Answering($"All {remembered.Dates.Count} dates for {where}.", all.ToString());
             }
 
             var text = new StringBuilder();
@@ -614,7 +649,27 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 text.AppendLine($"{spare} recorded {(spare == 1 ? "date is" : "dates are")} still spare; the next class would fall on {next:yyyy-MM-dd} ({next:dddd}).");
             }
 
-            return text.ToString().TrimEnd();
+            // Where they came from, so a teacher can recognise a stale answer
+            // and say so. It is NOT a clause that finishes the sentence above
+            // — "meets on 75 recorded days, from pasted by hand" — so it has a
+            // line of its own.
+            text.AppendLine();
+            text.AppendLine($"Where they came from: {remembered.Source}. Recorded {remembered.Recorded:yyyy-MM-dd}.");
+
+            // The offer, and the words that take it up. A prompt whose answer
+            // nothing understands is worse than no prompt, so the phrasing
+            // named here is one AssistCardCommand matches in code.
+            if (remembered.Dates.Count > thisWeek.Count)
+            {
+                int rest = remembered.Dates.Count - thisWeek.Count;
+                text.AppendLine();
+                text.AppendLine($"There {(rest == 1 ? "is" : "are")} {rest} more. Say “show me the rest of " +
+                                "the dates” if you would like the lot.");
+            }
+
+            string days = remembered.Dates.Count == 1 ? "day" : "days";
+            return Answering($"{where} meets on {remembered.Dates.Count} recorded {days}.",
+                             text.ToString().TrimEnd());
         });
 
     [McpServerTool(Name = "remember_timetable", Title = "Remember when a section meets",
@@ -907,7 +962,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "Choose pages by name, or by date with onOrAfter/before — \"every class from September 15th\" is one " +
                  "call, and the dates are compared for you. Accepts any page, not just class pages, and can follow " +
                  "their links, so you never need to work out which pages are linked.")]
-    public string PlanPublishPages(
+    public CallToolResult PlanPublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("True to also publish every page these pages link to. Choose deliberately; there is no default.")]
@@ -925,7 +980,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "Choose pages by name, or by date with onOrAfter/before — \"hide everything from next Monday on\" is " +
                  "one call. Note that a page linked from a class you are unpublishing may also be linked from one that must " +
                  "stay up; the plan lists every page, so check it before agreeing.")]
-    public string PlanUnpublishPages(
+    public CallToolResult PlanUnpublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("True to also unpublish every page these pages link to. Choose deliberately; there is no default.")]
@@ -936,9 +991,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("Only classes strictly before this date. " + DateHelp)] string before = "")
         => Plan(course, section, pages, includeLinked, draft: true, onOrAfter, before);
 
-    private string Plan(string course, int section, string[]? pages, bool includeLinked,
-                        bool draft, string onOrAfter, string before)
-        => Guarded(() => Render(workspace.PlanPublish(
+    private CallToolResult Plan(string course, int section, string[]? pages, bool includeLinked,
+                                bool draft, string onOrAfter, string before)
+        => Guarded(() => Proposing(workspace.PlanPublish(
             course, section, pages ?? Array.Empty<string>(), includeLinked, draft,
             publishes: true, onOrAfter: ParseDate(onOrAfter, "onOrAfter"), before: ParseDate(before, "before"))));
 
@@ -973,7 +1028,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                             $"{entry.When:HH:mm} — {entry.Description} " +
                             $"({entry.Files.Count} file{(entry.Files.Count == 1 ? "" : "s")})");
         }
-        text.Append("\nundo_last_change takes the most recent one back.");
+        // Never a tool's name: this sentence is read by a teacher, and
+        // "undo_last_change" is a thing in the code, not a thing they can say.
+        text.Append("\nThe most recent one can be taken back — say “undo that”.");
         return text.ToString();
     }
 
@@ -988,30 +1045,50 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "before each change. " +
                  "\n\nIf the teacher had already published the section themselves, undoing the pages does not " +
                  "un-publish the live site — they need to publish again in Plantoir to bring it back in step.")]
-    public string UndoLastChange()
+    public CallToolResult UndoLastChange()
     {
         if (workspace.History is not { } history)
-            return "This session isn’t keeping an undo history.";
+            return Answering(AssistWording.NothingToUndo);
 
         var result = history.Undo();
         if (!result.Succeeded && result.Restored.Count == 0 && result.Skipped.Count == 0)
-            return result.Description;   // nothing to undo: the message says so
+            return Answering(AssistWording.NothingToUndo);
 
-        var text = new StringBuilder();
-        text.Append($"Undid {result.Description} — put {result.Restored.Count} " +
-                    $"file{(result.Restored.Count == 1 ? "" : "s")} back.");
+        // Nothing went back, because every file has been edited since. This
+        // must not read like a success, and a count of files put back reads
+        // exactly like one when the count is zero.
+        if (result.Restored.Count == 0)
+        {
+            string refusal = AssistWording.CouldNotUndo(result.Description, result.Skipped.Count) +
+                             "\n\n" + Listing(result.Skipped) +
+                             "\n\n" + AssistWording.UndoIsStillAvailable;
+            return Answering(refusal);
+        }
 
+        // The wordings are the contract's, not this file's. What a teacher is
+        // told about an undo is one of the sentences both apps must say
+        // identically — see contracts/assist-wording.json.
+        string summary = result.Skipped.Count == 0
+            ? AssistWording.Undid(result.Description)
+            : AssistWording.UndidPartly(result.Description, result.Skipped.Count);
+
+        var detail = new StringBuilder(summary);
         if (result.Skipped.Count > 0)
         {
-            text.AppendLine().AppendLine();
-            text.AppendLine($"{result.Skipped.Count} file{(result.Skipped.Count == 1 ? " was" : "s were")} " +
-                            "left alone, because they have changed since — putting the old copy back would " +
-                            "throw away that newer work:");
-            foreach (string path in result.Skipped.Take(MostListed))
-                text.AppendLine("  " + workspace.Relative(path));
-            text.Append("\nThis change is still on the list, so it can be tried again.");
+            detail.Append("\n\nThe ones I left alone:\n").Append(Listing(result.Skipped));
+            detail.Append("\n\n").Append(AssistWording.UndoIsStillAvailable);
         }
-        return text.ToString();
+        detail.Append("\n\n").Append(AssistWording.UndoDoesNotReachTheLiveSite);
+        return Answering(summary, detail.ToString());
+    }
+
+    /// <summary>The files an undo could not put back, named so they can be dealt with.</summary>
+    private string Listing(IReadOnlyList<string> paths)
+    {
+        var lines = new List<string>();
+        foreach (string path in paths.Take(MostListed)) lines.Add("  " + workspace.Relative(path));
+        if (paths.Count > MostListed) lines.Add($"  …and {paths.Count - MostListed} more.");
+        return string.Join("\n", lines);
     }
 
     // ---- The commonest request of all ------------------------------------
@@ -1027,11 +1104,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "This is the tool for \"publish tomorrow's class\" or \"publish today's class\": it finds the class " +
                  "by date, follows its links, gives pages no other class uses that class's date, and points the " +
                  "section's front page at it. Always show the teacher the result before using publish_class_on.")]
-    public string PlanPublishClassOn(
+    public CallToolResult PlanPublishClassOn(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(ClassDateHelp)] string date)
-        => Guarded(() => Render(PlanForDay(course, section, date, publishes: true)));
+        => Guarded(() => Proposing(PlanForDay(course, section, date, publishes: true)));
 
     [McpServerTool(Name = "publish_class_on", Title = "Publish a day's class",
                    Destructive = false, Idempotent = true)]
@@ -1045,7 +1122,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "front of students: only the teacher can do that, from Plantoir. Tell them to look the preview " +
                  "over and publish it there when they are happy. " +
                  "This takes a few minutes.")]
-    public async Task<string> PublishClassOn(
+    public async Task<CallToolResult> PublishClassOn(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(ClassDateHelp)] string date,
@@ -1056,15 +1133,23 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         try
         {
             var plan = PlanForDay(course, section, date, preview);
+            if (plan.NothingToDoSentence is { } already) return Answering(already);
+
             var result = await workspace.Apply(plan, Relay(progress), cancellation);
 
             var text = new StringBuilder(result.Message);
             if (plan.Index is { WillChange: true } index)
                 text.Append($"\nThe section's front page now shows “{index.ToClass}”.");
-            return text.ToString();
+
+            // The teacher named a DAY, so the day is what they are told about.
+            // Which pages that turned out to mean, and what happened to the
+            // section's front page, are the model's business.
+            return result.Succeeded
+                ? Answering($"Published the class on {date}.", text.ToString())
+                : Answering(text.ToString());
         }
-        catch (AssistRefusal refusal) { return refusal.Message; }
-        catch (OperationCanceledException) { return "The publish was stopped before it finished."; }
+        catch (AssistRefusal refusal) { return Answering(refusal.Message); }
+        catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
     }
 
     private PublishPlan PlanForDay(string course, int section, string date, bool publishes)
@@ -1088,7 +1173,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "Only call this after plan_publish_pages and after the teacher has agreed to what it said. " +
                  "Pass every page you intend to change in ONE call: each call with preview=true rebuilds the preview again. " +
                  "This takes several minutes.")]
-    public Task<string> PublishPages(
+    public Task<CallToolResult> PublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("True to also publish every page these pages link to.")] bool includeLinked,
@@ -1110,7 +1195,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "Only call this after plan_unpublish_pages and after the teacher has agreed to what it said. " +
                  "Pass every page you intend to change in ONE call: each call with preview=true rebuilds the preview again. " +
                  "This takes several minutes.")]
-    public Task<string> UnpublishPages(
+    public Task<CallToolResult> UnpublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("True to also unpublish every page these pages link to.")] bool includeLinked,
@@ -1160,23 +1245,35 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     // ---- Shared ----------------------------------------------------------
 
-    private async Task<string> Act(string course, int section, string[]? pages, bool includeLinked,
-                                   bool draft, bool preview, string onOrAfter, string before,
-                                   IProgress<ProgressNotificationValue> progress,
-                                   CancellationToken cancellation)
+    private async Task<CallToolResult> Act(string course, int section, string[]? pages, bool includeLinked,
+                                           bool draft, bool preview, string onOrAfter, string before,
+                                           IProgress<ProgressNotificationValue> progress,
+                                           CancellationToken cancellation)
     {
         try
         {
             var plan = workspace.PlanPublish(
                 course, section, pages ?? Array.Empty<string>(), includeLinked, draft, preview,
                 ParseDate(onOrAfter, "onOrAfter"), ParseDate(before, "before"));
-            if (plan.ChangesNothing && !preview) return plan.Describe();
+
+            // Four words, when four words are the whole answer.
+            if (plan.NothingToDoSentence is { } already) return Answering(already);
+            if (plan.ChangesNothing && !preview) return Answering(plan.Describe());
+
+            // The count comes from the PLAN, not from what the writes
+            // reported: it is the number the teacher just agreed to, and the
+            // two disagreeing by one is how a reply stops being believed.
+            int changing = plan.Changing.Count();
+            string verb = plan.Hiding ? "Unpublished" : "Published";
+            string word = changing == 1 ? "page" : "pages";
 
             var result = await workspace.Apply(plan, Relay(progress), cancellation);
-            return result.Message;
+            return result.Succeeded
+                ? Answering($"{verb} {changing} {word}.", result.Message)
+                : Answering(result.Message);
         }
-        catch (AssistRefusal refusal) { return refusal.Message; }
-        catch (OperationCanceledException) { return "The publish was stopped before it finished."; }
+        catch (AssistRefusal refusal) { return Answering(refusal.Message); }
+        catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
     }
 
     /// <summary>
@@ -1209,13 +1306,69 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         catch (UnauthorizedAccessException) { return "Plantoir doesn’t have permission to read that."; }
     }
 
+    // ---- Two audiences ---------------------------------------------------
+
+    /// <summary>
+    /// An answer whose two audiences want different lengths.
+    ///
+    /// <paramref name="summary"/> is the ONE LINE the teacher reads in the
+    /// chat; <paramref name="detail"/> is what the model is handed, at
+    /// whatever length the question needs. The text content of the result is
+    /// the detail and only the detail, so Claude Code — which reads it and
+    /// writes its own summary — sees exactly what it saw before any of this
+    /// existed. The teacher's line rides in <c>_meta</c>, which every other
+    /// client ignores.
+    ///
+    /// This is <c>AssistToolOutcome</c> from the mac, ported. Its absence is
+    /// why "read Unit 2, Day 3" used to put a whole page of Markdown in a
+    /// teacher's chat window: one string cannot be short for a person and
+    /// complete for a model at the same time.
+    /// </summary>
+    private static CallToolResult Answering(string summary, string detail) => new()
+    {
+        Content = [new TextContentBlock { Text = detail }],
+        Meta = new JsonObject { [AssistToolAnswer.TeacherSummaryKey] = summary },
+    };
+
+    /// <summary>
+    /// An answer that is the same words to both — every refusal, and every
+    /// tool whose whole reply is already one sentence. No <c>_meta</c> is
+    /// sent, and the client reads that absence as "show what you were given".
+    /// </summary>
+    private static CallToolResult Answering(string both) => new()
+    {
+        Content = [new TextContentBlock { Text = both }],
+    };
+
+    /// <summary><see cref="Guarded(Func{string})"/>, for a tool that answers in two halves.</summary>
+    private static CallToolResult Guarded(Func<CallToolResult> work)
+    {
+        try { return work(); }
+        catch (AssistRefusal refusal) { return Answering(refusal.Message); }
+        catch (Plantoir.Core.Models.OutsideWorkspaceException refusal) { return Answering(refusal.Message); }
+        catch (IOException error) { return Answering($"That couldn’t be read: {error.Message}"); }
+        catch (UnauthorizedAccessException) { return Answering("Plantoir doesn’t have permission to read that."); }
+    }
+
     /// <summary>
     /// The plan itself lists every page it would touch, with the key and the
     /// transition; this only adds the standing instruction. Rendering the list
     /// here as well is how two counts drifted apart in the first place — one
     /// description of the plan, in one place.
+    ///
+    /// The instruction is addressed to whatever is reading a plan on a surface
+    /// with NO Go and Cancel of its own — which means Claude Code, and never
+    /// the teacher. Plantoir's own window puts the two buttons under the plan,
+    /// so a teacher who read "Show this to the teacher and ask before going
+    /// ahead" was being addressed as though they were the model, about
+    /// machinery, directly above the asking it described.
     /// </summary>
-    private static string Render(PublishPlan plan) =>
-        plan.Describe() +
-        "\n\nNothing has been changed. Show this to the teacher and ask before going ahead.";
+    private static CallToolResult Proposing(PublishPlan plan) =>
+        plan.NothingToDoSentence is { } already
+            ? Answering(already)
+            : Answering(plan.Describe(), plan.Describe() + "\n\n" + AskBeforeGoingAhead);
+
+    /// <summary>Said to a caller that has no Go and Cancel of its own. Never to a teacher.</summary>
+    private const string AskBeforeGoingAhead =
+        "Nothing has been changed. Show this to the teacher and ask before going ahead.";
 }

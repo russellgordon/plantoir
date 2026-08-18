@@ -117,15 +117,21 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
     }
 
     /// <summary>
-    /// Run a tool and return whatever it said, as text.
+    /// Run a tool and return what it said, in its two halves.
     ///
     /// The server answers a refusal as ordinary text rather than an error, so
     /// the model reads the reason and can correct itself — the same behaviour
     /// Claude Code gets.
+    ///
+    /// The TEXT is the model's half, unchanged, which is why Claude Code is
+    /// unaffected by any of this. The teacher's one-line half rides in the
+    /// result's <c>_meta</c>; a tool that says the same thing to both sends
+    /// none, and the fall-back below is what that absence means.
     /// </summary>
-    public async Task<string> CallTool(string name, JsonObject arguments,
-                                       Action<string>? progress = null,
-                                       CancellationToken cancellation = default)
+    public async Task<Plantoir.Core.Assist.AssistToolAnswer> CallTool(
+        string name, JsonObject arguments,
+        Action<string>? progress = null,
+        CancellationToken cancellation = default)
     {
         JsonNode? result;
         try
@@ -133,13 +139,23 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
             result = await Call("tools/call",
                 new JsonObject { ["name"] = name, ["arguments"] = arguments }, cancellation, progress);
         }
-        catch (Exception error) { return $"That tool couldn’t be run: {error.Message}"; }
+        catch (Exception error)
+        {
+            return Plantoir.Core.Assist.AssistToolAnswer.Same($"That tool couldn’t be run: {error.Message}");
+        }
 
-        if (result?["content"] is not JsonArray content) return "";
+        if (result?["content"] is not JsonArray content)
+            return Plantoir.Core.Assist.AssistToolAnswer.Same("");
         var text = new System.Text.StringBuilder();
         foreach (var block in content)
             if (block?["text"]?.GetValue<string>() is { } piece) text.AppendLine(piece);
-        return text.ToString().TrimEnd();
+        string detail = text.ToString().TrimEnd();
+
+        string? summary = result["_meta"]?[Plantoir.Core.Assist.AssistToolAnswer.TeacherSummaryKey]
+            ?.GetValue<string>();
+        return string.IsNullOrWhiteSpace(summary)
+            ? Plantoir.Core.Assist.AssistToolAnswer.Same(detail)
+            : new Plantoir.Core.Assist.AssistToolAnswer(summary, detail);
     }
 
     // ---- JSON-RPC --------------------------------------------------------

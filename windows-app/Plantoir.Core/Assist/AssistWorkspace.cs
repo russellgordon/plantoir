@@ -943,7 +943,12 @@ public sealed class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so nothing was changed: {error.Message}");
         }
 
-        _undo?.Begin($"{(plan.Hiding ? "hiding" : "publishing")} " +
+        // PAST TENSE, and "unpublished" rather than "hid". This clause is
+        // read back inside AssistWording.Undid — "Earlier, you {change}. Then
+        // you asked me to undo that…" — so a gerund here puts a broken
+        // sentence in front of the teacher at the one moment they are
+        // checking that the right thing was put back.
+        _undo?.Begin($"{(plan.Hiding ? "unpublished" : "published")} " +
                      $"{Humanize(plan.Named.Select(p => "“" + p.Title + "”"))} " +
                      $"in {course.Code} Section {section}");
 
@@ -1339,7 +1344,7 @@ public sealed class AssistWorkspace
             try
             {
                 string? contents = File.ReadAllText(marker);
-                _undo?.Begin($"cutting section {sectionNumber} loose from its website");
+                _undo?.Begin($"cut section {sectionNumber} loose from its website");
                 _undo?.Touch(marker, contents);
                 _undo?.Touch(kept, null);
                 File.Move(marker, kept);
@@ -1375,7 +1380,7 @@ public sealed class AssistWorkspace
             TimetableMemory.Write(_folder, course.Code, section, plan.AllMeetings,
                 $"block {plan.Block}", DateOnly.FromDateTime(DateTime.Now));
 
-        _undo?.Begin($"re-dating {course.Code} Section {section} onto block {plan.Block}");
+        _undo?.Begin($"re-dated {course.Code} Section {section} onto block {plan.Block}");
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         var classPaths = new HashSet<string>(
             plan.Dates.Select(d => d.RelativePath), StringComparer.OrdinalIgnoreCase);
@@ -1503,7 +1508,7 @@ public sealed class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so no dates were changed: {error.Message}");
         }
 
-        _undo?.Begin($"bringing {Humanize(plan.Anchors)}’ pages into date in " +
+        _undo?.Begin($"brought {Humanize(plan.Anchors)}’ pages into date in " +
                      $"{course.Code} Section {section}");
 
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
@@ -1711,7 +1716,7 @@ public sealed class AssistWorkspace
             throw new AssistRefusal($"{course.Code} couldn’t be backed up, so the page was not changed: {error.Message}");
         }
 
-        _undo?.Begin($"adding {plan.Adding.Count} curriculum expectations to “{plan.PageTitle}”");
+        _undo?.Begin($"added {plan.Adding.Count} curriculum expectations to “{plan.PageTitle}”");
 
         string path = PagePaths.ResolveInside(_folder, plan.RelativePath);
         string text = File.ReadAllText(path);
@@ -1929,7 +1934,7 @@ public sealed class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so nothing was moved: {error.Message}");
         }
 
-        _undo?.Begin($"making room for {plan.Added.Count} classes at Unit {plan.Unit}, Day {plan.AtDay} " +
+        _undo?.Begin($"made room for {plan.Added.Count} classes at Unit {plan.Unit}, Day {plan.AtDay} " +
                      $"in {course.Code} Section {section}");
 
         // Highest day first, so a rename never lands on a name still in use.
@@ -2174,7 +2179,7 @@ public sealed class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so no pages were created: {error.Message}");
         }
 
-        _undo?.Begin($"adding {plan.Classes.Count} class pages to Unit {plan.Unit} of " +
+        _undo?.Begin($"added {plan.Classes.Count} class pages to Unit {plan.Unit} of " +
                      $"{course.Code} Section {section}");
 
         // Match the time of day and UTC offset the section's existing classes

@@ -251,7 +251,11 @@ public class AssistWorkspaceTests : IDisposable
         Assert.Empty(result.Skipped);
         Assert.Contains("publish: false", File.ReadAllText(page));
         Assert.Contains("publishForSection1: false", File.ReadAllText(concept));
-        Assert.Contains("publishing “Unit 1, Day 2”", result.Description);
+        // PAST TENSE. This clause is read back inside AssistWording.Undid —
+        // "Earlier, you {change}." — so a gerund makes a broken sentence.
+        Assert.Contains("published “Unit 1, Day 2”", result.Description);
+        Assert.StartsWith("Earlier, you published “Unit 1, Day 2”",
+                          AssistWording.Undid(result.Description));
     }
 
     [Fact]
@@ -1399,7 +1403,7 @@ public class AssistWorkspaceTests : IDisposable
     public void ReadRememberedTimetable_WhenEmpty_OffersToAskForDates()
     {
         var tools = new Plantoir.Mcp.PlantoirTools(Open());
-        string result = tools.ReadRememberedTimetable("ICS3U", 1);
+        string result = tools.ReadRememberedTimetable("ICS3U", 1).Detail();
         Assert.Contains(AssistWording.MayIAskForYourDates, result);
         Assert.Contains("I don’t know when ICS3U Section 1 meets yet", result);
     }
@@ -1411,8 +1415,9 @@ public class AssistWorkspaceTests : IDisposable
         TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", new DateOnly(2026, 9, 1));
 
         var tools = new Plantoir.Mcp.PlantoirTools(Open());
-        string result = tools.ReadRememberedTimetable("ICS3U", 1, scope: "all");
-        Assert.Contains("All 3 dates for ICS3U Section 1", result);
+        var answer = tools.ReadRememberedTimetable("ICS3U", 1, scope: "all");
+        string result = answer.Detail();
+        Assert.Contains("All 3 dates for ICS3U Section 1", answer.Summary());
         Assert.Contains("2026-09-08", result);
         Assert.Contains("2026-09-10", result);
         Assert.Contains("2026-09-14", result);
@@ -1425,7 +1430,7 @@ public class AssistWorkspaceTests : IDisposable
         TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", new DateOnly(2026, 9, 1));
 
         var tools = new Plantoir.Mcp.PlantoirTools(Open());
-        string result = tools.ReadRememberedTimetable("ICS3U", 1, revise: "yes");
+        string result = tools.ReadRememberedTimetable("ICS3U", 1, revise: "yes").Detail();
         Assert.Contains(AssistWording.MayIAskForYourDates, result);
         Assert.Contains("open for editing", result);
     }

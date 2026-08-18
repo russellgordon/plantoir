@@ -70,6 +70,40 @@ public sealed class PublishPlan
         Index is not { WillChange: true };
 
     /// <summary>
+    /// The whole answer, when the whole answer is that there was nothing to
+    /// do — or null when something else needs saying.
+    ///
+    /// A teacher who asks to publish a class that is already published wants
+    /// four words back, not a plan with a heading, a count and a note that
+    /// nothing was changed because nothing needed to be. <see cref="Describe"/>
+    /// is still right for every other shape of "nothing changed": a name that
+    /// matched no page has to say so, and a request that found nothing at all
+    /// is not the same as one that found everything already done.
+    /// </summary>
+    public string? NothingToDoSentence
+    {
+        get
+        {
+            if (!ChangesNothing || Problems.Count > 0) return null;
+
+            var named = Named.ToList();
+            if (named.Count == 0) return null;
+
+            // Every page they NAMED is already the way they asked for it.
+            // The pages reached by following links are not what "it" means.
+            foreach (var page in named)
+                if (page.WillChange) return null;
+
+            // Word for word what the mac says, apostrophe included — these are
+            // sentences a teacher reads, and the two apps saying them
+            // differently is the drift the contract exists to catch.
+            if (named.Count == 1)
+                return Hiding ? "It's already hidden." : "It's already been published.";
+            return Hiding ? "They have already been hidden." : "They have already been published.";
+        }
+    }
+
+    /// <summary>
     /// The proposal as a teacher would read it.
     ///
     /// The shape of this is the direct result of a real session going wrong.

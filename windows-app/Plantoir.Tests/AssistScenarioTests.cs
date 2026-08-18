@@ -23,20 +23,20 @@ public class AssistScenarioTests
             Events = events;
         }
 
-        public Task<string> CallTool(string name, JsonObject arguments,
-                                     Action<string>? progress = null,
-                                     CancellationToken cancellation = default)
+        public Task<AssistToolAnswer> CallTool(string name, JsonObject arguments,
+                                               Action<string>? progress = null,
+                                               CancellationToken cancellation = default)
         {
             if (name == "deploy_section")
             {
                 Events.Add("runLauncherDirectly");
-                return Task.FromResult(AssistWording.Deployed("VVH2O", "1"));
+                return Task.FromResult(AssistToolAnswer.Same(AssistWording.Deployed("VVH2O", "1")));
             }
             else if (name == "unpublish_pages" || name == "publish_pages" || name == "publish_class_on")
             {
                 Events.Add("write");
             }
-            return Task.FromResult(Result);
+            return Task.FromResult(AssistToolAnswer.Same(Result));
         }
     }
 
@@ -125,8 +125,9 @@ public class AssistScenarioTests
                     ["arguments"] = "{}",
                 },
             };
-            string toolReply = await agent.RunTool(call, resultLines, CancellationToken.None);
-            resultLines.Add(new AssistAgent.Line("assistant", toolReply));
+            var toolReply = await agent.RunTool(call, resultLines, CancellationToken.None);
+            // The teacher's half: what the transcript actually shows.
+            resultLines.Add(new AssistAgent.Line("assistant", toolReply.Summary));
         }
 
         // Assert events if specified

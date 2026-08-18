@@ -61,15 +61,20 @@ public class AssistAgentTests
     {
         public readonly List<(string Name, JsonObject Arguments)> Calls = new();
         public string Result = "Done.";
+
+        /// <summary>The teacher's one-line half, when a test is about the split.</summary>
+        public string? Summary;
         public string[] Narration = Array.Empty<string>();
 
-        public Task<string> CallTool(string name, JsonObject arguments,
-                                     Action<string>? progress = null,
-                                     CancellationToken cancellation = default)
+        public Task<AssistToolAnswer> CallTool(string name, JsonObject arguments,
+                                               Action<string>? progress = null,
+                                               CancellationToken cancellation = default)
         {
             Calls.Add((name, (JsonObject)arguments.DeepClone()));
             foreach (string line in Narration) progress?.Invoke(line);
-            return Task.FromResult(Result);
+            return Task.FromResult(Summary is null
+                ? AssistToolAnswer.Same(Result)
+                : new AssistToolAnswer(Summary, Result));
         }
     }
 

@@ -20,15 +20,19 @@ public interface IChatModel
 }
 
 /// <summary>
-/// The tool half: run one tool, return what it said as text, narrate through
+/// The tool half: run one tool, return what it said, narrate through
 /// <paramref name="progress"/> along the way. McpClient implements it over
 /// stdio to plantoir-mcp.
+///
+/// The answer comes back in two halves — see <see cref="AssistToolAnswer"/>.
+/// It used to be one string, shown to the teacher and sent to the model both,
+/// and that single fact is why this app's replies read longer than the mac's.
 /// </summary>
 public interface IToolServer
 {
-    Task<string> CallTool(string name, JsonObject arguments,
-                          Action<string>? progress = null,
-                          CancellationToken cancellation = default);
+    Task<AssistToolAnswer> CallTool(string name, JsonObject arguments,
+                                    Action<string>? progress = null,
+                                    CancellationToken cancellation = default);
 }
 
 /// <summary>
@@ -601,8 +605,8 @@ public sealed class AssistAgent
     {
         var call = Synthesise(userText, tool, arguments);
         var lines = new List<Line>();
-        string result = await RunTool(call, lines, cancellation);
-        lines.Add(new Line("tools", result));
+        var answer = await RunTool(call, lines, cancellation);
+        lines.Add(new Line("tools", answer.Summary));
         TurnEnded(lines);   // the offer, when the command edited pages
         return lines;
     }
@@ -683,8 +687,8 @@ public sealed class AssistAgent
         OnPlanAccepted?.Invoke();
 
         var lines = new List<Line>();
-        string result = await RunTool(call, lines, cancellation);
-        lines.Add(new Line("tools", result));
+        var answer = await RunTool(call, lines, cancellation);
+        lines.Add(new Line("tools", answer.Summary));
         if (TurnEnded(lines)) return lines;
         return lines.Concat(await Run(cancellation)).ToList();
     }
@@ -770,8 +774,8 @@ public sealed class AssistAgent
                 return lines;
             }
 
-            string result = await RunTool(call, lines, cancellation);
-            lines.Add(new Line("tools", result));
+            var answer = await RunTool(call, lines, cancellation);
+            lines.Add(new Line("tools", answer.Summary));
             if (TurnEnded(lines)) return lines;
         }
 
@@ -780,11 +784,29 @@ public sealed class AssistAgent
         return lines;
     }
 
+    /// <summary>
+    /// The tools that END a turn.
+    ///
+    /// A READ hands back to the model, so it can answer the question it was
+    /// reading for. A WRITE is the end: the teacher asked for something, it
+    /// happened, and another lap round the model can only invent a follow-up
+    /// nobody asked for. macOS decides this per outcome; this list is the
+    /// same rule by name, and every write the server offers has to be on it.
+    ///
+    /// It has been wrong twice in the way a list is wrong — <c>roll_over_course</c>
+    /// was here for a tool actually called <c>roll_over_section</c>, and five
+    /// other writes were simply missing. Neither shows up as an error: the
+    /// write happens, the model gets a lap it should not have had, and the
+    /// teacher reads a paragraph restating the sentence above it.
+    /// </summary>
     private static readonly HashSet<string> WriteTools = new(StringComparer.OrdinalIgnoreCase)
     {
         "publish_pages", "unpublish_pages", "publish_class_on", "undo_last_change",
-        "add_next_class", "schedule_deploy", "cancel_scheduled_deploy",
-        "rebuild_preview", "deploy_section", "re_date_classes", "roll_over_course",
+        "add_next_class", "add_classes", "make_room_for_classes",
+        "schedule_deploy", "cancel_scheduled_deploy",
+        "rebuild_preview", "deploy_section", "re_date_classes", "roll_over_section",
+        "remember_timetable", "sync_page_dates", "add_curriculum_mentions",
+        "back_up_course",
     };
 
     private static bool IsWriteTool(string name) => WriteTools.Contains(name);
@@ -806,7 +828,7 @@ public sealed class AssistAgent
         return TakeHandedToApp();
     }
 
-    internal async Task<string> RunTool(JsonObject call, List<Line> lines, CancellationToken cancellation)
+    internal async Task<AssistToolAnswer> RunTool(JsonObject call, List<Line> lines, CancellationToken cancellation)
     {
         string name = call["function"]?["name"]?.GetValue<string>() ?? "";
         var arguments = new JsonObject();
@@ -881,12 +903,14 @@ public sealed class AssistAgent
             }
         }
 
-        string result = await _tools.CallTool(name, arguments, OnToolProgress, cancellation);
+        var answer = await _tools.CallTool(name, arguments, OnToolProgress, cancellation);
+        // The MODEL is given the long half; the teacher's line is added by
+        // whoever called this, from the short one.
         _messages.Add(new JsonObject
         {
             ["role"] = "tool",
             ["tool_call_id"] = call["id"]?.DeepClone(),
-            ["content"] = result,
+            ["content"] = answer.Detail,
         });
         if (IsWriteTool(name) || name.Equals("check_section", StringComparison.OrdinalIgnoreCase))
         {
@@ -896,11 +920,17 @@ public sealed class AssistAgent
         {
             ShowPreviewInApp.Invoke();
         }
-        return result;
+        return answer;
     }
 
-    /// <summary>Record a tool's answer without having called the server.</summary>
-    private string Answer(JsonObject call, string text)
+    /// <summary>
+    /// Record a tool's answer without having called the server.
+    ///
+    /// These are <c>AssistWording</c> sentences, written for the teacher and
+    /// short enough for the model to read as they stand — so the two halves
+    /// are the same words, deliberately.
+    /// </summary>
+    private AssistToolAnswer Answer(JsonObject call, string text)
     {
         _messages.Add(new JsonObject
         {
@@ -908,6 +938,6 @@ public sealed class AssistAgent
             ["tool_call_id"] = call["id"]?.DeepClone(),
             ["content"] = text,
         });
-        return text;
+        return AssistToolAnswer.Same(text);
     }
 }
