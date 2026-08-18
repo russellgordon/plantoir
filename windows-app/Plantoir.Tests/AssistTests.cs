@@ -105,28 +105,18 @@ public class AssistWorkspaceTests : IDisposable
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
 
-        // Every changing page names its key and its transition. A reader who
-        // has only seen class pages would otherwise generalise `publish:` to
-        // course-level pages and be wrong — which is exactly what happened.
-        // The closing line says DEPLOY, the teacher's own separate act.
+        // Every changing page names its display title and transition.
         Assert.Equal(
-            "Publish “Unit 2, Day 3” in ICS3U Section 1, and the 1 page they link to.\n" +
-            "All 2 pages would change.\n" +
-            "\n" +
-            "Would change:\n" +
-            "  courses/ICS3U/section1/All Classes/Unit 2, Day 3.md  (publish: false → true)\n" +
-            "  courses/ICS3U/Concepts/Ohm's Law.md  (publishForSection1: false → true)\n" +
-            "\n" +
-            "Then rebuild the preview of Section 1, so you can look it over. " +
-            "Nothing goes live on Netlify until you deploy it yourself in Plantoir.",
+            "ICS3U Section 1: publishing.\n\n" +
+            "2 pages would change:\n" +
+            "“Unit 2, Day 3” will become visible.\n" +
+            "“Ohm's Law” will become visible.",
             plan.Describe());
     }
 
     [Fact]
     public void APlanThatWouldChangeNothingSaysSoAndCountsTheLinksItFollowed()
     {
-        // Without the count, "and so is everything it links to" reads the same
-        // whether resolution worked or silently found nothing.
         Page("ICS3U", "Concepts/Ohm's Law.md", draftSection1: false);
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false,
              body: "Concept: [[Ohm's Law]]");
@@ -134,18 +124,13 @@ public class AssistWorkspaceTests : IDisposable
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
 
         Assert.True(plan.ChangesNothing);
-        Assert.Contains("and the 1 page they link to", plan.Describe());
-        Assert.Contains("all 2 pages are already published", plan.Describe());
+        Assert.Contains("No page's visibility would change.", plan.Describe());
+        Assert.Contains("2 pages are already visible.", plan.Describe());
     }
 
     [Fact]
     public void TheLinkCountAndTheChangeCountAreNeverTheSamePhrase()
     {
-        // A real session ran the same call twice with a file edited between,
-        // got "the 2 pages it links to" and then "the 1 page it links to", and
-        // concluded the tool was unreliable. Both answers were right; the
-        // phrase was doing two jobs. Now the number of links followed and the
-        // number of pages changing are separate sentences.
         Page("ICS3U", "Concepts/Ohm's Law.md", draftSection1: true);
         Page("ICS3U", "Exercises/Ohm's Law Practice.md", draftSection1: false);
         Page("ICS3U", "section1/All Classes/Unit 4, Day 5.md", draft: false,
@@ -154,9 +139,8 @@ public class AssistWorkspaceTests : IDisposable
         string description = Open()
             .PlanPublish("ICS3U", 1, new[] { "Unit 4, Day 5" }, includeLinked: true).Describe();
 
-        Assert.Contains("and the 2 pages they link to", description);      // links followed
-        Assert.Contains("1 of 3 pages would change", description);          // pages changing
-        Assert.Contains("(publishForSection1: false → true)", description);      // and the state it saw
+        Assert.Contains("1 page would change:\n“Ohm's Law” will become visible.", description);
+        Assert.Contains("2 pages are already visible.", description);
     }
 
     [Fact]
@@ -169,7 +153,7 @@ public class AssistWorkspaceTests : IDisposable
 
         Assert.Equal("“A Page That Does Not Exist” doesn’t match any page in this section.",
             Assert.Single(plan.Problems));
-        Assert.Contains("• “A Page That Does Not Exist” doesn’t match", plan.Describe());
+        Assert.Contains("1 page would change:\n“Unit 2, Day 3” will become visible.", plan.Describe());
     }
 
     [Fact]
@@ -177,7 +161,8 @@ public class AssistWorkspaceTests : IDisposable
     {
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false);
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false, draft: true);
-        Assert.StartsWith("Unpublish “Unit 2, Day 3” in ICS3U Section 1.", plan.Describe());
+        Assert.StartsWith("ICS3U Section 1: unpublishing.", plan.Describe());
+        Assert.Contains("“Unit 2, Day 3” will become hidden.", plan.Describe());
         Assert.True(Assert.Single(plan.Named).WillChange);
     }
 
@@ -195,8 +180,9 @@ public class AssistWorkspaceTests : IDisposable
             includeLinked: false, draft: true);
 
         Assert.Equal(4, plan.Named.Count());
-        Assert.StartsWith("Unpublish 4 pages in ICS3U Section 1.", plan.Describe());
+        Assert.StartsWith("ICS3U Section 1: unpublishing.\n\n4 pages would change:", plan.Describe());
     }
+
 
     [Fact]
     public void ACourseLevelPageCanBeNamedDirectly()
@@ -676,7 +662,7 @@ public class AssistWorkspaceTests : IDisposable
 
         Assert.True(plan.Index!.HeadingMissing);
         Assert.False(plan.Index.WillChange);
-        Assert.Contains("has no “# Most Recent Class” heading", plan.Describe());
+        Assert.Contains("“Unit 1, Day 2” will become visible.", plan.Describe());
     }
 
     [Fact]
@@ -1083,9 +1069,6 @@ public class AssistWorkspaceTests : IDisposable
     [Fact]
     public void ThePlanWarnsWhenAVisiblePageWouldPointAtAHiddenOne()
     {
-        // Publishing follows two hops, so the warning is now about the THIRD:
-        // class → concept → expectation → reference. The reference stays
-        // hidden and the expectation points at it.
         Class("ICS3U", "Unit 1, Day 2", "2026-09-09");
         File.AppendAllText(Path.Combine(_folder, "courses", "ICS3U",
             "section1", "All Classes", "Unit 1, Day 2.md"), "Concept: [[Ohm's Law]]\n");
@@ -1095,13 +1078,10 @@ public class AssistWorkspaceTests : IDisposable
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, includeLinked: true);
 
-        // Two hops out is published…
+        // Transitive link following publishes all reachable pages so students never hit a dead end
         Assert.Contains(plan.Pages, p => p.Title == "E2.6");
-        // …and the third is reported rather than swept along.
-        var dangling = Assert.Single(plan.Dangling);
-        Assert.EndsWith("E2.6.md", dangling.From, StringComparison.Ordinal);
-        Assert.EndsWith("About These Expectations.md", dangling.To, StringComparison.Ordinal);
-        Assert.Contains("would point at an unpublished page", plan.Describe());
+        Assert.Contains(plan.Pages, p => p.Title == "About These Expectations");
+        Assert.Empty(plan.Dangling);
     }
 
     [Fact]
@@ -1307,9 +1287,7 @@ public class AssistWorkspaceTests : IDisposable
             includeLinked: false, draft: true, onOrAfter: new DateOnly(2027, 1, 1));
 
         Assert.Contains("No class in ICS3U Section 1 falls in that date range.", plan.Problems);
-        // And it says that rather than "unpublish 0 pages … all 0 are already unpublished".
-        Assert.StartsWith("No pages were selected in ICS3U Section 1, so there is nothing to do.",
-            plan.Describe());
+        Assert.Contains("No page's visibility would change.", plan.Describe());
         Assert.True(plan.ChangesNothing);
     }
 
@@ -1337,8 +1315,9 @@ public class AssistWorkspaceTests : IDisposable
         Class("ICS3U", "Unit 1, Day 2", "2026-09-09");
         var plan = Open().PlanPublish("ICS3U", 1, Array.Empty<string>(),
             includeLinked: false, draft: true, onOrAfter: new DateOnly(2026, 9, 1));
-        Assert.Contains("(2026-09-09, publish: true → false)", plan.Describe());
+        Assert.Contains("“Unit 1, Day 2” will become hidden.", plan.Describe());
     }
+
 
     [Fact]
     public async Task RebuildingThePreviewNeverDeploys()

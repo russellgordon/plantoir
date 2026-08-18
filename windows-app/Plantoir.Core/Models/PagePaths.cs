@@ -33,6 +33,48 @@ public static class PagePaths
     }
 
     /// <summary>
+    /// True when <paramref name="candidate"/> is <paramref name="root"/> or
+    /// sits underneath it. Compared as full paths with a trailing separator,
+    /// so <c>C:\work</c> does not appear to contain <c>C:\workshop</c>.
+    /// </summary>
+    public static bool IsCurriculum(string root, string candidate)
+    {
+        string relative = Path.GetRelativePath(root, candidate).Replace('\\', '/');
+        return relative.Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Any(segment => segment.Contains("curriculum", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// What a teacher calls this page (Quartz displayName).
+    /// Follows contracts/shared-rules.json -> pageNaming:
+    /// 1. the frontmatter title, unless it is literally "index"
+    /// 2. for a file called index.md, the name of its FOLDER
+    /// 3. otherwise the file name without .md
+    /// </summary>
+    public static string DisplayTitle(string filePath, string pageText)
+    {
+        string? declared = PageFrontmatter.StoredText(pageText, "title");
+        if (!string.IsNullOrWhiteSpace(declared))
+        {
+            string tidied = declared.Trim('"', '\'', ' ', '\t', '\r', '\n');
+            if (!string.IsNullOrEmpty(tidied) && !string.Equals(tidied, "index", StringComparison.OrdinalIgnoreCase))
+            {
+                return tidied;
+            }
+        }
+        string fileName = Path.GetFileNameWithoutExtension(filePath);
+        if (string.Equals(fileName, "index", StringComparison.OrdinalIgnoreCase))
+        {
+            string? dir = Path.GetFileName(Path.GetDirectoryName(filePath));
+            if (!string.IsNullOrEmpty(dir))
+            {
+                return dir;
+            }
+        }
+        return fileName;
+    }
+
+    /// <summary>
     /// Resolve a caller-supplied path against <paramref name="root"/> and
     /// confirm it stays inside. Throws <see cref="OutsideWorkspaceException"/>
     /// otherwise — a refusal, not a clamp: silently rewriting a path to

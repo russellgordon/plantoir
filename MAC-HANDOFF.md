@@ -109,8 +109,23 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Assist Plan Formatting & Graph Sweep Parity Completed on Windows**
+  (Windows, 2026-08-18). Awareness only; Windows was brought into 100% byte-for-byte
+  parity with macOS for all assist tool plans and suggestions (`PublishPlan`, `ReDatePlan`,
+  `CurriculumMentionsPlan`).
+  - **What changed**: Windows was outputting technical mechanical descriptions (file paths,
+    frontmatter keys `publishForSection1: false → true`, `(2027-01-15, publish: true → false)`,
+    arrows `→`, fake index embed diffs, and Netlify deploy boilerplate). Rewrote `PublishPlan.cs`,
+    `ReDatePlan.cs`, and `AssistWorkspace.cs` unpublish sweep algorithm to match
+    `AssistPublishPlan.swift` and `SectionReDatePlanner.swift` exactly.
+  - **Graph Unpublish Sweep**: Implemented reason-to-keep link traversal (`“Tech Headlines” stays visible, because “Unit 1, Day 15” still links to it.`),
+    landing page preservation, Key Links protection, curriculum page preservation, and transitive link following for publishing.
+  - **Testing**: Added `AssistPlanParityTests.cs` explicitly validating the ICD2O Section 1 unpublish
+    case and plan structures. All 518 unit tests in `Plantoir.Tests` pass.
+
 - **Two `check_section` defects, one teacher report — and the second is the
   one that generalises** (Windows, 2026-08-18, `windows-sync`). Awareness
+
   only; the mac is right on both counts already.
 
   Asked what students would see, Windows answered "83 visible pages are linked

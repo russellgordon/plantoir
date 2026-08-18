@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -38,14 +42,15 @@ public sealed class CurriculumMentionsPlan
         if (Adding.Count == 0)
         {
             lines.Add(AlreadyThere.Count > 0
-                ? $"Nothing to add — “{PageTitle}” already points at {string.Join(", ", AlreadyThere)}."
+                ? $"Nothing to add — “{PageTitle}” already points at {Listed(AlreadyThere)}."
                 : $"Nothing to add to “{PageTitle}”.");
             AppendUnknown(lines);
             return string.Join("\n", lines);
         }
 
-        lines.Add($"Add {Adding.Count} curriculum expectation{(Adding.Count == 1 ? "" : "s")} to " +
-                  $"“{PageTitle}” in {CourseCode} Section {SectionNumber}:");
+        string word = Adding.Count == 1 ? "expectation" : "expectations";
+        lines.Add($"Add {Adding.Count} curriculum {word} to “{PageTitle}” in " +
+                  $"{CourseCode} Section {SectionNumber}:");
         lines.Add("");
 
         // The WORDING, not just the code. A teacher cannot check "A2.2" for
@@ -60,7 +65,7 @@ public sealed class CurriculumMentionsPlan
         if (AlreadyThere.Count > 0)
         {
             lines.Add("");
-            lines.Add($"Already there, left alone: {string.Join(", ", AlreadyThere)}.");
+            lines.Add($"Already there, left alone: {Listed(AlreadyThere)}.");
         }
 
         AppendUnknown(lines);
@@ -91,5 +96,14 @@ public sealed class CurriculumMentionsPlan
     {
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return words.Length <= MostWords ? text : string.Join(' ', words.Take(MostWords)) + "…";
+    }
+
+    private static string Listed(IReadOnlyList<string> codes)
+    {
+        var quoted = codes.Select(c => $"“{c}”").ToList();
+        if (quoted.Count <= 1) return quoted.FirstOrDefault() ?? "";
+        string last = quoted[^1];
+        quoted.RemoveAt(quoted.Count - 1);
+        return string.Join(", ", quoted) + " and " + last;
     }
 }

@@ -1028,7 +1028,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                                 bool draft, string onOrAfter, string before)
         => Guarded(() => Proposing(workspace.PlanPublish(
             course, section, pages ?? Array.Empty<string>(), includeLinked, draft,
-            publishes: true, onOrAfter: ParseDate(onOrAfter, "onOrAfter"), before: ParseDate(before, "before"))));
+            publishes: !draft, onOrAfter: ParseDate(onOrAfter, "onOrAfter"), before: ParseDate(before, "before"))));
+
 
     private static DateOnly? ParseDate(string raw, string which)
     {
@@ -1286,7 +1287,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         try
         {
             var plan = workspace.PlanPublish(
-                course, section, pages ?? Array.Empty<string>(), includeLinked, draft, preview,
+                course, section, pages ?? Array.Empty<string>(), includeLinked, draft, publishes: !draft,
                 ParseDate(onOrAfter, "onOrAfter"), ParseDate(before, "before"));
 
             // Four words, when four words are the whole answer.
@@ -1399,7 +1400,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private static CallToolResult Proposing(PublishPlan plan) =>
         plan.NothingToDoSentence is { } already
             ? Answering(already)
-            : Proposing(plan.Describe());
+            : (plan.ChangesNothing && plan.UnknownNames.Count > 0)
+                ? Answering(plan.Describe())
+                : Proposing(plan.Describe());
+
 
     /// <summary>
     /// A PLAN: what WOULD happen, and nothing done yet.

@@ -409,8 +409,7 @@ public class ReDateTests : IDisposable
         var plan = Open().PlanReDate("ICS3U", 1, Block(), new[] { "Unit 1, Day 1" }, new[] { 1 });
 
         Assert.Equal(2, plan.CurriculumCount);
-        Assert.Contains("2 are curriculum pages", plan.Describe());
-        Assert.Contains("you will not see a difference there", plan.Describe());
+        Assert.Contains("Curriculum pages are left alone", plan.Describe());
         // …and they are still re-dated in the teacher's files.
         Assert.Contains(plan.Reference, r => r.Title == "A1.1" && r.New == new DateOnly(2026, 10, 13));
     }
