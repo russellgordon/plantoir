@@ -51,6 +51,16 @@ public static class PreviewLeases
         lock (_gate) _active.Remove(lease);
     }
 
+    public static void Release(string folderPath, string courseCode, int sectionNumber)
+    {
+        lock (_gate)
+        {
+            _active.RemoveAll(l => l.FolderPath == folderPath &&
+                                  string.Equals(l.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) &&
+                                  l.SectionNumber == sectionNumber);
+        }
+    }
+
     public static void Reset()
     {
         lock (_gate) _active.Clear();

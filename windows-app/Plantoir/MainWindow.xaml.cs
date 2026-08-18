@@ -202,7 +202,12 @@ public sealed partial class MainWindow : Window
         {
             try
             {
-                Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                if (DetailHost.Content is not SectionDetailView existing ||
+                    !string.Equals(existing.Course.Code, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    existing.SectionNumber != section)
+                {
+                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                }
                 if (DetailHost.Content is SectionDetailView detail) detail.StartPreviewIfIdle();
             }
             catch (Exception ex)
@@ -223,7 +228,12 @@ public sealed partial class MainWindow : Window
         {
             try
             {
-                Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                if (DetailHost.Content is not SectionDetailView existing ||
+                    !string.Equals(existing.Course.Code, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    existing.SectionNumber != section)
+                {
+                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                }
                 if (DetailHost.Content is SectionDetailView detail) detail.StartDeployForAutomation();
             }
             catch (Exception ex)
@@ -240,7 +250,12 @@ public sealed partial class MainWindow : Window
         {
             try
             {
-                Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                if (DetailHost.Content is not SectionDetailView existing ||
+                    !string.Equals(existing.Course.Code, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    existing.SectionNumber != section)
+                {
+                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                }
                 if (DetailHost.Content is SectionDetailView detail) detail.StartDeployForAutomation();
             }
             catch (Exception ex)
@@ -275,7 +290,12 @@ public sealed partial class MainWindow : Window
         {
             try
             {
-                Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                if (DetailHost.Content is not SectionDetailView existing ||
+                    !string.Equals(existing.Course.Code, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    existing.SectionNumber != section)
+                {
+                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                }
                 if (DetailHost.Content is SectionDetailView detail) detail.StopPreviewIfRunning();
             }
             catch (Exception ex)
@@ -292,11 +312,26 @@ public sealed partial class MainWindow : Window
         {
             try
             {
-                Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                if (DetailHost.Content is not SectionDetailView existing ||
+                    !string.Equals(existing.Course.Code, courseCode, StringComparison.OrdinalIgnoreCase) ||
+                    existing.SectionNumber != section)
+                {
+                    Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
+                }
+
                 if (DetailHost.Content is SectionDetailView detail)
                 {
                     await detail.StopPreviewIfRunningAsync();
                 }
+                else if (Workspace.WorkspacePath is { } wp)
+                {
+                    await PreviewStopper.StopSectionProcessesAsync(wp, courseCode, section);
+                    PreviewLeases.Release(wp, courseCode, section);
+                }
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"StopPreviewForAsync exception: {ex}");
             }
             finally
             {
@@ -409,12 +444,23 @@ public sealed partial class MainWindow : Window
         {
             case SidebarSelection.SectionItem(var code, var number)
                 when Workspace.Courses.FirstOrDefault(c => c.Code == code) is { } course:
+                if (DetailHost.Content is SectionDetailView current &&
+                    string.Equals(current.Course.Code, code, StringComparison.OrdinalIgnoreCase) &&
+                    current.SectionNumber == number)
+                {
+                    break;
+                }
                 // Fresh identity per selection: preview runners and local
                 // state must never leak between sections.
                 DetailHost.Content = new SectionDetailView(this, course, number);
                 break;
             case SidebarSelection.CourseItem(var code)
                 when Workspace.Courses.FirstOrDefault(c => c.Code == code) is { } course:
+                if (DetailHost.Content is CourseSettingsView currentSettings &&
+                    string.Equals(currentSettings.Course.Code, code, StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
                 DetailHost.Content = new CourseSettingsView(this, course);
                 break;
             case SidebarSelection.ArchivedEntry(var id)

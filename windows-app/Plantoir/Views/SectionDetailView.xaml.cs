@@ -162,13 +162,22 @@ public sealed partial class SectionDetailView : UserControl
     /// Start this section's preview unless one is already serving — the
     /// assistant's "come and look" path. Guarded, because the click handler
     /// is a toggle: calling it blind against a running preview would STOP the
+    /// <summary>
+    /// Start the preview if nothing is currently previewing. If a preview
+    /// is already serving, starting is skipped — live reload will catch the
+    /// edit on its own, and starting again would tear down and rebuild the
     /// very thing the teacher was being shown.
     /// </summary>
     public void StartPreviewIfIdle()
     {
         try
         {
-            if (_previewRunner.IsRunning) return;
+            if (_previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null) return;
+            if (_window.Workspace.WorkspacePath is { } wp)
+            {
+                PreviewLeases.Release(wp, _course.Code, _sectionNumber);
+            }
+            _lease = null;
             PreviewOrStop_Click(this, new RoutedEventArgs());
         }
         catch (Exception ex)
@@ -180,7 +189,10 @@ public sealed partial class SectionDetailView : UserControl
     /// <summary>Stop the preview if one is up — the assistant's half of stop, edit, start again.</summary>
     public void StopPreviewIfRunning()
     {
-        if (_previewRunner.IsRunning || _lease is not null) StopPreview();
+        if (_previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null || _lease is not null)
+        {
+            StopPreview();
+        }
     }
 
     /// <summary>Asynchronously stop the preview if running, awaiting container process termination.</summary>
@@ -420,6 +432,10 @@ public sealed partial class SectionDetailView : UserControl
         _previewWork?.Dispose();
         _previewWork = null;
         if (_lease is { } lease) PreviewLeases.Release(lease);
+        if (_window.Workspace.WorkspacePath is { } wp)
+        {
+            PreviewLeases.Release(wp, _course.Code, _sectionNumber);
+        }
         _lease = null;
     }
 
