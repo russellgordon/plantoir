@@ -67,7 +67,21 @@ public static class SectionIndex
                     PagePaths.IsSectionLocal(course.DirectoryPath, page));
             if (date is not { } when) continue;
 
-            if (best is null || when > bestDate) { best = page; bestDate = when; }
+            if (best is null || when > bestDate)
+            {
+                best = page;
+                bestDate = when;
+            }
+            else if (when == bestDate && best is not null)
+            {
+                var currentUd = UnitDay.Parse(Path.GetFileNameWithoutExtension(best));
+                var newUd = UnitDay.Parse(Path.GetFileNameWithoutExtension(page));
+                if (newUd is not null && (currentUd is null || newUd.Value.CompareTo(currentUd.Value) > 0))
+                {
+                    best = page;
+                    bestDate = when;
+                }
+            }
         }
         return best;
     }

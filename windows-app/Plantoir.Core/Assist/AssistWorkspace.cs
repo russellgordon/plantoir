@@ -298,7 +298,7 @@ public sealed class AssistWorkspace
         return dates;
     }
 
-    private static DateOnly? DateOf(Course course, int sectionNumber, string pagePath)
+    public static DateOnly? DateOf(Course course, int sectionNumber, string pagePath)
     {
         bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, pagePath);
         try { return PageFrontmatter.CreatedOn(File.ReadAllText(pagePath), sectionNumber, sectionLocal); }
@@ -1563,16 +1563,28 @@ public sealed class AssistWorkspace
 
         string tail = SiblingTimeAndOffset(course, section, classPages);
         var dates = new List<PlannedDate>();
-        foreach (var (path, meeting) in chosen)
+        for (int i = 0; i < chosen.Count; i++)
         {
+            var (path, meeting) = chosen[i];
             bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, path);
+            bool isOverflow = i >= timetable.Meetings.Count;
+            bool isVisible = false;
+            try
+            {
+                string full = PagePaths.ResolveInside(_folder, path);
+                isVisible = !PageFrontmatter.IsDraft(File.ReadAllText(full), section);
+            }
+            catch { }
+            bool unpublishes = isOverflow && isVisible;
+
             dates.Add(new PlannedDate(
                 Title: Path.GetFileNameWithoutExtension(path),
                 RelativePath: Relative(path),
                 FrontmatterKey: PageFrontmatter.CreatedKeyFor(section, sectionLocal),
                 Current: DateOf(course, section, path),
                 New: meeting.Date,
-                MeetingNumber: meeting.Number));
+                MeetingNumber: meeting.Number,
+                Unpublishes: unpublishes));
         }
 
         var materials = ShiftMaterials(course, section, dates);
@@ -1585,7 +1597,7 @@ public sealed class AssistWorkspace
 
         var moves = new List<ReDateMove>();
         foreach (var d in dates.Where(d => d.WillChange))
-            moves.Add(new ReDateMove(d.Title, d.RelativePath, d.Current, d.New, ReDateReason.AClass));
+            moves.Add(new ReDateMove(d.Title, d.RelativePath, d.Current, d.New, ReDateReason.AClass, Unpublishes: d.Unpublishes));
         foreach (var m in materials.Where(m => m.WillChange))
         {
             string? anchor = dates.FirstOrDefault(d => d.New == m.New)?.Title;
@@ -1823,11 +1835,40 @@ public sealed class AssistWorkspace
         foreach (var date in plan.Changing)
         {
             string full = PagePaths.ResolveInside(_folder, date.RelativePath);
+            string fileText = File.ReadAllText(full);
             var (updated, changed) = PageFrontmatter.SetCreated(
-                File.ReadAllText(full), date.FrontmatterKey, date.New, tail);
+                fileText, date.FrontmatterKey, date.New, tail);
+            if (date.Unpublishes)
+            {
+                bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
+                string pubKey = PageFrontmatter.PublishKeyFor(section, sectionLocal);
+                var (draftUpdated, draftEdit) = PageFrontmatter.SetDraft(
+                    updated, pubKey, draft: true);
+                updated = draftUpdated;
+                if (draftEdit.Changed) changed = true;
+            }
             if (!changed) continue;
             Save(full, updated);
             if (classPaths.Contains(date.RelativePath)) classes++; else materials++;
+        }
+
+        string indexPath = SectionIndex.PathFor(course, section);
+        if (File.Exists(indexPath))
+        {
+            try
+            {
+                string indexText = File.ReadAllText(indexPath);
+                string? newestPublished = SectionIndex.MostRecentPublished(course, section, ClassPages(course, section));
+                if (newestPublished is not null)
+                {
+                    string targetName = Path.GetFileNameWithoutExtension(newestPublished);
+                    if (SectionIndex.WithMostRecent(indexText, targetName) is { } newIndexText && newIndexText != indexText)
+                    {
+                        Save(indexPath, newIndexText);
+                    }
+                }
+            }
+            catch { }
         }
 
         _undo?.End();

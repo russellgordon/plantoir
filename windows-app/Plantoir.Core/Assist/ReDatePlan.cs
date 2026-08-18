@@ -145,7 +145,8 @@ public sealed record ReDateMove(
     DateOnly? From,
     DateOnly To,
     ReDateReason Reason,
-    string? ClassTitle = null);
+    string? ClassTitle = null,
+    bool Unpublishes = false);
 
 /// <summary>One class page and the day it would move to.</summary>
 public sealed record PlannedDate(
@@ -154,9 +155,10 @@ public sealed record PlannedDate(
     string FrontmatterKey,
     DateOnly? Current,
     DateOnly New,
-    int MeetingNumber)
+    int MeetingNumber,
+    bool Unpublishes = false)
 {
-    public bool WillChange => Current != New;
+    public bool WillChange => Current != New || Unpublishes;
 
     private string Meeting => MeetingNumber > 0 ? $", meeting {MeetingNumber}" : "";
 

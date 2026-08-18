@@ -116,12 +116,13 @@ public sealed partial class SectionDetailView : UserControl
             (_deployRunner.IsRunning ||
              (_deployRunner.StartedAt ?? DateTime.MinValue) > (_previewRunner.StartedAt ?? DateTime.MinValue));
         if (showDeploy)
-            Progress.Show(_deployRunner, $"Deploying {TitleText}");
+            Progress.Show(_deployRunner, $"Deploying {TitleText}", onCancel: CancelDeploy);
         else
             Progress.Show(_previewRunner,
                 _previewRunner.IsRunning || _isWaitingForServer
                     ? $"Preparing the preview of {TitleText}"
-                    : $"Preview of {TitleText}");
+                    : $"Preview of {TitleText}",
+                onCancel: CancelPreview);
 
         bool anyOutput = _previewRunner.Transcript.Lines.Count > 0 || _deployRunner.Transcript.Lines.Count > 0
                          || _previewRunner.Transcript.CurrentLine.Length > 0;
@@ -408,6 +409,24 @@ public sealed partial class SectionDetailView : UserControl
         if (_lastLoadedUrl == url) return;
         _lastLoadedUrl = url;
         Preview.Source = url;
+    }
+
+    private void CancelPreview()
+    {
+        if (_previewRunner.IsRunning && _window.Workspace.WorkspacePath is { } workspacePath)
+            PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
+        _previewRunner.CancelByUser();
+        _previewUrl = null;
+        _isWaitingForServer = false;
+        ReleaseLease();
+        RefreshChrome();
+    }
+
+    private void CancelDeploy()
+    {
+        if (_deployRunner.IsRunning && _window.Workspace.WorkspacePath is { } workspacePath)
+            PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
+        _deployRunner.CancelByUser();
     }
 
     private void StopPreview()

@@ -106,11 +106,19 @@ public static class ActivityTrail
         Append(entry);
     }
 
+    public static void NoteLaunch()
+    {
+        Note(Event.AppOpened, "Plantoir opened — " + ProblemReportEnvironment.AppDescription);
+        Note(Event.Machine, "running on " + ProblemReportEnvironment.SystemDescription);
+        Note(Event.Helpers, "using " + ProblemReportEnvironment.HelperDescription);
+    }
+
     public static void NoteLaunch(string appVersion, string buildNumber, int processId, string executablePath)
     {
         string safePath = LogRedactor.Redacting(executablePath);
         Note(Event.AppOpened, $"Plantoir {appVersion} ({buildNumber}) opened (PID {processId}, {safePath})");
-        Note(Event.Machine, $"running on Windows {Environment.OSVersion.Version}, {Environment.ProcessorCount} cores, {Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE") ?? "x64"}");
+        Note(Event.Machine, "running on " + ProblemReportEnvironment.SystemDescription);
+        Note(Event.Helpers, "using " + ProblemReportEnvironment.HelperDescription);
     }
 
     private static void Append(string line)

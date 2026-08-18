@@ -54,6 +54,49 @@
             </StackPanel>
             <TextBlock x:Name="LaunchProblemText" Visibility="Collapsed" TextWrapping="Wrap"
                        Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+            <Grid x:Name="RunningActionsRow" Visibility="Collapsed" Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="WhyTakingLongButton" Background="Transparent" BorderThickness="0"
+                        Padding="0" VerticalAlignment="Center"
+                        AutomationProperties.AutomationId="whyTakingLongButton">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <FontIcon Glyph="&#xE9CE;" FontSize="12" Opacity="0.7" />
+                        <TextBlock Text="Why might this take a while?" FontSize="12" Opacity="0.7" />
+                    </StackPanel>
+                    <Button.Flyout>
+                        <Flyout>
+                            <StackPanel MaxWidth="380" Spacing="12" Padding="4">
+                                <TextBlock Text="Why might this take a while?" FontWeight="SemiBold" FontSize="14" />
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="First-time setup" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="Getting everything ready for the first time takes a couple of minutes to set up your website builder. Future previews and deploys will be much faster (usually just a few seconds)."
+                                               TextWrapping="Wrap" Opacity="0.8" FontSize="12" />
+                                </StackPanel>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="First-time publishing" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="Uploading your entire website for the first time takes a bit longer. Future publishes only upload the pages you’ve changed."
+                                               TextWrapping="Wrap" Opacity="0.8" FontSize="12" />
+                                </StackPanel>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Photos and attachments" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="Courses with many images, documents, or media files take extra time to prepare and upload."
+                                               TextWrapping="Wrap" Opacity="0.8" FontSize="12" />
+                                </StackPanel>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Internet connection" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="When publishing online, upload speed depends on your current internet connection."
+                                               TextWrapping="Wrap" Opacity="0.8" FontSize="12" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+                <Button Grid.Column="1" x:Name="TaskCancelButton" Content="Cancel"
+                        Click="TaskCancel_Click" AutomationProperties.AutomationId="taskCancelButton" />
+            </Grid>
         </StackPanel>
 
         <Border Grid.Row="1" Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />

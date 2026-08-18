@@ -269,6 +269,29 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         else SendLine(PendingCancelToken);
     }
 
+    /// <summary>
+    /// Cancels the task because the teacher asked to cancel it.
+    /// Sends an interrupt signal (Control-C) through the pseudo-terminal
+    /// so foreground process groups and traps terminate cleanly, falling back
+    /// to direct termination after two seconds.
+    /// </summary>
+    public void CancelByUser(Action? onCleanup = null)
+    {
+        WasCancelled = true;
+        WasStoppedByUser = true;
+        Notify(nameof(WasCancelled));
+        Notify(nameof(WasStoppedByUser));
+        onCleanup?.Invoke();
+        SendRaw("\x03");
+        Task.Delay(2000).ContinueWith(_ =>
+        {
+            if (IsRunning)
+            {
+                Terminate();
+            }
+        });
+    }
+
     /// <summary>An ending the teacher asked for is not a fault.</summary>
     public void StopByUser()
     {

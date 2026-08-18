@@ -1525,6 +1525,63 @@ public class AssistWorkspaceTests : IDisposable
         Assert.Contains("Moved 2 classes", result);
     }
 
+    [Fact]
+    public async Task ReDateClasses_WithOverflow_MarksOverflowClassesAsDraftAndRepointsIndex()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 1, Day 1.md", draft: false);
+        Page("ICS3U", "section1/All Classes/Unit 1, Day 2.md", draft: false);
+        Page("ICS3U", "section1/All Classes/Unit 1, Day 3.md", draft: false);
+
+        string indexPath = Path.Combine(_folder, "courses", "ICS3U", "section1", "index.md");
+        File.WriteAllText(indexPath, "---\ntitle: Home\n---\n# Most Recent Class\n![[Unit 1, Day 3]]\n");
+
+        var dates = new[] { new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 10) };
+        TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", new DateOnly(2026, 9, 1));
+
+        var workspace = Open();
+        var remembered = TimetableMemory.Read(workspace.FolderPath, "ICS3U", 1);
+        Assert.NotNull(remembered);
+        var timetable = Timetable.FromDates(remembered.Dates, remembered.Source);
+        var plan = workspace.PlanReDate("ICS3U", 1, timetable, Array.Empty<string>(), Array.Empty<int>());
+        Assert.Equal(1, plan.Overflowing);
+        var overflowDate = plan.Dates.FirstOrDefault(d => d.Title == "Unit 1, Day 3");
+        Assert.NotNull(overflowDate);
+        Assert.True(overflowDate.Unpublishes);
+
+        var result = workspace.ApplyReDate(plan);
+        Assert.True(result.Succeeded);
+
+        string page3Text = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 3.md"));
+        Assert.True(Plantoir.Core.Models.PageFrontmatter.IsDraft(page3Text, 1));
+
+        string page1Text = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 1.md"));
+        Assert.False(Plantoir.Core.Models.PageFrontmatter.IsDraft(page1Text, 1));
+
+        string page2Text = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 2.md"));
+        Assert.False(Plantoir.Core.Models.PageFrontmatter.IsDraft(page2Text, 1));
+
+        string newIndex = File.ReadAllText(indexPath);
+        Assert.Contains("![[Unit 1, Day 2]]", newIndex);
+    }
+
+    [Fact]
+    public void ReadRememberedTimetable_FormatsUpcomingClasses()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 1, Day 1.md", draft: false);
+        var dates = new[] { new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 10), new DateOnly(2026, 9, 12) };
+        TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", new DateOnly(2026, 9, 1));
+
+        var tools = new Plantoir.Mcp.PlantoirTools(Open());
+        var answer = tools.ReadRememberedTimetable("ICS3U", 1);
+        string detail = answer.Detail();
+
+        Assert.Contains("ICS3U Section 1", detail);
+        Assert.Contains("2026-09-08", detail);
+        Assert.Contains("2026-09-10", detail);
+        Assert.Contains("2026-09-12", detail);
+        Assert.Contains("Where they came from: test sheet", detail);
+    }
+
     // ---- Applying --------------------------------------------------------
 
     [Fact]

@@ -637,72 +637,123 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
             if (string.Equals(scope, "all", StringComparison.OrdinalIgnoreCase))
             {
-                // Taking up the offer at the end of the short answer is a
-                // follow-up, not a fresh question. They asked for the rest;
-                // they get the rest, without the count and the range and the
-                // provenance they have just read.
-                var all = new StringBuilder("Every date on file:");
+                var all = new StringBuilder($"Every date on file for {where}:");
                 foreach (var date in remembered.Dates)
-                    all.Append($"\n{date:dddd}, {date:yyyy-MM-dd}");
+                    all.Append($"\n• {date:dddd}, {date:yyyy-MM-dd}");
                 return Answering($"All {remembered.Dates.Count} dates for {where}.", all.ToString());
             }
 
-            var text = new StringBuilder();
-            text.AppendLine($"{where} meets on {remembered.Dates.Count} {(remembered.Dates.Count == 1 ? "day" : "days")}, from {remembered.Dates[0]:yyyy-MM-dd} ({remembered.Dates[0]:dddd}) to {remembered.Dates[^1]:yyyy-MM-dd} ({remembered.Dates[^1]:dddd}).");
-
-            var today = DateOnly.FromDateTime(DateTime.Now);
-            var nextSeven = today.AddDays(7);
-            var thisWeek = remembered.Dates.Where(d => d >= today && d <= nextSeven).ToList();
-
-            text.AppendLine();
-            if (thisWeek.Count == 0)
+            var classPages = workspace.ClassPages(found, number);
+            var classByDate = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var existingClasses = new List<(string Title, DateOnly? Date)>();
+            foreach (var cp in classPages)
             {
-                text.AppendLine("Nothing in the next seven days.");
-            }
-            else
-            {
-                text.AppendLine("In the next seven days:");
-                foreach (var date in thisWeek)
+                string title = Path.GetFileNameWithoutExtension(cp);
+                var dt = AssistWorkspace.DateOf(found, number, cp);
+                existingClasses.Add((title, dt));
+                if (dt is { } d)
                 {
-                    text.AppendLine($"  {date:dddd}, {date:yyyy-MM-dd}");
+                    classByDate[d.ToString("yyyy-MM-dd")] = title;
                 }
             }
 
-            var classPages = workspace.ClassPages(found, number);
-            int spare = Math.Max(0, remembered.Dates.Count - classPages.Count);
-            text.AppendLine();
-            text.AppendLine($"{where} has {classPages.Count} class {(classPages.Count == 1 ? "page" : "pages")}.");
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            var firstDate = remembered.Dates[0];
+            var lastDate = remembered.Dates[^1];
+            var upcomingDates = new List<DateOnly>();
+            var lines = new List<string>();
+
+            if (today < firstDate)
+            {
+                for (int i = 0; i < remembered.Dates.Count && i < 3; i++)
+                {
+                    upcomingDates.Add(remembered.Dates[i]);
+                }
+                string countStr = upcomingDates.Count == 1 ? "first class is" : $"first {upcomingDates.Count} classes are";
+                lines.Add($"The semester begins on {firstDate:dddd}, {firstDate:yyyy-MM-dd}. The {countStr}:");
+            }
+            else
+            {
+                foreach (var date in remembered.Dates)
+                {
+                    if (date >= today && upcomingDates.Count < 3)
+                    {
+                        upcomingDates.Add(date);
+                    }
+                }
+                if (upcomingDates.Count == 0)
+                {
+                    lines.Add($"All {remembered.Dates.Count} scheduled classes for {where} have concluded (last class was on {lastDate:dddd}, {lastDate:yyyy-MM-dd}).");
+                }
+                else
+                {
+                    string countStr = upcomingDates.Count == 1 ? "upcoming class" : $"{upcomingDates.Count} upcoming classes";
+                    lines.Add($"Your next {countStr} for {where}:");
+                }
+            }
+
+            for (int i = 0; i < upcomingDates.Count; i++)
+            {
+                var date = upcomingDates[i];
+                string dateStr = date.ToString("yyyy-MM-dd");
+                string classTitle;
+                if (classByDate.TryGetValue(dateStr, out var t))
+                {
+                    classTitle = t;
+                }
+                else
+                {
+                    int dateIdx = -1;
+                    for (int d = 0; d < remembered.Dates.Count; d++)
+                    {
+                        if (remembered.Dates[d] == date)
+                        {
+                            dateIdx = d;
+                            break;
+                        }
+                    }
+                    if (dateIdx >= 0 && dateIdx < existingClasses.Count)
+                    {
+                        classTitle = existingClasses[dateIdx].Title;
+                    }
+                    else
+                    {
+                        classTitle = "(page not yet created)";
+                    }
+                }
+                lines.Add($"• {date:dddd}, {date:yyyy-MM-dd} — {classTitle}");
+            }
+
+            lines.Add("");
+            int spare = Math.Max(0, remembered.Dates.Count - existingClasses.Count);
+            lines.Add($"{where} has {existingClasses.Count} class {(existingClasses.Count == 1 ? "page" : "pages")} across {remembered.Dates.Count} recorded dates ({spare} spare).");
             if (spare == 0)
             {
-                text.AppendLine("Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.");
+                lines.Add("Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.");
             }
-            else if (classPages.Count < remembered.Dates.Count)
+            else if (existingClasses.Count < remembered.Dates.Count)
             {
-                var next = remembered.Dates[classPages.Count];
-                text.AppendLine($"{spare} recorded {(spare == 1 ? "date is" : "dates are")} still spare; the next class would fall on {next:yyyy-MM-dd} ({next:dddd}).");
+                var next = remembered.Dates[existingClasses.Count];
+                lines.Add($"The next class would fall on {next:yyyy-MM-dd} ({next:dddd}).");
             }
 
-            // Where they came from, so a teacher can recognise a stale answer
-            // and say so. It is NOT a clause that finishes the sentence above
-            // — "meets on 75 recorded days, from pasted by hand" — so it has a
-            // line of its own.
-            text.AppendLine();
-            text.AppendLine($"Where they came from: {remembered.Source}. Recorded {remembered.Recorded:yyyy-MM-dd}.");
-
-            // The offer, and the words that take it up. A prompt whose answer
-            // nothing understands is worse than no prompt, so the phrasing
-            // named here is one AssistCardCommand matches in code.
-            if (remembered.Dates.Count > thisWeek.Count)
+            string origin = $"Where they came from: {remembered.Source}.";
+            if (remembered.Recorded is { } when)
             {
-                int rest = remembered.Dates.Count - thisWeek.Count;
-                text.AppendLine();
-                text.AppendLine($"There {(rest == 1 ? "is" : "are")} {rest} more. Say “show me the rest of " +
-                                "the dates” if you would like the lot.");
+                origin += $" Recorded {when:yyyy-MM-dd}.";
+            }
+            lines.Add("");
+            lines.Add(origin);
+
+            if (remembered.Dates.Count > upcomingDates.Count)
+            {
+                int rest = remembered.Dates.Count - upcomingDates.Count;
+                lines.Add("");
+                lines.Add($"There {(rest == 1 ? "is" : "are")} {rest} more. Say “show me all the dates” to see the full schedule.");
             }
 
-            string days = remembered.Dates.Count == 1 ? "day" : "days";
-            return Answering($"{where} meets on {remembered.Dates.Count} recorded {days}.",
-                             text.ToString().TrimEnd());
+            string fullAnswer = string.Join("\n", lines);
+            return Answering(fullAnswer, fullAnswer);
         });
 
     [McpServerTool(Name = "remember_timetable", Title = "Remember when a section meets",

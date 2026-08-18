@@ -1,4 +1,5 @@
 using System.Text;
+using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Xunit;
 
@@ -781,5 +782,72 @@ public class CourseRenamerTests
         {
             try { Directory.Delete(tempDir, recursive: true); } catch { }
         }
+    }
+}
+
+public class UnitDayAndSectionIndexTests
+{
+    [Fact]
+    public void UnitDay_ComparesUnitThenDayCorrectly()
+    {
+        var u1d2 = UnitDay.Parse("Unit 1, Day 2");
+        var u1d10 = UnitDay.Parse("Unit 1, Day 10");
+        var u2d1 = UnitDay.Parse("Unit 2, Day 1");
+
+        Assert.NotNull(u1d2);
+        Assert.NotNull(u1d10);
+        Assert.NotNull(u2d1);
+
+        Assert.True(u1d2.Value.CompareTo(u1d10.Value) < 0);
+        Assert.True(u1d10.Value.CompareTo(u1d2.Value) > 0);
+        Assert.True(u1d10.Value.CompareTo(u2d1.Value) < 0);
+        Assert.True(u2d1.Value.CompareTo(u1d10.Value) > 0);
+    }
+
+    [Fact]
+    public void SectionIndex_TieBreaksSameDateClassesByUnitDay()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "PlantoirSectionIndexTest-" + Guid.NewGuid());
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string page1 = Path.Combine(tempDir, "Unit 1, Day 1.md");
+            string page2 = Path.Combine(tempDir, "Unit 1, Day 2.md");
+            File.WriteAllText(page1, "---\ncreated: 2026-09-08\npublish: true\n---\n# Lesson 1");
+            File.WriteAllText(page2, "---\ncreated: 2026-09-08\npublish: true\n---\n# Lesson 2");
+
+            string configPath = Path.Combine(tempDir, "course_config.json");
+            File.WriteAllText(configPath, "{\n  \"course_code\": \"ICS3U\",\n  \"sections\": [1]\n}\n");
+            var config = CourseConfiguration.Load(configPath);
+            var course = new Course("ICS3U", tempDir, config);
+
+            string? best = SectionIndex.MostRecentPublished(course, 1, new[] { page1, page2 });
+            Assert.Equal(page2, best);
+
+            string? bestReversed = SectionIndex.MostRecentPublished(course, 1, new[] { page2, page1 });
+            Assert.Equal(page2, bestReversed);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+    }
+}
+
+public class ProblemReportEnvironmentTests
+{
+    [Fact]
+    public void EnvironmentDescriptions_ArePopulated()
+    {
+        string app = Plantoir.Core.Scripting.ProblemReportEnvironment.AppDescription;
+        string sys = Plantoir.Core.Scripting.ProblemReportEnvironment.SystemDescription;
+        string helpers = Plantoir.Core.Scripting.ProblemReportEnvironment.HelperDescription;
+
+        Assert.StartsWith("Plantoir", app);
+        Assert.Contains("pid", app);
+        Assert.StartsWith("Windows", sys);
+        Assert.Contains("cores", sys);
+        Assert.Contains("llama.cpp b10435", helpers);
+        Assert.Contains(".NET", helpers);
     }
 }

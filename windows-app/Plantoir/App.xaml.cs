@@ -39,6 +39,7 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         LogDiagnostic("App.OnLaunched starting");
+        Plantoir.Core.Scripting.ActivityTrail.NoteLaunch();
         try
         {
             Settings = AppSettings.Load();

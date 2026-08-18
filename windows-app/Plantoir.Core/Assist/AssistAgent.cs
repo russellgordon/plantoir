@@ -1048,7 +1048,7 @@ public sealed class AssistAgent
             ["tool_call_id"] = call["id"]?.DeepClone(),
             ["content"] = answer.Detail,
         });
-        if (IsWriteTool(name) || name.Equals("check_section", StringComparison.OrdinalIgnoreCase))
+        if (IsWriteTool(name) || name.Equals("check_section", StringComparison.OrdinalIgnoreCase) || name.Equals("read_remembered_timetable", StringComparison.OrdinalIgnoreCase))
         {
             _handedToApp = true;
         }

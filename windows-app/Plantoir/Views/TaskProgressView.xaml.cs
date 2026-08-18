@@ -52,18 +52,21 @@ public sealed partial class TaskProgressView : UserControl
         runner.PropertyChanged += (sender, e) => RunnerChanged((ScriptRunner)sender!, e);
     }
 
+    public Action? OnCancel { get; set; }
+
     /// <summary>Choose which registered runner the panel displays.</summary>
-    public void Show(ScriptRunner runner, string title)
+    public void Show(ScriptRunner runner, string title, Action? onCancel = null)
     {
         Register(runner);
         if (!ReferenceEquals(_runner, runner)) _renderedTranscriptVersion = -1;
         _runner = runner;
         _title = title;
+        OnCancel = onCancel;
         Render();
     }
 
     /// <summary>Single-runner callers (the wizard) register-and-show in one call.</summary>
-    public void Bind(ScriptRunner runner, string title) => Show(runner, title);
+    public void Bind(ScriptRunner runner, string title, Action? onCancel = null) => Show(runner, title, onCancel);
 
     private void RunnerChanged(ScriptRunner runner, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -134,6 +137,7 @@ public sealed partial class TaskProgressView : UserControl
 
         if (!_runner.IsRunning) EnsureTicking(false);
 
+        RunningActionsRow.Visibility = (_runner.IsRunning && !_runner.WasCancelled) ? Visibility.Visible : Visibility.Collapsed;
         AwaitingNotice.Visibility = _runner.IsAwaitingInput ? Visibility.Visible : Visibility.Collapsed;
         LaunchProblemText.Text = _runner.LaunchProblem ?? "";
         LaunchProblemText.Visibility = _runner.LaunchProblem is null ? Visibility.Collapsed : Visibility.Visible;
@@ -331,6 +335,18 @@ public sealed partial class TaskProgressView : UserControl
     private void ConsoleStop_Click(object sender, RoutedEventArgs e) => _runner?.Terminate();
 
     private string? _publishedFolder;
+
+    private void TaskCancel_Click(object sender, RoutedEventArgs e)
+    {
+        if (OnCancel is not null)
+        {
+            OnCancel.Invoke();
+        }
+        else
+        {
+            _runner?.CancelByUser();
+        }
+    }
 
     private void FolderResult_Click(object sender, RoutedEventArgs e)
     {
