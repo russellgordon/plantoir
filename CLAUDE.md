@@ -322,6 +322,43 @@ wait for it, or ask. Relaunching afterwards is HIS, the same way it is on the
 mac (rule 10): a rebuild that reopens the app steals focus from whatever he has
 moved on to.
 
+### Clean up after yourself, because a force-kill skips the app's own tidying
+
+`Stop-Process` is not Quit. The app never runs its shutdown path, so anything
+it would have released on the way out is still on disk — and the next agent, or
+the next build, meets it as a fault with no obvious cause. Both of these have
+already happened here, in one session:
+
+- **Delete the lease files whose owner you killed.** Plantoir and
+  `plantoir-mcp` announce what they are doing by writing
+  `<COURSE>.<kind>.<pid>.lease` into
+  `<working folder>/courses/.internal/activity/` — see `WorkLease`. A clean
+  quit deletes them; a kill does not. They are *designed* to survive it (a
+  lease whose process is gone is ignored, so nothing locks up), but a stale
+  `preview` lease is still litter, and a recycled process id whose name happens
+  to match is the one case the staleness check cannot see through. Remove the
+  ones you orphaned:
+
+  ```powershell
+  Remove-Item "<working folder>\courses\.internal\activity\*.lease"
+  ```
+
+- **Leave no `plantoir-mcp` running.** Driving the server over stdio to check
+  something — a genuinely good way to verify a tool's output without the GUI —
+  leaves the process alive unless you close its stdin and wait for it to exit.
+  A stray one holds `Plantoir.Core.dll` open, so the next build fails with the
+  SAME `MSB3027 … file is locked by` error the running app produces. It reads
+  as "the app is open" when the app is not open at all, and the fix is not the
+  one the message suggests:
+
+  ```powershell
+  Get-Process -Name plantoir-mcp -ErrorAction SilentlyContinue | Stop-Process -Force
+  ```
+
+This is the Windows half of rule 9 — **driving the interface leaves the machine
+as you found it**. Say what you cleaned up, the same way you say what you
+closed.
+
 ## App name vs. module name
 
 The user-facing name is **Plantoir** (bundle, binary, Dock, window title,

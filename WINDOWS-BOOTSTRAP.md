@@ -156,6 +156,22 @@ Get-Process -Name Plantoir -ErrorAction SilentlyContinue | Stop-Process -Force
 Say that you closed it, do not close it out from under a build or deploy he can
 watch happening, and leave relaunching to him.
 
+**And clean up after the kill.** `Stop-Process` is not Quit, so the app's own
+tidying never runs. Two things it would have done:
+
+```powershell
+# Lease files whose owner you killed — WorkLease writes them, a clean quit removes them.
+Remove-Item "<working folder>\courses\.internal\activity\*.lease"
+
+# Any plantoir-mcp you started to probe a tool over stdio. A stray one holds
+# Plantoir.Core.dll open, so the NEXT build fails with the same MSB3027 the
+# running app produces — and the message sends you looking for an app that is
+# not there.
+Get-Process -Name plantoir-mcp -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+Say what you cleaned up. `CLAUDE.md` has the reasoning.
+
 Tests touching **preview leases or the publish registry** belong in the
 `SharedActivityState` serialized collection: they are process-wide statics and
 xUnit parallelises test classes. Skipping that produces an intermittent failure
