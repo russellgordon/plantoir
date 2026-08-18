@@ -57,6 +57,7 @@ public class AssistScenarioTests
     [MemberData(nameof(GetScenarioCases))]
     public async Task AssistCases_Scenario_MatchesContract(string scenarioName, string caseJson)
     {
+        Assert.NotEmpty(scenarioName);
         var c = JsonNode.Parse(caseJson)!.AsObject();
         var given = c["given"]?.AsObject();
         string when = c["when"]!.ToString();

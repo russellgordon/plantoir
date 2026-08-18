@@ -128,6 +128,12 @@ is what happened to the test-race item, sitting here for three days with
     - *Host CPU fallback (`-ngl 0`)*: Prompt processing (`pp512`): **25.69 tok/s**, Generation (`tg128`): **11.67 tok/s**.
   - **Simplification**: Removed the fake 3-minute progress countdown and disk KV cache files from `AssistWindow.xaml.cs`. Warmup is now a fast, non-blocking background priming call. 464 tests passing in `Plantoir.Tests`.
 
+- **Assist scenario contract runner & confirmation discovery parity on Windows** (Windows, 2026-08-18).
+  The Windows side wired `AssistScenarioTests.cs` executing all 17 multi-turn scenario cases from `contracts/assist-cases.json` via parameterized `[Theory]` tests against `AssistAgent`.
+  Async preview teardown before deploy was implemented via `PreviewStopper.StopSectionProcessesAsync` and `SectionDetailView.StopPreviewIfRunningAsync`, ensuring container and host preview server ports are fully vacated before `deploy.ps1` runs.
+  Confirmation mode (`AppSettings.AssistantAsksBeforeChanging`) and 15-plan discovery milestone tracking (`plansAccepted >= 15` app-wide) were wired into `AssistAgent` and `AssistWindow.xaml.cs`, verified by `ContractTests.cs`. All 488 tests pass.
+
+
 - **Windows marketing screenshots & platform-conditional serving on plantoir.app** (Windows, 2026-08-17).
   The Windows side implemented autonomous screenshot capture in `MarketingShotCapturer.cs` (`Plantoir.exe --capture-marketing-shots <dir>`) and `website/shots/capture_windows.py`.
   The 5 app-window marketing shots (`courses`, `new-course`, `progress`, `preview`, `assistant`) are captured in Light and Dark mode at 2x HiDPI resolution, optimized with WebP companions into `site/img/`.

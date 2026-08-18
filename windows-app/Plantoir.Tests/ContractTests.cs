@@ -347,6 +347,60 @@ public class ContractTests
             }
         }
     }
+
+    [Fact]
+    public void AssistCases_Tools_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("assist-cases.json");
+        var tools = doc["tools"]!.AsObject();
+
+        var localTools = tools["local"]!.AsArray().Select(t => t!.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(localTools, AssistAgent.ForTheLocalModel);
+
+        var needsApproval = tools["needsApproval"]!.AsArray().Select(t => t!.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(needsApproval, AssistAgent.DeploysToStudents);
+
+        var mcpOnly = tools["mcpOnly"]!.AsArray().Select(t => t!.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var expectedMcpOnly = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "list_curriculum_expectations",
+            "plan_curriculum_mentions",
+            "add_curriculum_mentions",
+        };
+        Assert.Equal(expectedMcpOnly, mcpOnly);
+    }
+
+    [Fact]
+    public void AssistantConfirmation_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("shared-rules.json");
+        var conf = doc["assistantConfirmation"]!.AsObject();
+
+        bool defaultsToOn = conf["defaultsToOn"]!.GetValue<bool>();
+        Assert.True(defaultsToOn);
+
+        int plansBeforeMention = conf["mentionedAfter"]!["plansAccepted"]!.GetValue<int>();
+        Assert.Equal(15, plansBeforeMention);
+
+        // NeedsApproval only applies to DeploysToStudents (deploy_section, schedule_deploy)
+        Assert.True(AssistAgent.NeedsApproval("deploy_section"));
+        Assert.True(AssistAgent.NeedsApproval("schedule_deploy"));
+        Assert.False(AssistAgent.NeedsApproval("publish_pages"));
+        Assert.False(AssistAgent.NeedsApproval("list_pages"));
+        Assert.False(AssistAgent.NeedsApproval("cancel_scheduled_deploy"));
+    }
+
+    private sealed class ScriptedModel : IChatModel
+    {
+        public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation) =>
+            Task.FromResult<JsonObject?>(null);
+    }
+
+    private sealed class DummyTools : IToolServer
+    {
+        public Task<string> CallTool(string name, JsonObject arguments, Action<string>? progress = null, CancellationToken cancellation = default) =>
+            Task.FromResult("OK");
+    }
 }
 
 

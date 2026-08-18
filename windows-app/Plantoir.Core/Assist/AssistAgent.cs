@@ -79,7 +79,7 @@ public sealed class AssistAgent
     /// trouble with 26 tools. Nothing is removed; this narrows one client's
     /// view.
     /// </summary>
-    private static readonly HashSet<string> ForTheLocalModel = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly HashSet<string> ForTheLocalModel = new(StringComparer.OrdinalIgnoreCase)
     {
         // Finding your way about.
         "list_pages", "read_page", "check_section",
@@ -209,12 +209,12 @@ public sealed class AssistAgent
     /// the button collects. The firing itself asks nobody, which is the whole
     /// point of scheduling it.
     /// </summary>
-    private static readonly HashSet<string> DeploysToStudents = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly HashSet<string> DeploysToStudents = new(StringComparer.OrdinalIgnoreCase)
     {
         "deploy_section", "schedule_deploy",
     };
 
-    private static bool NeedsApproval(string name) => DeploysToStudents.Contains(name);
+    internal static bool NeedsApproval(string name) => DeploysToStudents.Contains(name);
 
     /// <summary>
     /// How many tool calls one turn may make before the loop stops.
@@ -390,6 +390,15 @@ public sealed class AssistAgent
 
     /// <summary>Async version of StopPreviewInApp.</summary>
     public Func<Task>? StopPreviewInAppAsync { get; set; }
+
+    /// <summary>
+    /// Whether the assistant asks before changing anything. Defaults to true.
+    /// Read fresh every turn so a change in Settings takes effect immediately.
+    /// </summary>
+    public Func<bool> ConfirmationMode { get; set; } = () => true;
+
+    /// <summary>Invoked whenever a pending plan/write action is accepted by the teacher.</summary>
+    public Action? OnPlanAccepted { get; set; }
 
     /// <summary>
     /// Tools that change pages. They run on the server as pure file edits —
@@ -670,6 +679,8 @@ public sealed class AssistAgent
     {
         if (_awaiting is not { } call) return new List<Line>();
         _awaiting = null;
+
+        OnPlanAccepted?.Invoke();
 
         var lines = new List<Line>();
         string result = await RunTool(call, lines, cancellation);

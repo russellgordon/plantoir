@@ -181,6 +181,12 @@ public sealed partial class AssistWindow : Window
                 lease.FolderPath == _folder &&
                 string.Equals(lease.CourseCode, _course.Code, StringComparison.OrdinalIgnoreCase) &&
                 lease.SectionNumber == _section),
+            ConfirmationMode = () => App.Settings.AssistantAsksBeforeChanging,
+            OnPlanAccepted = () =>
+            {
+                App.Settings.PlansAcceptedCount++;
+                try { App.Settings.Save(); } catch { }
+            },
         };
 
         // Mount the prompt shelf at the top of the window with clickable cards.
@@ -256,7 +262,18 @@ public sealed partial class AssistWindow : Window
         string word = ApproveButton.Content?.ToString() ?? (_agent.PendingTool == "deploy_section" ? AssistWording.DeployAccepted : AssistWording.PlanAccepted);
         HideApproval();
         Say("You", word);
-        await Turn(() => _agent.Approve(_closing.Token));
+        await Turn(async () =>
+        {
+            var lines = await _agent.Approve(_closing.Token);
+            if (App.Settings.AssistantAsksBeforeChanging && !App.Settings.ConfirmationMentioned && App.Settings.PlansAcceptedCount >= 15)
+            {
+                App.Settings.ConfirmationMentioned = true;
+                try { App.Settings.Save(); } catch { }
+                lines.Add(new AssistAgent.Line("assistant",
+                    "The assistant shows what it is about to do before doing it. You can change that in Settings."));
+            }
+            return lines;
+        });
     }
 
     private async void Decline_Click(object sender, RoutedEventArgs e)
