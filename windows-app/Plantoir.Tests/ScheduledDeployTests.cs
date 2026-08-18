@@ -97,7 +97,7 @@ public sealed class ScheduledDeployTests : IDisposable
 
         // The account ID lives in Plantoir's settings, and an unattended run
         // has no way to be given it.
-        Assert.Contains("needs the account ID only Plantoir has",
+        Assert.Contains("needs your Account ID",
             ScheduledDeploy.Problem(course, 1, now.AddDays(1), now));
     }
 

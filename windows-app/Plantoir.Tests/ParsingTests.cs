@@ -175,7 +175,7 @@ public class FailureExplainerTests
     public void RateLimitReadsTheResetWindow()
     {
         string output = "Netlify API error 429: rate limited\nWindow resets at: 2026-08-11 01:00:00 EDT (in ~59s).";
-        Assert.Equal("Netlify is limiting how often websites can be published right now. Try publishing again in about a minute.",
+        Assert.Equal("Netlify is limiting how often websites can be deployed right now. Try deploying again in about a minute.",
             FailureExplainer.Explanation(output));
         Assert.Contains("in about 3 minutes", FailureExplainer.WaitDescription("(in ~150s)"));
         Assert.Equal("in a few minutes", FailureExplainer.WaitDescription("no marker"));

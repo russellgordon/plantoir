@@ -27,7 +27,7 @@ public static class TaskScheduling
     /// reason it could not be scheduled.
     /// </summary>
     public static string? Schedule(string taskName, string workingFolder, string courseCode,
-                                   int section, DateTime when)
+                                   int section, DateTime when, IReadOnlyList<string>? deployArguments = null)
     {
         // The launcher does the deploy, exactly as the app does it. Quoted for
         // schtasks, which takes the whole command as one argument and would
@@ -36,9 +36,13 @@ public static class TaskScheduling
         if (!File.Exists(launcher))
             return $"There is no deploy.ps1 in {workingFolder}, so there is nothing to schedule.";
 
+        string argString = deployArguments != null && deployArguments.Count > 0
+            ? string.Join(" ", deployArguments)
+            : $"{courseCode} {section}";
+
         string command =
             $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\\"{launcher}\\\" " +
-            $"{courseCode} {section}";
+            argString;
 
         // schtasks accepts the date in the format the MACHINE's locale uses,
         // and rejects every other one outright — "Invalid Start Date (Date

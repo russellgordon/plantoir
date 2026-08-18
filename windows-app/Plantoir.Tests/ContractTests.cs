@@ -536,6 +536,289 @@ public class ContractTests
         Assert.False(AssistAgent.NeedsApproval("cancel_scheduled_deploy"));
     }
 
+    [Fact]
+    public void AppRules_DeployArguments_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("app-rules.json");
+        var cases = doc["deployArguments"]!["cases"]!.AsArray();
+
+        foreach (var c in cases)
+        {
+            if (c is null) continue;
+            string name = c["name"]!.ToString();
+            string course = c["course"]!.ToString();
+            int section = c["section"]!.GetValue<int>();
+            string cloudflareAccountID = c["cloudflareAccountID"]?.ToString() ?? "";
+            var configJson = c["configuration"]!.ToJsonString();
+            var config = CourseConfiguration.FromBytes(System.Text.Encoding.UTF8.GetBytes(configJson));
+
+            var actual = DeployCommand.Arguments(course, section, config, cloudflareAccountID);
+            var expected = c["expectArguments"]!.AsArray().Select(x => x!.ToString()).ToList();
+
+            Assert.Equal(expected, actual);
+        }
+    }
+
+    [Fact]
+    public void AppRules_ConfigurationRules_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("app-rules.json");
+        var rules = doc["configurationRules"]!.AsObject();
+
+        foreach (var c in rules["cloudflareAccountID"]!.AsArray())
+        {
+            if (c is null) continue;
+            string input = c["input"]!.ToString();
+            string? expect = c["expectProblem"]?.ToString();
+            Assert.Equal(expect, CourseConfiguration.CloudflareAccountProblem(input));
+        }
+
+        foreach (var c in rules["customDomain"]!.AsArray())
+        {
+            if (c is null) continue;
+            string input = c["input"]!.ToString();
+            string expect = c["expectNormalized"]!.ToString();
+            Assert.Equal(expect, CourseConfiguration.NormalizedCustomDomain(input));
+        }
+
+        string tempDir = Directory.CreateTempSubdirectory("contract-deployfolder").FullName;
+        try
+        {
+            string realFile = Path.Combine(tempDir, "not-a-folder.txt");
+            File.WriteAllText(realFile, "x");
+            string missing = Path.Combine(tempDir, "nope");
+
+            foreach (var c in rules["deployFolder"]!.AsArray())
+            {
+                if (c is null) continue;
+                string input = c["input"]!.ToString()
+                    .Replace("@MISSING@", missing)
+                    .Replace("@FILE@", realFile)
+                    .Replace("@FOLDER@", tempDir);
+                string? expect = c["expectProblem"]?.ToString();
+                Assert.Equal(expect, CourseConfiguration.DeployFolderProblem(input));
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void AppRules_FailureExplanations_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("app-rules.json");
+        var cases = doc["failureExplanations"]!["cases"]!.AsArray();
+
+        foreach (var c in cases)
+        {
+            if (c is null) continue;
+            string output = c["output"]!.ToString();
+            string? expect = c["expect"]?.ToString();
+            string? actual = FailureExplainer.Explanation(output);
+            Assert.Equal(expect, actual);
+        }
+    }
+
+    [Fact]
+    public void AppRules_LauncherFlags_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("app-rules.json");
+        var section = doc["launcherFlags"]!.AsObject();
+
+        string repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        string previewScript = File.ReadAllText(Path.Combine(repoRoot, "preview.ps1"));
+        string setupScript = File.ReadAllText(Path.Combine(repoRoot, "setup.ps1"));
+        string deployScript = File.ReadAllText(Path.Combine(repoRoot, "deploy.ps1"));
+
+        var previewFlags = section["preview"]!.AsArray().Select(x => x!["flag"]!.ToString().Split(' ')[0]).ToList();
+        foreach (var flag in previewFlags)
+        {
+            Assert.Contains(flag, previewScript, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var setupFlags = section["setup"]!.AsArray().Select(x => x!["flag"]!.ToString().Split(' ')[0]).ToList();
+        foreach (var flag in setupFlags)
+        {
+            Assert.Contains(flag, setupScript, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var deployFlags = new[] { "--target", "--account", "--to-folder" };
+        foreach (var flag in deployFlags)
+        {
+            Assert.Contains(flag, deployScript, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void SharedRules_PageNaming_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("shared-rules.json");
+        var cases = doc["pageNaming"]!["cases"]!.AsArray();
+
+        foreach (var c in cases)
+        {
+            if (c is null) continue;
+            string file = c["file"]!.ToString();
+            string? frontmatterTitle = c["frontmatterTitle"]?.ToString();
+            string expected = c["shown"]!.ToString();
+
+            string pageText = frontmatterTitle is not null
+                ? $"---\ntitle: {frontmatterTitle}\n---\nBody"
+                : "Body without frontmatter";
+
+            string actual = PagePaths.DisplayTitle(file, pageText);
+            Assert.Equal(expected, actual);
+        }
+    }
+
+    [Fact]
+    public void SharedRules_SidebarFilter_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("shared-rules.json");
+        var section = doc["sidebarFilter"]!.AsObject();
+
+        var coursesData = section["courses"]!.AsArray();
+        var courses = coursesData.Select(cd =>
+        {
+            string code = cd!["code"]!.ToString();
+            string name = cd["name"]!.ToString();
+            var config = CourseConfiguration.FromBytes(System.Text.Encoding.UTF8.GetBytes($$"""{"course_code": "{{code}}", "course_name": "{{name}}", "section_numbers": [1]}"""));
+            return new Course(code, Path.Combine("C:\\test\\courses", code), config);
+        }).ToList();
+
+        var cases = section["cases"]!.AsArray();
+        foreach (var c in cases)
+        {
+            if (c is null) continue;
+            string filter = c["filter"]!.ToString();
+            var expect = c["expect"]!.AsArray().Select(x => x!.ToString()).ToList();
+
+            var matches = Workspace.Filter(courses, filter).Select(x => x.Code).ToList();
+            Assert.Equal(expect, matches);
+        }
+    }
+
+    [Fact]
+    public void SharedRules_TranscriptStripping_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("shared-rules.json");
+        var cases = doc["transcriptStripping"]!["cases"]!.AsArray();
+
+        foreach (var c in cases)
+        {
+            if (c is null) continue;
+            string input = c["input"]!.ToString();
+            string expect = c["expect"]!.ToString();
+
+            string actual = TranscriptBuilder.StripControlSequences(input);
+            Assert.Equal(expect, actual);
+        }
+    }
+
+    [Fact]
+    public void SharedRules_ScheduledDeployRefusals_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("shared-rules.json");
+        var cases = doc["scheduledDeployRefusals"]!["cases"]!.AsArray();
+
+        var now = new DateTime(2026, 8, 18, 12, 0, 0);
+
+        foreach (var c in cases)
+        {
+            if (c is null) continue;
+            string name = c["name"]!.ToString();
+            string? expectRefusal = c["expectRefusal"]?.ToString();
+            var given = c["given"]!.AsObject();
+
+            bool isPast = given["whenIsInThePast"]?.GetValue<bool>() ?? false;
+            DateTime when = isPast ? now.AddHours(-1) : now.AddHours(2);
+
+            string target = given["target"]?.ToString() ?? "netlify";
+            string folderPath = given["folderProblem"]?.GetValue<bool>() == true ? "" : "C:\\Sites\\valid";
+            string cloudflareAccountID = given["cloudflareAccountID"]?.ToString() ?? "0123456789abcdef0123456789abcdef";
+            bool hasDeployed = given["hasDeployedBefore"]?.GetValue<bool>() ?? true;
+
+            string tempDir = Directory.CreateTempSubdirectory("contract-sched-deploy").FullName;
+            try
+            {
+                var config = CourseConfiguration.FromBytes(System.Text.Encoding.UTF8.GetBytes($$"""
+                {
+                    "course_code": "ICS3U",
+                    "course_name": "Computer Science",
+                    "section_numbers": [1],
+                    "deploy_target": "{{target}}",
+                    "deploy_folder_path": "{{folderPath.Replace("\\", "\\\\")}}"
+                }
+                """));
+                var course = new Course("ICS3U", tempDir, config);
+
+                if (hasDeployed)
+                {
+                    if (target == "cloudflare_pages")
+                    {
+                        Directory.CreateDirectory(Path.Combine(tempDir, ".cloudflare_sites"));
+                        File.WriteAllText(Path.Combine(tempDir, ".cloudflare_sites", "section1.json"), "{}");
+                    }
+                    else if (target == "netlify" || target == "local_folder")
+                    {
+                        Directory.CreateDirectory(Path.Combine(tempDir, ".netlify_sites"));
+                        File.WriteAllText(Path.Combine(tempDir, ".netlify_sites", "section1.json"), "{}");
+                    }
+                }
+
+                string? problem = ScheduledDeploy.Problem(course, 1, when, now, cloudflareAccountID);
+
+                if (expectRefusal is null)
+                {
+                    Assert.Null(problem);
+                }
+                else
+                {
+                    Assert.NotNull(problem);
+                    switch (expectRefusal)
+                    {
+                        case "hasAlreadyPassed":
+                            Assert.Contains("has already passed", problem);
+                            break;
+                        case "deployFolderNeedsAttention":
+                            Assert.Contains("needs attention first", problem);
+                            break;
+                        case "cloudflareAccountMissing":
+                            Assert.Contains("Cloudflare Pages, which needs your Account ID", problem);
+                            break;
+                        case "neverDeployed":
+                            Assert.Contains("has never been deployed", problem);
+                            break;
+                        default:
+                            Assert.Fail($"Unknown refusal case: {expectRefusal}");
+                            break;
+                    }
+                }
+            }
+            finally
+            {
+                try { Directory.Delete(tempDir, recursive: true); } catch { }
+            }
+        }
+    }
+
+    [Fact]
+    public void FileFormats_CourseConfigKeys_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("file-formats.json");
+        var keys = doc["courseConfigKeys"]!["keys"]!.AsArray().Select(k => k!["key"]!.ToString()).ToList();
+
+        string repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        string source = File.ReadAllText(Path.Combine(repoRoot, "windows-app", "Plantoir.Core", "Models", "CourseConfiguration.cs"));
+
+        foreach (string key in keys)
+        {
+            Assert.Contains($"\"{key}\"", source);
+        }
+    }
+
     private sealed class ScriptedModel : IChatModel
     {
         public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation) =>

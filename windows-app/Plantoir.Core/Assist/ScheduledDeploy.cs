@@ -26,23 +26,24 @@ public sealed class ScheduledDeploy
     /// thing being walked around here is a deploy that would sit waiting on a
     /// question at half six in the morning.
     /// </summary>
-    public static string? Problem(Models.Course course, int sectionNumber, DateTime when, DateTime now)
+    public static string? Problem(Models.Course course, int sectionNumber, DateTime when, DateTime now, string cloudflareAccountID = "")
     {
         if (when <= now)
             return $"{when:dddd d MMMM, h:mm tt} has already passed. Pick a time still to come.";
 
-        // A Pages-scoped Cloudflare token cannot list its own account, so the
-        // account id lives in Plantoir's settings and only a deploy started
-        // inside the app can pass it.
-        if (course.Configuration.DeploysToCloudflare)
-            return $"{course.Code} deploys to Cloudflare Pages, which needs the account ID only Plantoir " +
-                   "has. A scheduled deploy runs on its own and cannot be given it, so this can't be " +
-                   "scheduled — deploy this section from Plantoir instead.";
+        if (course.Configuration.DeployTarget == "local_folder")
+        {
+            if (Models.CourseConfiguration.DeployFolderProblem(course.Configuration.DeployFolderPath) is { } folderProblem)
+                return $"{course.Code} deploys to a folder, and that folder needs attention first: {folderProblem}";
+        }
 
-        // With no site marker, deploy.py asks what to call the website. Nobody
-        // is there to answer at the scheduled time; it would simply wait.
-        if (!course.Configuration.DeploysToLocalFolder &&
-            !File.Exists(Path.Combine(course.DirectoryPath, ".netlify_sites", $"section{sectionNumber}.json")))
+        if (course.Configuration.DeploysToCloudflare)
+        {
+            if (Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID) is { } accountProblem)
+                return $"{course.Code} deploys to Cloudflare Pages, which needs your Account ID. {accountProblem} Add it in this course’s settings, under Deploying, then schedule this again.";
+        }
+
+        if (!Models.DeployCommand.HasDeployedBefore(sectionNumber, course))
             return $"{course.Code} Section {sectionNumber} has never been deployed, so deploying it asks " +
                    "what to call the website. Nobody would be there to answer that at the scheduled time, " +
                    "and it would wait. Deploy it once from Plantoir, and after that it can be scheduled.";

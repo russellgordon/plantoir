@@ -443,6 +443,9 @@ public sealed class AssistAgent
     /// <summary>Invoked whenever a pending plan/write action is accepted by the teacher.</summary>
     public Action? OnPlanAccepted { get; set; }
 
+    /// <summary>Provides the human-readable destination for publishing/deploying (e.g. "Netlify", "Cloudflare Pages", "a folder on this computer").</summary>
+    public Func<string>? DestinationProvider { get; set; }
+
     /// <summary>
     /// Tools that change pages. They run on the server as pure file edits —
     /// <c>preview: false</c>, so the server builds nothing — and then the
@@ -681,7 +684,7 @@ public sealed class AssistAgent
     }
 
     /// <summary>
-    /// What the card says above the two buttons.
+    /// Explain what an approval card is asking for.
     ///
     /// Neither of these restates the request. The act itself is named by the
     /// question that follows, and the section is on the window's own title
@@ -698,7 +701,8 @@ public sealed class AssistAgent
         string moment = DateTime.TryParse(when, out var parsed)
             ? parsed.ToString("dddd d MMMM, h:mm tt")
             : when;
-        return $"Set this computer to deploy {_courseCode} Section {_section} at {moment}. " +
+        string destination = DestinationProvider?.Invoke() ?? "the web";
+        return $"Set this computer to deploy {_courseCode} Section {_section} to {destination} at {moment}. " +
                "It has to be on and awake then — plugged in if it is a laptop, lid open. " +
                "Plantoir cannot wake it up.";
     }

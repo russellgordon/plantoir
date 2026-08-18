@@ -78,7 +78,7 @@ public static class TaskMilestones
     {
         new TaskMilestone("Checking your site…", "Host timezone offset"),
         new TaskMilestone("Copying your files…", "to a folder"),
-        new TaskMilestone("Finishing up…", "Published."),
+        new TaskMilestone("Finishing up…", "PUBLISHED_FOLDER="),
     };
 
     /// <summary>Rebuild + folder publish presented as ONE task with one bar.</summary>
@@ -90,7 +90,7 @@ public static class TaskMilestones
         new TaskMilestone("Gathering your content…", "Copying shared folders"),
         new TaskMilestone("Building your site…", "Quartz v4"),
         new TaskMilestone("Copying your files…", "to a folder"),
-        new TaskMilestone("Finishing up…", "Published."),
+        new TaskMilestone("Finishing up…", "PUBLISHED_FOLDER="),
     };
 
     /// <summary>
@@ -103,7 +103,7 @@ public static class TaskMilestones
         new TaskMilestone("Building your website builder…", "Building your website builder"),
         new TaskMilestone("Starting up…", "Ensuring container is running"),
         new TaskMilestone("Checking your site…", "Deploying from local build"),
-        new TaskMilestone("Connecting to Cloudflare…", "Cloudflare project ready"),
+        new TaskMilestone("Connecting to Cloudflare…", "Cloudflare project"),
         new TaskMilestone("Uploading your pages…", "Uploading the built site"),
         new TaskMilestone("Finishing up…", "Deploy complete"),
     };
@@ -116,7 +116,7 @@ public static class TaskMilestones
         new TaskMilestone("Starting up…", "Starting container if needed"),
         new TaskMilestone("Gathering your content…", "Copying shared folders"),
         new TaskMilestone("Building your site…", "Quartz v4"),
-        new TaskMilestone("Connecting to Cloudflare…", "Cloudflare project ready"),
+        new TaskMilestone("Connecting to Cloudflare…", "Cloudflare project"),
         new TaskMilestone("Uploading your pages…", "Uploading the built site"),
         new TaskMilestone("Finishing up…", "Deploy complete"),
     };

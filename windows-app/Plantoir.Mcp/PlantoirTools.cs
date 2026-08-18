@@ -340,8 +340,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
 
             var plan = workspace.PlanScheduledDeploy(course, section, moment);
+            var deployArgs = DeployCommand.Arguments(plan.CourseCode, plan.SectionNumber, workspace.Course(plan.CourseCode).Configuration);
             if (TaskScheduling.Schedule(plan.TaskName, workspace.FolderPath,
-                                        plan.CourseCode, plan.SectionNumber, moment) is { } problem)
+                                        plan.CourseCode, plan.SectionNumber, moment, deployArgs) is { } problem)
                 throw new AssistRefusal($"Nothing was scheduled. {problem}");
 
             // The caution about the computer being awake is on the card the

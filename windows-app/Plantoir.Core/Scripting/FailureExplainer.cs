@@ -29,7 +29,7 @@ public static class FailureExplainer
     {
         if (!output.Contains("429") && !output.Contains("rate limit", StringComparison.OrdinalIgnoreCase))
             return null;
-        return $"Netlify is limiting how often websites can be published right now. Try publishing again {WaitDescription(output)}.";
+        return $"Netlify is limiting how often websites can be deployed right now. Try deploying again {WaitDescription(output)}.";
     }
 
     internal static string WaitDescription(string output)
@@ -56,9 +56,9 @@ public static class FailureExplainer
     private static string? AccountExplanation(string output)
     {
         if (output.Contains("Netlify token missing"))
-            return "Your Netlify account isn't connected yet. Add your Netlify access token, then publish again.";
+            return "Your Netlify account isn't connected yet. Add your Netlify access token, then deploy again.";
         if (output.Contains("Netlify API error 401") || output.Contains("Netlify API error 403"))
-            return "Netlify didn't accept your access token — it may have expired or been removed. Create a new one on Netlify, then publish again.";
+            return "Netlify didn't accept your access token — it may have expired or been removed. Create a new one on Netlify, then deploy again.";
         return null;
     }
 
@@ -78,6 +78,6 @@ public static class FailureExplainer
 
     private static string? MissingBuildExplanation(string output) =>
         output.Contains("Built site not found")
-            ? "This website hasn't been built yet. Preview it once, then publish."
+            ? "This website hasn't been built yet. Preview it once, then deploy."
             : null;
 }

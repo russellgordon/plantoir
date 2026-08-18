@@ -199,6 +199,12 @@ public sealed partial class AssistWindow : Window
                 App.Settings.PlansAcceptedCount++;
                 try { App.Settings.Save(); } catch { }
             },
+            DestinationProvider = () =>
+            {
+                if (_course.Configuration.DeploysToLocalFolder) return "a folder on this computer";
+                if (_course.Configuration.DeploysToCloudflare) return "Cloudflare Pages";
+                return "Netlify";
+            },
         };
 
         // Mount the prompt shelf at the top of the window with clickable cards.

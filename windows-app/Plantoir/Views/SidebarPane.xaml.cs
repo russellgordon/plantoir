@@ -585,7 +585,7 @@ public sealed partial class SidebarPane : UserControl
             var chosen = Chosen();
             string? problem = chosen is null
                 ? "Pick a day."
-                : ScheduledDeploy.Problem(course, number, chosen.Value, DateTime.Now);
+                : ScheduledDeploy.Problem(course, number, chosen.Value, DateTime.Now, Workspace.Settings.CloudflareAccountId);
             warning.Text = problem ?? "";
             warning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             dialog.IsPrimaryButtonEnabled = problem is null;
@@ -603,8 +603,9 @@ public sealed partial class SidebarPane : UserControl
         if (Chosen() is not { } when) return;
 
         if (Workspace.WorkspacePath is not { } folder) return;
+        var deployArgs = DeployCommand.Arguments(course.Code, number, course.Configuration, Workspace.Settings.CloudflareAccountId);
         if (TaskScheduling.Schedule(TaskScheduling.NameFor(course.Code, number),
-                                    folder, course.Code, number, when) is { } failure)
+                                    folder, course.Code, number, when, deployArgs) is { } failure)
         {
             await ShowError("That couldn't be scheduled", failure);
             return;
