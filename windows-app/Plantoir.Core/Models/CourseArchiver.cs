@@ -17,8 +17,21 @@ public static class CourseArchiver
         "dist", "build", "out", "__pycache__", ".DS_Store",
     };
 
-    public static string TimestampedName(string prefix, DateTime stamp) =>
-        prefix + "_" + stamp.ToString(ArchivedItem.StampFormat, CultureInfo.InvariantCulture) + ".zip";
+    /// <summary>
+    /// How many of the ASSISTANT's backups of one course are kept.
+    ///
+    /// A course full of images makes a large zip, and the assistant saves one
+    /// per conversation whether or not anybody asked for it, so without a
+    /// limit a term of chats fills a disk with copies of copies.
+    ///
+    /// A teacher's OWN backups are never counted here and never pruned. They
+    /// made those on purpose; deciding on their behalf that a backup from
+    /// last month has expired is not the app's call to make.
+    /// </summary>
+    public const int MostBackupsKept = 5;
+
+    public static string TimestampedName(string prefix, DateTime stamp, string suffix = "") =>
+        $"{prefix}_{stamp.ToString(ArchivedItem.StampFormat, CultureInfo.InvariantCulture)}{suffix}.zip";
 
     public static string BackupsDirectory(string coursesDirectory, string courseCode) =>
         Path.Combine(coursesDirectory, "_backups", courseCode);
@@ -30,8 +43,57 @@ public static class CourseArchiver
     /// (&lt;CODE&gt;_backup_&lt;timestamp&gt;.zip) is what separates a backup from an
     /// archive in the shared _backups folder.
     /// </summary>
-    public static string BackUpCourse(Course course, string coursesDirectory) =>
-        Archive(course.DirectoryPath, course.Code + "_backup", coursesDirectory, course.Code);
+    public static string BackUpCourse(Course course, string coursesDirectory, BackupMaker? maker = null)
+    {
+        var actualMaker = maker ?? BackupMaker.DefaultTeacher;
+        string backupPath = Archive(course.DirectoryPath, course.Code + "_backup", coursesDirectory, course.Code, actualMaker.NameSuffix);
+        PruneBackups(course.Code, coursesDirectory);
+        return backupPath;
+    }
+
+    /// <summary>
+    /// Deletes the oldest backups of one course until only
+    /// <see cref="MostBackupsKept"/> are left.
+    ///
+    /// ONLY the assistant's own backups are pruned. A teacher's backup is a
+    /// decision — deleting that on a schedule they never agreed to is the app
+    /// overruling them about their own work.
+    /// </summary>
+    public static void PruneBackups(string courseCode, string coursesDirectory)
+    {
+        string backupsDir = BackupsDirectory(coursesDirectory, courseCode);
+        if (!Directory.Exists(backupsDir)) return;
+
+        var entries = Directory.GetFiles(backupsDir, "*.zip");
+        var assistantBackups = new List<BackupItem>();
+        foreach (var file in entries)
+        {
+            if (BackupItem.From(file, courseCode) is { } item && item.Maker is BackupMaker.Assistant)
+            {
+                assistantBackups.Add(item);
+            }
+        }
+
+        if (assistantBackups.Count <= MostBackupsKept) return;
+
+        // Newest first. Two backups made in the same second are ordered by name.
+        assistantBackups.Sort((first, second) =>
+        {
+            if (first.BackedUpAt == second.BackedUpAt)
+                return string.Compare(Path.GetFileName(second.FilePath), Path.GetFileName(first.FilePath), StringComparison.Ordinal);
+            return second.BackedUpAt.CompareTo(first.BackedUpAt);
+        });
+
+        int kept = 0;
+        foreach (var backup in assistantBackups)
+        {
+            kept++;
+            if (kept > MostBackupsKept)
+            {
+                try { File.Delete(backup.FilePath); } catch { }
+            }
+        }
+    }
 
     /// <summary>
     /// Writes an archive of an entire course folder WITHOUT removing it —
@@ -69,7 +131,7 @@ public static class CourseArchiver
         return archivePath;
     }
 
-    private static string Archive(string folderPath, string prefix, string coursesDirectory, string courseCode)
+    private static string Archive(string folderPath, string prefix, string coursesDirectory, string courseCode, string suffix = "")
     {
         string backupsDir = BackupsDirectory(coursesDirectory, courseCode);
         Directory.CreateDirectory(backupsDir);
@@ -78,10 +140,10 @@ public static class CourseArchiver
         // in the same one — an assistant publishing two classes in a row does
         // it every time. Without this the second backup throws, which (because
         // no backup means no edits) turns a routine sequence into a refusal.
-        string archivePath = Path.Combine(backupsDir, TimestampedName(prefix, DateTime.Now));
+        string archivePath = Path.Combine(backupsDir, TimestampedName(prefix, DateTime.Now, suffix));
         for (int attempt = 2; File.Exists(archivePath) && attempt < 100; attempt++)
             archivePath = Path.Combine(backupsDir,
-                TimestampedName(prefix, DateTime.Now).Replace(".zip", $"-{attempt}.zip"));
+                TimestampedName(prefix, DateTime.Now, suffix).Replace(".zip", $"-{attempt}.zip"));
 
         ZipFolder(folderPath, archivePath);
         return archivePath;

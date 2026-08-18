@@ -469,6 +469,73 @@ public class CourseBackupTests
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
     }
+
+    [Fact]
+    public void BackUpCourse_WithAssistantMaker_AppendsSuffixAndPrunes()
+    {
+        string root = Temp();
+        try
+        {
+            string coursesDir = Path.Combine(root, "courses");
+            var course = MakeCourse(coursesDir, "ICS3U");
+            string zipPath = CourseArchiver.BackUpCourse(course, coursesDir, new BackupMaker.Assistant(2));
+            Assert.Contains("_assistant-section2.zip", zipPath);
+
+            var backup = BackupItem.From(zipPath, "ICS3U")!;
+            Assert.NotNull(backup);
+            Assert.IsType<BackupMaker.Assistant>(backup.Maker);
+            Assert.Equal(2, ((BackupMaker.Assistant)backup.Maker).SectionNumber);
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
+    [Fact]
+    public void PruneBackups_KeepsAtMostFiveAssistantBackups_AndNeverPrunesTeacherBackups()
+    {
+        string root = Temp();
+        try
+        {
+            string coursesDir = Path.Combine(root, "courses");
+            var course = MakeCourse(coursesDir, "ICS3U");
+            string backupsDir = CourseArchiver.BackupsDirectory(coursesDir, "ICS3U");
+            Directory.CreateDirectory(backupsDir);
+
+            // Create 3 teacher backups
+            var teacherFiles = new List<string>();
+            for (int i = 0; i < 3; i++)
+            {
+                var stamp = new DateTime(2026, 8, 1, 10, i, 0);
+                string file = Path.Combine(backupsDir, CourseArchiver.TimestampedName("ICS3U_backup", stamp));
+                File.WriteAllText(file, "teacher");
+                teacherFiles.Add(file);
+            }
+
+            // Create 8 assistant backups with increasing timestamps
+            var assistantFiles = new List<string>();
+            for (int i = 0; i < 8; i++)
+            {
+                var stamp = new DateTime(2026, 8, 2, 10, i, 0);
+                string file = Path.Combine(backupsDir, CourseArchiver.TimestampedName("ICS3U_backup", stamp, "_assistant-section1"));
+                File.WriteAllText(file, "assistant");
+                assistantFiles.Add(file);
+            }
+
+            // Run prune
+            CourseArchiver.PruneBackups("ICS3U", coursesDir);
+
+            // All 3 teacher backups must survive
+            foreach (var tf in teacherFiles)
+                Assert.True(File.Exists(tf), $"Teacher backup {tf} was wrongly pruned");
+
+            // Only the 5 newest assistant backups must survive (indices 3, 4, 5, 6, 7)
+            for (int i = 0; i < 3; i++)
+                Assert.False(File.Exists(assistantFiles[i]), $"Old assistant backup {assistantFiles[i]} should have been pruned");
+
+            for (int i = 3; i < 8; i++)
+                Assert.True(File.Exists(assistantFiles[i]), $"New assistant backup {assistantFiles[i]} should have been kept");
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
 }
 
 /// <summary>

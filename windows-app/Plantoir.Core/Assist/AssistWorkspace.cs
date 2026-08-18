@@ -1152,7 +1152,7 @@ public sealed class AssistWorkspace
         if (plan.Publishes) RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder)); }
+        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
         catch (Exception error)
         {
             // No backup, no edits. This is the one step that has no fallback.
@@ -1348,7 +1348,7 @@ public sealed class AssistWorkspace
         if (publishing) RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder)); }
+        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(section)); }
         catch (Exception error)
         {
             throw new AssistRefusal($"{course.Code} couldn’t be backed up, so nothing was changed: {error.Message}");
@@ -1812,7 +1812,7 @@ public sealed class AssistWorkspace
         if (plan.ChangesNothing) return new AssistResult(true, "Every class already carries that date.", null);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder)); }
+        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
         catch (Exception error)
         {
             throw new AssistRefusal(
@@ -1976,7 +1976,7 @@ public sealed class AssistWorkspace
         if (plan.ChangesNothing) return new AssistResult(true, "Every page already matches its class.", null);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder)); }
+        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
         catch (Exception error)
         {
             throw new AssistRefusal(
@@ -2185,7 +2185,7 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder)); }
+        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
         catch (Exception error)
         {
             throw new AssistRefusal($"{course.Code} couldn’t be backed up, so the page was not changed: {error.Message}");
@@ -2402,7 +2402,7 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder)); }
+        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
         catch (Exception error)
         {
             throw new AssistRefusal(
@@ -2647,7 +2647,7 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder)); }
+        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
         catch (Exception error)
         {
             throw new AssistRefusal(
