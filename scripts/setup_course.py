@@ -208,8 +208,11 @@ def clear_screen():
 def getch():
     """Read single keypress (supports arrow left/right) without Enter."""
     if termios is None:
-        # Windows console: arrows arrive as a two-character sequence with a
-        # \x00 or \xe0 prefix ('M' right, 'K' left).
+        # Windows console: a locally-typed arrow arrives as a two-character
+        # sequence with a \x00 or \xe0 prefix ('M' right, 'K' left). Under
+        # ConPTY (the app driving the wizard), the same key can arrive as
+        # the raw VT sequence ESC [ C / ESC [ D instead - handle both, and
+        # only call a lone ESC an ESC when nothing follows it.
         ch1 = msvcrt.getwch()
         if ch1 in ("\x00", "\xe0"):
             ch2 = msvcrt.getwch()
@@ -219,6 +222,14 @@ def getch():
                 return "LEFT"
             return "ESC"
         if ch1 == "\x1b":
+            if msvcrt.kbhit():
+                ch2 = msvcrt.getwch()
+                if ch2 == "[" and msvcrt.kbhit():
+                    ch3 = msvcrt.getwch()
+                    if ch3 == "C":
+                        return "RIGHT"
+                    if ch3 == "D":
+                        return "LEFT"
             return "ESC"
         if ch1 in ("\r", "\n"):
             return "ENTER"
