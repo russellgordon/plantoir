@@ -227,6 +227,45 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **The Windows screenshots were re-shot, and two of the findings are not
+  about screenshots** (Windows, 2026-08-19, branch `issue/windows-screenshots`,
+  GUI-IMPROVEMENTS row 287).
+  - **Nothing to match.** Each platform photographs itself; `capture.py` on
+    the mac is untouched. This entry exists for the two traps underneath.
+  - **The launch-theme brush trap.** WinUI resolves a brush fetched as
+    `Application.Current.Resources["..."]` against the theme the APP LAUNCHED
+    in, whatever `RequestedTheme` the element carries. The capturer ran one
+    process and asked for dark by overriding `RequestedTheme`, so every
+    control went dark while every hand-fetched brush stayed light: the
+    new-course card photographed as white text on a white card, and the
+    assistant's bubbles as light grey on a dark window. **Rejected**: fixing
+    the brushes one at a time — it would have meant finding all of them,
+    including the ones nobody had looked at, and the next hand-fetched brush
+    would bring it back. The harness now switches Windows into each
+    appearance and runs the app once per appearance, so resources resolve the
+    way a teacher's copy resolves them. **Worth a look on the mac** wherever a
+    capture forces an appearance the process did not launch in, because
+    `NSColor`'s dynamic colours resolve against the current appearance in the
+    same way, and the failure is silent: the screenshot is simply wrong.
+  - **`deploy_site_name` is not a key**, and this is the second half of the
+    answer already recorded above. `WINDOWS-HANDOFF.md` asked this side to
+    decide what it should hold under per-section naming; while re-shooting,
+    the same fixtures turned out to carry `section_count` too, which nothing
+    reads either — which is why every demo course in the Windows shots showed
+    ONE section while the mac's showed two. The real keys are `num_sections`
+    and `section_numbers` (`contracts/file-formats.json`), and a section's
+    address lives in `.netlify_sites/section<n>.json`. **The general lesson,
+    for both sides**: a config key that nothing reads fails silently and
+    forever, and the only thing that caught either of these was looking at a
+    picture. If a fixture writes a key, something should read it back.
+  - **A capture-only hook now exists on `AssistWindow`** —
+    `ShowPromptShelfForCapture()`, beside the older
+    `AddStagedBubbleForCapture` — because the prompt shelf mounts on the path
+    that runs once a local assistant is ready, and a capture never starts one.
+    The mac gets its shelf into frame by driving the real window through
+    XCUITest, so it needs no equivalent; noted only so the hook is not
+    mistaken for product behaviour.
+
 - **plantoir.app now has a Windows hero composite, and `deploy_site_name`
   turned out not to be a key** (Windows, 2026-08-19, commit "Give the Windows
   marketing shots a hero composite, and fix three fixtures").
