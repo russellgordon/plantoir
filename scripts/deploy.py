@@ -124,62 +124,65 @@ def safe_clean_public_dir(public_dir: Path):
     except Exception:
         pass
 
-def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str):
+def rebuild_for_production(course_code: str, section: str, host_os: str):
     """
-    If quartz.config.ts in section_dir or internal build dir has a baseUrl that does not match target_domain,
-    update it and rebuild for production so OpenGraph and Twitter meta tags reflect
+    Rebuild the section site for production using build_site.py --build-only.
+    Stages the build workspace on container-internal ext4 storage (/tmp/quartz-builds),
+    syncs public/ to host courses/<COURSE>/.merged_output/section<N>/public,
+    and ensures all live site domains and OpenGraph metadata are up to date.
+    """
+    print(" Rebuilding site for production…")
+    build_script = Path("/opt/scripts/build_site.py")
+    if not build_script.exists():
+        build_script = Path(__file__).parent / "build_site.py"
+
+    cmd = [
+        sys.executable,
+        str(build_script),
+        f"--course={course_code}",
+        f"--section={section}",
+        "--build-only",
+        f"--host-os={host_os}",
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+        print("✅ Production build complete.")
+    except (subprocess.CalledProcessError, OSError) as e:
+        print(f"❌ Production rebuild failed: {e}")
+        sys.exit(1)
+
+def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_code: str, section: str, host_os: str):
+    """
+    If quartz.config.ts in internal build dir has a baseUrl that does not match target_domain,
+    rebuild for production using build_site.py so OpenGraph and Twitter meta tags reflect
     the deployed site domain.
     """
     clean_target = clean_base_url(target_domain)
     if not clean_target:
         return
 
-    course_name = section_dir.parent.parent.name
-    section_name = section_dir.name
-    internal_dir = Path(f"/tmp/quartz-builds/{course_name}/{section_name}")
-
+    internal_dir = Path(f"/tmp/quartz-builds/{course_code}/section{section}")
     config_paths = [p / "quartz.config.ts" for p in [section_dir, internal_dir] if (p / "quartz.config.ts").is_file()]
-    if not config_paths:
-        return
 
     needs_rebuild = False
-    for config_path in config_paths:
-        try:
-            src = config_path.read_text(encoding="utf-8")
-            m = re.search(r'baseUrl\s*:\s*(["\'])([^"\']*)(\1)', src)
-            current_val = m.group(2) if m else None
-            if current_val != clean_target:
-                pattern = re.compile(r'(baseUrl\s*:\s*)(["\'][^"\']*["\']|undefined|null)')
-                def _repl(match: re.Match) -> str:
-                    return f'{match.group(1)}"{clean_target}"'
-                new_src, count = pattern.subn(_repl, src, count=1)
-                if count > 0:
-                    config_path.write_text(new_src, encoding="utf-8")
+    if not config_paths:
+        needs_rebuild = True
+    else:
+        for config_path in config_paths:
+            try:
+                src = config_path.read_text(encoding="utf-8")
+                m = re.search(r'baseUrl\s*:\s*(["\'])([^"\']*)(\1)', src)
+                current_val = m.group(2) if m else None
+                if current_val != clean_target:
                     needs_rebuild = True
-        except Exception:
-            pass
+                    break
+            except Exception:
+                needs_rebuild = True
+                break
 
     if needs_rebuild:
         print(f" Updating Quartz baseUrl to '{clean_target}' and rebuilding for production…")
-        env = os.environ.copy()
-        env.setdefault("TZ", "UTC")
-        env.setdefault("SOURCE_DATE_EPOCH", "1704067200")
-        safe_clean_public_dir(section_dir / "public")
-        build_cwd = internal_dir if internal_dir.exists() else section_dir
-        try:
-            subprocess.run(["npx", "quartz", "build", "--concurrency", "1"],
-                           cwd=build_cwd, env=env, check=True)
-            if build_cwd != section_dir and (build_cwd / "public").exists():
-                shutil.rmtree(section_dir / "public", ignore_errors=True)
-                shutil.copytree(build_cwd / "public", section_dir / "public", symlinks=True)
-                try:
-                    os.sync()
-                except Exception:
-                    pass
-            print("✅ Production build updated with live site domain.")
-        except (subprocess.CalledProcessError, OSError) as e:
-            print(f"❌ Production rebuild failed: {e}")
-            sys.exit(1)
+        rebuild_for_production(course_code, section, host_os)
 
 # ---------- Teacher profile (unchanged) ----------
 COURSES_ROOT = Path("/teaching/courses")
@@ -676,7 +679,7 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
 
     marker = load_cloudflare_marker(course_dir, section) or {}
     host = marker.get("subdomain") or f"{project_name}.pages.dev"
-    ensure_base_url_and_rebuild(public_dir.parent, host)
+    ensure_base_url_and_rebuild(public_dir.parent, host, course_code, str(section), _HOST_OS)
 
     print(" Uploading the built site to Cloudflare…")
     deploy_to_cloudflare(public_dir, project_name, token, account_id)
@@ -894,28 +897,7 @@ def main():
         is_preview_build = False
     if is_preview_build:
         print(" Preview build detected (live-reload client) — rebuilding for production…")
-        env = os.environ.copy()
-        env.setdefault("TZ", "UTC")
-        env.setdefault("SOURCE_DATE_EPOCH", "1704067200")  # match build_site.py
-        safe_clean_public_dir(public_dir)
-        internal_dir = Path(f"/tmp/quartz-builds/{args.course}/section{args.section}")
-        build_cwd = internal_dir if internal_dir.exists() else section_dir
-        try:
-            subprocess.run(["npx", "quartz", "build", "--concurrency", "1"],
-                           cwd=build_cwd, env=env, check=True)
-            if build_cwd != section_dir and (build_cwd / "public").exists():
-                shutil.rmtree(public_dir, ignore_errors=True)
-                shutil.copytree(build_cwd / "public", public_dir, symlinks=True)
-                try:
-                    os.sync()
-                except Exception:
-                    pass
-        except (subprocess.CalledProcessError, OSError):
-            print("❌ Could not rebuild the site for production, so this deploy would")
-            print(" publish the preview's live-reload page. Run the preview again, then retry:")
-            print(f"{_cmd_example('preview', args.course, args.section, _HOST_OS)}")
-            sys.exit(1)
-        print("✅ Production build complete.")
+        rebuild_for_production(args.course, str(args.section), _HOST_OS)
 
     # Determine course dir (for stable marker)
     course_dir = section_dir.parent.parent  # .../<COURSE>/.merged_output/section#
@@ -995,7 +977,7 @@ def main():
 
     target_domain = clean_base_url(site_url)
     if target_domain:
-        ensure_base_url_and_rebuild(section_dir, target_domain)
+        ensure_base_url_and_rebuild(section_dir, target_domain, args.course, str(args.section), _HOST_OS)
 
     # Always delta deploy to PRODUCTION (as requested)
     print(" Preparing delta deploy manifest…")

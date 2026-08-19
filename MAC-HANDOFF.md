@@ -109,6 +109,11 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Production rebuilds in `deploy.py` delegate to `build_site.py --build-only`**
+  (Shared Python, 2026-08-18).
+  - **What was fixed**: After Quartz build staging moved to container-internal ext4 storage (`/tmp/quartz-builds/<COURSE>/section<N>`), `deploy.py` failed when rebuilding for production (when detecting preview live-reload scripts in `index.html` or updating `baseUrl` for live site domains). It was calling `npx quartz build` directly in `cwd=section_dir` (`/teaching/courses/<COURSE>/.merged_output/section<N>`), which in the dual workspace architecture contains only `public/` and `course_config.json` rather than the full Quartz scaffold. If `/tmp/quartz-builds` was clean (e.g. freshly created container, or deploy without preview in the same session), `deploy.py` crashed immediately with `Production rebuild failed`.
+  - **The fix**: `deploy.py`'s `rebuild_for_production` and `ensure_base_url_and_rebuild` now delegate production rebuilds directly to `build_site.py --course <COURSE> --section <N> --build-only`, which ensures the internal workspace is staged, applies all patches and domain markers, generates the production build without the live-reload websocket, and syncs `public/` cleanly via `_sync_public_to_host`.
+
 - **Whole Unit Publish / Unpublish and MCP Tool Parameter Binding on Windows**
   (Windows, 2026-08-18). Awareness only; Windows now matches macOS behavior for whole unit operations.
   - **What was fixed**:
