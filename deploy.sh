@@ -244,7 +244,16 @@ if [[ ! -d "${SECTION_DIR_HOST}" ]]; then
   exit 1
 fi
 
-if [[ ! -d "${PUBLIC_DIR_HOST}" || -z "$(ls -A "${PUBLIC_DIR_HOST}" 2>/dev/null || true)" ]]; then
+_BUILT_FOUND="false"
+for ((_i=0; _i<10; _i++)); do
+  if [[ -d "${PUBLIC_DIR_HOST}" && -n "$(ls -A "${PUBLIC_DIR_HOST}" 2>/dev/null || true)" ]]; then
+    _BUILT_FOUND="true"
+    break
+  fi
+  sleep 0.2
+done
+
+if [[ "$_BUILT_FOUND" != "true" ]]; then
   echo "❌ Built site not found at:"
   echo " ${PUBLIC_DIR_HOST}"
   echo

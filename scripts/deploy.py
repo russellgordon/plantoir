@@ -172,6 +172,10 @@ def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str):
             if build_cwd != section_dir and (build_cwd / "public").exists():
                 shutil.rmtree(section_dir / "public", ignore_errors=True)
                 shutil.copytree(build_cwd / "public", section_dir / "public", symlinks=True)
+                try:
+                    os.sync()
+                except Exception:
+                    pass
             print("✅ Production build updated with live site domain.")
         except (subprocess.CalledProcessError, OSError) as e:
             print(f"❌ Production rebuild failed: {e}")
@@ -902,6 +906,10 @@ def main():
             if build_cwd != section_dir and (build_cwd / "public").exists():
                 shutil.rmtree(public_dir, ignore_errors=True)
                 shutil.copytree(build_cwd / "public", public_dir, symlinks=True)
+                try:
+                    os.sync()
+                except Exception:
+                    pass
         except (subprocess.CalledProcessError, OSError):
             print("❌ Could not rebuild the site for production, so this deploy would")
             print(" publish the preview's live-reload page. Run the preview again, then retry:")

@@ -3105,7 +3105,7 @@ def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
         dst_public.parent.mkdir(parents=True, exist_ok=True)
         try:
             res = subprocess.run(
-                ["rsync", "-a", "--delete", f"{src_public}/", f"{dst_public}/"],
+                ["rsync", "-a", "--no-owner", "--no-group", "--delete", f"{src_public}/", f"{dst_public}/"],
                 check=False,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -3124,6 +3124,11 @@ def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
             shutil.copy2(output_dir / "course_config.json", host_output_dir / "course_config.json")
         except Exception:
             pass
+
+    try:
+        os.sync()
+    except Exception:
+        pass
 
 def _start_public_sync_watcher(output_dir: Path, host_output_dir: Path) -> threading.Thread:
     """

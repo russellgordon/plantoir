@@ -197,7 +197,16 @@ if (-not (Test-Path -LiteralPath $SECTION_DIR_HOST)) {
   exit 1
 }
 
-if (-not (Test-Path -LiteralPath $PUBLIC_DIR_HOST) -or -not (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Force | Select-Object -First 1)) {
+$builtFound = $false
+for ($i = 0; $i -lt 10; $i++) {
+  if ((Test-Path -LiteralPath $PUBLIC_DIR_HOST) -and (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Force | Select-Object -First 1)) {
+    $builtFound = $true
+    break
+  }
+  Start-Sleep -Milliseconds 200
+}
+
+if (-not $builtFound) {
   Write-Host "Built site not found at:"
   Write-Host " $PUBLIC_DIR_HOST"
   Write-Host ""
