@@ -3720,6 +3720,44 @@ adds another such guard, it goes in the Dockerfile and it fails closed.
   presentation regressions get press-and-look tests (entry 81's lesson:
   button logic can be perfect while its dialog never shows).
 
+### Pinning the trail as wired, not merely declared (mac, 2026-08-19)
+
+Windows found the gap (2026-08-19, `MAC-HANDOFF.md`): three trail events sat
+in `ActivityTrail.Event`, the contract test compared the enum against
+`shared-rules.json` → `activityTrail.mustRecord` and passed — and nothing
+ever CALLED them, so a release smoke left zero lines for a course creation,
+a preview and a deploy. A list-against-list pin structurally cannot catch a
+declared-but-never-called event. The mac now has a second pin, and Windows
+should mirror it:
+
+- **A source scan**
+  (`mac-app/Tests/QuartzTeachersTests/ActivityTrailWiringTests.swift`):
+  for every `Event` case, fail unless `.caseName` is referenced somewhere in
+  product source outside the enum's own declaration and outside comments.
+  The C# mirror is the same idea over `windows-app/` product sources for
+  each `ActivityTrail.Event` member (locate the source tree from the test
+  assembly the way the mac test uses `#filePath`). Include a guard that the
+  scan actually found a plausible number of source files, so a moved folder
+  fails loudly instead of passing vacuously.
+- **Its honest limit, so nobody oversells it**: the scan proves a call site
+  EXISTS, not that it is reached. The mac additionally runs `noteLaunch()`
+  against a scratch store and counts its three lines. Full runtime coverage
+  of every event would mean driving every feature in unit tests; REJECTED as
+  disproportionate — the failure Windows actually shipped was
+  zero-references, which the scan catches outright.
+- **The suite-pollution fix differs by platform for a reason.** Windows'
+  `[ModuleInitializer]` redirect (`TestTrailRedirect.cs`) is right for xUnit,
+  where tests run in their own process. The mac CANNOT use that shape: its
+  test target is app-hosted (`TEST_HOST`), so the host app writes its launch
+  lines before any test-bundle code loads. Instead the redirect lives in the
+  product (`ProblemReportStore.standard` returns a throwaway folder when
+  `XCTestConfigurationFilePath` is in the environment), and
+  `testTheSuiteWritesToAThrowawayTrail` pins it so a refactor cannot lose it
+  silently. Worth a matching pin on Windows: one test asserting the trail
+  path is the redirected one, so the module initializer's presence is itself
+  under test. Verified on the mac empirically: `activity.txt` byte-identical
+  (same SHA-1) before and after a full suite run.
+
 ## Documentation map
 
 - [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — THE spec (179 entries as of

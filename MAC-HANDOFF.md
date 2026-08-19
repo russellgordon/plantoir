@@ -108,7 +108,33 @@ rather than being deleted.
   host-side deploy step never reads a half-written `public/`). Reference:
   `scripts/build_site.py` → `_sync_public_to_host`.
 
-- **Verify the mac actually EMITS the three trail events the contract pins —
+- ✅ DONE (mac, 2026-08-19, commit "Pin the trail as wired, not merely
+  declared"). All three events fire on the mac — verified against the REAL
+  trail from the 1.0.0 DMG smoke, not just the code: `opened the working
+  folder …`, `started setup.sh` → `finished after 15.2s`, preview
+  start/stopped-on-purpose, deploy start/finish with duration all appeared.
+  The stronger pin now exists:
+  `mac-app/Tests/QuartzTeachersTests/ActivityTrailWiringTests.swift` scans
+  the product source and fails if any `ActivityTrail.Event` case is
+  referenced nowhere outside its declaration — which turns
+  declared-but-never-called from a months-later discovery into a red test.
+  (It cannot prove a call site is *reached*; `noteLaunch`'s three events are
+  additionally verified as firing by running it against a scratch store.)
+  Windows should mirror the scan — see `WINDOWS-HANDOFF.md` → "Pinning the
+  trail as wired".
+  On pollution: the mac suite does NOT write the real trail, and never did —
+  `ProblemReportStore.standard` detects XCTest hosting
+  (`XCTestConfigurationFilePath`) and returns a throwaway folder, which also
+  covers the HOST APP's launch lines written before any test-bundle code
+  loads (the case a Windows-style module initializer runs too late for,
+  because the mac test target is app-hosted). Verified empirically: the real
+  `activity.txt` was byte-identical (same SHA-1) before and after a full
+  suite run. That redirect is now pinned by
+  `testTheSuiteWritesToAThrowawayTrail` so a refactor of `standard` cannot
+  silently lose it.
+
+  Original request follows, kept for the reasoning:
+  **Verify the mac actually EMITS the three trail events the contract pins —
   Windows declared them and never called them** (Windows, 2026-08-19). The
   same release smoke left ZERO lines on the Windows activity trail for a
   course creation, a preview and a deploy: `TaskStarted`, `TaskFinished` and
