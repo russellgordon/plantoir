@@ -71,9 +71,14 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
        dotnet tool install --global sign --prerelease
        winget install --exact --id JRSoftware.InnoSetup
 
-   Per session: `az login` (as the Azure signing account). The script preflights
-   the tools and login, signs the binaries, compiles `installer.iss`, and signs
-   `dist\PlantoirSetup.exe` with an RFC 3161 timestamp.
+   Per session: a plain `az login` as azure@russellgordon.ca — that user holds
+   the "Artifact Signing Certificate Profile Signer" role on the
+   `plantoir-signing` account directly (granted 2026-08-19), so no
+   service-principal secret is involved. (The `plantoir-signing` app
+   registration still exists and also holds the role, but the release flow no
+   longer needs its secret.) The script preflights the tools and login, signs
+   the binaries, compiles `installer.iss`, and signs `dist\PlantoirSetup.exe`
+   with an RFC 3161 timestamp.
 
    Output: **`dist/PlantoirSetup.exe`** (and portable `dist/Plantoir-win-x64.zip`) + SHA-256.
 

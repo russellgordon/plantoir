@@ -4,8 +4,8 @@ Builds the Windows release bundle: publish, optionally sign, package.
     powershell -File publish.ps1              # unsigned bundle (local testing)
     powershell -File publish.ps1 -Sign        # signed bundle (real releases)
 
-Output lands in windows-app\dist\Plantoir-<version>-win-x64.zip with its
-SHA-256 printed for the release notes. The version comes from ONE place:
+Output lands in windows-app\dist\PlantoirSetup.exe and Plantoir-win-x64.zip
+with SHA-256 printed for the release notes. The version comes from ONE place:
 <Version> in Plantoir\Plantoir.csproj — bump it there, tag the repo to
 match (v<version>), and this script names everything else accordingly.
 
@@ -18,7 +18,7 @@ untimestamped signature stops validating when the certificate does.
 param(
     [switch]$Sign,
     [string]$SigningEndpoint = "https://eus.codesigning.azure.net",
-    [string]$SigningAccount  = "plantoirsigning",
+    [string]$SigningAccount  = "plantoir-signing",
     [string]$SigningProfile  = "plantoir-public",
     [string]$TimestampUrl    = "http://timestamp.acs.microsoft.com"
 )
@@ -84,10 +84,14 @@ if ($Sign) {
         $targets += "$publishDir\llama\llama-server.exe"
     }
     Write-Host "Signing $($targets.Count) binaries via $SigningAccount/$SigningProfile" -ForegroundColor Green
+    # --azure-credential-type azure-cli: the default DefaultAzureCredential
+    # probes the VM-only IMDS endpoint (169.254.169.254) first, and on a dev
+    # machine that probe's failure aborts the chain before it reaches az login.
     sign code trusted-signing `
         --trusted-signing-endpoint $SigningEndpoint `
         --trusted-signing-account $SigningAccount `
         --trusted-signing-certificate-profile $SigningProfile `
+        --azure-credential-type azure-cli `
         --timestamp-url $TimestampUrl `
         @targets
     if ($LASTEXITCODE -ne 0) { throw "signing failed (is 'az login' current?)" }
@@ -104,6 +108,24 @@ if ($Sign) {
 # ---- Package: Inno Setup Installer & Portable Zip ---------------------------
 New-Item -ItemType Directory -Force "dist" | Out-Null
 
+# The publish tree holds 100+ toolchain files whose full paths exceed MAX_PATH
+# from this repo's depth (the root alone is ~142 chars), and both ISCC and
+# Compress-Archive fail on them. Map the folder to a free drive letter so every
+# source path is short; the finally below unmaps it even if packaging throws.
+$publishFull = (Resolve-Path $publishDir).Path
+$substDrive = $null
+foreach ($code in 90..71) {   # Z: down to G:
+    $candidate = "$([char]$code):"
+    if (-not (Test-Path "$candidate\")) {
+        subst $candidate $publishFull
+        if ($LASTEXITCODE -eq 0) { $substDrive = $candidate; break }
+    }
+}
+if (-not $substDrive) { throw "No free drive letter to map the publish folder for packaging" }
+Write-Host "Mapped $substDrive -> publish folder (long-path workaround)" -ForegroundColor Green
+
+try {
+
 # 1. Inno Setup Installer (Primary teacher distribution)
 # No `?.` here: this script documents `powershell -File`, and Windows
 # PowerShell 5.1 cannot PARSE the null-conditional operator — the whole
@@ -111,13 +133,20 @@ New-Item -ItemType Directory -Force "dist" | Out-Null
 $isccCommand = Get-Command iscc -ErrorAction SilentlyContinue
 $iscc = if ($isccCommand) { $isccCommand.Source } else { $null }
 if (-not $iscc) {
-    $possiblePath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-    if (Test-Path $possiblePath) { $iscc = $possiblePath }
+    # winget installs per-user (no admin rights) to LOCALAPPDATA; an elevated
+    # install lands in Program Files (x86). Check both before giving up.
+    $possiblePaths = @(
+        "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+    )
+    foreach ($possiblePath in $possiblePaths) {
+        if (Test-Path $possiblePath) { $iscc = $possiblePath; break }
+    }
 }
 
 if ($iscc) {
     Write-Host "Compiling Inno Setup installer via $iscc..." -ForegroundColor Green
-    & $iscc "/DAppVersion=$version" "installer.iss"
+    & $iscc "/DAppVersion=$version" "/DPublishDir=$substDrive" "installer.iss"
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
 
     $installer = "dist\PlantoirSetup.exe"
@@ -127,6 +156,7 @@ if ($iscc) {
             --trusted-signing-endpoint $SigningEndpoint `
             --trusted-signing-account $SigningAccount `
             --trusted-signing-certificate-profile $SigningProfile `
+            --azure-credential-type azure-cli `
             --timestamp-url $TimestampUrl `
             $installer
         if ($LASTEXITCODE -ne 0) { throw "Installer signing failed" }
@@ -146,7 +176,12 @@ if ($iscc) {
 # 2. Portable Zip
 $zip = "dist\Plantoir-win-x64.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
-Compress-Archive -Path "$publishDir\*" -DestinationPath $zip
+Compress-Archive -Path "$substDrive\*" -DestinationPath $zip
+
+} finally {
+    subst $substDrive /D | Out-Null
+}
+
 $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
 $size = '{0:N1} MB' -f ((Get-Item $zip).Length / 1MB)
 
