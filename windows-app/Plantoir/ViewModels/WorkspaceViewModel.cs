@@ -133,6 +133,9 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         _workspacePath = path;
         Settings.WorkspacePath = path;
         Settings.Save();
+        Plantoir.Core.Scripting.ActivityTrail.Note(
+            Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderOpened,
+            $"working folder opened — {path}");
         Reload();
         if (previous is not null && previous != path) ReleaseFolderIfUnused(previous);
         NoteBecameKey();
@@ -148,6 +151,9 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
             return;
         }
         _workspacePath = path;
+        Plantoir.Core.Scripting.ActivityTrail.Note(
+            Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderOpened,
+            $"working folder opened — {path}");
         App.LogDiagnostic("AdoptRestoredPath calling Reload()");
         Reload();
         App.LogDiagnostic("AdoptRestoredPath Reload() finished, calling Notify(WorkspacePath)");

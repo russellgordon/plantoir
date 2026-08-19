@@ -80,6 +80,56 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+- **Build the 1.0.0 DMG only from a tree containing the deploy-flush fix in
+  `scripts/build_site.py`** (Windows + shared, 2026-08-19). A Windows release
+  smoke hung FOREVER after "Done processing 272 files" with no error: the
+  script's post-copy `os.sync()` is a GLOBAL flush that waits on every
+  superblock in the kernel, and under WSL2 all distros share one kernel — a
+  leaked FUSE superblock (orphaned by WSLg, no live process holding it, so
+  nothing could ever answer) blocked it indefinitely. Diagnosed from the
+  kernel stack: `ksys_sync → fuse_sync_fs → request_wait_answer`, python
+  sleeping at zero CPU. The fix replaces `os.sync()` with `syncfs()` on the
+  host output directory's fd — flushing only the filesystem the site was just
+  copied to, which is the only one that step has any business waiting on.
+
+  **The mac is exposed to the same class of failure, not just in principle**:
+  Colima mounts `$HOME` into its VM via Lima's FUSE-based sshfs, so a global
+  sync inside that VM waits on the host mount daemon every time. Deploys
+  succeed today because the daemon answers, not by construction. Nothing to
+  implement — the script is shared — but the DMG must be built AFTER pulling
+  this commit or the two platforms ship different toolchains for 1.0.0. The
+  changed script also changes the image hash, so the first preview/deploy
+  after the mac app rebuild does a one-time image rebuild (a few minutes of
+  "Building your website builder…") — expected, not a fault.
+
+  Rejected: keeping `os.sync()` (it waits on superblocks wholly unrelated to
+  Plantoir); fsync-per-file (hundreds of files over a slow VM mount, and the
+  copy is rsync's work anyway); dropping the flush entirely (it exists so the
+  host-side deploy step never reads a half-written `public/`). Reference:
+  `scripts/build_site.py` → `_sync_public_to_host`.
+
+- **Verify the mac actually EMITS the three trail events the contract pins —
+  Windows declared them and never called them** (Windows, 2026-08-19). The
+  same release smoke left ZERO lines on the Windows activity trail for a
+  course creation, a preview and a deploy: `TaskStarted`, `TaskFinished` and
+  `WorkingFolderOpened` existed in `ActivityTrail.Event`, so the contract
+  test — which compares the ENUM list against `shared-rules.json` →
+  `activityTrail.mustRecord` — passed while nothing ever fired. The list pin
+  cannot catch a declared-but-never-called event, on either platform. Please
+  check the mac's call sites fire for real (drive one preview, read the
+  trail), and consider whether a stronger pin is possible. Windows wiring now
+  lives in `windows-app/Plantoir.Core/Scripting/ScriptRunner.cs` (start:
+  launcher + redacted arguments; finish: outcome distinguishing success /
+  failure / stopped-by-teacher / backed-out-at-a-question, plus duration) and
+  `WorkspaceViewModel.ChooseWorkspace` / `AdoptRestoredPath`.
+
+  Related, same session: the Windows test suite was writing fixture courses
+  (VVH2O) into the REAL trail — phantom lines a genuine problem report would
+  gather. Fixed with a module initializer redirecting the trail before any
+  test runs (`windows-app/Plantoir.Tests/TestTrailRedirect.cs`). Worth
+  checking whether the mac suite pollutes its real
+  `~/Library/Logs/Plantoir/activity.txt` the same way.
+
 - ✅ DONE — SUPERSEDED, nothing owed. **Mirror the stop-sweep guard: await
   in-flight `--stop` sweeps before starting any build** (Windows,
   2026-08-19, GUI-IMPROVEMENTS row 282). An adversarial review the same

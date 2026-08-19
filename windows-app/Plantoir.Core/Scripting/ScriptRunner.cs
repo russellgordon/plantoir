@@ -61,6 +61,8 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         }
     }
 
+    private string _launchedScriptName = "";
+
     public ScriptRunner(SynchronizationContext? uiContext = null)
     {
         _ui = uiContext ?? SynchronizationContext.Current;
@@ -117,6 +119,11 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         IsRunning = true;
         StartedAt = DateTime.UtcNow;
         _finished = 0;
+        _launchedScriptName = scriptName;
+        // "started preview.ps1 COMP 1" — the sentence a teacher would
+        // recognise; Note() redacts the arguments on the way in.
+        string argumentText = arguments.Count > 0 ? " " + string.Join(" ", arguments) : "";
+        ActivityTrail.Note(ActivityTrail.Event.TaskStarted, $"started {scriptName}{argumentText}");
         NotifyRunState();
 
         var process = _process;
@@ -377,7 +384,31 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         IsRunning = false;
         _process?.Dispose();
         _process = null;
+        NoteTaskFinished(exitCode);
         NotifyRunState();
+    }
+
+    /// <summary>
+    /// The trail line distinguishes a failure from a stop the teacher asked
+    /// for and from backing out at a question — all three exit non-zero, and
+    /// only one is a fault (see shared-rules.json → activityTrail.mustRecord).
+    /// </summary>
+    private void NoteTaskFinished(int exitCode)
+    {
+        string outcome = exitCode == 0 ? "succeeded"
+            : WasStoppedByUser ? "stopped by the teacher"
+            : WasCancelled ? "backed out at a question"
+            : $"failed (exit code {exitCode})";
+        string duration = "";
+        if (StartedAt is { } startedAt)
+        {
+            TimeSpan elapsed = DateTime.UtcNow - startedAt;
+            duration = elapsed.TotalSeconds < 60
+                ? $" after {Math.Max(1, (int)elapsed.TotalSeconds)}s"
+                : $" after {(int)elapsed.TotalMinutes}m {elapsed.Seconds}s";
+        }
+        ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
+            $"finished {_launchedScriptName} — {outcome}{duration}");
     }
 
     // ---- Milestones ------------------------------------------------------
