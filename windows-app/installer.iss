@@ -2,7 +2,7 @@
 ; Configured for zero-admin / per-user installation in school environments
 
 #ifndef AppVersion
-#define AppVersion "1.0.0"
+#define AppVersion "1.0.1"
 #endif
 
 ; publish.ps1 passes a short subst-drive path here: compiled from the repo's
