@@ -135,12 +135,14 @@ Neither app contains toolchain logic of its own: they write the same
    `main` is what teachers have, and it needs protecting from work in flight.
 
    - **`main` is what shipped.** It stays releasable at all times: release
-     tags point at `main`, plantoir.app's download links resolve against its
-     releases, and **Netlify deploys the site on every push to `main`** — so
-     pushing `main` IS deploying plantoir.app. Nothing lands there except a
-     merge from `dev`, plus the release flow's own commits (the website
-     version line). After anything lands on `main`, merge `main` back into
-     `dev` in the same session, so the two never drift.
+     tags point at `main`, and plantoir.app's download links resolve against
+     its releases. Nothing lands there except a merge from `dev`, plus the
+     release flow's own commits (the website version line). After anything
+     lands on `main`, merge `main` back into `dev` in the same session, so
+     the two never drift. (plantoir.app itself is NOT deployed by pushing —
+     the Netlify site is not connected to GitHub. `python3 website/build.py
+     --deploy` is the only way it updates, run from `main` so the live site
+     matches what shipped.)
    - **`dev` is where work integrates.** Start sessions from `dev`, branch
      off it, merge back to it. A piece merges only with its tests green and
      its write-ups done (rules 2–5).
@@ -671,7 +673,7 @@ they are a fair first task: implementing them fixes a real bug on that side.
 | [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Generated from the macOS app; never hand-edited. Its coverage table says what is deliberately NOT shared, and why. |
 | [`MAC-HANDOFF.md`](MAC-HANDOFF.md) | The mirror: work that originated on Windows or in shared `scripts/` and needs the mac's attention. Ordered by STATUS — contract cases waiting, then what is still owed, then awareness, then the finished ledger — so it can be read top-down and abandoned at any point. |
 | [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, and the frozen asset names both platforms depend on. |
-| [`website/`](website/README.md) | **plantoir.app.** The marketing site's SOURCES — a layout, a stylesheet, one file per page, and the screenshot harness. `python3 website/build.py` writes `site/`, which is what Netlify deploys: `site/` is a build output and hand-edits to it are overwritten. The release version line lives in `website/site.json`. Screenshots are captured from the real app and the real class sites by `website/shots/capture.py`, in both colour schemes. |
+| [`website/`](website/README.md) | **plantoir.app.** The marketing site's SOURCES — a layout, a stylesheet, one file per page, and the screenshot harness. `python3 website/build.py` writes `site/`, and `--deploy` publishes it to Netlify — the site is not Git-connected, so nothing deploys on push. `site/` is a build output and hand-edits to it are overwritten. The release version line lives in `website/site.json`. Screenshots are captured from the real app and the real class sites by `website/shots/capture.py`, in both colour schemes. |
 | [`TODO.md`](TODO.md) | Deferred work, with the research already done so picking one up is cheap. |
 | [`AGENTS.md`](AGENTS.md) · `.agents/rules/` | How this file reaches an agent that reads `AGENTS.md` rather than `CLAUDE.md` — Google Antigravity, among others. `.agents/rules/*.md` is a GENERATED copy of THIS file, split into parts because Antigravity silently truncates a rule file that is too long. **After changing CLAUDE.md, run `python3 .agents/sync-rules.py`** or the copy goes stale. |
 | [`research/`](research/README.md) | Measurement records the code cites as evidence — the assistant's model choices, the preview-staleness findings. Not an automated gate; each file states its own conditions. |
