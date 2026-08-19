@@ -93,6 +93,11 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         {
             LaunchProblem = $"This working folder is missing a piece it needs ({scriptName}). Try choosing your working folder again from the File menu.";
             Notify(nameof(LaunchProblem));
+            // A task that never started still happened to the teacher — a
+            // launch that fails silently is how a problem report arrives
+            // carrying "the last 0 tasks" after three visible failures.
+            ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
+                $"could not start {scriptName} — {LaunchProblem}");
             return;
         }
 
@@ -108,10 +113,10 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // When the app carries the native runtime (node, python, Quartz,
         // wrangler in its own folder), tell the launcher where it is: the
         // launcher then builds directly on this PC — no WSL2, no container,
-        // no administrator rights.
+        // no administrator rights. Every launcher child must get this —
+        // see NativeRuntime for the sweep that once did not.
         IReadOnlyDictionary<string, string>? extraEnvironment = null;
-        string runtimeDir = Path.Combine(AppContext.BaseDirectory, "runtime");
-        if (File.Exists(Path.Combine(runtimeDir, "manifest.json")))
+        if (NativeRuntime.Directory is { } runtimeDir)
             extraEnvironment = new Dictionary<string, string> { ["PLANTOIR_RUNTIME"] = runtimeDir };
 
         try

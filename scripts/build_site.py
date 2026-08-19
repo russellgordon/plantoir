@@ -3867,7 +3867,7 @@ def build_section_site(
         output_dir.mkdir(parents=True, exist_ok=True)
         print(f"📂 Created fresh (internal) output directory: {output_dir}")
 
-        print(f"📦 Staging Quartz scaffold on container storage from {quartz_src}...")
+        print(f"📦 Staging the website builder's files from {quartz_src}...")
         for item in quartz_src.iterdir():
             dest = output_dir / item.name
             if item.name == "node_modules":
@@ -4243,6 +4243,32 @@ def build_section_site(
         ws_port = port + 1000
         kill_existing_quartz(port)
         kill_existing_quartz(ws_port)
+        if os.name == "nt":
+            # Natively, ports are HOST-GLOBAL and the launcher's probe ran
+            # minutes ago, before the build - two folders building at once
+            # both get told 8081 and the loser dies on EADDRINUSE. Probe
+            # again here, moments before the bind, walking the same
+            # 10-apart blocks; the app follows the LAST announced address,
+            # so the re-announcement below is the one that counts. (In the
+            # container the port is a fixed mapping - never walk it there.)
+            import socket
+
+            def _port_is_free(candidate: int) -> bool:
+                try:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                        probe.bind(("", candidate))
+                    return True
+                except OSError:
+                    return False
+
+            for candidate in range(port, port + 60, 10):
+                if _port_is_free(candidate) and _port_is_free(candidate + 1000):
+                    if candidate != port:
+                        print(f"Port {port} is busy with another preview; using {candidate} instead.")
+                        port = candidate
+                        ws_port = port + 1000
+                    break
+            print(f"Preview will be available at: http://localhost:{port}/")
         print(f"\n🚀 Launching Quartz preview on http://localhost:{port}\n")
         safe_clean_public_dir(output_dir / "public")
         _start_public_sync_watcher(output_dir, host_output_dir)

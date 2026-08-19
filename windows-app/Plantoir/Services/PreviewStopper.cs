@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Services;
 
@@ -92,6 +93,10 @@ public static class PreviewStopper
                 RedirectStandardError = true,
                 WorkingDirectory = workspacePath,
             };
+            // Without this the sweep takes the launcher's container branch,
+            // boots WSL, finds no container and stops NOTHING - while the
+            // native preview it was meant to kill keeps serving.
+            NativeRuntime.Apply(info);
             info.ArgumentList.Add("-NoLogo");
             info.ArgumentList.Add("-NoProfile");
             info.ArgumentList.Add("-ExecutionPolicy");

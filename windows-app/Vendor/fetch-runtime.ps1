@@ -103,12 +103,17 @@ try {
     if ($LASTEXITCODE -ne 0) { Pop-Location; throw "npm install for Quartz failed" }
     Pop-Location
 
-    # Bake the Explorer hide-filter anchor, same function the Dockerfile runs,
-    # imported rather than copied so the two cannot drift.
+    # Bake the Explorer hide-filter anchor AND the OverflowList stable id,
+    # same functions the Dockerfile and setup wizard run, imported rather
+    # than copied so they cannot drift. Baking BOTH here matters: the
+    # runtime is shared by every working folder, so the wizard's own pass
+    # over these files must always find them already patched and write
+    # nothing - a wizard writing into the shared bundle races concurrent
+    # builds and fails outright on an unwritable install.
     $env:PLANTOIR_QUARTZ_DIR = $quartzDir
     $env:PLANTOIR_SUPPORT_DIR = Join-Path $RepoRoot "support"
-    & "$pyDir\python.exe" -c "import sys; sys.path.insert(0, r'$RepoRoot\scripts'); import setup_course; setup_course.ensure_quartz_explorer_anchor()"
-    if ($LASTEXITCODE -ne 0) { throw "Baking the Explorer hide-filter anchor failed" }
+    & "$pyDir\python.exe" -c "import sys; sys.path.insert(0, r'$RepoRoot\scripts'); import setup_course; setup_course.ensure_quartz_explorer_anchor(); setup_course.ensure_quartz_overflowlist_static_id()"
+    if ($LASTEXITCODE -ne 0) { throw "Baking the Quartz scaffold patches failed" }
     if (-not (Select-String -Path "$quartzDir\quartz.layout.ts" -Pattern 'CQ4T-OMIT-ANCHOR' -Quiet)) {
         throw "quartz.layout.ts is missing the CQ4T-OMIT-ANCHOR marker - hidden pages would publish"
     }

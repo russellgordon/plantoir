@@ -1053,8 +1053,30 @@ def _patch_explorer_with_anchor(layout_src: str) -> tuple[str, bool]:
 
     return layout_src, changed
 
+def _scaffold_is_bundled_runtime() -> bool:
+    """
+    True when the Quartz scaffold is the app's bundled native runtime — a
+    folder shared by every working folder and pre-baked with these patches
+    by fetch-runtime.ps1. The wizard must never write there: a write races
+    concurrent builds, and an installed copy may not be writable at all.
+    """
+    runtime = os.environ.get("PLANTOIR_RUNTIME", "").strip()
+    if not runtime:
+        return False
+    try:
+        toolchain_paths.QUARTZ_DIR.resolve().relative_to(Path(runtime).resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
+
+
+
 def ensure_quartz_explorer_anchor():
     """Idempotently ensure quartz.layout.ts includes the omit anchor block."""
+    if _scaffold_is_bundled_runtime():
+        print("ℹ️ The bundled website builder already carries the Explorer anchor (no change).")
+        return
     quartz_layout_path = toolchain_paths.QUARTZ_DIR / "quartz.layout.ts"
     if quartz_layout_path.exists():
         with open(quartz_layout_path, "r", encoding="utf-8") as f:
@@ -1079,6 +1101,9 @@ def ensure_quartz_explorer_anchor():
 # ---------- NEW: OverflowList stable ID patch (idempotent) -------------------
 
 def ensure_quartz_overflowlist_static_id():
+    if _scaffold_is_bundled_runtime():
+        print("ℹ️ The bundled website builder already carries the stable OverflowList id (no change).")
+        return
     """
     Idempotently ensure OverflowList uses a stable, non-random id to avoid noisy diffs:
       const id = randomIdNonSecure()   →   const id = "j8p48f"
