@@ -30,7 +30,10 @@ this skill automates its steps 5–6 and the note-writing.
    `releases/latest/download/<asset-name>`, so a renamed asset silently
    breaks the site. Refuse to attach an asset under any other name.
 4. Confirm `<Version>` in `windows-app/Plantoir/Plantoir.csproj` matches
-   the intended tag, and that the working tree is clean.
+   the intended tag, and that the working tree is clean. Confirm you are on
+   `main` with `dev` fully merged in (`git log main..dev` is empty) — the tag
+   and the website commit both land on `main` (CLAUDE.md rule 6). After the
+   website push, merge `main` back into `dev` so the branches do not drift.
 5. Confirm the mac side agrees: `MARKETING_VERSION` in `mac-app/project.yml`
    must carry the same version. `RELEASING.md` says the two move
    in lockstep — one product, one version series — so a mismatch is a stop,

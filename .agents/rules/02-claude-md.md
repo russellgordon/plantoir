@@ -112,40 +112,39 @@ description: "Plantoir project rules, part 2 of 7 - Rules that override default 
    nothing to report, because neither of the two things they had just done was
    among the things anybody had thought to record.
 
-6. **Commit straight to `main`.** Do not open a feature branch first, even
-   though general guidance says to branch when on the default branch. Russell
-   is the sole developer here and the history is linear; a branch only adds a
-   merge he has to undo. (The "for now" is his — if this project gains other
-   contributors, a later instruction to branch supersedes this rather than
-   contradicting it.) End every message with the `Co-Authored-By` trailer.
+6. **Branch model: `main` + `dev` + issue branches.** Adopted 2026-08-19, the
+   day v1.0.0 shipped, superseding the old "commit straight to `main`" rule —
+   which said a later instruction to branch would supersede rather than
+   contradict it, and this is that instruction. Before the first release,
+   every commit was equally unshipped and a branch only added a merge; now
+   `main` is what teachers have, and it needs protecting from work in flight.
 
-   **When a session is ITERATING on something — a run of changes each building
-   on the last, the shape this project's work usually takes — commit as you
-   go, without being asked each time.** Finish a coherent piece, get its tests
-   green, rebuild, and commit it; then start the next. This is a standing
-   order, not a per-session permission.
+   - **`main` is what shipped.** It stays releasable at all times: release
+     tags point at `main`, plantoir.app's download links resolve against its
+     releases, and **Netlify deploys the site on every push to `main`** — so
+     pushing `main` IS deploying plantoir.app. Nothing lands there except a
+     merge from `dev`, plus the release flow's own commits (the website
+     version line). After anything lands on `main`, merge `main` back into
+     `dev` in the same session, so the two never drift.
+   - **`dev` is where work integrates.** Start sessions from `dev`, branch
+     off it, merge back to it. A piece merges only with its tests green and
+     its write-ups done (rules 2–5).
+   - **One issue branch per coherent piece**, branched off `dev`: named
+     `issue/<number>-<slug>` when a GitHub issue exists, `issue/<slug>` when
+     not. "A coherent piece" keeps its old meaning — one thing a teacher
+     could notice, with its tests and its write-up; not one file, and not a
+     whole afternoon. Merge with `--no-ff` so the piece stays one readable
+     unit in history, and delete the branch after it merges.
+   - **Autonomy moves with the model.** Committing as you go on the issue
+     branch and merging a finished piece into `dev` are the standing order —
+     no per-session permission, exactly as commit-to-main used to be. Merging
+     `dev` into `main` is PUBLISHING: do it during a requested release cut,
+     or when Russell asks, never on your own initiative. Outside an iterative
+     run — a one-off question, an experiment, something half-finished — the
+     older rule still holds: ask first.
 
-   The failure it prevents is one session's worth of unrelated work sitting in
-   one working tree: forty files changed, a dozen decisions tangled together,
-   and no way to read back what was done for which reason — or to undo one
-   piece without unpicking the rest. A commit per piece is also the only thing
-   that makes `GUI-IMPROVEMENTS.md` rows and the code agree, since each row
-   then has a commit behind it.
-
-   "A coherent piece" is one thing a teacher could notice, with its tests and
-   its write-up. Not one file, and not a whole afternoon. Outside an iterative
-   run — a one-off question, an experiment, something half-finished — the
-   older rule still holds: ask first.
-
-7. **Colima is shared with other projects** on this machine (Supabase local dev,
-   among others). Never `colima stop` unless `docker ps -q` comes back empty.
-   The app's quit path and the scripts already enforce this; keep it that way.
-   The Colima VM only mounts `$HOME`, so a working folder outside the home
-   directory bind-mounts as an empty folder inside the container.
-8. **Swift follows the project style rules; the C# deliberately does not.**
-   The Swift in `mac-app/` avoids `map`/`filter`/`reduce`, uses `@Observable`
-   (never `ObservableObject`) and `// MARK: -` sections, and prefers clarity
-   over concision. Those rules live in Russell's MACHINE-WIDE instructions
-   (`~/.claude/CLAUDE.md`, mirrored to `~/.gemini/GEMINI.md`), not in this
-   repository, because they govern his Swift everywhere rather than this
-   project in particular.
+   End every commit message with the `Co-Authored-By` trailer. The failure
+   the commit-per-piece order prevents is unchanged: one session's worth of
+   unrelated work in one working tree — forty files, a dozen decisions
+   tangled together, no way to undo one piece without unpicking the rest —
+   and a `GUI-IMPROVEMENTS.md` row with no commit behind it.

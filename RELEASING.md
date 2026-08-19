@@ -96,8 +96,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 
    Output: **`mac-app/dist/Plantoir-macOS.dmg`** + SHA-256.
 
-5. **Tag and release** — ask Claude to "cut the release": the `cut-release`
-   skill (`.claude/skills/cut-release/`) drafts teacher-friendly notes, computes
+5. **Tag and release** — ask Claude to "cut the release". Since the branch
+   model arrived (CLAUDE.md rule 6), a release starts by merging `dev` into
+   `main`: the tag points at `main`, and the website commit the flow makes
+   lands there too, so finish by merging `main` back into `dev`. The
+   `cut-release` skill (`.claude/skills/cut-release/`) drafts teacher-friendly notes, computes
    SHA-256 hashes, creates a GitHub Draft Release, uploads the assets, publishes
    the release, updates `website/site.json`, redraws the brand card, rebuilds `site/`,
    and pushes to `main`.
