@@ -91,6 +91,50 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+- **Windows dropped the container entirely — shared scripts changed, run
+  `./verify.sh` on the next sync** (Windows + shared, 2026-08-19, branch
+  `windows-native-toolchain`). Windows now runs the whole toolchain
+  natively: Node 20, Python 3.11, the patched Quartz scaffold and wrangler
+  ship inside the app's own folder (built by
+  `windows-app/Vendor/fetch-runtime.ps1`, pins mirroring the Dockerfile's),
+  and the launchers run the shared Python directly when that runtime is
+  present. WHY: WSL2 needs admin rights, Windows feature changes and a
+  reboot — school-managed laptops refuse all three, and a teacher hit
+  exactly that in front of an audience twice in one day. Rejected: porting
+  the Python to C# (kills the shared-scripts contract and invites permanent
+  drift); keeping a WSL2 fallback (Russell chose deletion once verified —
+  two paths means two test surfaces forever).
+
+  **What the mac must know about the shared files:**
+  - `scripts/toolchain_paths.py` is new: every fixed path (`/opt/*`,
+    `/teaching/courses`) now routes through it. Container defaults are
+    byte-identical to before; the native path overrides via `PLANTOIR_*`
+    env vars the mac never sets. The Dockerfile COPYies it — image hash
+    changes, so the first mac preview after sync does a one-time rebuild.
+  - The 26 `tee` subprocess writes are plain writes now (`write_file`),
+    the Media/node_modules/.netlify links go through `link_directory`
+    (symlink first — the mac's behaviour is unchanged), and
+    `_sync_public_to_host` falls back to an incremental pure-Python mirror
+    only when rsync is absent (it never is, in the container).
+  - **The Quartz CLI is invoked as `node <abs>/quartz/bootstrap-cli.mjs`
+    instead of `npx quartz`** — measured on Windows, `npx` resolved the CLI
+    from the npm REGISTRY into its cache (a project's own bin never lands
+    in its node_modules/.bin), which needed network and floated off the
+    v4.5.0 pin. The container was almost certainly doing the same thing
+    quietly; check a container build log for an `npx` cache line if you
+    want the confirmation. Correctness held only because Quartz's CLI runs
+    the local patched `quartz/` source from CWD.
+  - `setup_course.py`'s keyboard reader imports termios where it exists,
+    msvcrt where it does not; POSIX behaviour identical.
+
+  Numbers (this machine, Ryzen-class x64, NVMe): first native build of the
+  199-page example course **57 s cold** including scaffold staging; Quartz
+  parse+emit 5 s; delta deploy to Netlify 117 files, ~40 s. The container
+  path's equivalent on this same machine paid a one-time ~8 min image
+  build plus WSL2 provisioning before the first build could start.
+  Reference: `Enter-NativeRuntime` in the three `.ps1` launchers,
+  `scripts/toolchain_paths.py`, `windows-app/Vendor/fetch-runtime.ps1`.
+
 - **Check that every finished mac task really writes a run transcript**
   (Windows, 2026-08-19, branch `windows-wsl2-auto-install`). A real teacher's
   problem report arrived saying "the last 0 tasks Plantoir ran for you" after
