@@ -264,16 +264,19 @@ is what happened to the test-race item, sitting here for three days with
 "worth ten minutes to check" in the middle of it.
 
 
-- **WSL2 / Container-Internal ext4 Build Acceleration Prototype** (Windows + shared, 2026-08-18, branch `perf/wsl2-ext4-build-acceleration`).
-  Tested and developed an acceleration architecture on branch `perf/wsl2-ext4-build-acceleration` to eliminate the 9P/virtiofs DrvFs cross-mount I/O bottleneck on Windows:
-  - **The Problem**: On Windows with WSL2, staging the 15,000+ files of Quartz's scaffold and `node_modules` in `courses/<COURSE>/.merged_output/section<N>` meant that all TypeScript transpilation, esbuild bundling, and markdown AST parsing traversed the 9P virtual mount layer. On a 15W Intel U-series CPU, an initial build took 2–4 minutes and incremental builds took 20–30s.
+- **WSL2 / Container-Internal ext4 Build Acceleration** (Windows + shared, 2026-08-18, commit `ed868215`).
+  Accelerated Quartz site builds on both platforms by eliminating the virtual host mount I/O bottleneck (WSL2 9P DrvFs on Windows, Colima virtiofs/9P on macOS):
+  - **The Problem**: Staging the 15,000+ files of Quartz's scaffold and `node_modules` in `courses/<COURSE>/.merged_output/section<N>` meant that all TypeScript transpilation, esbuild bundling, and markdown AST parsing traversed virtual filesystem mount layers. On Windows with WSL2, initial builds took 2–4 minutes; on macOS, clean builds took ~18.7s with 14s burned on `npm install` across the mount boundary.
   - **The Solution**:
     1. Pre-bake `npm install` inside the container image in `/opt/quartz` (`Dockerfile`).
     2. In `scripts/build_site.py`, stage the Quartz workspace on native Linux ext4 storage (`/tmp/quartz-builds/<COURSE>/section<N>`), symlinking `/opt/quartz/node_modules` instantly.
     3. `scripts/build_site.py` runs differential `rsync -a --delete` to mirror `public/` and `course_config.json` back to `/teaching/courses/<COURSE>/.merged_output/section<N>/public/` upon build completion (and via a daemon thread in `--serve` mode), preserving 100% compatibility with `BuildFreshness`, `SectionDetailView`, `ScheduledDeploy`, and `deploy.py`.
     4. Updated `preview.ps1` and `preview.sh` `--stop` scripts so `PreviewStopper` checks `/tmp/quartz-builds/...` PIDs in addition to `.merged_output/...`.
     5. Updated `deploy.py` to support container-internal rebuilds.
-  - **Results**: Initial scaffold copy dropped from 45s to < 0.1s; `npm install` over 9P dropped to 0s; site builds run at native NVMe/ext4 speeds. All 570 unit tests pass.
+  - **Results**:
+    - **macOS (Apple Silicon + Colima)**: Full/clean builds dropped from **18.66 s avg** (18.39 s min) down to **5.08 s avg** (4.58 s min) — **3.7× faster**; incremental rebuilds dropped from **4.42 s** to **3.35 s** (1.32× faster) on `EXC2O` (260 Markdown files).
+    - **Windows (Intel Core i5 + WSL2)**: Initial scaffold copy dropped from 45s to < 0.1s; `npm install` over 9P dropped to 0s; site builds run at native NVMe/ext4 speeds. All 570 Windows unit tests pass.
+  - **✅ DONE (Adopted on macOS & merged to main, 2026-08-18).** All 760 macOS unit tests and `./verify.sh` pass.
 
 - **Arrow-key prompt history navigation in Windows assist chat** (Windows, 2026-08-18).
   Windows now supports Terminal-style Up/Down arrow key history navigation in `AssistWindow.xaml.cs`.
