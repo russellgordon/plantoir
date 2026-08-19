@@ -629,7 +629,12 @@ def capture_obsidian(workspace: Path, suffix: str) -> None:
     time.sleep(1.5)
 
     helper = Path(__file__).resolve().parent / "windowid.swift"
-    result = subprocess.run(["swift", str(helper), "Obsidian"], capture_output=True, text=True)
+    # Bounds match the position and size set just above — so a second
+    # Obsidian window somewhere else can never be the one photographed.
+    result = subprocess.run(
+        ["swift", str(helper), "Obsidian", "60", "60", "1280", "800"],
+        capture_output=True, text=True,
+    )
     if result.returncode != 0 or not result.stdout.strip():
         print("   Could not find Obsidian window to capture.", file=sys.stderr)
         return

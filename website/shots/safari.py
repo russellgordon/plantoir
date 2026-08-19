@@ -73,12 +73,19 @@ class SafariWindow:
     def __enter__(self) -> "SafariWindow":
         self.previous_application = frontmost_application()
         osascript('tell application "Safari" to activate')
-        self.window_id = osascript(
-            'tell application "Safari"\n'
-            '  make new document with properties {URL:"about:blank"}\n'
-            '  return id of window 1\n'
-            'end tell'
+        time.sleep(0.6)
+        # A PRIVATE window, made with the keyboard because Safari's
+        # AppleScript vocabulary cannot create one. Private on purpose:
+        # a class site remembers a light/dark choice in local storage, and
+        # a choice saved during somebody's ordinary browsing once overrode
+        # the appearance the dark pass had set machine-wide — one course
+        # photographed light in a dark run. A private window starts with
+        # no storage and leaves none behind.
+        osascript(
+            'tell application "System Events" to keystroke "n" using {command down, shift down}'
         )
+        time.sleep(1.2)
+        self.window_id = osascript('tell application "Safari" to return id of front window')
         self.resize(self.width, self.height)
         return self
 
@@ -107,22 +114,67 @@ class SafariWindow:
         time.sleep(0.4)
 
     def load(self, url: str, settle_seconds: float = 3.0) -> None:
+        """Load a page, and land anchors where they claim to point.
+
+        A URL with a fragment is loaded in two stages: the page first, so
+        diagrams and mathematics finish rendering and the layout stops
+        moving, then the fragment, so the scroll happens against the final
+        layout. Scrolled in one step, Safari jumps to where the anchor WAS
+        before the diagrams above it reflowed the page — the capture then
+        shows the section above the one the caption names.
+        """
+        if "#" in url:
+            page = url.split("#")[0]
+            osascript(
+                f'tell application "Safari" to set URL of document of window id {self.window_id} to "{page}"'
+            )
+            time.sleep(settle_seconds)
+            osascript(
+                f'tell application "Safari" to set URL of document of window id {self.window_id} to "{url}"'
+            )
+            time.sleep(1.5)
+            self.unfocus_address_bar()
+            return
         osascript(
             f'tell application "Safari" to set URL of document of window id {self.window_id} to "{url}"'
         )
         time.sleep(settle_seconds)
+        self.unfocus_address_bar()
+
+    def unfocus_address_bar(self) -> None:
+        """Escape, so the address field is not selected in the photograph.
+
+        A private window opens with the address field focused, and loading a
+        page programmatically does not move focus — every capture then shows
+        the full URL selected in blue, which reads as somebody mid-edit.
+        """
+        osascript(
+            f'tell application "Safari"\n'
+            f'  set index of window id {self.window_id} to 1\n'
+            f'  activate\n'
+            f'end tell\n'
+            'tell application "System Events" to key code 53'
+        )
+        time.sleep(0.4)
 
     def press(self, keystroke: str, using: str = "") -> None:
-        """Send a keystroke to the front window through System Events.
+        """Send a keystroke to THIS window through System Events.
 
         Safari's own AppleScript vocabulary cannot type into a page, and
         running JavaScript from an Apple Event is off by default and cannot be
         turned on programmatically. System Events can, which is how the search
         panel gets opened and typed into.
+
+        The window is raised by ID first. Activating Safari alone fronts
+        whatever window was already frontmost — once, the developer's own
+        logged-in browser window — and the keystrokes landed there.
         """
         modifier = f" using {using}" if using else ""
         osascript(
-            f'tell application "Safari" to activate\n'
+            f'tell application "Safari"\n'
+            f'  set index of window id {self.window_id} to 1\n'
+            f'  activate\n'
+            f'end tell\n'
             f'delay 0.4\n'
             f'tell application "System Events" to keystroke "{keystroke}"{modifier}'
         )
@@ -153,14 +205,20 @@ class SafariWindow:
         return destination
 
     def window_number(self) -> int:
-        """The CoreGraphics window number for this Safari window.
+        """The CoreGraphics window number for THIS Safari window.
 
         Read fresh each time: window numbers survive a page load, but not a
         window being closed and reopened, and a stale one captures nothing.
+
+        Matched on the frame this object set, never "the biggest Safari
+        window": the biggest one was once the developer's own logged-in
+        Netlify dashboard, restored by Safari at launch, and three class-site
+        captures photographed it instead of the page the harness had loaded.
         """
         helper = Path(__file__).resolve().parent / "windowid.swift"
         result = subprocess.run(
-            ["swift", str(helper), "Safari"],
+            ["swift", str(helper), "Safari",
+             str(self.left), str(self.top), str(self.width), str(self.height)],
             capture_output=True, text=True,
         )
         if result.returncode != 0 or not result.stdout.strip():
