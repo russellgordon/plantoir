@@ -49,12 +49,11 @@ from images import prepare, WIDEST_WINDOW_PIXELS  # noqa: E402
 
 WORKSPACE = Path.home() / "Teaching"
 VAULT = WORKSPACE / "courses" / "ENG2D"
-# The newest published class in the example semester -- the same one the
-# published site transcludes onto its front page, so the three cards tell
-# one story rather than three. NOT index.md: the demo workspace is copied
-# straight from support/example_content, so its title is still the
-# placeholder the setup script would have substituted.
-NOTE_FILE = "section2/All Classes/Unit 4, Day 23"
+# The card shows SECTION 1, because everything else in the picture does:
+# Plantoir is deploying ENG2D-S1 and Edge is on the section 1 site.
+SECTION = 1
+# Which class note, though, is not ours to decide -- see most_recent_class().
+FALLBACK_CLASS = "Unit 4, Day 22"
 # Read from the one table both capture scripts share, so a renamed demo
 # site never leaves this harness photographing a dead address.
 from capture_windows import DEMO_COURSES  # noqa: E402
@@ -334,11 +333,37 @@ def card_geometry() -> tuple[int, int, int, int]:
     return left + 20, top + 20, width, height
 
 
+def most_recent_class() -> str:
+    """The class the published site is currently showing.
+
+    The three cards only tell one story if the note open in Obsidian is the
+    one Edge is displaying beside it, and the site's front page transcludes
+    whichever class was published last. Hard-coding the name held for exactly
+    as long as it took the demo sites to be redeployed: the note said Day 23
+    while the site had moved to Day 22, and nothing in the harness could
+    notice. So ask the page.
+    """
+    import re
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(SITE_URL, timeout=20) as response:
+            page = response.read().decode("utf-8", errors="replace")
+        found = re.search(r"Unit \d+, Day \d+", page)
+        if found:
+            print(f"   the site's most recent class is {found.group(0)}")
+            return found.group(0)
+    except Exception as problem:
+        print(f"   could not read the site ({problem}); using {FALLBACK_CLASS}")
+    return FALLBACK_CLASS
+
+
 def capture_obsidian(theme: str, x: int, y: int, w: int, h: int) -> Path:
     announce(f"Obsidian, {theme}")
     dress_vault(dark=(theme == "dark"))
+    note = f"section{SECTION}/All Classes/{most_recent_class()}"
     address = ("obsidian://open?vault=" + urllib.parse.quote(VAULT.name)
-               + "&file=" + urllib.parse.quote(NOTE_FILE))
+               + "&file=" + urllib.parse.quote(note))
     subprocess.Popen([str(OBSIDIAN_EXE), address])
     hwnd = wait_for_window(lambda: window_titled("Obsidian"), seconds=45)
     time.sleep(3.5)
@@ -361,6 +386,10 @@ def capture_plantoir(exe: Path, theme: str, x: int, y: int, w: int, h: int) -> P
 
 def capture_edge(theme: str, x: int, y: int, w: int, h: int) -> Path:
     announce(f"Edge on the published site, {theme}")
+    # A fresh profile every time. Reusing it across the two themes let Edge
+    # restore the previous pass's tab after being force-killed, so the dark
+    # card came back with the same page open twice.
+    shutil.rmtree(EDGE_PROFILE, ignore_errors=True)
     EDGE_PROFILE.mkdir(parents=True, exist_ok=True)
     subprocess.Popen([
         str(EDGE_EXE),
