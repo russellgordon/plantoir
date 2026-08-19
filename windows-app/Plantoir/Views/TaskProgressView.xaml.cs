@@ -207,73 +207,74 @@ public sealed partial class TaskProgressView : UserControl
         try
         {
             var req = Plantoir.Core.Scripting.CredentialRequests.MatchPrompt(runner.PendingQuestion);
+            bool richDialogShown = false;
             if (req is not null)
             {
-                Plantoir.Core.Scripting.ActivityTrail.Note(
-                    Plantoir.Core.Scripting.ActivityTrail.Event.AskedForACredential,
-                    $"asked for the {req.FieldLabel}");
-                var panel = new StackPanel { Spacing = 12, MaxWidth = 480 };
-                panel.Children.Add(new TextBlock { Text = req.Explanation, TextWrapping = TextWrapping.Wrap });
-
-                var stepsList = new StackPanel { Spacing = 6, Margin = new Thickness(0, 4, 0, 4) };
-                for (int i = 0; i < req.Steps.Count; i++)
+                try
                 {
-                    stepsList.Children.Add(new TextBlock
+                    Plantoir.Core.Scripting.ActivityTrail.Note(
+                        Plantoir.Core.Scripting.ActivityTrail.Event.AskedForACredential,
+                        $"asked for the {req.FieldLabel}");
+                    var panel = CredentialRequestPanel.Build(req);
+
+                    // The label above the field says what it is; the field's
+                    // own placeholder says what to do, rather than repeating
+                    // the label back (mac parity: CredentialRequestSheet).
+                    var fieldColumn = new StackPanel { Spacing = 4 };
+                    fieldColumn.Children.Add(new TextBlock { Text = req.FieldLabel });
+                    string placeholder = req.FieldPlaceholder.Length > 0 ? req.FieldPlaceholder : req.FieldLabel;
+                    Control inputControl;
+                    Func<string> getAnswer;
+                    if (req.IsSecret)
                     {
-                        Text = $"{i + 1}. {req.Steps[i]}",
-                        TextWrapping = TextWrapping.Wrap
-                    });
-                }
-                panel.Children.Add(stepsList);
-
-                var linkBtn = new HyperlinkButton
-                {
-                    Content = req.LinkTitle,
-                    NavigateUri = new Uri(req.LinkAddress),
-                    Padding = new Thickness(0)
-                };
-                panel.Children.Add(linkBtn);
-
-                Control inputControl;
-                Func<string> getAnswer;
-                if (req.IsSecret)
-                {
-                    var pw = new PasswordBox
+                        var pw = new PasswordBox
+                        {
+                            PlaceholderText = placeholder,
+                            Password = runner.SuggestedAnswer
+                        };
+                        inputControl = pw;
+                        getAnswer = () => pw.Password;
+                    }
+                    else
                     {
-                        PlaceholderText = req.FieldLabel,
-                        Password = runner.SuggestedAnswer
+                        var tb = new TextBox
+                        {
+                            PlaceholderText = placeholder,
+                            Text = runner.SuggestedAnswer
+                        };
+                        inputControl = tb;
+                        getAnswer = () => tb.Text;
+                    }
+                    fieldColumn.Children.Add(inputControl);
+                    panel.Children.Add(fieldColumn);
+
+                    var dialog = new ContentDialog
+                    {
+                        Title = req.Title,
+                        Content = panel,
+                        PrimaryButtonText = "Save and continue",
+                        CloseButtonText = "Cancel",
+                        DefaultButton = ContentDialogButton.Primary,
+                        XamlRoot = XamlRoot,
                     };
-                    inputControl = pw;
-                    getAnswer = () => pw.Password;
+                    inputControl.Loaded += (_, _) => inputControl.Focus(FocusState.Programmatic);
+                    richDialogShown = true;
+                    var result = await dialog.ShowAsync();
+                    if (result == ContentDialogResult.Primary) runner.SendLine(getAnswer());
+                    else runner.CancelPendingQuestion();
                 }
-                else
+                catch (Exception ex) when (!richDialogShown)
                 {
-                    var tb = new TextBox
-                    {
-                        PlaceholderText = req.FieldLabel,
-                        Text = runner.SuggestedAnswer
-                    };
-                    inputControl = tb;
-                    getAnswer = () => tb.Text;
+                    // A presentation bug must degrade to the plain dialog,
+                    // never to NO dialog: the script is sitting on its
+                    // question either way, and a teacher who sees nothing
+                    // can only cancel the whole task. (This is exactly what
+                    // an unguarded new Uri("") did to the surname dialog.)
+                    App.LogDiagnostic($"Credential dialog failed to build, falling back: {ex}");
+                    req = null;
                 }
-
-                panel.Children.Add(inputControl);
-
-                var dialog = new ContentDialog
-                {
-                    Title = req.Title,
-                    Content = panel,
-                    PrimaryButtonText = "Save and continue",
-                    CloseButtonText = "Cancel",
-                    DefaultButton = ContentDialogButton.Primary,
-                    XamlRoot = XamlRoot,
-                };
-                inputControl.Loaded += (_, _) => inputControl.Focus(FocusState.Programmatic);
-                var result = await dialog.ShowAsync();
-                if (result == ContentDialogResult.Primary) runner.SendLine(getAnswer());
-                else runner.CancelPendingQuestion();
             }
-            else
+            if (req is null)
             {
                 var answerBox = new TextBox
                 {

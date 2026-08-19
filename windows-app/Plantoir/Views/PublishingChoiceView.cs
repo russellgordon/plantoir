@@ -123,25 +123,7 @@ public sealed class PublishingChoiceView
                 Plantoir.Core.Scripting.ActivityTrail.Event.AskedForACredential,
                 "opened instructions for Cloudflare Account ID");
             var help = Plantoir.Core.Scripting.CredentialRequests.CloudflareAccountIDHelp;
-            var panel = new StackPanel { Spacing = 10, MaxWidth = 460 };
-            panel.Children.Add(new TextBlock { Text = help.Explanation, TextWrapping = TextWrapping.Wrap });
-            var stepsList = new StackPanel { Spacing = 6, Margin = new Thickness(0, 4, 0, 4) };
-            for (int i = 0; i < help.Steps.Count; i++)
-            {
-                stepsList.Children.Add(new TextBlock
-                {
-                    Text = $"{i + 1}. {help.Steps[i]}",
-                    TextWrapping = TextWrapping.Wrap
-                });
-            }
-            panel.Children.Add(stepsList);
-            var linkBtn = new HyperlinkButton
-            {
-                Content = help.LinkTitle,
-                NavigateUri = new Uri(help.LinkAddress),
-                Padding = new Thickness(0)
-            };
-            panel.Children.Add(linkBtn);
+            var panel = CredentialRequestPanel.Build(help);
 
             var dialog = new ContentDialog
             {

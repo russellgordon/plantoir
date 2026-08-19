@@ -11,7 +11,8 @@ public sealed record CredentialRequest(
     bool IsSecret,
     string LinkAddress,
     string LinkTitle,
-    IReadOnlyList<string> Steps);
+    IReadOnlyList<string> Steps,
+    string FieldPlaceholder = "");
 
 public static class CredentialRequests
 {
@@ -30,6 +31,7 @@ public static class CredentialRequests
                      "It does that with an access token — a long code that acts like a password made just for this app. " +
                      "Creating one takes about a minute, and you will not be asked again: it is saved securely on this computer.",
         FieldLabel: "Netlify token",
+        FieldPlaceholder: "Paste it here",
         IsSecret: true,
         LinkAddress: "https://app.netlify.com/user/applications#personal-access-tokens",
         LinkTitle: "Open Netlify’s access tokens page",
@@ -51,6 +53,7 @@ public static class CredentialRequests
                      "It does that with an API token — a long code that acts like a password made just for this app. " +
                      "Creating one takes about two minutes, and you will not be asked again: it is saved securely on this computer.",
         FieldLabel: "Cloudflare token",
+        FieldPlaceholder: "Paste it here",
         IsSecret: true,
         LinkAddress: "https://dash.cloudflare.com/profile/api-tokens",
         LinkTitle: "Open Cloudflare’s API tokens page",
@@ -96,6 +99,7 @@ public static class CredentialRequests
         Explanation: "Your surname is used to create a clear, recognizable web address for your students and families (such as mcv4u-s1-2026-gordon), " +
                      "and to prevent naming conflicts with other classes. It is saved on this computer and only asked once.",
         FieldLabel: "Surname",
+        FieldPlaceholder: "e.g. Gordon",
         IsSecret: false,
         LinkAddress: "",
         LinkTitle: "",
