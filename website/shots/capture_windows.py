@@ -84,11 +84,31 @@ def find_or_build_plantoir_exe() -> Path:
 
 
 def capture_app_windows(plantoir_exe: Path) -> None:
+    """One run per appearance, with Windows switched into it first.
+
+    Not one run photographing both: a WinUI brush read from
+    Application.Current.Resources resolves against the theme the app LAUNCHED
+    in, whatever RequestedTheme the window's content carries. Photographing
+    dark from a light-launched process produced a white dialog card with white
+    text on it, and assistant bubbles in light grey on a dark window.
+    """
     announce("Photographing Plantoir App Windows on Windows")
-    subprocess.run([
-        "powershell", "-Command",
-        f"Start-Process '{plantoir_exe}' -ArgumentList '--capture-marketing-shots', '{IMAGE_DIR.resolve()}' -Wait -NoNewWindow"
-    ], cwd=REPO, check=True)
+    from hero_windows import read_theme, write_theme
+
+    was_apps, was_system = read_theme()
+    try:
+        for theme in ("light", "dark"):
+            print(f"   --- Plantoir {theme} appearance ---", flush=True)
+            write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
+            subprocess.run([
+                "powershell", "-Command",
+                f"Start-Process '{plantoir_exe}' -ArgumentList "
+                f"'--capture-marketing-shots', '{IMAGE_DIR.resolve()}', "
+                f"'--theme', '{theme}' -Wait -NoNewWindow"
+            ], cwd=REPO, check=True)
+    finally:
+        write_theme(was_apps, was_system)
+        print("   Windows colour mode put back")
 
 
 def capture_browser_sites() -> None:

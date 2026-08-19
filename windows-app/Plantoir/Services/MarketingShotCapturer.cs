@@ -42,7 +42,19 @@ public static class MarketingShotCapturer
         catch { }
     }
 
-    public static async Task RunAsync(string outputDir)
+    /// <summary>
+    /// Photograph the app windows, optionally for one appearance only.
+    ///
+    /// One appearance per PROCESS, with the OS switched to it first, is the
+    /// only way these come out right. Setting RequestedTheme on the window's
+    /// content changes what the controls draw, but every brush fetched as
+    /// Application.Current.Resources["..."] still resolves against the theme
+    /// the APP launched in — so a dark capture came back with a white dialog
+    /// card carrying white text, and assistant bubbles in light grey on a
+    /// dark window. Chasing those brush by brush would have meant finding
+    /// every one of them, including the ones nobody had looked at yet.
+    /// </summary>
+    public static async Task RunAsync(string outputDir, string? onlyTheme = null)
     {
         try
         {
@@ -65,7 +77,12 @@ public static class MarketingShotCapturer
             ProvisionDemoWorkspace(workspacePath);
             Log($"Workspace provisioned at {workspacePath}");
 
-            foreach (var theme in new[] { ElementTheme.Light, ElementTheme.Dark })
+            var wanted = onlyTheme is null
+                ? new[] { ElementTheme.Light, ElementTheme.Dark }
+                : new[] { onlyTheme.Equals("dark", StringComparison.OrdinalIgnoreCase)
+                              ? ElementTheme.Dark : ElementTheme.Light };
+
+            foreach (var theme in wanted)
             {
                 string themeName = theme == ElementTheme.Dark ? "dark" : "light";
                 Log($"--- Capturing theme: {themeName} ---");

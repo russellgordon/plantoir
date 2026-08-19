@@ -71,7 +71,10 @@ public partial class App : Application
         {
             var bootstrapWindow = new MainWindow(null, null);
             bootstrapWindow.Activate();
-            _ = MarketingShotCapturer.RunAsync(outputDir);
+            // Optional: capture one appearance only, so the harness can run
+            // us once per OS theme and every themed brush resolves right.
+            _ = MarketingShotCapturer.RunAsync(
+                outputDir, ArgumentAfter(cmdArgs, rawArgs, "--theme") is { Length: > 0 } t ? t : null);
             return;
         }
 
