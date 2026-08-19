@@ -82,7 +82,15 @@ Netlify supports a
 Deploys always go to **production** (no draft deploys), matching the
 "publish what I previewed" mental model.
 
-<a name="why-determinism-matters"></a>
+### Automatic production rebuilds (live-reload detection)
+
+A preview build embeds a live-reload WebSocket client (`ws://localhost:<port>`)
+into generated HTML pages. Deploying those directly would cause students'
+browsers to prompt for local network permissions. `deploy.py` detects this
+signature in `public/index.html` (or checks if `baseUrl` in `quartz.config.ts` needs
+updating for the deployed domain) and automatically re-executes a clean static
+build inside the container-internal workspace (`/tmp/quartz-builds/...`),
+mirroring the production assets back to `public/` before uploading.
 
 ### Why determinism matters
 

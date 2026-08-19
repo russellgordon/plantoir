@@ -2,19 +2,35 @@
 
 [◀ Previous: Course Setup](04-course-setup.md) · [Back to index](README.md) · [Next: Quartz Customizations ▶](06-quartz-customizations.md)
 
-`scripts/build_site.py` (~3,800 lines) is the engine of the toolchain. Given
+`scripts/build_site.py` (~4,300 lines) is the engine of the toolchain. Given
 a course code and section number, it assembles a complete, customized Quartz
-site at `courses/<CODE>/.merged_output/section<N>/` and either serves it
-(preview mode, the default) or builds it statically (`--build-only`, used by
-deploy).
+site and either serves it (preview mode, the default) or builds it statically
+(`--build-only`, used by deploy).
+
+To achieve maximum performance across all host operating systems (especially
+Windows WSL2 and macOS Colima/Lima mounts), the pipeline uses a **dual-workspace
+architecture**:
 
 ```
 course_config.json ─┐
 shared folders ─────┤                       ┌─▶ preview: quartz build --serve :8081-8084
-section<N>/ ────────┼─▶ .merged_output/section<N>/ ─┤
-patched Quartz ─────┤        (scaffold + content)   └─▶ deploy:  quartz build → public/
-support files ──────┘
+section<N>/ ────────┼─▶ /tmp/quartz-builds/ ─┤            (fast ext4 AST/esbuild)
+patched Quartz ─────┤    (internal ext4)     │                    │
+support files ──────┘                        │                    ▼
+                                             └─▶ rsync ──▶ .merged_output/section<N>/public/
+                                                 (mirror)         │
+                                                                  └─▶ deploy: deploy.py / deploy.ps1
 ```
+
+1. **Active build workspace (`/tmp/quartz-builds/<CODE>/section<N>/`)**: Sits
+   on container-internal native Linux ext4 storage. The Quartz scaffold,
+   pre-baked `node_modules` symlinks, TypeScript transpilation, esbuild bundling,
+   and AST walks run here at native disk speeds without crossing virtual host mounts.
+2. **Host-mirrored output (`courses/<CODE>/.merged_output/section<N>/public/`)**:
+   Receives the final built static assets (`public/`) and `course_config.json` via
+   differential `rsync -a --delete` (with `shutil.copytree` fallback). Host-side
+   components (`BuildFreshness`, `SectionDetailView`, `ScheduledDeploy`, and `deploy.py`)
+   read from this path directly on the host filesystem.
 
 ## Stage 1: Validation and preflight discovery
 
@@ -39,17 +55,23 @@ OS junk files) are excluded from discovery.
 
 ## Stage 2: Scaffold management
 
-The output folder `.merged_output/section<N>/` is created on first build (or
-wiped and recreated with `--full-rebuild`) by copying everything from
-`/opt/quartz` — the pinned v4.5.0 checkout that already carries the
+The container build workspace `/tmp/quartz-builds/<CODE>/section<N>/` is
+created on first build (or wiped and recreated with `--full-rebuild`) by staging
+from `/opt/quartz` — the pinned v4.5.0 checkout carrying the
 [image-level patches](06-quartz-customizations.md#a-components-replaced-at-image-build-time)
 and [setup-time patches](06-quartz-customizations.md#b-patches-applied-at-setup-time-to-the-scaffold).
+
+Because staging happens on native ext4 storage within the container, copying the
+scaffold takes **< 0.1 seconds**, and `/opt/quartz/node_modules` is symlinked
+directly into the build folder. The host output folder
+`courses/<CODE>/.merged_output/section<N>/` is created to receive the mirrored
+`public/` build outputs.
 
 On a fresh scaffold, the script immediately applies the **first-build
 patches** (Graph removal, locales, date-handling config, folder-page
 behaviour, date format, styles, transclusion support, fonts — all enumerated
 in [customizations §C1](06-quartz-customizations.md#c1-applied-on-first-build--full-rebuild)).
-On subsequent builds the scaffold (including its `node_modules`) is reused
+On subsequent builds the scaffold (including its `node_modules` symlink) is reused
 for speed, and only the **every-build patches**
 ([§C2](06-quartz-customizations.md#c2-applied-on-every-build)) run — these
 are the ones driven by settings a teacher might change between builds
@@ -185,20 +207,25 @@ site-build time* to know which folders are expandable.
 
 ## Stage 5: Dependencies and the actual Quartz build
 
-- `npm install` runs only when needed: missing `node_modules`, missing/stale
-  `package-lock.json`, or `--force-npm-install`.
+- **Pre-baked dependencies:** If `node_modules` is not present in the workspace,
+  it is symlinked instantly from `/opt/quartz/node_modules` in the image. `npm install`
+  is only invoked if explicitly requested with `--force-npm-install`.
 - The environment sets `TZ=UTC` and a fixed `SOURCE_DATE_EPOCH`
   (2024-01-01), nudging build tooling toward reproducible output —
   part of the [determinism strategy](07-deployment.md#why-determinism-matters)
   that keeps Netlify uploads small.
 - **Preview mode (default):** kills any process holding the requested
-  port (`lsof`, that port only — several previews can run at once), then
+  port (`lsof`, that port only — several previews can run at once). Starts a
+  lightweight background synchronization watcher thread that polls `public/` and
+  mirrors changes to the host's `.merged_output/section<N>/public/`, then
   runs `npx quartz build --concurrency 1 --serve --port <8081-8084>
   --wsPort <port+1000>` (the websocket port keeps concurrent previews'
   live reload from colliding). The teacher browses the HOST address the
   launcher printed; Quartz rebuilds on file changes.
-- **Build-only mode:** `npx quartz build --concurrency 1`, then verifies
-  `public/` exists. This is the path `deploy` uses.
+- **Build-only mode:** `npx quartz build --concurrency 1`, verifies
+  `public/` exists in `/tmp/quartz-builds/...`, and performs a one-shot
+  sync to the host `.merged_output/section<N>/public/` and `course_config.json`.
+  This is the path `deploy` uses.
 
 > **Why `--concurrency 1`?** Quartz's parallel transpile workers can stall
 > or crash silently inside a resource-constrained Docker container. A serial

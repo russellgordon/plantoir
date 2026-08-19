@@ -35,8 +35,9 @@ The image is layered as follows (in order):
    program (`npx quartz build`). Also installed: `curl`, `git` (needed to
    clone Quartz), `lsof` (used to kill a previous preview server holding
    the requested port, 8081–8084), `dos2unix`/`unix2dos` (line-ending
-   conversion, below), and `fonts-noto-color-emoji` (the colour emoji
-   drawn onto social sharing cards).
+   conversion, below), `fonts-noto-color-emoji` (the colour emoji
+   drawn onto social sharing cards), and `rsync` (used for fast differential
+   mirroring of the built `public/` directory back to the host mount).
 4. **`npm install -g wrangler@4.80.0`** — Cloudflare's own deploy CLI,
    used by `deploy.py` when a course publishes to Cloudflare Pages (see
    [deployment](07-deployment.md)). It is pinned, and pinned **below
@@ -47,13 +48,18 @@ The image is layered as follows (in order):
    an upstream CLI change from breaking a teacher's publishing mid-term.
    Note this adds an npm-registry dependency to the image build, alongside
    the Debian and GitHub sources.
-5. **Clone Quartz v4.5.0 → `/opt/quartz`** — a pinned checkout:
+5. **Clone Quartz v4.5.0 & pre-bake dependencies → `/opt/quartz`** — a pinned checkout:
    ```dockerfile
-   RUN git clone --branch v4.5.0 https://github.com/jackyzha0/quartz.git quartz
+   RUN git clone --branch v4.5.0 https://github.com/jackyzha0/quartz.git quartz \
+       && cd quartz && npm install --no-audit && npm cache clean --force
    ```
    Pinning matters because most customizations are regex patches that target
    the exact source text of this version
-   (see [Quartz Customizations](06-quartz-customizations.md)).
+   (see [Quartz Customizations](06-quartz-customizations.md)). Pre-installing
+   dependencies inside the image ensures that `/opt/quartz/node_modules` is
+   baked into the image layers, completely eliminating the need to run `npm install`
+   across slow host filesystem mounts (9P on WSL2 or virtiofs on macOS) when
+   setting up or building course sections.
 6. **Overwrite five Quartz source files with patched versions** from
    [`patches/`](../patches/) — three components and two filter files:
    - `patches/Explorer.tsx` → `quartz/components/Explorer.tsx`
