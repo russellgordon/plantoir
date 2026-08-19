@@ -235,3 +235,20 @@ an item when it ships (finished behaviour is recorded in
   than reachability. (`LinkGraph.cs`'s doc comment quotes 50 unreachable
   course-level pages, but for a "sample course" it does not name — a
   different measurement from the 32 above, not a contradiction of it.)
+
+## Assistant replies "deployed" before the deploy finishes (Windows)
+
+Found 2026-08-19 during the deploy-during-preview adversarial review.
+`MainWindow.DeployForAsync` resolves its completion source the moment
+`StartDeployForAutomation()` returns — i.e. at `Deploy_Click`'s first await,
+minutes before the outcome — so the assistant words `AssistWording.Deployed`
+unconditionally, success or not. The mac awaits `deployAndWait()` and words
+the actual result, including destination refusals. Fix is to thread the
+deploy's real outcome back through `DeployForAsync` (a TaskCompletionSource
+resolved in `EndPublishActivity`/failure paths, or `Deploy_Click` returning a
+result the automation wrapper awaits). Contract case "deploy with a preview
+running" expects `wording.deployed` only on success; today Windows says it
+regardless. The scenario test is also blind to this — it injects its own
+`SectionIsBusy`/deploy stubs rather than the production wiring
+(`AssistScenarioTests.cs:80`), so wiring the real lambdas into a testable
+seam is part of the fix.

@@ -80,8 +80,18 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
-- **Mirror the stop-sweep guard: await in-flight `--stop` sweeps before
-  starting any build** (Windows, 2026-08-19, GUI-IMPROVEMENTS row 282).
+- ✅ DONE — SUPERSEDED, nothing owed. **Mirror the stop-sweep guard: await
+  in-flight `--stop` sweeps before starting any build** (Windows,
+  2026-08-19, GUI-IMPROVEMENTS row 282). An adversarial review the same
+  night showed the mac needs none of this: its `PreviewStopper` already
+  registers each sweep synchronously at the click and `waitForStopsToFinish`
+  re-polls a live list — the two properties whose absence made the Windows
+  copy racy. The Windows field failure this entry was written to explain
+  turned out to be Windows-local anyway: `ScriptRunner.WaitUntilFinished`
+  had been given a DEFAULT 5-second timeout that force-killed every deploy's
+  build (row 283) — the sweep was never the killer. Windows has since
+  adopted the mac's deploy-during-preview flow outright (row 283). Kept for
+  the diagnostic reasoning; act on nothing here.
   Stopping a preview runs the launcher's `--stop` mode fire-and-forget, and
   that sweep kills the section's container-side processes BY WORKING
   DIRECTORY — including `/tmp/quartz-builds/<COURSE>/section<N>` — several

@@ -15,34 +15,46 @@ namespace Plantoir.Services;
 /// runs it fire-and-forget, output discarded, exactly as the mac app's
 /// PreviewStopper does (row 105).
 ///
-/// The sweep is NOT instantaneous: the stop child takes several seconds to
-/// start PowerShell, probe the engine, and kill by working directory — and
-/// it kills by working directory, so a BUILD started in that window for the
-/// same section dies with it. That is precisely what "stop the preview, then
-/// deploy" does, since Deploy is only clickable once the preview is stopped.
-/// Every in-flight sweep is therefore tracked, and anything about to start a
-/// build for a section must await <see cref="WhenSweepsFinish"/> first.
+/// The sweep is NOT instantaneous, and it kills by WORKING DIRECTORY — so a
+/// build started for the same section while a sweep is still in flight dies
+/// with the processes the sweep was actually after. Anything about to start
+/// a build must therefore await <see cref="WaitForStopsToFinish"/> first.
+/// The wait is scoped to one section, as on the mac: waiting for every stop
+/// everywhere would be safe but would let one window's Stop delay another
+/// window's Preview for no reason.
 /// </summary>
 public static class PreviewStopper
 {
+    /// <summary>One sweep in flight, and which section it belongs to.</summary>
+    private sealed record Sweep(string CourseCode, int SectionNumber, Task Finished);
+
     private static readonly object SweepGate = new();
-    private static readonly List<Task> PendingSweeps = new();
+    private static readonly List<Sweep> PendingSweeps = new();
 
     /// <summary>
-    /// Completed once every sweep started so far has ended (or timed out).
-    /// Await this before starting a preview or deploy build — a sweep that
-    /// lands mid-build kills the build, and the failure it produces shows
-    /// nothing but the launcher's first lines.
+    /// Waits until this section has no stop sweep still running, or the
+    /// deadline passes — bounded, because a stop that hangs must not take
+    /// the build waiting on it down too (parity with the mac's
+    /// PreviewStopper.waitForStopsToFinish, 20 s). RE-POLLS the live list,
+    /// as the mac does, so a sweep launched WHILE waiting extends the wait
+    /// — a frozen snapshot would let that late sweep land mid-build.
     /// </summary>
-    public static Task WhenSweepsFinish()
+    public static async Task WaitForStopsToFinish(string courseCode, int sectionNumber)
     {
-        Task[] snapshot;
-        lock (SweepGate)
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (DateTime.UtcNow < deadline)
         {
-            PendingSweeps.RemoveAll(sweep => sweep.IsCompleted);
-            snapshot = PendingSweeps.ToArray();
+            bool stillGoing;
+            lock (SweepGate)
+            {
+                PendingSweeps.RemoveAll(sweep => sweep.Finished.IsCompleted);
+                stillGoing = PendingSweeps.Any(sweep =>
+                    string.Equals(sweep.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase)
+                    && sweep.SectionNumber == sectionNumber);
+            }
+            if (!stillGoing) return;
+            await Task.Delay(120);
         }
-        return snapshot.Length == 0 ? Task.CompletedTask : Task.WhenAll(snapshot);
     }
 
     public static void StopSectionProcesses(string workspacePath, string courseCode, int sectionNumber)
@@ -50,24 +62,27 @@ public static class PreviewStopper
         LaunchSweep(workspacePath, courseCode, sectionNumber);
     }
 
+    /// <summary>
+    /// Starts a sweep and waits for every sweep this section has in flight —
+    /// this one included — to finish, within the same bounded deadline.
+    /// </summary>
     public static async Task StopSectionProcessesAsync(string workspacePath, string courseCode, int sectionNumber)
     {
-        var sweep = LaunchSweep(workspacePath, courseCode, sectionNumber);
-        if (sweep is not null) await Task.WhenAny(sweep, Task.Delay(5000));
+        LaunchSweep(workspacePath, courseCode, sectionNumber);
+        await WaitForStopsToFinish(courseCode, sectionNumber);
     }
 
     /// <summary>
-    /// Starts the launcher's --stop mode and returns a task that completes
-    /// when the sweep ends — capped at 15 seconds so a wedged stop child can
-    /// never hold up the deploys waiting on <see cref="WhenSweepsFinish"/>.
-    /// Returns null when there was nothing to start.
+    /// Starts the launcher's --stop mode and records it as in flight. The
+    /// recorded task completes when the sweep's process exits, or after 15
+    /// seconds, so a wedged stop child can never hold a waiter forever.
     /// </summary>
-    private static Task? LaunchSweep(string workspacePath, string courseCode, int sectionNumber)
+    private static void LaunchSweep(string workspacePath, string courseCode, int sectionNumber)
     {
         try
         {
             string scriptPath = Path.Combine(workspacePath, "preview.ps1");
-            if (!File.Exists(scriptPath)) return null;
+            if (!File.Exists(scriptPath)) return;
             var info = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
@@ -88,7 +103,7 @@ public static class PreviewStopper
             info.ArgumentList.Add("--stop");
 
             var process = Process.Start(info);
-            if (process is null) return null;
+            if (process is null) return;
             var exited = new TaskCompletionSource();
             // Drain and discard output so the pipes can never fill and block
             // the kill; the process object frees itself when the stop ends.
@@ -104,18 +119,20 @@ public static class PreviewStopper
             };
             if (process.HasExited) exited.TrySetResult();
 
-            var sweep = Task.WhenAny(exited.Task, Task.Delay(15000));
+            // Recorded as finished only when the sweep's process actually
+            // exits — no per-sweep cap. A cap here made the wait's promise a
+            // lie: a sweep slower than the cap was reported done while its
+            // kill was still coming. The 20 s deadline in
+            // WaitForStopsToFinish is the one and only bound.
             lock (SweepGate)
             {
-                PendingSweeps.RemoveAll(pending => pending.IsCompleted);
-                PendingSweeps.Add(sweep);
+                PendingSweeps.RemoveAll(sweep => sweep.Finished.IsCompleted);
+                PendingSweeps.Add(new Sweep(courseCode, sectionNumber, exited.Task));
             }
-            return sweep;
         }
         catch
         {
             // Best-effort: a failed cleanup must never break the stop itself.
-            return null;
         }
     }
 }

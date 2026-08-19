@@ -272,9 +272,15 @@ public sealed partial class MainWindow : Window
 
     public bool IsSectionBusy(string courseCode, int section)
     {
+        // Busy, to the caller asking before a DEPLOY, means "a deploy is
+        // already running" — not "a preview is up". The Deploy path stops a
+        // running preview itself and waits for it (deploy-during-preview
+        // port, mac commit "Allow Deploy button to stop active preview
+        // before publishing"), so reporting a preview as busy here made the
+        // assistant refuse — and say so — while the deploy went ahead.
         if (DetailHost.Content is SectionDetailView detail)
         {
-            return detail.IsBusy;
+            return detail.IsDeploying;
         }
         return false;
     }

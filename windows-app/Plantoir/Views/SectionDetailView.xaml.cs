@@ -48,6 +48,11 @@ public sealed partial class SectionDetailView : UserControl
     public string CourseCode => _course.Code;
     public int SectionNumber => _sectionNumber;
     internal bool IsBusy => _previewRunner.IsRunning || _deployRunner.IsRunning;
+    // What "busy" means to a DEPLOY since the deploy-during-preview port: a
+    // running preview no longer stands in the way (Deploy stops it itself),
+    // so only a deploy already running does. Mac parity: deployAndWait()'s
+    // check is deployRunner.isRunning, evaluated after the stop.
+    internal bool IsDeploying => _deployRunner.IsRunning;
     private string TitleText => $"{_course.Code}-S{_sectionNumber}";
 
     public SectionDetailView(MainWindow window, Course course, int sectionNumber)
@@ -94,7 +99,12 @@ public sealed partial class SectionDetailView : UserControl
         // seconds it runs, because two builds clear the same output folder.
         bool building = _window.Workspace.WorkspacePath is { } folder &&
                         CourseActivity.IsBuildingElsewhere(folder, _course.Code);
-        DeployButton.IsEnabled = !IsBusy && !building;
+        // Deploying WHILE a preview runs is allowed (parity with the mac,
+        // commit "Allow Deploy button to stop active preview before
+        // publishing"): Deploy_Click stops the preview itself and waits for
+        // the stop — sweep included — before building. Only a deploy already
+        // running disables the button.
+        DeployButton.IsEnabled = !_deployRunner.IsRunning && !building;
         if (building)
             ToolTipService.SetToolTip(DeployButton, $"Available in a moment — {_course.Code} is being built");
 
@@ -205,7 +215,7 @@ public sealed partial class SectionDetailView : UserControl
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
-            await PreviewStopper.WhenSweepsFinish();
+            await PreviewStopper.WaitForStopsToFinish(_course.Code, _sectionNumber);
 
             _previewUrl = null;
             _lastLoadedUrl = null;
@@ -314,7 +324,7 @@ public sealed partial class SectionDetailView : UserControl
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
-            await PreviewStopper.WhenSweepsFinish();
+            await PreviewStopper.WaitForStopsToFinish(_course.Code, _sectionNumber);
 
             _previewUrl = null;
             _lastLoadedUrl = null;
@@ -442,11 +452,16 @@ public sealed partial class SectionDetailView : UserControl
         // Whenever a preview was actually running (or still building),
         // reclaim its container-side processes too — ending the host
         // launcher alone leaves the serve chain alive inside the container.
+        // The sweep launches BEFORE the runner is told to stop (mac order):
+        // registering it at the first instant of the stop is what lets
+        // WaitForStopsToFinish in every other caller see it — registered
+        // late, a deploy could honestly find nothing to wait for and start
+        // a build the sweep then kills.
         bool hadPreview = _previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null;
         _serverWait?.Cancel();
-        if (_previewRunner.IsRunning) _previewRunner.StopByUser();
         if (hadPreview && _window.Workspace.WorkspacePath is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
+        if (_previewRunner.IsRunning) _previewRunner.StopByUser();
         _previewUrl = null;
         _lastLoadedUrl = null;
         _isWaitingForServer = false;
@@ -458,14 +473,22 @@ public sealed partial class SectionDetailView : UserControl
     {
         bool hadPreview = _previewRunner.IsRunning || _isWaitingForServer || _previewUrl is not null;
         _serverWait?.Cancel();
+        // Sweep first, registered synchronously, THEN stop the host runner
+        // (mac order — see StopPreview). A second sweep after the runner
+        // dies catches whatever the first missed while the server was still
+        // spawning, and the awaited wait covers both.
+        if (hadPreview && _window.Workspace.WorkspacePath is { } workspacePath)
+            PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
         if (_previewRunner.IsRunning)
         {
             _previewRunner.StopByUser();
-            await _previewRunner.WaitUntilFinished();
+            // Bounded, and force-finished past the deadline: the process was
+            // just told to die, so hanging here is the only failure left.
+            await _previewRunner.WaitUntilFinishedOrKill(5000);
         }
-        if (hadPreview && _window.Workspace.WorkspacePath is { } workspacePath)
+        if (hadPreview && _window.Workspace.WorkspacePath is { } workspacePathAgain)
         {
-            await PreviewStopper.StopSectionProcessesAsync(workspacePath, _course.Code, _sectionNumber);
+            await PreviewStopper.StopSectionProcessesAsync(workspacePathAgain, _course.Code, _sectionNumber);
         }
         _previewUrl = null;
         _lastLoadedUrl = null;
@@ -504,7 +527,7 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
-            if (IsBusy) return;
+            if (_deployRunner.IsRunning) return;
             if (await TheAssistantIsBuilding()) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
 
@@ -542,14 +565,23 @@ public sealed partial class SectionDetailView : UserControl
                 return;
             }
 
-            // Stopping a preview sweeps the container for this section's
-            // processes BY WORKING DIRECTORY, seconds after the click — and
-            // the deploy's own build works in that same directory. Deploying
-            // right after stopping (the natural order, since Deploy needs the
-            // preview stopped) put the sweep on top of the fresh build and
-            // killed it before its first output flushed: an instant failure
-            // showing nothing past the launcher's opening lines.
-            await PreviewStopper.WhenSweepsFinish();
+            // Stop any running or building preview before deploying, and
+            // wait for the container-side stop sweep to finish so it cannot
+            // kill or race the deploy build (the sweep kills by WORKING
+            // DIRECTORY, the same one the quiet build works in). Mac parity:
+            // deployAndWait() in SectionDetailView.swift does exactly this.
+            if (_previewRunner.IsRunning)
+                await StopPreviewAsync();
+            else
+                await PreviewStopper.WaitForStopsToFinish(_course.Code, _sectionNumber);
+
+            // Said AFTER the stop, as on the mac: a deploy that began while
+            // we were waiting is the one thing that still stands in the way.
+            if (_deployRunner.IsRunning) return;
+            // The stop can take up to ~20 s, and the leases came off with the
+            // preview — long enough for the assistant to begin a build of its
+            // own. The click-time answer is stale; ask again.
+            if (await TheAssistantIsBuilding()) return;
 
             bool needsBuild = BuildFreshness.NeedsRebuild(_course, _sectionNumber);
             _deployRunner.Milestones = toFolder
@@ -562,8 +594,8 @@ public sealed partial class SectionDetailView : UserControl
             _deployRunner.CustomDomainForLinks = customDomain.Length == 0 ? null : customDomain;
 
             // The publish is on the books for its WHOLE life — the quiet build
-            // included — and comes off them on every exit path (EndPublish runs
-            // from the runner-stopped transition in RefreshChrome).
+            // included — and comes off them on every exit path: the two early
+            // returns below, the normal end, and the catch.
             _publishActivity?.Dispose();
             _publishActivity = CourseActivity.BeginPublish(workspacePath, _course.Code, _sectionNumber);
             _publishWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Publishing);
@@ -594,6 +626,10 @@ public sealed partial class SectionDetailView : UserControl
         catch (Exception ex)
         {
             App.LogDiagnostic($"Deploy_Click exception: {ex}");
+            // An exception between BeginPublish and the normal end would
+            // otherwise leave the course registered as publishing — holding
+            // the publish and build claims — until the view is torn down.
+            EndPublishActivity();
         }
     }
 

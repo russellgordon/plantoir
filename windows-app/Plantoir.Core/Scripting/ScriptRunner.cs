@@ -302,7 +302,31 @@ public sealed class ScriptRunner : INotifyPropertyChanged
 
     public void Terminate() => _process?.Kill();
 
-    public async Task<bool> WaitUntilFinished(int timeoutMs = 5000)
+    /// <summary>
+    /// Waits for the run to end, however long it takes. UNBOUNDED on
+    /// purpose, as on the mac: a build or deploy runs for minutes, and a
+    /// default timeout here once force-killed every deploy five seconds in
+    /// — the console died between two launcher lines and the failure read
+    /// as the toolchain's, not the app's. A bound belongs only where the
+    /// caller has already asked the process to die: see
+    /// <see cref="WaitUntilFinishedOrKill"/>.
+    /// </summary>
+    public async Task<bool> WaitUntilFinished()
+    {
+        while (IsRunning)
+        {
+            await Task.Delay(100);
+        }
+        return LastExitCode == 0;
+    }
+
+    /// <summary>
+    /// Bounded wait for a process that has been TOLD to stop (StopByUser /
+    /// Terminate): if it has not died by the deadline, force-finish it so a
+    /// wedged teardown cannot hang its caller. Never use this to wait on
+    /// live work — the force-finish kills the run it waits on.
+    /// </summary>
+    public async Task<bool> WaitUntilFinishedOrKill(int timeoutMs)
     {
         var start = DateTime.UtcNow;
         while (IsRunning && (DateTime.UtcNow - start).TotalMilliseconds < timeoutMs)
