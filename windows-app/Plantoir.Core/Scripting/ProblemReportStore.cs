@@ -38,6 +38,45 @@ public class ProblemReportStore
             .ToList();
     }
 
+    /// <summary>
+    /// Writes one finished task's transcript into the runs folder, redacting
+    /// each line on the way in (the LogRedactor rule: what is on disk is
+    /// already safe to hand over), and prunes the folder to
+    /// <see cref="MostRetainedRuns"/>. Fills the gap the 2026-08-19 problem
+    /// report exposed: the report promised "the last N tasks Plantoir ran for
+    /// you" while nothing on Windows ever wrote one — three failed setups and
+    /// the one file that said why was never made.
+    /// </summary>
+    public string SaveRunTranscript(string scriptName, string outcome, DateTime startedAt,
+                                    IEnumerable<string> transcriptLines)
+    {
+        Directory.CreateDirectory(RunsFolder);
+        string safeName = string.Concat(scriptName.Split(Path.GetInvalidFileNameChars()));
+        string path = Path.Combine(RunsFolder, $"{startedAt:yyyy-MM-dd HHmmss} {safeName}.txt");
+        var lines = new List<string>
+        {
+            $"{scriptName} — {outcome}",
+            $"Started {startedAt:yyyy-MM-dd HH:mm:ss}.",
+            "",
+        };
+        foreach (string line in transcriptLines)
+            lines.Add(LogRedactor.Redacting(line));
+        File.WriteAllLines(path, lines);
+        PruneRuns();
+        return path;
+    }
+
+    private void PruneRuns()
+    {
+        var stale = Directory.GetFiles(RunsFolder, "*.txt")
+            .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+            .Skip(MostRetainedRuns);
+        foreach (string path in stale)
+        {
+            try { File.Delete(path); } catch { }
+        }
+    }
+
     public string ActivityText(bool includingPrompts)
     {
         string path = ActivityFile;

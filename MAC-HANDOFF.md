@@ -91,6 +91,21 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+- **Check that every finished mac task really writes a run transcript**
+  (Windows, 2026-08-19, branch `windows-wsl2-auto-install`). A real teacher's
+  problem report arrived saying "the last 0 tasks Plantoir ran for you" after
+  three failed setups: the Windows report reads `Logs\runs\*.txt`, and
+  nothing ever wrote that folder — the reading side was tested against
+  hand-made files, so the gap passed every test. Windows now saves every
+  finished task's transcript from `ScriptRunner`'s finish path (redacted on
+  the way in, pruned to the newest 20, header matching the trail's
+  "finished … — outcome" sentence). The ask here is a VERIFICATION, not a
+  port: drive one real failing task on the mac and confirm a file appears in
+  the folder its report actually reads — the failure mode is precisely that
+  the tests cannot see this. Reference:
+  `ProblemReportStore.SaveRunTranscript`, `ScriptRunner.NoteTaskFinished`,
+  `ProblemReportTests.Store_SavesRunTranscripts_RedactedAndPruned`.
+
 - **The Windows launchers now install WSL2 themselves — the mac owes only
   the three explainer sentences** (Windows, 2026-08-19, branch
   `windows-wsl2-auto-install`). What it fixed: a teacher on a PC with no

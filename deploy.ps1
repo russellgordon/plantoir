@@ -694,7 +694,7 @@ exit `$LASTEXITCODE
 
   $elevated = $null
   try {
-    $elevated = Start-Process powershell -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',$script) -Verb RunAs -Wait -PassThru
+    $elevated = Start-Process powershell -ArgumentList @('-NoProfile','-WindowStyle','Hidden','-ExecutionPolicy','Bypass','-File',$script) -Verb RunAs -Wait -PassThru -WindowStyle Hidden
   } catch {
     Write-Host "ERROR: Windows permission was declined, so this PC could not be set up."
     Write-Host "Run this again, and choose Yes when Windows asks for permission."
@@ -708,7 +708,7 @@ exit `$LASTEXITCODE
   # what can lag is being able to LAUNCH it (first start of a fresh distro).
   # No distribution in the list will not appear by waiting.
   $distros = @()
-  try { $distros = (wsl -l -q) | Where-Object { $_ -and $_.Trim() } } catch {}
+  try { $distros = (wsl -l -q) 2>$null | Where-Object { $_ -and $_.Trim() } } catch {}
   if ($distros) {
     for ($i = 0; $i -lt 30; $i++) {
       if (Test-WslLaunches) {
@@ -745,7 +745,7 @@ function Ensure-ContainerRuntime {
   }
 
   $distros = @()
-  try { $distros = (wsl -l -q) | Where-Object { $_ -and $_.Trim() } } catch {}
+  try { $distros = (wsl -l -q) 2>$null | Where-Object { $_ -and $_.Trim() } } catch {}
   if (-not $distros) { Install-WindowsSubsystem }
 
   # Already-running engine inside WSL? (Try as the default user, then as root.)

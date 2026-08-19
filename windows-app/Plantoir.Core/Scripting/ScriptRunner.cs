@@ -409,6 +409,32 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         }
         ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
             $"finished {_launchedScriptName} — {outcome}{duration}");
+        SaveRunTranscript(outcome + duration);
+    }
+
+    /// <summary>
+    /// Every finished task leaves its transcript in the problem-report store,
+    /// success and failure alike — the 2026-08-19 report arrived with "the
+    /// last 0 tasks" after three failed setups, and the guessing that caused
+    /// is what this line ends. A transcript that cannot be written must never
+    /// break the task it records.
+    /// </summary>
+    private void SaveRunTranscript(string outcomeWithDuration)
+    {
+        try
+        {
+            var lines = new List<string>(Transcript.Lines);
+            string unfinished = Transcript.CurrentLine;
+            if (unfinished.Length > 0) lines.Add(unfinished);
+            DateTime startedLocal = StartedAt is { } startedAt
+                ? startedAt.ToLocalTime()
+                : DateTime.Now;
+            ProblemReportStore.Standard.SaveRunTranscript(
+                _launchedScriptName, outcomeWithDuration, startedLocal, lines);
+        }
+        catch
+        {
+        }
     }
 
     // ---- Milestones ------------------------------------------------------
