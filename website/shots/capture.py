@@ -849,9 +849,29 @@ def preflight_permissions() -> None:
     minute. Any UI test would trigger the SAME dialog -- xcodebuild asks
     before the test's own logic runs -- so this one is chosen for speed, not
     for anything it captures.
+
+    The two halves run in PARALLEL, slow one first. The XCTest dialog cannot
+    appear until xcodebuild has built and launched the test runner -- most of
+    a minute -- so run in sequence, it surfaced long after the person who
+    granted the Safari prompt had walked away. Started in the background
+    before Safari is poked, that build runs while the first dialog is being
+    answered, and both prompts land as early as each mechanically can.
     """
     announce("Requesting permissions up front (Safari control, then UI automation)")
-    print("   If a system dialog appears for either one, approve it now.")
+    print("   If a system dialog appears for either one, approve it now --")
+    print("   the second can take up to a minute to surface. Both granted and")
+    print("   remembered, the rest of the run needs nobody at the keyboard.")
+
+    smoke_command: list[str] = [
+        "xcodebuild", "-project", str(MAC_APP / "Plantoir.xcodeproj"),
+        "-scheme", "Plantoir", "-configuration", "Debug", "test",
+        "-only-testing:QuartzTeachersUITests/QuartzTeachersUITests/testSidebarShowsExampleCourse",
+    ]
+    print(f"   $ {' '.join(smoke_command)}  (in the background)")
+    smoke = subprocess.Popen(
+        smoke_command, cwd=MAC_APP,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
 
     try:
         subprocess.run(
@@ -861,13 +881,13 @@ def preflight_permissions() -> None:
     except subprocess.TimeoutExpired:
         print("   Safari did not respond within a minute -- the dialog may still be waiting.")
 
-    result = run(
-        ["xcodebuild", "-project", str(MAC_APP / "Plantoir.xcodeproj"),
-         "-scheme", "Plantoir", "-configuration", "Debug", "test",
-         "-only-testing:QuartzTeachersUITests/QuartzTeachersUITests/testSidebarShowsExampleCourse"],
-        cwd=MAC_APP, capture_output=True, text=True, timeout=300,
-    )
-    if result.returncode != 0:
+    try:
+        returncode: int = smoke.wait(timeout=300)
+    except subprocess.TimeoutExpired:
+        smoke.kill()
+        smoke.wait()
+        returncode = -1
+    if returncode != 0:
         print("   The preflight test did not pass -- if a permission dialog is still on screen, "
               "answer it and re-run.", file=sys.stderr)
     else:
