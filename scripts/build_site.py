@@ -3125,8 +3125,20 @@ def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
         except Exception:
             pass
 
+    # Flush ONLY the host mount's filesystem, never os.sync(): a global sync
+    # waits on every superblock in the kernel, and under WSL2 all distros share
+    # one kernel — a leaked FUSE superblock anywhere (WSLg has produced one)
+    # blocks it forever, presenting as a deploy that hangs after the Quartz
+    # build with no error. syncfs() touches just the filesystem the site was
+    # copied to, which is the only one this step has any business flushing.
     try:
-        os.sync()
+        import ctypes
+        libc = ctypes.CDLL(None, use_errno=True)
+        fd = os.open(str(host_output_dir), os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            libc.syncfs(fd)
+        finally:
+            os.close(fd)
     except Exception:
         pass
 
