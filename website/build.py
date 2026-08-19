@@ -123,9 +123,12 @@ def picture_element(shot: dict, problems: list[str], modifier: str, up: str) -> 
     win_light = IMAGE_DIR / f"{identifier}-windows-light.png"
     win_dark = IMAGE_DIR / f"{identifier}-windows-dark.png"
 
-    classes = "shot"
+    classes = ["shot"]
+    if shot.get("capture", {}).get("kind") == "composite":
+        classes.append("shot-composite")
     if modifier:
-        classes = f"shot shot-{modifier}"
+        classes.append(f"shot-{modifier}")
+    classes_html = " ".join(classes)
 
     caption = shot.get("caption", "")
     caption_html = ""
@@ -135,7 +138,7 @@ def picture_element(shot: dict, problems: list[str], modifier: str, up: str) -> 
     if not light.exists() or not dark.exists():
         problems.append(f"screenshot '{identifier}' has not been captured yet")
         return (
-            f'<figure class="{classes}">\n'
+            f'<figure class="{classes_html}">\n'
             f'    <div class="shot-missing">Screenshot pending: {identifier}</div>'
             f'{caption_html}\n'
             f'</figure>'
@@ -174,7 +177,7 @@ def picture_element(shot: dict, problems: list[str], modifier: str, up: str) -> 
     win_src_attr = f' data-win-src="{up}img/{win_prefix}light.png"' if has_windows else ""
 
     return (
-        f'<figure class="{classes}">\n'
+        f'<figure class="{classes_html}">\n'
         f'    <picture>\n'
         f'{joined}\n'
         f'      <img src="{up}img/{identifier}-light.png"{win_src_attr} alt="{shot["alt"]}"\n'

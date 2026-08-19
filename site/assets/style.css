@@ -313,9 +313,11 @@ ol.steps li::before {
 .shot-device { width: 100%; margin-left: 0; transform: none; }
 .shot-device img { max-width: 290px; border-radius: 0; box-shadow: none; }
 
-/* An assembled figure brings its own rounded corners and its own shadows —
-   the cards inside it are drawn that way — so the frame the other shots get
-   would sit around the outside of the arrangement and spoil it. */
+/* An assembled or composite figure brings its own rounded corners and its own
+   shadows — the cards and windows inside it are drawn that way — so the frame
+   the other shots get would sit around the outside of the arrangement and
+   spoil it. */
+.shot-composite img,
 .shot-static img { border-radius: 0; box-shadow: none; }
 
 .shot figcaption {
