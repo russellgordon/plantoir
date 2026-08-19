@@ -12,6 +12,7 @@ token from the `containerized-quartz-netlify` Keychain item or
 ```bash
 python3 website/build.py          # write site/
 python3 website/build.py --check  # report problems, write nothing
+python3 website/build.py --serve  # preview locally; edits rebuild on refresh
 python3 website/build.py --deploy # build, then publish to plantoir.app
 ```
 
