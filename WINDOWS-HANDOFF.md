@@ -3618,6 +3618,22 @@ Windows uses, and check the *count of captured images*, never the exit code.
   session-restore mechanism exists, captures must start from exactly one
   window.
 
+### The demo sites were renamed on 2026-08-19
+
+The published demo sites now follow a per-SECTION scheme —
+`<code>-s<n>-2026-gordon.netlify.app`, e.g. `eng2d-s1-2026-gordon` — and
+ENG2D has a section 2 site of its own. `capture.py`, `capture_windows.py`
+and `website/site.json` carry the new names, but
+`windows-app/Plantoir/Services/MarketingShotCapturer.cs` still writes the
+OLD per-course names (`{code}-gordon-2026-27`) into its fixture configs'
+`deploy_site_name`, in two places. Left for the Windows side to update
+rather than edited blind from the mac, because the new scheme names a
+SECTION and `deploy_site_name` is course-level config: the right value for
+those fixtures — probably the section 1 name — is a judgement about how
+that capturer uses them. The authoritative record of what is actually
+deployed is the demo working folder itself:
+`courses/<CODE>/.netlify_sites/section<n>.json`.
+
 ### The demo courses, and why those three
 
 The screenshots are taken against a working folder holding ENG2D, MCV4U and

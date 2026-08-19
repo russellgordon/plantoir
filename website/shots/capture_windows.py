@@ -46,10 +46,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from images import prepare, WIDEST_PHONE_PIXELS, WIDEST_WINDOW_PIXELS  # noqa: E402
 from composite import fan, side_by_side  # noqa: E402
 
+# Per-section naming, matching the sites redeployed on 2026-08-19 — see the
+# note beside the same table in capture.py.
 DEMO_COURSES = [
-    {"code": "ENG2D", "site": "eng2d-gordon-2026-27"},
-    {"code": "MCV4U", "site": "mcv4u-gordon-2026-27"},
-    {"code": "SCH3U", "site": "sch3u-gordon-2026-27"},
+    {"code": "ENG2D", "site": "eng2d-s1-2026-gordon"},
+    {"code": "MCV4U", "site": "mcv4u-s1-2026-gordon"},
+    {"code": "SCH3U", "site": "sch3u-s1-2026-gordon"},
 ]
 
 

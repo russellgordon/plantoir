@@ -40,7 +40,7 @@ Then check, in this order:
    `courses/`. If it does not, that is a provisioning run
    (`capture.py --provision`), which is slow and separate. See below.
 4. **For `--sites`, the three class sites answer.** They are at
-   `<code>-gordon-2026-27.netlify.app`. A 404 means the demo sites need
+   `<code>-s1-2026-gordon.netlify.app`. A 404 means the demo sites need
    publishing again (`capture.py --publish`), not that the capture is broken.
 
 ## Two permissions you cannot grant

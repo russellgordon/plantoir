@@ -66,11 +66,14 @@ APP_BUNDLE_DEFAULTS_DOMAIN = "ca.russellgordon.Plantoir"
 DEFAULT_WORKSPACE = Path.home() / "Desktop" / "Teaching"
 
 # The courses the marketing shots are taken from, and the Netlify site each is
-# published to. The naming pattern is the one Russell asked for.
+# published to. The naming scheme is per-SECTION — <code>-s<n>-2026-gordon —
+# matching the sites Russell redeployed on 2026-08-19; the browser and phone
+# shots use each course's section 1. The authoritative record is the working
+# folder itself: courses/<CODE>/.netlify_sites/section<n>.json.
 DEMO_COURSES = [
-    {"code": "ENG2D", "site": "eng2d-gordon-2026-27"},
-    {"code": "MCV4U", "site": "mcv4u-gordon-2026-27"},
-    {"code": "SCH3U", "site": "sch3u-gordon-2026-27"},
+    {"code": "ENG2D", "site": "eng2d-s1-2026-gordon"},
+    {"code": "MCV4U", "site": "mcv4u-s1-2026-gordon"},
+    {"code": "SCH3U", "site": "sch3u-s1-2026-gordon"},
 ]
 
 # The simulator used for the phone shot, and the RocketSim helper that draws

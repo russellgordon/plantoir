@@ -19,17 +19,17 @@
       {
         "code": "ENG2D",
         "label": "English, Grade 10",
-        "url": "https://eng2d-gordon-2026-27.netlify.app"
+        "url": "https://eng2d-s1-2026-gordon.netlify.app"
       },
       {
         "code": "MCV4U",
         "label": "Calculus and Vectors, Grade 12",
-        "url": "https://mcv4u-gordon-2026-27.netlify.app"
+        "url": "https://mcv4u-s1-2026-gordon.netlify.app"
       },
       {
         "code": "SCH3U",
         "label": "Chemistry, Grade 11",
-        "url": "https://sch3u-gordon-2026-27.netlify.app"
+        "url": "https://sch3u-s1-2026-gordon.netlify.app"
       }
     ]
   }
