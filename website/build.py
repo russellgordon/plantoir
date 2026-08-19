@@ -462,8 +462,14 @@ def serve(port: int) -> int:
     for candidate in range(port, port + 10):
         try:
             with socketserver.ThreadingTCPServer(("127.0.0.1", candidate), handler) as server:
-                print(f"\n🔎 Previewing at http://localhost:{candidate}/ — edit a source,")
+                address = f"http://localhost:{candidate}/"
+                print(f"\n🔎 Previewing at {address} — edit a source,")
                 print("   refresh the browser, and the page rebuilds. Ctrl+C stops it.")
+                # Open the browser only for a person at a terminal: a piped or
+                # scripted run (tests, agents) must not fling windows around.
+                if sys.stdout.isatty():
+                    import webbrowser
+                    webbrowser.open(address)
                 try:
                     server.serve_forever()
                 except KeyboardInterrupt:
