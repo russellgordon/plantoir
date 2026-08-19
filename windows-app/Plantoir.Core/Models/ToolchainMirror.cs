@@ -98,7 +98,7 @@ public static class ToolchainMirror
     }
 
     /// <summary>Copy when missing or byte-different; never touch an identical file.</summary>
-    internal static int SyncFile(string source, string destination)
+    internal static int SyncFile(string source, string destination, HashSet<string>? createdDirs = null)
     {
         try
         {
@@ -118,7 +118,12 @@ public static class ToolchainMirror
                     }
                 }
             }
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            string? dir = Path.GetDirectoryName(destination);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                if (createdDirs is null || createdDirs.Add(dir))
+                    Directory.CreateDirectory(dir);
+            }
             File.Copy(source, destination, overwrite: true);
             CopyModificationDate(srcInfo, new FileInfo(destination));
             return 1;
@@ -136,6 +141,7 @@ public static class ToolchainMirror
     {
         int changed = 0;
         var sourceRelatives = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var createdDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (Directory.Exists(sourceRoot))
         {
             var srcDir = new DirectoryInfo(sourceRoot);
@@ -146,7 +152,7 @@ public static class ToolchainMirror
                 string destFile = Path.Combine(destinationRoot, relative);
                 var dstInfo = new FileInfo(destFile);
                 if (dstInfo.Exists && FilesLookIdentical(fileInfo, dstInfo)) continue;
-                changed += SyncFile(fileInfo.FullName, destFile);
+                changed += SyncFile(fileInfo.FullName, destFile, createdDirs);
             }
         }
         if (Directory.Exists(destinationRoot))

@@ -44,11 +44,23 @@ public sealed partial class WorkspacePickerView : UserControl
     private void Choose_Click(object sender, RoutedEventArgs e) =>
         _window.OpenWorkingFolder_Click(sender, e);
 
-    private void Initialize_Click(object sender, RoutedEventArgs e)
+    private async void Initialize_Click(object sender, RoutedEventArgs e)
     {
-        _window.Workspace.InitializeWorkspace();
-        _window.ApplyState();
-        if (_window.Workspace.State == WorkspaceState.Ready && _window.Workspace.WorkspaceProblem is null)
-            _ = _window.SidebarPane.OpenNewCourseWizard();
+        InitializeButton.IsEnabled = false;
+        ChooseButton.IsEnabled = false;
+        InitializeButton.Content = "Setting up…";
+        try
+        {
+            await System.Threading.Tasks.Task.Run(() => _window.Workspace.InitializeWorkspace());
+            _window.ApplyState();
+            if (_window.Workspace.State == WorkspaceState.Ready && _window.Workspace.WorkspaceProblem is null)
+                _ = _window.SidebarPane.OpenNewCourseWizard();
+        }
+        finally
+        {
+            InitializeButton.IsEnabled = true;
+            ChooseButton.IsEnabled = true;
+            InitializeButton.Content = "Set Up This Folder";
+        }
     }
 }
