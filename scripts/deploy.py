@@ -271,23 +271,28 @@ def save_teacher_last_name(last_name: str):
     except Exception:
         pass
 
-def get_or_prompt_teacher_last_name() -> str:
+def get_or_prompt_teacher_last_name() -> str | None:
     ln = load_teacher_last_name()
     if ln:
         return ln
-    # First run under this /teaching/courses folder
-    print("\nTeacher Surname.")
-    print("Your surname is used to create a clear, recognizable web address for your")
-    print("students and families (such as mcv4u-s1-2026-gordon), and to prevent naming")
-    print("conflicts with other classes. It is saved on this computer and only asked once.\n")
-    raw = input("First time setup... what is your last name? (letters only): ").strip()
-    ln = sanitize_last_name(raw)
-    while not ln:
-        raw = input("Please enter letters only for your last name (e.g., 'Gordon'): ").strip()
+    if not sys.stdin.isatty():
+        return None
+    try:
+        # First run under this /teaching/courses folder
+        print("\nTeacher Surname.")
+        print("Your surname is used to create a clear, recognizable web address for your")
+        print("students and families (such as mcv4u-s1-2026-gordon), and to prevent naming")
+        print("conflicts with other classes. It is saved on this computer and only asked once.\n")
+        raw = input("First time setup... what is your last name? (letters only): ").strip()
         ln = sanitize_last_name(raw)
-    save_teacher_last_name(ln)
-    print(f" Saved teacher last name for future deploys: {ln}")
-    return ln
+        while not ln:
+            raw = input("Please enter letters only for your last name (e.g., 'Gordon'): ").strip()
+            ln = sanitize_last_name(raw)
+        save_teacher_last_name(ln)
+        print(f" Saved teacher last name for future deploys: {ln}")
+        return ln
+    except (EOFError, OSError):
+        return None
 
 # ---------- Timezone helpers ----------
 def parse_host_tz() -> dt.tzinfo:
@@ -311,10 +316,18 @@ TZ = parse_host_tz()
 NOW = dt.datetime.now(TZ)
 
 def prompt(text: str, default: str | None = None) -> str:
+    if not sys.stdin.isatty():
+        return default or ""
     if default is not None and default != "":
-        resp = input(f"{text} [{default}]: ").strip()
-        return resp or default
-    return input(f"{text}: ").strip()
+        try:
+            resp = input(f"{text} [{default}]: ").strip()
+            return resp or default
+        except (EOFError, OSError):
+            return default
+    try:
+        return input(f"{text}: ").strip()
+    except (EOFError, OSError):
+        return ""
 
 # ---------- Netlify API helpers ----------
 def netlify_api(method: str, path: str, token: str, payload: dict | None = None, headers: dict | None = None, data: bytes | None = None) -> dict:
@@ -407,6 +420,10 @@ def maybe_create_netlify_site_simple(token: str, team_slug: str | None, course_c
             if _is_netlify_name_conflict(e):
                 attempt += 1
                 suggestion = f"{base}-{attempt:02d}"
+                if not sys.stdin.isatty():
+                    print(f"⚠️ Website Address '{site_name}' is already in use on Netlify. Trying '{suggestion}'…")
+                    site_name = suggestion
+                    continue
                 print(f"\n⚠️ Website Address Already Taken.")
                 print(f"The address '{site_name}' is already in use by another site on Netlify.")
                 print("Tip: Add your school's initials (e.g. lcs-mcv4u-s1-2026-gordon) or a number suffix.\n")
