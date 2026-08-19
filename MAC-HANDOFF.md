@@ -51,9 +51,20 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
-**Nothing waiting right now.** This section exists so that when something is,
-it is the first thing read here — and so a red mac suite is instantly
-explicable rather than alarming.
+- `contracts/app-rules.json` → `failureExplanations.cases` → **the three
+  one-time-Windows-setup cases** ("needs to restart to finish getting
+  ready", "Windows permission was declined", "Windows could not add the
+  feature this needs"), proposed 2026-08-19. The Windows launchers now
+  install WSL2 themselves (see the entry below); these are the three
+  non-fault ways that setup can stop, and the app turns each into one
+  actionable sentence. The outputs can never occur on macOS — the ask is to
+  add the same three mappings to the mac's failure explainer anyway, so the
+  explainer stays identical on both sides instead of growing a platform
+  switch (the alternative, a `platform` field on contract cases, was
+  rejected as machinery for exactly three lines). Reference:
+  `windows-app/Plantoir.Core/Scripting/FailureExplainer.cs` →
+  `SetupExplanation`, covered by `ContractTests` → the
+  `failureExplanations` case runner.
 
 The mechanism, in one paragraph. `Plantoir --write-contracts` runs on the mac,
 so the Windows side cannot regenerate the derived halves of
@@ -79,6 +90,38 @@ outstanding.
 
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
+
+- **The Windows launchers now install WSL2 themselves — the mac owes only
+  the three explainer sentences** (Windows, 2026-08-19, branch
+  `windows-wsl2-auto-install`). What it fixed: a teacher on a PC with no
+  WSL2 hit "ERROR: WSL is present but no Linux distribution is installed"
+  plus an instruction to open an Administrator PowerShell — it failed live
+  in front of an audience on 2026-08-19. This was the Windows analogue of
+  the mac's zero-prerequisite Colima bootstrap, called for by
+  `WINDOWS-HANDOFF.md`'s "Container engine" note (entry 72), and it now
+  exists: each `.ps1` launcher's `Install-WindowsSubsystem` runs one
+  elevated `wsl --install -d Ubuntu --no-launch` (retrying with
+  `--web-download` for Store-blocked school machines), detects
+  restart-pending by USABILITY rather than exit code (the exit code is 0 on
+  that path), and reports the three non-fault stops in plain words. WHY the
+  choices: `--no-launch` because Ubuntu's first-run username wizard would
+  otherwise block a non-interactive run forever — the distro runs as root,
+  fine for an appliance no teacher opens; UAC is announced first ("Watch
+  for a Windows permission prompt") because it is the one step that cannot
+  be silent; a distro installed BY the run is provisioned without the
+  Docker-engine question (the mac never asks either), while a pre-existing
+  distro keeps the question because it belongs to whoever set it up.
+  Rejected: DISM feature-enable plus manual distro import (re-implements
+  what `wsl --install` already does, and needs the same elevation);
+  prompting before the install (the handoff asks for silent, and UAC is
+  already the consent); auto-restarting the PC (never — the teacher may
+  have unsaved work everywhere). Untested on a truly fresh machine — this
+  dev box has WSL — so the restart path is asserted from the launcher's
+  printed lines, which is what the contract cases pin. What the mac does:
+  the three contract cases above, nothing else — the `.sh` launchers are
+  untouched. Reference: `Install-WindowsSubsystem` in `setup.ps1`,
+  `preview.ps1` (where stop mode exits before it can ever run), and
+  `deploy.ps1`.
 
 - **Build the 1.0.0 DMG only from a tree containing the deploy-flush fix in
   `scripts/build_site.py`** (Windows + shared, 2026-08-19). A Windows release

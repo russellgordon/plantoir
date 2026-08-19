@@ -8,11 +8,30 @@ namespace Plantoir.Core.Scripting;
 public static class FailureExplainer
 {
     public static string? Explanation(string output) =>
-        RateLimitExplanation(output)
+        SetupExplanation(output)
+        ?? RateLimitExplanation(output)
         ?? AccountExplanation(output)
         ?? ConnectionExplanation(output)
         ?? FolderAccessExplanation(output)
         ?? MissingBuildExplanation(output);
+
+    /// <summary>
+    /// The one-time Windows setup (the launchers' Install-WindowsSubsystem)
+    /// has three ways to stop that are not faults: Windows wants a restart,
+    /// the teacher declined the permission prompt, or the download failed.
+    /// Checked FIRST because that setup's own log is echoed into the output
+    /// and could contain lines the broader matchers below would misread.
+    /// </summary>
+    private static string? SetupExplanation(string output)
+    {
+        if (output.Contains("needs to restart to finish getting ready"))
+            return "This PC needs to restart to finish getting ready. Restart it, then try setting up again — it carries on by itself.";
+        if (output.Contains("Windows permission was declined"))
+            return "Plantoir needs your permission to get this PC ready. Try again, and choose Yes when Windows asks.";
+        if (output.Contains("Windows could not add the feature this needs"))
+            return "This PC couldn't get ready — check your internet connection, then try setting up again. It's safe to try as many times as you like.";
+        return null;
+    }
 
     private static readonly string[] FolderAccessSigns =
     {

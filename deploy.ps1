@@ -616,6 +616,8 @@ this computer.
 $env:WSL_UTF8 = '1'   # make wsl.exe emit UTF-8 so PowerShell can parse its output
 $global:DockerViaWsl = $false
 $global:WslUserArgs  = @()
+$global:FreshWsl        = $false   # WSL was installed by THIS run — its distro is ours to provision silently
+$global:SetupAnnounced  = $false   # "Setting up this PC" milestone printed at most once
 
 function Test-NativeDockerReady {
   if (-not (Get-Command docker -CommandType Application -ErrorAction SilentlyContinue)) { return $false }
@@ -651,6 +653,86 @@ function Use-WslDocker {
   Write-Host "Using the Docker engine inside WSL2."
 }
 
+function Test-WslLaunches {
+  try { wsl -u root -e sh -c "exit 0" *> $null } catch { return $false }
+  return ($LASTEXITCODE -eq 0)
+}
+
+# WSL2 is installed automatically when it is missing. wsl.exe itself ships
+# with Windows; what a fresh PC lacks is the subsystem's Windows features
+# and a Linux distribution, and one elevated `wsl --install` provides both.
+# Elevation means Windows shows its permission prompt (UAC) — the one step
+# that cannot be silent, so it is announced in plain words first.
+# `--no-launch` skips Ubuntu's interactive first-run username wizard: the
+# distribution then runs as root, which suits an appliance no teacher ever
+# opens. Enabling the VM platform usually requires a restart; that is
+# detected by USABILITY (not the exit code, which is 0 on the
+# restart-pending path) and reported in plain words. The whole step is safe
+# to re-run — after the restart the same call finishes what is left.
+function Install-WindowsSubsystem {
+  Write-Host "Setting up this PC - a one-time step that runs on its own ..."
+  $global:SetupAnnounced = $true
+  Write-Host "Adding a Windows feature your website builder needs (a few minutes)."
+  Write-Host "Watch for a Windows permission prompt - choose Yes to continue."
+
+  $log     = Join-Path $env:TEMP 'plantoir-wsl-install.log'
+  $script  = Join-Path $env:TEMP 'plantoir-wsl-install.ps1'
+  Remove-Item $log -ErrorAction SilentlyContinue
+  # -Verb RunAs cannot capture output, so the elevated shell writes its own
+  # log. The second attempt adds --web-download for machines where the
+  # Microsoft Store is blocked (common on school-managed PCs); older wsl.exe
+  # builds reject the flag, which only matters after the plain form failed.
+  @"
+`$env:WSL_UTF8 = '1'
+`$ProgressPreference = 'SilentlyContinue'
+wsl --install -d Ubuntu --no-launch 2>&1 | Out-File -FilePath '$log' -Encoding utf8
+if (`$LASTEXITCODE -ne 0) {
+  wsl --install -d Ubuntu --no-launch --web-download 2>&1 | Out-File -FilePath '$log' -Append -Encoding utf8
+}
+exit `$LASTEXITCODE
+"@ | Set-Content -Path $script -Encoding utf8
+
+  $elevated = $null
+  try {
+    $elevated = Start-Process powershell -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',$script) -Verb RunAs -Wait -PassThru
+  } catch {
+    Write-Host "ERROR: Windows permission was declined, so this PC could not be set up."
+    Write-Host "Run this again, and choose Yes when Windows asks for permission."
+    exit 1
+  }
+  $report = ''
+  try { $report = [IO.File]::ReadAllText($log) } catch {}
+  if ($report) { Write-Host $report }
+
+  # A distribution registered by --install appears in the list immediately;
+  # what can lag is being able to LAUNCH it (first start of a fresh distro).
+  # No distribution in the list will not appear by waiting.
+  $distros = @()
+  try { $distros = (wsl -l -q) | Where-Object { $_ -and $_.Trim() } } catch {}
+  if ($distros) {
+    for ($i = 0; $i -lt 30; $i++) {
+      if (Test-WslLaunches) {
+        Write-Host "This PC is ready to continue."
+        $global:FreshWsl = $true
+        return
+      }
+      Start-Sleep -Seconds 2
+    }
+  }
+
+  if ($elevated -and $elevated.ExitCode -ne 0 -and -not $distros) {
+    Write-Host "ERROR: Windows could not add the feature this needs."
+    Write-Host "Check your internet connection and try again - it is safe to re-run."
+    Write-Host "If it keeps failing, run this in an Administrator PowerShell, restart, and re-run this script:"
+    Write-Host "  wsl --install"
+    exit 1
+  }
+
+  Write-Host "This PC needs to restart to finish getting ready."
+  Write-Host "Restart this PC, then try again - setup continues on its own."
+  exit 1
+}
+
 function Ensure-ContainerRuntime {
   if (Test-NativeDockerReady) { return }
 
@@ -664,12 +746,7 @@ function Ensure-ContainerRuntime {
 
   $distros = @()
   try { $distros = (wsl -l -q) | Where-Object { $_ -and $_.Trim() } } catch {}
-  if (-not $distros) {
-    Write-Host "ERROR: WSL is present but no Linux distribution is installed."
-    Write-Host "Run this in PowerShell, then reboot and re-run this script:"
-    Write-Host "  wsl --install"
-    exit 1
-  }
+  if (-not $distros) { Install-WindowsSubsystem }
 
   # Already-running engine inside WSL? (Try as the default user, then as root.)
   if (Test-WslDockerReady) { Use-WslDocker; return }
@@ -679,17 +756,27 @@ function Ensure-ContainerRuntime {
 
   # One-time provisioning begins here. The line below is a milestone
   # marker the app watches for (parity with the .sh launchers' one-time
-  # "Setting up this Mac" moment).
-  Write-Host "Setting up this PC - a one-time step that runs on its own ..."
+  # "Setting up this Mac" moment) — printed at most once per run, since a
+  # fresh WSL install above already announced it.
+  if (-not $global:SetupAnnounced) {
+    Write-Host "Setting up this PC - a one-time step that runs on its own ..."
+    $global:SetupAnnounced = $true
+  }
 
   # Is the engine installed inside WSL at all?
   $dockerInWsl = $false
   try { wsl -e sh -c "command -v docker" *> $null; $dockerInWsl = ($LASTEXITCODE -eq 0) } catch {}
 
   if (-not $dockerInWsl) {
-    Write-Host "The Docker engine is not installed inside WSL yet."
-    $ans = Read-Host "Install it now inside your WSL distribution? (Y/n)"
-    if ($ans -and $ans -notmatch '^(?i:y)') { Write-Host "Cancelled. A container runtime is required to continue."; exit 1 }
+    # A distribution THIS run just installed is ours — provision it without
+    # asking (the mac's zero-prerequisite bootstrap never asks either). A
+    # pre-existing distribution belongs to whoever set it up, so the
+    # question stays for that case.
+    if (-not $global:FreshWsl) {
+      Write-Host "The Docker engine is not installed inside WSL yet."
+      $ans = Read-Host "Install it now inside your WSL distribution? (Y/n)"
+      if ($ans -and $ans -notmatch '^(?i:y)') { Write-Host "Cancelled. A container runtime is required to continue."; exit 1 }
+    }
     Write-Host "Installing the Docker engine inside WSL (this can take a few minutes)..."
     wsl -u root -e sh -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io"
     if ($LASTEXITCODE -ne 0) {
