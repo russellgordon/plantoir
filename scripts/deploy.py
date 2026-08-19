@@ -346,7 +346,7 @@ def netlify_api(method: str, path: str, token: str, payload: dict | None = None,
         body = json.dumps(payload).encode("utf-8")
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, data=body) as resp:
+        with urllib.request.urlopen(req, data=body, timeout=60) as resp:
             raw = resp.read()
             if not raw:
                 return {}
@@ -771,29 +771,44 @@ def _upload_required_files(deploy_id: str, token: str, root: Path, required_shas
     Only one path per required digest is necessary.
     """
     if not required_shas:
-        print(" No file uploads needed (all content already present on Netlify).")
+        print(" No file uploads needed (all content already present on Netlify).", flush=True)
         return
-    uploaded = 0
+
+    items_to_upload = []
     for sha in required_shas:
         pairs = sha_to_pairs.get(sha) or []
         if not pairs:
-            print(f"⚠️ Netlify requested unknown digest {sha[:8]}…; skipping.")
+            print(f"⚠️ Netlify requested unknown digest {sha[:8]}…; skipping.", flush=True)
             continue
         remote_path, local_rel = pairs[0]
         local_file = root / local_rel
         if not local_file.exists():
-            print(f"⚠️ Missing local file for {remote_path}; skipping.")
+            print(f"⚠️ Missing local file for {remote_path}; skipping.", flush=True)
             continue
-        # Encode remote path for URL; escape reserved chars safely
         encoded_path = urllib.parse.quote(remote_path.lstrip("/"), safe="/")
-        with local_file.open("rb") as f:
+        items_to_upload.append((encoded_path, local_file))
+
+    uploaded = 0
+    total = len(items_to_upload)
+    import concurrent.futures
+
+    def _upload_one(item):
+        enc_path, loc_file = item
+        with loc_file.open("rb") as f:
             data = f.read()
         headers = {"Content-Type": "application/octet-stream"}
-        netlify_api("PUT", f"/deploys/{deploy_id}/files/{encoded_path}", token, headers=headers, data=data)
-        uploaded += 1
-        if uploaded % 25 == 0:
-            print(f" …uploaded {uploaded}/{len(required_shas)} required files")
-    print(f"⬆️ Uploaded {uploaded} file(s) required by Netlify.")
+        netlify_api("PUT", f"/deploys/{deploy_id}/files/{enc_path}", token, headers=headers, data=data)
+
+    max_workers = min(10, max(1, len(items_to_upload)))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_upload_one, item): item for item in items_to_upload}
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
+            uploaded += 1
+            if uploaded % 25 == 0 or uploaded == total:
+                print(f" …uploaded {uploaded}/{total} required files", flush=True)
+
+    print(f"⬆️ Uploaded {uploaded} file(s) required by Netlify.", flush=True)
 
 # ---------- Diagnostics (new) ----------
 _IMG_EXT  = {"jpg","jpeg","png","gif","webp","svg","bmp","tiff","ico","avif"}
