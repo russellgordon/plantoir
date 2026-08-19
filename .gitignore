@@ -17,8 +17,10 @@ windows-app/**/obj/
 .claude/*
 !.claude/skills/
 
-# Windows release bundles (publish.ps1 output)
+# Release bundles (publish output)
 windows-app/dist/
+mac-app/dist/
+mac-app/build/
 
 # llama.cpp builds, fetched by Vendor/fetch-llama scripts.
 # ~25-35 MB of build output; the scripts pin the version.

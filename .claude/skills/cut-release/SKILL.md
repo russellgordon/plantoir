@@ -15,14 +15,18 @@ this skill automates its steps 5–6 and the note-writing.
 1. Last release: `git describe --tags --abbrev=0` (if no tag exists,
    this is the first release — summarize the product, not the delta).
 2. The story since: `git log <last-tag>..HEAD --pretty=format:'%s%n%b%n---'`
-3. The bundle(s) to attach — normally `windows-app/dist/Plantoir-win-x64.zip`
-   freshly produced by `publish.ps1 -Sign` (confirm with the user that
-   the SIGNED bundle exists; never attach an unsigned one to a public
-   release). Compute each asset's hash yourself:
-   `(Get-FileHash <zip> -Algorithm SHA256).Hash.ToLower()` — from the
-   EXACT file being uploaded, never trusted from memory or logs.
-   Asset names are LOAD-BEARING: `Plantoir-win-x64.zip` and
-   `Plantoir-macOS.zip`, exactly — plantoir.app's download links resolve
+3. The bundle(s) to attach:
+   - `mac-app/dist/Plantoir-macOS.dmg` (freshly built & notarized by `mac-app/publish.sh -Sign`)
+   - `windows-app/dist/PlantoirSetup.exe` (freshly built & signed by `publish.ps1 -Sign`)
+   - (Optional) `windows-app/dist/Plantoir-win-x64.zip` (portable edition)
+   
+   Confirm with the user that the SIGNED & NOTARIZED bundles exist; never attach
+   an unsigned one to a public release. Compute each asset's hash yourself:
+   `shasum -a 256 <asset>` or `(Get-FileHash <asset> -Algorithm SHA256).Hash.ToLower()`
+   from the EXACT file being uploaded, never trusted from memory or logs.
+   
+   Asset names are LOAD-BEARING: `Plantoir-macOS.dmg` and `PlantoirSetup.exe`
+   (and `Plantoir-win-x64.zip`), exactly — plantoir.app's download links resolve
    `releases/latest/download/<asset-name>`, so a renamed asset silently
    breaks the site. Refuse to attach an asset under any other name.
 4. Confirm `<Version>` in `windows-app/Plantoir/Plantoir.csproj` matches
@@ -31,7 +35,7 @@ this skill automates its steps 5–6 and the note-writing.
    must carry the same version. `RELEASING.md` says the two move
    in lockstep — one product, one version series — so a mismatch is a stop,
    not a note. (`project.yml` is the source; the Xcode project is generated
-   from it, so edit `project.yml` and re-run `xcodegen`.)
+   from it, so edit `project.yml` and re-run `xcodegen generate`.)
 6. **Confirm the release target repository (`russellgordon/plantoir`).**
    The remote `origin` and `website/site.json` (`repo_url`) both point to
    `github.com/russellgordon/plantoir`. Confirm this with the user, then pass
@@ -63,7 +67,8 @@ Style rules, in order of importance:
 
   | File | Size | SHA-256 |
   | --- | --- | --- |
-  | Plantoir-win-x64.zip | 58.5 MB | `043a1c…` |
+  | Plantoir-macOS.dmg | 49.0 MB | `5708cc…` |
+  | PlantoirSetup.exe | 62.1 MB | `043a1c…` |
 
   Below the table, one line: "The SHA-256 lets your IT department verify
   the download is genuine."
@@ -73,89 +78,39 @@ publishing anything.
 
 ## Publish (after approval)
 
-1. Update the site's version line. It is NOT in the HTML any more —
-   `site/` is generated. Set `version` and `released` in
-   `website/site.json`, then rebuild and check:
+1. **Create GitHub Release as DRAFT and upload assets first.**
+   This avoids the 404 race condition where Netlify deploys the website before
+   GitHub finishes receiving the binary assets:
 
+```bash
+# Create draft release
+gh release create v<version> --draft -R <owner/repo> \
+  --title "Plantoir <version>" --notes-file <notes.md>
+
+# Upload all assets
+gh release upload v<version> <assets...> -R <owner/repo>
+
+# Publish the release (un-draft)
+gh release edit v<version> --draft=false -R <owner/repo>
 ```
+
+2. **Update and deploy plantoir.app**:
+   Set `version` and `released` in `website/site.json`, redraw brand images,
+   rebuild, and push:
+
+```bash
+# Redraw brand images if needed
+python scripts/brand_images.py --install-card
+
+# Rebuild site
 python3 website/build.py
 python3 website/build.py --check
+
+# Commit and push (Netlify deploys automatically)
+git add website/site.json site/ brand/
+git commit -m "Update website for v<version> release"
+git push origin main
 ```
-
-   Commit `website/site.json` and the regenerated files under `site/`
-   together. If `--check` reports a screenshot that has never been taken,
-   stop and say so rather than publishing a page with a placeholder on
-   it; `website/README.md` explains the capture run.
-
-   **This rebuild ALWAYS happens.** It is what puts the new version and
-   the new download URLs on the page, and it takes seconds.
-
-2. **Ask whether to re-shoot the screenshots. The default is no.**
-
-   Capturing them drives the real app for the better part of an hour,
-   needs the Mac left alone, and briefly switches the machine's
-   appearance. It is worth it when the interface a teacher sees has
-   visibly changed since the last release, and a waste of an hour when
-   it has not — most releases do not need it.
-
-   Help the user decide rather than making them guess. Look at what has
-   changed in the views since the last tag:
-
-```
-git diff --stat <last-tag>..HEAD -- mac-app/QuartzTeachers/Views   support/example_content
-```
-
-   Say what you find — "nothing under Views has changed since v1.2, so
-   the screenshots are still accurate" is an answer they can act on —
-   then ask. On a yes:
-
-```
-python3 website/shots/capture.py --app      # the app windows
-python3 website/shots/capture.py --sites    # the class websites
-```
-
-   Run only the half that changed: app-interface work needs `--app`,
-   changes to the example course content or to Quartz need `--sites`.
-   Look at the results before committing them, and commit them as their
-   own change rather than folding them into the release commit — a
-   screenshot that turns out wrong should be revertable without
-   unpicking the version bump.
-
-   Never run the bare `capture.py` with no flags during a release: it
-   also provisions courses and publishes the demo sites, which is
-   first-run setup rather than anything a release needs.
-3. Tag and release:
-
-```
-git tag v<version>
-git push origin main v<version>
-gh release create v<version> <assets...> -R <owner/repo> \
-  --title "Plantoir <version>" --notes-file <notes.md>
-```
-
-`-R <owner/repo>` is the repository settled in Gather step 6 — always
-explicit, never left to the remote.
-
-The push redeploys plantoir.app automatically (Netlify watches `site/`),
-and the evergreen download links now serve the new assets — nothing
-manual remains for the site. Remind the user only of: the mac asset (see
-below), and — once WinSparkle lands — the appcast entry.
-
-**The mac asset is made BY HAND today.** There is no mac packaging or
-signing script in this repository — `publish.ps1` has no counterpart, and
-`mac-app/Vendor/fetch-llama.sh` is the only script on that side. So
-whoever builds `Plantoir-macOS.zip` archives and signs it themselves, and
-two things must be true before they do:
-
-- `mac-app/Vendor/llama` must be fetched first (`mac-app/Vendor/fetch-llama.sh`).
-  The binaries are gitignored, `project.yml` copies the folder into the
-  bundle as-is, and an empty folder builds without complaint — so an app
-  built on a fresh clone ships an assistant that cannot start.
-- the asset must be named exactly `Plantoir-macOS.zip`, per the rule in
-  Gather step 3.
-
-If no such bundle exists, do not invent one: publish the Windows asset
-alone and say the mac asset is outstanding.
 
 **Redraw the brand images in the same commit as the version line.** After
 editing `website/site.json` and rebuilding, and before tagging, run:

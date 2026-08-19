@@ -34,15 +34,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    to cut.
 3. **Build the signed Windows bundle**: `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
-   remedy if anything is missing. Output lands in `windows-app\dist\`.
-4. **Try it like a teacher**: extract the zip on a machine (or at least a fresh
-   folder) and run it. Check the signature on **both** executables.
+   remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
+   (and `Plantoir-win-x64.zip`).
+4. **Build the signed & notarized macOS bundle**:
+   `cd mac-app; ./publish.sh -Sign`. Output lands in `mac-app/dist/Plantoir-macOS.dmg`.
 5. **Tell Claude "cut the release."** It drafts teacher-friendly notes, adds the
-   SHA-256 table, shows you the draft, and only after your OK: updates the
-   site's version line, redraws the brand images, tags and publishes.
-6. **The mac asset ships on the same release**, named exactly
-   `Plantoir-macOS.zip` — see "The macOS asset" below, because nothing in this
-   repository builds it for you yet.
+   SHA-256 table, creates the GitHub Draft Release, uploads the assets, publishes
+   the release, updates the site's version line, redraws the brand images, and pushes to `main`.
 
 ## The checklist, with the reasons
 
@@ -71,123 +69,47 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 
        winget install --exact --id Microsoft.AzureCLI   # then open a NEW terminal
        dotnet tool install --global sign --prerelease
+       winget install --exact --id JRSoftware.InnoSetup
 
    Per session: `az login` (as the Azure signing account). The script preflights
-   all three — missing tool or stale login fails in seconds with the remedy,
-   before the minutes-long build. It signs with an RFC 3161 timestamp and
-   refuses to package a signature without one.
+   the tools and login, signs the binaries, compiles `installer.iss`, and signs
+   `dist\PlantoirSetup.exe` with an RFC 3161 timestamp.
 
-   **It publishes TWO projects.** `Plantoir.csproj` and `Plantoir.Mcp.csproj`:
-   `plantoir-mcp.exe` is copied in beside `Plantoir.exe`, and **four** binaries
-   are signed — `Plantoir.exe`, `Plantoir.dll`, `Plantoir.Core.dll`,
-   `plantoir-mcp.exe`. That copy is load-bearing: without it the assistant
-   reports that Plantoir's own tools cannot be found, on a teacher's machine
-   only. An unsigned executable sitting beside signed ones is also exactly what
-   SmartScreen complains about.
+   Output: **`dist/PlantoirSetup.exe`** (and portable `dist/Plantoir-win-x64.zip`) + SHA-256.
 
-   Output: **`dist/Plantoir-win-x64.zip`** + its SHA-256. The name is
-   deliberately **unversioned** — see the asset-name rule in step 5.
-4. **Verify like a teacher** (the only test that reproduces what they see): copy
-   the zip to a machine — or at least a fresh folder — download it through a
-   browser if possible, extract, then right-click **both** `Plantoir.exe` and
-   `plantoir-mcp.exe` → Properties → Digital Signatures → signature OK,
-   timestamp present, no street address in the certificate subject.
+4. **Build the signed macOS bundle**:
+
+       ./publish.sh -Sign
+
+   One-time tooling on the Mac:
+   - Developer ID Application certificate installed in Keychain Access
+   - Credentials stored in notarytool: `xcrun notarytool store-credentials "notarytool-profile" --apple-id <email> --team-id <team-id> --password <app-specific-password>`
+
+   The script builds Release, signs dylibs and executables bottom-up with Hardened Runtime,
+   creates a drag-and-drop DMG, signs the DMG, notarizes with Apple, staples the ticket,
+   and verifies Gatekeeper acceptance.
+
+   Output: **`mac-app/dist/Plantoir-macOS.dmg`** + SHA-256.
+
 5. **Tag and release** — ask Claude to "cut the release": the `cut-release`
-   skill (`.claude/skills/cut-release/`) drafts teacher-friendly notes from the
-   commits since the last tag (grouped New / Improved / Fixed, internal work
-   omitted), appends a Downloads table with each asset's size and SHA-256
-   computed from the exact files being uploaded, shows the draft for approval,
-   then tags and publishes via `gh release create`. Manual equivalent:
-
-       git tag v<version>
-       git push origin main v<version>
-       gh release create v<version> dist/Plantoir-win-x64.zip \
-         -R <owner/repo> --title "Plantoir <version>" --notes "..."
+   skill (`.claude/skills/cut-release/`) drafts teacher-friendly notes, computes
+   SHA-256 hashes, creates a GitHub Draft Release, uploads the assets, publishes
+   the release, updates `website/site.json`, redraws the brand card, rebuilds `site/`,
+   and pushes to `main`.
 
    **Asset names are LOAD-BEARING and must never change**:
-   `Plantoir-win-x64.zip` (publish.ps1 emits exactly this) and
-   `Plantoir-macOS.zip`. plantoir.app's download cards point at
+   `PlantoirSetup.exe` and `Plantoir-macOS.dmg`. plantoir.app's download cards point at
    `releases/latest/download/<asset-name>` — GitHub's evergreen URL that serves
    the newest release's asset, so teachers click Windows or macOS and get the
-   file, no GitHub in sight. Renaming an asset silently breaks the site's
-   download link, which is why the zip carries no version number.
+   file, no GitHub in sight.
+
 6. **plantoir.app updates itself**: the site lives in `site/` in this repo, and
-   Netlify deploys it on every push (one-time setup: in the Netlify UI, link the
-   site to the GitHub repo, publish directory `site/`, no build command).
-
-   **`site/` is BUILT, not hand-edited.** The sources are in `website/`; the
-   version and release month are two fields in `website/site.json`. Cutting the
-   release edits those, runs
-
-       python3 website/build.py
-
-   and commits both `website/site.json` and the regenerated `site/`. Editing
-   the built HTML directly works right up until the next build overwrites it.
-   `python3 website/build.py --check` reports any page that still refers to a
-   screenshot nobody has taken — run it before tagging.
-
-   **The rebuild always happens; the SCREENSHOTS are a separate decision.**
-   The two jobs have opposite costs. Rebuilding is seconds and is what puts the
-   new version and the new download URLs on the page, so it happens every time.
-   Capturing screenshots drives the real app for the better part of an hour,
-   needs the Mac left alone, and briefly switches its appearance — so it is an
-   answer to a question, never automatic:
-
-       python3 website/shots/capture.py --app      # the app windows
-       python3 website/shots/capture.py --sites    # the class websites
-
-   Re-shoot when the interface a teacher SEES has visibly changed since the
-   last release, and only the half that changed. `git diff --stat <last-tag>..HEAD
-   -- mac-app/QuartzTeachers/Views support/example_content` answers that in one
-   line. Most releases need neither.
-
-   Commit new screenshots as their own change rather than folding them into the
-   release commit, so one that turns out wrong can be reverted without
-   unpicking the version bump. Do not run the bare `capture.py` with no flags
-   during a release — it also provisions courses and publishes the demo sites,
-   which is first-run setup. See `website/README.md`.
-
-   Cutting the release also redraws the brand images and installs the card:
-
-       python scripts/brand_images.py --install-card
-
-   Safe to run every time: the output is deterministic, so unless the icon,
-   palette or tagline changed this leaves the working tree clean and there is
-   nothing to commit. See **Brand images** below.
-7. **Update the WinSparkle appcast** once in-app updates land: add an `<item>`
-   for the new version to **`site/appcast-windows.xml`**, pointing at the GitHub
-   release asset URL. The mac's Sparkle feed is a SEPARATE file,
-   `site/appcast-macos.xml` — per-platform names from the start, so two update
-   feeds can never collide.
-
-## The macOS asset
-
-**Nothing in this repository builds it.** Windows has `publish.ps1`; the mac
-side has no packaging or signing script at all, so today the mac asset is
-produced by hand and named exactly `Plantoir-macOS.zip`. Two things to know
-before building one:
-
-- **`mac-app/Vendor/llama` must be fetched first** (`./Vendor/fetch-llama.sh`).
-  It is gitignored, and `xcodegen generate` fails without it — but a bundle
-  built from a stale project would ship an assistant with no engine.
-- The mac app must be signed and notarised for a teacher to open it without
-  ceremony; that is not automated here either.
-
-Until this is scripted, it is legitimate to ship a Windows-only release and say
-so plainly in the notes — but the mac download card on plantoir.app should not
-advertise a file that does not exist.
+   Netlify deploys it on every push.
 
 ## Bundle format
 
-Currently a plain zip of the self-contained publish folder (the ~58 MB
-zipped / ~157 MB installed figures predate `plantoir-mcp.exe` being bundled —
-re-measure after a `publish.ps1` run; no .NET or Windows App SDK install needed —
-everything travels in the folder). The planned move to WinSparkle
-auto-updates pairs naturally with an Inno Setup installer
-(`PlantoirSetup-<version>.exe`): WinSparkle downloads and RUNS the
-update it fetches, which a zip cannot do. When that lands, `publish.ps1`
-gains an installer step after signing (and the installer itself gets
-signed too); the zip can remain as a portable alternative.
+- **macOS**: A styled drag-and-drop disk image (`Plantoir-macOS.dmg`) containing `Plantoir.app` and an `/Applications` shortcut. The DMG is code-signed, notarized by Apple, and stapled with its ticket for offline Gatekeeper verification.
+- **Windows**: An Inno Setup installer (`PlantoirSetup.exe`) configured for `PrivilegesRequired=lowest` (per-user installation to `%LOCALAPPDATA%\Programs\Plantoir`, requiring zero administrator rights). A portable zip (`Plantoir-win-x64.zip`) is also emitted.
 
 ## Brand images
 

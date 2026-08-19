@@ -101,12 +101,45 @@ if ($Sign) {
     Write-Host "Skipping signing (-Sign not given) - fine for local testing only." -ForegroundColor Yellow
 }
 
-# ---- Package ----------------------------------------------------------------
-# STABLE asset name, deliberately unversioned: plantoir.app's download link
-# is releases/latest/download/Plantoir-win-x64.zip, which GitHub resolves to
-# the newest release only when every release names the asset identically.
-# The version lives inside (exe metadata, About panel) and in the tag.
+# ---- Package: Inno Setup Installer & Portable Zip ---------------------------
 New-Item -ItemType Directory -Force "dist" | Out-Null
+
+# 1. Inno Setup Installer (Primary teacher distribution)
+$iscc = (Get-Command iscc -ErrorAction SilentlyContinue)?.Source
+if (-not $iscc) {
+    $possiblePath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+    if (Test-Path $possiblePath) { $iscc = $possiblePath }
+}
+
+if ($iscc) {
+    Write-Host "Compiling Inno Setup installer via $iscc..." -ForegroundColor Green
+    & $iscc "/DAppVersion=$version" "installer.iss"
+    if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
+
+    $installer = "dist\PlantoirSetup.exe"
+    if ($Sign -and (Test-Path $installer)) {
+        Write-Host "Signing $installer via $SigningAccount/$SigningProfile..." -ForegroundColor Green
+        sign code trusted-signing `
+            --trusted-signing-endpoint $SigningEndpoint `
+            --trusted-signing-account $SigningAccount `
+            --trusted-signing-certificate-profile $SigningProfile `
+            --timestamp-url $TimestampUrl `
+            $installer
+        if ($LASTEXITCODE -ne 0) { throw "Installer signing failed" }
+    }
+
+    if (Test-Path $installer) {
+        $instHash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
+        $instSize = '{0:N1} MB' -f ((Get-Item $installer).Length / 1MB)
+        Write-Host ""
+        Write-Host "Installer: $installer ($instSize)" -ForegroundColor Green
+        Write-Host "SHA-256:   $instHash"
+    }
+} else {
+    Write-Host "Inno Setup (iscc) not found - skipping installer compilation. (Install: winget install --exact --id JRSoftware.InnoSetup)" -ForegroundColor Yellow
+}
+
+# 2. Portable Zip
 $zip = "dist\Plantoir-win-x64.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Compress-Archive -Path "$publishDir\*" -DestinationPath $zip
@@ -114,7 +147,7 @@ $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
 $size = '{0:N1} MB' -f ((Get-Item $zip).Length / 1MB)
 
 Write-Host ""
-Write-Host "Bundle:  $zip ($size)" -ForegroundColor Green
-Write-Host "SHA-256: $hash"
+Write-Host "Bundle:    $zip ($size)" -ForegroundColor Green
+Write-Host "SHA-256:   $hash"
 Write-Host ""
-Write-Host "Next: tag v$version, create the GitHub release, attach the zip."
+Write-Host "Next: tag v$version, create the GitHub release, attach the installer and zip."
