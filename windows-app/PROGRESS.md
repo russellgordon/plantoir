@@ -92,7 +92,8 @@ plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
   (branch `windows-native-toolchain`, 2026-08-19). Run
   `Vendoretch-runtime.ps1` once before building - it fetches Node 20,
   Python 3.11 embeddable, patched Quartz with win-x64 node_modules, wrangler
-  and the emoji font into `Vendoruntime` (~600 MB, gitignored), which the
+  and the emoji font into `Vendor
+untime` (~600 MB, gitignored), which the
   build robocopy-mirrors beside the app. The launchers run natively whenever
   `PLANTOIR_RUNTIME` (set by `ScriptRunner`) or the installed app's own
   runtime folder exists; without it they still take the WSL2/Docker path,
