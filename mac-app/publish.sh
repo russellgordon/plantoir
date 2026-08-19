@@ -169,13 +169,13 @@ if command -v create-dmg >/dev/null 2>&1; then
     --no-internet-enable \
     "${DMG_PATH}" \
     "${DMG_STAGE}" || {
-      echo "   create-dmg exited non-zero, falling back to native hdiutil..."
+      echo "   create-dmg exited non-zero, falling back to native hdiutil (APFS)..."
       rm -f "${DMG_PATH}"
-      hdiutil create -volname "Plantoir" -srcfolder "${DMG_STAGE}" -ov -format UDZO "${DMG_PATH}"
+      hdiutil create -fs APFS -volname "Plantoir" -srcfolder "${DMG_STAGE}" -ov -format UDZO "${DMG_PATH}"
     }
 else
-  echo "   Using native hdiutil to create UDZO disk image..."
-  hdiutil create -volname "Plantoir" -srcfolder "${DMG_STAGE}" -ov -format UDZO "${DMG_PATH}"
+  echo "   Using native hdiutil to create APFS disk image..."
+  hdiutil create -fs APFS -volname "Plantoir" -srcfolder "${DMG_STAGE}" -ov -format UDZO "${DMG_PATH}"
 fi
 
 # ---- 6. Sign DMG, Notarize & Staple ------------------------------------------
