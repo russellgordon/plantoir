@@ -684,6 +684,13 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
         project_name = marker["name"]
         print(f" Using this section's existing Cloudflare project: {project_name}")
     else:
+        # Same rule as the Netlify path: the surname is asked for only when
+        # a NEW project is being named, never on a repeat deploy.
+        if teacher_last_name is None:
+            try:
+                teacher_last_name = get_or_prompt_teacher_last_name()
+            except Exception:
+                teacher_last_name = None
         project_name = suggest_pages_name(course_code, section, teacher_last_name)
         project = ensure_pages_project(token, account_id, project_name)
         project_name = project.get("name") or project_name
@@ -975,9 +982,14 @@ def main():
     # Determine course dir (for stable marker)
     course_dir = section_dir.parent.parent  # .../<COURSE>/.merged_output/section#
 
-    # Capture teacher last name for naming
+    # The surname exists ONLY to name a NEW site, so it is merely LOADED
+    # here — never prompted for. A deploy to a section that already has its
+    # site must ask no questions at all: prompting eagerly meant every
+    # deploy on a machine with no saved surname stopped for input, and in
+    # the GUI a missed or cancelled dialog read as "deploys are broken".
+    # The prompt happens at the one place a name is actually being chosen.
     try:
-        teacher_last_name = get_or_prompt_teacher_last_name()
+        teacher_last_name = load_teacher_last_name()
     except Exception:
         teacher_last_name = None
 
@@ -1034,6 +1046,14 @@ def main():
                     raise
 
     if not site_marker:
+        # A site is about to be NAMED — the one moment the surname is
+        # useful. On a terminal this asks (once, then it is saved); anywhere
+        # non-interactive it stays None and the name simply omits it.
+        if teacher_last_name is None:
+            try:
+                teacher_last_name = get_or_prompt_teacher_last_name()
+            except Exception:
+                teacher_last_name = None
         team_slug = args.team  # <-- use CLI flag; no interactive prompt
         if team_slug:
             print(f" Using Netlify team: {team_slug}")

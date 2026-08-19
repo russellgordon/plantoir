@@ -109,6 +109,34 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Deploys ask for the teacher's surname only when NAMING a new site, never
+  on a repeat deploy** (Shared Python, 2026-08-19).
+  - **What was fixed**: `deploy.py` called `get_or_prompt_teacher_last_name()`
+    unconditionally at the top of every deploy. On a machine with no saved
+    surname that stopped EVERY deploy for input — including deploys to a
+    section whose site already existed and needed no name at all. In the GUI
+    the question surfaces as a dialog, but a missed or cancelled dialog read
+    as "deploys are broken", and in any non-interactive context the answer
+    was silently None anyway. Seen live during Russell's presentation prep:
+    a fresh workspace's first app deploy stalled at the surname question and
+    never reached site creation.
+  - **The fix**: the surname is LOADED silently at the top
+    (`load_teacher_last_name()`), and `get_or_prompt_teacher_last_name()`
+    runs only at the two places a NEW name is being chosen — the Netlify
+    `not site_marker` branch and the Cloudflare no-marker branch. A repeat
+    deploy therefore asks nothing anywhere: GUI, MCP, scheduled, or shell.
+    Verified live on Windows: repeat deploy with no saved surname and no
+    profile.json completed with zero prompts and wrote no profile.
+  - **Rejected**: keeping the eager prompt and teaching every caller to
+    pre-seed profile.json (fixes one machine at a time — the failure just
+    met is exactly that patch not scaling); prompting but defaulting after a
+    timeout (a deploy that behaves differently depending on how fast you
+    answer is worse than one that never asks).
+  - **Mac impact**: shared `deploy.py` — rebuild the mac app so its bundled
+    toolchain carries it. The mac's own GUI has the same exposure (its
+    launcher runs on a pseudo-terminal, so the eager prompt fired there
+    too).
+
 - **Two corrections to the release-packaging sync, made while integrating it
   on Windows** (Windows, 2026-08-19, follows `6326c8c9`/`1117e47c`).
   - **`windows-app/publish.ps1` could not START on Windows.** The new
