@@ -204,6 +204,31 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         SchedulePromptCheck();
     }
 
+    /// <summary>
+    /// Make a runner that never launched anything LOOK like one in the middle
+    /// of a task, so the marketing captures photograph the real progress view
+    /// instead of a blank one.
+    ///
+    /// Capture-only: nothing in the product calls it. Without it the staged
+    /// window rendered neither branch of <c>TaskProgressView.Render</c> — no
+    /// step counter and no plain-language line — which made the Windows
+    /// "progress" screenshot contradict its own caption ("Progress is
+    /// described in words") by showing no words at all. The quiet seconds are
+    /// backdated deliberately: four is what makes the view show its
+    /// "still working…" timer, which is the state worth photographing.
+    /// </summary>
+    public void StageAsRunningForCapture(IReadOnlyList<TaskMilestone> milestones,
+                                         string output,
+                                         int quietSeconds = 4)
+    {
+        Milestones = milestones;
+        IsRunning = true;
+        StartedAt = DateTime.UtcNow;
+        ReceiveOutput(output);
+        LastOutputAt = DateTime.UtcNow.AddSeconds(-quietSeconds);
+        NotifyRunState();
+    }
+
     // ---- Question detection ---------------------------------------------
 
     /// <summary>

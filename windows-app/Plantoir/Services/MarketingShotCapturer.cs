@@ -109,6 +109,46 @@ public static class MarketingShotCapturer
         }
     }
 
+    /// <summary>
+    /// Open one Plantoir window, staged mid-deploy, and leave it on screen.
+    ///
+    /// This is the only capture that is NOT a RenderTargetBitmap: the hero
+    /// composite sets Plantoir beside Obsidian and Edge, and a visual-tree
+    /// render has no title bar, so it would be the one card in the cascade
+    /// with no window chrome. The Python harness photographs this window off
+    /// the screen instead, which is also how it takes the other two.
+    ///
+    /// Nothing here writes settings or joins App's window list -- the process
+    /// is killed once the picture is taken, and a remembered-window list that
+    /// grew a marketing window would reopen it on the teacher's next launch.
+    /// </summary>
+    public static async Task ShowHeroWindowAsync(string themeName)
+    {
+        var theme = themeName.Equals("dark", StringComparison.OrdinalIgnoreCase)
+            ? ElementTheme.Dark : ElementTheme.Light;
+
+        string workspacePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Teaching");
+        ProvisionDemoWorkspace(workspacePath);
+
+        var window = new MainWindow(workspacePath, null);
+        if (window.Content is FrameworkElement root) root.RequestedTheme = theme;
+        window.Activate();
+
+        await Task.Delay(700);
+        window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 1);
+        await Task.Delay(500);
+
+        var runner = new ScriptRunner(System.Threading.SynchronizationContext.Current);
+        var progressView = new TaskProgressView();
+        progressView.RequestedTheme = theme;
+        progressView.Show(runner, "Deploying ENG2D-S1");
+        window.DetailPresenter.Content = progressView;
+        runner.StageAsRunningForCapture(TaskMilestones.Deploy, DeployTranscript);
+
+        Log($"Hero window staged in {themeName}; waiting to be photographed.");
+    }
+
     private static void ProvisionDemoWorkspace(string workspacePath)
     {
         if (Directory.Exists(workspacePath))
@@ -193,17 +233,58 @@ public static class MarketingShotCapturer
             {
                 ["course_name"] = courseName,
                 ["course_code"] = code,
-                ["section_count"] = 2,
+                // NOT "section_count" -- no such key. The two apps and the
+                // Python both read num_sections/section_numbers, so a course
+                // written the other way silently came up with one section.
+                ["num_sections"] = 2,
+                ["section_numbers"] = new JArray(1, 2),
                 ["colour_scheme"] = scheme,
                 ["header_font"] = hFont,
                 ["body_font"] = bFont,
                 ["use_literal_grade_markers"] = false,
                 ["use_lcs_terminology"] = false,
-                ["deploy_target"] = "netlify",
-                ["deploy_site_name"] = $"{code.ToLowerInvariant()}-gordon-2026-27"
+                ["deploy_target"] = "netlify"
             };
             var config = CourseConfiguration.FromDictionary(configObj);
             config.Write(Path.Combine(courseTarget, "course_config.json"));
+
+            WriteNetlifyMarkers(courseTarget, code);
+        }
+    }
+
+    /// <summary>
+    /// Record which site each SECTION is published to, the way a real deploy
+    /// does -- ".netlify_sites/section&lt;n&gt;.json", which is what
+    /// build_site.py's resolve_section_domain and deploy.py's
+    /// load_netlify_marker actually read.
+    ///
+    /// This replaces a "deploy_site_name" key these fixtures used to write.
+    /// WINDOWS-HANDOFF.md asked this side to decide what that key should hold
+    /// under the per-section naming adopted on 2026-08-19
+    /// (<c>&lt;code&gt;-s&lt;n&gt;-2026-gordon</c>), on the grounds that the new
+    /// scheme names a section while the key sits in course-level config. The
+    /// answer is that the key was never real: it appears in no launcher, no
+    /// contract (contracts/file-formats.json lists the keys course_config.json
+    /// carries) and nowhere else in either app, so renaming it would have
+    /// looked like settling the question while changing nothing. The per-section
+    /// marker is where a section's address genuinely lives, so that is what
+    /// gets written.
+    /// </summary>
+    private static void WriteNetlifyMarkers(string courseDir, string code)
+    {
+        string markerDir = Path.Combine(courseDir, ".netlify_sites");
+        Directory.CreateDirectory(markerDir);
+        foreach (int section in new[] { 1, 2 })
+        {
+            string name = $"{code.ToLowerInvariant()}-s{section}-2026-gordon";
+            var marker = new JObject
+            {
+                ["name"] = name,
+                ["url"] = $"http://{name}.netlify.app",
+                ["ssl_url"] = $"https://{name}.netlify.app"
+            };
+            File.WriteAllText(Path.Combine(markerDir, $"section{section}.json"),
+                              marker.ToString());
         }
     }
 
@@ -333,6 +414,27 @@ public static class MarketingShotCapturer
         window.Close();
     }
 
+    /// <summary>
+    /// Enough launcher output to walk the preview milestones as far as
+    /// "Building your site…", which is the step worth photographing: far
+    /// enough in that the bar has moved, not so far that it reads as finished.
+    /// The strings are the MARKERS from <see cref="TaskMilestones.Preview"/> --
+    /// change one there and this stops advancing, which is the intended
+    /// coupling.
+    /// </summary>
+    private const string PreviewTranscript =
+        "Setting up this PC\nBuilding your website builder\nStarting container if needed\n"
+        + "Copying shared folders\nUpdated pageTitle\nInstalling dependencies\n";
+
+    /// <summary>
+    /// The deploy equivalent, stopped at "Connecting to Netlify…" -- the step
+    /// the hero composite shows, and the one that makes the picture say
+    /// "publishing" rather than "building".
+    /// </summary>
+    private const string DeployTranscript =
+        "Setting up this PC\nBuilding your website builder\nEnsuring container is running\n"
+        + "Deploying from local build\n";
+
     private static async Task CaptureProgressWindow(string workspacePath, ElementTheme theme, string outputPath)
     {
         var window = new MainWindow(workspacePath, null);
@@ -343,15 +445,17 @@ public static class MarketingShotCapturer
         window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 2);
         await Task.Delay(400);
 
-        // Stage progress view for preview build matching macOS progress shot
+        // Stage the progress view exactly as a real preview does. The runner
+        // has to LOOK like it is running, or Render() takes neither branch and
+        // the pane shows a bar with no words beside it -- which contradicts
+        // this shot's own caption ("Progress is described in words").
         var runner = new ScriptRunner(System.Threading.SynchronizationContext.Current);
         var progressView = new TaskProgressView();
         progressView.RequestedTheme = theme;
         progressView.Show(runner, "Preparing the preview of ENG2D-S2");
         window.DetailPresenter.Content = progressView;
 
-        runner.Milestones = TaskMilestones.Preview;
-        runner.ReceiveOutput("Setting up this PC\nBuilding your website builder\nEnsuring container is running\nStarting preview container\n");
+        runner.StageAsRunningForCapture(TaskMilestones.Preview, PreviewTranscript);
 
         await Task.Delay(600);
         await SaveWindowContentToPngAsync(window, outputPath);
@@ -384,14 +488,14 @@ public static class MarketingShotCapturer
         {
             ["course_name"] = "Grade 10 English",
             ["course_code"] = "ENG2D",
-            ["section_count"] = 1,
+            ["num_sections"] = 1,
+            ["section_numbers"] = new JArray(1),
             ["colour_scheme"] = "default",
             ["header_font"] = "serif",
             ["body_font"] = "sans-serif",
             ["use_literal_grade_markers"] = false,
             ["use_lcs_terminology"] = false,
-            ["deploy_target"] = "netlify",
-            ["deploy_site_name"] = "eng2d-gordon-2026-27"
+            ["deploy_target"] = "netlify"
         };
         var config = CourseConfiguration.FromDictionary(configObj);
         var course = new Course("ENG2D", Path.Combine(workspacePath, "courses", "ENG2D"), config);

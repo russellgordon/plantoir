@@ -75,6 +75,17 @@ public partial class App : Application
             return;
         }
 
+        // The hero composite needs a REAL window on screen, title bar and all,
+        // because the Python harness photographs it off the desktop beside
+        // Obsidian and Edge. So this mode stages the window and stops -- the
+        // harness takes the picture and kills the process.
+        string heroTheme = ArgumentAfter(cmdArgs, rawArgs, "--hero-window");
+        if (!string.IsNullOrEmpty(heroTheme))
+        {
+            _ = MarketingShotCapturer.ShowHeroWindowAsync(heroTheme);
+            return;
+        }
+
         // Windows has no system restoration: the remembered list is the
         // mechanism. Replay it when the preference asks; otherwise one
         // window, which shows the picker when no folder is remembered.
@@ -87,6 +98,25 @@ public partial class App : Application
         }
         foreach (var entry in remembered)
             OpenWindow(entry.Path, entry);
+    }
+
+    /// <summary>
+    /// The value following a command-line flag. Windows hands the same
+    /// arguments over twice -- once parsed in <c>Environment.GetCommandLineArgs</c>
+    /// and once as one raw string on <c>LaunchActivatedEventArgs</c> -- and
+    /// which one carries them depends on how the app was started, so both are
+    /// searched.
+    /// </summary>
+    private static string ArgumentAfter(string[] cmdArgs, string rawArgs, string flag)
+    {
+        int index = Array.IndexOf(cmdArgs, flag);
+        if (index >= 0 && index + 1 < cmdArgs.Length) return cmdArgs[index + 1].Trim('"');
+
+        if (!rawArgs.Contains(flag)) return "";
+        string[] parts = rawArgs.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        index = Array.IndexOf(parts, flag);
+        if (index >= 0 && index + 1 < parts.Length) return parts[index + 1].Trim('"');
+        return "";
     }
 
     public static MainWindow OpenWindow(string? folderPath, RememberedWindow? frame)
