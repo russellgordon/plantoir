@@ -28,25 +28,28 @@ WINDOW_CORNER_RADIUS_POINTS = 11
 
 
 def mask_window_corners(path: Path, width_in_points: int) -> Path:
-    """Make a window capture's four corners transparent.
+    """Make a window capture's four corners transparent with antialiasing."""
+    from PIL import ImageChops
 
-    The same result `screencapture -o` gives for a window: the window alone,
-    no shadow, and nothing of the desktop caught in the curve of a corner. A
-    hair more than the true radius is taken, because the pixels just inside
-    the arc are blended with the background too and a one-pixel dark fringe
-    is just as visible as the corner itself.
-    """
     with Image.open(path) as opened:
         image = opened.convert("RGBA")
 
     scale = max(1, round(image.width / width_in_points)) if width_in_points else 2
-    radius = WINDOW_CORNER_RADIUS_POINTS * scale + scale
+    radius = WINDOW_CORNER_RADIUS_POINTS * scale
 
-    mask = Image.new("L", image.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [(0, 0), (image.width - 1, image.height - 1)], radius=radius, fill=255
+    # 4x supersampling ensures smooth subpixel antialiasing at the corner curves
+    ss_scale = 4
+    big_size = (image.width * ss_scale, image.height * ss_scale)
+    big_mask = Image.new("L", big_size, 0)
+    ImageDraw.Draw(big_mask).rounded_rectangle(
+        [(0, 0), (big_size[0] - 1, big_size[1] - 1)],
+        radius=radius * ss_scale,
+        fill=255,
     )
-    image.putalpha(mask)
+    mask = big_mask.resize(image.size, Image.Resampling.LANCZOS)
+
+    combined_alpha = ImageChops.multiply(image.split()[3], mask)
+    image.putalpha(combined_alpha)
     image.save(path, format="PNG")
     return path
 

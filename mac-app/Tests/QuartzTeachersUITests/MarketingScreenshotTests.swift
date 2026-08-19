@@ -100,10 +100,69 @@ class MarketingScreenshotCase: XCTestCase {
         // which has a tooltip of its own.
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.04, dy: 0.75)).hover()
         Thread.sleep(forTimeInterval: 1.2)
+
+        // Capture the native window directly via screencapture -o -l (the programmatic
+        // equivalent of Command-Shift-4, Spacebar, Option-Click). This captures the window's
+        // native transparent rounded corners and subpixel anti-aliasing directly from CoreGraphics,
+        // without desktop background pixels showing at the corner curves.
+        if let windowNumber: Int = windowNumber(forOwner: "Plantoir") {
+            let tempURL: URL = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("plantoir-shot-\(UUID().uuidString).png")
+            let process: Process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            process.arguments = ["-x", "-o", "-l", "\(windowNumber)", tempURL.path]
+            do {
+                try process.run()
+                process.waitUntilExit()
+                if process.terminationStatus == 0,
+                   let data: Data = try? Data(contentsOf: tempURL),
+                   let image: NSImage = NSImage(data: data) {
+                    try? FileManager.default.removeItem(at: tempURL)
+                    let attachment: XCTAttachment = XCTAttachment(image: image)
+                    attachment.name = name
+                    attachment.lifetime = .keepAlways
+                    add(attachment)
+                    return
+                }
+            } catch {
+                // Fall through to window.screenshot() below.
+            }
+        }
+
         let attachment: XCTAttachment = XCTAttachment(screenshot: window.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    /// Looks up the largest ordinary layer-0 window for a given application name.
+    func windowNumber(forOwner owner: String) -> Int? {
+        guard let windows = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
+        ) as? [[String: Any]] else {
+            return nil
+        }
+        var bestNumber: Int?
+        var bestArea: Double = 0
+        for window in windows {
+            guard let name = window[kCGWindowOwnerName as String] as? String, name == owner else {
+                continue
+            }
+            let layer: Int = window[kCGWindowLayer as String] as? Int ?? 0
+            guard layer == 0 else { continue }
+            guard let number = window[kCGWindowNumber as String] as? Int,
+                  let bounds = window[kCGWindowBounds as String] as? [String: Any],
+                  let width = bounds["Width"] as? Double,
+                  let height = bounds["Height"] as? Double else {
+                continue
+            }
+            let area: Double = width * height
+            if area > bestArea {
+                bestArea = area
+                bestNumber = number
+            }
+        }
+        return bestNumber
     }
 
     /// Opens a course's section in the sidebar and returns the main window.
@@ -273,7 +332,7 @@ final class MarketingScreenshots: MarketingScreenshotCase {
 
         let milestone: XCUIElement = application.staticTexts["taskMilestoneLabel"]
         XCTAssertTrue(milestone.waitForExistence(timeout: 60), "Progress should be described while the site deploys")
-        settle(3.0)
+        settle(2.0)
         save(window, as: "hero-plantoir")
 
         let cancelButton: XCUIElement = application.buttons["taskCancelButton"]

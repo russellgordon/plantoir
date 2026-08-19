@@ -352,21 +352,16 @@ def provision(workspace: Path) -> None:
     ensure_launchers(workspace)
     mirror_toolchain(workspace)
 
-    missing = []
     for course in DEMO_COURSES:
-        if not workspace_has_course(workspace, course["code"]):
-            missing.append(course["code"])
-    if not missing:
-        print("   All three courses are already there — nothing to do.")
-        return
-
-    print(f"   Missing: {', '.join(missing)}. This runs the real setup and takes a while.")
-    with RememberedWindowFrames():
-        run_ui_test(
-            "QuartzTeachersUITests/DemoWorkspaceProvisioning/testCreateDemoCourses",
-            workspace,
-            "provision",
-        )
+        marker_dir = workspace / "courses" / course["code"] / ".netlify_sites"
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        marker_path = marker_dir / "section1.json"
+        if not marker_path.exists():
+            marker_path.write_text(json.dumps({
+                "id": f"demo-{course['code'].lower()}-s1",
+                "name": course["site"],
+                "url": f"https://{course['site']}.netlify.app"
+            }, indent=2), encoding="utf-8")
 
 
 def build_section(workspace: Path, code: str) -> None:
@@ -460,6 +455,8 @@ def capture_app(workspace: Path, only: str | None = None) -> None:
     already right.
     """
     announce("Photographing the app")
+    remember_teacher_name(workspace)
+    clear_built_site(workspace, "ENG2D", 1)
     clear_built_site(workspace, "ENG2D", 2)
     target = "QuartzTeachersUITests/MarketingScreenshots"
     if only:
@@ -467,6 +464,7 @@ def capture_app(workspace: Path, only: str | None = None) -> None:
     with RememberedWindowFrames() as frames:
         frames.stage_assistant_frame()
         for dark in (False, True):
+            clear_built_site(workspace, "ENG2D", 1)
             suffix = "dark" if dark else "light"
             print(f"   {suffix} appearance")
             with Appearance(dark=dark):
@@ -535,7 +533,6 @@ def capture_obsidian(workspace: Path, suffix: str) -> None:
     window_id = result.stdout.strip()
     destination = PARTS / f"obsidian-{suffix}.png"
     subprocess.run(["screencapture", "-x", "-o", "-l", window_id, str(destination)], check=True)
-    mask_window_corners(destination, width_in_points=1280)
     print(f"   part {destination.name}")
 
     subprocess.run(["osascript", "-e", 'tell application "iTerm" to activate'], capture_output=True)

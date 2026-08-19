@@ -165,8 +165,9 @@ def diagonal_hero(
     for img in raw_images:
         aspect = img.width / img.height
         w = round(base_height * aspect)
-        resized = img.resize((w, base_height), Image.LANCZOS)
-        cards.append(rounded(resized, radius=CORNER_RADIUS))
+        # Resampling with Lanczos smoothly scales the native anti-aliased rounded corners
+        resized = img.resize((w, base_height), Image.Resampling.LANCZOS)
+        cards.append(resized)
 
     card_w = cards[1].width
     card_h = base_height
@@ -188,11 +189,13 @@ def diagonal_hero(
 
     for card, (ox, oy) in zip(cards, offsets):
         shadow_canvas = Image.new("RGBA", (card.width + pad * 2, card.height + pad * 2), (0, 0, 0, 0))
-        shape = Image.new("L", card.size, 0)
-        ImageDraw.Draw(shape).rounded_rectangle(
-            [(0, 0), (card.width - 1, card.height - 1)], radius=CORNER_RADIUS, fill=105
-        )
-        shadow_canvas.paste((0, 0, 0, 105), (pad, pad + 8), shape)
+        # Derive drop shadow directly from card's own alpha channel so shadow perfectly conforms
+        card_alpha = card.split()[3]
+        shadow_alpha = card_alpha.point(lambda p: round(p * 0.40))
+        shadow_layer = Image.new("RGBA", card.size, (0, 0, 0, 0))
+        shadow_color = Image.new("RGBA", card.size, (0, 0, 0, 255))
+        shadow_layer.paste(shadow_color, (0, 0), shadow_alpha)
+        shadow_canvas.alpha_composite(shadow_layer, (pad, pad + 8))
         shadow_canvas = shadow_canvas.filter(ImageFilter.GaussianBlur(SHADOW_BLUR / 2))
 
         canvas.alpha_composite(shadow_canvas, (ox, oy))
@@ -204,7 +207,7 @@ def diagonal_hero(
 
     if canvas.width != figure_width:
         h = round(canvas.height * figure_width / canvas.width)
-        canvas = canvas.resize((figure_width, h), Image.LANCZOS)
+        canvas = canvas.resize((figure_width, h), Image.Resampling.LANCZOS)
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(destination, format="PNG", optimize=True)
