@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -793,13 +794,53 @@ def _upload_required_files(deploy_id: str, token: str, root: Path, required_shas
     import concurrent.futures
 
     def _upload_one(item):
+        # Netlify rate-limits the upload endpoint, and concurrent PUTs reach
+        # that limit far sooner than the old serial loop did — measured live:
+        # 318 files at 10 workers died on the first 429 and failed the whole
+        # deploy. A 429 (or a transient 5xx/timeout) is therefore an expected
+        # event here, not an error: back off — honouring Retry-After when
+        # Netlify names a wait — and try that file again.
         enc_path, loc_file = item
         with loc_file.open("rb") as f:
             data = f.read()
         headers = {"Content-Type": "application/octet-stream"}
-        netlify_api("PUT", f"/deploys/{deploy_id}/files/{enc_path}", token, headers=headers, data=data)
+        delay = 1.0
+        last_error: Exception | None = None
+        for attempt in range(6):
+            try:
+                netlify_api("PUT", f"/deploys/{deploy_id}/files/{enc_path}", token, headers=headers, data=data)
+                return
+            except RuntimeError as e:
+                msg = str(e)
+                retryable = any(f"Netlify API error {code}" in msg for code in (429, 500, 502, 503, 504))
+                if not retryable:
+                    raise
+                last_error = e
+                wait = delay
+                cause = getattr(e, "__cause__", None)
+                retry_after = None
+                try:
+                    if cause is not None and getattr(cause, "headers", None):
+                        retry_after = cause.headers.get("Retry-After")
+                except Exception:
+                    retry_after = None
+                if retry_after:
+                    try:
+                        wait = max(wait, float(retry_after))
+                    except ValueError:
+                        pass
+                time.sleep(min(wait, 30.0))
+                delay *= 2
+            except (urllib.error.URLError, TimeoutError) as e:
+                # Socket timeout or drop mid-upload; the file is small, retry it.
+                last_error = e
+                time.sleep(min(delay, 30.0))
+                delay *= 2
+        raise RuntimeError(f"Upload of {enc_path} kept failing after retries: {last_error}") from last_error
 
-    max_workers = min(10, max(1, len(items_to_upload)))
+    # 5 workers, not 10: with retries in place 10 still converges, but it
+    # spends most of its time backing off — 5 stays under the limit.
+    max_workers = min(5, max(1, len(items_to_upload)))
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(_upload_one, item): item for item in items_to_upload}
         for future in concurrent.futures.as_completed(futures):
