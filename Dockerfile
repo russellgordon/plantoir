@@ -44,6 +44,10 @@ COPY patches/build.ts /opt/quartz/quartz/build.ts
 RUN cp -r /opt/quartz /opt/quartz-site
 
 # Copy in setup_course.py, build_site.py, deploy.py
+# toolchain_paths.py is the shared path shim: in here its container defaults
+# apply untouched; the Windows-native runtime points it elsewhere via
+# PLANTOIR_* environment variables.
+COPY scripts/toolchain_paths.py /opt/scripts/toolchain_paths.py
 COPY scripts/setup_course.py /opt/scripts/setup_course.py
 COPY scripts/build_site.py /opt/scripts/build_site.py
 COPY scripts/deploy.py /opt/scripts/deploy.py

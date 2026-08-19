@@ -78,6 +78,46 @@ function Get-PhysicalPath([string]$p) {
 $WORKDIR_PHYSICAL = Get-PhysicalPath (Get-Location).Path
 $WORKDIR_ID = ([BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes("$WORKDIR_PHYSICAL`n"))) -replace '-','').Substring(0,8).ToLower()
 $CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"
+
+# ==================== Native toolchain (no container) ====================
+# When the app's bundled runtime folder is present, everything runs directly
+# on this PC: no WSL2, no Docker, no administrator rights, no one-time
+# machine setup at all. The runtime is found through PLANTOIR_RUNTIME (set
+# by the app), falling back to the installed app's own folder so launchers
+# run by hand still find it. The container path below remains intact until
+# the native path has proven itself end to end.
+$NATIVE_RUNTIME = $env:PLANTOIR_RUNTIME
+if (-not $NATIVE_RUNTIME) {
+  $appRuntime = Join-Path $env:LOCALAPPDATA 'Programs\Plantoir\runtime'
+  if (Test-Path (Join-Path $appRuntime 'manifest.json')) { $NATIVE_RUNTIME = $appRuntime }
+}
+if ($NATIVE_RUNTIME -and -not (Test-Path (Join-Path $NATIVE_RUNTIME 'manifest.json'))) { $NATIVE_RUNTIME = $null }
+
+# Points the shared Python at the bundled runtime and this working folder,
+# and returns the bundled interpreter's path. $WORKDIR_ID is computed below,
+# before any caller runs.
+function Enter-NativeRuntime {
+  $env:PATH = (Join-Path $NATIVE_RUNTIME 'node') + ';' + (Join-Path $NATIVE_RUNTIME 'wrangler\node_modules\.bin') + ';' + $env:PATH
+  $toolchainDir = Join-Path (Get-Location).Path '.toolchain'
+  $base = if (Test-Path (Join-Path $toolchainDir 'scripts')) { $toolchainDir } else { (Get-Location).Path }
+  $env:PLANTOIR_SCRIPTS_DIR = Join-Path $base 'scripts'
+  $env:PLANTOIR_SUPPORT_DIR = Join-Path $base 'support'
+  $env:PLANTOIR_QUARTZ_DIR  = Join-Path $NATIVE_RUNTIME 'quartz'
+  $env:PLANTOIR_EMOJI_FONT  = Join-Path $NATIVE_RUNTIME 'fonts\NotoColorEmoji.ttf'
+  $env:PLANTOIR_COURSES_DIR = Join-Path (Get-Location).Path 'courses'
+  # Build output lives OUTSIDE the working folder: teachers keep working
+  # folders in OneDrive, and a build's thousands of small files would sync
+  # and lock in place there.
+  $buildRoot = Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)
+  $env:PLANTOIR_BUILD_ROOT = $buildRoot
+  $env:PLANTOIR_WORK_DIR   = Join-Path $buildRoot 'work'
+  # The embeddable Python defaults to the ANSI code page; the scripts print
+  # their progress with emoji.
+  $env:PYTHONUTF8 = '1'
+  $env:PYTHONIOENCODING = 'utf-8'
+  return (Join-Path $NATIVE_RUNTIME 'python\python.exe')
+}
+# =========================================================================
 $KEY_TARGET     = 'containerized-quartz-netlify'  # Windows Credential Manager target
 # Cloudflare's token lives under its own name, so a teacher who publishes some
 # courses to Netlify and others to Cloudflare keeps both without one clobbering
@@ -605,6 +645,35 @@ this computer.
 }  # end: Netlify-only token discovery
 
 # ======================
+# Native run (no container)
+# ======================
+if ($NATIVE_RUNTIME) {
+  $py = Enter-NativeRuntime
+  $env:HOST_TZ_OFFSET = $HOST_TZ_OFFSET
+  Write-Host ("Deploying {0} S{1} from this PC ..." -f $COURSE_CODE, $SECTION_NUM)
+  $deployArgs = @('--host-os','windows')
+  if ($TARGET -eq 'cloudflare') { $deployArgs += @('--target','cloudflare') }
+  $deployArgs += @('--course', $COURSE_CODE, '--section', $SECTION_NUM)
+  if ($DIAGNOSE)  { $deployArgs += $DIAGNOSE }
+  if ($TEAM_SLUG) { $deployArgs += @('--team', $TEAM_SLUG) }
+  # The token rides the child's environment, never a command line: process
+  # environments are not persisted anywhere, and wrangler itself reads
+  # CLOUDFLARE_API_TOKEN this way.
+  if ($TARGET -eq 'cloudflare') {
+    $env:CLOUDFLARE_API_TOKEN = $CF_TOKEN
+    if ($CF_ACCOUNT) { $env:CLOUDFLARE_ACCOUNT_ID = $CF_ACCOUNT }
+  } else {
+    $env:NETLIFY_AUTH_TOKEN = $TOKEN
+  }
+  & $py -u (Join-Path $env:PLANTOIR_SCRIPTS_DIR 'deploy.py') @deployArgs
+  $nativeExit = $LASTEXITCODE
+  $env:NETLIFY_AUTH_TOKEN = $null
+  $env:CLOUDFLARE_API_TOKEN = $null
+  $env:CLOUDFLARE_ACCOUNT_ID = $null
+  exit $nativeExit
+}
+
+# ======================
 # Docker / container (mount-aware + writability probe)
 # ======================
 # ==================== Container runtime (Docker Engine in WSL2) ====================
@@ -970,8 +1039,12 @@ function Run-ContainerWithMount {
   if (-not $script:IMAGE_REF) {
     $context = Get-BuildContext
     if ($context) {
+      # Native runs need no image, and hashing the whole build context is
+      # the slowest thing this launcher does - skip it.
+      if (-not $NATIVE_RUNTIME) {
       Write-Host "Checking whether your website builder is up to date..."
       $script:IMAGE_REF = "teaching-quartz:src-$(Get-ToolchainHash $context)"
+      }
     }
   }
   Ensure-Image $script:IMAGE_REF

@@ -127,6 +127,45 @@ $WORKDIR_PHYSICAL = Get-PhysicalPath (Get-Location).Path
 $WORKDIR_ID = ([BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes("$WORKDIR_PHYSICAL`n"))) -replace '-','').Substring(0,8).ToLower()
 $CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"
 
+# ==================== Native toolchain (no container) ====================
+# When the app's bundled runtime folder is present, everything runs directly
+# on this PC: no WSL2, no Docker, no administrator rights, no one-time
+# machine setup at all. The runtime is found through PLANTOIR_RUNTIME (set
+# by the app), falling back to the installed app's own folder so launchers
+# run by hand still find it. The container path below remains intact until
+# the native path has proven itself end to end.
+$NATIVE_RUNTIME = $env:PLANTOIR_RUNTIME
+if (-not $NATIVE_RUNTIME) {
+  $appRuntime = Join-Path $env:LOCALAPPDATA 'Programs\Plantoir\runtime'
+  if (Test-Path (Join-Path $appRuntime 'manifest.json')) { $NATIVE_RUNTIME = $appRuntime }
+}
+if ($NATIVE_RUNTIME -and -not (Test-Path (Join-Path $NATIVE_RUNTIME 'manifest.json'))) { $NATIVE_RUNTIME = $null }
+
+# Points the shared Python at the bundled runtime and this working folder,
+# and returns the bundled interpreter's path.
+function Enter-NativeRuntime {
+  $env:PATH = (Join-Path $NATIVE_RUNTIME 'node') + ';' + (Join-Path $NATIVE_RUNTIME 'wrangler\node_modules\.bin') + ';' + $env:PATH
+  $toolchainDir = Join-Path (Get-Location).Path '.toolchain'
+  $base = if (Test-Path (Join-Path $toolchainDir 'scripts')) { $toolchainDir } else { (Get-Location).Path }
+  $env:PLANTOIR_SCRIPTS_DIR = Join-Path $base 'scripts'
+  $env:PLANTOIR_SUPPORT_DIR = Join-Path $base 'support'
+  $env:PLANTOIR_QUARTZ_DIR  = Join-Path $NATIVE_RUNTIME 'quartz'
+  $env:PLANTOIR_EMOJI_FONT  = Join-Path $NATIVE_RUNTIME 'fonts\NotoColorEmoji.ttf'
+  $env:PLANTOIR_COURSES_DIR = Join-Path (Get-Location).Path 'courses'
+  # Build output lives OUTSIDE the working folder: teachers keep working
+  # folders in OneDrive, and a build's thousands of small files would sync
+  # and lock in place there.
+  $buildRoot = Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)
+  $env:PLANTOIR_BUILD_ROOT = $buildRoot
+  $env:PLANTOIR_WORK_DIR   = Join-Path $buildRoot 'work'
+  # The embeddable Python defaults to the ANSI code page; the scripts print
+  # their progress with emoji.
+  $env:PYTHONUTF8 = '1'
+  $env:PYTHONIOENCODING = 'utf-8'
+  return (Join-Path $NATIVE_RUNTIME 'python\python.exe')
+}
+# =========================================================================
+
 # ==================== Container runtime (Docker Engine in WSL2) ====================
 # Docker Desktop is no longer required. On Windows this script uses the Docker
 # Engine running inside WSL2 (Windows Subsystem for Linux) and installs/starts
@@ -338,14 +377,18 @@ function Get-MountPath([string]$winPath) {
   return $winPath
 }
 
+if (-not $NATIVE_RUNTIME) {
 Ensure-ContainerRuntime
+}
 # ====================================================================
 
+if (-not $NATIVE_RUNTIME) {
 $CURRENT_CONTEXT = (docker context show 2>$null) -as [string]; if (-not $CURRENT_CONTEXT) { $CURRENT_CONTEXT = 'unknown' }
 $HOST_ARCH       = (docker info --format '{{.Architecture}}' 2>$null) -as [string];  if (-not $HOST_ARCH) { $HOST_ARCH = 'unknown' }
 $HOST_OS         = (docker info --format '{{.OSType}}' 2>$null) -as [string];         if (-not $HOST_OS)   { $HOST_OS   = 'unknown' }
 Write-Host "Docker context: $CURRENT_CONTEXT"
 Write-Host "Host detected by Docker: $HOST_OS/$HOST_ARCH"
+}
 
 # -------------------- Folders & permissions --------------------
 $CoursesRoot       = Join-Path -Path (Get-Location) -ChildPath 'courses'
@@ -368,6 +411,40 @@ if ($CreatedCoursesDir) {
     $me = "$env:USERDOMAIN\$env:USERNAME"
     icacls "$CoursesRoot" /grant "${me}:(OI)(CI)M" 2>$null | Out-Null
   } catch {}
+}
+
+# -------------------- Native run (no container) --------------------
+if ($NATIVE_RUNTIME) {
+  $py = Enter-NativeRuntime
+  $HOST_TZ_OFFSET = (Get-Date).ToString('zzz').Replace(':','')
+  Write-Host "Detected host timezone offset: $HOST_TZ_OFFSET"
+  Write-Host "Backups will be written to: $BackupsRoot"
+  if ($PassthruArgs.Count -gt 0 -and ($PassthruArgs -contains '--no-backup')) {
+    Write-Host 'You are running with --no-backup.'
+    Write-Host 'This will skip creating a safety ZIP before modifying course folders.'
+    $confirm = Read-Host 'Are you sure you want to proceed without a backup? (yes/no)'
+    if ($confirm -notin @('yes','y','Y')) {
+      Write-Host 'Cancelled.'
+      exit 1
+    } else {
+      Write-Host 'Proceeding without backup...'
+    }
+  }
+  if ($PassthruArgs.Count -gt 0) {
+    $clean = New-Object System.Collections.Generic.List[string]
+    for ($i=0; $i -lt $PassthruArgs.Count; $i++) {
+      $p = $PassthruArgs[$i]
+      if ($p -eq '--host-os') { $i++; continue }
+      if ($p -like '--host-os=*') { continue }
+      $clean.Add($p) | Out-Null
+    }
+    $PassthruArgs = $clean.ToArray()
+  }
+  $PassthruArgs += @('--host-os','windows')
+  $env:HOST_TZ_OFFSET = $HOST_TZ_OFFSET
+  Write-Host "Running the course setup wizard..."
+  & $py -u (Join-Path $env:PLANTOIR_SCRIPTS_DIR 'setup_course.py') @PassthruArgs
+  exit $LASTEXITCODE
 }
 
 function Normalize-HostPath([string]$p) {
@@ -497,8 +574,12 @@ $BUILD_CONTEXT = Get-BuildContext
 if ($OVERRIDE_IMAGE) {
   $IMAGE = $OVERRIDE_IMAGE
 } elseif ($BUILD_CONTEXT) {
+  # Native runs need no image, and hashing the whole build context is
+  # the slowest thing this launcher does - skip it.
+  if (-not $NATIVE_RUNTIME) {
   Write-Host "Checking whether your website builder is up to date..."
   $IMAGE = "teaching-quartz:src-$(Get-ToolchainHash $BUILD_CONTEXT)"
+  }
 } else {
   Write-Host "This folder is missing the toolchain's build recipe."
   Write-Host "Open the folder in the app once to refresh it, or run from a repository copy."

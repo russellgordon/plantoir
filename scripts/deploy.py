@@ -18,6 +18,13 @@ import hashlib
 import unicodedata
 from zoneinfo import ZoneInfo
 from pathlib import Path
+
+# The embeddable Python used by the native Windows runtime replaces
+# sys.path wholesale (python311._pth), so the script's own folder must
+# be added by hand before sibling imports. Harmless everywhere else.
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+import toolchain_paths
 from collections import Counter
 
 # ---- Host OS signaling & example command helper -----------------------------
@@ -133,7 +140,7 @@ def rebuild_for_production(course_code: str, section: str, host_os: str):
     and ensures all live site domains and OpenGraph metadata are up to date.
     """
     print(" Rebuilding site for production…")
-    build_script = Path("/opt/scripts/build_site.py")
+    build_script = toolchain_paths.SCRIPTS_DIR / "build_site.py"
     if not build_script.exists():
         build_script = Path(__file__).parent / "build_site.py"
 
@@ -186,7 +193,7 @@ def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_co
         rebuild_for_production(course_code, section, host_os)
 
 # ---------- Teacher profile (unchanged) ----------
-COURSES_ROOT = Path("/teaching/courses")
+COURSES_ROOT = toolchain_paths.COURSES_DIR
 # Hidden global store for non-secret preferences (e.g., teacher profile)
 GLOBAL_SECRETS_ROOT = COURSES_ROOT / ".internal"
 # Legacy path (kept only to migrate profile.json, not tokens)
@@ -633,7 +640,7 @@ def deploy_to_cloudflare(public_dir: Path, project_name: str, token: str, accoun
     env["CI"] = "1"
     env.setdefault("WRANGLER_SEND_METRICS", "false")
     cmd = [
-        "wrangler", "pages", "deploy", str(public_dir),
+        toolchain_paths.WRANGLER, "pages", "deploy", str(public_dir),
         f"--project-name={project_name}",
         # The production branch is what gives the stable <project>.pages.dev
         # address; a different branch would publish to a preview URL instead.
@@ -949,7 +956,7 @@ def main():
     # (Do NOT migrate or touch any token stores here; host launcher handles that.)
 
     # Path: /teaching/courses/<COURSE>/.merged_output/section<SECTION>
-    section_dir = Path(f"/teaching/courses/{args.course}/.merged_output/section{args.section}").resolve()
+    section_dir = (toolchain_paths.merged_output_root(toolchain_paths.COURSES_DIR / args.course) / f"section{args.section}").resolve()
     if not section_dir.exists():
         print(f"❌ Section directory not found: {section_dir}")
         print(f" Please run the preview/build first:")

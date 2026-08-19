@@ -73,4 +73,16 @@
   <Target Name="PublishMcpBesideApp" AfterTargets="Build">
     <MSBuild Projects="..\Plantoir.Mcp\Plantoir.Mcp.csproj" Targets="Publish" Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);PublishDir=$(TargetDir)" />
   </Target>
+
+  <!-- The native toolchain runtime (node, python, patched Quartz, wrangler)
+       from Vendor\fetch-runtime.ps1. Mirrored with robocopy rather than
+       Content items: it holds ~24,000 files (node_modules), and that many
+       MSBuild items slows every build. Robocopy exit codes below 8 mean
+       success, hence the exit-code laundering. -->
+  <Target Name="CopyNativeRuntime" AfterTargets="Build" Condition="Exists('..\Vendor\runtime\manifest.json')">
+    <Exec Command="robocopy &quot;$(MSBuildProjectDirectory)\..\Vendor\runtime&quot; &quot;$(TargetDir)runtime&quot; /MIR /NFL /NDL /NJH /NJS /NP &amp; if %25errorlevel%25 lss 8 exit /b 0" />
+  </Target>
+  <Target Name="PublishNativeRuntime" AfterTargets="Publish" Condition="Exists('..\Vendor\runtime\manifest.json')">
+    <Exec Command="robocopy &quot;$(MSBuildProjectDirectory)\..\Vendor\runtime&quot; &quot;$(PublishDir)runtime&quot; /MIR /NFL /NDL /NJH /NJS /NP &amp; if %25errorlevel%25 lss 8 exit /b 0" />
+  </Target>
 </Project>

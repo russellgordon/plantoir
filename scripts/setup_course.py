@@ -2,10 +2,26 @@ import os
 import json
 import subprocess
 from pathlib import Path
+
+# The embeddable Python used by the native Windows runtime replaces
+# sys.path wholesale (python311._pth), so the script's own folder must
+# be added by hand before sibling imports. Harmless everywhere else.
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+import toolchain_paths
 import re
 import sys
-import tty
-import termios
+# The wizard's single-keypress reader. termios/tty are POSIX-only; running
+# natively on Windows the same keys arrive through msvcrt instead, and the
+# import must not sink the whole module (everything non-interactive in here
+# is imported by the build machinery too).
+try:
+    import tty
+    import termios
+except ImportError:
+    tty = None
+    termios = None
+    import msvcrt
 from datetime import datetime, timezone, timedelta
 import textwrap
 import zipfile  # NEW: for backups
@@ -67,7 +83,7 @@ DEFAULT_PER_SECTION_FILES = [
 # are never published, and stay that way unless the teacher flips them.
 UNPUBLISHED_PER_SECTION_FILES = {"Private Notes.md", "Scratch Page.md"}
 
-COURSE_LOOKUP_PATH = Path("/opt/support/ontario_secondary_courses.json")
+COURSE_LOOKUP_PATH = toolchain_paths.SUPPORT_DIR / "ontario_secondary_courses.json"
 
 # ---------- NEW: Backup exclusion set ---------------------------------------
 BACKUP_DEFAULT_EXCLUDES = {
@@ -140,7 +156,7 @@ def backup_existing_course_dir(course_dir: Path, backup_root: Path, excludes: se
 
 CANDIDATE_COLOUR_JSON_PATHS = [
     Path("support/colour_schemes.json"),
-    Path("/opt/support/colour_schemes.json"),
+    toolchain_paths.SUPPORT_DIR / "colour_schemes.json",
     Path(__file__).resolve().parent.parent / "support" / "colour_schemes.json",
     Path(__file__).resolve().parent / "support" / "colour_schemes.json",
 ]
@@ -191,6 +207,22 @@ def clear_screen():
 
 def getch():
     """Read single keypress (supports arrow left/right) without Enter."""
+    if termios is None:
+        # Windows console: arrows arrive as a two-character sequence with a
+        # \x00 or \xe0 prefix ('M' right, 'K' left).
+        ch1 = msvcrt.getwch()
+        if ch1 in ("\x00", "\xe0"):
+            ch2 = msvcrt.getwch()
+            if ch2 == "M":
+                return "RIGHT"
+            if ch2 == "K":
+                return "LEFT"
+            return "ESC"
+        if ch1 == "\x1b":
+            return "ESC"
+        if ch1 in ("\r", "\n"):
+            return "ENTER"
+        return ch1
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
@@ -1012,7 +1044,7 @@ def _patch_explorer_with_anchor(layout_src: str) -> tuple[str, bool]:
 
 def ensure_quartz_explorer_anchor():
     """Idempotently ensure quartz.layout.ts includes the omit anchor block."""
-    quartz_layout_path = Path("/opt/quartz/quartz.layout.ts")
+    quartz_layout_path = toolchain_paths.QUARTZ_DIR / "quartz.layout.ts"
     if quartz_layout_path.exists():
         with open(quartz_layout_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -1020,17 +1052,11 @@ def ensure_quartz_explorer_anchor():
         new_content, changed = _patch_explorer_with_anchor(content)
 
         if changed:
-            try:
-                subprocess.run(
-                    ["tee", str(quartz_layout_path)],
-                    input=new_content.encode("utf-8"),
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
+            result = toolchain_paths.write_file(quartz_layout_path, new_content.encode("utf-8"))
+            if result.returncode == 0:
                 print(f"✅ Ensured Explorer has omit anchor in {quartz_layout_path}")
-            except subprocess.CalledProcessError as e:
-                print(f"❌ Failed to write updated layout. Error:\n{e.stderr.decode()}")
+            else:
+                print(f"❌ Failed to write updated layout. Error:\n{result.stderr.decode()}")
         else:
             if "CQ4T-OMIT-ANCHOR" in content:
                 print("ℹ️ Explorer already contains omit anchor (no change).")
@@ -1047,7 +1073,7 @@ def ensure_quartz_overflowlist_static_id():
       const id = randomIdNonSecure()   →   const id = "j8p48f"
     Targets: /opt/quartz/quartz/components/OverflowList.tsx
     """
-    tsx_path = Path("/opt/quartz/quartz/components/OverflowList.tsx")
+    tsx_path = toolchain_paths.QUARTZ_DIR / "quartz" / "components" / "OverflowList.tsx"
     if not tsx_path.exists():
         print(f"⚠️ OverflowList.tsx not found at: {tsx_path}")
         return
@@ -1072,17 +1098,11 @@ def ensure_quartz_overflowlist_static_id():
         print("⚠️ Could not find 'const id = randomIdNonSecure()' in OverflowList.tsx; no changes made.")
         return
 
-    try:
-        subprocess.run(
-            ["tee", str(tsx_path)],
-            input=new_src.encode("utf-8"),
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
+    result = toolchain_paths.write_file(tsx_path, new_src.encode("utf-8"))
+    if result.returncode == 0:
         print(f"✅ Patched OverflowList to use a stable id in {tsx_path}")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Failed to write updated OverflowList.tsx. Error:\n{e.stderr.decode()}")
+    else:
+        print(f"❌ Failed to write updated OverflowList.tsx. Error:\n{result.stderr.decode()}")
 
 # ---------- NEW: Example Course installer -----------------------------------
 
@@ -1090,7 +1110,7 @@ EXAMPLE_COURSE_CODE = "EXC2O"
 
 CANDIDATE_EXAMPLE_SOURCE_PATHS = [
     Path("support/example_course") / EXAMPLE_COURSE_CODE,
-    Path("/opt/support/example_course") / EXAMPLE_COURSE_CODE,
+    toolchain_paths.SUPPORT_DIR / "example_course" / EXAMPLE_COURSE_CODE,
     Path(__file__).resolve().parent.parent / "support" / "example_course" / EXAMPLE_COURSE_CODE,
     Path(__file__).resolve().parent / "support" / "example_course" / EXAMPLE_COURSE_CODE,
 ]
@@ -1247,7 +1267,7 @@ def maybe_install_example_course(courses_root: Path) -> bool:
 
 EXAMPLE_CONTENT_ROOTS = [
     Path("support/example_content"),
-    Path("/opt/support/example_content"),
+    toolchain_paths.SUPPORT_DIR / "example_content",
     Path(__file__).resolve().parent.parent / "support" / "example_content",
 ]
 
@@ -1409,7 +1429,7 @@ def load_example_content_manifest(payload_dir: Path) -> dict:
 
 SKELETON_ROOTS = [
     Path("support/skeletons"),
-    Path("/opt/support/skeletons"),
+    toolchain_paths.SUPPORT_DIR / "skeletons",
     Path(__file__).resolve().parent.parent / "support" / "skeletons",
 ]
 
@@ -1753,7 +1773,7 @@ def prompt_section_numbers(num_sections: int, saved_config: dict) -> list[int]:
 
 CANDIDATE_OBSIDIAN_DEFAULTS_PATHS = [
     Path("support/obsidian_defaults") / ".obsidian",
-    Path("/opt/support/obsidian_defaults") / ".obsidian",
+    toolchain_paths.SUPPORT_DIR / "obsidian_defaults" / ".obsidian",
     Path(__file__).resolve().parent.parent / "support" / "obsidian_defaults" / ".obsidian",
     Path(__file__).resolve().parent / "support" / "obsidian_defaults" / ".obsidian",
 ]
@@ -1807,7 +1827,7 @@ def copy_obsidian_defaults(course_dir: Path) -> None:
 def setup_course(no_backup: bool = False):
     print("📚 Welcome to the Course Setup Script!\n")
 
-    base_path = Path("/teaching/courses")
+    base_path = toolchain_paths.COURSES_DIR
 
     # --- NEW: Offer to install the Example Course (EXC2O) -------------------
     try:
@@ -2261,7 +2281,7 @@ def setup_course(no_backup: bool = False):
 
     # ---------- Create shared structure (with createdSectionN + publishForSectionN) ----------
     for folder in shared_folders:
-        folder_path = Path("/teaching/courses") / course_code / folder
+        folder_path = toolchain_paths.COURSES_DIR / course_code / folder
         folder_path.mkdir(parents=True, exist_ok=True)
         index_md_path = folder_path / "index.md"
         if not index_md_path.exists():
@@ -2275,7 +2295,7 @@ def setup_course(no_backup: bool = False):
                 f.write(f"This is the **{folder}** folder. Add Markdown files to this folder to build out your site. Optionally, you can remove this `index.md` file and Quartz will then show only a listing of files that exist in this folder instead.\n")
     
     for file in shared_files:
-        file_path = Path("/teaching/courses") / course_code / file
+        file_path = toolchain_paths.COURSES_DIR / course_code / file
         if not file_path.exists():
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write("---\n")
@@ -2305,7 +2325,7 @@ def setup_course(no_backup: bool = False):
 
     for sec in section_numbers:
         section_name = f"section{sec}"
-        section_path = Path("/teaching/courses") / course_code / section_name
+        section_path = toolchain_paths.COURSES_DIR / course_code / section_name
         section_path.mkdir(exist_ok=True)
     
         index_md_path = section_path / "index.md"
@@ -2384,6 +2404,6 @@ if __name__ == "__main__":
     # Set module-level host OS for OS-aware examples
     _HOST_OS = getattr(args, "host_os", "unknown")
     if args.install_example:
-        installed = install_example_course_noninteractive(Path("/teaching/courses"))
+        installed = install_example_course_noninteractive(toolchain_paths.COURSES_DIR)
         sys.exit(0 if installed else 1)
     setup_course(no_backup=args.no_backup)

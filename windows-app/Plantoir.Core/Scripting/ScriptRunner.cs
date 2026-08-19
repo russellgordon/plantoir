@@ -105,9 +105,19 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             else commandLine.Append(argument);
         }
 
+        // When the app carries the native runtime (node, python, Quartz,
+        // wrangler in its own folder), tell the launcher where it is: the
+        // launcher then builds directly on this PC — no WSL2, no container,
+        // no administrator rights.
+        IReadOnlyDictionary<string, string>? extraEnvironment = null;
+        string runtimeDir = Path.Combine(AppContext.BaseDirectory, "runtime");
+        if (File.Exists(Path.Combine(runtimeDir, "manifest.json")))
+            extraEnvironment = new Dictionary<string, string> { ["PLANTOIR_RUNTIME"] = runtimeDir };
+
         try
         {
-            _process = ConPtyProcess.Start(commandLine.ToString(), workingDirectory);
+            _process = ConPtyProcess.Start(commandLine.ToString(), workingDirectory,
+                                           extraEnvironment: extraEnvironment);
         }
         catch (Exception error)
         {

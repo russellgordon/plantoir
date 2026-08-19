@@ -146,6 +146,47 @@ function Normalize-HostPath([string]$p) {
     try { (Resolve-Path -LiteralPath $p).Path.TrimEnd('\','/') } catch { $p.TrimEnd('\','/') }
 }
 
+
+# ==================== Native toolchain (no container) ====================
+# When the app's bundled runtime folder is present, everything runs directly
+# on this PC: no WSL2, no Docker, no administrator rights, no one-time
+# machine setup at all. The runtime is found through PLANTOIR_RUNTIME (set
+# by the app), falling back to the installed app's own folder so launchers
+# run by hand still find it. The container path below remains intact until
+# the native path has proven itself end to end.
+$NATIVE_RUNTIME = $env:PLANTOIR_RUNTIME
+if (-not $NATIVE_RUNTIME) {
+    $appRuntime = Join-Path $env:LOCALAPPDATA 'Programs\Plantoir\runtime'
+    if (Test-Path (Join-Path $appRuntime 'manifest.json')) { $NATIVE_RUNTIME = $appRuntime }
+}
+if ($NATIVE_RUNTIME -and -not (Test-Path (Join-Path $NATIVE_RUNTIME 'manifest.json'))) { $NATIVE_RUNTIME = $null }
+
+# Points the shared Python at the bundled runtime and this working folder,
+# and returns the bundled interpreter's path. $WORKDIR_ID is computed below,
+# before any caller runs.
+function Enter-NativeRuntime {
+    $env:PATH = (Join-Path $NATIVE_RUNTIME 'node') + ';' + (Join-Path $NATIVE_RUNTIME 'wrangler\node_modules\.bin') + ';' + $env:PATH
+    $toolchainDir = Join-Path (Get-Location).Path '.toolchain'
+    $base = if (Test-Path (Join-Path $toolchainDir 'scripts')) { $toolchainDir } else { (Get-Location).Path }
+    $env:PLANTOIR_SCRIPTS_DIR = Join-Path $base 'scripts'
+    $env:PLANTOIR_SUPPORT_DIR = Join-Path $base 'support'
+    $env:PLANTOIR_QUARTZ_DIR  = Join-Path $NATIVE_RUNTIME 'quartz'
+    $env:PLANTOIR_EMOJI_FONT  = Join-Path $NATIVE_RUNTIME 'fonts\NotoColorEmoji.ttf'
+    $env:PLANTOIR_COURSES_DIR = Join-Path (Get-Location).Path 'courses'
+    # Build output lives OUTSIDE the working folder: teachers keep working
+    # folders in OneDrive, and a build's thousands of small files would sync
+    # and lock in place there.
+    $buildRoot = Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)
+    $env:PLANTOIR_BUILD_ROOT = $buildRoot
+    $env:PLANTOIR_WORK_DIR   = Join-Path $buildRoot 'work'
+    # The embeddable Python defaults to the ANSI code page; the scripts print
+    # their progress with emoji.
+    $env:PYTHONUTF8 = '1'
+    $env:PYTHONIOENCODING = 'utf-8'
+    return (Join-Path $NATIVE_RUNTIME 'python\python.exe')
+}
+# =========================================================================
+
 # ==================== Container runtime (Docker Engine in WSL2) ====================
 # Docker Desktop is no longer required. On Windows this script uses the Docker
 # Engine running inside WSL2 (Windows Subsystem for Linux) and installs/starts
@@ -374,8 +415,10 @@ function Get-MountPath([string]$winPath) {
     return $winPath
 }
 
+if (-not $NATIVE_RUNTIME) {
 Ensure-ContainerRuntime
 $MOUNT_COURSES = Get-MountPath $HOST_COURSES
+}
 # ====================================================================
 
 # ---- Container handling (mount-aware) ----
@@ -423,6 +466,27 @@ $CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"
 # build, no container creation. Processes are found by WORKING
 # DIRECTORY, not port, so builds are caught as well as servers and
 # other sections' processes can never be touched (parity: preview.sh).
+if ($NATIVE_RUNTIME -and $STOP_MODE) {
+    # Section processes are recognisable without /proc: the per-section
+    # scaffold copy means the serving node's command line carries the
+    # section's work dir, and the python build carries --course/--section.
+    $buildRoot = Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)
+    $sectionNeedle = (Join-Path $buildRoot ('work\' + $COURSE + '\section' + $SECTION)).ToLowerInvariant()
+    Write-Host "Stopping preview processes for $COURSE section $SECTION ..."
+    $stopped = 0
+    foreach ($proc in (Get-CimInstance Win32_Process -Filter "Name='node.exe' OR Name='python.exe'")) {
+        $line = [string]$proc.CommandLine
+        if (-not $line) { continue }
+        $lower = $line.ToLowerInvariant()
+        $isBuild = ($lower.Contains('build_site.py') -and $lower.Contains(('--course=' + $COURSE).ToLowerInvariant()) -and $lower.Contains(('--section=' + $SECTION).ToLowerInvariant()))
+        if ($lower.Contains($sectionNeedle) -or $isBuild) {
+            try { Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop; $stopped++ } catch {}
+        }
+    }
+    Write-Host "Stopped $stopped process(es)."
+    exit 0
+}
+
 if ($STOP_MODE) {
     $dockerReady = $false
     try { docker info *> $null; if ($LASTEXITCODE -eq 0) { $dockerReady = $true } } catch {}
@@ -597,14 +661,20 @@ if ($OVERRIDE_IMAGE) {
   $BUILD_CONTEXT = $null
   $IMAGE = $OVERRIDE_IMAGE
 } elseif ($BUILD_CONTEXT) {
+  # Native runs need no image, and hashing the whole build context is
+  # the slowest thing this launcher does - skip it.
+  if (-not $NATIVE_RUNTIME) {
   Write-Host "Checking whether your website builder is up to date..."
   $IMAGE = "teaching-quartz:src-$(Get-ToolchainHash $BUILD_CONTEXT)"
+  }
 } else {
   Write-Host "This folder is missing the toolchain's build recipe."
   Write-Host "Open the folder in the app once to refresh it, or run from a repository copy."
   exit 1
 }
+if (-not $NATIVE_RUNTIME) {
 Build-ImageIfMissing
+}
 
 
 # A free block of host ports for this folder's previews (four site ports
@@ -644,6 +714,7 @@ function Run-ContainerWithMount {
         tail -f /dev/null | Out-Null
 }
 
+if (-not $NATIVE_RUNTIME) {
 # A container keeps running the version it was created from, so an update
 # only takes effect once the container itself is recreated.
 # The line below is a milestone marker the app watches for (parity with
@@ -705,6 +776,7 @@ if ($containerExists) {
     Write-Host "Creating a new container named $CONTAINER_NAME (image: $IMAGE) ..."
     Run-ContainerWithMount
 }
+}
 
 # ---- Validate SECTION against course_config.json ----
 Write-Host "Checking allowed timetable sections for $COURSE ..."
@@ -760,11 +832,34 @@ $argList += "--port=$PREVIEW_PORT"
 # address is resolved from the container rather than assumed. The exact
 # phrase below is what the app watches for.
 $HOST_PREVIEW_PORT = $null
-$portLine = docker port "$CONTAINER_NAME" "$PREVIEW_PORT/tcp" 2>$null | Select-Object -First 1
-if ($portLine -and ($portLine -match ':(\d+)\s*$')) { $HOST_PREVIEW_PORT = $Matches[1] }
+if ($NATIVE_RUNTIME) {
+    # Serving directly, so probe a free site+websocket pair here, walking the
+    # same 10-apart blocks the container port mapping used (8081/8091/8101...).
+    if (-not $BUILD_ONLY) {
+        foreach ($candidate in @($PREVIEW_PORT, ($PREVIEW_PORT+10), ($PREVIEW_PORT+20), ($PREVIEW_PORT+30), ($PREVIEW_PORT+40), ($PREVIEW_PORT+50))) {
+            $siteBusy = Get-NetTCPConnection -State Listen -LocalPort $candidate -ErrorAction SilentlyContinue
+            $wsBusy   = Get-NetTCPConnection -State Listen -LocalPort ($candidate + 1000) -ErrorAction SilentlyContinue
+            if (-not $siteBusy -and -not $wsBusy) { $HOST_PREVIEW_PORT = $candidate; break }
+        }
+        if (-not $HOST_PREVIEW_PORT) { Write-Host "Could not find free ports for this folder's previews."; exit 1 }
+        $argList = @($argList | Where-Object { $_ -notlike '--port=*' }) + "--port=$HOST_PREVIEW_PORT"
+    }
+} else {
+    $portLine = docker port "$CONTAINER_NAME" "$PREVIEW_PORT/tcp" 2>$null | Select-Object -First 1
+    if ($portLine -and ($portLine -match ':(\d+)\s*$')) { $HOST_PREVIEW_PORT = $Matches[1] }
+}
 if (-not $HOST_PREVIEW_PORT) { $HOST_PREVIEW_PORT = $PREVIEW_PORT }
 if (-not $BUILD_ONLY) {
     Write-Host ("Preview will be available at: http://localhost:{0}/" -f $HOST_PREVIEW_PORT)
+}
+
+# ---- Native run (no container) ----
+if ($NATIVE_RUNTIME) {
+    $py = Enter-NativeRuntime
+    $env:HOST_TZ_OFFSET = (Get-Date).ToString('zzz').Replace(':','')
+    Write-Host "Running the website builder on this PC ..."
+    & $py -u (Join-Path $env:PLANTOIR_SCRIPTS_DIR 'build_site.py') @argList
+    exit $LASTEXITCODE
 }
 
 # ---- Run build inside the container ----
