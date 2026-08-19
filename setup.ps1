@@ -309,7 +309,14 @@ function Get-ToolchainHash([string]$context) {
   # Fast directory traversal with pruning of excluded folders:
   $filesToHash = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
   $stack = [System.Collections.Generic.Stack[string]]::new()
-  $fullContext = [System.IO.Path]::GetFullPath($context)
+  # Anchor to the launcher's own folder (the PowerShell location), NOT the
+  # process working directory: .NET path APIs resolve relative paths against
+  # Environment.CurrentDirectory, which Set-Location does not update — a run
+  # whose process CWD held a DIFFERENT (stale) .toolchain hashed that one and
+  # tagged the image with the wrong recipe. Docker children DO inherit the
+  # PowerShell location, so this keeps hash and build context pointed at the
+  # same folder.
+  $fullContext = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $context))
   $stack.Push($fullContext)
 
   while ($stack.Count -gt 0) {

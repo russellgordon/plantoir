@@ -109,6 +109,50 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Netlify uploads now retry on 429 with backoff, at 5 workers not 10**
+  (Shared Python, 2026-08-19, follows `e0136437`).
+  - **What was fixed**: the parallel-upload optimization (`e0136437`, 10-worker
+    `ThreadPoolExecutor`) broke EVERY deploy large enough to matter: Netlify
+    rate-limits the per-file upload endpoint, and one 429 aborted the whole
+    deploy. Measured live on Windows (WSL2 Docker, home broadband): a fresh
+    318-file ICS3U deploy died on the first 429 — reproducibly — where the old
+    serial loop had always stayed under the limit. So "optimized" deploys
+    failed 100% of the time on any new site; that is why deploys "stopped
+    working" the same evening the optimization landed.
+  - **The fix** (`scripts/deploy.py` → `_upload_required_files`): each file
+    upload retries up to 6 times on 429/500/502/503/504 and on socket
+    timeouts, with exponential backoff (1 s doubling, capped 30 s), honouring
+    a `Retry-After` header when Netlify sends one; workers reduced 10 → 5.
+    A non-retryable API error still fails the deploy immediately.
+  - **Rejected**: reverting to serial (throws away a real win once retries
+    exist); keeping 10 workers with retries (converges, but spends its time
+    backing off — 5 stays mostly under the limit); a global rate limiter
+    shared across threads (more machinery than the endpoint's behaviour
+    justifies — per-file backoff empties the herd quickly enough).
+  - **Mac impact**: `deploy.py` is shared, so the mac had the same broken
+    window between `e0136437` and this fix. Nothing to port — but the mac app
+    must be REBUILT so its bundled toolchain carries the fix, or every
+    working folder it refreshes keeps deploying with the 10-worker version.
+
+- **`Get-ToolchainHash` in the `.ps1` launchers now anchors to the launcher's
+  own folder** (Windows launchers only, 2026-08-19). `.sh` launchers are
+  unaffected — bash `cd` moves the real process CWD.
+  - **What was fixed**: the PowerShell hash function resolved its relative
+    context (`./.toolchain`) with .NET path APIs, which use
+    `Environment.CurrentDirectory` — and `Set-Location` does NOT update that.
+    A launcher invoked from a process whose CWD held a *different* stale
+    `.toolchain` (seen live: a terminal session sitting in the repository,
+    which had an Aug-11 mirror at its root) hashed the stale folder, matched
+    an Aug-11 image tag, and silently ran week-old scripts while `docker
+    build`'s context — resolved from the PowerShell location — pointed at the
+    fresh folder. Image tag and image contents could disagree.
+  - **The fix**: `$fullContext` is now built from `(Get-Location).ProviderPath`
+    (the launchers `Set-Location` to their own folder at startup), in
+    `deploy.ps1`, `preview.ps1`, and `setup.ps1` alike.
+  - **Mac relevance**: know that a Windows image tag from before this fix may
+    not describe its contents; if a Windows machine misbehaves after sync,
+    recreating the container clears it.
+
 - **Production rebuilds in `deploy.py` delegate to `build_site.py --build-only`**
   (Shared Python, 2026-08-18).
   - **What was fixed**: After Quartz build staging moved to container-internal ext4 storage (`/tmp/quartz-builds/<COURSE>/section<N>`), `deploy.py` failed when rebuilding for production (when detecting preview live-reload scripts in `index.html` or updating `baseUrl` for live site domains). It was calling `npx quartz build` directly in `cwd=section_dir` (`/teaching/courses/<COURSE>/.merged_output/section<N>`), which in the dual workspace architecture contains only `public/` and `course_config.json` rather than the full Quartz scaffold. If `/tmp/quartz-builds` was clean (e.g. freshly created container, or deploy without preview in the same session), `deploy.py` crashed immediately with `Production rebuild failed`.
