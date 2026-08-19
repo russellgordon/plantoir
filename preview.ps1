@@ -467,21 +467,40 @@ $CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"
 # DIRECTORY, not port, so builds are caught as well as servers and
 # other sections' processes can never be touched (parity: preview.sh).
 if ($NATIVE_RUNTIME -and $STOP_MODE) {
-    # Section processes are recognisable without /proc: the per-section
-    # scaffold copy means the serving node's command line carries the
-    # section's work dir, and the python build carries --course/--section.
+    # Section processes are recognisable without /proc: the python build
+    # carries --course/--section on its command line, and the serving node's
+    # carries the section's work dir when launched with an absolute path.
+    # What that misses is a child spawned with a RELATIVE path (npx does),
+    # so every match's descendants go too, walked through the same process
+    # snapshot's parent links.
     $buildRoot = Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)
     $sectionNeedle = (Join-Path $buildRoot ('work\' + $COURSE + '\section' + $SECTION)).ToLowerInvariant()
     Write-Host "Stopping preview processes for $COURSE section $SECTION ..."
-    $stopped = 0
-    foreach ($proc in (Get-CimInstance Win32_Process -Filter "Name='node.exe' OR Name='python.exe'")) {
+    $snapshot = @(Get-CimInstance Win32_Process)
+    $matched = New-Object System.Collections.Generic.HashSet[uint32]
+    foreach ($proc in $snapshot) {
+        if ($proc.Name -ne 'node.exe' -and $proc.Name -ne 'python.exe') { continue }
         $line = [string]$proc.CommandLine
         if (-not $line) { continue }
         $lower = $line.ToLowerInvariant()
         $isBuild = ($lower.Contains('build_site.py') -and $lower.Contains(('--course=' + $COURSE).ToLowerInvariant()) -and $lower.Contains(('--section=' + $SECTION).ToLowerInvariant()))
-        if ($lower.Contains($sectionNeedle) -or $isBuild) {
-            try { Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop; $stopped++ } catch {}
+        if ($lower.Contains($sectionNeedle) -or $isBuild) { $null = $matched.Add($proc.ProcessId) }
+    }
+    # Descendants: repeat until no new child turns up (the chain is
+    # python -> cmd -> node, so one pass is not enough).
+    do {
+        $grew = $false
+        foreach ($proc in $snapshot) {
+            if ($matched.Contains($proc.ProcessId)) { continue }
+            if ($proc.ParentProcessId -and $matched.Contains([uint32]$proc.ParentProcessId)) {
+                $null = $matched.Add($proc.ProcessId)
+                $grew = $true
+            }
         }
+    } while ($grew)
+    $stopped = 0
+    foreach ($processId in $matched) {
+        try { Stop-Process -Id $processId -Force -ErrorAction Stop; $stopped++ } catch {}
     }
     Write-Host "Stopped $stopped process(es)."
     exit 0

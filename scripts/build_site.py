@@ -4214,6 +4214,11 @@ def build_section_site(
     # ===========================
     # Build or Preview (server?)
     # ===========================
+    # The scaffold's own CLI by ABSOLUTE path: `npx quartz` resolves the
+    # CLI from the npm registry (a project's own bin is never linked into
+    # its node_modules/.bin), which needs network and floats the version.
+    # The absolute path also puts the section's work dir on the serve
+    # process's command line - what the native stop matches on.
     env = os.environ.copy()
     env.setdefault("TZ", "UTC")
     env.setdefault("SOURCE_DATE_EPOCH", "1704067200")  # 2024-01-01T00:00:00Z
@@ -4222,7 +4227,7 @@ def build_section_site(
         # Static build ONLY (single build)
         print("\n🏗️  Building static site with Quartz → public/")
         safe_clean_public_dir(output_dir / "public")
-        subprocess.run([toolchain_paths.NPX, "quartz", "build", "--concurrency", "1"], cwd=output_dir, env=env, check=True)
+        subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1"], cwd=output_dir, env=env, check=True)
 
         public_dir = output_dir / "public"
         if not public_dir.exists():
@@ -4241,7 +4246,7 @@ def build_section_site(
         print(f"\n🚀 Launching Quartz preview on http://localhost:{port}\n")
         safe_clean_public_dir(output_dir / "public")
         _start_public_sync_watcher(output_dir, host_output_dir)
-        subprocess.run([toolchain_paths.NPX, "quartz", "build", "--concurrency", "1", "--serve", "--port", str(port), "--wsPort", str(ws_port)], cwd=output_dir, env=env, check=True)
+        subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1", "--serve", "--port", str(port), "--wsPort", str(ws_port)], cwd=output_dir, env=env, check=True)
 
 def main():
     parser = argparse.ArgumentParser(description="Build Quartz site for a course section (preview by default; use --build-only for a static build without preview).")
