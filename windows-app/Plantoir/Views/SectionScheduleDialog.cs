@@ -93,7 +93,7 @@ public sealed class SectionScheduleDialog : ContentDialog
         _hwnd = hwnd;
 
         Title = $"When does {course.Code} Section {sectionNumber} meet?";
-        PrimaryButtonText = "Remember these dates";
+        PrimaryButtonText = "Remember dates";
         SecondaryButtonText = "Check Dates";
         CloseButtonText = "Cancel";
         DefaultButton = ContentDialogButton.Primary;
