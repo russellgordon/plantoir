@@ -359,12 +359,36 @@ final class MarketingScreenshots: MarketingScreenshotCase {
 
         let deployButton: XCUIElement = application.buttons["deployButton"]
         XCTAssertTrue(deployButton.waitForExistence(timeout: 20), "Deploy button should exist")
+
+        // Parked before the click, and saved the moment a step is described,
+        // with no settle: a warm delta deploy of unchanged content finishes
+        // in a few seconds, and a two-second settle here once outlived the
+        // whole thing — the capture showed "Done" instead of a deploy under
+        // way.
+        parkPointer(in: window)
         deployButton.click()
 
         let milestone: XCUIElement = application.staticTexts["taskMilestoneLabel"]
         XCTAssertTrue(milestone.waitForExistence(timeout: 60), "Progress should be described while the site deploys")
-        settle(2.0)
-        save(window, as: "hero-plantoir")
+
+        // Prefer a step past the first: on a set-up Mac the opening
+        // milestone reads "Getting this Mac ready…", which is a confusing
+        // sentence to put under a "Deploying" title on the front page. But
+        // wait no more than a few seconds — a warm delta deploy can finish
+        // in four, and waiting it out captures "Done" instead of a deploy.
+        // The sentence is the element's VALUE; its label is empty.
+        let betterStepBy: Date = Date().addingTimeInterval(4)
+        while Date() < betterStepBy {
+            if !milestone.exists {
+                break
+            }
+            let described: String = (milestone.value as? String) ?? ""
+            if !described.isEmpty && !described.contains("Getting this Mac ready") {
+                break
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        save(window, as: "hero-plantoir", alreadyParked: true)
 
         let cancelButton: XCUIElement = application.buttons["taskCancelButton"]
         if cancelButton.exists {

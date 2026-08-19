@@ -31,7 +31,6 @@ unlocked.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import shutil
@@ -498,32 +497,46 @@ def kill_orphaned_model_servers() -> None:
     subprocess.run(["pkill", "-f", "Resources/llama/llama-server"], capture_output=True)
 
 
-def stop_preview_container(workspace: Path) -> None:
-    """Stop the demo folder's own container, so a preview really builds.
+class BackupsSetAside:
+    """Keep the teacher's course backups out of frame, without touching them.
 
-    Belt and braces around the progress photograph: clearing the built pages
-    already forces a rebuild, and stopping the container as well makes the
-    preview walk the whole path from container start, the way a teacher who
-    just opened the app sees it. (STOP, never remove: recreating a container
-    loses the in-container hide-filter patch — the standing TODO.md item —
-    so `docker rm` here would flip the demo sites to publishing hidden
-    pages.)
-
-    Only THIS folder's container is stopped. The name is derived exactly the
-    way the launcher derives it (`pwd -P | shasum -a 256`, first 8 hex
-    characters — including the trailing newline `pwd` emits), and Colima is
-    shared with other projects, so nothing broader than one container is
-    touched.
+    Backups accumulate whenever the assistant changes a section, and each
+    adds a row to the sidebar's Backups group — so the same capture taken a
+    week apart would differ by whatever work happened in between, and a
+    backup named after a course once made every query for that course
+    ambiguous mid-test ("Multiple matching elements found"). The `_backups`
+    folder is renamed aside for the run and put back whole afterwards;
+    nothing inside it is read, altered, or deleted.
     """
-    real_path: str = os.path.realpath(str(workspace))
-    digest: str = hashlib.sha256((real_path + "\n").encode()).hexdigest()[:8]
-    container: str = f"teaching-quartz-{digest}"
-    result = subprocess.run(
-        ["docker", "stop", container],
-        capture_output=True, text=True,
-    )
-    if result.returncode == 0:
-        print(f"   Stopped {container}, so the next preview builds from the start.")
+
+    def __init__(self, workspace: Path) -> None:
+        self.backups: Path = workspace / "courses" / "_backups"
+        self.aside: Path = workspace / "courses" / "_backups.set-aside-for-capture"
+
+    def __enter__(self) -> "BackupsSetAside":
+        if self.backups.exists() and not self.aside.exists():
+            self.backups.rename(self.aside)
+            print("   Set the course backups aside, so the sidebar photographs the same every run.")
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        if self.aside.exists():
+            if self.backups.exists():
+                # Something recreated _backups mid-run; fold the set-aside
+                # contents back in rather than losing either side.
+                for course_dir in self.aside.iterdir():
+                    target = self.backups / course_dir.name
+                    if target.exists():
+                        for item in course_dir.iterdir():
+                            shutil.move(str(item), str(target / item.name))
+                        course_dir.rmdir()
+                    else:
+                        shutil.move(str(course_dir), str(target))
+                self.aside.rmdir()
+            else:
+                self.aside.rename(self.backups)
+            print("   Put the course backups back.")
+        return False
 
 
 def capture_app(workspace: Path, only: str | None = None) -> None:
@@ -536,20 +549,25 @@ def capture_app(workspace: Path, only: str | None = None) -> None:
     announce("Photographing the app")
     kill_orphaned_model_servers()
     remember_teacher_name(workspace)
-    clear_built_site(workspace, "ENG2D", 1)
-    clear_built_site(workspace, "ENG2D", 2)
     target = "QuartzTeachersUITests/MarketingScreenshots"
     if only:
         target = ",".join(f"{target}/{name}" for name in only.split(","))
-    with RememberedWindowFrames() as frames:
+    with RememberedWindowFrames() as frames, BackupsSetAside(workspace):
         frames.stage_assistant_frame()
         for dark in (False, True):
-            # BOTH sections, and per appearance: the progress capture builds
-            # section 2, and clearing it only once left the second pass
-            # photographing the first pass's finished build as "progress".
-            clear_built_site(workspace, "ENG2D", 1)
+            # Section 2 ONLY, and per appearance: the progress capture
+            # previews section 2, and clearing its output is what makes a
+            # real build happen — clearing it only once left the second
+            # pass photographing the first pass's finished build as
+            # "progress". Section 1 is deliberately NOT cleared: the
+            # preview capture photographs the FINISHED site, which the
+            # existing build shows identically and minutes sooner — a
+            # fresh section 1 build per appearance was most of a run's
+            # dead time. (The container is left running for the same
+            # reason: a warm section 2 rebuild still holds the progress
+            # view up for several seconds, and the 20 Hz poll in the test
+            # needs only one of them.)
             clear_built_site(workspace, "ENG2D", 2)
-            stop_preview_container(workspace)
             suffix = "dark" if dark else "light"
             print(f"   {suffix} appearance")
             with Appearance(dark=dark):
@@ -907,6 +925,9 @@ def main() -> int:
     parser.add_argument("--sites", action="store_true", help="only photograph the class websites")
     parser.add_argument("--phone", action="store_true",
                         help="only photograph the class site on the phone, both appearances")
+    parser.add_argument("--skip-preflight", action="store_true",
+                        help="skip the permission preflight — for back-to-back runs, when both "
+                             "grants were exercised minutes ago and macOS still remembers them")
     parser.add_argument("--figures", action="store_true",
                         help="only reassemble the static figures from parts already captured")
     parser.add_argument("--hero", action="store_true",
@@ -943,7 +964,11 @@ def main() -> int:
 
     keeping_awake = stay_awake()
     try:
-        preflight_permissions()
+        if arguments.skip_preflight:
+            print("   Skipping the permission preflight, as asked. If a capture "
+                  "stalls on a system dialog, re-run without --skip-preflight.")
+        else:
+            preflight_permissions()
         if everything or arguments.provision:
             provision(workspace)
         if everything or arguments.publish:
