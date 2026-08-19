@@ -1,5 +1,7 @@
 ---
 title: Writing About First Nations, Métis, and Inuit Studies
+aliases:
+  - "Writing About First Nations, Métis, and Inuit Studies"
 publish: true
 created: __CREATED__
 enableToc: true

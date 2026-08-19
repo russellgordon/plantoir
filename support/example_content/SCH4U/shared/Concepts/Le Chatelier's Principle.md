@@ -1,5 +1,7 @@
 ---
 title: Le Châtelier's Principle
+aliases:
+  - "Le Châtelier's Principle"
 publish: true
 created: __CREATED__
 enableToc: true
