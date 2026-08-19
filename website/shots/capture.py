@@ -48,7 +48,7 @@ from images import (  # noqa: E402
     WIDEST_PHONE_PIXELS,
     WIDEST_WINDOW_PIXELS,
 )
-from composite import fan, side_by_side    # noqa: E402
+from composite import fan, side_by_side, diagonal_hero, FIGURE_WIDTH    # noqa: E402
 from safari import SafariWindow            # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent.parent
@@ -177,6 +177,12 @@ class RememberedWindowFrames:
                   f"got {written!r}", file=sys.stderr)
         else:
             print(f"   Assistant window staged at {ASSISTANT_FRAME}")
+
+        main_key = (
+            "NSWindow Frame SwiftUI.ModifiedContent<QuartzTeachers.WindowRootView, "
+            "SwiftUI._FlexFrameLayout>-1-AppWindow-1"
+        )
+        write_defaults(main_key, "40 60 1280 800 0 0 1512 982")
 
 
 # ---------- The UI tests ----------
@@ -497,23 +503,77 @@ def capture_parts(window: "SafariWindow", suffix: str) -> None:
         print(f"   part {destination.name}")
 
 
-def build_static_figures() -> None:
-    """Assemble the two figures whose subject is colour.
+def capture_obsidian(workspace: Path, suffix: str) -> None:
+    """Capture Obsidian showing the ENG2D course note."""
+    PARTS.mkdir(parents=True, exist_ok=True)
+    note_path = workspace / "courses" / "ENG2D" / "section2" / "index.md"
+    if not note_path.exists():
+        note_path = workspace / "ENG2D" / "section2" / "index.md"
 
-    Both are built from the LIGHT captures of the course home pages, and both
-    are served unchanged to every visitor: a figure comparing three courses'
-    colour schemes must not change colour to match the reader, or it is no
-    longer showing what it claims.
+    run(["open", f"obsidian://open?path={note_path}"], capture_output=True)
+    time.sleep(2.5)
+
+    script = """
+    tell application "Obsidian" to activate
+    delay 0.4
+    tell application "System Events"
+      tell process "Obsidian"
+        set position of window 1 to {60, 60}
+        set size of window 1 to {1280, 800}
+      end tell
+    end tell
     """
+    subprocess.run(["osascript", "-e", script], capture_output=True)
+    time.sleep(1.5)
+
+    helper = Path(__file__).resolve().parent / "windowid.swift"
+    result = subprocess.run(["swift", str(helper), "Obsidian"], capture_output=True, text=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        print("   Could not find Obsidian window to capture.", file=sys.stderr)
+        return
+
+    window_id = result.stdout.strip()
+    destination = PARTS / f"obsidian-{suffix}.png"
+    subprocess.run(["screencapture", "-x", "-o", "-l", window_id, str(destination)], check=True)
+    mask_window_corners(destination, width_in_points=1280)
+    print(f"   part {destination.name}")
+
+    subprocess.run(["osascript", "-e", 'tell application "iTerm" to activate'], capture_output=True)
+
+
+def build_hero_figures() -> None:
+    """Assemble the diagonal hero composite images for light and dark appearances."""
+    announce("Assembling the hero figures")
+    for suffix in ("light", "dark"):
+        obsidian = PARTS / f"obsidian-{suffix}.png"
+        plantoir = IMAGE_DIR / f"hero-plantoir-{suffix}.png"
+        safari = IMAGE_DIR / f"site-eng2d-{suffix}.png"
+
+        if not obsidian.exists():
+            print(f"   Missing Obsidian capture for {suffix} ({obsidian.name})", file=sys.stderr)
+            continue
+        if not plantoir.exists():
+            print(f"   Missing Plantoir capture for {suffix} ({plantoir.name})", file=sys.stderr)
+            continue
+        if not safari.exists():
+            print(f"   Missing Safari capture for {suffix} ({safari.name})", file=sys.stderr)
+            continue
+
+        dest = IMAGE_DIR / f"hero-{suffix}.png"
+        diagonal_hero(obsidian, plantoir, safari, dest, stagger_ratio=0.20, figure_width=FIGURE_WIDTH)
+        print(f"   saved {dest.name}")
+
+
+def build_static_figures() -> None:
+    """Assemble the figures whose subject is composite or colour."""
     announce("Assembling the colour figures")
     fanned = [PARTS / f"home-{course['code'].lower()}-light.png" for course in DEMO_COURSES]
     missing = [path.name for path in fanned if not path.exists()]
     if missing:
         print(f"   Missing parts: {', '.join(missing)} — run --sites first.", file=sys.stderr)
-        return
-
-    fan(fanned, IMAGE_DIR / "colour-schemes.png")
-    print("   saved colour-schemes.png")
+    else:
+        fan(fanned, IMAGE_DIR / "colour-schemes.png")
+        print("   saved colour-schemes.png")
 
     pair = [PARTS / "home-eng2d-light.png", PARTS / "home-eng2d-dark.png"]
     if all(path.exists() for path in pair):
@@ -521,6 +581,8 @@ def build_static_figures() -> None:
         print("   saved light-and-dark.png")
     else:
         print("   Missing the dark half of the light/dark pair.", file=sys.stderr)
+
+    build_hero_figures()
 
 
 def capture_search(window: "SafariWindow", shot: dict, suffix: str) -> None:
@@ -564,7 +626,7 @@ def shots_of_kind(kind: str) -> list[dict]:
     return wanted
 
 
-def capture_sites() -> None:
+def capture_sites(workspace: Path) -> None:
     announce("Photographing the class websites")
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     shots = browser_shots()
@@ -573,6 +635,7 @@ def capture_sites() -> None:
         print(f"   {suffix} appearance")
         with Appearance(dark=dark):
             time.sleep(2)
+            capture_obsidian(workspace, suffix)
             with SafariWindow(1280, 860) as window:
                 for shot in shots:
                     capture = shot["capture"]
@@ -739,12 +802,19 @@ def main() -> int:
                         help="with --app, run one capture (e.g. test6Assistant) instead of all of them")
     parser.add_argument("--sites", action="store_true", help="only photograph the class websites")
     parser.add_argument("--figures", action="store_true",
-                        help="only reassemble the two colour figures from parts already captured")
+                        help="only reassemble the static figures from parts already captured")
+    parser.add_argument("--hero", action="store_true",
+                        help="only reassemble the hero composite from parts already captured")
     arguments = parser.parse_args()
 
     workspace = Path(arguments.workspace).expanduser()
     if Path.home() not in workspace.parents:
         raise SystemExit("The demo folder has to be inside your home folder, or the site builder sees it as empty.")
+
+    if arguments.hero:
+        build_hero_figures()
+        rebuild_site()
+        return 0
 
     everything = not (arguments.provision or arguments.publish or arguments.app
                       or arguments.sites or arguments.figures)
@@ -760,7 +830,7 @@ def main() -> int:
         if everything or arguments.app:
             capture_app(workspace, only=arguments.only)
         if everything or arguments.sites:
-            capture_sites()
+            capture_sites(workspace)
             build_static_figures()
         if arguments.figures and not (everything or arguments.sites):
             build_static_figures()

@@ -136,3 +136,78 @@ def side_by_side(sources: list[Path], destination: Path, gap: int = 34) -> Path:
     canvas.save(destination, format="PNG", optimize=True)
     canvas.save(destination.with_suffix(".webp"), format="WEBP", quality=88, method=6)
     return destination
+
+
+def diagonal_hero(
+    obsidian_path: Path,
+    plantoir_path: Path,
+    safari_path: Path,
+    destination: Path,
+    stagger_ratio: float = 0.20,
+    figure_width: int = FIGURE_WIDTH,
+) -> Path:
+    """Cascade 3 windows diagonally with equal horizontal and vertical stagger.
+
+    1. Back / Top-Left: Obsidian note editor & vault tree
+    2. Middle: Plantoir deploying progress view
+    3. Front / Bottom-Right: Safari viewing the live published class site
+    """
+    from PIL import ImageFilter
+
+    raw_images = [
+        Image.open(obsidian_path).convert("RGBA"),
+        Image.open(plantoir_path).convert("RGBA"),
+        Image.open(safari_path).convert("RGBA"),
+    ]
+
+    base_height = 800
+    cards: list[Image.Image] = []
+    for img in raw_images:
+        aspect = img.width / img.height
+        w = round(base_height * aspect)
+        resized = img.resize((w, base_height), Image.LANCZOS)
+        cards.append(rounded(resized, radius=CORNER_RADIUS))
+
+    card_w = cards[1].width
+    card_h = base_height
+
+    # Equal horizontal and vertical stagger for 1:1 diagonal visual symmetry
+    stagger = round(card_w * stagger_ratio)
+    pad = SHADOW_BLUR * 2
+
+    total_w = card_w + stagger * 2 + pad * 2
+    total_h = card_h + stagger * 2 + pad * 2
+
+    canvas = Image.new("RGBA", (total_w, total_h), (0, 0, 0, 0))
+
+    offsets = [
+        (0, 0),
+        (stagger, stagger),
+        (stagger * 2, stagger * 2),
+    ]
+
+    for card, (ox, oy) in zip(cards, offsets):
+        shadow_canvas = Image.new("RGBA", (card.width + pad * 2, card.height + pad * 2), (0, 0, 0, 0))
+        shape = Image.new("L", card.size, 0)
+        ImageDraw.Draw(shape).rounded_rectangle(
+            [(0, 0), (card.width - 1, card.height - 1)], radius=CORNER_RADIUS, fill=105
+        )
+        shadow_canvas.paste((0, 0, 0, 105), (pad, pad + 8), shape)
+        shadow_canvas = shadow_canvas.filter(ImageFilter.GaussianBlur(SHADOW_BLUR / 2))
+
+        canvas.alpha_composite(shadow_canvas, (ox, oy))
+        canvas.alpha_composite(card, (ox + pad, oy + pad))
+
+    bbox = canvas.getbbox()
+    if bbox:
+        canvas = canvas.crop(bbox)
+
+    if canvas.width != figure_width:
+        h = round(canvas.height * figure_width / canvas.width)
+        canvas = canvas.resize((figure_width, h), Image.LANCZOS)
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(destination, format="PNG", optimize=True)
+    canvas.save(destination.with_suffix(".webp"), format="WEBP", quality=88, method=6)
+    return destination
+

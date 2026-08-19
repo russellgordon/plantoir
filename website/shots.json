@@ -2,6 +2,19 @@
   "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else \u2014 a capitalised address would be photographed mid-redirect.",
   "shots": [
     {
+      "id": "hero",
+      "capture": {
+        "kind": "composite",
+        "of": [
+          "obsidian",
+          "hero-plantoir",
+          "site-eng2d"
+        ]
+      },
+      "alt": "Three overlapping windows in a diagonal cascade: Markdown notes in Obsidian on the left, Plantoir deploying the site in the middle, and the finished class website in Safari on the right.",
+      "caption": "From your notes in Obsidian, through Plantoir, to a live class website."
+    },
+    {
       "id": "courses",
       "capture": {
         "kind": "app-window",

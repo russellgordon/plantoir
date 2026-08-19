@@ -53,9 +53,9 @@ class MarketingScreenshotCase: XCTestCase {
     /// The frame string AppKit stores for a window: the window's own frame
     /// followed by the frame of the screen it was on.
     static func frameArgument(width: CGFloat, height: CGFloat) -> String {
-        let screen: CGRect = NSScreen.screens.first?.frame ?? CGRect(x: 0, y: 0, width: 1512, height: 982)
-        let x: CGFloat = (screen.width - width) / 2
-        let y: CGFloat = (screen.height - height) / 2
+        let screen: CGRect = NSScreen.main?.frame ?? NSScreen.screens.first?.frame ?? CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let x: CGFloat = 40
+        let y: CGFloat = 60
         return "\(Int(x)) \(Int(y)) \(Int(width)) \(Int(height)) "
             + "\(Int(screen.minX)) \(Int(screen.minY)) \(Int(screen.width)) \(Int(screen.height)) "
     }
@@ -259,6 +259,27 @@ final class MarketingScreenshots: MarketingScreenshotCase {
         save(window, as: "new-course")
 
         application.buttons["wizardCloseButton"].click()
+    }
+
+    /// Plantoir in the middle of deploying, showing the deployment progress.
+    func test3Deploying() throws {
+        let workspacePath: String = try demoWorkspacePath()
+        let application: XCUIApplication = launchApp(workspacePath: workspacePath)
+        let window: XCUIElement = openSection(1, ofCourse: "ENG2D", in: application)
+
+        let deployButton: XCUIElement = application.buttons["deployButton"]
+        XCTAssertTrue(deployButton.waitForExistence(timeout: 20), "Deploy button should exist")
+        deployButton.click()
+
+        let milestone: XCUIElement = application.staticTexts["taskMilestoneLabel"]
+        XCTAssertTrue(milestone.waitForExistence(timeout: 60), "Progress should be described while the site deploys")
+        settle(3.0)
+        save(window, as: "hero-plantoir")
+
+        let cancelButton: XCUIElement = application.buttons["taskCancelButton"]
+        if cancelButton.exists {
+            cancelButton.click()
+        }
     }
 
     /// Progress, described in words while a site is built.
