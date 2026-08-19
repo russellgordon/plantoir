@@ -448,6 +448,17 @@ public sealed class AssistAgent
     private static readonly HashSet<string> EditsPages = new(StringComparer.OrdinalIgnoreCase)
     {
         "publish_pages", "unpublish_pages", "publish_class_on", "undo_last_change",
+        "re_date_classes", "roll_over_section", "sync_page_dates",
+        "add_next_class", "add_classes", "make_room_for_classes", "add_curriculum_mentions",
+    };
+
+    /// <summary>
+    /// Tools that must always start a preview in Plantoir after finishing their work,
+    /// even if a preview was not previously active.
+    /// </summary>
+    private static readonly HashSet<string> AlwaysStartsPreview = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "re_date_classes", "roll_over_section",
     };
 
     /// <summary>The page-editing tools that accept a preview flag to decline the server's build.</summary>
@@ -1050,7 +1061,7 @@ public sealed class AssistAgent
         {
             _handedToApp = true;
         }
-        if (edits && hadPreview && ShowPreviewInApp is not null)
+        if (edits && (hadPreview || AlwaysStartsPreview.Contains(name)) && ShowPreviewInApp is not null)
         {
             ShowPreviewInApp.Invoke();
         }

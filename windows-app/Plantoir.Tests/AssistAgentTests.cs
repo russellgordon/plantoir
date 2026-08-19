@@ -265,6 +265,35 @@ public class AssistAgentTests
         Assert.False(rig.Agent.IsAwaitingApproval);
     }
 
+    [Fact]
+    public void ReDatingClasses_WhenPreviewIsRunning_StopsPreviewModifiesFilesAndStartsNewPreview()
+    {
+        var rig = new Rig { PreviewShowing = true, Confirming = false };
+        rig.Tools.Result = "Re-dated 86 classes and 181 pages they use.";
+
+        var lines = rig.Say("re-date my classes");
+
+        Assert.Contains("stop preview", rig.AppActions);
+        Assert.Contains("show preview", rig.AppActions);
+        Assert.Equal("stop preview", rig.AppActions[0]);
+        Assert.Equal("show preview", rig.AppActions[^1]);
+        Assert.Equal("re_date_classes", Assert.Single(rig.Tools.Calls).Name);
+    }
+
+    [Fact]
+    public void ReDatingClasses_WhenNoPreviewRunning_ModifiesFilesAndStartsNewPreview()
+    {
+        var rig = new Rig { PreviewShowing = false, Confirming = false };
+        rig.Tools.Result = "Re-dated 86 classes and 181 pages they use.";
+
+        var lines = rig.Say("re-date my classes");
+
+        Assert.DoesNotContain("stop preview", rig.AppActions);
+        Assert.Contains("show preview", rig.AppActions);
+        Assert.Equal("show preview", rig.AppActions[^1]);
+        Assert.Equal("re_date_classes", Assert.Single(rig.Tools.Calls).Name);
+    }
+
     // ---- Looking before you leap ----------------------------------------
 
     [Fact]
