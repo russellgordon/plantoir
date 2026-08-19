@@ -203,6 +203,10 @@ public sealed partial class SectionDetailView : UserControl
                 return;
             }
 
+            // The same stop-sweep race the deploy path guards against: a
+            // just-stopped preview's sweep would kill this one's build.
+            await PreviewStopper.WhenSweepsFinish();
+
             _previewUrl = null;
             _lastLoadedUrl = null;
             _isWaitingForServer = true;
@@ -307,6 +311,10 @@ public sealed partial class SectionDetailView : UserControl
                 await ShowDialogSafelyAsync(dialog);
                 return;
             }
+
+            // The same stop-sweep race the deploy path guards against: a
+            // just-stopped preview's sweep would kill this one's build.
+            await PreviewStopper.WhenSweepsFinish();
 
             _previewUrl = null;
             _lastLoadedUrl = null;
@@ -533,6 +541,15 @@ public sealed partial class SectionDetailView : UserControl
                 await ShowDialogSafelyAsync(accountDialog);
                 return;
             }
+
+            // Stopping a preview sweeps the container for this section's
+            // processes BY WORKING DIRECTORY, seconds after the click — and
+            // the deploy's own build works in that same directory. Deploying
+            // right after stopping (the natural order, since Deploy needs the
+            // preview stopped) put the sweep on top of the fresh build and
+            // killed it before its first output flushed: an instant failure
+            // showing nothing past the launcher's opening lines.
+            await PreviewStopper.WhenSweepsFinish();
 
             bool needsBuild = BuildFreshness.NeedsRebuild(_course, _sectionNumber);
             _deployRunner.Milestones = toFolder

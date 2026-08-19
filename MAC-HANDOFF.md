@@ -80,6 +80,38 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+- **Mirror the stop-sweep guard: await in-flight `--stop` sweeps before
+  starting any build** (Windows, 2026-08-19, GUI-IMPROVEMENTS row 282).
+  Stopping a preview runs the launcher's `--stop` mode fire-and-forget, and
+  that sweep kills the section's container-side processes BY WORKING
+  DIRECTORY — including `/tmp/quartz-builds/<COURSE>/section<N>` — several
+  seconds after the click. A deploy started right after stopping (the only
+  order the interface allows, since Deploy needs the preview stopped) puts
+  the sweep on top of the deploy's own quiet build and kills it before its
+  first output flushes. The teacher sees an instant failure whose transcript
+  ends at "Starting container if needed …" — nothing to go on at all.
+
+  Windows reproduced this live during presentation prep and fixed it by
+  making `PreviewStopper` track every in-flight sweep (each capped at 15 s so
+  a wedged stop child can never hold a deploy hostage) and exposing
+  `WhenSweepsFinish()`; the deploy path and both preview-start paths await it
+  before launching a build. Reference: `windows-app/Plantoir/Services/
+  PreviewStopper.cs`, `windows-app/Plantoir/Views/SectionDetailView.xaml.cs`.
+
+  **The mac has the same latent race**: its `PreviewStopper` is the design
+  Windows copied (row 105), equally fire-and-forget, and its `--stop` kills
+  by the same working directories. Deploys there succeed today by timing —
+  Colima's socket answers faster than WSL2, so the sweep usually lands before
+  the next build starts — not by construction. Please mirror the guard.
+
+  Rejected on Windows: teaching the sweep to spare "young" processes (the
+  sweep cannot tell a leftover preview build from a new deploy build — any
+  age cut-off guesses); retrying the killed build once (hides the mechanism
+  and doubles the slowest path); having deploy skip the quiet build when a
+  sweep is near (the build is needed; the wait is the honest fix). This
+  cannot be a contract case: it is process timing on one machine, exactly
+  the platform mechanics the contract's coverage table excludes.
+
 - **A contract case for the summary/detail split — the mac already passes it,
   so this is a pin, not a request** (Windows, 2026-08-18, `windows-sync`).
   Windows has just ported `AssistToolOutcome`'s two-audience split, having
