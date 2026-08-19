@@ -21,7 +21,7 @@
         "test": "testCourseList"
       },
       "alt": "The Plantoir window listing three courses in a sidebar, with one section open beside it.",
-      "caption": "Every course and every class section, in one window."
+      "caption": "Every course you teach and every class section, in one window."
     },
     {
       "id": "new-course",
