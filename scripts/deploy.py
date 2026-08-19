@@ -942,10 +942,25 @@ def main():
     if site_marker:
         site_id = site_marker.get("id")
         site_url = site_marker.get("url") or site_marker.get("admin_url")
-        print(" Using existing Netlify site for this section.")
-        if site_url:
-            print(f" Site: {site_url}")
-    else:
+        # Verify that the site actually exists on Netlify with this token
+        if site_id:
+            try:
+                live_site = netlify_api("GET", f"/sites/{site_id}", netlify_token)
+                site_url = live_site.get("ssl_url") or live_site.get("url") or site_url
+                print(" Using existing Netlify site for this section.")
+                if site_url:
+                    print(f" Site: {site_url}")
+            except RuntimeError as e:
+                if "404" in str(e):
+                    print(f"⚠️ Saved Netlify site ({site_id}) was not found on Netlify.")
+                    print(" Creating a fresh Netlify site for this section…")
+                    site_marker = None
+                    site_id = None
+                    site_url = None
+                else:
+                    raise
+
+    if not site_marker:
         team_slug = args.team  # <-- use CLI flag; no interactive prompt
         if team_slug:
             print(f" Using Netlify team: {team_slug}")
