@@ -151,6 +151,59 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **plantoir.app now has a Windows hero composite, and `deploy_site_name`
+  turned out not to be a key** (Windows, 2026-08-19, commit "Give the Windows
+  marketing shots a hero composite, and fix three fixtures").
+  - **What changed**: the hero image existed only for the mac, so
+    `build.py`'s platform swap served Windows visitors a picture of a Mac.
+    `website/shots/hero_windows.py` now produces `hero-windows-light.png` and
+    `hero-windows-dark.png` from Obsidian, Plantoir mid-deploy and Edge on
+    the published site, through the same `composite.diagonal_hero()` the mac
+    uses. Nothing on the mac side changes: `build.py` picks the twin up by
+    file name the moment it exists.
+  - **The one mechanism worth knowing**, because it is where the two
+    platforms genuinely differ: the mac's `screencapture -l <window id>`
+    returns a single window with its rounded corners already transparent.
+    Windows has no equivalent, so every card is a REGION of the screen —
+    the window is placed, raised, and the rectangle `DwmGetWindowAttribute`
+    reports as `DWMWA_EXTENDED_FRAME_BOUNDS` is grabbed, then the corners are
+    masked. `GetWindowRect` is the wrong rectangle: it includes an invisible
+    resize border. **Rejected**: `PrintWindow`, which can capture a window
+    bigger than the screen and would have avoided the sizing constraint
+    below, but returns black for WinUI 3 surfaces.
+  - **Consequence the mac does not have**: the cards are limited by the real
+    desktop. This machine is 1920×1080 at 150%, so a work area of 1920×1008
+    caps them at 1680×960 real pixels — a wider aspect than the mac's
+    1280×800 cards. The finished figures still land at the shared
+    `FIGURE_WIDTH` of 1700, so the column edges line up down the page.
+  - **A `--hero-window <theme>` mode was added to `Plantoir.exe`** for the
+    middle card. **Rejected**: reusing the `RenderTargetBitmap` the other
+    Windows shots use — it renders the visual tree, which has no title bar,
+    so Plantoir would have been the one card in the cascade with no window
+    chrome beside Obsidian's and Edge's.
+  - **The `deploy_site_name` question is answered**, and the answer is not
+    the one `WINDOWS-HANDOFF.md` anticipated. That file asked this side to
+    decide what the capturer's fixtures should write now the demo sites are
+    named per section (`<code>-s<n>-2026-gordon`), since the new scheme names
+    a SECTION while the key sits in course-level config. The key was never
+    real: it appears in no launcher, in no contract —
+    `contracts/file-formats.json` lists what `course_config.json` carries and
+    it is not there — and nowhere else in either app. **Renaming it would
+    have looked like settling the question while changing nothing.** The
+    fixtures now write `.netlify_sites/section<n>.json`, the per-section
+    marker a real deploy leaves and the one `build_site.py`'s
+    `resolve_section_domain` and `deploy.py`'s `load_netlify_marker` actually
+    read. Worth a glance on the mac only to confirm nothing there writes the
+    invented key either.
+  - **A second invented key was found beside it**: the same fixtures wrote
+    `section_count`, which nothing reads, so every demo course came up with
+    ONE section while the mac's showed two. It is `num_sections` /
+    `section_numbers`. Reference:
+    `windows-app/Plantoir/Services/MarketingShotCapturer.cs`.
+  - **Nothing for the mac to match.** Both harnesses photograph their own
+    platform; this is a note so the next mac session is not surprised to find
+    a `hero-windows-*` pair in `site/img/`.
+
 - **Deploys ask for the teacher's surname only when NAMING a new site, never
   on a repeat deploy** (Shared Python, 2026-08-19).
   - **What was fixed**: `deploy.py` called `get_or_prompt_teacher_last_name()`
