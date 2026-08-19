@@ -102,6 +102,25 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    the release, updates `website/site.json`, redraws the brand card, rebuilds `site/`,
    and pushes to `main`.
 
+   **The Windows binaries' signatures can be verified from the Mac** — no need
+   to take "it's signed" on faith when the files arrive by hand. `brew install
+   osslsigncode`, fetch Microsoft's root (`curl -sL "https://www.microsoft.com/
+   pkiops/certs/Microsoft%20Identity%20Verification%20Root%20Certificate%20
+   Authority%202020.crt"`, convert with `openssl x509 -inform DER`), then
+   `osslsigncode verify -CAfile ms-root.pem -TSA-CAfile ms-root.pem
+   PlantoirSetup.exe` and expect `Signature verification: ok`. Without the
+   `-CAfile` flags it reports "failed" for a perfectly good signature, because
+   the Mac has no Windows root store — the failure reason to read for is a
+   missing issuer, not a bad digest. Azure Trusted Signing certs live ~3 days,
+   so verify the timestamp line too (proven first on v1.0.0, 2026-08-19).
+
+   Relatedly, `brand_images.py` output is deterministic in PIXELS but not in
+   BYTES: a Pillow/zlib version shift re-encodes identical images into
+   different files. If the release run shows the brand PNGs modified, compare
+   pixels (`PIL.ImageChops.difference(...).getbbox()` is `None` when
+   identical) before treating it as a real change — pixel-identical churn
+   should be checked out, not committed (hit on v1.0.0).
+
    **Asset names are LOAD-BEARING and must never change**:
    `PlantoirSetup.exe` and `Plantoir-macOS.dmg`. plantoir.app's download cards point at
    `releases/latest/download/<asset-name>` — GitHub's evergreen URL that serves
