@@ -74,8 +74,10 @@ DEMO_COURSES = [
 ]
 
 # The simulator used for the phone shot, and the RocketSim helper that draws
-# the device around it.
-SIMULATOR_DEVICE = "iPhone 17"
+# the device around it. "iPhone 17 Pro" because the plain iPhone 17 simulator
+# no longer exists on this Mac (device lists change with Xcode updates), and
+# simulator_udid() exits when the name matches nothing.
+SIMULATOR_DEVICE = "iPhone 17 Pro"
 ROCKETSIM = Path("/Applications/RocketSim.app/Contents/Helpers/rocketsim")
 
 # Window frames the app remembers between launches. The UI tests override them
@@ -880,6 +882,8 @@ def main() -> int:
                         help="with --app, run just the named captures, comma-separated "
                              "(e.g. test4Progress,test6Assistant) instead of all of them")
     parser.add_argument("--sites", action="store_true", help="only photograph the class websites")
+    parser.add_argument("--phone", action="store_true",
+                        help="only photograph the class site on the phone, both appearances")
     parser.add_argument("--figures", action="store_true",
                         help="only reassemble the static figures from parts already captured")
     parser.add_argument("--hero", action="store_true",
@@ -892,6 +896,21 @@ def main() -> int:
 
     if arguments.hero:
         build_hero_figures()
+        rebuild_site()
+        return 0
+
+    if arguments.phone:
+        # No preflight: the phone shot is simctl and RocketSim end to end —
+        # no Safari control, no UI automation — so neither permission dialog
+        # can appear, and the smoke test would only cost a minute.
+        announce("Photographing the class site on the phone")
+        IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+        keeping_awake = stay_awake()
+        try:
+            for dark in (False, True):
+                capture_phone(dark=dark)
+        finally:
+            keeping_awake.terminate()
         rebuild_site()
         return 0
 
