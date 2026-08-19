@@ -9,6 +9,22 @@ description: "Plantoir project rules, part 3 of 7 - Rules that override default 
 
 ## Rules that override default behaviour (continued)
 
+   End every commit message with the `Co-Authored-By` trailer naming the
+   agent that did the work. Claude sessions use the trailer their harness
+   supplies. **An Antigravity or Gemini session must use
+   `Co-Authored-By: Antigravity <noreply@google.com>` — never
+   `antigravity@google.com`.** GitHub resolves co-author emails to whatever
+   account has the address registered, and `antigravity@google.com` belongs
+   to a stranger's personal account (`shimonenator`), so every commit
+   carrying it credits that person as a contributor to this repository —
+   found 2026-08-19, after seven commits had already done exactly that.
+   `noreply@google.com` was checked the same day and maps to no account at
+   all, which is the property that makes it safe. The failure
+   the commit-per-piece order prevents is unchanged: one session's worth of
+   unrelated work in one working tree — forty files, a dozen decisions
+   tangled together, no way to undo one piece without unpicking the rest —
+   and a `GUI-IMPROVEMENTS.md` row with no commit behind it.
+
 7. **Colima is shared with other projects** on this machine (Supabase local dev,
    among others). Never `colima stop` unless `docker ps -q` comes back empty.
    The app's quit path and the scripts already enforce this; keep it that way.

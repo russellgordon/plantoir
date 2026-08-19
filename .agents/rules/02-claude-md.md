@@ -144,9 +144,3 @@ description: "Plantoir project rules, part 2 of 7 - Rules that override default 
      or when Russell asks, never on your own initiative. Outside an iterative
      run — a one-off question, an experiment, something half-finished — the
      older rule still holds: ask first.
-
-   End every commit message with the `Co-Authored-By` trailer. The failure
-   the commit-per-piece order prevents is unchanged: one session's worth of
-   unrelated work in one working tree — forty files, a dozen decisions
-   tangled together, no way to undo one piece without unpicking the rest —
-   and a `GUI-IMPROVEMENTS.md` row with no commit behind it.
