@@ -88,14 +88,15 @@ plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
 
 ## Known rough edges for the next session
 
-- **A PC with no WSL2 at all is handled but untested end to end.** The
-  launchers' `Install-WindowsSubsystem` (branch `windows-wsl2-auto-install`,
-  2026-08-19) runs one elevated `wsl --install -d Ubuntu --no-launch` and
-  reports restart-needed / permission-declined / download-failed in plain
-  words that `FailureExplainer` maps to one sentence each (contract-pinned).
-  This dev machine has WSL, so the fresh-install and restart paths are
-  asserted from the printed lines, not driven — a fresh VM run is the
-  missing verification.
+- **The fresh-PC path is verified in place; only the restart-pending
+  variant is not.** The launchers' `Install-WindowsSubsystem` (branch
+  `windows-wsl2-auto-install`, 2026-08-19) was driven end to end on this
+  machine after removing its WSL package and distro: stub state detected,
+  WSL + Ubuntu installed on one UAC click, engine provisioned silently,
+  image built, container mounted — stopping only at the wizard's TTY, which
+  the app provides. Not driven: the restart-pending branch (this machine's
+  VM-platform features were already enabled, so no reboot was demanded);
+  it is asserted from its printed lines, which the contract cases pin.
 - The toolbar can still truncate at narrow widths. The window minimum **is**
   enforced at 900×600 (`MainWindow.xaml.cs`, `PreferredMinimumWidth` /
   `PreferredMinimumHeight`); the opening size is not 900×600 but a share of

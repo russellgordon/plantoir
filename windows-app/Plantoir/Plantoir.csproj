@@ -9,7 +9,7 @@
     <!-- The product version: the single source the About panel reads, the
          release zip is named after, and the git tag must match (v1.0.0).
          Keep in lockstep with the mac app's marketing version. -->
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Company>Russell Gordon</Company>
     <Product>Plantoir</Product>
     <Copyright>Copyright 2026 Russell Gordon</Copyright>
