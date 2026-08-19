@@ -454,14 +454,28 @@ def serve(port: int) -> int:
                     built_from = current
             super().do_GET()
 
+        def end_headers(self) -> None:
+            # Without this the browser caches assets heuristically and an
+            # edited stylesheet or screenshot can survive a refresh — the
+            # copied images keep their original (old) timestamps, which
+            # makes the heuristic window days long. A preview never caches.
+            self.send_header("Cache-Control", "no-store")
+            super().end_headers()
+
         def log_message(self, format: str, *args) -> None:
             pass  # one line per asset drowns the rebuild messages
+
+    class PreviewServer(socketserver.ThreadingTCPServer):
+        # Without this, a just-stopped preview leaves its socket in
+        # TIME_WAIT and an immediate restart silently hops to the next
+        # port — the browser tab from last time then shows stale pages.
+        allow_reuse_address = True
 
     handler = functools.partial(PreviewHandler, directory=str(OUTPUT))
     last_error: OSError | None = None
     for candidate in range(port, port + 10):
         try:
-            with socketserver.ThreadingTCPServer(("127.0.0.1", candidate), handler) as server:
+            with PreviewServer(("127.0.0.1", candidate), handler) as server:
                 address = f"http://localhost:{candidate}/"
                 print(f"\n🔎 Previewing at {address} — edit a source,")
                 print("   refresh the browser, and the page rebuilds. Ctrl+C stops it.")
