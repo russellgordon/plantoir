@@ -72,6 +72,12 @@ class MarketingScreenshotCase: XCTestCase {
         let application: XCUIApplication = XCUIApplication()
         application.launchEnvironment["UITEST_WORKSPACE"] = workspacePath
         application.launchArguments = [
+            // Never restore windows from the previous session. A capture that
+            // dies mid-test leaves the app killed with two windows open, and
+            // every launch after that restores BOTH — at which point every
+            // element query in every test finds two of everything and fails
+            // with "Multiple matching elements found".
+            "-ApplePersistenceIgnoreState", "YES",
             "-" + MarketingScreenshotCase.mainWindowFrameKey,
             MarketingScreenshotCase.frameArgument(
                 width: MarketingScreenshotCase.windowWidth,
@@ -93,19 +99,19 @@ class MarketingScreenshotCase: XCTestCase {
     /// it, it hovers a toolbar button long enough for the tooltip to appear —
     /// and a screenshot with "Stop previewing this section" floating over the
     /// toolbar looks like a mistake nobody noticed.
-    func save(_ window: XCUIElement, as name: String) {
-        // The empty part of the sidebar, below the last course: the only
-        // large area of the window with nothing under it to explain itself.
-        // The bottom edge was tried first and hovers the working-folder path,
-        // which has a tooltip of its own.
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.04, dy: 0.75)).hover()
-        Thread.sleep(forTimeInterval: 1.2)
+    /// Pass ``alreadyParked`` when the pointer was parked ahead of time —
+    /// a capture racing a short-lived label cannot afford the 1.2 s park
+    /// here, which once outlived the very step being photographed.
+    func save(_ window: XCUIElement, as name: String, alreadyParked: Bool = false) {
+        if !alreadyParked {
+            parkPointer(in: window)
+        }
 
         // Capture the native window directly via screencapture -o -l (the programmatic
         // equivalent of Command-Shift-4, Spacebar, Option-Click). This captures the window's
         // native transparent rounded corners and subpixel anti-aliasing directly from CoreGraphics,
         // without desktop background pixels showing at the corner curves.
-        if let windowNumber: Int = windowNumber(forOwner: "Plantoir") {
+        if let windowNumber: Int = windowNumber(matching: window.frame, forOwner: "Plantoir") {
             let tempURL: URL = URL(fileURLWithPath: NSTemporaryDirectory())
                 .appendingPathComponent("plantoir-shot-\(UUID().uuidString).png")
             let process: Process = Process()
@@ -135,15 +141,32 @@ class MarketingScreenshotCase: XCTestCase {
         add(attachment)
     }
 
-    /// Looks up the largest ordinary layer-0 window for a given application name.
-    func windowNumber(forOwner owner: String) -> Int? {
+    /// Parks the pointer over the empty part of the sidebar, below the last
+    /// course: the only large area of the window with nothing under it to
+    /// explain itself. The bottom edge was tried first and hovers the
+    /// working-folder path, which has a tooltip of its own.
+    func parkPointer(in window: XCUIElement) {
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.04, dy: 0.75)).hover()
+        Thread.sleep(forTimeInterval: 1.2)
+    }
+
+    /// Looks up the layer-0 window for a given application name whose bounds
+    /// match the window being photographed.
+    ///
+    /// Matched on FRAME, not taken as "the largest": the owner name covers
+    /// every process called Plantoir, and one capture photographed a stray
+    /// Settings window instead of the panel the test had just filled in.
+    /// The XCUIElement's frame and CGWindowList bounds share the same
+    /// top-left-origin screen coordinates, so the right window is the one
+    /// whose edges line up.
+    func windowNumber(matching frame: CGRect, forOwner owner: String) -> Int? {
         guard let windows = CGWindowListCopyWindowInfo(
             [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
         ) as? [[String: Any]] else {
             return nil
         }
         var bestNumber: Int?
-        var bestArea: Double = 0
+        var bestMismatch: Double = .infinity
         for window in windows {
             guard let name = window[kCGWindowOwnerName as String] as? String, name == owner else {
                 continue
@@ -152,15 +175,23 @@ class MarketingScreenshotCase: XCTestCase {
             guard layer == 0 else { continue }
             guard let number = window[kCGWindowNumber as String] as? Int,
                   let bounds = window[kCGWindowBounds as String] as? [String: Any],
+                  let x = bounds["X"] as? Double,
+                  let y = bounds["Y"] as? Double,
                   let width = bounds["Width"] as? Double,
                   let height = bounds["Height"] as? Double else {
                 continue
             }
-            let area: Double = width * height
-            if area > bestArea {
-                bestArea = area
+            let mismatch: Double = abs(x - frame.minX) + abs(y - frame.minY)
+                + abs(width - frame.width) + abs(height - frame.height)
+            if mismatch < bestMismatch {
+                bestMismatch = mismatch
                 bestNumber = number
             }
+        }
+        // A window that is nowhere near the one asked for is somebody else's;
+        // better the XCUITest fallback below than a picture of the wrong thing.
+        guard bestMismatch < 40 else {
+            return nil
         }
         return bestNumber
     }
@@ -356,8 +387,59 @@ final class MarketingScreenshots: MarketingScreenshotCase {
 
         let milestone: XCUIElement = application.staticTexts["taskMilestoneLabel"]
         XCTAssertTrue(milestone.waitForExistence(timeout: 60), "Progress should be described while the site builds")
-        settle(6.0)
-        save(window, as: "progress")
+
+        // Photograph a NAMED step rather than sleeping a fixed six seconds.
+        // On a warm machine the whole build finished inside that sleep, and
+        // the capture showed the finished site: the same picture as
+        // `preview`, filed as progress.
+        //
+        // The step waited for is "Opening the preview…", and the choice is
+        // not free: it is the only state a capture can dependably reach.
+        // Instrumented polling at 20 Hz showed every earlier step already
+        // gone by the first sample — the launcher's early lines arrive in
+        // one buffered chunk, and the pre-build "Launching Quartz preview"
+        // line (the final step's marker) completes every milestone at once,
+        // after which this sentence sits on screen for the whole build,
+        // minutes at a time. That a preview spends those minutes on a full
+        // bar captioned with its LAST step is a real milestone defect,
+        // recorded in TODO.md, not a capture problem; when it is fixed,
+        // this wait should move to the step that replaces it, and the shot
+        // should be re-taken.
+        //
+        // A hand-rolled poll, not XCTNSPredicateExpectation: the
+        // expectation form is not dependable against attributes other than
+        // existence. Reading `label` directly takes a fresh snapshot every
+        // pass, and each read costs an accessibility snapshot anyway, so
+        // the loop polls about as fast as XCUITest can.
+        // Parked NOW, not inside save(): the park costs 1.2 s, and the step
+        // being photographed can be over in less.
+        parkPointer(in: window)
+
+        let namedStepBy: Date = Date().addingTimeInterval(300)
+        var namedStepSeen: Bool = false
+        // Every distinct sentence the label showed, kept so a failure names
+        // what WAS on screen instead of inviting another guess.
+        var observedLabels: Set<String> = []
+        while Date() < namedStepBy {
+            if milestone.exists {
+                // The sentence lives in the VALUE. Reading only `label`,
+                // as the first three attempts did, sees an empty string
+                // whatever the view shows — which reads exactly like the
+                // step never happening.
+                let text: String = milestone.label
+                let value: String = (milestone.value as? String) ?? ""
+                observedLabels.insert("label=\(text) value=\(value)")
+                if text.contains("Opening the preview") || value.contains("Opening the preview") {
+                    namedStepSeen = true
+                    break
+                }
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        XCTAssertTrue(namedStepSeen,
+                      "A named step should be described while the site builds. "
+                      + "Observed: \(observedLabels.sorted())")
+        save(window, as: "progress", alreadyParked: true)
 
         if application.buttons["stopPreviewButton"].exists {
             application.buttons["stopPreviewButton"].click()
@@ -426,10 +508,28 @@ final class MarketingScreenshots: MarketingScreenshotCase {
         // rejected: its groups are DisclosureTriangles that do not expand
         // from a synthesized click, so the suggestion inside one is never
         // reachable. Typing needs no disclosure to open.
+        //
+        // Pasted rather than typed. `typeText` synthesizes one event per
+        // character, and each waits for the app to go quiescent first; twice
+        // now the wait timed out mid-sentence ("Failed to synthesize event")
+        // with the model resident and the window busy settling. A paste is a
+        // single chord, so there is one quiescence wait instead of
+        // twenty-three. The pasteboard is system-wide, so the runner can set
+        // it for the app — and the teacher's own clipboard is put back after.
+        let pasteboard: NSPasteboard = NSPasteboard.general
+        let previousClipboard: String? = pasteboard.string(forType: .string)
+        pasteboard.clearContents()
+        pasteboard.setString("Unpublish Unit 2, Day 3", forType: .string)
+
         input.click()
         settle(1.0)
-        input.typeText("Unpublish Unit 2, Day 3")
+        application.typeKey("v", modifierFlags: .command)
         settle(0.8)
+
+        pasteboard.clearContents()
+        if let previousClipboard {
+            pasteboard.setString(previousClipboard, forType: .string)
+        }
 
         let send: XCUIElement = application.buttons["assistSendButton"]
         XCTAssertTrue(send.isEnabled, "Send should light up once there is something to send")

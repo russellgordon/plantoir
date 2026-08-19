@@ -3540,13 +3540,19 @@ now rather than discovered later.
 
 Three mac-specific things carry this, and each needs its own Windows answer:
 
-- **The window screenshots come from XCUITest.** `window.screenshot()` returns
-  exactly the window rectangle at the display's own resolution, with no drop
-  shadow and with the rounded corners transparent. That last part matters more
-  than it sounds: a plain region grab of the same rectangle picks up whatever
-  was on the desktop behind the corners, which looks like a rendering bug on a
-  marketing page. Whatever Windows uses (WinAppDriver, an accessibility-driven
-  harness, `PrintWindow`) has to produce the window alone, not a screen crop.
+- **The window screenshots are native single-window captures, not test-runner
+  screenshots.** The tests drive the app with XCUITest, but the pixels come
+  from `screencapture -x -o -l <window-id>` — the programmatic equivalent of
+  Command-Shift-4, Space, Option-click — because that is the only capture that
+  delivers the window's rounded corners genuinely transparent, with macOS's
+  own subpixel anti-aliasing. `window.screenshot()` was used first and bakes
+  the desktop into the corner curves; masking the corners off afterwards
+  approximates the radius and leaves stray fringe pixels, which is exactly the
+  rendering-bug look a marketing page cannot carry (fixed in commit
+  `63495853`). Whatever Windows uses (WinAppDriver, an accessibility-driven
+  harness, `PrintWindow`) has to produce the window alone with its real alpha
+  channel, not a screen crop and not a rectangle that gets its corners shaved
+  off in post.
 - **The window SIZE is forced, not remembered.** Passing
   `-"NSWindow Frame <autosave-name>" "<frame>"` as a launch argument puts the
   frame in AppKit's argument domain, which outranks the saved value — so every
@@ -3568,6 +3574,49 @@ one skipped test and no screenshots — success, and nothing to show for it. The
 variable has to be passed as `TEST_RUNNER_MARKETING_WORKSPACE`, which arrives
 in the test as `MARKETING_WORKSPACE`. Expect the same hop in whatever runner
 Windows uses, and check the *count of captured images*, never the exit code.
+
+### Three more traps, met on 2026-08-19, that will port themselves
+
+- **The assistant photograph depends on a Settings toggle.** The picture is of
+  the "Shall I go ahead?" card — but that card only appears when "ask before
+  changing" is on, and the development machine's own copy may have it turned
+  off. With it off the assistant does not fail: it CARRIES OUT the request,
+  the capture shows "Unpublished 1 page." instead of a plan, and the demo
+  course really has a page hidden in it afterwards — which then poisons the
+  *other* appearance's capture with "It's already hidden." The harness must
+  stage the setting on for the run and restore the teacher's own value after,
+  exactly as it stages window frames (`capture.py` does this now). Windows
+  keeps an equivalent setting; `capture_windows.py` photographs the assistant
+  and needs the same staging.
+- **Photograph progress when a step is NAMED, never after a fixed sleep —
+  and know which steps can actually appear.** The progress shot used to
+  wait for the progress view to exist and then sleep six seconds; on a
+  machine with a warm container the whole build finished inside the sleep,
+  and the capture showed the finished site — the same picture as `preview`,
+  filed as progress. The test now waits for the milestone text to contain
+  "Opening the preview" and shoots the moment it does. That sentence and
+  not a prettier one, because instrumented 20 Hz polling showed it is the
+  ONLY state a capture can reach: the launcher's early lines arrive in one
+  buffered chunk, and the pre-build "Launching Quartz preview" line — the
+  final milestone's marker — completes every milestone at once, so every
+  earlier step is gone before a test can look. A preview then spends the
+  whole build, minutes, on a full bar captioned with its last step — a
+  product defect recorded in `TODO.md`, and one Windows shares, since the
+  milestone tables and the launcher output are the same on both platforms.
+  Two smaller traps inside that finding: the milestone sentence is the
+  element's accessibility VALUE, and its label is empty — a wait on the
+  label alone never fires while the sentence is plainly on screen — and
+  the pointer-parking pause inside the save helper once outlived the very
+  step being photographed, so park before waiting, not after. The built output is also cleared before EACH
+  appearance pass, not once per run — clearing it once left the dark pass
+  photographing the light pass's finished build.
+- **Launch with window restoration off.** A capture that dies mid-test kills
+  the app with two windows open (main plus assistant); every launch after
+  that restores both, and every element query in every test then finds two of
+  everything and fails with "multiple matching elements". On the mac the fix
+  is the `-ApplePersistenceIgnoreState YES` launch argument; whatever Windows
+  session-restore mechanism exists, captures must start from exactly one
+  window.
 
 ### The demo courses, and why those three
 

@@ -35,7 +35,8 @@ Then check, in this order:
    already produced one "failing" unit test that passed perfectly on its own.
 2. **The test target compiles.**
    `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug build-for-testing`
-3. **The demo folder exists** — `~/Teaching`, with ENG2D, MCV4U and SCH3U in
+3. **The demo folder exists** — `~/Desktop/Teaching` (NOT `~/Teaching`,
+   which holds real courses now), with ENG2D, MCV4U and SCH3U in
    `courses/`. If it does not, that is a provisioning run
    (`capture.py --provision`), which is slow and separate. See below.
 4. **For `--sites`, the three class sites answer.** They are at
@@ -187,7 +188,7 @@ first and fall back to the PNG.
 
 ## Provisioning, and when you need it
 
-Only on a machine that has never done this, or after `~/Teaching` is deleted:
+Only on a machine that has never done this, or after `~/Desktop/Teaching` is deleted:
 
 ```bash
 python3 website/shots/capture.py --provision   # creates the three courses

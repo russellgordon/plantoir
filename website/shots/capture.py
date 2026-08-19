@@ -31,6 +31,7 @@ unlocked.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -59,7 +60,10 @@ SCRATCH = Path(os.environ.get("TMPDIR", "/tmp")) / "plantoir-marketing-shots"
 MAC_APP = REPO / "mac-app"
 APP_BUNDLE_DEFAULTS_DOMAIN = "ca.russellgordon.Plantoir"
 
-DEFAULT_WORKSPACE = Path.home() / "Teaching"
+# ~/Desktop/Teaching, not ~/Teaching: the plain ~/Teaching folder on this
+# Mac now holds REAL courses (ADA1O, MCR3U), and a default pointing there
+# would provision demo courses into a teacher's actual working folder.
+DEFAULT_WORKSPACE = Path.home() / "Desktop" / "Teaching"
 
 # The courses the marketing shots are taken from, and the Netlify site each is
 # published to. The naming pattern is the one Russell asked for.
@@ -91,6 +95,16 @@ REMEMBERED_FRAME_KEYS = [
 # launch argument does not reliably win against a value the app applies by
 # hand after the window is shown.
 ASSISTANT_FRAME = "{{500, 60}, {560, 760}}"
+
+# The assistant photograph is of the "Shall I go ahead?" card — but that card
+# only appears when plan mode is on, and plan mode follows a Settings toggle
+# the developer's own Mac may have turned OFF. With it off the assistant
+# CARRIES OUT the request instead: the capture then shows "Unpublished 1
+# page.", and the demo course really has a page hidden in it afterwards. So
+# the setting is staged on for the run and put back, exactly like the window
+# frames. (The Windows capture harness has the same dependency if it ever
+# photographs an approval card — its app keeps an equivalent setting.)
+ASSISTANT_ASKS_KEY = "assistantAsksBeforeChanging"
 
 # The width, in points, each captured window is forced to. Only used to work
 # out how many pixels there are per point, so the corner radius comes out
@@ -150,11 +164,11 @@ def write_defaults(key: str, value: str | None) -> None:
 
 
 class RememberedWindowFrames:
-    """Puts back whatever window sizes the app had before the capture."""
+    """Puts back whatever window sizes and settings the app had before the capture."""
 
     def __enter__(self) -> "RememberedWindowFrames":
         self.saved: dict[str, str | None] = {}
-        for key in REMEMBERED_FRAME_KEYS:
+        for key in REMEMBERED_FRAME_KEYS + [ASSISTANT_ASKS_KEY]:
             self.saved[key] = read_defaults(key)
         return self
 
@@ -184,6 +198,16 @@ class RememberedWindowFrames:
         )
         write_defaults(main_key, "40 60 1280 800 0 0 1512 982")
 
+        # Plan mode on, whatever this Mac's own setting is, so the assistant
+        # answers with the card the photograph is of. -bool, not -string: the
+        # app reads it as a boolean.
+        subprocess.run(
+            ["defaults", "write", APP_BUNDLE_DEFAULTS_DOMAIN,
+             ASSISTANT_ASKS_KEY, "-bool", "true"],
+            capture_output=True,
+        )
+        print("   Plan mode staged on, so the assistant asks before changing anything.")
+
 
 # ---------- The UI tests ----------
 
@@ -209,6 +233,13 @@ def run_ui_test(test_identifier: str, workspace: Path, label: str,
     environment["MARKETING_WORKSPACE"] = str(workspace)
     environment["TEST_RUNNER_MARKETING_WORKSPACE"] = str(workspace)
 
+    # Several identifiers may arrive comma-separated, so a re-shoot of three
+    # wrong captures costs one run rather than three preflights and six
+    # appearance flips.
+    only_flags: list[str] = []
+    for identifier in test_identifier.split(","):
+        only_flags.append("-only-testing:" + identifier)
+
     result = run(
         [
             "xcodebuild",
@@ -216,7 +247,7 @@ def run_ui_test(test_identifier: str, workspace: Path, label: str,
             "-scheme", "Plantoir",
             "-configuration", "Debug",
             "test",
-            "-only-testing:" + test_identifier,
+            *only_flags,
             "-resultBundlePath", str(bundle),
         ],
         cwd=MAC_APP,
@@ -447,6 +478,49 @@ def clear_built_site(workspace: Path, code: str, section: int) -> None:
         print(f"   Cleared the built pages for {code} section {section}, so its preview really builds.")
 
 
+def kill_orphaned_model_servers() -> None:
+    """Sweep up assistant model servers whose app has been killed.
+
+    The app spawns the assistant's engine as a child process, and a UI test
+    run ends by KILLING the app — so the engine outlives every capture that
+    opened the assistant. Each orphan holds gigabytes of memory and a share
+    of the GPU, and four of them once slowed the machine enough that
+    keystroke synthesis timed out mid-test, which reads as a flaky test
+    rather than as a loaded machine. Swept before and after the capture:
+    at both moments no app instance is (or is about to stay) running, so
+    every engine from the app bundle is an orphan by definition.
+    """
+    subprocess.run(["pkill", "-f", "Resources/llama/llama-server"], capture_output=True)
+
+
+def stop_preview_container(workspace: Path) -> None:
+    """Stop the demo folder's own container, so a preview really builds.
+
+    Belt and braces around the progress photograph: clearing the built pages
+    already forces a rebuild, and stopping the container as well makes the
+    preview walk the whole path from container start, the way a teacher who
+    just opened the app sees it. (STOP, never remove: recreating a container
+    loses the in-container hide-filter patch — the standing TODO.md item —
+    so `docker rm` here would flip the demo sites to publishing hidden
+    pages.)
+
+    Only THIS folder's container is stopped. The name is derived exactly the
+    way the launcher derives it (`pwd -P | shasum -a 256`, first 8 hex
+    characters — including the trailing newline `pwd` emits), and Colima is
+    shared with other projects, so nothing broader than one container is
+    touched.
+    """
+    real_path: str = os.path.realpath(str(workspace))
+    digest: str = hashlib.sha256((real_path + "\n").encode()).hexdigest()[:8]
+    container: str = f"teaching-quartz-{digest}"
+    result = subprocess.run(
+        ["docker", "stop", container],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        print(f"   Stopped {container}, so the next preview builds from the start.")
+
+
 def capture_app(workspace: Path, only: str | None = None) -> None:
     """Photograph the app, once per appearance.
 
@@ -455,16 +529,22 @@ def capture_app(workspace: Path, only: str | None = None) -> None:
     already right.
     """
     announce("Photographing the app")
+    kill_orphaned_model_servers()
     remember_teacher_name(workspace)
     clear_built_site(workspace, "ENG2D", 1)
     clear_built_site(workspace, "ENG2D", 2)
     target = "QuartzTeachersUITests/MarketingScreenshots"
     if only:
-        target = f"{target}/{only}"
+        target = ",".join(f"{target}/{name}" for name in only.split(","))
     with RememberedWindowFrames() as frames:
         frames.stage_assistant_frame()
         for dark in (False, True):
+            # BOTH sections, and per appearance: the progress capture builds
+            # section 2, and clearing it only once left the second pass
+            # photographing the first pass's finished build as "progress".
             clear_built_site(workspace, "ENG2D", 1)
+            clear_built_site(workspace, "ENG2D", 2)
+            stop_preview_container(workspace)
             suffix = "dark" if dark else "light"
             print(f"   {suffix} appearance")
             with Appearance(dark=dark):
@@ -477,6 +557,7 @@ def capture_app(workspace: Path, only: str | None = None) -> None:
                 )
             saved = export_attachments(bundle, suffix)
             print(f"   saved {len(saved)} image(s): {', '.join(saved)}")
+    kill_orphaned_model_servers()
 
 
 def site_address(code: str) -> str:
@@ -796,7 +877,8 @@ def main() -> int:
     parser.add_argument("--publish", action="store_true", help="only build and publish the demo sites")
     parser.add_argument("--app", action="store_true", help="only photograph the app")
     parser.add_argument("--only", default=None,
-                        help="with --app, run one capture (e.g. test6Assistant) instead of all of them")
+                        help="with --app, run just the named captures, comma-separated "
+                             "(e.g. test4Progress,test6Assistant) instead of all of them")
     parser.add_argument("--sites", action="store_true", help="only photograph the class websites")
     parser.add_argument("--figures", action="store_true",
                         help="only reassemble the static figures from parts already captured")

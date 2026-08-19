@@ -4,6 +4,48 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **A preview's progress bar sits at 100% saying "Opening the preview…"
+  for the entire build** — found 2026-08-19, while re-shooting the
+  marketing screenshots; the "Building your site…" step is unreachable.
+
+  Two facts combine. First, `build_site.py` prints "🚀 Launching Quartz
+  preview on…" (the FINAL preview milestone's marker) *before* it runs
+  `npx quartz build --serve`, because build and serve are one command.
+  Second, `ScriptRunner.advanceMilestones` deliberately jumps to the
+  highest marker seen (so varying output never stalls the bar) — so that
+  early line completes every milestone at once. From then until the site
+  appears, a teacher watches a full bar captioned "Opening the preview…
+  still working… (Ns)". "Building your site…" (marker "Quartz v4") and
+  "Preparing components…" (marker "Installing dependencies" — a line that
+  no longer prints, since the image ships `/opt/quartz/node_modules` and
+  the script copies it instead of running npm) never display at all. The
+  old marketing shot showing "Building your site… still working… (4s)"
+  dates from when npm install still ran.
+
+  The fix: give the final preview milestone a marker that appears when the
+  server is actually up — Quartz prints a "server listening" line once
+  serving — instead of the pre-build launch line. **Verify the exact
+  string against a real preview's transcript before pinning it**: a marker
+  that never matches leaves the bar stuck one step short, which is the
+  same defect wearing the other shoe. This is contract-carried data
+  (`contracts/app-rules.json` milestone tables, mirrored in the Windows
+  app's `TaskMilestones.cs`), so the change means `--write-contracts`, a
+  `GUI-IMPROVEMENTS.md` row, and a Windows note — which is why it was
+  recorded here rather than folded into the screenshot re-shoot that
+  found it. Measured while pinning this down (instrumented 20 Hz polling of the
+  milestone text during real previews): every step before "Opening the
+  preview…" is gone before a first sample can be taken — the launcher's
+  early output arrives in one buffered chunk — and the sentence then sits
+  on a FULL bar for the whole build, observed at 100+ seconds. Until the
+  fix ships, the marketing `progress` shot photographs that state, because
+  it is the only one the app dependably shows;
+  `MarketingScreenshotTests.test4Progress` documents the dependency and
+  says to re-take the shot when the fix lands. Worth knowing when fixing:
+  the label shows the step whose marker has NOT yet printed, so a marker
+  is read in practice as "the previous step ended", whatever the struct
+  comment says — and the on-screen sentence is the accessibility VALUE of
+  `taskMilestoneLabel`; its label is empty.
+
 - **A recreated container publishes pages the teacher HID** — found
   2026-08-17, while re-shooting the marketing screenshots. Highest-severity
   item on this list: it exposes material a teacher deliberately held back.
