@@ -51,7 +51,7 @@ public sealed partial class WorkspacePickerView : UserControl
         InitializeButton.Content = "Setting up…";
         try
         {
-            await System.Threading.Tasks.Task.Run(() => _window.Workspace.InitializeWorkspace());
+            await _window.Workspace.InitializeWorkspaceAsync();
             _window.ApplyState();
             if (_window.Workspace.State == WorkspaceState.Ready && _window.Workspace.WorkspaceProblem is null)
                 _ = _window.SidebarPane.OpenNewCourseWizard();

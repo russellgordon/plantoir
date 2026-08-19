@@ -224,6 +224,24 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     }
 
 
+    public async Task InitializeWorkspaceAsync()
+    {
+        if (_workspacePath is null) return;
+        try
+        {
+            await Task.Run(() => ToolchainMirror.InitializeWorkspace(_workspacePath, BundledToolchain.Root));
+        }
+        catch (Exception error)
+        {
+            WorkspaceProblem = error is InvalidOperationException
+                ? error.Message
+                : $"Could not set up this folder: {error.Message}";
+            Notify(nameof(WorkspaceProblem));
+            return;
+        }
+        Reload();
+    }
+
     public void InitializeWorkspace()
     {
         if (_workspacePath is null) return;

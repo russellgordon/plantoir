@@ -171,7 +171,8 @@ public static class ToolchainMirror
 
     /// <summary>
     /// Sets an empty folder up as a working folder: launchers copied in,
-    /// courses/ created. Throws with teacher-facing wording on failure.
+    /// courses/ created, and .toolchain/ populated. Throws with teacher-facing
+    /// wording on failure.
     /// </summary>
     public static void InitializeWorkspace(string workspacePath, string bundledRoot)
     {
@@ -184,5 +185,6 @@ public static class ToolchainMirror
             File.Copy(source, Path.Combine(workspacePath, name), overwrite: true);
         }
         Directory.CreateDirectory(Workspace.CoursesDirectory(workspacePath));
+        RefreshToolchain(workspacePath, bundledRoot);
     }
 }
