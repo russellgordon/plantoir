@@ -267,34 +267,52 @@ public sealed class SectionScheduleDialog : ContentDialog
 
     private async void OnSecondaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
-        args.Cancel = true; // keep dialog open
-        await ReadDatesAsync();
+        var deferral = args.GetDeferral();
+        try
+        {
+            args.Cancel = true; // keep dialog open
+            await ReadDatesAsync();
+        }
+        finally
+        {
+            deferral.Complete();
+        }
     }
 
     private async void OnPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
-        if (_parsedDates is null || _parsedDates.Count == 0)
+        var deferral = args.GetDeferral();
+        try
         {
-            args.Cancel = true;
-            bool ok = await ReadDatesAsync();
-            if (!ok || _parsedDates is null || _parsedDates.Count == 0)
-                return;
-        }
+            if (_parsedDates is null || _parsedDates.Count == 0)
+            {
+                bool ok = await ReadDatesAsync();
+                if (!ok || _parsedDates is null || _parsedDates.Count == 0)
+                {
+                    args.Cancel = true;
+                    return;
+                }
+            }
 
-        string source = string.IsNullOrWhiteSpace(_sourceBox.Text) ? "the teacher" : _sourceBox.Text.Trim();
-        var today = DateOnly.FromDateTime(DateTime.Now);
+            string source = string.IsNullOrWhiteSpace(_sourceBox.Text) ? "the teacher" : _sourceBox.Text.Trim();
+            var today = DateOnly.FromDateTime(DateTime.Now);
 
-        bool wrote = TimetableMemory.Write(_workspacePath, _course.Code, _sectionNumber, _parsedDates, source, today);
-        if (wrote)
-        {
-            SavedDates = _parsedDates;
-            SavedSource = source;
+            bool wrote = TimetableMemory.Write(_workspacePath, _course.Code, _sectionNumber, _parsedDates, source, today);
+            if (wrote)
+            {
+                SavedDates = _parsedDates;
+                SavedSource = source;
+            }
+            else
+            {
+                _statusBlock.Text = "Could not save timetable to disk.";
+                _statusBlock.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
+                args.Cancel = true;
+            }
         }
-        else
+        finally
         {
-            _statusBlock.Text = "Could not save timetable to disk.";
-            _statusBlock.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
-            args.Cancel = true;
+            deferral.Complete();
         }
     }
 
