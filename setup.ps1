@@ -403,6 +403,7 @@ $BUILD_CONTEXT = Get-BuildContext
 if ($OVERRIDE_IMAGE) {
   $IMAGE = $OVERRIDE_IMAGE
 } elseif ($BUILD_CONTEXT) {
+  Write-Host "Checking whether your website builder is up to date..."
   $IMAGE = "teaching-quartz:src-$(Get-ToolchainHash $BUILD_CONTEXT)"
 } else {
   Write-Host "This folder is missing the toolchain's build recipe."

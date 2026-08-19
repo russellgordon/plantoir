@@ -866,7 +866,10 @@ function Run-ContainerWithMount {
   Write-Host "Binding host courses to container: $MOUNT_COURSES -> /teaching/courses"
   if (-not $script:IMAGE_REF) {
     $context = Get-BuildContext
-    if ($context) { $script:IMAGE_REF = "teaching-quartz:src-$(Get-ToolchainHash $context)" }
+    if ($context) {
+      Write-Host "Checking whether your website builder is up to date..."
+      $script:IMAGE_REF = "teaching-quartz:src-$(Get-ToolchainHash $context)"
+    }
   }
   Ensure-Image $script:IMAGE_REF
   docker run -dit `
@@ -969,8 +972,7 @@ if ($containerExists) {
 }
 else {
   Write-Host "Creating new container named $CONTAINER_NAME with correct mount..."
-  # No pre-existing container -> use default/override image.
-  $script:IMAGE_REF = if (Get-BuildContext) { "teaching-quartz:src-$(Get-ToolchainHash (Get-BuildContext))" } else { $null }
+  $script:IMAGE_REF = $null
   Run-ContainerWithMount
 }
 
