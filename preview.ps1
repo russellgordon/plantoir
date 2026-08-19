@@ -406,16 +406,46 @@ function Get-ToolchainHash([string]$context) {
   # Hash only what the recipe is made of (parity with the .sh launchers):
   # in the repository the context is the repo root, and build outputs or
   # app sources must not steer the tag.
-  $hashes = Get-ChildItem -Path $context -Recurse -File | Where-Object {
-    $_.FullName -notmatch '[\\/](\.git|courses|mac-app|windows-app|node_modules|\.merged_output|bin|obj)[\\/]' -and $_.Name -ne '.DS_Store'
-  } | Sort-Object FullName | ForEach-Object {
-    (Get-FileHash -Algorithm SHA256 -Path $_.FullName).Hash
+  # Fast directory traversal with pruning of excluded folders:
+  $filesToHash = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+  $stack = [System.Collections.Generic.Stack[string]]::new()
+  $fullContext = [System.IO.Path]::GetFullPath($context)
+  $stack.Push($fullContext)
+
+  while ($stack.Count -gt 0) {
+    $dir = $stack.Pop()
+    try {
+      foreach ($subDir in [System.IO.Directory]::GetDirectories($dir)) {
+        $dirName = [System.IO.Path]::GetFileName($subDir)
+        if ($dirName -match '^(\.git|courses|mac-app|windows-app|node_modules|\.merged_output|bin|obj|\.gemini|\.system_generated|\.agents)$') {
+          continue
+        }
+        $stack.Push($subDir)
+      }
+      foreach ($file in [System.IO.Directory]::GetFiles($dir)) {
+        $fileName = [System.IO.Path]::GetFileName($file)
+        if ($fileName -eq '.DS_Store') { continue }
+        $filesToHash.Add([System.IO.FileInfo]::new($file))
+      }
+    } catch {}
   }
-  # -join rather than += inside the loop: PowerShell strings are
-  # immutable, so appending one hash at a time reallocates the whole
-  # string on every file. Same characters in the same order, so the
-  # same tag — just not quadratic.
-  $combined = -join $hashes
+
+  $filesToHash.Sort([System.Comparison[System.IO.FileInfo]]{ param($a, $b) [System.StringComparer]::CurrentCultureIgnoreCase.Compare($a.FullName, $b.FullName) })
+
+  $sb = [System.Text.StringBuilder]::new()
+  foreach ($fileInfo in $filesToHash) {
+    try {
+      $stream = [System.IO.File]::OpenRead($fileInfo.FullName)
+      try {
+        $fileHashBytes = $sha.ComputeHash($stream)
+        $null = $sb.Append(([System.BitConverter]::ToString($fileHashBytes) -replace '-',''))
+      } finally {
+        $stream.Dispose()
+      }
+    } catch {}
+  }
+
+  $combined = $sb.ToString()
   $bytes = [Text.Encoding]::UTF8.GetBytes($combined)
   return ([BitConverter]::ToString($sha.ComputeHash($bytes)) -replace '-','').Substring(0,8).ToLower()
 }
