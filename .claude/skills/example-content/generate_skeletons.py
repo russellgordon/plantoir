@@ -20,6 +20,7 @@ It writes support/skeletons/<family>/ and support/skeletons/families.json.
 
 import json
 import shutil
+import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -1762,6 +1763,27 @@ def build_family(name: str) -> int:
 
     def write(relative: str, text: str):
         nonlocal written
+        # Bundled FILENAMES must be ASCII-safe: Finder decomposes accented
+        # names to NFD when a DMG is built, so a file named with é on one
+        # side arrives with e + combining accent on the other and wikilinks
+        # to it break (decided on the mac, 2026-08-19, commit "Ensure all
+        # bundled resource filenames are ASCII"). The TITLE keeps its
+        # accents; the old accented name becomes an alias so existing
+        # wikilinks still resolve. Only combining marks are folded — an en
+        # dash or ² is a single code point and survives a DMG unchanged.
+        decomposed = unicodedata.normalize("NFD", relative)
+        if decomposed != relative:
+            folded = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+            if relative.endswith(".md"):
+                old_stem = relative.rsplit("/", 1)[-1][:-3]
+                lines = text.split("\n")
+                for index, line in enumerate(lines):
+                    if line.startswith("title: "):
+                        lines.insert(index + 1, "aliases:")
+                        lines.insert(index + 2, f'  - "{old_stem}"')
+                        break
+                text = "\n".join(lines)
+            relative = folded
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")

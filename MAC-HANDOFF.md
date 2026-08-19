@@ -109,6 +109,30 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Two corrections to the release-packaging sync, made while integrating it
+  on Windows** (Windows, 2026-08-19, follows `6326c8c9`/`1117e47c`).
+  - **`windows-app/publish.ps1` could not START on Windows.** The new
+    installer block used the null-conditional operator (`?.`), which Windows
+    PowerShell 5.1 — the interpreter the script's own header prescribes via
+    `powershell -File` — cannot parse: the whole file failed with
+    "Unexpected token '?.Source'" before running a line. Verified with the
+    5.1 parser before and after; now rewritten as a plain `if`. When writing
+    PowerShell from the mac, treat 5.1 as the floor: no `?.`, `??`, ternary,
+    or pipeline-chain `&&`/`||`.
+  - **The Métis skeleton rename would not have survived regeneration.**
+    `support/skeletons/` is generated (`generate_skeletons.py`), and
+    `1117e47c` renamed a generated file by hand — the next
+    `generate_skeletons.py` run would have resurrected the accented filename
+    and dropped the alias, silently. The rule now lives in the generator
+    (`write()` folds combining marks out of filenames and inserts the
+    accented alias after the title) and in `lint_skeletons.py` (title may
+    differ from filename only by combining marks, and only with the alias
+    kept). Regeneration verified byte-identical to the committed tree.
+    Rejected: leaving the hand-edit in place (a generated tree that differs
+    from its generator is a time bomb) and ASCII-folding en dashes / ² too
+    (single code points do not decompose in a DMG; seven such names ship in
+    example_content today and are fine).
+
 - **Netlify uploads now retry on 429 with backoff, at 5 workers not 10**
   (Shared Python, 2026-08-19, follows `e0136437`).
   - **What was fixed**: the parallel-upload optimization (`e0136437`, 10-worker

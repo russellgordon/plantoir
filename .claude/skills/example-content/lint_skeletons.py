@@ -12,6 +12,7 @@ into the output.
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -83,7 +84,17 @@ def check(family: str) -> list:
             continue
         title = fields.get("title")
         if path.name != "index.md" and title != path.stem:
-            problems.append(f"{relative}: title is {title!r}, filename says {path.stem!r}")
+            # One sanctioned exception: filenames fold combining accents to
+            # ASCII (Finder decomposes them to NFD inside a DMG and wikilinks
+            # break — see write() in generate_skeletons.py), so a title with
+            # an é may sit in a file named with an e, PROVIDED the accented
+            # name is kept as an alias so old wikilinks still resolve.
+            folded = "".join(
+                ch for ch in unicodedata.normalize("NFD", title or "")
+                if not unicodedata.combining(ch))
+            alias_kept = f'- "{title}"' in text
+            if not (folded == path.stem and alias_kept):
+                problems.append(f"{relative}: title is {title!r}, filename says {path.stem!r}")
         if path.name == "index.md" and not title:
             problems.append(f"{relative}: a folder landing needs a title, or it shows as 'index'")
 

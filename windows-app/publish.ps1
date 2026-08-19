@@ -105,7 +105,11 @@ if ($Sign) {
 New-Item -ItemType Directory -Force "dist" | Out-Null
 
 # 1. Inno Setup Installer (Primary teacher distribution)
-$iscc = (Get-Command iscc -ErrorAction SilentlyContinue)?.Source
+# No `?.` here: this script documents `powershell -File`, and Windows
+# PowerShell 5.1 cannot PARSE the null-conditional operator — the whole
+# script fails to start, not just this line.
+$isccCommand = Get-Command iscc -ErrorAction SilentlyContinue
+$iscc = if ($isccCommand) { $isccCommand.Source } else { $null }
 if (-not $iscc) {
     $possiblePath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
     if (Test-Path $possiblePath) { $iscc = $possiblePath }
