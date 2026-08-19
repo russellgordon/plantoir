@@ -1506,7 +1506,7 @@ public class AssistWorkspaceTests : IDisposable
     public async Task ReDateClasses_WhenNoDatesOnRecord_OffersToAskForDates()
     {
         var tools = new Plantoir.Mcp.PlantoirTools(Open());
-        string result = await tools.ReDateClasses("ICS3U", 1);
+        string result = (await tools.ReDateClasses("ICS3U", 1)).Detail();
         Assert.Contains(AssistWording.MayIAskForYourDates, result);
         Assert.Contains("I don’t know when ICS3U Section 1 meets", result);
     }
@@ -1521,8 +1521,8 @@ public class AssistWorkspaceTests : IDisposable
         TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", new DateOnly(2026, 9, 1));
 
         var tools = new Plantoir.Mcp.PlantoirTools(Open());
-        string result = await tools.ReDateClasses("ICS3U", 1);
-        Assert.Contains("Moved 2 classes", result);
+        string result = (await tools.ReDateClasses("ICS3U", 1)).Summary();
+        Assert.Contains("Re-dated 2 classes", result);
     }
 
     [Fact]

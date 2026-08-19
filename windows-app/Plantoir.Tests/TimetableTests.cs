@@ -497,7 +497,7 @@ public class ReDateTests : IDisposable
         var result = workspace.ApplyReDate(
             workspace.PlanReDate("ICS3U", 1, Block(), new[] { "Unit 1, Day 1" }, new[] { 1 }));
 
-        Assert.StartsWith("Moved 1 class and 1 linked page onto block F", result.Message);
+        Assert.StartsWith("Re-dated 1 class and 1 page they use.", result.Message);
     }
 
     [Fact]

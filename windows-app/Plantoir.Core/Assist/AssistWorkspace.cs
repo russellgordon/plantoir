@@ -1875,15 +1875,20 @@ public sealed class AssistWorkspace
 
         // Counted apart, because "moved 91 classes" when 26 classes and 65
         // materials moved is a sentence a teacher would rightly query.
-        string what = $"Moved {classes} class{(classes == 1 ? "" : "es")}";
-        if (materials > 0)
-            what += $" and {materials} linked page{(materials == 1 ? "" : "s")}";
+        int moved = plan.Moves.Count > 0 ? plan.Moves.Count : plan.Changing.Count();
+        int classCount = plan.ClassCount > 0 ? plan.ClassCount : plan.Dates.Count;
+        int materialsMoved = moved - classCount;
+        string summary = $"Re-dated {classCount} {(classCount == 1 ? "class" : "classes")}" +
+                         $" and {materialsMoved} {(materialsMoved == 1 ? "page" : "pages")} they use.";
+        string detail = summary +
+                        $"\n\n{BackedUpNote}" +
+                        "\n\nNothing was published or hidden, so students see no change until you deploy.";
 
-        return new AssistResult(true,
-            $"{what} onto block {plan.Block} in {course.Code} Section {section}. " +
-            "Nothing was deployed — preview or deploy the section when ready.",
-            backup);
+        return new AssistResult(true, detail, backup);
     }
+
+    public const string BackedUpNote =
+        "The course was backed up before this conversation changed anything, so this can also be undone from Plantoir's Backups list.";
 
     /// <summary>
     /// Work out what bringing a lesson's materials into date with the lesson

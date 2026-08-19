@@ -80,6 +80,7 @@ public static class DateAudit
         // that is correct, not a mistake.
         foreach (string page in graph.Pages)
         {
+            if (IsIgnored(page)) continue;
             if (dateOf(page) is not { } pageDate) continue;
             var linkers = graph.SourcesOf(page)
                 .Where(s => dateOf(s) is not null && classPages.Contains(s))
@@ -116,8 +117,8 @@ public static class DateAudit
     /// naming files, and fifty lines would bury the findings that need
     /// individual attention.
     ///
-    /// Index pages are skipped: they carry an install-time date on purpose and
-    /// are navigation rather than teaching content.
+    /// Index pages and _DUPLICATE ME template pages are skipped: they are
+    /// navigation/templates rather than teaching content.
     /// </summary>
     public static List<string> Stragglers(
         IReadOnlyList<string> pages, DateOnly firstClass, DateOnly lastClass,
@@ -126,7 +127,7 @@ public static class DateAudit
         var left = new List<string>();
         foreach (string page in pages)
         {
-            if (string.Equals(Path.GetFileName(page), "index.md", StringComparison.OrdinalIgnoreCase)) continue;
+            if (IsIgnored(page)) continue;
             if (dateOf(page) is not { } date) continue;
             if (date >= firstClass.AddDays(-ToleranceDays) && date <= lastClass.AddDays(ToleranceDays)) continue;
             left.Add(page);
@@ -142,6 +143,21 @@ public static class DateAudit
             (left.Count == 1 ? "it" : "them") + ", so nothing moved " +
             (left.Count == 1 ? "it" : "them") + " with the lessons. Run check_section to see them all.",
         };
+    }
+
+    /// <summary>
+    /// Templates, system pages, and index pages are not teaching content and
+    /// must be ignored by date auditing.
+    /// </summary>
+    public static bool IsIgnored(string path)
+    {
+        string fileName = Path.GetFileName(path);
+        string stem = Path.GetFileNameWithoutExtension(path);
+        if (string.Equals(fileName, "index.md", StringComparison.OrdinalIgnoreCase)) return true;
+        if (string.Equals(stem, "_DUPLICATE ME", StringComparison.OrdinalIgnoreCase)) return true;
+        if (fileName.StartsWith("._", StringComparison.Ordinal)) return true;
+        if (fileName.StartsWith("_", StringComparison.Ordinal)) return true;
+        return false;
     }
 
     /// <summary>"7 months", "3 weeks" — the size of the gap, the way a person would say it.</summary>

@@ -850,7 +850,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "nothing but a warm-up, or split a lesson that has to stay whole. Leave both empty for an even " +
                  "spread across the block, which is a starting point rather than an answer. " +
                  "The plan also reports date problems the change would leave behind.")]
-    public Task<string> PlanReDateClasses(
+    public Task<CallToolResult> PlanReDateClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(TimetableHelp)] string timetable = "",
@@ -922,10 +922,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     }
 
     [McpServerTool(Name = "re_date_classes", Title = "Re-date classes", Destructive = false, Idempotent = true)]
-    [Description("Move a section's classes onto a timetable's dates. The course is backed up first, automatically. " +
-                 "Only call this after plan_re_date_classes and after the teacher has agreed to what it said. " +
-                 "This changes dates only — nothing is published, and no page's visibility changes.")]
-    public Task<string> ReDateClasses(
+    [Description("TEACHERS SAY: \"re-date my classes\", \"roll this section over to a new year\", " +
+                 "\"put my classes on this year's dates\". Re-date every class in a section onto the " +
+                 "class dates on file, by POSITION — the first class takes the first date — and move " +
+                 "the pages each class uses onto that class's day with it. Pages this section's Key " +
+                 "Links points at move to the first day of class. Curriculum pages are left alone, " +
+                 "because Plantoir dates those itself on every build.")]
+    public Task<CallToolResult> ReDateClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(TimetableHelp)] string timetable = "",
@@ -941,9 +944,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         int startYear = 0)
         => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: true, firstDay, cancellation);
 
-    private async Task<string> ReDate(string course, int section, string timetable, string block,
-                                      string[]? pages, int[]? meetings, int startYear, bool apply,
-                                      string firstDay, CancellationToken cancellation)
+    private async Task<CallToolResult> ReDate(string course, int section, string timetable, string block,
+                                              string[]? pages, int[]? meetings, int startYear, bool apply,
+                                              string firstDay, CancellationToken cancellation)
     {
         try
         {
@@ -956,7 +959,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 var remembered = TimetableMemory.Read(workspace.FolderPath, found.Code, number);
                 if (remembered is null || remembered.Dates.Count == 0)
                 {
-                    return $"I don’t know when {found.Code} Section {number} meets, so I can’t re-date it. {AssistWording.MayIAskForYourDates}";
+                    return Answering($"I don’t know when {found.Code} Section {number} meets, so I can’t re-date it. {AssistWording.MayIAskForYourDates}");
                 }
                 parsed = Timetable.FromDates(remembered.Dates, remembered.Source);
             }
@@ -969,21 +972,35 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 pages ?? Array.Empty<string>(), meetings ?? Array.Empty<int>());
 
             if (!apply)
-                return plan.Describe() +
-                       "\n\nNothing has been changed. Show this to the teacher and ask before going ahead.";
+            {
+                if (plan.ChangesNothing)
+                {
+                    string already = $"Every page in {found.Code} Section {number} is already on the day it should be.";
+                    return Answering(already);
+                }
+                return Proposing(plan.Describe());
+            }
+
+            if (plan.ChangesNothing)
+            {
+                string already = $"Every page in {found.Code} Section {number} is already on the day it should be.";
+                return Answering(already);
+            }
 
             var result = workspace.ApplyReDate(plan);
-            var text = new StringBuilder(result.Message);
-            if (plan.Problems.Count > 0)
-            {
-                text.AppendLine().AppendLine();
-                text.AppendLine($"{plan.Problems.Count} thing{(plan.Problems.Count == 1 ? "" : "s")} worth looking at:");
-                foreach (string problem in plan.Problems) text.AppendLine("  • " + problem);
-            }
-            return text.ToString();
+            int moved = plan.Moves.Count > 0 ? plan.Moves.Count : plan.Changing.Count();
+            int classCount = plan.ClassCount > 0 ? plan.ClassCount : plan.Dates.Count;
+            int materials = moved - classCount;
+            string summary = $"Re-dated {classCount} {(classCount == 1 ? "class" : "classes")}" +
+                             $" and {materials} {(materials == 1 ? "page" : "pages")} they use.";
+            string detail = summary +
+                            $"\n\n{AssistWorkspace.BackedUpNote}" +
+                            "\n\nNothing was published or hidden, so students see no change until you deploy.";
+
+            return Answering(summary, detail);
         }
-        catch (AssistRefusal refusal) { return refusal.Message; }
-        catch (Plantoir.Core.Models.OutsideWorkspaceException refusal) { return refusal.Message; }
+        catch (AssistRefusal refusal) { return Answering(refusal.Message); }
+        catch (Plantoir.Core.Models.OutsideWorkspaceException refusal) { return Answering(refusal.Message); }
     }
 
     private static async Task<Timetable> Load(string timetable, string block, int startYear,

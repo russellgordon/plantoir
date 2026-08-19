@@ -242,13 +242,6 @@ public sealed class AssistAgent
     /// no page, <c>undo_last_change</c> IS the remedy, <c>deploy_section</c>
     /// waits on its own button whatever this setting says, and a cancelled
     /// scheduled deploy is remedied by scheduling it again.
-    ///
-    /// <c>re_date_classes</c> is in the contract's twin list and NOT here, and
-    /// the reason is worth keeping: it is not a tool the local model is shown
-    /// (see <see cref="ForTheLocalModel"/>), and its twin does not mark its
-    /// answer as a plan, so putting it here would gate a write behind a
-    /// proposal this loop would then read as a refusal. A test pins that this
-    /// map covers every twin the local model CAN reach.
     /// </summary>
     internal static readonly Dictionary<string, string> PlanTwins = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -257,6 +250,7 @@ public sealed class AssistAgent
         ["publish_class_on"] = "plan_publish_class_on",
         ["add_next_class"] = "plan_add_next_class",
         ["remember_timetable"] = "plan_remember_timetable",
+        ["re_date_classes"] = "plan_re_date_classes",
     };
 
     /// <summary>
