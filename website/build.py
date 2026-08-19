@@ -7,8 +7,14 @@ the screenshot harness stay outside the published folder.
 
 Usage::
 
-    python3 website/build.py             # write site/
+    python3 website/build.py             # write site/ (preview it locally)
     python3 website/build.py --check     # report problems, write nothing
+    python3 website/build.py --deploy    # build, then publish to plantoir.app
+
+Publishing is deliberately a separate, explicit flag: the Netlify site is not
+connected to GitHub, so plantoir.app changes ONLY when --deploy (or
+website/netlify_deploy.py directly) is run. Build, look at site/ locally,
+deploy when it is right.
 
 A page is one file in ``website/pages/``: a short front matter block, then the
 body as HTML. Everything shared -- masthead, navigation, footer, the head tags
@@ -414,8 +420,22 @@ def main() -> int:
         action="store_true",
         help="report problems without writing anything",
     )
+    parser.add_argument(
+        "--deploy",
+        action="store_true",
+        help="after a clean build, publish site/ to plantoir.app on Netlify",
+    )
     arguments = parser.parse_args()
-    return build(check_only=arguments.check)
+    if arguments.check and arguments.deploy:
+        parser.error("--check writes nothing, so there is nothing for --deploy to publish")
+    result = build(check_only=arguments.check)
+    if arguments.deploy:
+        if result != 0:
+            print("Not deploying: fix the build warnings above first.", file=sys.stderr)
+            return result
+        import netlify_deploy
+        return netlify_deploy.deploy()
+    return result
 
 
 if __name__ == "__main__":

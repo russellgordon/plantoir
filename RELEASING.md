@@ -130,8 +130,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    the newest release's asset, so teachers click Windows or macOS and get the
    file, no GitHub in sight.
 
-6. **plantoir.app updates itself**: the site lives in `site/` in this repo, and
-   Netlify deploys it on every push.
+6. **Deploy plantoir.app deliberately**: `python3 website/build.py --deploy`
+   builds `site/` and publishes it to Netlify (delta upload; the token comes
+   from the `containerized-quartz-netlify` Keychain item, the site id from
+   `website/site.json`). The Netlify site is NOT connected to GitHub —
+   pushing this repository deploys nothing, which is why this step exists.
 
 ## Bundle format
 
