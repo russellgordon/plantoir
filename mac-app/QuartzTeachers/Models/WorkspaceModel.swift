@@ -447,21 +447,25 @@ class WorkspaceModel {
             return
         }
 
+        let toolchainURL: URL = workspaceURL.appendingPathComponent(".toolchain")
+        let dockerfileURL: URL = toolchainURL.appendingPathComponent("Dockerfile")
+
         // Once per folder per run of the app, and that is not a shortcut: the
         // SOURCE is the app's own bundle, which cannot change while the app
         // is running, so a second mirror of the same folder cannot find
-        // anything the first one missed.
+        // anything the first one missed — unless the destination is actually
+        // missing its files on disk.
         //
         // It used to run inside every `reloadCourses()` — which is after
         // every rename, backup, restore and archive — and cost 0.37 s each
         // time even with nothing to do. That is what a teacher felt as a
         // pause between pressing Return on a renamed course and the field
         // going away. (Before the mirror was made cheap it was 3.8 s.)
-        if WorkspaceModel.foldersWithFreshToolchain.contains(workspaceURL.path) {
+        if WorkspaceModel.foldersWithFreshToolchain.contains(workspaceURL.path) &&
+           fileManager.fileExists(atPath: dockerfileURL.path) {
             return
         }
         WorkspaceModel.foldersWithFreshToolchain.insert(workspaceURL.path)
-        let toolchainURL: URL = workspaceURL.appendingPathComponent(".toolchain")
 
         var changed: Int = 0
         var rootFiles: [String] = ["Dockerfile"]
@@ -1218,6 +1222,8 @@ class WorkspaceModel {
             return
         }
 
+        WorkspaceModel.foldersWithFreshToolchain.remove(workspaceURL.path)
+        refreshToolchain(in: workspaceURL)
         reloadCourses()
 
         // The natural next step in a fresh folder is creating a course.

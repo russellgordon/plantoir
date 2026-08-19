@@ -55,6 +55,7 @@ final class WorkspaceInitializationTests: XCTestCase {
             XCTAssertTrue(fileManager.isExecutableFile(atPath: scriptPath), "\(scriptName) should be executable")
         }
         XCTAssertTrue(fileManager.fileExists(atPath: folderURL.appendingPathComponent("courses").path))
+        XCTAssertTrue(fileManager.fileExists(atPath: folderURL.appendingPathComponent(".toolchain").appendingPathComponent("Dockerfile").path), "The .toolchain build recipe should be copied in")
 
         // The copied script must be the real launcher, not a stub.
         let previewContents: String = try String(contentsOf: folderURL.appendingPathComponent("preview.sh"), encoding: .utf8)
