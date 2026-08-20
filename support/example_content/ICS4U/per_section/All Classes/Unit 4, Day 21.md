@@ -10,9 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Hand in [[Final Reflection]] and your [[Code Journal]]
-2. Essential Skills, evaluated honestly against your own semester:
-   reading, writing, thinking, working with others, continuous learning
+1. Handover debrief: what your partner did yesterday that no rehearsal
+   predicted, and what you would put in the package next time
+2. Finish [[Final Reflection]] here, with your [[Code Journal]] open
+   beside you — including its last section, where you evaluate your own
+   development of three of the Essential Skills and work habits the
+   Ontario Skills Passport names, September against now, with the
+   dated evidence for each. Both are handed in at the end of the
+   period.
 3. Course feedback, written and anonymous
 
 ## Things to do before our next class

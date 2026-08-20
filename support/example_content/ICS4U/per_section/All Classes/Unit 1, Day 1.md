@@ -13,7 +13,10 @@ tags:
 1. Welcome, and how a room that builds software together works:
    [[How This Class Works]] and [[Our Classroom Norms]]
 2. The founding problem: [[The Inherited Program]] — a working program
-   nobody here wrote, and a change request you must make safely
+   nobody here wrote, and a change request you must make safely. This
+   one is a diagnostic: nothing is collected and nothing is marked. What
+   the room can and cannot do with it today is what decides where Unit 1
+   starts.
 3. Compare and name it: [[Reading Somebody Else's Code]]
 4. Tour of the site, so nothing here is hidden from you:
    [[Using This Site]]

@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Spot the Bug]]
-2. [[The Model]], day 5 — working period: objects working together, and the
-   program that demonstrates them
+2. [[The Model]], day 5 — working period: the fix your own check named
+   yesterday first, then objects working together and the program that
+   demonstrates them
 3. Swap models with another student and read theirs cold
 
 ## Things to do before our next class

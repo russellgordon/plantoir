@@ -8,9 +8,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Teams, with your community partner present · the final class of the
-> course · your partner runs the software, the room reviews it, and the
-> project is passed to whoever owns it next — in writing
+> Teams, with your community partner present · Unit 4, Day 20, the last
+> class of the build · your partner runs the software, the room reviews
+> it, and the project is passed to whoever owns it next — in writing
 
 ## What happens
 
@@ -77,7 +77,7 @@ the two that get skipped are always six and seven.
 
 Come with these answered in writing, not improvised at the front:
 
-- What did your plan say in Unit 3, Day 6, and where did reality
+- What did your plan say on Unit 3, Day 15, and where did reality
   diverge from it first?
 - Which milestone was hardest to hit, and what would you change about
   how the team worked rather than about the code?
@@ -92,8 +92,24 @@ Come with these answered in writing, not improvised at the front:
 - [ ] The complete handover package, in your partner's hands and
       confirmed item by item.
 - [ ] The team review, written, one document per team.
-- [ ] Your [[Final Reflection]], individually.
-- [ ] Your [[Code Journal]], complete, per [[Journal Checklist]].
+
+## What you hand in next class
+
+- [ ] Your [[Final Reflection]] and your [[Code Journal]] — both
+      individual, both complete per [[Journal Checklist]]. You begin
+      the reflection in class on Unit 4, Day 19 and finish it in class
+      on Unit 4, Day 21, which exists for exactly that. Nothing about
+      either one is carried home tonight.
+
+The reflection's last section is the one this task adds to what your
+journal has been doing all year: **your own evaluation of the
+Essential Skills and work habits** the Ontario Skills Passport names —
+three of them, where you started, where you are now, and the dated
+evidence for both. It is written in the Unit 4, Day 21 period along
+with the rest of the reflection, and it is expectation `D4.4`, which
+is why it is marked at all: what is judged is the evidence and the
+reasoning, never the rating you give yourself. [[How Marks Work]] sets
+out why that distinction is not a technicality.
 
 ## How this is assessed
 
@@ -101,6 +117,19 @@ Per [[How Marks Work]], today assesses the close of the project, not a
 performance. A modest program handed over completely and honestly
 scores above an impressive one whose partner leaves holding a memory
 stick and a hope.
+
+Today is part of the final thirty per cent of your mark, together with
+the [[Final Examination]]. The package is judged as a team's work,
+because that is what it is — but what is recorded against your name is
+the part of it you wrote and answer for, the item you confirmed out
+loud, and your [[Final Reflection]]. Four names on a cover page do not
+produce four identical marks here any more than anywhere else in this
+course.
+
+Read the criteria table below on Unit 4, Day 17, not on Day 20. That
+period is set aside for exactly this, [[Judging Your Own Work]] is the
+routine, and Day 18's rehearsal is where you act on what it tells
+you.
 
 Two things carry the most weight. First, **whether your partner can
 actually use it** — visible in ten minutes with your hands in your lap.
@@ -110,7 +139,7 @@ the documentation and the history, and which is the entire argument of
 
 ## Success criteria
 
-| Quality | What it looks like on the day |
+| Quality | What it looks like |
 | --- | --- |
 | Your partner drives | They run it; you do not touch the keyboard |
 | It does the thing they asked for | The core works, in front of witnesses |
@@ -120,6 +149,7 @@ the documentation and the history, and which is the entire argument of
 | Data explained | Where it lives, how to back it up, how to delete |
 | Review is about the work | Plan versus reality, stated plainly |
 | A named next owner | A person, and a check-in date you will keep |
+| Skills judged on evidence | Three skills, September and now, each claim dated and citable |
 
 ## Reflect
 
@@ -138,9 +168,9 @@ day you had? And what did you not get to, and who should be told?
 > play it to the room — their hands, their pace, their surprises, not a
 > narrated tour by you. Everything else about the handover is unchanged
 > and still happens today: the package, the confirmation item by item,
-> and the named next owner. Arrange it with me before Unit 4, Day 6 so
-> the recording exists before the last class, rather than becoming one
-> more thing to do on the night.
+> and the named next owner. Arrange it with me before Unit 4, Day 18
+> so the recording exists in time for the rehearsal, rather than
+> becoming one more thing to do on the night before.
 
 %%curriculum-start%%
 ## Curriculum connection
@@ -152,4 +182,55 @@ day you had? And what did you not get to, and who should be told?
 ![[B2.3]]
 
 ![[A4.4]]
+
+![[D4.4]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Day 20 has guests in the room, and you are running it. What you watch
+during the demonstrations IS the assessment rather than evidence
+gathered beside it — thirty seconds of looking per team, no more, and
+no conferring at all. Everything below happens before the guests
+arrive.
+
+OBSERVE — Unit 4, Day 18, the rehearsal, when the stand-in team asks
+about item seven
+  Watch for: what a team does when somebody playing their partner
+  asks who to contact in March. The criteria table asks for a named
+  next owner and a check-in date, and every package will carry one by
+  Day 20 — a name written in the night before reads exactly like a
+  name that was arranged with a real person. Watching the rehearsal is
+  what tells the two apart, so treat this as corroborating that row
+  rather than replacing it.
+  Going well: a name, plus when the team last spoke to that person and
+  what they said.
+  Stuck: a pause, then a name invented on the spot — or a name that
+  turns out to belong to somebody who is graduating in June.
+  Record: one line per team on the day plan — arranged, named only,
+  not yet.
+  That is B1.5, closing the project by planning its support and
+  maintenance, seen at the point where it is still fixable.
+
+TALK — Unit 4, Day 14, after the team conference already on that
+agenda, and again in the Day 17 working period
+  The conference is announced as being about what is finished and what
+  is hoped for, so the team will arrive with that ready. Take it, then
+  keep one member back at a time for ninety seconds. Two members per
+  team on Day 14, the other two while they work on Day 17 — that fits
+  the period, and doing it privately is the whole point.
+  Ask: "What did you personally get wrong that the team absorbed
+  without much fuss?"
+  Then: "What did somebody else get wrong that you absorbed?"
+  A strong answer is specific in both directions and does not turn the
+  second one into a complaint. That is B2.3 — reflecting on and
+  assessing team and individual progress — and it is precisely the
+  half of the project review a team document cannot contain, because
+  the team writes that document together and nobody puts this in it.
+  Record: two lines each on the conference sheet. Names, not
+  paraphrase.
+
+The product evidence is the handover package, the written team review,
+and the demonstration itself.
+%%

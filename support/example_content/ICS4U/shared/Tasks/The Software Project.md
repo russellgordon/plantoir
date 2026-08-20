@@ -7,7 +7,7 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Teams of three or four · launched Unit 3, Day 5 and running underneath
+> Teams of three or four · launched Unit 3, Day 8 and running underneath
 > every class of Unit 4 · a real community partner, a version-controlled
 > team build, reviewed code, and a handover package somebody else can
 > act on · the culminating project of this course
@@ -111,16 +111,21 @@ marked. A code nobody consulted is a code nobody wrote.
 ## Milestones
 
 Checked in class, on the day named. Nothing here is a final-week
-scramble; a project that reaches Unit 4, Day 4 without a working core
+scramble; a project that reaches Unit 4, Day 9 without a working core
 is a project I will help you cut down, not one you should rescue by
 staying up.
 
-- [ ] **Unit 3, Day 5 — launched.** Two possible partners per team,
+- [ ] **Unit 3, Day 8 — launched.** Two possible partners per team,
       each with the problem in their own words.
-- [ ] **Unit 3, Day 6 — partner, roles, and algorithms agreed.** One
-      confirmed partner with consent recorded; roles posted in writing;
-      your search and sort choices defended out loud with their costs;
-      scope document and "deliberately not doing" list submitted.
+- [ ] **Unit 3, Day 12 — partner, roles, and algorithms agreed.** One
+      confirmed partner; roles posted in writing; your search and sort
+      choices defended out loud with their costs.
+- [ ] **Unit 3, Day 13 — interviewed, with consent and scope in
+      writing.** The problem in your partner's own words, their consent
+      recorded, and the scope document submitted with its "deliberately
+      not doing" list.
+- [ ] **Unit 3, Day 16 — the walking skeleton runs**, badly, end to
+      end, on invented data — or you say plainly what stopped it.
 - [ ] **Unit 4, Day 1 — version control running.** Repository set up,
       at least one commit from every member, and one conflict already
       resolved on purpose.
@@ -130,15 +135,26 @@ staying up.
 - [ ] **Unit 4, Day 3 — testing plan, and tests you did not author.**
       Written plan naming who tests what, plus tests over code another
       teammate wrote.
-- [ ] **Unit 4, Day 4 — reviewed.** Every member has reviewed a
+- [ ] **Unit 4, Day 5 — reviewed.** Every member has reviewed a
       teammate's code and had their own reviewed, using the protocol in
       [[The Code Review]]; agreements recorded in the history.
-- [ ] **Unit 4, Day 5 — privacy statement.** What it stores, where, and
-      how your partner deletes it, in your partner's language.
-- [ ] **Unit 4, Day 6 — documented and submitted.** Final build, and
+- [ ] **Unit 4, Day 9 — tested by your partner**, in the room, with
+      your hands off the keyboard, and what you saw triaged into
+      defect, request, or misunderstanding.
+- [ ] **Unit 4, Day 11 — feature freeze.** Defects fixed, every test
+      re-run. Only repairs and writing after this.
+- [ ] **Unit 4, Day 15 — privacy statement**, drafted in that day's
+      build period and finished for Day 16's review: what it stores,
+      where, and how your partner deletes it, in their language.
+- [ ] **Unit 4, Day 16 — reviewed by another team**, against your code
+      of practice as well as your code, and the top three comments
+      acted on in the same period.
+- [ ] **Unit 4, Day 18 — handover rehearsed** on a team who play your
+      partner, and whatever they could not follow repaired.
+- [ ] **Unit 4, Day 19 — documented and submitted.** Final build, and
       the handover package complete.
-- [ ] **Unit 4, Day 7 — handed over.** Your partner runs it in front of
-      the room at [[The Handover]] and takes it home.
+- [ ] **Unit 4, Day 20 — handed over.** Your partner runs it in front
+      of the room at [[The Handover]] and takes it home.
 
 ## The handover package
 
@@ -146,7 +162,7 @@ staying up.
 somebody else can change it next year without you. That takes more than
 a folder of files. The full contents, and the standard they are judged
 against, are set out in [[The Handover]] — read it in Unit 4, Day 1,
-not in Unit 4, Day 6.
+not in Unit 4, Day 19.
 
 ## How your individual contribution is evidenced
 
@@ -166,8 +182,12 @@ and none of which can be manufactured at the end:
    argued for and lost. Per [[Journal Checklist]].
 4. **Your role.** What you answered for, and whether it held.
 
-Per [[How Marks Work]], the working periods are assessed too. This
-project is judged across five weeks, not on the last day.
+Per [[How Marks Work]], the working periods are where two of the three
+kinds of evidence come from: what I watch you do, and what you tell me
+at the milestone check-ins. This project is judged across five weeks,
+not on the last day. [[Judging Your Own Work]] is how you read the
+table below before I do — Unit 3, Day 18 is the period set aside for
+it, and Days 20 and 21 are where the two rows it names get fixed.
 
 ## Success criteria
 
@@ -196,10 +216,11 @@ does not have the day you had? Then read
 
 > [!question]- If your team is stuck, at any stage
 > Three failures account for nearly all of them. **No partner by
-> Day 6**: come to me, I keep a list of people in this building and the
-> neighbourhood who have already said yes. **The team has stopped
-> talking**: run the disagreement protocol in [[Working in a Team]] in
-> a working period, with me present if you want. **The scope is too
+> Unit 3, Day 12**: come to me, I keep a list of people in this
+> building and the neighbourhood who have already said yes. **The team
+> has stopped talking**: run the disagreement protocol in
+> [[Working in a Team]] in a working period, with me present if you
+> want. **The scope is too
 > big**, which shows up as three half-features and no working core: cut
 > it in the working period, tell your partner what they will and will
 > not be getting, and finish the smaller thing properly. All three are
@@ -227,3 +248,51 @@ does not have the day you had? Then read
 
 ![[D2.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+This task self-reports more than any other in the course: the history,
+the reviews and the journal are all evidence a student creates. Do not
+duplicate them. What follows is the one thing none of them records.
+
+OBSERVE — Unit 4, Day 4, the branch-and-merge working period, and
+again at Unit 4, Day 14
+  Watch for: who is deciding. The history records who typed a line and
+  who merged it. It cannot record who was asked what the line should
+  be, and on a team of four those are regularly different people — a
+  student with a modest commit count can be the one every design
+  question gets put to, and their commits alone will undersell them
+  badly.
+  Going well: a fork in the road argued out loud, then written into a
+  branch name, a commit message, or the board.
+  Stuck: one person at the keyboard and three watching; or four people
+  building four things nobody agreed on.
+  Record: one row per team on the day plan, with the initials of
+  whoever the questions were addressed to. Doing it twice, ten classes
+  apart, is the point — where that changes, you have found either a
+  team that matured or a student who stopped being consulted.
+  That is B2.1, contributing as a team member to the planning and the
+  development, and it corroborates the commit history instead of
+  repeating it.
+
+TALK — Unit 4, Day 6, at the conference already on that agenda
+  The agenda invites each team to bring one decision they want a
+  second opinion on, so take that first and then keep going.
+  Ask: "What is on your deliberately-not-doing list that your partner
+  still does not know about?"
+  Then: "When does that conversation happen, and which of you is
+  having it?"
+  A strong answer names an item, names the person who will say it, and
+  names a date before the handover. A weak one is a promise to tell
+  them at the end, which is how a partner finds out on Day 20 in front
+  of an audience. That is B1.2 — developing the software so that it
+  actually meets the end user's needs within the time available —
+  heard as an intention while there is still time to keep it, rather
+  than read afterwards in a scope document that was written in Unit 3.
+  Record: one line per team on the conference sheet, with the date
+  they named. Check it on Day 14.
+
+The product evidence is the repository, the reviews, the journal, and
+the final build submitted on Day 19.
+%%

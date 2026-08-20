@@ -13,7 +13,9 @@ tags:
 1. Warm-up: [[Spot the Bug]] — the lookup loop that returns the wrong
    record as soon as two people share a first name
 2. The problem of the day: [[The Wrong Container]] — a tally a plain
-   list handles badly, and one deletion that quietly corrupts it
+   list handles badly, and one deletion that quietly corrupts it. A
+   diagnostic, not a test: what this room reaches for first is what
+   tells me where the unit has to begin.
 3. Invent the notation: the room writes on the board how it *wishes* it
    could ask for one person's count
 4. Park it deliberately. Nothing gets named today; you need the idea

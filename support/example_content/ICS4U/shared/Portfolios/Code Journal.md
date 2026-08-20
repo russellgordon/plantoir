@@ -7,8 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · ongoing all course · one entry after every class ·
-> collected at the end of each unit
+> Individual · ongoing all course · one short entry after every class,
+> kept for you · one milestone entry per unit, written in class, which
+> is the entry read against the criteria
 
 ## What you are making
 
@@ -81,12 +82,22 @@ techniques transfer far better than the specific programs do.
 
 ## Success criteria and collection
 
-The journal comes in at the end of each unit and is read against
-these criteria. [[Journal Checklist]] turns them into a self-check.
+The last period of each unit sets aside its final fifteen minutes for
+a **milestone entry**, written here, in class: what this unit changed
+about how you work, with the entries from the unit open beside you.
+That milestone entry is what is read against the criteria below, and
+it is what [[How Marks Work]] counts. Unit 4 is the exception, and
+only in form: its milestone is the [[Final Reflection]], which is
+longer, is begun in class on Unit 4, Day 19 and finished in class on
+Day 21, and does the same job across the whole course rather than
+across one unit. The daily entries between
+classes are yours — they are the raw material the milestone entry is
+made from, and practice you do at home is never something I mark.
+[[Journal Checklist]] turns the criteria into a self-check.
 
 | Quality | What it looks like |
 | --- | --- |
-| Regularity | An entry for every class, written close to the day |
+| Grounded in the day | The moments cited were written down when they happened, not reconstructed afterwards |
 | Honesty | Real breakage and real confusion recorded, not only wins |
 | Precision | Bugs located and quoted; decisions stated with their alternatives |
 | Contribution | What *I* did, in a form a reader could check against the history |

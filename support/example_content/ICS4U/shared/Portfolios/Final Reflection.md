@@ -28,7 +28,7 @@ by somebody else. As you read, flag:
 
 ## The shape
 
-Four sections, roughly a page and a half, built the way
+Five sections, roughly two pages, built the way
 [[Showing Growth]] taught: cite the earlier entry, quote your own
 words, then show the now.
 
@@ -52,6 +52,20 @@ words, then show the now.
    will break first. Then the personal version: a course you might
    take, something you want to build, and one first step you could
    genuinely take in the next month.
+5. **Where I stand on the Essential Skills.** The Ontario Skills
+   Passport names a set of skills and work habits that every kind of
+   employment and study runs on; the ones this course leans on hardest
+   are reading text, writing, document use, computer use, thinking
+   (problem solving and decision making), working with others, and
+   continuous learning. Take three of them — not all seven, and not
+   the three you are best at. For each one, say where you were in
+   September, where you are now, and cite the dated evidence for both:
+   an entry, a commit, a review, a thing that went wrong. Then name the
+   one you would work on next and what you would do about it. This
+   section is marked on the evidence you cite and the reasoning you
+   build from it. It is not marked on how highly or how harshly you
+   rate yourself, and a rating with nothing under it scores nothing
+   either way.
 
 > [!tip] Do not write it as a thank-you card
 > The temptation is to perform gratitude and round everything up.
