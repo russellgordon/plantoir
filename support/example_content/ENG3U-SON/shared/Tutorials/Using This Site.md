@@ -28,8 +28,8 @@ text at once — faster than browsing if you already know a word or a title.
 
 ## Following a link
 
-Blue text you can click is a link to another page — [[How This Site Is
-Organised]] is one, if you want to try it. A page sometimes also shows
+Blue text you can click is a link to another page — [[How This Site Is Organised]]
+is one, if you want to try it. A page sometimes also shows
 another page's content inline, without you needing to click at all; that is
 called a transclusion, and you'll see it most on task pages that pull in
 their curriculum connections or on your section's landing page, which

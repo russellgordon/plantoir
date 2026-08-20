@@ -12,8 +12,8 @@ page.
 ## What belongs in Portfolios
 
 Reflection and self-assessment — pages that build a student's judgement
-about their own work, never pages that themselves get marked. [[Judging
-Your Own Work]], [[Your Reading Life]], and [[Looking Back, Looking Ahead]]
+about their own work, never pages that themselves get marked. [[Judging Your Own Work]],
+[[Your Reading Life]], and [[Looking Back, Looking Ahead]]
 are the three examples already here.
 
 ## A starting shape

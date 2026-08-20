@@ -31,10 +31,9 @@ real version may add to it.
 ## Before *Indian Horse*
 
 Unit 2 spends real time with residential schools — not as a historical
-footnote, but as the subject of the novel we read start to finish. [[Before
-We Begin: Residential Schools and Indian Horse]] is where that unit's own
-version of this agreement gets built, because that material asks for more
-than the general list above.
+footnote, but as the subject of the novel we read start to finish. [[Before We Begin - Residential Schools and Indian Horse|Before We Begin: Residential Schools and Indian Horse]] is where that
+unit's own version of this agreement gets built, because that material asks
+for more than the general list above.
 
 ## If something in a text or a discussion is genuinely too much
 

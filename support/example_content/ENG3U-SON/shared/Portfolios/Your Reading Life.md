@@ -42,3 +42,11 @@ day.
 By the end of the course, flip back through what you wrote in September.
 The gap between your first entry and your last one is usually the most
 honest evidence you have of how much you've actually grown as a reader.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B4.1]]
+
+![[B4.2]]
+%%curriculum-end%%

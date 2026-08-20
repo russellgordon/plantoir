@@ -31,3 +31,11 @@ growth across the course instead of at one piece of writing.
 > Whatever you write here is worth reading again in January, once Unit 4's
 > Independent Culminating Study asks you to reflect one more time on how
 > far you've come.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C4.2]]
+
+![[C4.3]]
+%%curriculum-end%%

@@ -51,3 +51,17 @@ After the first modelled use, every task in this course asks you to use
 this page again, on your own, before you hand work in — Unit 1's essay,
 Unit 2's essay, Unit 3's written companion piece, and Unit 4's Independent
 Culminating Study each schedule a day for exactly that.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A3.1]]
+
+![[A3.2]]
+
+![[C4.1]]
+
+![[D4.1]]
+
+![[D4.2]]
+%%curriculum-end%%

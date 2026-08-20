@@ -19,8 +19,8 @@ pie showData
 ## Seventy: the semester's work
 
 Seventy per cent comes from the five tasks you complete across the four
-units — [[Two Stories, One Thread]], [[The Weight of the Ice]], [[Staging
-the Unseen]], and [[Your Canada, Your Story]] — the fifth being the
+units — [[Two Stories, One Thread]], [[The Weight of the Ice]], [[Staging the Unseen]],
+and [[Your Canada, Your Story]] — the fifth being the
 individually-marked companion pieces that travel alongside a group task
 (Unit 3's rhetorical analysis, for instance). Where a task is worked on in a
 group — Unit 3's scene study — the group product is not what gets marked:

@@ -30,8 +30,8 @@ noticed until it is much harder to fix.
 
 ## If a text itself is the problem
 
-Some of what we read this year is heavy — see [[How We Talk About Hard
-Things]]. If a specific text or discussion is genuinely too much for you,
+Some of what we read this year is heavy — see [[How We Talk About Hard Things]].
+If a specific text or discussion is genuinely too much for you,
 tell me privately. There is always another way to reach the same learning
 goal.
 

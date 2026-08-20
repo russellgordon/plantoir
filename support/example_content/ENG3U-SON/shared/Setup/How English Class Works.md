@@ -31,8 +31,8 @@ piece of writing.
 
 Discussion days are not "free talk." Every seminar or circle has a real
 question behind it, and the expectation is that you have something to say
-about the text, not just about how the class is going. [[How We Talk About
-Hard Things]] is the agreement we build together in the second class of the
+about the text, not just about how the class is going. [[How We Talk About Hard Things]]
+is the agreement we build together in the second class of the
 year, and it governs every discussion after that — including the ones about
 material that is genuinely difficult.
 
