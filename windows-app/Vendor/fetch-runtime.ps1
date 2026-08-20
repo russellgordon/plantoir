@@ -97,6 +97,21 @@ try {
     # The clone is a scaffold, not a repository; keeping .git would ship it.
     Remove-Item (Join-Path $quartzDir ".git") -Recurse -Force
 
+    # NATIVE-ONLY: bind the preview server and its live-reload websocket to
+    # loopback. Quartz listens on every interface, and Windows shows a
+    # firewall consent dialog naming "Node.js JavaScript Runtime" for any
+    # non-loopback listener - machinery in a teacher's face on their very
+    # first preview. A preview is only ever browsed at localhost. This must
+    # NOT be made a shared patch: inside the container, loopback binding
+    # would break Docker's port forwarding, which connects to the
+    # container's own address.
+    $handlers = Join-Path $quartzDir "quartz\cli\handlers.js"
+    $handlersText = Get-Content $handlers -Raw
+    $handlersText = $handlersText.Replace('server.listen(argv.port)', 'server.listen(argv.port, "127.0.0.1")')
+    $handlersText = $handlersText.Replace('new WebSocketServer({ port: argv.wsPort })', 'new WebSocketServer({ host: "127.0.0.1", port: argv.wsPort })')
+    if ($handlersText -notmatch '127\.0\.0\.1') { throw "The loopback patch found neither bind site in quartz/cli/handlers.js" }
+    Set-Content $handlers $handlersText -Encoding utf8 -NoNewline
+
     Write-Host "Installing Quartz dependencies (a few minutes)..." -ForegroundColor Cyan
     Push-Location $quartzDir
     & "$nodeDir\npm.cmd" install --no-audit --no-fund --silent
