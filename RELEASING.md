@@ -41,6 +41,16 @@ sentences and rules regardless of their OS. Three consequences:
   different releases — each honestly labelled. (If the catch-up work turns
   out to change behaviour, it becomes the next patch version instead, and
   the ready platform re-attaches unchanged.)
+
+  **That labelling is not optional, it is a broken download otherwise.** Both
+  cards normally use GitHub's evergreen `releases/latest/download/<asset>`
+  URL, which begins resolving to the new release the instant it publishes —
+  so the lagging platform's button 404s until its binary joins. Pin that card
+  to the last release that has the asset, note the older version on it, and
+  **un-pin it when the platform catches up**: a pinned card keeps serving an
+  old version from a button that looks perfectly healthy, which is why the
+  un-pinning is the half that gets forgotten. Done first for v1.1.0
+  (Windows only), 2026-08-20; the procedure is in the `cut-release` skill.
 - **"No code changes" does not exempt a platform from the gate.** A mac DMG
   gets the 1.1.0 label only when a mac session has made its suite green
   against the 1.1.0 contracts — for 1.1.0 concretely: implement the

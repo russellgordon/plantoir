@@ -19,26 +19,53 @@ this skill automates its steps 5–6 and the note-writing.
    - `mac-app/dist/Plantoir-macOS.dmg` (freshly built & notarized by `mac-app/publish.sh -Sign`)
    - `windows-app/dist/PlantoirSetup.exe` (freshly built & signed by `publish.ps1 -Sign`)
    - (Optional) `windows-app/dist/Plantoir-win-x64.zip` (portable edition)
-   
+
+   **A cut may carry one platform's assets only** — see step 5 and
+   `RELEASING.md`, "Two platforms, one version series". The other platform's
+   binary is added to the SAME release later, so nothing here needs redoing
+   when it arrives.
+
    Confirm with the user that the SIGNED & NOTARIZED bundles exist; never attach
    an unsigned one to a public release. Compute each asset's hash yourself:
    `shasum -a 256 <asset>` or `(Get-FileHash <asset> -Algorithm SHA256).Hash.ToLower()`
    from the EXACT file being uploaded, never trusted from memory or logs.
+
+   **When the asset is on the other machine** — the Windows bundle is built
+   and uploaded from the PC — you cannot hash it here. Take the hashes from
+   the cut sheet, SAY in your report that you did not compute them, and ask
+   whoever uploads to re-hash on that machine and confirm. Never present a
+   hash you did not compute as if you had.
    
    Asset names are LOAD-BEARING: `Plantoir-macOS.dmg` and `PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`), exactly — plantoir.app's download links resolve
    `releases/latest/download/<asset-name>`, so a renamed asset silently
    breaks the site. Refuse to attach an asset under any other name.
+
+   The same evergreen URL is why a one-platform cut has to touch the site:
+   the moment the new release becomes "latest", the missing platform's
+   evergreen link 404s. See "Publish", step 2.
 4. Confirm `<Version>` in `windows-app/Plantoir/Plantoir.csproj` matches
    the intended tag, and that the working tree is clean. Confirm you are on
    `main` with `dev` fully merged in (`git log main..dev` is empty) — the tag
    and the website commit both land on `main` (CLAUDE.md rule 6). After the
    website push, merge `main` back into `dev` so the branches do not drift.
-5. Confirm the mac side agrees: `MARKETING_VERSION` in `mac-app/project.yml`
-   must carry the same version. `RELEASING.md` says the two move
-   in lockstep — one product, one version series — so a mismatch is a stop,
-   not a note. (`project.yml` is the source; the Xcode project is generated
-   from it, so edit `project.yml` and re-run `xcodegen generate`.)
+5. Check `MARKETING_VERSION` in `mac-app/project.yml` against
+   `<Version>` in the csproj. **A mismatch is a QUESTION, not automatically
+   a stop** — corrected 2026-08-20, when this step still said the two move in
+   lockstep and a mismatch was a stop. `RELEASING.md`'s "Two platforms, one
+   version series" replaced that: the version names which CONTRACTS a build
+   passes, and a platform that has not passed the new contracts keeps its old
+   number until it does. So there are two readings and you must tell them
+   apart by asking which platforms this cut carries:
+   - **Both platforms shipping** — they must match, and a mismatch is a stop
+     exactly as before.
+   - **One platform shipping** (the other joins the tag later) — the lagging
+     platform's number is CORRECT where it is. Do not "fix" it to match the
+     tag: re-badging an untested binary would claim contracts it never ran
+     against, which is the precise thing the policy forbids.
+
+   (`project.yml` is the source; the Xcode project is generated from it, so
+   edit `project.yml` and re-run `xcodegen generate`.)
 6. **Confirm the release target repository (`russellgordon/plantoir`).**
    The remote `origin` and `website/site.json` (`repo_url`) both point to
    `github.com/russellgordon/plantoir`. Confirm this with the user, then pass
@@ -65,6 +92,11 @@ Style rules, in order of importance:
 - Cover BOTH platforms when the release carries both assets; label
   platform-specific items "(Windows)" / "(macOS)" only when they truly
   apply to one side.
+- **When only one platform ships, say so in the first line, plainly** —
+  "macOS: no changes", or the reverse, and where the other platform's
+  download currently comes from. `RELEASING.md` requires that sentence:
+  it is the entire cost of keeping one version series, and it is cheaper
+  than every support conversation under two.
 - End with a **Downloads** section listing each attached asset, its
   size, and its SHA-256 in a table:
 
@@ -97,9 +129,29 @@ gh release upload v<version> <assets...> -R <owner/repo>
 gh release edit v<version> --draft=false -R <owner/repo>
 ```
 
+   `gh release view v<version>` resolves a DRAFT by tag name, so the upload
+   works from the other machine without a release id. A draft does not create
+   the git tag; if the other machine needs a real tag to build or verify
+   against, push an annotated one yourself and target the draft at it.
+
 2. **Update and deploy plantoir.app**:
    Set `version` and `released` in `website/site.json`, redraw brand images,
-   rebuild, and push:
+   rebuild, and push.
+
+   **If this cut carries one platform only, fix that platform's download card
+   in `website/pages/index.html` in the same commit.** The cards use GitHub's
+   evergreen `releases/latest/download/<asset-name>` URL, which starts
+   resolving to the NEW release the moment it publishes — and the release has
+   no asset for the lagging platform, so that button 404s for every visitor on
+   that OS. Pin it to the last release that HAS the asset
+   (`releases/download/v<older>/<asset-name>`), and add one short note saying
+   that platform is still on the older version.
+
+   **Then un-pin it in the release that catches the platform up**, and delete
+   the note. A pinned card keeps working forever, which is exactly why it is
+   easy to forget: it serves an old version from a button that looks healthy.
+   The comment beside the card in `index.html` says all of this too — first
+   done for v1.1.0 (Windows only), 2026-08-20.
 
 ```bash
 # Redraw brand images if needed
