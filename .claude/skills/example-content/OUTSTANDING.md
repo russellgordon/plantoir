@@ -97,22 +97,67 @@ Not every hit is a defect — a month can appear in a text, a quotation or a
 generic reference — so this needs reading per instance rather than a
 find-and-replace. The scheduling claims are the ones that mislead.
 
-## Truncated and corrupted curriculum text
+## Corrupted curriculum text in the English payloads
 
-The skill's Phase 1 rule is verbatim or not at all. Beyond the nine pages
-recorded earlier, ENG4U's pass found two more truncated mid-sentence —
-**C1.5** ("determine whether the ideas and information") and **C3.6** ("use a
-variety of presentation features, including") — both of which sit on task
-pages. **C4.1** also has a stray teacher-prompt fragment spliced on after its
-closing parenthesis.
+The skill's Phase 1 rule is verbatim or not at all, and the English family
+breaks it three different ways. Measured 2026-08-20. **Read the caveat at the
+bottom before quoting any number here** — this was got wrong twice before it
+was got right, and the counts are lower bounds rather than totals.
 
-Authors have been told not to cite any truncated code in a triangulation
-block, and none has. But a teacher following ENG4U's Critical Essay block
-opens a C4.1 page with junk on the end of it.
+**1. Trailing truncation — the sentence stops mid-phrase.** Thirteen
+confirmed:
 
-Fixing these means re-fetching the live Ontario English curriculum. It is a
-Phase 1 job, cheap to do on its own, and it should be done before the English
-payloads are shown to anyone.
+| Payload | Pages |
+|---|---|
+| ENG2D | A1.9, B1.4, D3.1 |
+| ENG3U | A2.2, B2.1, D4.2 |
+| ENG4U | A1.9, A2.2, B1.8, B2.1, C1.5, C2.2, C3.6 |
+
+`ENG4U/C1.5` is the clearest specimen: its entire body is "determine whether
+the ideas and information", where the neighbouring `C1.4` runs to a full
+paragraph with its examples intact. `ENG2D/A1.9` ends "…a variety of pres-",
+broken at a hyphen, which says the text was lifted from a PDF's line wrap
+rather than from the web source — and that is probably the cause of the whole
+class.
+
+**2. Over-capture — the next subheading is glued onto the end.** `ENG3U/C2.1`
+ends "…for different purposes and audiences Voice", where *Voice* is the
+heading of the following section. **ENL1W has this pervasively** — at least 16
+of its 59 expectation pages, and the true figure is higher because the
+detector misses any heading containing a lowercase word ("Online Safety,
+Well-Being, and Etiquette"). ENL1W is the 2023 curriculum, whose expectations
+carry no bracketed examples, so the "ends with `)`" signal that finds the
+problem in the 2007 courses does not exist there. Treat ENL1W's Curriculum
+folder as needing a wholesale re-fetch rather than a page-by-page repair.
+
+**3. A stray teacher prompt spliced on.** `ENG4U/C4.1` carries two coaching
+questions after its closing parenthesis — "…in which areas are you weak?" —
+which are prompts from the source page, not part of the expectation. The
+linter's existing check is for content after the `^text` anchor; this sits
+BEFORE the anchor, so that check does not catch it. Worth extending.
+
+**There are no LEADING truncations.** A scan for expectation text starting
+mid-word came back empty — the pages that look wrong at the front
+("automatically understand most words", "regularly proofread", "conduct
+research") open with adverbs or with ordinary verbs, and every one is
+verbatim. Recorded so nobody re-runs it.
+
+**Caveat on the numbers, and it matters.** Three detectors were written for
+this and the first two were wrong in opposite directions. One keyed on a list
+of stopwords and missed `C1.5` because it ends on the content word
+"information". One keyed on terminal punctuation and over-flagged `ENG3U/D3.1`
+and `ENG4U/D3.1`, which genuinely end "…in achieving their purpose" with no
+full stop. The counts above survived being checked BY EYE against the source
+pages, but they are lower bounds: no mechanical rule separates "ends on a
+content word because it was cut" from "ends on a content word because that is
+where the expectation ends". The remedy does not depend on the count.
+
+Fixing all three classes means re-fetching the live Ontario English
+curriculum — a Phase 1 job, cheap to do on its own, and it should happen
+before the English payloads are shown to anyone. Authors have been told not to
+cite a truncated code in a triangulation block and none has, but a teacher
+following ENG4U's Critical Essay block still opens a page with half a sentence
+on it.
 
 ## Weighting pies that chart an inventory instead of the 70/30 shape
 
