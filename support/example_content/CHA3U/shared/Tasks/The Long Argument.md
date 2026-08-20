@@ -44,7 +44,11 @@ all four periods — not merely mentionable in them.
   period with evidence, and where it stands today.
 - **A presentation** of twelve minutes to an audience outside this class
   — another class, a library or historical society programme, a
-  community organisation, or a recording published somewhere real.
+  community organisation, or a recording published somewhere real. On the
+  day it runs as three simultaneous stations and three rounds: your group
+  presents in one of them and is part of the audience for the other two.
+  Twelve minutes each, with the visitors moving between stations, is the
+  only way a room this size hears every argument in one period.
 - **A one-page leave-behind** that your audience keeps.
 
 ## What is marked as yours
@@ -107,7 +111,9 @@ evidence matters more here than anywhere else in the course. Neither prompt
 below is on Day 18: that period is the delivery, you are running the room
 and hosting an audience, and nothing careful gets recorded during it.
 
-OBSERVE — Unit 4, Day 15, the analysis period
+OBSERVE — Unit 4, Day 16, the drafting period — Period 6, the one whose
+stated job on the table above is the through-line and the place where it
+breaks
   Watch for: whether the break in the through-line was FOUND or NOMINATED.
   The criteria row asks for the place where the pattern breaks or reverses,
   so every brief will name one — the row guarantees it. What today shows

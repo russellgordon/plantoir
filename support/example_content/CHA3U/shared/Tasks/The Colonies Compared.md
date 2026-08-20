@@ -80,8 +80,10 @@ sit, see [[Government Records]].
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 1, Day 11, the work period, while the argument section is
-being drafted
+OBSERVE — Unit 1, Day 11, the work period
+  The drafting itself is set for that evening, so what is on the screen in
+  the period is the comparison table and the sources behind it. That is
+  the right moment for this.
   Watch for: what a student does with a source that undercuts the regional
   difference they had already decided to argue. There are three moves —
   change the claim, narrow it to what the evidence will carry, or leave the

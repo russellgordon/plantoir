@@ -54,9 +54,12 @@ means you have been reading sources that already agreed with you, which
 
 ## What is marked
 
-The notebook is handed in as a set, once, near the end of term, and marked
-together with the two reflections as [[The Historian's Portfolio]]. The
-criteria live on that page and they are there from the first week.
+The notebook is read and marked as a set, once, in the closing portfolio
+class, together with the two reflections — the whole thing is
+[[The Historian's Portfolio]], and the criteria live on that page from the
+first week. It is gone through with you in the period rather than taken
+away, because you need it for the three review classes and for
+[[The Document Examination]].
 
 One rule worth knowing now: **the entries that carry the mark are the ones
 written in class, at a milestone.** Six periods this term have one on the

@@ -115,12 +115,13 @@ Been Avoided?"
   will stop.
 
 TALK — Unit 3, Day 10, the preparation slot already on that agenda
-  Ask, while they are choosing a criterion for "Is the United States an
-  Empire?": "Is there a case in this course that meets your criterion and
-  that you would still refuse to call an empire? What does that tell you
-  about the criterion?"
-  Then: "Which of the three positions on the page do you think the room
-  will find easiest, and is easy the same as right here?"
+  The page hands them a table of criteria with a counter-case already
+  written against each, so do not ask for a counter-case — ask them to
+  judge the ones they have been given.
+  Ask, while they are choosing: "Which of the counter-cases in that table
+  is the weakest, and what would you have to show to knock it down?"
+  Then: "Which of the three positions do you think the room will find
+  easiest, and is easy the same as right here?"
   A strong answer treats the criterion as something that can fail a test
   rather than as a label to apply — findings evaluated and synthesised into
   a judgement the student can defend, which is A1.6. An essay shows you the

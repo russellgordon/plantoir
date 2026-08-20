@@ -79,20 +79,22 @@ instincts already. For the shape of the essay, see
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 1, Day 18, the working period, while the counter-argument is
-being drafted
-  Watch for: what happens when the hard objection is actually put to a
-  student — by you in passing, or by whoever is sitting next to them. Two
-  things can follow. The objection goes into the draft, or the claim
-  quietly widens until the objection no longer touches it. The criteria
-  require a counter-argument, so the finished essay will contain one either
-  way, and it will be presented as the strongest available. Nothing on the
-  page can tell you whether a harder one was in the room an hour earlier.
-  Going well: the claim gets NARROWER and the objection stays hard.
-  Stuck: a redefinition offered as an answer — "that's not really what I'm
-  saying" — after which the thesis means less than it did.
-  Record: two columns on the day plan, took it or moved the claim. Put the
-  objection to at least half the room; it is a thirty-second intervention.
+OBSERVE — Unit 1, Day 18, the working period that follows the self-check
+  Every student named their own weakest row on Day 17. Watch for whether
+  the change they now make is to THAT row, or to an easier one. This is the
+  first time the course asks anybody to act on their own judgement, and it
+  is the only moment you will ever be able to compare a stated intention
+  with the action taken: the essay arrives showing the final state of
+  everything and the history of nothing.
+  Going well: the named row is the one being worked on, and the student can
+  point at the paragraph that changed.
+  Stuck: twenty minutes of tidying footnotes and rereading the opening
+  while the row they called weakest is untouched. Not laziness — it is
+  almost always the row they do not know how to fix, which is exactly the
+  thing to know before you mark them.
+  Record: have them write the row they named at the top of the page on Day
+  17, so that on Day 18 it is in front of you. One tick if the work matches
+  it, and the name of what they did instead if it does not.
 
 TALK — Unit 1, Day 17, the conferences on claims that are not yet arguable
   Ask: "Who alive in 1776 would be most annoyed by your claim, and what

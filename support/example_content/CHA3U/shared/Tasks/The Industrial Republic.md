@@ -41,9 +41,12 @@ A **document set** of five to eight sources you located yourselves, each
 with a one-line note on what it is evidence of, and a **ten-minute
 presentation** built on those documents rather than on a summary of them.
 
-The presentations run in rounds on the hand-in day: two pairs at a time,
-twice over, so that everybody presents inside one period and everybody is an
-audience twice. Ten minutes to four people is still ten minutes.
+The presentations run in two rounds on the hand-in day. In the first, half
+the pairs present at the same time in different corners of the room, each to
+a standing audience of one or two other pairs; in the second, the halves
+swap. Ten minutes each way, so everybody presents once and listens once, and
+the whole thing fits inside one period. Ten minutes to four people is still
+ten minutes, and it is a harder room than the back row of a lecture.
 
 ## What is marked as yours
 
@@ -95,29 +98,33 @@ warnings on both pages before you rely on them.
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-Done in pairs, so the conversation is also how you get the INDIVIDUAL
-evidence the mark needs. Ask each partner on their own, never across the
-pair.
+Two people, one case, two marks. Everything below is about telling the
+partners apart, because the document set will not do it for you: a pair
+that split the work sensibly and a pair where one person did four of the
+five questions hand in the same folder.
 
 OBSERVE — Unit 3, Day 3, the research period after the photographs lesson
-  Watch for: what gets given up when a figure will not come. There are two
-  moves and they cost very different amounts. Loosen the CLAIM — "wages
-  were low" instead of a wage — or loosen the SCOPE, quietly letting one
-  city become "American cities". A document set of eight sources looks
-  equally complete after either, and by the presentation nobody can tell
-  which happened.
-  Going well: the claim narrows to exactly what one published table
-  supports — one mill, one year — and the city survives.
-  Stuck: a round number with no publisher attached; or "we'll just do steel
-  in general", said quietly, twenty minutes in.
-  Record: initials and one word on the day plan, claim or scope. It takes
-  the length of a lap of the room.
+  Watch for: the SEAM between the two halves of a pair. The page tells them
+  to split the five questions in writing at the start, and the document set
+  arrives with initials against every source whether that happened or not.
+  What the set cannot show you is whether the two halves were ever put
+  together — whether either partner has read a line the other found, or
+  whether two people sat at two screens for a period and never spoke.
+  Going well: the split written down inside the first ten minutes, and then
+  one partner reading the other's note aloud and arguing with it.
+  Stuck: a division agreed out loud and never written, so that both chase
+  the same question and nobody has the ownership figures; or two silent
+  screens and a pair who cannot say, at the bell, what the other found.
+  Record: on the day plan, one letter per pair — W if the split is written,
+  S if you saw them cross the seam. It is the only individual evidence this
+  task gives you before the conferences.
 
 TALK — Unit 3, Day 7, the conferences already on that agenda
-  Ask each partner separately: "Your wage figure is per what — per hour,
-  per day, per piece? And what did that buy in that city, in that year?"
-  Then: "Is that one job, or the whole plant averaged together? If it is an
-  average, who is inside it?"
+  Ask each partner separately, about a figure from THEIR OWN half of the
+  case — a wage, a profit, an output, a rent, a death rate: "That number is
+  per what, exactly? And what did it buy in that city, in that year?"
+  Then: "Is that one job, or a whole category averaged together? If it is
+  an average, who is inside it?"
   A strong answer turns the number into something a person could live on or
   could not, and then notices that an average across a plant conceals the
   very differential the second question of this task is about. D1.2 asks for
@@ -129,7 +136,7 @@ TALK — Unit 3, Day 7, the conferences already on that agenda
   them separately.
 
 The product evidence is the document set handed in on Day 9, and the
-presentations, which run in rounds that same period — you are moving between
-four groups at once, which is another reason not to try to gather anything
-else on that day.
+presentations, which run in two rounds that same period — half the class
+presenting at once, in different corners, while you move between them. That
+is another reason not to plan to gather anything careful on that day.
 %%

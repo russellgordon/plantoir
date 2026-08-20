@@ -102,10 +102,12 @@ The one narrow exception is where a habit is itself part of what the
 curriculum asks this course to teach. Expectation A2.2 asks you to apply
 "skills and work habits developed through historical investigation" in
 everyday contexts, and names self-regulation and initiative in doing so — so
-the paragraph [[Skills You Are Building]] asks for, about an occasion you
-noticed a task going wrong and changed your approach, is marked like
-anything else in the curriculum. That is the whole of the exception, and it
-lives on one page.
+the paragraph [[Skills You Are Building]] asks for, about an occasion
+OUTSIDE this class where you noticed a task going wrong and changed your
+approach, is marked like anything else in the curriculum. Note where the
+weight falls: it is the transfer out of here that the expectation is about,
+not how organised you were in September. That is the whole of the
+exception, and it lives on one page.
 
 **Your own judgement of your work, and your classmates', are not part of
 your mark.** You will judge your own work against the criteria often — see

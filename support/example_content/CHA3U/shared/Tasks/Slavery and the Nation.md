@@ -88,19 +88,23 @@ how a student handles the record, never how they feel about what is in it.
 OBSERVE — Unit 2, Day 5, the research period that follows the archive
 lesson
   Watch for: what a student does when a finding aid returns nothing. There
-  are three moves and they are not equivalent. Change the search terms;
-  change the archive; or change the question so that the gap stops
-  mattering. The third is the common one, and it is invisible in the
-  finished essay, because the essay is about whichever question survived —
-  most often the sixth part, "what outlasted it", quietly missing.
-  Going well: search terms changed to the ones the records were INDEXED
-  under, which are the period's words and not ours — a surname, a ship, a
-  county court, an estate — rather than the terms we would use to describe
-  the same thing today.
-  Stuck: the same three modern words retyped into the same box for twenty
-  minutes; or a part of the task dropped with "there was nothing".
-  Record: initials and one letter on the day plan — T for terms, A for
-  archive, Q for question.
+  are four moves and they are not equivalent. Climb the LADDER the lesson
+  they have just had describes — ask which agency was obliged to create
+  this document, find its record group, read the series descriptions.
+  Change the search TERMS. Change the ARCHIVE. Or change the QUESTION so
+  that the gap stops mattering. The last is the common one, and it is
+  invisible in the finished essay, because the essay is about whichever
+  question survived — most often the sixth part, "what outlasted it",
+  quietly missing.
+  Going well: the ladder, used unprompted — a student who stops typing into
+  the box and starts asking who would have had to write this down. That is
+  the whole point of the day's tutorial and this is the only place you find
+  out whether it took.
+  Stuck: the same words retyped into the same box for twenty minutes; or a
+  part of the task dropped with "there was nothing".
+  Record: initials and one letter on the day plan — L for ladder, T for
+  terms, A for archive, Q for question. The Ls are the ones who have
+  understood the lesson.
 
 TALK — Unit 2, Day 7, the conferences already on that agenda
   Ask: "Read me the clause you chose. Which single word would you have to

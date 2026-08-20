@@ -10,10 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Reflection: what the culminating taught that the units did not
-2. Portfolio closes: [[Where History Leads]] written here, the notebook handed in as a set
-3. [[Skills You Are Building]] revisited, with one paragraph added after the culminating
-4. How [[The Document Examination]] works
+1. Portfolio closes: [[Where History Leads]] written here, and your notebook read through with me in the same period — you keep it afterwards
+2. [[Skills You Are Building]] revisited: what the culminating taught that the units did not
+3. How [[The Document Examination]] works, and what the three review classes will do
 
 ## Things to do before our next class
 

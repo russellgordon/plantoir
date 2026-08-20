@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. **Period 8 of 8: [[The Long Argument]] delivered**
-2. Arguments delivered to the invited audience, and questions taken live
-3. Written versions handed in
+2. Three stations and three rounds, with the invited audience moving between them; questions taken live
+3. Written versions and leave-behinds handed in
 
 ## Things to do before our next class
 

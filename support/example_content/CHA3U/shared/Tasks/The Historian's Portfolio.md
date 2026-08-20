@@ -32,7 +32,9 @@ fall where the course has just given you something to think with:
 - the middle of Unit 3, after mass production and what it did to work;
 - late in Unit 3, when [[Skills You Are Building]] is written;
 - the closing portfolio class in Unit 4, where [[Where History Leads]] is
-  written and the notebook is handed in as a set.
+  written and the whole portfolio is read and marked with you, in the
+  period. You keep the notebook afterwards: you need it for the three
+  review classes and for [[The Document Examination]].
 
 Bring the notebook to all six. An entry written from memory is visibly
 thinner than one written from the pages beside it.
@@ -41,8 +43,8 @@ thinner than one written from the pages beside it.
 
 | Criterion | What earns the marks |
 | --- | --- |
-| Sourcing | Every entry can be traced back — author, title, date, repository, reference |
-| Question | Each entry names which kind of question it is asking, and stays that kind |
+| Sourcing | The marked entries can be traced back — author, title, date, repository, reference |
+| Question | Each marked entry names which kind of question it is asking, and stays that kind |
 | Movement | You can show a position that changed, what changed it, and when |
 | Transfer | Your claims about your own skill each have one piece of your own work behind them |
 | Application | The current-issue entry is analysed with the tools, not decorated with them |
@@ -94,14 +96,17 @@ OBSERVE — Unit 1, Day 20, the first portfolio milestone written in class
   Stuck: a notebook opened at a blank page and filled forwards; a student
   who cannot find the entry they are describing.
   Record: three columns on your day plan — open, shut, no notebook. Two
-  minutes, whole class, and the pattern in Unit 1 predicts the stack in
-  Unit 4 almost exactly.
+  minutes, whole class, and the pattern you see in Unit 1 predicts the
+  portfolios you read in Unit 4 almost exactly.
 
 TALK — Unit 4, Day 19, the closing portfolio class, while they write "Where
 History Leads" with the notebooks in front of them
-  This is the one period all term when every notebook is open in the room
-  and the careers list is the thing being worked on, which is why the two
-  questions belong here rather than earlier.
+  This is not an extra job squeezed into that period — it IS the
+  read-through. You are going round the room marking notebooks while the
+  room writes, so ask these two while the notebook is open in front of you
+  and the marking is what you are already doing. It is also the one period
+  all term when every notebook is open and the careers list is the thing
+  being worked on, which is why the questions belong here and not earlier.
   Ask: "Open the notebook at October. What were you asking then that you
   would now say was the wrong shape of question?"
   Then: "Which of the jobs on that list actually does the thing you have
@@ -114,7 +119,8 @@ History Leads" with the notebooks in front of them
   and every student knows what a good one is supposed to say.
   Record: initials and one phrase, on the class list, as you move on.
 
-The product evidence is the stack, handed in on that same closing class —
-which is exactly why the conversation has to happen while the notebooks are
-still open in front of them, and not after you have taken them away.
+The product evidence is the portfolio itself, and you read it WITH the
+student in that same closing class rather than carrying it home: they need
+the notebook for the three review periods and for the examination. Marking
+in the period is what makes the two questions above possible at all.
 %%

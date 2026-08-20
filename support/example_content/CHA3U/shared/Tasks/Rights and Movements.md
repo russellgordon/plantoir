@@ -92,23 +92,28 @@ being marked on. For first-person accounts, see
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-Done in pairs. Ask each partner on their own; the reports are separate and
-so is the evidence.
+The two reports are written separately, so the evidence should be gathered
+separately too — one partner in front of you at a time, and never a
+question the other one can answer over their shoulder.
 
-OBSERVE — Unit 4, Day 5, the research period
-  Watch for: which half of the story a pair opens FIRST, and what the other
-  half is left. The post-1945 campaign is a search away; the organising
-  under Jim Crow is not, and it takes longer to find on purpose. The
-  criteria row about continuity means the finished report will present the
-  earlier decades as the movement whether or not anybody looked — that
-  sentence is easy to write and impossible to check afterwards. Where the
-  hours went is only visible now.
-  Going well: a pre-1945 source open in the first ten minutes, or an even
-  count of sources between the two halves by the end.
-  Stuck: forty minutes on the 1960s and "we'll add the earlier stuff at
-  home".
-  Record: a slash on the day plan beside a pair the first time they open a
-  pre-1945 source, and the clock time beside it. One number per pair.
+OBSERVE — Unit 4, Day 6, the work period — the SECOND period on this task
+  Not Day 5. Days 4, 5 and 6 are all taught out of the years after 1945, so
+  a pair deep in the 1960s on Day 5 is doing exactly what the lesson set
+  up; that is not a tell, and marking it as one would punish them for
+  paying attention. The tell is what the OTHER half of the case looks like
+  by the end of a second period on it. A sentence saying the pre-1945
+  organising was the movement rather than its prologue takes ten seconds to
+  write and cannot be audited afterwards; whether anyone spent an hour on
+  it can only be seen while the hour is being spent.
+  Watch for: whether anything at all has been opened for the decades before
+  1945 — an association's minutes, a Black newspaper, a lawsuit, a school
+  built where none was provided.
+  Going well: a pre-1945 source open on one of the two screens, and the
+  partner who is not on it able to say what it is.
+  Stuck: two screens of post-1945 material at the end of the second period,
+  and "we'll add the earlier stuff at home".
+  Record: one pass at the start of the period and one at the end, a slash
+  beside each pair with a pre-1945 source open. Two numbers, whole class.
 
 TALK — Unit 4, Day 7, the conferences already on that agenda
   Ask each partner separately: "Where did the organisation you are

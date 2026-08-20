@@ -80,14 +80,13 @@ will and will not tell you, see [[Newspapers and Print Culture]].
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 2, Day 16, the working period, while the causation section is
-drafted
+OBSERVE — Unit 2, Day 16, the working period where the causation section is
+started
   Watch for: the ORDER in which the criteria and the ranking get written.
-  The criteria row on this page means every essay handed in will have a
-  standard stated somewhere near the top, and the page tells students to
-  put it there, so its presence proves nothing. What it cannot show you is
-  whether the standard governed the ranking or was fitted to a ranking the
-  student already liked — and that is decided in this period, on paper, in
+  A finished essay reports a standard and it reports a ranking; what it
+  does not report, and cannot, is which of the two was decided first. That
+  single fact is the whole difference between an argument and a verdict
+  gone looking for reasons, and it is settled in this period, on paper, in
   front of you.
   Going well: a written standard before any cause is placed, and then a
   cause MOVING because the standard put it somewhere the student did not
