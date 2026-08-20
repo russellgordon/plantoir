@@ -51,6 +51,15 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
+- `contracts/app-rules.json` → `failureExplanations.cases` → **the
+  teacher-made-link case** ("untrusted mount point"), proposed 2026-08-20.
+  Windows refuses to traverse a junction inside the teacher's own course
+  folder (the Obsidian shared-Media trick); the toolchain creates no links
+  of its own on Windows any more, so the error can only be theirs, and the
+  raw OSError read as a crash. Cannot occur on macOS; implement the mapping
+  anyway to keep the explainer identical — same reasoning as the setup
+  cases below. Reference: `FailureExplainer.VaultLinkExplanation`.
+
 - `contracts/app-rules.json` → `failureExplanations.cases` → **the three
   one-time-Windows-setup cases** ("needs to restart to finish getting
   ready", "Windows permission was declined", "Windows could not add the

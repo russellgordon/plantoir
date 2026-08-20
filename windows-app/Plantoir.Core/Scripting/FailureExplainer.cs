@@ -9,6 +9,7 @@ public static class FailureExplainer
 {
     public static string? Explanation(string output) =>
         SetupExplanation(output)
+        ?? VaultLinkExplanation(output)
         ?? RateLimitExplanation(output)
         ?? AccountExplanation(output)
         ?? ConnectionExplanation(output)
@@ -22,6 +23,18 @@ public static class FailureExplainer
     /// Checked FIRST because that setup's own log is echoed into the output
     /// and could contain lines the broader matchers below would misread.
     /// </summary>
+    /// <summary>
+    /// A Windows link (junction/symlink) inside the TEACHER's own course
+    /// folder. The toolchain itself creates none on Windows any more, so
+    /// this error can only come from their filesystem — commonly the
+    /// Obsidian trick of linking one shared Media folder into several
+    /// vaults, which current Windows refuses to traverse (WinError 448).
+    /// </summary>
+    private static string? VaultLinkExplanation(string output) =>
+        output.Contains("untrusted mount point")
+            ? "Part of this course folder is a link to another folder, and Windows won't let the website builder follow it. Replace the link with the real folder (the details above name which one), then try again."
+            : null;
+
     private static string? SetupExplanation(string output)
     {
         if (output.Contains("needs to restart to finish getting ready"))

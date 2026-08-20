@@ -406,6 +406,11 @@
         "output" : "Built site not found at /courses/ICS3U/.merged_output/section1/public"
       },
       {
+        "expect" : "Part of this course folder is a link to another folder, and Windows won't let the website builder follow it. Replace the link with the real folder (the details above name which one), then try again.",
+        "output" : "OSError: [WinError 448] The path cannot be traversed because it contains an untrusted mount point: 'C:\\Users\\person\\Documents\\My Course\\courses\\ICS3U\\Media'",
+        "why" : "The toolchain creates no Windows links of its own any more, so this error can only come from a link inside the teacher's OWN folder — commonly the Obsidian trick of sharing one Media folder across vaults with a junction, which current Windows refuses to traverse. The teacher can fix it; the raw OSError reads as a crash. Windows-only output — recognising it on the mac keeps the explainer identical, same reasoning as the one-time-setup cases."
+      },
+      {
         "expect" : "This PC needs to restart to finish getting ready. Restart it, then try setting up again — it carries on by itself.",
         "output" : "This PC needs to restart to finish getting ready.\nRestart this PC, then try again - setup continues on its own.",
         "why" : "Windows sometimes cannot finish adding what the website builder needs until the PC restarts. The launcher says so in plain words already; the app repeats it as the one actionable sentence so the teacher is not left reading a wall of output. Windows-only output — it can never appear on macOS, but recognising it there keeps the explainer identical on both sides rather than growing a platform switch."
