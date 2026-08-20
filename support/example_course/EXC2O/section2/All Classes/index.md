@@ -1,7 +1,7 @@
 ---
 title: All Classes
 publish: true
-created: 2026-08-14T12:24:26.000-0400
+created: 2027-01-19T07:00:00.000-0500
 ---
 Every class we have had, most recent at the top of the section page.
 

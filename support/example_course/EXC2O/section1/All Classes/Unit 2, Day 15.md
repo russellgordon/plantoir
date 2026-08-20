@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[Climate Change Action Plan]], day 3 — working period: sustainable practices,
-   including those used by First Nations, Métis, and Inuit communities
+1. [[Climate Change Action Plan]], day 3 — working period, starting from what
+   yesterday's conference settled: sustainable practices, including those
+   used by First Nations, Métis, and Inuit communities
 2. Sources from those communities where you can find them, named — the
    knowledge is theirs and the citation says so
 

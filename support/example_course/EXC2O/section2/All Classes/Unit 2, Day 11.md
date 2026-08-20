@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Model and write-up finished.
+- [ ] Read [[The Greenhouse Effect]] before next class.

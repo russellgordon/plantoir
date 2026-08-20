@@ -10,8 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Investigation: [[Static Electricity Stations]] — begin physics
-2. Concept: [[Static Electricity]] — naming what happened at each station
+1. Diagnostic, five minutes before anything else: what is electricity? Two
+   sentences in your notebook, no notes, no marks and nothing handed in. I
+   read them as I walk round, and they decide where this unit starts
+2. Investigation: [[Static Electricity Stations]] — begin physics
+3. Concept: [[Static Electricity]] — naming what happened at each station
 
 ## Things to do before our next class
 

@@ -1,7 +1,7 @@
 ---
 title: Scratch Page
 publish: false
-created: 2026-08-14T12:24:26.000-0400
+created: 2026-09-08T07:00:00.000-0400
 ---
 Somewhere to draft the next class before it is ready. Also unpublished.
 

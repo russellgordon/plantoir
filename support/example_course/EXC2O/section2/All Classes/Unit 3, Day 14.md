@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. [[Product Life Cycle Analysis]], day 4 — working period: the honest ending.
-   What happens to it, and what would have to change
-2. Trade analyses and challenge one claim each
+1. First ten minutes: [[Judging Your Own Work]] — your draft against the
+   success criteria on [[Product Life Cycle Analysis]]. Name your weakest row
+2. [[Product Life Cycle Analysis]], day 4 — working period: that row first,
+   then the honest ending. What happens to it, and what would have to change
+3. Trade analyses and challenge one claim each
 
 ## Things to do before our next class
 

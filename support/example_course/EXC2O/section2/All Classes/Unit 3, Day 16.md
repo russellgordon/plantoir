@@ -13,6 +13,8 @@ tags:
 1. Retrieval clinic — no notes: a Bohr-Rutherford diagram, a name from a
    formula, and evidence for a chemical change
 2. Compare answers in pairs
+3. Last fifteen minutes: [[Showing Growth]] — an early lab report beside
+   your most recent one, the comparison written here
 
 ## Things to do before our next class
 

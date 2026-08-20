@@ -62,6 +62,7 @@ the data to explain the differences in what grows there.
 ## Hand in
 
 - [ ] Complete data table, all raw readings shown
+- [ ] A graph comparing your two plots, built in a spreadsheet
 - [ ] Answers to the three analysis questions
 - [ ] One sentence stating what you would measure next, and why
 

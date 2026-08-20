@@ -25,6 +25,12 @@ actually asking.
 thinking, deliberately, so that one difficult afternoon does not decide this
 on its own.
 
+```mermaid
+pie title Where your mark comes from
+    "The semester's work" : 70
+    "The final evaluation" : 30
+```
+
 The seventy is the seven marked [[Lab Reports]]; your three
 [[Science in the News]] submissions; [[Coding a Scientific Model]];
 [[Climate Change Action Plan]]; [[Product Life Cycle Analysis]];
