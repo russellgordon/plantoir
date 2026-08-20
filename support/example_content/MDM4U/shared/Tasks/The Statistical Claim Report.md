@@ -27,8 +27,16 @@ and what was compared with what. Third, the **verdict**, in one of
 three words — *supported*, *overstated*, or *not proven* — followed by
 the evidence that forces it.
 
-Somewhere in part two you will meet at least one of the tricks from
-[[The Graph Gallery]] or one of the confusions from
+Part two ends with one more move, and it is the one that separates a
+report from an opinion: **look for somebody who studied the same
+relationship and concluded differently.** Cite them in a sentence, or
+state plainly that you looked and found none. Two studies of the same
+question disagreeing is not a scandal — it is the ordinary condition
+of the subject, and a verdict written as though only one study exists
+is weaker than it looks.
+
+Somewhere in part two you will also meet at least one of the tricks
+from [[The Graph Gallery]] or one of the confusions from
 [[Correlation and Causation]]. Name it when you meet it. If the claim
 turns out to be perfectly sound, say so with the same confidence — a
 verdict of *supported* is a real result, and it is worth exactly as
@@ -43,6 +51,8 @@ much.
       compared against what
 - [ ] Any graph in the article reconstructed honestly, or the reason
       it cannot be reconstructed stated
+- [ ] A second study of the same relationship found and cited, or its
+      absence stated after a genuine search
 - [ ] Verdict delivered in one of the three words, with the two or
       three pieces of evidence that decide it
 
@@ -71,6 +81,7 @@ it comes in on Day 10.
 | Method examined | Sample, selection, comparison, and funding named |
 | Statistics used, not waved | The specific number that decides it |
 | A proportionate verdict | Confidence matching the evidence, either way |
+| Not the only study | A second study of the same question cited, or its absence proven |
 
 > [!question]- If the article cites no source at all
 > Then you have already found something. Search for the researcher,
@@ -104,15 +115,16 @@ OBSERVE — Unit 4, Day 7, the working period on what the study was for
   longer fits. Some rewrite the verdict. Some quietly go looking for a
   different article about the same topic, and start again with the
   answer they wanted. The report that arrives on Day 10 reads the same
-  either way, and none of the five criteria rows can tell you which
+  either way, and not one row of the criteria table can tell you which
   happened. This is D3.2 — assessing validity — as a behaviour rather
   than a paragraph.
   Going well: the verdict word changes while the student is still
   reading, and they say so out loud to whoever is nearest.
   Stuck: a new tab, a new article, and the original verdict intact.
-  Record: initials in one of two columns in your day plan, changed or
-  changed-the-source. It takes a second and it is the single most
-  useful thing you will know about this task.
+  Record: initials in one of two columns in your day plan, headed
+  "verdict moved" and "source swapped". It takes a second, and which
+  column somebody lands in is the single most useful thing you will
+  know about them on this task.
 
 TALK — Unit 4, Day 6, at the conference already on that agenda
   Once you have established that they can reach the study, ask:

@@ -16,9 +16,6 @@ tags:
    limitations written before the conclusion
 3. Look ahead: next unit, other people's claims — and then your own,
    defended
-4. Last fifteen minutes: your Unit 3 milestone entry in your
-   [[Math Journal]], written here — [[Journal Checklist]] is the
-   standard, and journals come in at the door
 
 ## Things to do before our next class
 

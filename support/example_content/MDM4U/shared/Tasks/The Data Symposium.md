@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - tasks
-  - final-evaluation
 enableToc: true
 ---
 > [!abstract] At a glance
@@ -115,16 +114,21 @@ write what you would want to receive.
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-Be straight about the two symposium days: you are running the room,
-timing six-minute slots, and there are guests in it. Do not plan to
-gather observation evidence while doing that. The critique sheets and
-the presentations are strong product evidence on their own, and the
-two prompts below are where the rest of it is actually reachable.
+Be straight about the two symposium days. You are the audience for
+every six minutes and every three minutes of questions, so the
+presentations and the sheets — the two things this task is marked on —
+are gathered exactly where the page says they are. What you cannot do
+while timing slots with guests in the room is gather anything EXTRA.
+So the two prompts below sit before the symposium rather than during
+it, and they are for the evidence those days cannot give you.
 
 OBSERVE — Unit 4, Day 13, the gallery of graphs critiqued by the room
-  This is the only period before the symposium where students critique
-  each other's mathematical work out loud with you free to circulate,
-  so it is where E2.4 — critique the work of others in a constructive
+  Day 14's rehearsal also has students questioning each other, but you
+  are running a clock through it and every pair is talking at once.
+  Day 13's gallery is the one where the object under critique is a
+  finished piece of somebody's own work, the whole room is looking at
+  the same thing, and you are free to circulate. That makes it the
+  place where E2.4 — critique the work of others in a constructive
   manner — can be watched rather than only read. Be clear about what
   this prompt is for: the critique sheets are strong product evidence
   and the criteria table already marks them on specificity, so what

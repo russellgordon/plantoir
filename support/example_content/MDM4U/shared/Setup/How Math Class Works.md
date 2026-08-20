@@ -25,9 +25,11 @@ graph LR
 
 ## Number talk
 
-We open with ten minutes of mental mathematics — a
+Almost every class opens with ten minutes of mental mathematics — a
 [[Number Talks/index|number talk]] — done in heads, defended out
-loud. No pencils, no calculators, no single right method. The method
+loud. The exceptions are the days that need every minute of the
+period: a checkpoint, a retrieval clinic, a working period with a
+conference in it, the symposium. No pencils, no calculators, no single right method. The method
 you defend today becomes the method someone else reaches for
 tomorrow.
 

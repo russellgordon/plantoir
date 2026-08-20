@@ -36,9 +36,12 @@ that earns the marks:
    answer.
 
 You finish by **rewriting two of the questions** so they measure the
-same thing without the push, and by writing the conclusion you believe
-the data can carry — which may be considerably smaller than the one
-that got published.
+same thing without the push, by **auditing the instrument for
+privacy** — what one respondent's completed form would let the
+publisher work out about them, who was told that, and whether
+declining was possible — and by writing the conclusion you believe the
+data can carry, which may be considerably smaller than the one that
+got published.
 
 ## Milestones
 
@@ -49,6 +52,8 @@ that got published.
 - [ ] The missing group identified, and the direction of the resulting
       error argued
 - [ ] Three questions analysed word by word; two of them rewritten
+- [ ] Privacy audited: what one completed form reveals about the
+      person who filled it in, and what they were told about that
 - [ ] Your own defensible conclusion, stated in one sentence
 
 ## How it is assessed
@@ -83,7 +88,9 @@ row can still be fixed.
 | Frame before sample | Who could be reached, then who was |
 | A named absence | The missing group, and the direction of its effect |
 | Wording taken seriously | Quoted, analysed, and rewritten cleanly |
+| Privacy taken seriously | What one completed form reveals, and who was told |
 | A right-sized conclusion | One sentence the data can actually carry |
+| Whose work is whose | Each analysis signed, and one rewrite from each of you |
 
 > [!warning]- When the survey is one your own school ran
 > Fair game, and often the most interesting choice — but the people

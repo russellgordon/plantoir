@@ -43,7 +43,7 @@ thing you were hoping nobody would look at.
 > row. **Change:** write the direction and the reason for it, this
 > period, then check whether my own conclusion still survives it.
 >
-> That entry is worth more than "looks good to me" on all five rows,
+> That entry is worth more than "looks good to me" on all seven rows,
 > and it took less time to write.
 
 ## Why this is not a mark

@@ -81,6 +81,7 @@ what you find there can still be fixed.
 | An expected value, not a guess | Each payout weighted by its own chance |
 | A defended price | The fair price stated, and the gap explained |
 | Honest limits | What the model leaves out, named plainly |
+| Both hands visible | Each partner's outcomes initialled, and each defends part of the verdict |
 
 > [!success]- If your probabilities refuse to sum to one
 > Two causes, almost always. Either an outcome is missing — the

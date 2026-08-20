@@ -35,7 +35,7 @@ the shape the course has had all along.
 | --- | --- | --- |
 | A. Counting and probability | 25% | Count arrangements and selections — including from a row of Pascal's triangle — build a sample space, and compute probabilities that are conditional, complementary, or joint |
 | B. Distributions | 25% | Recognize which distribution a situation is, build it, compute an expected value, use the normal model and a $z$-score |
-| C. Data and its collection | 30% | Name a sampling method and its weakness, summarize one- and two-variable data, read a regression and its residuals, interpret a margin of error |
+| C. Data and its collection | 30% | Separate a population from the sample that stood for it, name a sampling method and its weakness, summarize one- and two-variable data, read a regression and its residuals, interpret a margin of error |
 | D. Reading a claim | 20% | One published claim, dissected: who was measured, what was compared, what the graph does, and what the data can carry |
 
 Part C is the largest because the middle half of this course is data,
@@ -123,6 +123,8 @@ nobody can help you, which is exactly what makes it worth having.
 ![[A2.3]]
 
 ![[A2.4]]
+
+![[B1.2]]
 
 ![[B1.4]]
 

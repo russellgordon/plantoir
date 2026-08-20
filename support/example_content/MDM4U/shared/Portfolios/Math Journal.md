@@ -67,8 +67,9 @@ you hand it over.
 > The nightly entries are practice, and practice is not marked in
 > this course — see [[How Marks Work]]. What I evaluate is the
 > **milestone entry**: the last fifteen minutes of the final class of
-> each unit, written here, in the room, looking back across the unit
-> against the five qualities above. The nightly entries are what make
-> that fifteen minutes possible, which is the honest reason to keep
-> them. [[Final Reflection]] is the last milestone entry of the
-> course, written in class in the final week.
+> Units 1, 2 and 3, written here, in the room, looking back across the
+> unit against the five qualities above. The nightly entries are what
+> make that fifteen minutes possible, which is the honest reason to
+> keep them. Unit 4 ends differently: [[Final Reflection]] is its
+> milestone entry, written in class on the last day before the review
+> classes begin.

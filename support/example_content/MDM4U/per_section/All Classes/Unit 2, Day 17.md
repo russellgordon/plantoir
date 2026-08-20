@@ -14,7 +14,10 @@ tags:
 2. [[The Culminating Investigation]], day 3 — working period. Yesterday's
    conference and your own weakest row land here first; then the plan
    — sampling method, sample size, and the biases you expect
-3. Approval checkpoint: no collection starts without a plan I have read
+3. The ethics half of the plan, in writing: the four things [[Bias]]
+   says to settle before you collect from anybody
+4. Approval checkpoint: no collection starts without a plan I have
+   read, and that includes the ethics half
 
 ## Things to do before our next class
 

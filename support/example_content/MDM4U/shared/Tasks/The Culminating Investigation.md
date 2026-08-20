@@ -81,7 +81,12 @@ one.
 - **Background**: what is already known, and where you looked.
 - **The plan**: population, variables, sampling method, sample size,
   and the sources of bias you anticipated — in the form you agreed to
-  at the approval checkpoint.
+  at the approval checkpoint. If you collected from people, the plan
+  also settles the four things [[Bias]] lists before a single response
+  arrives: what you are asking, who will see it, how you will store
+  it, and how somebody declines without penalty. Secondary data is not
+  exempt — say how the people in it consented, or say that you cannot
+  tell.
 - **The data**: how you [[E1.3|gathered and organized]] it, cleaned
   honestly, with every source cited per [[Citing Your Sources]].
 - **The analysis**: numerical and graphical summaries, each chosen for
@@ -146,9 +151,11 @@ use it once it exists.
 | A question worth asking | Precise, answerable, and genuinely open |
 | A plan that anticipated trouble | Bias and limits named before collection |
 | Traceable data | Every number leads back to a citable source |
+| Collected ethically | Consent, storage and the right to decline settled — or, for secondary data, accounted for |
 | Analysis chosen, not sprayed | Each summary justified by the question |
 | A conclusion the data carries | Claims sized to the evidence behind them |
 | Limits owned | Weaknesses named by you, before anyone asks |
+| Whose work is whose | Working as a pair: every section signed, and each of you able to answer for all of it |
 
 > [!tip]- If your data turns out to be worse than you hoped
 > This happens to real researchers constantly, and it is not a reason
@@ -175,8 +182,6 @@ use it once it exists.
 ![[E2.1]]
 
 ![[B2.2]]
-
-![[B2.4]]
 
 ![[D2.1]]
 

@@ -21,4 +21,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Bring your questions for the review classes.
+- [ ] Read [[The Final Examination]] before next class. It says what
+      is on the paper, and the three review classes run on the
+      questions you bring to them.
