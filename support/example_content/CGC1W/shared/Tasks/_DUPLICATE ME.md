@@ -35,13 +35,44 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
-%%curriculum-start%%
-## Curriculum connection
-
 %%
 Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
+
+This note lives OUTSIDE the curriculum markers below on purpose. Anything between %%curriculum-start%% and %%curriculum-end%% is deleted when a course is installed without curriculum pages, so a note nested in there disappears without warning.
 %%
+
+%%curriculum-start%%
+## Curriculum connection
 
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+A mark is meant to rest on three kinds of evidence: what students make, what
+you watch them do, and what they tell you. The first arrives on its own. Fill
+in the other two here, for THIS task. Nobody else ever sees this note — it is
+a comment, so it never reaches the website — and it sits outside the
+curriculum markers above so that it survives an install without curriculum
+pages.
+
+OBSERVE — Unit ?, Day ?, which part of the period
+  Watch for: something visible only while they work and invisible in the
+  finished piece. Check the criteria table above first: if the product already
+  reports the thing, say so, and write the line as corroboration. If you cannot
+  name anything, the task itself may be worth reopening.
+  Going well:
+  Stuck:
+  Record: how you will note it in a few seconds, for a whole class.
+
+TALK — Unit ?, Day ?, ideally a conference the schedule already has
+  Ask: a real question, in the words you would say. Not one printed on this
+  page or on that day's agenda — they will have read it.
+  Then: a second one, asking for something different in kind from the first.
+  A strong answer sounds like: and which expectation you would be hearing.
+  Record:
+
+The product evidence is: what gets handed in, and when.
+%%

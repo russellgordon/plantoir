@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Draft two of your three graphs.
+- [ ] Bring the table your next graph needs, and the year it comes from. The graphs themselves are built in class.

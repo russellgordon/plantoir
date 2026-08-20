@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Working period: the investigation
+1. Working period: the investigation, including the resource map — every
+   layer named, sourced, and dated
 2. Source clinic — perspectives that genuinely differ
 3. Conferences
 
