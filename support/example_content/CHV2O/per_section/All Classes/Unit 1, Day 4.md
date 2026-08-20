@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Who Decides What, and Where]] — most civic frustration is aimed at the wrong government
-2. Federal, provincial, municipal, and Indigenous jurisdiction
-3. Ten real complaints, sorted to the body that can actually act
+1. [[How Canada Is Governed]] — constitutional monarchy, parliamentary democracy, federation
+2. Three claims in one sentence, taken one at a time
+3. Where a law actually comes from, start to finish
 
 ## Things to do before our next class
 
-- [ ] Read [[Who Decides What, and Where]].
+- [ ] Read [[How Canada Is Governed]].

@@ -12,8 +12,8 @@ tags:
 
 1. Seminar: [[When Should a Right Give Way|When Should a Right Give Way?]]
 2. Positions taken, and the strongest opposing case stated fairly
-3. Notebook
+3. Notebook milestone, written here in the last ten minutes: what standard did you find yourself using?
 
 ## Things to do before our next class
 
-- [ ] Notebook: what standard did you find yourself using?
+- [ ] Nothing to write. Start looking for a case you have not already made up your mind about.

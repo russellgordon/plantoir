@@ -23,7 +23,7 @@ is what happened, that nothing changed.
 | 3 | Finding the decision point and its date |
 | 4 | Comparing the routes; choosing one; writing the success criterion |
 | 5 | Checkpoint with me — the plan is approved or sent back |
-| 6–7 | Building it: the letter, deputation, submission, campaign, or event, then a rehearsal or a second reader |
+| 6–7 | Any plan that came back, fixed first; then building it — the letter, deputation, submission, campaign, or event — then a rehearsal or a second reader |
 | 8 | Carrying it out, or the follow-up if it happened outside class |
 | 9 | Writing the report against the criterion you set in period 4 |
 | 10 | Presenting to the class, with questions |
@@ -47,6 +47,13 @@ act on, or a plan you did not carry out.
   think it happened, and what you would do differently.
 - **The assessment of routes** you did not take, and why yours was better
   for this issue at this time.
+
+**What is marked is yours alone.** Work in a group if you like, but there
+is no group mark. The plan and the artefact belong to the group; the
+action log and the assessment of routes are written by each of you
+separately, and they are what your own mark is built from. Keep the log
+as you go — date, what you did, who it reached, what came back — because
+it cannot be reconstructed in the last period.
 
 ## How it is marked
 
@@ -91,3 +98,37 @@ act on, or a plan you did not carry out.
 
 ![[C2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 6, period 4, comparing the routes
+  Watch for: whether routes are tested against the decision date and the
+  decision-maker, or whether the group arrived with the route it wanted
+  and is now writing the justification for it. The plan reads identically
+  either way, which is exactly why the plan cannot tell you.
+  Going well: a group abandons the route it walked in with, and says why.
+  Stuck: the success criterion is written before any route has been
+  compared with anything.
+  This is C2.2 visible — merits and effectiveness assessed, not asserted
+  after the fact.
+  Record: one line per group on the checkpoint sheet you will use the
+  following period anyway.
+
+TALK — Unit 3, Day 7, period 5, the checkpoint conference already on that
+agenda
+  Ask: "If this route fails, what is your next one, and what will you know
+  then that you do not know now?"
+  Then: "Who benefits if nothing changes here, and what will they do when
+  they hear from you?"
+  A strong answer names a real actor with a real interest and a plausible
+  response — not "people who do not care". That is C2.1 heard: how the
+  issue is viewed by different groups, tested on a group the students are
+  not sympathetic to.
+  Record: two lines per group, on the same sheet, as you approve or send
+  the plan back.
+
+The product evidence is the plan, the artefact and the report, handed in
+at the end of Day 12. Do not try to observe on Day 12 — the presentations
+are running and the room is yours.
+%%

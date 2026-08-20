@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. **Period 10 of 10: [[The Civic Action Project]] presented**
+1. **Period 10 of 10: [[The Civic Action Project]] presented**, and the report handed in at the end
 2. Questions from the class, taken honestly
 3. Where nothing changed, and why that is a finding rather than a failure
 

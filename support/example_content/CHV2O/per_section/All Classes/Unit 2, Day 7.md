@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[The Rights Case]] handed in
-2. Oral answers taken, one hostile question each
-3. What held up under it, and what did not
+1. Revision period, the whole of it: the fix your self-check named, and the fix the conference named
+2. The criteria table read line by line before you let the argument go
+3. [[The Rights Case]] handed in at the end of the period
 
 ## Things to do before our next class
 
-- [ ] Nothing tonight.
+- [ ] Rehearse your two minutes. The hostile questions are put to you next class.

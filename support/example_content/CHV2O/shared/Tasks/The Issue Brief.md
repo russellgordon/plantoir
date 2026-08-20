@@ -6,8 +6,9 @@ tags:
   - tasks
   - unit-1
 ---
-**Due mid-way through Unit 1.** Individual. About 800 words, written for
-somebody who has to make a decision and has four minutes.
+**Due near the end of Unit 1**, handed in at the close of the revision
+period. Individual. About 800 words, written for somebody who has to make
+a decision and has four minutes.
 
 A brief is not an essay. It is the document a minister's staffer, a
 councillor, or a board chair actually reads: what the issue is, who wants
@@ -73,3 +74,35 @@ cannot work out who holds the power.
 
 ![[B1.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 10, the work period
+  Watch for: where the three positions come from. A student writing them
+  with a source open in front of them, and one writing them from memory
+  of what "those people" think, hand in three equally tidy paragraphs.
+  Going well: they go back to a source and change a sentence about the
+  group they disagree with.
+  Stuck: the paragraph on the group they disagree with is written fastest
+  of the three, and nothing is open on the desk.
+  This is where A1.2 is visible — sources chosen so that they reflect
+  multiple perspectives, rather than perspectives supplied from memory.
+  Record: three columns on the class list, a tick when you see a source
+  consulted for a position.
+
+TALK — Unit 1, Day 10, the conferences already on that agenda
+  Ask: "Which of your three groups would be angriest at how you have
+  described them, and what would they say you got wrong?"
+  Then: "Where did that figure come from, and what would you have done if
+  you could not find it?"
+  A strong answer names a document and the search that found it, and can
+  say what the group would object to without conceding the point. The
+  brief's value-conflict and what-is-not-known sections are already
+  printed on this page, so they have those rehearsed — these two are not.
+  Record: a name and one phrase on the conference sheet, before the next
+  student sits down.
+
+The product evidence is the brief, handed in at the end of Day 11, once
+the revision block at the head of that period has been used.
+%%

@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. [[Bills and What Happens to Them]] — a proposed law, published in full while it is still being argued about
-2. Readings, committee, and what changes in between
-3. Tracing your own decision back to its document
+1. [[What Democracy Asks of You]] — three votes, everything between them, and what turnout does and does not explain
+2. [[Who Decided This|Who Decided This?]] findings compared across the class. No mark on this one; it is where I find out who is still missing a step
+3. Launched: [[How Government Works]], in pairs — we read the criteria table today, not the night before the walkthrough
 
 ## Things to do before our next class
 
-- [ ] Find the bill, bylaw, or motion behind the decision you chose.
+- [ ] Finish the investigation's questions.
+- [ ] Agree your pair, and the issue the two of you will explain.

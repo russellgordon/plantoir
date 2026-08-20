@@ -10,7 +10,9 @@ the front of your notebook and use it as a table of contents.
 
 - [ ] One journal entry per week, dated
 - [ ] Every investigation's analysis section
-- [ ] The five task submissions
+- [ ] Every task submission, marked and handed back
+- [ ] Each self-check you wrote with [[Judging Your Own Work]], beside
+      the work it judged
 - [ ] One page per unit: "the three things I would tell someone starting
       this unit"
 - [ ] The murky questions, with any that got answered marked as answered

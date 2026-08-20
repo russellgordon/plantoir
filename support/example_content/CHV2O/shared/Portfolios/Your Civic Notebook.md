@@ -60,10 +60,18 @@ your sources have all agreed with each other.
 
 ## What is marked
 
-The notebook is assessed once as a set, near the end of term, on
-consistency, on precision of sourcing, and on evidence that your thinking
-actually moved. It also supplies the material for
-[[Where You Stand Now]].
+Three entries, and they are written **in class**, at a milestone: after
+the local-decision seminar at the end of Unit 1, after the rights seminar
+early in Unit 2, and after the voting seminar at the start of Unit 3. You
+will know the day, you will have the period, and I will tell you which
+question the entry answers. They are marked as a set, on precision of
+sourcing and on evidence that your thinking actually moved.
+
+The weekly current-events entry is not marked. It is practice, it is
+yours, and it is where the three milestone entries — and
+[[Where You Stand Now]], and most of [[The Civic Action Project]] — get
+their material. A notebook with ten weekly entries in it makes the marked
+three easy to write; an empty one makes them impossible.
 
 %%curriculum-start%%
 ## Curriculum connection

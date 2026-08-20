@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Counting period: who sits on it, and how each of them got there
-2. Launched: [[Whose Voice Is Missing]]
+2. Launched: [[Whose Voice Is Missing]] — the criteria read before the counting is written up
 3. The recommendation, addressed to a real chair
 
 ## Things to do before our next class
 
-- [ ] Draft the findings: the body, and the gap, with figures.
+- [ ] Bring the membership list, the minutes and the figures. The findings are written in class.

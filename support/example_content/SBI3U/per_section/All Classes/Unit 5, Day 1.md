@@ -10,10 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 5 — a leaf in cross-section, under the microscope
-2. [[Plant Structure]]: three tissue systems, one trade-off
-3. Stomata, and the compromise every leaf makes
-4. Drawing practice: the leaf cross-section
+1. Diagnostic, before the microscopes come out and not marked: draw what
+   you think is inside a leaf, and label whatever you can name
+2. Start of Unit 5 — a leaf in cross-section, under the microscope
+3. [[Plant Structure]]: three tissue systems, one trade-off
+4. Stomata, and the compromise every leaf makes
+5. Drawing practice: the leaf cross-section
 
 ## Things to do before our next class
 

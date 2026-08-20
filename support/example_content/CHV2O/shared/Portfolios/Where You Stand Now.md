@@ -10,6 +10,10 @@ The final portfolio entry, written after [[The Civic Action Project]] is
 handed in. Three parts, about 700 words in total: what you think, what
 this course did to how you think, and where the skill gets paid for.
 
+It is written **in class**, in one period near the end of Unit 3, with
+your notebook open beside you. Bring the November entries; part two is
+unwritable without them.
+
 ## Part one — your position, stated properly
 
 Choose one issue from your [[Your Civic Notebook]] and write your own

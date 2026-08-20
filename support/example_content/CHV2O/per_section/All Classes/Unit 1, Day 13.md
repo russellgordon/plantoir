@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Launched: [[How Government Works]], in pairs
-2. One real issue; every government involved; what each can and cannot do about it
-3. Building the five-minute walkthrough
+1. Revision period, the whole first block: act on what the checkpoint found, pair by pair, with me in the room
+2. One last rehearsal of the five-minute walkthrough, on a pair that is not yours
+3. Retrieval across Unit 1 in the last twenty minutes: the orders of government, and where a law comes from
 
 ## Things to do before our next class
 
-- [ ] Draft the written explanation.
+- [ ] Nothing tonight. The explanation is finished; bring it and the diagram.
