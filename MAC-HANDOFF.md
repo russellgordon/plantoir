@@ -51,6 +51,22 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
+> **v1.1.0 cut sheet (Windows assets ready, 2026-08-20).** The verified
+> Windows artifacts live on the Windows machine and will be uploaded FROM
+> there (`gh` is authed there) once the tag exists — so cut the release as a
+> DRAFT, tell Russell, and publish after the assets attach. Hashes for the
+> notes' SHA-256 table:
+> `PlantoirSetup.exe` 224.5 MB
+> `9990bcacade548a35cbd5b11f65dbf79d4a0236eeeee4d4d0e5322204c96527e` ·
+> `Plantoir-win-x64.zip` 379.9 MB
+> `b141c7ac30116c9836334e90472e5a2527fb4e50629c56d4c2f258f437cbb1ba`.
+> Built from commit 8e9faab0, proven by five clean-machine smoke tests
+> (install → course → preview → assistant → deploy, no .NET/WSL/Docker on
+> the machine). The macOS DMG does NOT ship in this cut — see RELEASING.md
+> "Two platforms, one version series": the mac joins v1.1.0 after the gate
+> list below is green.
+
+
 - `contracts/app-rules.json` → `failureExplanations.cases` → **the
   teacher-made-link case** ("untrusted mount point"), proposed 2026-08-20.
   Windows refuses to traverse a junction inside the teacher's own course
