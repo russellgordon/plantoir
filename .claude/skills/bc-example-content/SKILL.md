@@ -364,6 +364,11 @@ reminder of:
 - **Canadian writers, with real Indigenous presence**, for any BC English
   course — the same rule as Ontario, verified before publishing.
 - **Python for Computer Science.**
+- **All three kinds of assessment, the per-unit sequence, success criteria
+  on task pages, and the hidden triangulation block** — see the next
+  section. These came out of Ontario's *Growing Success*, but nothing in
+  them is Ontario-specific and BC's own reporting policy asks for most of
+  it in its own words.
 - **The whole style contract** — frontmatter shape, Canadian spelling, em
   dashes, ~80-column wrap, one Obsidian feature per page, exercises' folded
   answers with no "(click to expand)" hint, checklists framed as read-only,
@@ -397,6 +402,124 @@ reminder of:
   installer E2E, the same app test suite, the same `verify.sh`, the same
   catalogue-page refresh, the same commit-message convention (name the
   course code, no GUI-IMPROVEMENTS entry for a content-only payload).
+
+## Assessment: for, as, and of learning
+
+Inherited from the Ontario skill, where it is derived from *Growing
+Success*. **Do not cite *Growing Success* in a BC payload** — it is Ontario
+policy and governs nothing here. BC's own instrument is the **K-12 Student
+Reporting Policy** (effective 1 July 2023), at
+`https://www2.gov.bc.ca/gov/content/education-training/k-12/administration/legislation-policy/public-schools/student-reporting`.
+Read it LIVE if a decision turns on its wording — this skill deliberately
+does not quote it, for the same reason it does not keep a copy of the
+curriculum. In summary, it requires descriptive feedback written in clear,
+accessible language that names strengths and supports specific goals;
+student self-reflection on the Core Competencies and student goal-setting
+as REQUIRED content in Learning Updates and the Summary of Learning; the
+Provincial Proficiency Scale (Emerging, Developing, Proficient, Extending)
+for K–9; and timely, responsive communication with students and families.
+The practical effect is that **assessment *as* learning is not optional
+here — BC reports on it by name.**
+
+**Three modes, all of which a payload must show.** *Of* learning is
+evaluation, at or near the end of a unit and the end of the course. *For*
+learning is evidence gathered to decide what to teach next and to give
+descriptive feedback. *As* learning is the student judging their own work
+against criteria they understand, setting a goal, and acting on it. A
+payload of four units and five summative tasks has written only the first.
+The other two live in the AGENDAS, which is where a reader can tell whether
+they were designed or merely assumed.
+
+**Per unit, the arc must contain all of the following, in this order:**
+
+1. a **diagnostic** near the unit's start whose named purpose on the class
+   page is finding out where this class is starting from;
+2. the unit's **learning goals and success criteria in student language**,
+   in the students' hands at launch rather than at hand-in. They live on
+   the TASK page (or a unit page) that the class page links to on launch
+   day — a class page is a schedule, so the criteria go where the work is.
+   Write them from the Curricular Competencies the task actually demands,
+   in words a student uses, not by pasting competency text;
+3. **formative work on at least a third of the unit's class pages**, named
+   as such on the agenda — an exit ticket, a code review, a design critique,
+   a draft read aloud;
+4. at least one **feedback checkpoint before the summative**, and at least
+   one working period after THAT CHECKPOINT whose stated job is acting on
+   the feedback. A unit that launches a task and then collects it, with
+   nothing in between, has nowhere for the feedback to land — and BC's
+   policy is explicit that feedback must "support specific goals for
+   further development", which is impossible if there is no later work to
+   apply it to;
+5. at least one **self-assessment episode the teacher has modelled first**,
+   and at least one that touches the **Core Competencies** by name, since
+   the student's own reflection on them is required reporting content
+   rather than an enrichment activity;
+6. the **summative task**, at or near the end.
+
+**Success criteria on every task page, before the work starts.** A short
+table of qualities and what each looks like to a reader, an audience or a
+user is the usual shape; a plain list is fine where the page's one
+demonstrated Obsidian feature is something else. A task with no success
+criteria cannot support assessment *as* learning, because there is nothing
+for a student to judge their own work against — and in BC that is a
+reporting gap, not just a pedagogical one.
+
+**Triangulate: observation, conversation, product — and put a hidden
+prompt on every task page.** Evidence gathered only from things handed in
+is one source of three. Observation and conversation are the hardest and
+slowest to gather well, they leave no trace unless the teacher deliberately
+makes one, and they are therefore the two that quietly vanish from a real
+course. A payload cannot gather them for anybody, but it CAN tell the
+teacher exactly where in each task they are available.
+
+**The mechanics are identical to the Ontario skill's, and they are
+technical rather than stylistic** — read that section for the full
+reasoning, but do not deviate from any of this:
+
+- The block goes at the very END of the task page, AFTER
+  `%%curriculum-end%%`. Never INSIDE the curriculum markers:
+  `strip_curriculum_blocks()` in `scripts/setup_course.py` deletes
+  everything between them for a teacher who declines curriculum pages, so a
+  nested comment vanishes silently.
+- `%%` is Obsidian's comment marker and the vendored Quartz strips it at
+  text level (`commentRegex = /%%[\s\S]*?%%/g` in
+  `quartz/plugins/transformers/ofm.ts`), so multi-line blocks are safe and
+  nothing inside is ever published.
+- **Plain text only inside the block** — no `[[wikilinks]]` and no
+  `![[transclusions]]`. `lint_payload.py` and `build_site.py` read the raw
+  markdown without stripping comments, so a hidden transclusion would count
+  as curriculum coverage no student page provides, and a hidden link would
+  satisfy the two-hop reachability check. The linter now FAILS on this.
+- "Task" means a page in `Tasks/`: both gates decide what counts as
+  assessed work by folder name, so evaluated work that lives only in
+  `Explorations` or `Programs` leaves red chips on the Curriculum Coverage
+  map. If the real evaluated work is an exploration, the task page belongs
+  in `Tasks/` and links to it.
+- Write it SPECIFIC to this task, naming real days from the arc and
+  checking them against the class pages; name what is visible only in the
+  DOING and invisible in the product; give the conversation two or three
+  ACTUAL questions plus what a strong answer sounds like; say how to record
+  it in seconds; prefer a slot the arc already has; and tie it to a
+  competency code the task already lists, checking that the code says what
+  you claim. `lint_payload.py` emits a NOTE for any `Tasks/` page missing
+  the block, and the note cannot tell a real prompt from boilerplate — that
+  part is on you.
+
+**What stays out of a mark — with an honest caveat.** The Ontario skill
+lists four prohibitions drawn from *Growing Success*: a peer's or the
+student's own judgement never contributes to a mark; no common group mark;
+ongoing homework is not evaluated work; learning skills and work habits are
+reported separately from achievement. **Only the first has a direct BC
+analogue** — self-reflection in BC is reporting content the student
+authors, not a mark the teacher borrows. The other three are this project's
+practice rather than BC requirements, and a BC payload should follow them
+because they are defensible, not because policy compels them. Do not write
+them into a `How Marks Work` page as though BC mandated them, and **do not
+carry Ontario's 70/30 final-evaluation split into a BC course** — that is
+an Ontario secondary rule with no BC equivalent. A BC `How Marks Work`
+should instead say where evidence comes from (all three kinds), name the
+Curricular Competencies in student words, and say plainly that the
+student's own reflection is part of what gets reported.
 
 ## What made the ORIGINAL MCMPR11 draft "sparse" despite reasonable prose —
 ## and the check that finds this in any BC (or Ontario) payload
