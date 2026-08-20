@@ -141,6 +141,66 @@ def mirror_tree(src: Path, dst: Path) -> None:
             pass
 
 
+def hardlink_mirror(src: Path, dst: Path) -> None:
+    """
+    Mirror src into dst by HARDLINKING each file (falling back to a copy
+    when a link is refused or crosses volumes). Used for the Media folder on
+    native Windows instead of a junction: a junction is an NTFS mount
+    point, and current Windows refuses to TRAVERSE user-made mount points
+    during directory enumeration (WinError 448) - which killed the coverage
+    builder's walk over content/ in the first real end-user test. Hardlinks
+    are ordinary directory entries: nothing to distrust, no privileges
+    needed, and no bytes copied.
+    """
+    import shutil
+    src = Path(src)
+    dst = Path(dst)
+    dst.mkdir(parents=True, exist_ok=True)
+    src_entries = {entry.name: entry for entry in src.iterdir()}
+    for existing in dst.iterdir():
+        if existing.name in src_entries:
+            continue
+        if existing.is_dir() and not existing.is_symlink():
+            shutil.rmtree(existing, ignore_errors=True)
+        else:
+            try:
+                existing.unlink()
+            except OSError:
+                pass
+    for name, entry in src_entries.items():
+        target = dst / name
+        if entry.is_dir() and not entry.is_symlink():
+            if target.exists() and not target.is_dir():
+                try:
+                    target.unlink()
+                except OSError:
+                    continue
+            hardlink_mirror(entry, target)
+            continue
+        try:
+            if target.exists():
+                s, t = entry.stat(), target.stat()
+                if s.st_ino and s.st_ino == t.st_ino and s.st_dev == t.st_dev:
+                    continue  # already the very same file
+                target.unlink()
+            try:
+                os.link(str(entry), str(target))
+            except OSError:
+                shutil.copy2(str(entry), str(target))
+        except OSError:
+            pass
+
+
+def is_reparse_point(path: Path) -> bool:
+    """True for junctions and symlinks alike (Windows); False elsewhere."""
+    try:
+        import stat as stat_module
+        attributes = os.lstat(str(path)).st_file_attributes
+        return bool(attributes & stat_module.FILE_ATTRIBUTE_REPARSE_POINT)
+    except (OSError, AttributeError):
+        return False
+
+
 def link_directory(target: Path, link: Path) -> str:
     """
     Make `link` refer to the directory `target` without copying it, and say

@@ -2972,6 +2972,29 @@ def _ensure_media_symlink(content_root: Path, course_dir: Path):
     link_path = content_root / "Media"
     target_abs = (course_dir / "Media").resolve()
 
+    if os.name == "nt":
+        # No junction here: it is an NTFS mount point, and current Windows
+        # refuses to TRAVERSE user-made mount points while enumerating
+        # directories (WinError 448) - the coverage builder's walk over
+        # content/ died on exactly this in the first real end-user test.
+        # Hardlinks carry the same no-copy economics with nothing for the
+        # OS to distrust. An old-style link left by a previous build is
+        # replaced first (rmtree on a junction removes only the link).
+        if link_path.is_symlink() or toolchain_paths.is_reparse_point(link_path):
+            try:
+                if link_path.is_dir():
+                    os.rmdir(link_path)
+                else:
+                    link_path.unlink()
+            except OSError as e:
+                print(f"⚠️ Could not replace the old 'Media' link at {link_path}: {e}")
+        try:
+            toolchain_paths.hardlink_mirror(Path(str(target_abs)), link_path)
+            print(f"🔗 Mirrored Media into the build (hardlinks): {link_path} -> {target_abs}")
+        except Exception as e:
+            print(f"❌ Failed to mirror Media at {link_path}: {e}")
+        return
+
     # If a file/dir already exists at link_path, remove it first (carefully)
     if link_path.exists() or link_path.is_symlink():
         try:
