@@ -80,12 +80,26 @@ choice saved during ordinary browsing once overrode the appearance a dark
 pass had set machine-wide — one course photographed light in a dark run. It
 is answered two other ways now, neither of which costs an address bar:
 
-- **A Safari profile named `Screenshots`**, if one exists — separate storage,
-  history and cookies, ordinary chrome. This is the same answer Windows gets
-  from `--user-data-dir`. It is made by hand, once per Mac: Safari ▸ Settings
-  ▸ Profiles ▸ Start Using Profiles, named exactly `Screenshots`. Safari
-  offers no way to make one programmatically. The run says so when it is
-  missing and carries on in an ordinary window.
+- **A Safari profile named `⎚`** (U+239A CLEAR SCREEN SYMBOL), if one
+  exists — separate storage, history and cookies, ordinary chrome. This is
+  the same answer Windows gets from `--user-data-dir`. It is made by hand,
+  once per Mac: Safari ▸ Settings ▸ Profiles ▸ Start Using Profiles, named
+  exactly that one character. Safari offers no way to make one
+  programmatically. The run says so when it is missing and carries on in an
+  ordinary window.
+
+  **The one-character name is the point, not a whim.** Safari puts the
+  profile's name in the window's toolbar, so a profile called "Screenshots"
+  would stamp that word across the top of every class site on plantoir.app —
+  a caption about our photography, in a picture meant to be about a
+  teacher's website. Keep it a single glyph if you ever rename it, and
+  change `CAPTURE_PROFILE` in `safari.py` to match.
+
+  Safari's File menu grows a flat `New ⎚ Window` item when the profile
+  exists (verified on Safari 26.6); older builds may use a `New Window`
+  submenu instead, and `open_profile_window` handles both, matching by NAME
+  rather than position because that menu's indices shift when a profile is
+  added.
 - **`verify_appearance`**, which checks every capture and stops the run when
   a page came out light in a dark pass or the other way round. It reads the
   median luminance of a band well inside the content: measured across the

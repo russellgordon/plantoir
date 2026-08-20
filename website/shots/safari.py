@@ -56,9 +56,17 @@ DARK_BELOW = 128
 # Profiles (or +), named exactly this. Safari offers no way to create one
 # programmatically, which is fine for something done once.
 #
+# **The NAME is deliberately a single symbol, and that is not decoration.**
+# Safari puts the profile's name in the window's own toolbar, so a profile
+# called "Screenshots" would stamp that word across the top of every class
+# site on plantoir.app — a caption about our photography, in a picture meant
+# to be about a teacher's website. U+239A CLEAR SCREEN SYMBOL is one glyph
+# wide and says nothing. If you rename the profile, rename it here, and keep
+# it short for the same reason.
+#
 # When it is absent the run still works — an ordinary window, with
 # `verify_appearance` catching the fault the profile would have prevented.
-CAPTURE_PROFILE = "Screenshots"
+CAPTURE_PROFILE = "\u239a"  # ⎚
 
 
 def open_profile_window(profile: str) -> bool:
