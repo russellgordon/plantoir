@@ -31,9 +31,14 @@ electron microscope · ion thruster.
    up, and why.
 4. **The societal question**: who benefits, who pays, and what the
    environmental cost is.
+5. **Your two best sources, weighed.** Not listed — weighed. For the two
+   you leaned on hardest: who produced it, what they had to gain from
+   the number you took, and why you used it anyway. If the two disagree,
+   say which you believed and what decided it.
 
-Part 4 is not decoration; it is a third of the mark, and it is the
-Ministry's reason this strand exists.
+Part 4 is not decoration. It carries as much as the physics does, which
+surprises people every year, and it is the Ministry's reason this strand
+exists at all.
 
 ## How this is assessed
 
@@ -48,6 +53,7 @@ writing. Read it against these rows before you hand it in, and use
 | Real numbers, from somewhere you name | Values taken from a source you cite, carried through with units, and an answer whose size you say something about |
 | The trade-off is specific | One thing that gets harder as the device is scaled up, tied to a quantity that appears in your own equation |
 | The societal question is answered, not gestured at | Who benefits, who pays, and what the environmental cost is — each with evidence behind it rather than an impression |
+| The sources are judged, not just listed | For the two you leaned on hardest, a line each on who produced it, what they stood to gain, and what made you trust it — and, where two disagree, which you believed and why |
 | Sources somebody could check | An accepted form of documentation, and at least one source that is not a summary site |
 
 %%curriculum-start%%
@@ -58,8 +64,6 @@ writing. Read it against these rows before you hand it in, and use
 ![[D1.2]]
 
 ![[D2.2]]
-
-![[D3.1]]
 
 ![[D2.1]]
 
@@ -79,22 +83,25 @@ using are the discussion, where the research meets other people, and the
 conference, where you can ask about a device rather than read about it.
 
 OBSERVE — Unit 3, Day 14, during the discussion on that agenda
-  Watch for: what a student brings to the table. A figure with a source
-  behind it, or a position. Then watch the harder thing — whether
-  anybody's position moves when somebody else's figure lands on it. A
-  four-page report presents a settled view and cannot show you whether
-  it was ever unsettled.
-  Going well: "I thought that too, until I found…", said out loud, in
-  front of people.
-  Stuck: research produced only where it agrees with the opinion the
-  student walked in with.
-  Record: two ticks against the class list — brought a figure, changed a
-  position. The second tick is rare and it is worth writing the sentence
-  down when it happens.
+  Watch for: whether a student's contribution comes out of their own
+  device or out of the topic in general. The discussion is about fields
+  and people; everybody in the room has spent three periods on one
+  specific machine. The ones who own their research answer a general
+  question with a specific number from it — the field strength of the
+  scanner, the voltage on the plates, the mass of the satellite. The ones
+  who have read four pages about a device can only offer the general
+  claim. Both write the same-shaped report.
+  Going well: a general question answered with a figure from their own
+  technology, unprompted, and the unit stated.
+  Stuck: three contributions in a row that would fit any device.
+  Record: one tick per student against the class list — spoke from their
+  own machine, or spoke in general. That tick predicts which reports are
+  summaries better than anything you will see before Day 15.
 
-TALK — Unit 3, Day 13, at the conference already on that agenda
-  The agenda's own question about sources is already printed, so it will
-  be answered before you sit down. Go to the argument instead.
+TALK — Unit 3, Day 13, during the conference that day already schedules
+  Everyone arrives with the source question answered, because it is
+  printed on the agenda they read this morning. Go past it, to the
+  argument.
   Ask: "Your fourth section says who pays for this. Take the other side
   for thirty seconds — what is the strongest case that the benefit is
   worth that cost?"

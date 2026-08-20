@@ -45,6 +45,10 @@ kinetic energy before and after.
    disappeared, and where did it go?
 4. Your momentum totals will not balance exactly. Give the percentage,
    and name the two most likely reasons.
+5. For the sticky collision, compute the impulse on each cart from its
+   own change in momentum. Newton's third law says the two should come
+   out equal and opposite. Do they, inside your uncertainty? If the
+   collision lasted 40 ms, what average force was each cart carrying?
 
 %%curriculum-start%%
 ## Curriculum connection

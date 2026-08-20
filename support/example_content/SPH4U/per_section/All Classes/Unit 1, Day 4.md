@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Launch, first ten minutes: [[Investigation Write-Ups]] — the six rows
-   every marked write-up in this course is judged against
+1. Launch, first ten minutes: [[Investigation Write-Ups]] — the seven
+   rows every marked write-up in this course is judged against, and which
+   five investigations they land on
 2. Then, together and out loud: last year's projectile write-up judged
    row by row, the way [[Judging Your Own Work]] describes. I go first,
    and I pick the row I would have lost

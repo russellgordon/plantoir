@@ -15,7 +15,8 @@ tags:
 2. [[Modern Physics Seminar]], day 3 — working period: the calculation you
    will do live, rehearsed until either of you can run it from the physics
    rather than from memory
-3. The brief drafted against [[Writing About Physics]]
+3. The brief drafted against [[Writing About Physics]], closing
+   paragraph included: what your moment made possible, and who built it
 
 ## Things to do before our next class
 

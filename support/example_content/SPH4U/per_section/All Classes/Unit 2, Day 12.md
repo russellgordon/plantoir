@@ -12,7 +12,8 @@ tags:
 
 1. Launch: [[The Roller Coaster Loop, Properly]]
 2. The rolling correction: where the missing energy was hiding
-3. Work time and question surgery
+3. Work time, question surgery, and [[Momentum and Collisions Practice]]
+   finished off — the last of it, out loud, with the room
 4. Unit 2 consolidation: which conservation law, and why
 
 ## Things to do before our next class

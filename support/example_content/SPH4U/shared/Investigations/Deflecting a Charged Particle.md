@@ -8,9 +8,10 @@ tags:
   - unit-3
 ---
 > [!abstract] At a glance
-> **Time:** one class with the simulation, written up two periods later —
-> the fourth of the marked [[Investigation Write-Ups]]. **Pairs at the
-> screen, write-up yours alone.** The prediction comes first, as always.
+> **Time:** one class with the simulation, analysed two periods later.
+> **Pairs.** Not one of the marked [[Investigation Write-Ups]] — the
+> magnetic half of it is not named properly until Day 10, so this one is
+> for finding out. The prediction comes first, as always.
 
 A charged particle entering a uniform field bends — parabolically in an
 electric field, circularly in a magnetic one. This investigation is where

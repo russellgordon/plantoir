@@ -6,14 +6,17 @@ enableToc: true
 tags:
   - setup
 ---
-## The seventy and the thirty
+## Seventy, then thirty
 
-Every Grade 12 credit in Ontario is built the same way. **Seventy per
-cent** of your mark comes from work spread across the whole semester, and
-it leans towards your **most recent and most consistent** work rather
-than averaging September against January. Your physics in January is not
-your physics in September, and the mark is supposed to say where you
-ended up.
+Ontario builds every Grade 12 credit out of two unequal pieces, and it is
+worth knowing which is which in September rather than in January.
+
+**Seventy per cent** is the semester's work. Putting a number on it means
+asking two questions of the evidence — what level do you reach
+**consistently**, and what does the **most recent** evidence say — and
+neither of those is answered by averaging September into January. Almost
+everybody in this room gets better at two-dimensional problems somewhere
+around November. The mark is supposed to notice.
 
 **The seventy** is five things, in the order you meet them: the
 [[Circular Motion Design Challenge]], the five marked
@@ -23,9 +26,10 @@ and the [[Optics Investigation Report]]. They are not equally weighted.
 The roller coaster analysis and the optics investigation you design
 yourself take longest and ask for the most, so they carry more than the
 rest; the write-ups carry less individually but there are five of them,
-which is what makes them the steadiest evidence in the course. Ask me for
-the exact split whenever you want it — it is not a secret, it is just not
-the useful thing to memorise.
+which is what makes them the steadiest evidence in the course. The exact
+percentages exist and I will show them to anybody who asks for them. They
+are not printed here because knowing that one task carries four points
+more than another has never once helped anyone do it better.
 
 **The thirty** is the final evaluation, and it is two things in two very
 different rooms: the [[Modern Physics Seminar]], which your class hears
@@ -54,12 +58,15 @@ arrangement under which asking for help is not cheating.
 
 On each of the tasks that runs across several periods, there is a period
 where I sit down with each pair or group while the work can still change,
-and at least one working period afterwards whose stated job is doing
-something about what we said. That is why those tasks take five or six
-periods rather than being launched and then collected.
+and the next working period opens with ten or fifteen minutes whose
+stated job is doing something about what we said. Ten minutes is not
+generous and I am not going to call it generous — but it is on the
+agenda, it is before anything is handed in, and the rest of that period
+is still working time. That is why those tasks take five or six periods
+rather than being launched and then collected.
 
 The [[Investigation Write-Ups]] work differently, because each of them is
-one period. What they get instead is the same six rows, five times over:
+one period. What they get instead is the same seven rows, five times over:
 what I write on the second write-up is about rows you will be judged on
 again in the third, three weeks later. It is the only feedback in this
 course you get to use more than once.
@@ -85,29 +92,36 @@ task: the [[Optics Investigation Report]] is almost entirely Thinking and
 Investigation, the [[Fields Technology Report]] leans on Application and
 Communication. Each task page names which ones it is asking for.
 
-## Three kinds of evidence, and two of them are not paper
+## Marks come from three places and only one of them is paper
 
-**What you make** is the obvious one: reports, write-ups, derivations,
-the seminar brief. **What I watch you do** is the second: whether the
-diagram appears before the algebra, what you do with a run that disagrees
-with the one before it, whether the same person holds the stopwatch every
-time. **What you tell me** is the third — the conferences during the
-working periods are not progress checks, they are evidence in their own
-right, and some of what you understand will only ever show up there.
+The obvious place is **what you hand me**: write-ups, reports,
+derivations, the seminar brief.
 
-If your apparatus refused to work all period and your write-up is thin,
-the two minutes we spent at your bench may still be the strongest
-evidence of the day. That is not a consolation prize. It is how the mark
-is meant to work.
+The second is **what I see you do**. A bench period is three quarters of
+an hour of physics happening in front of me. Whether the diagram gets
+drawn before the algebra. What becomes of a run that disagrees with the
+one before it. Whether the stopwatch ever changes hands. None of that
+reaches paper and all of it is evidence.
 
-## What is not in your mark
+The third is **what you say**. The conferences inside the working periods
+are not me checking up on you — they are where reasoning that never got
+written down gets heard, and for some people in this room they will be
+the strongest evidence the course produces.
 
-How you work is reported separately, on the same report card, as **E, G,
-S or N** — six habits: responsibility, organization, independent work,
-collaboration, initiative, and self-regulation. They matter, we will talk
-about them, and they do not move your percentage. Your mark is about the
-work; that column is about the worker, and mixing the two tells you less
-about both.
+So a period in which the apparatus fought you and the write-up came out
+thin is not a wasted period; the two minutes at your bench still counted.
+That is not me being generous. It is what the evidence rules actually
+ask for.
+
+## What the percentage is not measuring
+
+Six work habits — responsibility, organization, independent work,
+collaboration, initiative, self-regulation — are reported on the same
+report card, in a column of their own, as **E, G, S or N**. They are
+reported, they are discussed, and they do not move the percentage. The
+percentage answers "what physics can this person do". The letters answer
+"how does this person go about it". A single number asked to answer both
+answers neither one honestly.
 
 Ontario allows one exception to that, for a course whose curriculum
 expectations are themselves about a habit — the process expectations in
@@ -116,12 +130,13 @@ mathematics, the living skills in health and physical education.
 the physics or about how an experiment is done, so nothing on the habits
 list moves your percentage here.
 
-Your own judgement of your work, and your classmates', are not part of
-your mark either. You will judge your own work against the criteria
-often — see [[Judging Your Own Work]] — and there are periods in this
-course where a partner reads your report before I do. None of that
-becomes a number. Deciding the mark is my job, from evidence, and knowing
-that is what makes it safe to be honest in a self-check.
+Neither your judgement of your own work nor a classmate's is part of the
+percentage. You will hold your work up against the criteria all semester
+— [[Judging Your Own Work]] is how — and there are periods where a
+partner reads your report before I do. None of it turns into a number.
+The mark is mine to decide, from evidence, and that is exactly what makes
+it safe for you to write down that your uncertainty section is the weak
+one.
 
 ## Late work
 
@@ -134,7 +149,7 @@ responsibility. It is not a deduction from your percentage: a mark that
 drops for lateness has stopped describing what you know, which is the one
 job it has.
 
-Each task page lists its success criteria before you start, written as
-things a reader could see in your work. If a mark ever surprises you,
-ask — those criteria are the whole story, and [[Getting Help]] lists the
-ways to reach me.
+Every task page publishes its criteria before the work starts, written as
+things a reader could point at in what you handed in. A mark that
+surprises you is a conversation worth having, and those rows are what the
+conversation will be about — [[Getting Help]] has the ways to find me.

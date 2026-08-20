@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Write-up period: [[Mapping an Electric Field]] — equipotentials drawn,
-   field lines inferred, analysis written. The third marked write-up, in
+   field lines inferred, analysis written. The fourth marked write-up, in
    at the bell; the rows are on [[Investigation Write-Ups]]
 2. Where the field is strongest, and how your map shows it
 3. Consolidate: [[Electric Fields and Potential]] — field and potential

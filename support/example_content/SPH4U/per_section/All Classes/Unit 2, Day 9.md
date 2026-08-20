@@ -15,7 +15,7 @@ tags:
    second marked write-up; see [[Investigation Write-Ups]]
 2. Which quantity survived every collision, and what that means
 3. Conclusions justified against theory, not against expectation, and the
-   six rows read down before you hand it up at the bell
+   rows read down before you hand it up at the bell
 
 ## Things to do before our next class
 

@@ -14,9 +14,10 @@ start.
 - [[Fields Technology Report]] — Unit 3
 - [[Optics Investigation Report]] — Unit 4
 - [[Modern Physics Seminar]] — Unit 5, the culminating task, and the
-  first half of the final evaluation
-- [[Final Examination]] — the rest of the final evaluation, in the
+  smaller part of the final evaluation
+- [[Final Examination]] — the larger part of the final evaluation, in the
   examination period
 
-[[How Marks Work]] explains the four categories these are judged in, and
-which of them make up the seventy and which the thirty.
+[[How Marks Work]] explains the four categories these are judged in. It
+also says which of them build the seventy per cent and which two are the
+final thirty.

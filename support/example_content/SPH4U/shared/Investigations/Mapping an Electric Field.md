@@ -9,7 +9,7 @@ tags:
 ---
 > [!abstract] At a glance
 > **Time:** one class, written up in the next period and handed in at the
-> bell — the third of the marked [[Investigation Write-Ups]]. **Pairs at
+> bell — the fourth of the marked [[Investigation Write-Ups]]. **Pairs at
 > the bench, write-up yours alone.** You will draw a field you cannot see,
 > from measurements you can.
 

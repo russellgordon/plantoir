@@ -101,12 +101,13 @@ decides your grade alone.
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-Be straight about this one. An examination is product evidence and
-nothing else: there is no watching and no talking in an examination
-room, and attempting either would be unfair to everyone in it. What
-follows is where the observation and conversation evidence for THESE
-expectations is still available — the four review classes, while there
-is time for what you find to change how somebody prepares.
+No pretending with this one. A paper written under examination conditions
+is product and nothing but product — you cannot watch a student think in
+that room, and you certainly cannot talk to one, and trying would be
+unfair to everybody sitting there. The two prompts below therefore live
+in the four review classes, which are both the last place these
+expectations can be watched and heard, and the last place what you find
+can still change somebody's week.
 
 OBSERVE — Unit 5, Day 14, review part one, on the questions they bring
   Watch for: the first mark a student makes on a problem they have not
@@ -124,9 +125,9 @@ OBSERVE — Unit 5, Day 14, review part one, on the questions they bring
   the Day 17 clinic.
 
 TALK — Unit 5, Day 15, during the by-request review
-  Half that period runs itself while you circulate, so take two minutes
-  a student and ask for physics in words, which the paper only rewards
-  where a question happens to ask for it.
+  That period is students working the sets they asked for, so you are
+  free to move. Take two minutes a student and ask for physics in words,
+  which a paper only rewards where a question happens to ask for it.
   Ask: "Two equal positive charges, and the point exactly halfway
   between them. What is the field there, and what is the potential?"
   Then: "The energy questions and the modern physics questions both use
@@ -140,7 +141,8 @@ TALK — Unit 5, Day 15, during the by-request review
   is the sort of understanding a three-hour paper picks up by accident
   or not at all.
   Record: one line per student in the review list, and the pairs of
-  words they could not separate. Those are what Day 16 is for.
+  words they could not separate. Day 16 opens with those pairs on the
+  board, which is why the list is worth keeping.
 
 The product evidence is the examination itself.
 %%

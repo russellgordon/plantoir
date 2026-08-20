@@ -34,6 +34,12 @@ Questions that have worked before:
 - A prediction with an uncertainty, submitted before data collection.
 - At least one graph whose slope or intercept carries meaning.
 - An honest treatment of what limited your precision.
+- **A closing paragraph on the thing in the world.** Every question above
+  runs on physics that somebody has already built a device out of — a
+  grating in a spectrometer, the coating on a camera lens, polarizing
+  film in a pair of sunglasses or a laptop screen, the pits on a CD.
+  Name the one closest to your question, say what it is for, and say
+  which of your own results explains why it works.
 - Prose that meets the standard on [[Writing About Physics]].
 
 ## What is not required
@@ -65,6 +71,7 @@ Read your own against them before you hand it in — see
 | A graph that carries the argument | Axes with units, the data on the graph rather than beside it, and a slope or intercept whose physical meaning is stated |
 | Precision treated honestly | What limited you, by how much, and whether that is enough to explain the gap you found — or whether something else is going on |
 | A conclusion your data supports | The answer these measurements allow, including "this apparatus cannot tell the two apart" where that is the truth |
+| The physics is shown doing a job | One real device that runs on the effect you measured, what it is for, and which of your own numbers explains why it works — your result used to explain the device, not the device used to decorate your result |
 
 %%curriculum-start%%
 ## Curriculum connection
@@ -76,8 +83,6 @@ Read your own against them before you hand it in — see
 ![[A1.1]]
 
 ![[E1.1]]
-
-![[E3.3]]
 
 ![[A1.10]]
 %%curriculum-end%%

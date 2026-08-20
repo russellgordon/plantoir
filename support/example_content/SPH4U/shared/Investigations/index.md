@@ -10,7 +10,7 @@ rather than a procedure; those get designed by you and checked by me.
 
 Five of them are written up properly and marked, each in a period set
 aside for it — [[Investigation Write-Ups]] says which five, when, and what
-the six rows are. The rest are done for what they show you.
+they are judged against. The rest are done for what they show you.
 
 **Unit 1 — Dynamics**
 

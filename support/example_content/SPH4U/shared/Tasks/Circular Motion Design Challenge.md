@@ -27,13 +27,24 @@ it with numbers before you build it.
 
 ## What to submit
 
-1. **The design calculation**, done first: the geometry that gives the
-   specified behaviour, from the equations of
-   [[Uniform Circular Motion]].
+1. **The design calculation**, done first — and the derivation under it
+   shown rather than quoted. Start from [[Uniform Circular Motion]] and
+   work through to the expression you will actually solve, saying where
+   period, radius, speed and mass enter it and which of them fall out
+   again. That last part is the whole reason a conical pendulum can be
+   built to a specified period by three people who own no identical
+   masses.
 2. **The free-body diagram** at the critical point.
 3. **The build**, and the measurement of how it actually behaved.
 4. **The discrepancy**, quantified and explained. A design that missed by
    8% with a clear account beats one that hit by luck.
+5. **The same machine, at full size.** Name a device already in use that
+   holds something in a circle the way yours does — a centrifuge, an
+   amusement ride, a banked highway curve, a spin dryer. Say what its
+   designers must control that you were allowed to ignore, and then say
+   who carries the cost when it is built at scale or when it fails: who
+   is in it, who is near it, what it draws to run, and what is thrown
+   away when it wears out.
 
 ## The constraint that makes it interesting
 
@@ -42,11 +53,13 @@ change — this is a test of physics, not of retrofitting.
 
 ## What is yours alone
 
-The first three items are the group's, and you do them together. **Item 4
-you write yourself**, one page, and it is where your own mark comes
-from — because explaining a gap between prediction and measurement is
-the part of this task that is thinking rather than building. Three
-identical accounts of the same discrepancy are one account, not three.
+The first three items are the group's, and you do them together. **Items
+4 and 5 you write yourself**, one page for the two of them, and they are
+where your own mark comes from — because explaining a gap between
+prediction and measurement, and then carrying the principle out of this
+room and into a machine nobody handed you, are the two parts of this task
+that are thinking rather than building. Three identical accounts of the
+same discrepancy are one account, not three.
 
 ## How this is assessed
 
@@ -57,8 +70,11 @@ Read your own page against these rows before you hand it in — see
 | --- | --- |
 | You predicted before you built | A number with an uncertainty, submitted on the working period set aside for it and unchanged afterwards, with the geometry it came from shown |
 | The physics is in the diagram | A free-body diagram at the critical point, every force labelled, the centripetal direction marked — and no outward force anywhere on it |
+| The derivation is explained, not quoted | Every step from the circular-motion relationship to the expression you designed against, with period, radius, speed and mass tracked through it, and a sentence on which of them cancelled and why that mattered to the build |
 | It was actually made, and actually measured | A build that ran, and a measurement of what it did, with the method of measuring stated so a reader knows how much to trust it |
-| The discrepancy is a number, not a word | The gap between predicted and measured as a percentage, and an account of where it went that somebody could go and test |
+| The discrepancy is a number, not a word | The gap between predicted and measured as a percentage, to a number of significant figures your measurements can carry, and an account of where it went that somebody could go and test |
+| The principle travels | A real device named, the constraint its designers face that you did not — the speed it must never drop below, the wall that has to hold, the tolerance a road is built to — traced back to the same relationship between speed and radius your own build obeys |
+| Somebody is affected, and you say who | Who is inside the device, who is beside it, and what running it costs — the power it draws, what it wears out, what is thrown away when it does. One honest paragraph with a real consequence in it, rather than "it could be dangerous" |
 | A reader could rebuild it | Dimensions, materials and settings written down, and the calculation followed once through in symbols before any number is substituted |
 
 %%curriculum-start%%
@@ -78,40 +94,42 @@ Read your own page against these rows before you hand it in — see
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-This task hands you a rare thing: a prediction locked before the test, so
-the interesting behaviour is all in what a group does when the build
-disagrees with it. That happens on one day, in front of you, and never
-appears in the three pages.
+The submitted pages will show a design and a build that agree with each
+other. What they cannot show is which of the two came first — whether
+the thing was built to the numbers, or the numbers written up to suit
+the thing. That question is settled on one bench, on one afternoon, and
+it is the difference between designing and fiddling.
 
 OBSERVE — Unit 1, Day 15, the build-and-test period
-  Watch for: the first move after a run that misses. Some groups go back
-  to the apparatus — is the radius what we wrote down, is the track
-  level, did the string stretch — and some reopen the algebra. Only one
-  of those is testing the prediction; the other is negotiating with it.
-  The submitted account is written after everything is settled and shows
-  neither.
-  Going well: someone re-measures before anyone touches a calculation.
-  Stuck: the equation acquires a factor, and the factor makes it fit.
-  Record: three columns down your day plan — checked the apparatus,
-  checked the algebra, changed the prediction. Anyone in the third column
-  is a two-minute conversation before Day 17.
+  Watch for: where the design calculation physically is. On the bench,
+  open, marked up, being consulted before a dimension is committed — or
+  folded in a bag while somebody adjusts the string until it looks about
+  right. Both groups hand in the same two documents.
+  Going well: a length gets checked against the calculation before it is
+  cut or clamped, and somebody says the number out loud first.
+  Stuck: the sheet never comes out, and the build converges on the target
+  by repeated adjustment. If you ask what the calculation says the radius
+  should be, nobody knows without looking.
+  Record: two columns down your day plan — sheet on the bench, sheet in
+  the bag. It is a glance per group and it predicts item 4 better than
+  anything else you will see.
 
-TALK — Unit 1, Day 14, at the conference already on that agenda
-  That agenda prints its own question, so they will arrive with an answer
-  to it. Ask it, then go somewhere they have not prepared.
+TALK — Unit 1, Day 14, in the conference that day already schedules
+  Day 14 prints its own question where the class can read it, so an
+  answer to that one is already written. Take it, then leave the script.
   Ask: "Slow your device down by ten per cent and change nothing else.
   Which of the forces on your diagram changes, and which does not?"
-  Then: "Name a machine in the world that holds something in a circle the
-  way yours does, and tell me one thing its designers have to get right
-  that you were allowed to ignore."
+  Then: "You had four options and you took this one. What made its
+  equation the one you could actually design against — and which of the
+  others would you not have wanted to predict?"
   A strong answer to the first says the force needed at the centre falls
   with the square of the speed while the weight is untouched, and points
-  at the line where the two were set equal. A strong answer to the second
-  names a real device and a real constraint that follows from the same
-  ratio of speed squared to radius — the strength a rotor wall must have,
-  the speed a ride must never drop below, the tolerance a highway curve
-  is built to. That is B2.6 and B1.1 heard, and a free-body diagram on
-  paper is a static picture that shows neither.
+  at the line where the two were set equal. That is B2.6 heard. A strong
+  answer to the second names the variables its derivation depends on and
+  says which of them a bench can actually set — a conical pendulum's
+  length and angle can be set, a rotor's friction cannot — which is B3.3,
+  the derivation explained rather than recited. A free-body diagram on
+  paper is a static picture and shows you neither.
   Record: one line per group, in the margin of the conference list.
 
 The product evidence is the group's three pages and your own page, in on
