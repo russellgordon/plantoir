@@ -4,6 +4,38 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **The assistant's first turn does not wait for its warm-up** — measured
+  2026-08-20, while qualifying the mac for v1.1.0. `AssistSession` sets
+  `readiness = .ready` (which is all `canSend` checks) and only THEN awaits
+  `warmUp`, so a teacher who types straight away queues behind the
+  ~3,400-token priming request on the server's single slot. Same question,
+  same model, same Mac: **1.7 s** warm against **3.1 s** racing the warm-up.
+
+  It is an optimisation, not a fix — deliberately left out of 1.1.0 because
+  changing it would have made an unchanged mac binary a behaviour change,
+  and the failure Windows repaired (a first question ending in silence)
+  cannot happen here: the timeout is 180 s, `AssistAgent.think()`'s catch
+  surfaces every error as a message and a trail line, and the engine's
+  output goes to `nullDevice` so no pipe can wedge. Windows already awaits
+  its warm-up; see `MAC-HANDOFF.md` and GUI-IMPROVEMENTS row 295.
+
+  The fix is small: hold `.ready` until the warm-up returns, or gate
+  `canSend` on a separate `hasFinishedWarmUp`. **Pin it with a test** that
+  a turn cannot start before the warm-up's request has come back — the
+  measurement above is the evidence it is worth doing, not a substitute
+  for one.
+
+- **A mac problem report can carry nothing the engine said** — found the
+  same day. `AssistServerHost` sends `llama-server`'s stdout and stderr to
+  `FileHandle.nullDevice`. That is load-bearing (an unread pipe is what
+  wedged the Windows server mid-request, and this is why the mac never
+  had that bug) but it also means model-load errors, slot warnings and
+  timing lines reach nobody — the one place they could matter is a report
+  from a teacher whose assistant is misbehaving. Windows added
+  `NoteServerLine` for this. Sample a BOUNDED tail into the trail rather
+  than piping the firehose, and keep the no-blocking-read property that
+  makes the current arrangement safe.
+
 - **A preview's progress bar sits at 100% saying "Opening the preview…"
   for the entire build** — found 2026-08-19, while re-shooting the
   marketing screenshots; the "Building your site…" step is unreachable.
