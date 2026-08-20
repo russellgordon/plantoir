@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Period 5 of 8: analysis
+1. Period 5 of 8: analysis, starting from what last class's conferences said
+   your evidence will and will not support
 2. Whose history is told here, whose is absent, and why
 3. [[Historical Significance]] applied to a local decision
 

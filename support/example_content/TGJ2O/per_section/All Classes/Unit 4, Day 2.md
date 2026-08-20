@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Standup
-2. Warm-up: [[Which One Doesn't Belong]] — four grids
+2. Launch: [[The Front Page]] — read its criteria before you draw
+   anything
 3. Studio: thumbnails first — three front pages sketched at postcard
    size before anything is typeset
 4. Consolidate: [[Design Principles]] — the focal point, argued for

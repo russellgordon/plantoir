@@ -8,8 +8,10 @@ tags:
   - unit-2
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Groups of three.** Full lab report, due in three
-> classes — see [[Writing a Lab Report]].
+> **Time:** two bench periods and an analysis period.
+> **Groups of three.** Full lab report, and it is one of the five that
+> are marked — see [[Investigation Reports]] and
+> [[Writing a Lab Report]].
 
 $F_{net} = ma$ claims two proportionalities at once: acceleration goes up
 with force, and down with mass. You will test them one at a time, because

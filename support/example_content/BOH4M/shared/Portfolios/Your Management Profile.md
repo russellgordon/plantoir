@@ -42,6 +42,10 @@ You will re-read this before writing
 [[Your Leadership Statement]], and say what changed. Keep it somewhere
 you will find it.
 
+The analysis is written in class, and it is marked against the four rows
+on [[The Management Portfolio]] — the same four rows as every other
+entry.
+
 %%curriculum-start%%
 ## Curriculum connection
 

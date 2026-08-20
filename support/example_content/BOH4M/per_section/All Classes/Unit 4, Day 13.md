@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish [[Feedback You Received]] for next week.
+- [ ] Read [[The Management Review]] — the engagement starts next class and day one is already scoping.

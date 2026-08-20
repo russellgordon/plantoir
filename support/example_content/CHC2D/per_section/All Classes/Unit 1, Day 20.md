@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval across Unit 1
+1. Retrieval across Unit 1, and your Day 1 photograph paragraph handed back —
+   read it before you write anything else
 2. What the three lenses gave us: context, conflict, identity
 3. Looking ahead: the decade that broke
 

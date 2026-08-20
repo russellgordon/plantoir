@@ -12,7 +12,8 @@ tags:
 
 1. Period 7 of 8: rehearsal
 2. A hostile question from another group
-3. Revision after it
+3. Revision, acting on the hostile question, on last class's conference
+   notes, and on the row you named weakest
 
 ## Things to do before our next class
 

@@ -17,3 +17,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Journal: the step in the tilted-axis method you keep forgetting.
+- [ ] [[Newton's Second Law]] report finished; it is handed in next class.

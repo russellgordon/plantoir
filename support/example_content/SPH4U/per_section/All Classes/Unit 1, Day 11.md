@@ -10,12 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Analysis period: [[The Flying Pig]] — both routes to the speed,
-   compared with an uncertainty
-2. Skill: [[Uncertainty and Error]] — which route was more precise, and
-   how you can tell
-3. Report drafted in class against [[Writing a Lab Report]]
+1. Skill, first fifteen minutes: [[Uncertainty and Error]] — which route
+   to the speed was more precise, and how you can tell
+2. Write-up period: [[The Flying Pig]], both routes compared with an
+   uncertainty, in the shape set out on [[Writing a Lab Report]]. This is
+   the first marked one — see [[Investigation Write-Ups]]
+3. Judge it against the six rows before you hand it up, on your own this
+   time: [[Judging Your Own Work]]. Reports are collected at the bell
 
 ## Things to do before our next class
 
-- [ ] Flying pig analysis finished.
+- [ ] Nothing on the pig — it went in today. Read ahead if you like.

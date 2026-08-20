@@ -13,9 +13,12 @@ tags:
 1. Standup
 2. Warm-up: [[Spot the Edit]]
 3. Studio: [[Publish to the Web]] — the same story online, with alt text,
-   headings, and a file size a phone can load
-4. Compare: print and web, and what each does better
+   headings, and a file size a phone can load, then the home screen
+   [[The Front Page]] asks for
+4. Compare: print and web, and what each does better — then file both
+   halves of [[The Front Page]] per [[Filing a Story]]
 
 ## Things to do before our next class
 
-- [ ] Story published to the staging site.
+- [ ] Story published to the staging site; both halves of
+      [[The Front Page]] filed.

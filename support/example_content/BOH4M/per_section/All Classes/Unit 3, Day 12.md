@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Working period: evidence and analysis
-2. Conferences — bring your SWOT with evidence attached
+2. Conferences — bring your SWOT with evidence attached; you leave with one change named, and tomorrow ends with time to make it
 3. Peer challenge: swap with another pair and attack one entry each
 
 ## Things to do before our next class

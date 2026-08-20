@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Discussion: [[What Counts as Evidence]]
+1. Diagnostic discussion: [[What Counts as Evidence]] — nothing written
+   down and no marks. I am finding out what this class already counts as
+   proof, so I know where to start
 2. Concept: [[WHMIS and Lab Safety]] — pictograms and the rules of this room
 3. Setup: [[Your Lab Notebook]] — set up your first pages
 4. Where the equipment lives, and the safety walk
@@ -19,4 +21,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Signed [[Safety Contract]] due next class. **No signature, no lab.**
-- [ ] Write your [[First Entry]] in your portfolio.
+- [ ] Read the three questions on [[First Entry]] and think about them. You
+      write that entry in class.

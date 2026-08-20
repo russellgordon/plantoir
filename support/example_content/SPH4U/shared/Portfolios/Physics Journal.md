@@ -26,9 +26,10 @@ diagnostic in the course and the one students skip most.
 
 ## What it is not
 
-Not a summary of the class. Not a copy of my board notes. Not marked for
-neatness. The murky question at the end is often the most valuable line in
-the entry, and I read those.
+Not a summary of the class. Not a copy of my board notes. Not marked at
+all — see [[How Marks Work]] — because a page a week written at home is
+practice, and practice is not something I evaluate. The murky question at
+the end is often the most valuable line in the entry, and I read those.
 
 [[Portfolio Checklist]] is what a complete portfolio holds by January —
 worth copying into the front of the notebook now rather than in June.

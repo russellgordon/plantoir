@@ -21,6 +21,12 @@ one social post that sends readers to it.
 Roles rotate every event — writer, photographer, editor, producer —
 so everyone reports, shoots, and edits. Nobody holds the tripod all term.
 
+There is no team mark on this beat. You are evaluated on the pieces
+that carry your name in each rotation — the recap you wrote, the frames
+you shot and captioned, the edits you made to somebody else's copy, the
+card you built — and on what you say in the conference at your desk.
+The crew succeeds together; the mark is yours alone.
+
 ## How to work
 
 1. Before the event, the producer books the coverage: who plays whom,
@@ -40,21 +46,23 @@ so everyone reports, shoots, and edits. Nobody holds the tripod all term.
 6. Rotate roles and do it again. Chasing the ceiling? Cut a
    [[Cut a Highlight Reel|highlight reel]] for the news program.
 
-The desk period after each event is class time for filing and
-editing — using it well is part of the task, per [[How Marks Work]].
+The desk period after each event is class time for filing and editing.
+Evaluated work gets made here, in front of me — which is also why
+nothing on a homework list is ever the marked thing, as
+[[How Marks Work]] explains.
 
 ## Success criteria
 
 | Quality | What it looks like in your package |
 | --- | --- |
-| On deadline | The recap is filed within two days, every rotation |
+| Filed while it is news | The recap reaches readers within two days |
 | Fair to both sides | Effort from both teams; nobody's worst moment |
 | Action and faces | Plays AND the people around them, in every set |
 | Complete captions | Every photo says who, what, and when — correctly |
 | Accuracy | Score, names, and quotes verified before filing |
 | Consent | Every recognisable face cleared before publication |
 | Credit | Photos and words carry the maker's name in every channel |
-| Real rotation | Everyone has filed, shot, and edited by unit's end |
+| Every role held | You have filed, shot, and edited by the unit's end |
 
 ## Reflect
 
@@ -84,3 +92,47 @@ what will you hand to the next person who holds it?
 
 ![[A1.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 15, the ingest-and-log period before anything is
+edited
+  Not the event itself on Day 14; you are running that room and half
+  the class is out of it. Day 15 is the crews at desks with full cards.
+  Watch how the workflow is actually run. Does someone read a shot list
+  aloud while another types, or does the crew open the editor first and
+  promise to log it later? Did anybody actually open a file from the
+  venue backup to check it survived the night — the thing Day 14's
+  homework asked for — or is "it copied fine" being taken on trust? A
+  finished reel cut from unlogged footage looks exactly like one cut
+  from logged footage — it simply took three times as long and quietly
+  lost the two shots nobody could find again. That difference is A1.3,
+  understanding a production workflow, demonstrated by running one —
+  and this period is the only place you ever watch it being run.
+  Going well: cards go in one at a time and nothing is deleted until a
+  second copy opens.
+  Stuck: three of the four are watching one person scrub a timeline.
+  Record: on the crew sheet, one tick per crew — logged / backed up /
+  neither — before the bell. Twenty seconds for the whole room.
+
+TALK — Unit 2, Day 19, the conference already on that agenda
+  Ask something other than that day's printed question about whether
+  the story needs the photographs, and something other than the
+  Reflect prompt on this page, which they will have written already:
+  "Something in this rotation got decided without a vote. What was it,
+  and how did it get settled?"
+  Then: "Name a moment you changed your mind because of what a
+  crewmate said."
+  A strong answer names the mechanism rather than the outcome — we shot
+  it both ways and compared them on the screen; I asked to see the
+  frame before I wrote the caption — which is A3.3, describing and
+  using the techniques that make a team work. A package that came out
+  well cannot tell you whether it was collaboration or one person doing
+  four jobs while three watched.
+  Record: one row per crew in your day plan, initials against the
+  technique each member named.
+
+The product evidence is the recap, photo set, and social card filed on
+Day 20. That one arrives on its own.
+%%

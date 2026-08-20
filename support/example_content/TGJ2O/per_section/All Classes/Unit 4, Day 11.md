@@ -18,4 +18,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Proof corrections applied.
+- [ ] Bring your marked proof — we apply the corrections together in
+      class.

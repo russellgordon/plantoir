@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: predict current and voltage at five points, in writing
-2. In groups: build all five and compare with the predictions
-3. Consolidate: the two rules, stated by the room, then checked
+1. Hand in the [[Ohm's Law and Resistance]] analysis
+2. Warm-up: predict current and voltage at five points, in writing
+3. In groups: build all five and compare with the predictions
+4. Consolidate: the two rules, stated by the room, then checked
 
 ## Things to do before our next class
 

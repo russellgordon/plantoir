@@ -9,8 +9,8 @@ What a complete portfolio holds by the end of the course. Copy this into
 the front of your notebook and use it as a table of contents.
 
 - [ ] One journal entry per week, dated
-- [ ] Every investigation's analysis section
-- [ ] The five task submissions
+- [ ] Every investigation's analysis section, marked or not
+- [ ] Your copy of each task submission, and of the five marked write-ups
 - [ ] One page per unit: "the three things I would tell someone starting
       this unit"
 - [ ] The murky questions, with any that got answered marked as answered

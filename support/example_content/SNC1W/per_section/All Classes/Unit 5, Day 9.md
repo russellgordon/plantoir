@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[Space Mission Proposal]], day 3 — working period: the science, the
-   instruments, and the constraints — distance, energy, and time
+1. [[Space Mission Proposal]], day 3 — working period, picking up where
+   yesterday's conference left off: the science, the instruments, and the
+   constraints — distance, energy, and time
 2. The Sun's role, and what it does to your spacecraft
 
 ## Things to do before our next class

@@ -40,6 +40,9 @@ wrote the day in order" — dated, testable, and yours.
 
 The journal comes in each unit, read against these criteria —
 [[Journal Checklist]] turns them into a self-check before handing in.
+It is **read and written back to, not marked**: nothing in here moves
+your percentage, and [[How Marks Work]] explains why that is the
+arrangement rather than an oversight.
 
 | Quality | What it looks like |
 | --- | --- |

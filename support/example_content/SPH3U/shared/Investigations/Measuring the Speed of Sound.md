@@ -8,7 +8,10 @@ tags:
   - unit-4
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Groups of three.** Analysis due next class.
+> **Time:** two bench periods and two analysis periods.
+> **Groups of three.** Write-up: the analysis section with both methods
+> compared, and it is one of the five that are marked — see
+> [[Investigation Reports]].
 
 Two methods, one of which is limited by your reaction time and one of
 which is not. Comparing them is half the point.

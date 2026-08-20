@@ -97,3 +97,50 @@ decides your grade alone.
 
 ![[F2.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Be straight about this one. An examination is product evidence and
+nothing else: there is no watching and no talking in an examination
+room, and attempting either would be unfair to everyone in it. What
+follows is where the observation and conversation evidence for THESE
+expectations is still available — the four review classes, while there
+is time for what you find to change how somebody prepares.
+
+OBSERVE — Unit 5, Day 14, review part one, on the questions they bring
+  Watch for: the first mark a student makes on a problem they have not
+  seen since September. Axes, a free-body diagram, a positive direction
+  — or an equation off the formula sheet with numbers pushed into it.
+  The paper will show diagrams wherever a question asks for one; this
+  room shows whether drawing is anybody's first move when nobody asked.
+  That is A1.12 watched rather than assumed.
+  Going well: pencil, picture, labels, and a positive direction chosen
+  before a single equation.
+  Stuck: an equation first, then a long silence, then a different
+  equation.
+  Record: three columns down the class list — drew first, drew after,
+  did not draw. The third column is the list you make sure to reach in
+  the Day 17 clinic.
+
+TALK — Unit 5, Day 15, during the by-request review
+  Half that period runs itself while you circulate, so take two minutes
+  a student and ask for physics in words, which the paper only rewards
+  where a question happens to ask for it.
+  Ask: "Two equal positive charges, and the point exactly halfway
+  between them. What is the field there, and what is the potential?"
+  Then: "The energy questions and the modern physics questions both use
+  the word conserved. Do they mean the same thing by it?"
+  A strong first answer gives zero and not-zero, and can say why: one is
+  a sum of arrows that cancel, the other a sum of numbers that do not.
+  A strong second answer notices that the book-keeping is the same and
+  that the later units simply added a term to it. That is D2.1, C2.1 and
+  F2.1 heard — the terminology of fields, of energy and momentum, and of
+  relativity and quanta, used precisely rather than recognised — and it
+  is the sort of understanding a three-hour paper picks up by accident
+  or not at all.
+  Record: one line per student in the review list, and the pairs of
+  words they could not separate. Those are what Day 16 is for.
+
+The product evidence is the examination itself.
+%%

@@ -11,14 +11,15 @@ tags:
 ## Agenda
 
 1. Standup
-2. Warm-up: [[Which One Doesn't Belong]] — four ledes
+2. Modelled together: [[Judging Your Own Work]] — my own draft on the
+   screen, judged out loud against the criteria, weakest row named
 3. Edit and compare: drafts on the screen, peer edit at desks under
    [[Our Newsroom Standards]]
-4. How work gets filed here: [[Filing a Story]] and
-   [[Writing for Publication]]
-5. Desk time: revise toward tomorrow's deadline
+4. Desk time: act on it — yesterday's conference note and today's peer
+   edit, both, while there is still deadline left to use
 
 ## Things to do before our next class
 
-- [ ] Revise [[Your First Byline]] and file it per [[Filing a Story]].
+- [ ] Keep revising [[Your First Byline]] — a full second draft for
+      tomorrow's peer edit.
 - [ ] Journal: the edit that stung — and helped.

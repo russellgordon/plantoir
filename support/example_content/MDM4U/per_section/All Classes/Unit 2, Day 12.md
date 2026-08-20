@@ -17,7 +17,9 @@ tags:
 3. Name it: [[The Normal Distribution]] — one shape, two numbers, and
    the rule your wall just predicted before it was stated
 4. Launch: [[The Culminating Investigation]] — it runs to the last day
-   of the course; [[Choosing a Data Set]] makes a question answerable
+   of the course; [[Choosing a Data Set]] makes a question answerable.
+   Read the milestone schedule and the criteria table on the task page
+   today: between them they are the standard from here to January
 5. Practise: [[Normal Distribution Practice]], first set
 
 ## Things to do before our next class

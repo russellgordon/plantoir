@@ -17,4 +17,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] [[Measuring g]] report finished for next class.
+- [ ] [[Measuring g]] analysis finished; it is handed in next class.

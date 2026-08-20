@@ -6,9 +6,11 @@ tags:
   - portfolios
   - unit-3
 ---
-An honest inventory, written in Unit 3 while there is still term left to act
-on it: what studying history is actually building in you, with a specific
-piece of your own work behind every claim.
+An honest inventory, written in class late in Unit 3 while there is still
+term left to act on it: what studying history is actually building in you,
+with a specific piece of your own work behind every claim. It is marked with
+the rest of [[The Historian's Portfolio]], and the criteria are on that
+page.
 
 Historical investigation is not one skill. It is a chain, and it breaks at
 whichever link you have not practised:

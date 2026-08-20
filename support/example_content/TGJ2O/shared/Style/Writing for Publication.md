@@ -43,8 +43,9 @@ else.
 The same standards run through your [[Newsroom Journal]], with one
 addition: name what *you* did and decided, not just what the team did.
 "We covered the game" hides the learning; "I reshot the celebration
-from the baseline because the first angle buried it" shows it — and
-that is the evidence [[How Marks Work]] actually counts.
+from the baseline because the first angle buried it" shows it — and it
+is the second version you will be able to point at in
+[[Showing Growth]] in January.
 
 %%curriculum-start%%
 ## Curriculum connection

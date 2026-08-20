@@ -7,9 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo or pairs · three desk periods in one week, late in the term ·
-> one print front page and one site home screen, built from the
-> term's real published stories
+> Solo or pairs · four desk periods for the print page, plus the
+> studio period where the home screen is built · one print front page
+> and one site home screen, from the term's real published stories
 
 ## What you are making
 
@@ -35,13 +35,19 @@ and you must be able to say why — that is
    and set headlines and body with care, per [[Typography]].
 4. Sharpen every headline until it earns its size, and complete every
    caption — no photo runs anonymous or unexplained.
-5. Build the home screen variant, then compare the two honestly using
-   [[Audiences and Platforms]]: what does print do better, what does
-   the screen do better, and what did you change between them?
-6. Post both where the newsroom can critique them, and revise once.
+5. Pin the print page where the newsroom can critique it, take three
+   notes from another desk, and revise on the strength of them.
+6. Then build the home screen variant and compare the two honestly
+   using [[Audiences and Platforms]]: what does print do better, what
+   does the screen do better, and what did you change between them?
+   File both halves together.
 
-The desk periods are class time, and using them well is part of the
-task — [[How Marks Work]] explains how.
+The desk periods are class time. A page is made at a desk with me in
+the room on purpose: I cannot judge a layout I never saw being built,
+and you cannot ask a question at midnight. If you work in a pair, the
+two of you split the page into named sections and each of you is
+evaluated on your own — [[How Marks Work]] explains why there is no
+shared mark here.
 
 ## Success criteria
 
@@ -82,3 +88,43 @@ someone — usually yourself — for the reader's sake.
 
 ![[B2.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 2, the thumbnail studio, immediately after this
+page is launched
+  Watch whether the pencil moves before the mouse. A designer who opens
+  the layout software first and sketches the three postcard thumbnails
+  afterwards hands in the same three sketches as one who used them to
+  choose — the paper on the wall cannot tell you which. Only the first
+  one has actually done B2.5, which is using hand-drawn sketches to
+  compare alternatives rather than to document a decision already made.
+  Going well: three genuinely different pages, and the pencil goes back
+  to a rejected one to steal something from it.
+  Stuck: one page drawn three times with the photograph moved, or a
+  screen already open.
+  Record: a two-column list, sketched-then-built / built-then-sketched,
+  names only. It takes one lap of the room.
+
+TALK — Unit 4, Day 4, at desks while the type is being set to a scale
+  Do not ask about the focal point; Day 2 consolidated that out loud
+  and they will hand it back to you. Ask:
+  "Which size on this page did you set because the scale said so, and
+  which because the headline would not fit? What did you change to keep
+  the scale?"
+  Then: "If I doubled the body size and left everything else alone,
+  what breaks first?"
+  A strong answer names the principle that would give way — proportion,
+  then space, then contrast — and says what the reader loses, instead
+  of "it would look bad". The criteria row "Design with intent" asks
+  you to judge that the spacing and contrast are choices rather than
+  luck; the printed page looks identical either way, and this is the
+  two minutes where you find out. That is A1.2 understood rather than
+  recited.
+  Record: one word per student in your day plan — the principle they
+  named, or a dash.
+
+The product evidence is the print page and the site home screen. Those
+arrive on their own.
+%%

@@ -10,10 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 4 — two dippers in a tray of water
+1. Start of Unit 4 — before the tray comes out: thirty seconds, no notes,
+   draw me what happens where two sets of ripples meet. Not collected and
+   not marked; the drawings sort this class into three groups, and I teach
+   the rest of the day to the biggest one
 2. [[Ripple Tank Interference]]: nodal lines you can watch
 3. Name it: [[Interference of Waves]] and path difference
-4. Hand in [[Fields Technology Report]]
 
 ## Things to do before our next class
 

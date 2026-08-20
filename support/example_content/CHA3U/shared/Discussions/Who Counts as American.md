@@ -52,6 +52,8 @@ statute recognised it, and the legal record is the trailing indicator. This
 position needs the sources from [[Arts, Culture, and Consumer Society]] as
 much as from [[Government Records]].
 
+This is the last of [[The Four Seminars]], and the one that counts most.
+
 Open with your position and name the evidence that would move you. Comparing
 with Canada is welcome and must be evidenced, not flattering — see
 [[Our Working Agreement]]. The argument feeds [[The Long Argument]].

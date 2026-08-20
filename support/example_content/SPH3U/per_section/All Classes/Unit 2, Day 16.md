@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: one situation, forces named, motion predicted
+1. Warm-up: one situation, forces named, motion predicted — starting
+   with whatever came top of your revision list
 2. Consolidation: the unit on one page, built by the room
 3. Look ahead: force and motion, in the currency of energy instead
 

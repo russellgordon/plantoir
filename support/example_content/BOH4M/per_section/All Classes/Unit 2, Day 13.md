@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Working period: the team project
-2. Stand-ups, then work; conferences with each team
+2. Stand-ups, then work; conferences with each team, and each team leaves with one change named for the working period on Day 15
 3. Blockers raised out loud, which is the whole point of the meeting
 
 ## Things to do before our next class

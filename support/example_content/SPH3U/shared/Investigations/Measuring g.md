@@ -8,8 +8,9 @@ tags:
   - unit-1
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Groups of three.** Write-up: analysis section
-> only, due next class.
+> **Time:** two bench periods and two analysis periods.
+> **Groups of three.** Write-up: the analysis section only, and it is one
+> of the five that are marked — see [[Investigation Reports]].
 
 Everyone is told that objects fall at $9.8\ \text{m/s}^2$ regardless of
 mass. This is where you find out whether that is true in this room, with

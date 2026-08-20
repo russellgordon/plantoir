@@ -8,8 +8,10 @@ tags:
   - unit-3
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Groups of three.** Goggles required — boiling
-> water and hot metal.
+> **Time:** one class plus an analysis period. **Groups of three.**
+> Goggles required — boiling water and hot metal. Write-up: the analysis
+> section, and it is one of the five that are marked — see
+> [[Investigation Reports]].
 
 Heat a metal, drop it into water, and let the two settle. The energy the
 metal loses is the energy the water gains, and from that you can find the

@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Internal and external control: [[Discipline and Control Measures]]
-2. Progressive discipline, and why consistency is the whole thing
-3. Seminar: [[When Control Becomes Surveillance]]
+1. First fifteen minutes: the change my note named on your change plan yesterday, made here
+2. Internal and external control: [[Discipline and Control Measures]]
+3. Progressive discipline, and why consistency is the whole thing
+4. Seminar: [[When Control Becomes Surveillance]]
 
 ## Things to do before our next class
 

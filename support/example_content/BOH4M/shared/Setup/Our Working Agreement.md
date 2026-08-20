@@ -17,7 +17,9 @@ in. This is the agreement we work under.
   entitled to your own facts.
 - **Let people finish.** Especially when you are certain they are wrong.
 - **Change your mind out loud.** It is the most respected thing anyone
-  does in a seminar, and it is worth marks in the discussion criteria.
+  does in a seminar, and saying what moved you is exactly the reasoning
+  I am listening for — see [[How Marks Work]] on evidence you speak
+  rather than write.
 
 ## About real people
 

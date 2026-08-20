@@ -10,11 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: one change, three consequences
-2. Consolidation: one local ecosystem, described completely — biotic,
+1. First fifteen minutes: the revision list from yesterday's checkpoint,
+   worked — the test is next class, and this is the time you get for it
+2. Warm-up: one change, three consequences
+3. Consolidation: one local ecosystem, described completely — biotic,
    abiotic, energy flow, and one threat
-3. Look ahead: next unit goes inside the matter all of this is made of
+4. Look ahead: next unit goes inside the matter all of this is made of
 
 ## Things to do before our next class
 
+- [ ] **Unit 2 test next class.** The Concepts pages are the study guide.
 - [ ] Bring one material you use daily and cannot identify.

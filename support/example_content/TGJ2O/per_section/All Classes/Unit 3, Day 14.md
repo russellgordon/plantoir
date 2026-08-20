@@ -16,9 +16,11 @@ tags:
    [[Clean Audio]] taught your ears
 4. Back it up before anything else: [[Backing Up Your Media]] —
    no exceptions today
-5. Desk time: weave the element into your draft
+5. Desk time: finish the fixes yesterday's clinic found, then weave the
+   element into your draft
 
 ## Things to do before our next class
 
-- [ ] Bring a complete draft — text plus element — to peer edit.
+- [ ] Get your draft to text-plus-element state — tomorrow it needs a
+      number worth drawing.
 - [ ] Journal: how many takes your standup really took.

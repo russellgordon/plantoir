@@ -4,9 +4,9 @@ publish: true
 created: __CREATED__
 tags:
   - tasks
-  - unit-3
+  - unit-4
 ---
-**Due: the end of Unit 3.** Pairs. An inquiry with a public-facing
+**Due: the first half of Unit 4.** Pairs. An inquiry with a public-facing
 product.
 
 Rights in the United States were claimed before they were granted, and
@@ -40,6 +40,17 @@ mechanism, what changed in law, what changed in life, and what did not
 change at all. And a **public-facing piece** — a panel, a short
 recording, a briefing sheet — that a stranger could learn from in five
 minutes.
+
+## What is marked as yours
+
+The pair shares a right and shares the searching. It does not share a mark.
+**You each write your own inquiry report**, in your own words, from the
+evidence the two of you found — that report is the piece your mark comes
+from, and two reports that agree sentence for sentence are two students who
+did not think about this separately. The public-facing piece is made
+together; put your name against the parts you made, so that the
+communication row has something of yours in it. Your conference before the
+hand-in is with you alone.
 
 ## How it is marked
 
@@ -77,3 +88,49 @@ being marked on. For first-person accounts, see
 
 ![[E2.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Done in pairs. Ask each partner on their own; the reports are separate and
+so is the evidence.
+
+OBSERVE — Unit 4, Day 5, the research period
+  Watch for: which half of the story a pair opens FIRST, and what the other
+  half is left. The post-1945 campaign is a search away; the organising
+  under Jim Crow is not, and it takes longer to find on purpose. The
+  criteria row about continuity means the finished report will present the
+  earlier decades as the movement whether or not anybody looked — that
+  sentence is easy to write and impossible to check afterwards. Where the
+  hours went is only visible now.
+  Going well: a pre-1945 source open in the first ten minutes, or an even
+  count of sources between the two halves by the end.
+  Stuck: forty minutes on the 1960s and "we'll add the earlier stuff at
+  home".
+  Record: a slash on the day plan beside a pair the first time they open a
+  pre-1945 source, and the clock time beside it. One number per pair.
+
+TALK — Unit 4, Day 7, the conferences already on that agenda
+  Ask each partner separately: "Where did the organisation you are
+  following get its money?"
+  Then: "Did your two groups ever appear in the same room — a joint
+  petition, a shared lawyer, a march one of them endorsed? Or does the
+  record show no contact at all?"
+  A strong answer names dues, a church collection, a newspaper's
+  subscribers, a union local, a northern donor — and sees that where the
+  money came from set the limits of what could be demanded. On the second,
+  it produces an occasion or says plainly that the record shows none,
+  without inventing a solidarity nobody documented. Note that this is a
+  different question from the one on the page: the page asks what the two
+  CLAIMS had in common, and this asks whether the two organisations ever
+  actually met. D2.4 asks for the contributions of African Americans to
+  American society to be analysed, and an institution is the contribution
+  most often described without anyone asking who paid for it; D3.4 asks for
+  developments related to citizenship rights FOR VARIOUS GROUPS, which is
+  why a second group belongs in this task at all.
+  Record: one line per STUDENT, and note which of the two answered from
+  evidence and which from the other's notes.
+
+The product evidence is the reports and the public piece, handed in and
+displayed on Day 9.
+%%

@@ -44,6 +44,11 @@ current posting, an association, a person you spoke to.
 This entry closes the portfolio, and it is the reflective piece your
 teacher reads alongside [[The Management Review]].
 
+It is written in class across two periods: the next-three-years section
+on the day you research the routes, the rest of it in the final week. It
+is marked against the four rows on [[The Management Portfolio]] — the
+same four rows as every other entry.
+
 %%curriculum-start%%
 ## Curriculum connection
 

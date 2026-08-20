@@ -76,3 +76,41 @@ will and will not tell you, see [[Newspapers and Print Culture]].
 
 ![[C2.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 16, the working period, while the causation section is
+drafted
+  Watch for: the ORDER in which the criteria and the ranking get written.
+  The criteria row on this page means every essay handed in will have a
+  standard stated somewhere near the top, and the page tells students to
+  put it there, so its presence proves nothing. What it cannot show you is
+  whether the standard governed the ranking or was fitted to a ranking the
+  student already liked — and that is decided in this period, on paper, in
+  front of you.
+  Going well: a written standard before any cause is placed, and then a
+  cause MOVING because the standard put it somewhere the student did not
+  expect.
+  Stuck: five causes listed in the order the class met them, with a
+  criteria sentence added on top at the end.
+  Record: two columns on the day plan, criteria first or ranking first. If
+  a page is too messy to read, "which of these did you write first?" settles
+  it in five seconds.
+
+TALK — Unit 2, Day 17, the conferences already on that agenda
+  Ask: "Cross out your first cause. Does the argument change, or does the
+  second one simply take the job?"
+  Then: "Which two of your causes are really the same cause under two
+  names?"
+  A strong answer distinguishes a cause the explanation depends on from one
+  that is interchangeable with the next, and either merges the pair and
+  says so or defends the distinction with a date, a vote, or a document.
+  C2.3 asks for the significance of the developments between north and
+  south to be ASSESSED, not listed — and assessment is audible here in a
+  way a ranked list on a page can never be, because the list looks the same
+  whether it was reasoned or remembered.
+  Record: initials, and which cause survived the crossing out.
+
+The product evidence is the argument handed in on Day 20.
+%%

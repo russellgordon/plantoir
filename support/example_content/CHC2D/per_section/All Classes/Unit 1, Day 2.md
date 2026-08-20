@@ -12,7 +12,9 @@ tags:
 
 1. What history is made of: [[Reading a Primary Source]]
 2. Provenance in thirty seconds — who, when, for whom, why
-3. Starting [[Your Inquiry Notebook]]
+3. Starting [[Your Inquiry Notebook]] — and what it is eventually marked
+   as part of: [[The Portfolio Case]], criteria read today, closing in
+   January
 
 ## Things to do before our next class
 

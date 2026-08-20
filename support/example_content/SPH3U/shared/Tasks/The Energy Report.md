@@ -95,3 +95,39 @@ back to a press release is one source, not three.
 
 ![[A2.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 16, the working period on efficiency numbers
+  Watch for: whether the CONDITIONS attached to a number are written down
+  in the same keystroke as the number, or reconstructed an hour later
+  from memory. The criteria on this page ask for conditions to be stated,
+  so the handed-in table has them either way — what this period tells you
+  is whether the student has them or is about to invent them. This one
+  corroborates a self-report rather than replacing it, and it is still
+  worth the two minutes, because the difference shows up nowhere else.
+  Going well: a note beside every figure saying who measured it, when,
+  and at what load or wind speed.
+  Stuck: a page of bare percentages and a plan to find the sources later.
+  Record: walk the room once and mark the class list N for "number only"
+  or N+C for "number with its conditions".
+
+TALK — Unit 3, Day 15, at the conference already on that agenda
+  Ask: "Of the two sources you found, which one would say something
+  different if a different organisation had paid for it — and what,
+  exactly, would change?"
+  Then: "Your technology loses most of its energy at one step. If you
+  could halve that one loss, what would the efficiency become? Roughly,
+  out loud, now."
+  A strong first answer names the interest and says what it would move —
+  the number, the boundary the number was drawn around, or which losses
+  got counted — rather than calling a source biased and moving on. That
+  is A1.9, and the finished report only ever shows you the sources that
+  survived. The second answer tells you whether the energy path is
+  understood or merely drawn.
+  Record: one line per student on the conference list, a tick per
+  question.
+
+The product evidence is the four pages, handed in on Day 18.
+%%

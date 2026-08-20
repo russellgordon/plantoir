@@ -10,11 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Analysis period: [[Collisions in One Dimension]] — the momentum and
-   energy tables, both filled
+1. Write-up period: [[Collisions in One Dimension]] — the momentum and
+   energy tables both filled, then the analysis and the conclusion. The
+   second marked write-up; see [[Investigation Write-Ups]]
 2. Which quantity survived every collision, and what that means
-3. Conclusions justified against theory, not against expectation
+3. Conclusions justified against theory, not against expectation, and the
+   six rows read down before you hand it up at the bell
 
 ## Things to do before our next class
 
-- [ ] Collision report finished.
+- [ ] Nothing to finish — the write-up went in today. Read
+      [[Collisions in Two Dimensions]] instead.

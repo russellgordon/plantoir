@@ -12,7 +12,8 @@ tags:
 ## Agenda
 
 1. Reflection: what the inquiry taught that the units did not
-2. Portfolio closes: [[Where History Leads]] written and handed in
+2. Portfolio closes: [[Where History Leads]] written in class, and
+   [[The Portfolio Case]] handed in complete
 3. How [[The Document Examination]] works
 
 ## Things to do before our next class

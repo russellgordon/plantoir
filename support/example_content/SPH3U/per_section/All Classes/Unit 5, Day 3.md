@@ -19,3 +19,5 @@ tags:
 
 - [ ] Finish [[Circuit Practice]].
 - [ ] Journal: why is house wiring parallel?
+- [ ] [[Ohm's Law and Resistance]] analysis finished; it is handed in
+      next class.

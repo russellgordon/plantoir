@@ -7,8 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Pairs · launched at the end of Unit 1, due two classes later · one
-> game, one complete distribution, one price you can defend
+> Pairs · launched on Unit 1, Day 14, with working periods on Days 16
+> and 17 · defended on Unit 2, Day 2 · one game, one complete
+> distribution, one price you can defend
 
 ## What you are making
 
@@ -54,9 +55,22 @@ audited airtightly outranks a spectacular game whose probabilities do
 not sum to $1$. On the due date your pair defends the verdict out loud
 in three minutes, and the first question will always be *where did that
 probability come from?* Your [[Math Journal]] entry on the moment your
-first outcome table turned out to be incomplete finishes the evidence —
+first outcome table turned out to be incomplete is worth writing —
 that moment happens to almost everyone, and hiding it costs you more
 than it saves.
+
+**Working in a pair, marked as yourself.** There is no shared mark
+here. The audit you hand in is one document, and it names which
+outcomes each of you built and totalled — initials in the margin of
+the table are enough. Beyond that, your mark comes from the half of
+the three-minute defence you deliver, from the conference on Day 16,
+and from what I see you doing across the two working periods. So
+splitting the game down the middle and never looking at your
+partner's half is the one strategy that reliably costs both of you.
+
+Bring the whole thing to [[Judging Your Own Work]] on Day 16 before
+you decide you are finished. Day 17 is the period that exists so that
+what you find there can still be fixed.
 
 ## Success criteria
 
@@ -84,3 +98,46 @@ than it saves.
 
 ![[B1.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 16, the working period on the sample space
+  Watch the order things appear on the page. Some pairs build the
+  outcome table, total the probability column, and only then find out
+  what the game returns. Others write down the price they think the
+  game "should" cost and assemble outcomes underneath it until the
+  arithmetic agrees. Both hand in a table and a fair price, and the
+  finished audit looks the same either way — which is why this is
+  visible here and nowhere else. It is the difference between
+  determining a probability distribution and decorating a conclusion,
+  and A1.3 is the expectation it belongs to.
+  Going well: the probability column is totalled before anyone says a
+  price out loud.
+  Stuck: a price at the top of the page, and outcomes being adjusted
+  to reach it.
+  Record: two columns in your day plan, table first or price first,
+  initials in whichever one fits.
+
+TALK — Unit 1, Day 17, while the pairs are trading games and auditing
+each other's arithmetic
+  You are free for most of that period, and the room is already
+  talking. Two questions, thirty seconds each:
+  "Point at the outcome in your table that pays the most and happens
+  least. How much of the fair price is that one row responsible for —
+  most of it, about half, or hardly any?"
+  "The pair you just audited priced their game differently from yours.
+  Whose is closer to fair, and how did you work that out without
+  redoing their arithmetic?"
+  A strong answer reasons from the weighting rather than the size of
+  the prize, and can say so without a calculator: the rare jackpot
+  usually contributes far less than it feels like it should, because
+  its payout arrives multiplied by a very small number. That is B1.2's
+  connection between the expected value and a weighted mean, heard
+  rather than read, and the handed-in table shows the arithmetic
+  without ever showing whether they can reason across it.
+  Record: one line per pair on the seating plan, right then.
+
+The product evidence is the audit and the three-minute defence on
+Unit 2, Day 2.
+%%

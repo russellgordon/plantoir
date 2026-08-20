@@ -12,7 +12,8 @@ tags:
 
 1. Retrieval across Unit 3
 2. The three lenses, third time
-3. Notebook and portfolio check
+3. Notebook and portfolio check — I read yours with you, and it counts
+   towards [[The Portfolio Case]]
 
 ## Things to do before our next class
 

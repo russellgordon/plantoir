@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Leadership Profile]]
+1. Launch: [[The Leadership Profile]], criteria read together before anyone chooses a leader
 2. Finding three real decisions — where to look, and what counts
 3. Portfolio time: [[Your Leadership Statement]] started, to be finished in June
 4. Working period

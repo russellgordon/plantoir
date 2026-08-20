@@ -8,8 +8,10 @@ tags:
   - unit-3
 ---
 > [!abstract] At a glance
-> **Format:** a built track plus a four-page analysis. **Groups of three.**
-> **Build:** two classes. **Analysis:** due one week after the test run.
+> **Format:** a built track plus a four-page analysis. **Built in threes;
+> the analysis is written and handed in by each of you separately.**
+> **Build and test:** four classes, with a checkpoint on the third.
+> **Analysis:** due the class after the final runs.
 > **Assessed on:** Thinking and Investigation, Application, Communication.
 
 Build a roller coaster out of foam pipe insulation, run a ball bearing
@@ -101,6 +103,22 @@ measurement, and report the spread, not just the mean — see
    it. Report the prediction BEFORE the result, even if the prediction
    was wrong. Especially then.
 
+The track is built by three people and the measurements are shared —
+somebody has to hold the metre stick. The analysis is not shared. You
+decide what your table shows, you do the loop calculation, and you write
+the account of where the energy went.
+
+## How it is marked
+
+| What is judged | What it looks like in your analysis |
+| --- | --- |
+| The energy table | Complete for every measured point, with one calculation shown in full and the rest tabulated |
+| The loop | Theoretical minimum release height computed from YOUR loop's radius, and compared with the height that actually worked |
+| The losses | Named by the form the energy ended up in, quantified where you can, and honestly listed where you cannot |
+| The efficiency | One named section, with $E_{out}$ and $E_{in}$ both identified — not a whole-track number with no boundary |
+| The tested change | Prediction written down before the result, and the result reported either way |
+| Communication | A reader who never saw your track could rebuild the argument from your table and your one worked calculation |
+
 ## What good work looks like
 
 A group whose coaster failed twice and who can tell me exactly how much
@@ -112,8 +130,11 @@ friction". The number is the point.
 > The build works with any rolling mass, but a steel ball bearing in split
 > foam insulation is the most forgiving combination — heavy enough that
 > air resistance is negligible, small enough that the channel guides it.
-> Budget two classes: groups that get one class build a ramp, groups that
-> get two build a coaster. The rolling-energy point in question 3 is
+> Budget three build classes and a day of final runs: groups that get one
+> class build a ramp, groups that get three build a coaster. The
+> checkpoint on the third build day is what stops a group arriving at the
+> final runs with a track that works and no numbers.
+> The rolling-energy point in question 3 is
 > deliberately left for students to discover as a discrepancy; SPH4U picks
 > it up properly.
 
@@ -128,3 +149,40 @@ friction". The number is the point.
 
 ![[D3.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 6, the test-run and filming period
+  Watch for: how many things change between one run and the next. The
+  agenda asks for one change, predicted then tested, and this is the
+  period where you find out whether that discipline exists when the track
+  is still being made to work at all. Analysis question 5 will report a
+  clean single change from every group, because that is what it asks for;
+  what the build runs show you is whether they can do it when nothing is
+  working yet. That is D2.4 — conducting an inquiry into gravitational
+  and kinetic energy — and no page can show it to you.
+  Going well: one change per run, and somebody says out loud what they
+  expect it to do before the ball is released.
+  Stuck: the loop is re-taped, the release point moves and a heavier ball
+  goes in, all before the same run, and nobody can say which of the three
+  is why it worked.
+  Record: a tally on your day plan — runs against changes, one line per
+  group.
+
+TALK — Unit 3, Day 7, at the checkpoint on that agenda
+  Ask: "Between your release point and the bottom of the first drop, name
+  one force that did work on the ball and one that did none, and tell me
+  how you know."
+  Then: "Point at the run where the coaster nearly failed. What was it
+  short of — height, or speed, or something else?"
+  A strong first answer says the normal force is perpendicular to the
+  motion and therefore does no work, which is exactly the condition D3.5
+  states, and the energy table never asks the question. A strong second
+  answer connects two sections of the report that students otherwise keep
+  apart: the energy account is about height, the loop condition is about
+  speed at the top, and it is the same joules being spent.
+  Record: one line per group on the checkpoint sheet.
+
+The product evidence is the analysis, handed in on Day 9.
+%%

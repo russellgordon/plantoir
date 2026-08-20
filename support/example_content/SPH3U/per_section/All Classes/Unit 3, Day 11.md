@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Report finished.
+- [ ] [[Specific Heat of a Metal]] analysis finished; it is handed in
+      next class.

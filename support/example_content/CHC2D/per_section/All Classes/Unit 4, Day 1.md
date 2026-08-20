@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Patriation, 1982: what changed and what was left unresolved
-2. [[Patriation, the Charter, and After]]
+1. First, and not marked: name three rights you think you have, and where they
+   come from. Your answers tell me where this unit starts
+2. Patriation, 1982: what changed and what was left unresolved —
+   [[Patriation, the Charter, and After]]
 3. The Charter's own timeline, including section 15 in 1985
 
 ## Things to do before our next class

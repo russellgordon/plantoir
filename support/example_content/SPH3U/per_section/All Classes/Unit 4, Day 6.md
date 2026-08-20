@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] [[Measuring the Speed of Sound]] report finished.
+- [ ] [[Measuring the Speed of Sound]] analysis finished, both methods
+      compared; it is handed in next class.

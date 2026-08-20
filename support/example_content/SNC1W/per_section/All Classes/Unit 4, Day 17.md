@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: one device, traced from the wall to the work it does
-2. Consolidation: a circuit designed on paper to a specification, then
+1. First fifteen minutes: yesterday's revision list, worked
+2. Warm-up: one device, traced from the wall to the work it does
+3. Consolidation: a circuit designed on paper to a specification, then
    built and measured
-3. Look ahead: the last unit is the biggest thing there is
+4. Look ahead: the last unit is the biggest thing there is
 
 ## Things to do before our next class
 

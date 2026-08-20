@@ -15,7 +15,9 @@ tags:
 3. Read together: [[Safety in the Lab]]
 4. How the course runs: [[How Physics Class Works]], [[How Marks Work]], and
    what we are aiming at — [[Learning Goals]]
-5. First motion: [[Walking a Graph]]
+5. First motion: [[Walking a Graph]] — nothing here is marked. I am
+   finding out what this class already reads into a graph, and the next
+   four classes are built on what you notice today
 
 ## Things to do before our next class
 

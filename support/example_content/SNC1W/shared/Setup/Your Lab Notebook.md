@@ -28,7 +28,12 @@ Date · Investigation title · Group members
 > settle patent disputes and safety investigations. The habits are the same at
 > every level: contemporaneous, unaltered, honest.
 
-## What earns full marks
+## What a good one looks like
 
 Not neatness. **Completeness and honesty** — including the trial that failed and
 what you did next.
+
+The notebook itself is not marked. What it does is make the seven marked
+[[Lab Reports]] possible: everything you write while the work is happening is
+what you have to write from afterwards, and the criterion about naming your
+limits honestly is more or less impossible without it.

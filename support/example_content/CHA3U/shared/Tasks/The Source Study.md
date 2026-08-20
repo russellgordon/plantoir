@@ -76,5 +76,41 @@ reach from here.
 
 ![[A1.3]]
 
+![[A1.8]]
+
 ![[B1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 6, the source study work period
+  Watch for: how many different sources a student opens before the bell.
+  The task allows them to write "I could not establish who made this",
+  and that is the honest move — but the easier move is to drop a source
+  that resists and start again, and a study handed in about a document
+  that gave itself up in five minutes reads exactly like one where the
+  student stayed and worked. You cannot see the three abandoned sources
+  in the finished 600 words. You can see them on Day 6.
+  Going well: still on the same document at the end of the period, with a
+  written list of what could not be established.
+  Stuck: a third source opened inside forty minutes; "it was too hard"
+  offered without being able to say which part was hard.
+  Record: a tick beside each name every time a new source is opened. The
+  tally is the whole record, and it takes no writing.
+
+TALK — Unit 1, Day 7, the source study conferences already on that agenda
+  Ask: "Which sentence in your source can you not explain?"
+  Then: "Why did this survive when so much else from the same place did
+  not — who kept it, and what did keeping it do for them?"
+  A strong answer treats the unexplained sentence as information rather
+  than as a gap, and can name an institution with a reason to preserve —
+  a company, a court, a parish, a state — which is emphasis and omission
+  operating at the level of the archive rather than the page. That is
+  A1.3 heard in conversation; a written study can borrow a purpose from a
+  catalogue record in one line, and this cannot be borrowed.
+  Record: one phrase per student on the class list, while they are still
+  in front of you.
+
+The product evidence is the study handed in on Day 8.
+%%

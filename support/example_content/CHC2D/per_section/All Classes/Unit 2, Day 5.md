@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Who relief did not reach: rules, status, and race
-2. Work period
+2. Work period: acting on the conference notes from last class
 3. Presentation preparation
 
 ## Things to do before our next class

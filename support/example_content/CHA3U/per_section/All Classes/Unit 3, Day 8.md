@@ -12,7 +12,7 @@ tags:
 
 1. Washington and Du Bois, argued from their own words rather than from summaries
 2. The NAACP, the Great Migration, and the segregation that awaited in the north
-3. Work period
+3. Work period: the weakest row you named on Day 6, and what your conference turned up
 
 ## Things to do before our next class
 

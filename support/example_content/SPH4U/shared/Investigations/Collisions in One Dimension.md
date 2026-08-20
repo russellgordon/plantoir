@@ -8,8 +8,10 @@ tags:
   - unit-2
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Groups of three.** Bring the energy question with
-> you: is kinetic energy conserved here?
+> **Time:** one class, written up in the next period and handed in at the
+> bell — the second of the marked [[Investigation Write-Ups]]. **Groups of
+> three at the track, write-up yours alone.** Bring the energy question
+> with you: is kinetic energy conserved here?
 
 Two carts on a track, magnets for elastic collisions and velcro for
 inelastic ones, and photogates or video for the speeds.

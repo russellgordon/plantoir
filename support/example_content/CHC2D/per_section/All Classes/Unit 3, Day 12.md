@@ -12,7 +12,7 @@ tags:
 
 1. Seminar: [[Who Gets to Tell the Story|Who Gets to Tell the Story?]]
 2. Whose accounts became the record
-3. Work period
+3. Work period: acting on the conference notes from last class
 
 ## Things to do before our next class
 

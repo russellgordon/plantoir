@@ -15,6 +15,8 @@ tags:
    seen, in ten minutes flat
 3. Consolidate: the four questions, in the order that saves the most
    time
+4. Exit ticket, not marked: which question you would ask first, and
+   what it costs you to ask it last
 
 ## Things to do before our next class
 

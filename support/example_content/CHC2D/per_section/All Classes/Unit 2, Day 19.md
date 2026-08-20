@@ -11,8 +11,10 @@ tags:
 ## Agenda
 
 1. Work period
-2. Peer reading: is the judgement's standard stated?
-3. Revision
+2. Peer reading: is the judgement's standard stated? Then your own draft
+   against the criteria: [[Judging Your Own Work]]
+3. Revision, acting on my conference notes from last class and on the row you
+   have just named as weakest
 
 ## Things to do before our next class
 

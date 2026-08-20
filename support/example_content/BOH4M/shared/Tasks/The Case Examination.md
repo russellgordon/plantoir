@@ -70,3 +70,60 @@ worked cases from the term — [[The Flat Structure]] and
 
 ![[E2.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Be honest about this one. A three-hour written paper, sat in silence
+under examination conditions, offers you no observation and no
+conversation, and there is no arrangement that would make it offer any.
+The thirty per cent is a product, deliberately and unavoidably.
+
+What that means in practice is that the observation and conversation
+below belong to the SEVENTY. They come from the three review classes,
+they are evidence of the same expectations, and if what you see there
+changes your view of a student it changes their term mark — not their
+examination mark, which is what is on the paper. Gather it anyway: for
+several students these are the last two conversations of the course, and
+Day 23 is the last day of the year on which a diagnosis is being made in
+front of you rather than posted to you.
+
+OBSERVE — Unit 4, Day 23, the first twenty minutes of the timed case
+  Watch for: what a student does before writing anything. Reading it
+  twice. Marking the case up. Writing three candidate problems and
+  choosing. Or a heading appearing at minute three and the answer being
+  discovered on the way down the page. Every paper you eventually mark
+  will start with a heading, and the ones that planned and the ones that
+  did not are indistinguishable at the top. That is D1.2 (apply different
+  problem-solving strategies to a variety of management planning
+  challenges), and the strategy is only ever visible in the twenty
+  minutes before the writing.
+  Going well: pen on the case rather than on the page; a crossed-out
+  first candidate.
+  Stuck: writing from minute one, or reading passively to the end and
+  then starting again.
+  Record: at minute twenty, one pass of the room and a P or a W beside
+  each name on the seating plan. Sixty seconds, and you will use it when
+  Day 24 asks them to practise the first twenty minutes deliberately.
+
+TALK — Unit 4, Day 23, the "comparing diagnoses" discussion already on
+  that agenda; take two named students per question rather than the room
+  Ask: "Before you read that case, what kind of organization were you
+  expecting — and where did it stop matching?" A strong answer can name
+  the assumption it walked in with and the sentence that broke it. That
+  is C1.3 (analyse how personal perception can influence the
+  interpretation of information and thereby affect the decisions an
+  individual makes), which is the one expectation on this task that a
+  written paper almost never shows you, because a paper reports the
+  conclusion and not the expectation it corrected.
+  Then: "What kind of strategic plan is this organization actually
+  running — growth, retrenchment, something else — and what in the case
+  told you?" A strong answer points at a sentence, usually one that is
+  not about strategy at all: a hiring freeze, a closed office, a new
+  region. That is D3.2 (describe the types of strategic plans used by
+  specific organizations).
+  Record: names in two columns on the day plan as you go. Over Days 23
+  and 24 you can reach most of the class.
+
+The product evidence is the paper, written in the examination period.
+%%

@@ -18,3 +18,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Finish the first section.
+- [ ] [[Ohm's Law and Resistance]] analysis drafted — graph, slope, and
+      the lamp.

@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Welcome — this class is a newsroom, and you are its founding team
-2. First warm-up ever: [[News or Not]] — six items, you make the call
+2. First warm-up ever: [[News or Not]] — six items, you make the call,
+   and I find out what this room already counts as news
 3. Read together: [[Our Newsroom Standards]] — we sign before we file
 4. Tour of the site: [[Using This Site]] and [[How This Site Is Organised]]
 5. The rhythm we run on: [[How the Newsroom Runs]] — standup to file-and-log

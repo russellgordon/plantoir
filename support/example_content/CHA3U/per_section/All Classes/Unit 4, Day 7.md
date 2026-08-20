@@ -17,3 +17,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Draft the public-facing piece.
+- [ ] Bring a legal fact and a lived one for the seminar next class, both sourced.

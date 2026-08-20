@@ -10,10 +10,12 @@ that is what these tasks are. Not exercises to be marked and filed:
 real coverage, with real readers at the other end of every byline.
 
 Each task page publishes its success criteria before you start,
-phrased as things a reader or an editor could see. Process, standards,
-and deadlines all count — [[How Marks Work]] explains how, every
-criteria table honours [[Our Newsroom Standards]], and everything
-traces back to our [[Learning Goals]].
+phrased as things a reader or an editor could see — and those criteria
+describe the published work, never the person who made it.
+[[How Marks Work]] explains where the four beats and
+[[Publication Day]] sit in your mark, every criteria table honours
+[[Our Newsroom Standards]], and everything traces back to our
+[[Learning Goals]].
 
 ## The five beats
 

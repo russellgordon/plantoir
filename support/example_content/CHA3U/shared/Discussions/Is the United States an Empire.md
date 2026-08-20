@@ -48,6 +48,8 @@ same country behaved very differently in different regions and periods, and
 a defensible answer may be "empire here, in these years, on this criterion"
 — which is a conclusion, not a fence to sit on, provided you name the years.
 
+The criteria are the same five as last time — [[The Four Seminars]].
+
 Read [[Foreign Policy and Its Justifications]] before you come, and note
 that Canada's own position in this argument is a source too — but bring
 evidence for it, as [[Our Working Agreement]] requires. The seminar leads

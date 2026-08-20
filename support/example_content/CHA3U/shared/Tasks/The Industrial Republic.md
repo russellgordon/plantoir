@@ -41,6 +41,22 @@ A **document set** of five to eight sources you located yourselves, each
 with a one-line note on what it is evidence of, and a **ten-minute
 presentation** built on those documents rather than on a summary of them.
 
+The presentations run in rounds on the hand-in day: two pairs at a time,
+twice over, so that everybody presents inside one period and everybody is an
+audience twice. Ten minutes to four people is still ten minutes.
+
+## What is marked as yours
+
+You work in pairs and you are marked individually — there is no shared
+mark on this task. Split the five questions between you, in writing, at the
+start, and put your initials against each source in the set: those sources
+and those one-line notes are yours. In the presentation you take five of the
+ten minutes, on the questions you researched. And the conference in the week
+before it is with each of you separately, on your own half.
+
+Divide the questions; do not divide the thinking. You are each expected to
+be able to answer for the whole case.
+
 ## How it is marked
 
 | Criterion | What earns the marks |
@@ -75,3 +91,45 @@ warnings on both pages before you rely on them.
 
 ![[D2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Done in pairs, so the conversation is also how you get the INDIVIDUAL
+evidence the mark needs. Ask each partner on their own, never across the
+pair.
+
+OBSERVE — Unit 3, Day 3, the research period after the photographs lesson
+  Watch for: what gets given up when a figure will not come. There are two
+  moves and they cost very different amounts. Loosen the CLAIM — "wages
+  were low" instead of a wage — or loosen the SCOPE, quietly letting one
+  city become "American cities". A document set of eight sources looks
+  equally complete after either, and by the presentation nobody can tell
+  which happened.
+  Going well: the claim narrows to exactly what one published table
+  supports — one mill, one year — and the city survives.
+  Stuck: a round number with no publisher attached; or "we'll just do steel
+  in general", said quietly, twenty minutes in.
+  Record: initials and one word on the day plan, claim or scope. It takes
+  the length of a lap of the room.
+
+TALK — Unit 3, Day 7, the conferences already on that agenda
+  Ask each partner separately: "Your wage figure is per what — per hour,
+  per day, per piece? And what did that buy in that city, in that year?"
+  Then: "Is that one job, or the whole plant averaged together? If it is an
+  average, who is inside it?"
+  A strong answer turns the number into something a person could live on or
+  could not, and then notices that an average across a plant conceals the
+  very differential the second question of this task is about. D1.2 asks for
+  economic developments to be explained and SOME OF their causes and
+  consequences analysed; a figure on a slide is not an explanation, and a
+  pair can present one competently without either of them being able to say
+  what it means.
+  Record: one line per STUDENT, not per pair — that is the point of asking
+  them separately.
+
+The product evidence is the document set handed in on Day 9, and the
+presentations, which run in rounds that same period — you are moving between
+four groups at once, which is another reason not to try to gather anything
+else on that day.
+%%

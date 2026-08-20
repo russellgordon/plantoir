@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. [[Modern Physics Seminar]], day 3 — working period: the calculation you will
-   do live, rehearsed until it is clean
-2. The brief drafted against [[Writing About Physics]]
+1. First ten minutes: whatever yesterday's conference sent you back for
+   — usually the source, occasionally the whole choice of moment
+2. [[Modern Physics Seminar]], day 3 — working period: the calculation you
+   will do live, rehearsed until either of you can run it from the physics
+   rather than from memory
+3. The brief drafted against [[Writing About Physics]]
 
 ## Things to do before our next class
 

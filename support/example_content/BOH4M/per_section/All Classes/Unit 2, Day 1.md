@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Retrieval: three questions from Unit 1, no notes
-2. Activity: the same instruction given four ways — which would you have followed?
+2. Diagnostic activity, so I know what this class already believes about leading: the same instruction given four ways — which would you have followed, and why? You write your answer before we talk, I keep them, and nothing here is marked
 3. Naming it: [[Personality and Behaviour]]
 
 ## Things to do before our next class

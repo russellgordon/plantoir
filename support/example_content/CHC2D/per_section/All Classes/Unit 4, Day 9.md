@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. The economy since 1982: agreements, regions, and work
-2. Work period
+2. Work period: acting on the conference notes from last class
 3. Conferences
 
 ## Things to do before our next class

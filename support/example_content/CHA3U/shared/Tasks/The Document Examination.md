@@ -78,3 +78,50 @@ testing.
 
 ![[E2.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+An examination is three hours of silence in which you are invigilating, so
+none of the evidence below can be gathered on the day. The three review
+periods are the only place it exists, and they are timetabled — Days 20, 21
+and 22 of Unit 4 — which makes this the one task in the course where the
+observation has to be planned a fortnight ahead or it does not happen.
+
+OBSERVE — Unit 4, Day 20, the unseen document set worked against the clock
+  That day's agenda tells everyone to establish provenance, so everyone
+  does: a neat header on each document with maker, date and audience. Watch
+  for something else — whether that header does any WORK once they start
+  answering. When a student reaches a claim, do they reach back to who made
+  the document, or read them all as though they were equally disinterested?
+  The header is on the script either way, which is why the script cannot
+  tell you this and the room can.
+  Going well: a provenance note referred back to at the moment two
+  documents conflict — out loud, or by an arrow drawn on the page.
+  Stuck: complete and correct provenance on every document, followed by an
+  answer that weighs none of them differently.
+  Record: two columns on the day plan, used or parked. It is the best
+  predictor of the examination mark you will see all term, and it arrives
+  early enough to do something about.
+
+TALK — Unit 4, Day 20, the same period, during "comparing readings
+afterwards"
+  Ask: "You have just worked that set against the clock. Which document did
+  you read twice, and what sent you back to it?"
+  Then: "One of these was made years after the events it describes. Does
+  that make it worse evidence, or different evidence?"
+  A strong first answer names a hinge — a date that would not fit, a figure
+  that contradicted another, a phrase that assumed something the student
+  did not know — rather than "it was the hard one". A strong second answer
+  refuses the word worse, and says what a retrospective account is good
+  evidence OF: the moment it was made as much as the moment it describes.
+  A1.4 asks for evidence to be interpreted and analysed using tools,
+  strategies and approaches appropriate for historical inquiry, and a
+  reading strategy is precisely that. A script shows you the conclusions
+  and never the route to them.
+  Record: initials and the number of the document they went back to.
+  Patterns across the class tell you which review dossier to use next.
+
+The product evidence is the examination script itself, and it is the only
+part of this task that arrives without being planned for.
+%%

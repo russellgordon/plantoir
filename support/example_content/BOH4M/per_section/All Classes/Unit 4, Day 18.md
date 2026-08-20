@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Day 5 of 8: checkpoint conferences with me, twelve minutes per team
+1. Day 5 of 8: checkpoint conferences with me, twelve minutes per team; every team leaves with the findings it has to redraft, and tomorrow opens with that
 2. Teams not in conference: testing each other's findings
 3. The hardest question another team can ask you
 

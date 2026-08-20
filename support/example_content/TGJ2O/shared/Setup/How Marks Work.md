@@ -4,50 +4,147 @@ publish: true
 created: __CREATED__
 tags:
   - setup
+enableToc: true
 ---
 Marks in this course worry people for one wrong reason: the belief that
 some people are "naturals" — born writers, born photographers — and
-the rest should hold the tripod. No such split exists — reporting,
-shooting, editing, and designing are learned crafts, and you are
-marked on **process, growth, and communication**, all inside your
-control.
+the rest should hold the tripod. No such split exists. Reporting,
+shooting, editing, and designing are learned crafts, and you are marked
+on what your work does for a reader.
 
-## Where evidence comes from
+## The seventy and the thirty
+
+Every Grade 10 credit in Ontario is built the same way. Seventy per
+cent of your mark comes from work spread across the whole semester, and
+it leans towards your **most recent and most consistent** work rather
+than averaging September against January — a reporter is judged on the
+beat they are filing now, not the one they filed in week two. The other
+thirty per cent comes from a final evaluation at the end of the term.
 
 ```mermaid
-pie title Where evidence comes from
-    "Published work and tasks" : 45
-    "Quizzes and check-ins" : 20
-    "Dev Journal and reflection" : 20
-    "Daily practice and collaboration" : 15
+pie title Where your mark comes from
+    "The term's four beats" : 70
+    "Publication Day" : 30
 ```
 
-**Published work** is the pages in Tasks — each lists its success
-criteria before you start, phrased as things a reader could see. A
-flashy package with unverified names scores lower than a modest one
-that is accurate, consented, and credited, because
-[[Our Newsroom Standards|standards]] are most of the craft.
+**The seventy** is the four beats you file during the term, in the
+order you meet them: [[Your First Byline]], [[The Athletics Package]],
+[[The Investigation]], and [[The Front Page]]. They are not equally
+weighted. [[The Investigation]] runs four weeks and asks for everything
+at once, so it carries the most; [[Your First Byline]] is the shortest,
+because it is the rehearsal that makes the other three possible. Ask me
+for the exact split whenever you want it — it is not a secret, it is
+just not the useful thing to memorise.
 
-**Quizzes** are short, frequent, low-stakes, and re-attemptable after
-new learning — they exist to find out what needs work, not to close the
-book on it.
+**The thirty** is [[Publication Day]]: the term's work published across
+all four channels, the portfolio you select from it, and the two
+minutes you spend standing beside one piece telling invited readers
+what it is and what it took. It lands with eight classes of term still
+to run, deliberately — so that the corrections, the portfolio, and the
+reading-back all still have somewhere to go afterwards.
 
-**Reflection** is your [[Newsroom Journal]]. It is where a spiked
-story or a blurry contact sheet turns into evidence of learning —
-often the strongest evidence you have.
+## Four kinds of judgement, not one
 
-**Daily practice** is the small stuff done consistently: warm-up
-judgement calls, fair teamwork on shoots, deadlines kept, the edit
-that made a teammate's story better.
+Every beat asks for more than one of these, and the balance shifts with
+the beat. A publishable story is never only one of them.
+
+| What is being judged | What it means at this desk |
+| --- | --- |
+| What you know | Terms, tools, how a message travels to a reader |
+| How you think | News judgement, verification, and what to cut |
+| How you communicate | The story, the photograph, the page, your talk |
+| Where you apply it | A beat nobody has walked you through first |
+
+The fourth is why [[The Investigation]] exists. Anyone can cover the
+game they were told to cover; this course is asking whether you can
+answer a question nobody has answered in front of you.
+
+## Three kinds of evidence, and two of them are not paper
+
+**What you make** is the obvious one: stories, photographs, cuts,
+pages, cards. **What I watch you do** is the second: whether a crew
+logs its cards before anything is edited, what you do in the first two
+minutes after an edit note lands, whether you reopen the recording or
+work from what you remember hearing. **What you tell me** is the
+third — the conferences already on the schedule are not progress
+checks, they are evidence in their own right, and some of what you
+understand will only ever show up there.
+
+If your package is unfinished and you are quiet, the conference is
+often where the strongest evidence of the day comes from. That is not a
+consolation prize. It is how the mark is meant to work.
+
+## What is not in your mark
+
+How you work is reported separately, in its own column on the same
+report card, as **E, G, S or N** — six habits: responsibility,
+organization, independent work, collaboration, initiative, and
+self-regulation. They matter, we will talk about them often, and they
+do not move your percentage. The mark is about the work; that column is
+about the worker, and mixing the two tells you less about both.
+
+Your own judgement of your work, and your classmates', are not part of
+your mark either. You will judge your own work against the criteria
+constantly — [[Judging Your Own Work]] is how — because it is the
+fastest way to get better. The mark itself is mine to determine, from
+evidence.
+
+Your [[Newsroom Journal]] is **not marked**. It is collected each unit,
+I read every page and write back, and nothing in it moves your
+percentage — which is exactly what makes it usable. An honest entry
+about a spiked story is worth more to both of us than a performed one,
+and you will only risk the honest one if it cannot cost you anything.
+The same goes for your [[Final Reflection]] at the end: it is the
+record you keep, not a paper I grade.
+
+### Where the curriculum itself names a habit
+
+There is one narrow exception, and this course genuinely has it. Two
+places in the curriculum name work habits outright:
+[[A3.3|the teamwork expectations]] ask you to describe *and use* the
+techniques that make a team work, and
+[[D2.4|the work-habits expectation]] asks you to show that you
+understand the habits this industry runs on. What is marked there is
+what you can name, use, and explain — the technique you used to settle
+a disagreement over which frame runs, the reason a producer confirms
+call times in writing. It is not a report on whether you are generally
+reliable. That is still the E/G/S/N column.
+
+### Deadlines, honestly
+
+A deadline here is a property of the product, not a comment on your
+character. A recap filed a week after the final whistle is not a
+recap — timeliness is the first of the tests in [[News Values]], which
+is why [[The Athletics Package]] is judged partly on whether the story
+reached readers while the result still mattered. What is being judged
+is the published thing, and whether you used a schedule to get it
+there. That second half is a curriculum expectation of its own —
+[[B1.2|time-management tools, used so deadlines are met]] — and a
+real, teachable skill. Whether you are generally punctual is
+Responsibility, and it lives in the other column.
+
+## Where the feedback lands
+
+Every beat has a checkpoint before it is due — a conference at your
+desk, a peer edit under [[Our Newsroom Standards]], a fact-check
+clinic, a pin-up another desk writes three notes on, a proof read by
+somebody who did not write the page — and desk time afterwards, the
+same period or the next one, whose stated job on the class page is
+acting on what the checkpoint found. That is not a
+courtesy. It is the only reason handing a first draft to anyone is
+worth doing, and the version I evaluate is the one that came out the
+far side.
 
 > [!important] First drafts are never penalised as first drafts
 > Version one of everything gets edited — that is what editors are
-> for. The mark follows where your work ends up and how visibly you
-> got there; the journal and your revision notes are how "visibly"
-> happens.
+> for. The mark follows where your work ends up, not where it
+> started. Your revision notes are the record of that distance, and
+> your journal is where you keep it for yourself.
 
-If a mark ever surprises you, ask — the criteria on each task page are
-the whole story, and [[Getting Help]] lists the ways to reach me.
+Each beat publishes its success criteria before you start, phrased as
+things a reader or an editor could see. If a mark ever surprises you,
+ask — those criteria are the whole story, and [[Getting Help]] lists
+the ways to reach me.
 
 %%curriculum-start%%
 ## Curriculum connection

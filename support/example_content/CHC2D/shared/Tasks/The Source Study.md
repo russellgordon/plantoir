@@ -57,3 +57,44 @@ on [[Where the Records Live]].
 
 ![[B1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 6, the source study work period
+  Watch the ORDER, not the output. A student who finds out who made the
+  thing and why before deciding what it means is doing the work; a student
+  who reads it once, forms the point, and then goes looking for a
+  provenance to attach to the point they already have is not. The finished
+  write-up presents these in the order the task asks for either way, so the
+  page cannot tell you which happened. Twenty minutes in the room can.
+  Going well: the catalogue record or the finding aid is open before the
+  highlighter comes out; somebody says out loud "I do not know who made
+  this yet".
+  Stuck: a conclusion written in the first five minutes and the rest of the
+  period spent supporting it.
+  Record: three columns down your class list — provenance first, content
+  first, needed prompting. One pass round the room.
+
+TALK — Unit 1, Day 7, the source study conferences on that agenda
+  Ask: "If I told you this was made five years later than you think, which
+  sentence of yours would have to go?"
+  Then: "What would the person who made this say you had got wrong about
+  them — and would they have a point?"
+  Do not ask what second source would check it (item 5 of the task) or why
+  this one survived (the concept page from Day 2). Both answers are already
+  written down where they can see them.
+  A strong first answer names one claim that rests on the date and defends
+  the rest; a weak one says the whole thing would change, which means
+  nothing in it was pinned to anything. A strong second answer finds the
+  line where the student stopped describing the source and started judging
+  it, and can hold both at once — "they would say I have missed what it was
+  for, and on that they would be right". Both are A1.3 heard aloud:
+  credibility judged from the perspective and purpose of the source and
+  from the values of whoever made it. The provenance paragraph will be in
+  the write-up because the criteria table asks for it; this is how you find
+  out whether it was a judgement or a form filled in.
+  Record: one line each in the margin of your class list.
+
+The product evidence is the 600 words handed in on Unit 1, Day 8.
+%%

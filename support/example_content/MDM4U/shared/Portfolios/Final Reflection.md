@@ -6,8 +6,9 @@ tags:
   - portfolio
 ---
 The final reflection is the last piece of writing in this course: one
-sustained look **across** your whole [[Math Journal]], written in the
-final week. Every other entry looked at a single day. This one reads
+sustained look **across** your whole [[Math Journal]], written in
+class on Unit 4, Day 18, and handed in with the journal at the end of
+that period. Every other entry looked at a single day. This one reads
 the entire record and answers the only question a course can really
 be measured by: *what do you leave with that you did not arrive
 with?*

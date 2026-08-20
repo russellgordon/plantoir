@@ -12,8 +12,9 @@ tags:
 
 1. Warm-up: the mass spectrometer, derived on the board
 2. Practise: [[Fields Practice]] to the end
-3. Launch: [[Fields Technology Report]] — one technology, one field, one
-   honest account
+3. [[Fields Technology Report]], day 2 — the six rows it is marked
+   against, read down together, then your technology defended to me in
+   one sentence
 
 ## Things to do before our next class
 

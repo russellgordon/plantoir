@@ -4,11 +4,13 @@ publish: true
 created: __CREATED__
 tags:
   - tasks
+  - final-evaluation
 enableToc: true
 ---
 > [!abstract] At a glance
-> The whole class, across the last two days · six minutes to present,
-> three to be questioned · every person critiques three investigations
+> Unit 4, Days 16 and 17 · six minutes to present, three to be
+> questioned · every person critiques three investigations, in writing,
+> in the period
 
 ## What you are making
 
@@ -62,11 +64,26 @@ holding the sheet.
 
 ## How it is assessed
 
-Per [[How Marks Work]], your presentation is marked on whether an
-outsider could follow the argument and whether your claims stayed
-inside your evidence — not on polish, and certainly not on nerve. Your
-three critique sheets are marked on specificity and usefulness. The
-authors read them, so write what you would want to receive.
+This day is part of the final evaluation — the thirty per cent
+[[How Marks Work]] describes, alongside [[The Final Examination]] —
+which is why it sits at the end of the course and asks for everything
+at once. The written report itself was handed in on Day 15 and belongs
+to the semester's work; what is evaluated here is the defence of it
+and the critiques you write of other people's.
+
+Your presentation is marked on whether an outsider could follow the
+argument and whether your claims stayed inside your evidence — not on
+polish, and certainly not on nerve. Your three critique sheets are
+marked on specificity and usefulness, and they are written here, in
+the period, while the presentation is fresh.
+
+Two things follow from that, and both matter. **Nothing a classmate
+writes about your work affects your mark** — the sheets are evidence
+about the person who wrote them, not a rating of the person who
+received them. And **if your investigation was a pair, you still
+present alone**: six minutes each, your own three minutes of
+questions, your own critique sheets. The authors read the sheets, so
+write what you would want to receive.
 
 ## Success criteria
 
@@ -88,11 +105,64 @@ authors read them, so write what you would want to receive.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[E2.1]]
-
 ![[E2.2]]
 
 ![[E2.3]]
 
 ![[E2.4]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Be straight about the two symposium days: you are running the room,
+timing six-minute slots, and there are guests in it. Do not plan to
+gather observation evidence while doing that. The critique sheets and
+the presentations are strong product evidence on their own, and the
+two prompts below are where the rest of it is actually reachable.
+
+OBSERVE — Unit 4, Day 13, the gallery of graphs critiqued by the room
+  This is the only period before the symposium where students critique
+  each other's mathematical work out loud with you free to circulate,
+  so it is where E2.4 — critique the work of others in a constructive
+  manner — can be watched rather than only read. Be clear about what
+  this prompt is for: the critique sheets are strong product evidence
+  and the criteria table already marks them on specificity, so what
+  you gather here CORROBORATES them rather than replacing them. Its
+  real value is timing. It arrives three classes before the sheets are
+  written, so you can still change what somebody hands in.
+  Listen for who the critique is addressed to. The weaker kind is
+  addressed to the rules — the axis does not start at zero, the caption
+  is missing. The stronger kind is addressed to a reader — somebody who
+  has not seen your data would come away thinking the gap is four times
+  bigger than it is. It is also where you find the student whose spoken
+  critique is far better than anything they will write down, which the
+  sheets alone would report as weakness.
+  Going well: a critique that names what the reader would conclude, and
+  offers a change.
+  Stuck: a verdict with no reader in it, or a rule quoted back.
+  Record: circulate with the class list and put a plus, a dot, or
+  nothing beside each name as you pass. The dots and blanks are who to
+  stand near on Day 16.
+
+TALK — Unit 4, Day 15, at the last conference already on that agenda
+  Two questions, while the reports are being assembled:
+  "Who in this room is most likely to disagree with your conclusion,
+  and what will they say?"
+  "You have six minutes and room for one graph. What did the other
+  graphs lose to it?"
+  A strong first answer names an actual classmate's study whose data
+  pulls the other way, says what the objection would be, and says how
+  they would answer it — that is E2.3's respond to critiques, heard a
+  day before the room does it live, and it is the single best predictor
+  of how the three minutes of questions will go. A strong second answer
+  talks about what the audience needs in order to follow the argument
+  rather than about which graph took longest to make, which is E2.2
+  choosing a summary for a specified length of time.
+  Record: two words per student against the presentation running order
+  — for the first answer, the name they gave; for the second, audience
+  or effort.
+
+The product evidence is the presentation itself and the three critique
+sheets, and both arrive on the day.
+%%

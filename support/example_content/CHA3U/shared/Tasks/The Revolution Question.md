@@ -75,3 +75,38 @@ instincts already. For the shape of the essay, see
 
 ![[B3.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 18, the working period, while the counter-argument is
+being drafted
+  Watch for: what happens when the hard objection is actually put to a
+  student — by you in passing, or by whoever is sitting next to them. Two
+  things can follow. The objection goes into the draft, or the claim
+  quietly widens until the objection no longer touches it. The criteria
+  require a counter-argument, so the finished essay will contain one either
+  way, and it will be presented as the strongest available. Nothing on the
+  page can tell you whether a harder one was in the room an hour earlier.
+  Going well: the claim gets NARROWER and the objection stays hard.
+  Stuck: a redefinition offered as an answer — "that's not really what I'm
+  saying" — after which the thesis means less than it did.
+  Record: two columns on the day plan, took it or moved the claim. Put the
+  objection to at least half the room; it is a thirty-second intervention.
+
+TALK — Unit 1, Day 17, the conferences on claims that are not yet arguable
+  Ask: "Who alive in 1776 would be most annoyed by your claim, and what
+  would they say first?"
+  Then: "If they said that, which document would you reach for?"
+  A strong answer produces somebody from the period with an interest — a
+  Loyalist printer, a Mohawk council, a merchant with debts in London, a
+  woman with property she could not hold in her own name — rather than a
+  modern sceptic, and their first move is one the record actually
+  preserves. B1.4 asks for the significance of the political changes to be
+  assessed for DIFFERENT GROUPS, and a student who can only imagine a
+  present-day objector has an opinion about the Revolution rather than a
+  perspective on it. The essay cannot show you the difference.
+  Record: initials and the name of the objector they produced, one line.
+
+The product evidence is the argument handed in on Day 19.
+%%
