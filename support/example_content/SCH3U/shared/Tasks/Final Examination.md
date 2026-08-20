@@ -100,3 +100,48 @@ nor one investigation decides your grade alone.
 
 ![[F3.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+The examination room hands you paper and nothing else, and that is
+correct: it is the one piece of evidence in the course that is
+unambiguously one student's. So this prompt does not point at the
+examination at all. It points at the four review classes in front of it,
+which are the last days anything you notice can still change how
+somebody prepares.
+
+OBSERVE — Unit 5, Day 15, the mole map redrawn from memory
+  Watch for: what is written ON the arrows. A map whose arrows are bare
+  is a picture of the relationships; a map with molar mass on one arrow,
+  Avogadro's number on the next and molar volume on the third is the
+  relationships themselves. Both look like a map from across the room,
+  and on the examination the first one becomes a route the student
+  cannot actually walk. Watch also who opens their September journal to
+  compare, and who leaves it shut because they would rather not know.
+  Going well: labelled arrows, and a hand going to the old version.
+  Stuck: four boxes and four arrows, drawn quickly and confidently;
+  a September page never opened.
+  Record: three columns — arrows labelled, boxes only, did not try it
+  from memory. That is D3.2 in the one form a written answer rarely
+  shows you, and the third column is who to find on Day 18.
+
+TALK — Unit 5, Day 18, at the individual conferences already on that
+agenda, data booklet closed
+  Ask: "Take the ideal gas law and hold two of the four things still.
+  Which of the laws you have met comes back out — pick one and do it out
+  loud."
+  Then: "A gas is squeezed into half the space. Before any arithmetic,
+  is the answer bigger or smaller, and how do you know without
+  calculating it?"
+  A strong answer derives rather than recites, and reasons about the
+  direction before the number. That is F3.5, and Part B of this paper
+  will show you the arithmetic without ever showing you whether the
+  relationship underneath it was understood or memorised. It is also the
+  last conversation of the semester, which is worth knowing while it is
+  happening.
+  Record: one line each, and which law they reached for first.
+
+The product evidence is the paper itself, written in the examination
+period.
+%%

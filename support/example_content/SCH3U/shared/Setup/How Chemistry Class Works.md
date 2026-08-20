@@ -83,7 +83,9 @@ where the next unit starts fresh. Say something early.
 
 Turn up, bring your data, argue with each other, and say when you do not
 follow something. The last one is the only one people find hard, and it
-is the one that changes your mark most.
+is the one that changes what you learn most. It is not itself part of
+your mark — how you work is reported separately from what your work
+shows, and [[How Marks Work]] explains where the line falls.
 
 > [!note] Missing a class
 > Read the class page — the agenda links everything we used, so you can

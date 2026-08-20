@@ -202,3 +202,43 @@ Wider context and the discussion this connects to:
 
 ![[C2.4]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 9, the working period where the predictions are
+written down before any bench time
+  Watch for: the ORDER. A student who classifies the reaction first and
+  lets the products follow from the pattern is doing C2.4; a student who
+  writes a plausible product and then attaches a reaction type to it has
+  produced a page that reads identically. The finished prediction page
+  cannot tell you which happened, and the two students need different
+  things from you next week.
+  Going well: the reaction type circled, named, or said out loud before
+  a product appears on the page; a formula checked for charge balance
+  after the pattern is applied.
+  Stuck: products first, type appended; or a product with an impossible
+  charge that never gets checked.
+  Record: two columns on your day plan — type first, product first.
+  Star anyone who catches their own charge-balance error, which is the
+  strongest thing you will see all period.
+
+TALK — Unit 2, Day 11, the working period on where prediction met
+observation
+  Ask: "Your process ran for years before anybody treated that
+  by-product at all. What changed — a law, a cost, or somebody
+  complaining?"
+  Then: "Suppose the treatment worked twice as well from tomorrow. What
+  would still be left over, and who would still not be satisfied?"
+  Both questions work whichever process they chose. A strong answer
+  names a driver outside the chemistry, and knows that a treatment moves
+  material into another form rather than making it go away. That is C1.2
+  — assessing the effectiveness of an application that addresses a
+  social or environmental problem — heard rather than read, and a
+  briefing note can be assembled out of a company's own wording by
+  somebody who has understood neither half.
+  Record: one line each, and whether they got past "it is removed".
+
+The product evidence is the briefing note, the equations appendix and
+the prediction page, handed in on Day 12.
+%%

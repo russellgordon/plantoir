@@ -155,6 +155,11 @@ open. If you cannot find a reliable figure, **write that you could not**
 **2. A one-page section on Part 2**, connecting your bench arithmetic to
 the setting you researched.
 
+You run the reaction with a partner and the masses are shared data.
+**The ranked analysis of the gap is written by you alone**, and so is
+Part 2 — those are the parts your individual mark rests on, together
+with what I see and hear at your bench.
+
 > [!important] A yield over 100% is information, not an error to hide
 > If your recovered mass exceeds the theoretical yield, **report it**,
 > and treat it as the most interesting result on your page. It is not
@@ -230,3 +235,48 @@ The arithmetic: [[Limiting Reagent and Yield]] and
 
 ![[D2.7]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+The bench day is the richest observation in the course. A percentage
+yield is one number, and it arrives with no record of how it was got.
+
+OBSERVE — Unit 3, Day 14, the bench period: run, filter, dry, weigh
+  The task already asks them to report whether they reached constant
+  mass, so two weighings and one are different rows in the table. What
+  you are gathering here is the corroboration — the ground truth for
+  reading those rows, and the pair whose table will claim constant mass
+  without it.
+  Watch for: the INTERVAL between the two weighings. Two masses taken
+  thirty seconds apart agree because nothing had time to leave, not
+  because the drying finished, and on the page they look exactly like
+  two taken ten minutes apart with a cooling stop between. Watch too for
+  warm ceramic going onto the balance pan — the rising air drags the
+  reading low and the pair has no way of knowing it did.
+  Going well: the crucible left on the mat while they do something else,
+  then weighed again; the two masses compared out loud before either is
+  called final.
+  Stuck: both weighings inside a minute; a hand reaching for the balance
+  straight off the hotplate; a second weighing skipped because the first
+  one "looked right".
+  Record: your class list with three columns — cooled between weighings,
+  weighed twice back to back, weighed once. Carry that list to the
+  marking: column three should be reporting that constant mass was not
+  reached, and any table in column two claiming it was is worth a
+  conversation.
+
+TALK — Unit 3, Day 15, the working period on the account of the gap
+  Ask: "Your bench was out by that much. Now run the same reaction for a
+  tonne of product — what stays the same, and what stops being
+  tolerable?"
+  Then: "In the setting you researched, who finds out first that the
+  number was wrong, and how do they find out?"
+  A strong answer scales the error rather than repeating it, and names a
+  person or a monitoring step rather than "the environment". That is
+  D1.2 heard, and the researched paragraph can be assembled from an
+  agency page by somebody who could not do either.
+  Record: one line per student, and the scale they reasoned at.
+
+The product evidence is the lab report, handed in on Day 16.
+%%

@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Investigation: [[Measuring a Gas Law]] — volume against pressure, then heat
+1. Investigation: [[Measuring a Gas Law]] — volume against pressure, then
+   heat. Nothing today is marked: what you can already say about the two
+   shapes is where this unit starts
 2. Plot as you go, in pencil — the shape matters more than the points do
 3. Compare shapes across the room: one curve, one straight line, and why
 4. Say in words what each graph claims, before any law is given a name

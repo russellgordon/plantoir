@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Bench rules first, and we mean them: [[Lab Safety and WHMIS]]
-2. Investigation: [[Sorting the Elements]] — twenty cards, your own order
+2. Investigation: [[Sorting the Elements]] — twenty cards, your own order.
+   Nothing today is marked: your order is how I find out what this room
+   already believes about the table
 3. Defend your arrangement to a group that ordered them differently
 4. What the semester asks: [[How Chemistry Class Works]], [[Learning Goals]]
 5. Finding anything again later: [[Using This Site]]

@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Investigation: [[Sorting Five Reactions]] — run all five, record everything
+1. Investigation: [[Sorting Five Reactions]] — run all five, record
+   everything. Not marked: the families you invent tell me which of the
+   five this room can already tell apart
 2. Sort them into families of your own making, and name your families
 3. Defend your sort to a group who built different families
 4. Write a word equation for each before you leave the bench
