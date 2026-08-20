@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Journal: what you would tell yourself before the next naming test.
+- [ ] Journal: what you would tell yourself before the next naming
+      checkpoint.

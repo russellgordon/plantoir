@@ -10,8 +10,8 @@ tags:
 Practice, with the answer to each question folded up underneath it.
 
 These are not marked, not counted, and not collected. Ever. They are how
-you find out whether you understood something before a test tells you
-that you did not.
+you find out whether you understood something before a checkpoint — or
+the examination — tells you that you did not.
 
 > [!tip] How to use these pages
 > Answer the question **first**, on paper, all the way to a number with
@@ -89,8 +89,8 @@ Each set ramps. The first questions are routine and the last ones are
 not, and somewhere near the end of every set is a question asking you to
 say what is wrong with somebody else's answer. Those are the ones worth
 doing slowly — finding the flaw in a plausible piece of reasoning is the
-skill the tests are actually built around, and it is also what you will
-be doing to your own lab data all year.
+skill the examination is actually built around, and it is also what you
+will be doing to your own lab data all year.
 
 Two habits that Grade 12 rewards and Grade 11 did not need:
 

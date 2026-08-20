@@ -288,8 +288,8 @@ is the most common place a logarithm quietly destroys precision. See
     worth having. A rule you cannot say the limits of is worth much
     less.
 
-Where this goes next: [[Le Châtelier's Principle]] names what you have
-just watched and states it precisely enough to be wrong about,
+Where this goes next: [[Le Chatelier's Principle|Le Châtelier's Principle]]
+names what you have just watched and states it precisely enough to be wrong about,
 [[Reading an Equilibrium Table]] is what you need before trusting a
 booklet value, and [[Acids and Bases]] takes the Part 2 measurement
 somewhere much bigger. More ICE tables than you want:

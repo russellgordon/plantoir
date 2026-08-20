@@ -13,9 +13,10 @@ reaction that ran to completion and released heat. That was the Grade 11
 account, and it was good enough to get a number out of a thermometer.
 
 It is not good enough any more. Everything in
-[[Dynamic Equilibrium]] and [[Le Châtelier's Principle]] applies to acid
-solutions, and once it is applied, the two-line definition you learned
-last year turns out to be describing a special case.
+[[Dynamic Equilibrium]] and [[Le Chatelier's Principle|Le Châtelier's Principle]]
+applies to acid solutions, and once it is applied, the two-line
+definition you learned last year turns out to be describing a special
+case.
 
 ## What changed since Grade 11
 
@@ -139,8 +140,8 @@ $$K_w = [\ce{H3O+}][\ce{OH-}] = 1.0 \times 10^{-14}$$
 That value holds **at 25 °C**. The temperature is not decoration, and it
 belongs in the sentence every time you quote the number. $K_w$ is an
 equilibrium constant, and by
-[[Le Châtelier's Principle]] the only thing that changes an equilibrium
-constant is temperature — so $K_w$ at 50 °C is a different number.
+[[Le Chatelier's Principle|Le Châtelier's Principle]] the only thing that
+changes an equilibrium constant is temperature — so $K_w$ at 50 °C is a different number.
 
 Because the product is fixed, the two concentrations are locked
 together: push one up and the other must come down. There is hydroxide

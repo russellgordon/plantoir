@@ -62,10 +62,10 @@ form to fill in, and what finally worked was writing down what each row
 physically meant before putting a number in it."
 
 > [!important] This is the entry I read first
-> If you are short of time at the end of the semester, put it here. A
-> thin journal with a sharp final reflection tells me more than a thick
-> one that stops at description — and [[Journal Checklist]] weights it
-> accordingly.
+> If the twenty minutes is tight, put them here rather than anywhere
+> else. A thin journal with a sharp final reflection tells me more than
+> a thick one that stops at description, and [[Journal Checklist]] says
+> why it is the entry I read first.
 
 Standard to match: [[What a Strong Entry Looks Like]]. Where this sits
 in the mark: [[How Marks Work]].

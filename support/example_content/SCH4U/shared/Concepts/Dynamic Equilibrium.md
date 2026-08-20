@@ -80,7 +80,7 @@ That is the reaction quotient, compared against $K_c$ — same expression,
 non-equilibrium concentrations. Second: if you disturb a system that has
 already settled, what does it do? You will find that out by doing it, in
 [[Disturbing an Equilibrium]], before the answer gets a name in
-[[Le Châtelier's Principle]].
+[[Le Chatelier's Principle|Le Châtelier's Principle]].
 
 Practise setting up expressions and reading constants in
 [[Equilibrium Practice]], and keep [[Reading an Equilibrium Table]]

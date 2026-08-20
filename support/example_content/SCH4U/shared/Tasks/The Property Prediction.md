@@ -47,8 +47,10 @@ next clause says what that costs them.
 ## Part 1 — The prediction, before any source
 
 You will be given a coded substance: a formula, and where relevant a
-structural formula. Working from that alone, and with every book and
-site closed, produce your prediction.
+structural formula. **Yours is yours** — no two people in the class get
+the same code, so there is nobody to compare answers with and this task
+is entirely your own from the first line. Working from that alone, and
+with every book and site closed, produce your prediction.
 
 **a) The type of solid it forms**, chosen from the four, with the
 reasoning that got you there:
@@ -266,3 +268,47 @@ Where the ideas came from: [[Intermolecular Forces]],
 
 ![[A1.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 11, the working period with every book and site
+closed
+  Watch for: which way round the work goes. The whole task rests on
+  deriving properties from a structure, and a finished property sheet
+  cannot tell you whether that happened — a student who settles the type
+  of solid first and reasons each property out of it, and a student who
+  writes down what the substance sounds like and then picks the type
+  those properties fit, hand in pages that read the same.
+  Going well: the four types gone through out loud with at least one
+  ruled out and a reason given; properties said in the form "because it
+  is that, it will do this"; a property changed once the type has been
+  argued.
+  Stuck: five properties written straight down and a classification
+  chosen at the end to fit them; the same confidence word applied to all
+  five without any of them being reconsidered.
+  Record: initials in the margin of your day plan, two columns — derived,
+  or reverse-engineered. The second column is who to stand beside for the
+  rest of the period.
+
+TALK — Unit 1, Day 12, the two minutes at each desk on the checking day
+  Ask, holding a formula they have never seen: "Type this one for me.
+  Then two things it will do that follow from the type, and one thing it
+  might do that the type does not settle."
+  Then: "Suppose your own substance had to line a container for a hot
+  solvent. From the type you gave it, what fails first?"
+  The first question is C2.5 done live on an unrehearsed substance,
+  which is the one thing their own sheet cannot show you: a sheet is one
+  substance, prepared, with a week to think about it. Listen for the
+  type argued from the formula rather than recognised, and for an honest
+  "the formula does not fix the crystal form" on the third part. A
+  strong second answer names a specific failure — softening,
+  dissolving, cracking, going brittle — and traces it to what holds that
+  solid together, which is the describing half of C2.5 put somewhere it
+  has not been put for them.
+  Record: their two answers in your own words, on the back of the class
+  list. You will want the wording when you mark Part 1.
+
+The product evidence is Part 1, dated and handed in before the checking
+starts, and the whole thing on Day 14.
+%%

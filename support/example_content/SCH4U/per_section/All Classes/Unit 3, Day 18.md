@@ -13,7 +13,8 @@ tags:
 1. Checkpoint, on your own: enthalpy, Hess's law, and a rate law with
    one explanation
 2. Mark your own; revision list written
-3. Portfolio check-in: [[Showing Growth]]
+3. Portfolio check-in: read [[Showing Growth]] and choose the two pieces
+   of your own writing you will put side by side next unit
 
 ## Things to do before our next class
 

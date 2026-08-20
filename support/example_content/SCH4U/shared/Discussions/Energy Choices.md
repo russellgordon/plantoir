@@ -94,7 +94,8 @@ energy, and the unreacted gas is recycled rather than vented. The
 catalyst is worth being precise about: it changes the path, so both the
 forward and the reverse reaction speed up. It does not change $\Delta H$
 and it does not change how far the reaction goes — that will be
-[[Le Châtelier's Principle]] and [[Dynamic Equilibrium]] in Unit 4.
+[[Le Chatelier's Principle|Le Châtelier's Principle]] and
+[[Dynamic Equilibrium]] in Unit 4.
 
 Two smaller cases, both worth an argument:
 

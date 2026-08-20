@@ -33,6 +33,25 @@ You are going to produce one answer of that kind, at bench scale, and
 then find out what the same question looks like where the arithmetic has
 consequences.
 
+## Who does what
+
+You design and run this in **pairs**, because four values of a variable
+in triplicate is more than one pair of hands can time well, and because
+an argument about what to hold constant is worth having out loud.
+
+**The report is yours alone from the analysis onward.** One design
+contract and one raw data table come from the bench and may be
+identical; the graph you chose, the result you extracted, the
+uncertainty you ranked, the conclusion you justified and the whole of
+Part 2 are written by you and marked as yours.
+
+The design is still marked individually, and the conference in the
+working period is where that happens: I ask each of you separately why
+that range, why that many trials, and how you are getting an initial
+rate rather than an average. Signing a contract your partner wrote is
+audible in about fifteen seconds, so it is worth building it together
+rather than dividing it up.
+
 ## Part 1 — Design and run the investigation
 
 **Choose your reaction** from those we have used, or propose another and
@@ -268,3 +287,47 @@ arithmetic: [[Rates of Reaction]], [[Rate Law Practice]], and
 
 ![[A1.10]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 14, the bench period
+  Watch for: where a run is judged to end, and whether the same rule
+  survives the slowest condition. A table of times, gas volumes or
+  masses looks identical whether the end point was agreed out loud
+  before the first trial or settled trial by trial — and it drifts in a
+  direction, because the slow runs get called early as the bell
+  approaches, which flattens the very effect the series exists to
+  measure.
+  Going well: an end point stated before the first trial and repeated
+  aloud when the slow condition comes round; one person on the watch
+  throughout, or, for a volume or a mass loss, readings taken on a
+  stated clock rather than whenever somebody looks up.
+  Stuck: the watch changing hands between conditions; a reading interval
+  that stretches as the period goes on; a trial that disagreed dropped
+  from the table rather than repeated.
+  Record: a tally on the whiteboard as you pass — one stroke for a bench
+  working to a stated rule, none for a bench improvising — and copy it
+  into your day plan at the end. That is the conducting half of D2.8.
+
+TALK — Unit 3, Day 15, while they graph and extract the order
+  Ask: "Show me the two numbers your uncertainty came out of. Now, if
+  your three repeats had landed on exactly the same value, would that
+  have told you your ratio is right?"
+  Then: "You fixed something so that your variable could move on its
+  own. Name it, and tell me what experiment you would have been running
+  if you had let it move with the variable instead."
+  A strong first answer separates precision from accuracy without being
+  handed the words, and finds its own example of a fault that repeats
+  faithfully — an end-point rule applied loosely every time, a reagent
+  bottle that had been standing open since the morning. A strong second
+  answer sees that the two would have moved together, so nothing could
+  be attributed to either, and that the reason anything is held fixed is
+  attribution rather than tidiness. Both are D2.8, and the second is the
+  one a correctly graphed report can be completely silent about.
+  Record: two names in your day plan — the ones whose answer to the
+  first question was about their own two numbers rather than about the
+  idea in general.
+
+The product evidence is the report and Part 2, handed in on Day 16.
+%%

@@ -80,6 +80,23 @@ this examination is part of the final 30% of the course mark alongside
 [[The Chemistry Showcase]], so that neither one afternoon nor one
 investigation decides your grade alone.
 
+The criteria are the same ones you have been reading on task pages all
+semester, applied to a paper instead of a report:
+
+| What I am looking for | What it looks like on this paper |
+| --- | --- |
+| The right chemistry | The correct idea, stated correctly, with the terms used the way the course has used them |
+| A route I can follow | Every calculation shows how it got there, so a slip costs the digit and not the question |
+| Numbers that behave | Units on every quantity, figures the data entitles you to, and a sign you can account for |
+| Mechanism in the explanations | Which particles, which rate, which attraction — not the name of the principle used as though naming were explaining |
+| The boundary named | Where the model you used stops being true, in the questions that turn on it |
+| Evidence read honestly | In Part E, a claim stated no more strongly than the data you were handed supports |
+
+Nothing in that table is new. If it looks familiar it is because it is
+the right-hand column of nearly every criteria table in
+[[Tasks/index|Tasks]], which is the point of writing them the same way
+all year.
+
 %%curriculum-start%%
 ## Curriculum connection
 
@@ -93,3 +110,63 @@ investigation decides your grade alone.
 
 ![[F3.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+An examination is a product and only a product, deliberately: three
+hours, alone, no help, and nothing about it can be watched or discussed
+while it is happening. That is the point of it, and it is also its
+limitation. The five expectations this paper carries are explaining and
+describing expectations, and a script can hide a student who explains
+well out loud and cannot write it down, or one who has memorised a
+worked route and never understood what it was a route through.
+
+So the two slots below are a diagnostic rather than a third source of
+evidence, and they are worth the time for that alone. What you gather
+there does not move the examination mark — this is the final thirty per
+cent, and it is what the paper says. It moves what you teach in the last
+three periods, and it tells you whether a low script is going to mean a
+gap in the chemistry or a gap in the room.
+
+OBSERVE — Unit 5, Day 15, when the four calculations are worked in one
+sitting
+  Watch for: how the calorimetry problem is entered. Before any
+  arithmetic, does the student say which mass is being warmed and whose
+  heat capacity is being used — or are the numbers substituted in the
+  order the question printed them? A correct answer looks identical
+  either way, and some of the room gets there by pattern rather than by
+  meaning.
+  Going well: the mass of solution named as the thing warmed rather than
+  the mass of solute; the heat capacity attached out loud to the water
+  rather than to the reaction; the sign argued from which way the
+  temperature went, before a number is written.
+  Stuck: the first three numbers in the question multiplied together;
+  the mass of the solid used because it was the mass that was given.
+  Record: your class list, two columns — read the quantities, or matched
+  the pattern. That is D3.3, and the second column is exactly who to
+  work an example with when the open clinic comes round on Day 17.
+
+TALK — Unit 5, Day 14, during the clinic, while they work at the board
+  Ask: "An ester and a carboxylic acid. What do their names have in
+  common, and what one change to the structure produces the change in
+  the name?"
+  Then: "Why does the 4s level fill before the 3d, when three is less
+  than four — and what does that do to the shape of the table?"
+  A strong first answer finds the acid's parent chain surviving inside
+  the ester's name and connects the two-part name to the replacement of
+  the acidic hydrogen by an alkyl group. That is B3.1, and it is the
+  kind of thing a student can get right on paper by recognising the
+  shape of a name without ever having taken one apart. A strong second
+  answer says that the filling order follows energies rather than
+  principal numbers, that the two sets of levels are close enough to
+  overlap, and that the blocks of the table are that overlap made
+  visible — the aufbau half of C3.2, said rather than written out.
+  Record: nothing on paper. Note the two or three students whose answer
+  was a rule they remembered rather than a structure they read, and take
+  their question to the open clinic on Day 17, where the room sets the
+  agenda anyway.
+
+The product evidence is the paper itself, in the examination period, and
+it is the whole of the evidence this evaluation rests on.
+%%

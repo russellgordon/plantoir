@@ -44,7 +44,7 @@ where the idea was met, and then say it properly.
 **Unit 4 — Chemical systems and equilibrium**
 
 - [[Dynamic Equilibrium]]
-- [[Le Châtelier's Principle]]
+- [[Le Chatelier's Principle|Le Châtelier's Principle]]
 - [[Acids and Bases]]
 - [[Buffers and Titration Curves]]
 

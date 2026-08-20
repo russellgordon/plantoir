@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Circle up: what the showcase surfaced that the reports had hidden
-2. Hand in [[Final Reflection]] and your [[Chemistry Journal]], against
-   [[Journal Checklist]]
+2. Hand in your [[Chemistry Journal]], against [[Journal Checklist]];
+   [[Final Reflection]] went in yesterday
 3. Then: what the examination asks for. [[Final Examination]]
 
 ## Things to do before our next class
