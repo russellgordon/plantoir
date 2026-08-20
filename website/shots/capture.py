@@ -43,13 +43,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from appearance import Appearance          # noqa: E402
 from images import (  # noqa: E402
-    mask_window_corners,
     prepare,
     WIDEST_PHONE_PIXELS,
     WIDEST_WINDOW_PIXELS,
 )
 from composite import fan, side_by_side, diagonal_hero, FIGURE_WIDTH    # noqa: E402
-from safari import SafariWindow            # noqa: E402
+from safari import SafariWindow, verify_appearance  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent.parent
 WEBSITE = REPO / "website"
@@ -299,11 +298,9 @@ def export_attachments(bundle: Path, suffix: str) -> list[str]:
             source = exported / attachment["exportedFileName"]
             destination = IMAGE_DIR / f"{shot_name}-{suffix}.png"
             shutil.copy2(source, destination)
-            # Corners first, at capture resolution: masking after the resize
-            # would round a radius that has already been scaled, and leave the
-            # fringe behind.
-            width_in_points = ASSISTANT_WINDOW_POINTS if shot_name == "assistant" else WINDOW_POINTS
-            mask_window_corners(destination, width_in_points)
+            # No corner masking: the attachment came from `screencapture -l`,
+            # which hands back the real curve with the corners already
+            # transparent. See the note at the top of images.py.
             prepare(destination, WIDEST_WINDOW_PIXELS)
             saved.append(destination.name)
     return saved
@@ -602,6 +599,7 @@ def capture_parts(window: "SafariWindow", suffix: str) -> None:
         window.load(site_address(course["code"]) + "/", settle_seconds=3.5)
         destination = PARTS / f"home-{course['code'].lower()}-{suffix}.png"
         window.capture(destination)
+        verify_appearance(destination, suffix == "dark", course["code"])
         print(f"   part {destination.name}")
 
 
@@ -704,6 +702,7 @@ def capture_search(window: "SafariWindow", shot: dict, suffix: str) -> None:
     time.sleep(2.0)
     destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
     window.capture(destination)
+    verify_appearance(destination, suffix == "dark", shot["id"])
     prepare(destination, WIDEST_WINDOW_PIXELS)
     print(f"   saved {destination.name}")
 
@@ -749,6 +748,8 @@ def capture_sites(workspace: Path) -> None:
                     window.load(url, settle_seconds=3.5)
                     destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
                     window.capture(destination)
+                    # Before the resize, while the page is still full size.
+                    verify_appearance(destination, dark, shot["id"])
                     prepare(destination, WIDEST_WINDOW_PIXELS)
                     print(f"   saved {destination.name}")
 

@@ -17,14 +17,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from PIL import Image, ImageDraw
-
-# macOS rounds a window's corners; a rectangular capture therefore picks up a
-# few pixels of whatever was behind them. Rounding the saved image by the same
-# amount turns those into transparency instead. Points, doubled below for the
-# Retina capture.
-CORNER_RADIUS_POINTS = 11
-
+from PIL import Image
 
 def osascript(script: str) -> str:
     result = subprocess.run(
@@ -42,17 +35,163 @@ def frontmost_application() -> str:
     )
 
 
-def round_corners(path: Path, radius_pixels: int) -> None:
-    """Make the four corners transparent, so no desktop shows through."""
-    image = Image.open(path).convert("RGBA")
-    mask = Image.new("L", image.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [(0, 0), (image.size[0] - 1, image.size[1] - 1)],
-        radius=radius_pixels,
-        fill=255,
+# Where a page stops reading as light and starts reading as dark, measured
+# rather than picked: across the sixteen class-site shots on the site today,
+# every light page's band medians 248-249 and every dark one 17-21. The
+# midpoint is nowhere near either cluster, so the split is decisive rather
+# than a judgement call — 107 below the nearest dark page, 120 above the
+# nearest light one.
+DARK_BELOW = 128
+
+
+# The Safari profile the captures are taken in, when it exists.
+#
+# A profile has its OWN storage, history and cookies, and ordinary window
+# chrome — which is exactly what Windows gets from `--user-data-dir`, and what
+# a private window can never give, since Safari marks a private window with a
+# dark address bar on purpose. A profile therefore starts with no theme saved
+# for any class site, and nothing done in ordinary browsing can reach it.
+#
+# It is made by hand, once per Mac: Safari > Settings > Profiles > Start Using
+# Profiles (or +), named exactly this. Safari offers no way to create one
+# programmatically, which is fine for something done once.
+#
+# When it is absent the run still works — an ordinary window, with
+# `verify_appearance` catching the fault the profile would have prevented.
+CAPTURE_PROFILE = "Screenshots"
+
+
+def open_profile_window(profile: str) -> bool:
+    """Open a new Safari window in `profile`, if that profile exists.
+
+    Safari has had profiles since 17, and its File menu grows a route to them
+    the moment one exists — but the SHAPE of that route differs by version:
+    some builds add a flat "New <profile> Window" item, others turn "New
+    Window" into a submenu listing the profiles by name. Both are handled,
+    because guessing wrong means quietly opening an ordinary window and never
+    noticing.
+
+    Answers True when a profile window was opened, False when there is no
+    profile to open one in — the caller then falls back to an ordinary
+    window, which is a lesser but honest arrangement.
+
+    Menu items are matched BY NAME, never by position: a menu that grows an
+    entry shifts every index below it, and this menu grows an entry exactly
+    when a profile is added.
+    """
+    script = """
+    tell application "Safari" to activate
+    delay 0.5
+    tell application "System Events" to tell process "Safari"
+      set fileMenu to menu 1 of menu bar item "File" of menu bar 1
+      repeat with anItem in menu items of fileMenu
+        set itemName to ""
+        try
+          set itemName to name of anItem as text
+        end try
+        if itemName is "New PROFILE_NAME Window" then
+          click anItem
+          return "opened"
+        end if
+      end repeat
+      repeat with anItem in menu items of fileMenu
+        set itemName to ""
+        try
+          set itemName to name of anItem as text
+        end try
+        if itemName is "New Window" and (count of menus of anItem) > 0 then
+          repeat with subItem in menu items of menu 1 of anItem
+            set subName to ""
+            try
+              set subName to name of subItem as text
+            end try
+            if subName is "PROFILE_NAME" then
+              click subItem
+              return "opened"
+            end if
+          end repeat
+        end if
+      end repeat
+      return "no profile"
+    end tell
+    """.replace("PROFILE_NAME", profile)
+    try:
+        answer = osascript(script)
+    except subprocess.CalledProcessError:
+        return False
+    if answer != "opened":
+        print(
+            f'   No Safari profile named "{profile}" - capturing in an ordinary window.\n'
+            f"   Making one (Safari > Settings > Profiles) keeps a light/dark choice saved\n"
+            f"   during ordinary browsing out of these shots."
+        )
+        return False
+    time.sleep(1.2)
+    return True
+
+
+class WrongAppearance(SystemExit):
+    """A capture came out light in a dark pass, or the other way round."""
+
+
+def page_is_dark(path: Path) -> bool:
+    """Whether a captured page reads as dark, from the page itself.
+
+    The MEDIAN luminance of a band well inside the content — middle 60%
+    across, lower 60% down. Median rather than mean because a page is mostly
+    background with text scattered over it, and the median ignores the text
+    while a mean is dragged around by it. The band avoids the window chrome
+    at the top, which is tinted by the system appearance and would answer a
+    different question than the one being asked.
+    """
+    with Image.open(path) as opened:
+        image = opened.convert("RGBA")
+    left = int(image.width * 0.20)
+    right = int(image.width * 0.80)
+    top = int(image.height * 0.40)
+    band = image.crop((left, top, right, image.height)).convert("L")
+
+    # The median from the HISTOGRAM rather than from a list of pixels: it is
+    # exact over every pixel in the band, it does not build a list of several
+    # million of them, and it uses no API Pillow has deprecated.
+    counts = band.histogram()
+    total = 0
+    for count in counts:
+        total += count
+    seen = 0
+    median = 0
+    for value in range(len(counts)):
+        seen += counts[value]
+        if seen >= total // 2:
+            median = value
+            break
+    return median < DARK_BELOW
+
+
+def verify_appearance(path: Path, expect_dark: bool, what: str) -> None:
+    """Stop the run when a shot was taken in the wrong appearance.
+
+    This is what replaced the private window (see `SafariWindow.__enter__`).
+    A class site follows the system appearance UNLESS somebody has toggled
+    that site's own light/dark switch, which it remembers in local storage —
+    so an ordinary Safari window can serve a light page in the middle of a
+    dark pass. That produces a screenshot which is WRONG and looks RIGHT,
+    the worst kind this harness can make.
+
+    The remedy named below is the whole reason this check is worth having:
+    it is one click on the site's own toggle, and it is not obvious unless
+    somebody says so.
+    """
+    if page_is_dark(path) == expect_dark:
+        return
+    wanted = "dark" if expect_dark else "light"
+    got = "light" if expect_dark else "dark"
+    raise WrongAppearance(
+        f"{what} came out {got} during the {wanted} pass ({path.name}).\n"
+        f"That site has a {got} theme saved in Safari's local storage, which overrides "
+        f"the system appearance. Open it in Safari, click the site's own light/dark "
+        f"toggle until it follows the system again, then re-run this pass."
     )
-    image.putalpha(mask)
-    image.save(path)
 
 
 class SafariWindow:
@@ -74,16 +213,32 @@ class SafariWindow:
         self.previous_application = frontmost_application()
         osascript('tell application "Safari" to activate')
         time.sleep(0.6)
-        # A PRIVATE window, made with the keyboard because Safari's
-        # AppleScript vocabulary cannot create one. Private on purpose:
-        # a class site remembers a light/dark choice in local storage, and
-        # a choice saved during somebody's ordinary browsing once overrode
-        # the appearance the dark pass had set machine-wide — one course
-        # photographed light in a dark run. A private window starts with
-        # no storage and leaves none behind.
-        osascript(
-            'tell application "System Events" to keystroke "n" using {command down, shift down}'
-        )
+        # A window in the capture PROFILE if there is one, an ordinary
+        # window otherwise. **Never a private one** — this is a rule, not
+        # a preference.
+        #
+        # A private window wears a dark address bar, deliberately, as Safari's
+        # way of telling you where you are. On a marketing page that is a
+        # black band across the top of every class-site screenshot, next to
+        # shots that do not have one. It sticks out, and no visitor can be
+        # told why it is there.
+        #
+        # It WAS private, for a real reason: a class site remembers a
+        # light/dark choice in local storage, and a choice saved during
+        # ordinary browsing once overrode the appearance a dark pass had set
+        # machine-wide, so one course was photographed light in a dark run.
+        # That reason has not gone away — it is answered differently now, by
+        # `verify_appearance` below, which CHECKS each capture instead of
+        # trying to control the storage it came from. Checking is the better
+        # trade even setting the address bar aside: the private window
+        # prevented the fault silently, and a check that fails says which
+        # site, which pass, and what to do about it.
+        #
+        # (Windows solved the same problem with `--user-data-dir`, a
+        # throwaway Edge profile — clean storage, ordinary chrome. Safari
+        # takes no such flag, which is why the mac needs its own answer.)
+        if not open_profile_window(CAPTURE_PROFILE):
+            osascript('tell application "System Events" to keystroke "n" using command down')
         time.sleep(1.2)
         self.window_id = osascript('tell application "Safari" to return id of front window')
         self.resize(self.width, self.height)
@@ -144,9 +299,9 @@ class SafariWindow:
     def unfocus_address_bar(self) -> None:
         """Escape, so the address field is not selected in the photograph.
 
-        A private window opens with the address field focused, and loading a
-        page programmatically does not move focus — every capture then shows
-        the full URL selected in blue, which reads as somebody mid-edit.
+        A new window opens with the address field focused, and loading a page
+        programmatically does not move focus — every capture then shows the
+        full URL selected in blue, which reads as somebody mid-edit.
         """
         osascript(
             f'tell application "Safari"\n'

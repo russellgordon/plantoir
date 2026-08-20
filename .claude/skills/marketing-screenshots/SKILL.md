@@ -43,6 +43,62 @@ Then check, in this order:
    `<code>-s1-2026-gordon.netlify.app`. A 404 means the demo sites need
    publishing again (`capture.py --publish`), not that the capture is broken.
 
+## Two rules about HOW a picture is taken
+
+Both were paid for in ugly screenshots that shipped, and neither is a
+preference to be weighed against convenience.
+
+**1. One capture method, and it is `screencapture -o -l <window number>`.**
+That is macOS's own window capture — the programmatic form of
+Command-Shift-4, Space, Option-click. It asks CoreGraphics for the WINDOW, so
+what comes back has the real rounded corners already transparent and
+antialiased, independent of what is in front of or behind it. Measured: the
+four corner pixels of such a capture read `(0, 0, 0, 0)`.
+
+There used to be a second method. `MarketingScreenshotTests.save` fell
+through to XCUITest's `window.screenshot()` whenever the window number could
+not be found — a RECTANGLE capture, which bakes the corner curves against
+whatever was behind them and hands back **opaque black specks**, invisible on
+a dark page and obvious on a light one. It did this SILENTLY, so a run could
+file a mix of good and bad shots with nothing to say which was which, and
+`mask_window_corners` grew in the Python to paper over the difference. Both
+are gone. A failure now stops the run and names the shot.
+
+So: **if black corners ever appear again, the capture went wrong — find out
+why it did not go through `screencapture -l`.** Do not paint over them, and
+do not add a fallback "just in case": a marketing screenshot is not worth
+having if it is the wrong picture.
+
+**2. NEVER capture in a Safari private window.** Safari marks a private
+window with a dark address bar, deliberately. On plantoir.app that is a black
+band across the top of every class-site shot, sitting beside shots that do
+not have one, and no visitor can be told why.
+
+The private window was there for a real reason, and the reason still stands:
+a class site remembers a light/dark choice in `localStorage["theme"]`, and a
+choice saved during ordinary browsing once overrode the appearance a dark
+pass had set machine-wide — one course photographed light in a dark run. It
+is answered two other ways now, neither of which costs an address bar:
+
+- **A Safari profile named `Screenshots`**, if one exists — separate storage,
+  history and cookies, ordinary chrome. This is the same answer Windows gets
+  from `--user-data-dir`. It is made by hand, once per Mac: Safari ▸ Settings
+  ▸ Profiles ▸ Start Using Profiles, named exactly `Screenshots`. Safari
+  offers no way to make one programmatically. The run says so when it is
+  missing and carries on in an ordinary window.
+- **`verify_appearance`**, which checks every capture and stops the run when
+  a page came out light in a dark pass or the other way round. It reads the
+  median luminance of a band well inside the content: measured across the
+  sixteen class-site shots on the site today, light pages median 248–249 and
+  dark ones 17–21, against a threshold of 128 — decisive, not a judgement
+  call.
+
+Deleting the saved theme instead was investigated and does not work: Safari's
+website data lives in a TCC-protected container (`Operation not permitted`
+without Full Disk Access), and setting the value needs `do JavaScript`, which
+Safari refuses unless "Allow JavaScript from Apple Events" is turned on by
+hand in the Develop menu.
+
 ## Two permissions you cannot grant
 
 Every invocation of `capture.py` — `--app`, `--sites`, `--provision`,
