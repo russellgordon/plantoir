@@ -15,6 +15,13 @@ emoji, or marker setting always reach the card.
 """
 
 from pathlib import Path
+
+# The embeddable Python used by the native Windows runtime replaces
+# sys.path wholesale (python311._pth), so the script's own folder must
+# be added by hand before sibling imports. Harmless everywhere else.
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+import toolchain_paths
 import json
 
 from PIL import Image, ImageDraw, ImageFont, ImageColor
@@ -30,14 +37,17 @@ EMOJI_TEXT_GAP = 18
 # Where the toolchain's support files live: baked into the image, with a
 # repo-relative fallback so the renderer can be exercised outside it.
 SUPPORT_CANDIDATES = [
-    Path("/opt/support"),
+    toolchain_paths.SUPPORT_DIR,
     Path(__file__).resolve().parent.parent / "support",
 ]
 
 # Debian's package puts the colour emoji font here.
 EMOJI_FONT_CANDIDATES = [
     Path("/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"),
+    toolchain_paths.SUPPORT_DIR / "fonts" / "NotoColorEmoji.ttf",
 ]
+if toolchain_paths.EMOJI_FONT:
+    EMOJI_FONT_CANDIDATES.insert(0, Path(toolchain_paths.EMOJI_FONT))
 # Pillow can only rasterize this font at its embedded bitmap size.
 EMOJI_STRIKE_SIZE = 109
 

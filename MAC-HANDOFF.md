@@ -51,9 +51,51 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
-**Nothing waiting right now.** This section exists so that when something is,
-it is the first thing read here — and so a red mac suite is instantly
-explicable rather than alarming.
+> **v1.1.0 cut sheet (Windows assets ready, 2026-08-20).** The verified
+> Windows artifacts live on the Windows machine and will be uploaded FROM
+> there (`gh` is authed there) once the tag exists — so cut the release as a
+> DRAFT, tell Russell, and publish after the assets attach. Hashes for the
+> notes' SHA-256 table:
+> `PlantoirSetup.exe` 224.5 MB
+> `9990bcacade548a35cbd5b11f65dbf79d4a0236eeeee4d4d0e5322204c96527e` ·
+> `Plantoir-win-x64.zip` 379.9 MB
+> `b141c7ac30116c9836334e90472e5a2527fb4e50629c56d4c2f258f437cbb1ba`.
+> Built from commit 8e9faab0, proven by five clean-machine smoke tests
+> (install → course → preview → assistant → deploy, no .NET/WSL/Docker on
+> the machine). The macOS DMG does NOT ship in this cut — see RELEASING.md
+> "Two platforms, one version series": the mac joins v1.1.0 after the gate
+> list below is green.
+
+
+- `contracts/app-rules.json` → `failureExplanations.cases` → **the
+  teacher-made-link case** ("untrusted mount point"), proposed 2026-08-20.
+  Windows refuses to traverse a junction inside the teacher's own course
+  folder (the Obsidian shared-Media trick); the toolchain creates no links
+  of its own on Windows any more, so the error can only be theirs, and the
+  raw OSError read as a crash. Cannot occur on macOS; implement the mapping
+  anyway to keep the explainer identical — same reasoning as the setup
+  cases below. Reference: `FailureExplainer.VaultLinkExplanation`.
+
+- `contracts/app-rules.json` → `failureExplanations.cases` → **the three
+  one-time-Windows-setup cases** ("needs to restart to finish getting
+  ready", "Windows permission was declined", "Windows could not add the
+  feature this needs"), proposed 2026-08-19. **Superseded the same day:**
+  branch `windows-native-toolchain` deleted the Windows container path
+  entirely, so the launcher lines these cases match can no longer be
+  printed by any shipping launcher. If that branch merges, RETIRE these
+  three cases from the contract instead of implementing them (they ship
+  only in 1.0.2, whose launchers are frozen); if it does not, implement as
+  originally written below. The Windows launchers now
+  install WSL2 themselves (see the entry below); these are the three
+  non-fault ways that setup can stop, and the app turns each into one
+  actionable sentence. The outputs can never occur on macOS — the ask is to
+  add the same three mappings to the mac's failure explainer anyway, so the
+  explainer stays identical on both sides instead of growing a platform
+  switch (the alternative, a `platform` field on contract cases, was
+  rejected as machinery for exactly three lines). Reference:
+  `windows-app/Plantoir.Core/Scripting/FailureExplainer.cs` →
+  `SetupExplanation`, covered by `ContractTests` → the
+  `failureExplanations` case runner.
 
 The mechanism, in one paragraph. `Plantoir --write-contracts` runs on the mac,
 so the Windows side cannot regenerate the derived halves of
@@ -79,6 +121,97 @@ outstanding.
 
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
+
+- **Windows dropped the container entirely — shared scripts changed, run
+  `./verify.sh` on the next sync** (Windows + shared, 2026-08-19, branch
+  `windows-native-toolchain`). Windows now runs the whole toolchain
+  natively: Node 20, Python 3.11, the patched Quartz scaffold and wrangler
+  ship inside the app's own folder (built by
+  `windows-app/Vendor/fetch-runtime.ps1`, pins mirroring the Dockerfile's),
+  and the launchers run the shared Python directly when that runtime is
+  present. WHY: WSL2 needs admin rights, Windows feature changes and a
+  reboot — school-managed laptops refuse all three, and a teacher hit
+  exactly that in front of an audience twice in one day. Rejected: porting
+  the Python to C# (kills the shared-scripts contract and invites permanent
+  drift); keeping a WSL2 fallback (Russell chose deletion once verified —
+  two paths means two test surfaces forever).
+
+  **What the mac must know about the shared files:**
+  - `scripts/toolchain_paths.py` is new: every fixed path (`/opt/*`,
+    `/teaching/courses`) now routes through it. Container defaults are
+    byte-identical to before; the native path overrides via `PLANTOIR_*`
+    env vars the mac never sets. The Dockerfile COPYies it — image hash
+    changes, so the first mac preview after sync does a one-time rebuild.
+  - The 26 `tee` subprocess writes are plain writes now (`write_file`),
+    the Media/node_modules/.netlify links go through `link_directory`
+    (symlink first — the mac's behaviour is unchanged), and
+    `_sync_public_to_host` falls back to an incremental pure-Python mirror
+    only when rsync is absent (it never is, in the container).
+  - **The Quartz CLI is invoked as `node <abs>/quartz/bootstrap-cli.mjs`
+    instead of `npx quartz`** — measured on Windows, `npx` resolved the CLI
+    from the npm REGISTRY into its cache (a project's own bin never lands
+    in its node_modules/.bin), which needed network and floated off the
+    v4.5.0 pin. The container was almost certainly doing the same thing
+    quietly; check a container build log for an `npx` cache line if you
+    want the confirmation. Correctness held only because Quartz's CLI runs
+    the local patched `quartz/` source from CWD.
+  - `setup_course.py`'s keyboard reader imports termios where it exists,
+    msvcrt where it does not; POSIX behaviour identical.
+
+  Numbers (this machine, Ryzen-class x64, NVMe): first native build of the
+  199-page example course **57 s cold** including scaffold staging; Quartz
+  parse+emit 5 s; delta deploy to Netlify 117 files, ~40 s. The container
+  path's equivalent on this same machine paid a one-time ~8 min image
+  build plus WSL2 provisioning before the first build could start.
+  Reference: `Enter-NativeRuntime` in the three `.ps1` launchers,
+  `scripts/toolchain_paths.py`, `windows-app/Vendor/fetch-runtime.ps1`.
+
+- **Check that every finished mac task really writes a run transcript**
+  (Windows, 2026-08-19, branch `windows-wsl2-auto-install`). A real teacher's
+  problem report arrived saying "the last 0 tasks Plantoir ran for you" after
+  three failed setups: the Windows report reads `Logs\runs\*.txt`, and
+  nothing ever wrote that folder — the reading side was tested against
+  hand-made files, so the gap passed every test. Windows now saves every
+  finished task's transcript from `ScriptRunner`'s finish path (redacted on
+  the way in, pruned to the newest 20, header matching the trail's
+  "finished … — outcome" sentence). The ask here is a VERIFICATION, not a
+  port: drive one real failing task on the mac and confirm a file appears in
+  the folder its report actually reads — the failure mode is precisely that
+  the tests cannot see this. Reference:
+  `ProblemReportStore.SaveRunTranscript`, `ScriptRunner.NoteTaskFinished`,
+  `ProblemReportTests.Store_SavesRunTranscripts_RedactedAndPruned`.
+
+- **The Windows launchers now install WSL2 themselves — the mac owes only
+  the three explainer sentences** (Windows, 2026-08-19, branch
+  `windows-wsl2-auto-install`). What it fixed: a teacher on a PC with no
+  WSL2 hit "ERROR: WSL is present but no Linux distribution is installed"
+  plus an instruction to open an Administrator PowerShell — it failed live
+  in front of an audience on 2026-08-19. This was the Windows analogue of
+  the mac's zero-prerequisite Colima bootstrap, called for by
+  `WINDOWS-HANDOFF.md`'s "Container engine" note (entry 72), and it now
+  exists: each `.ps1` launcher's `Install-WindowsSubsystem` runs one
+  elevated `wsl --install -d Ubuntu --no-launch` (retrying with
+  `--web-download` for Store-blocked school machines), detects
+  restart-pending by USABILITY rather than exit code (the exit code is 0 on
+  that path), and reports the three non-fault stops in plain words. WHY the
+  choices: `--no-launch` because Ubuntu's first-run username wizard would
+  otherwise block a non-interactive run forever — the distro runs as root,
+  fine for an appliance no teacher opens; UAC is announced first ("Watch
+  for a Windows permission prompt") because it is the one step that cannot
+  be silent; a distro installed BY the run is provisioned without the
+  Docker-engine question (the mac never asks either), while a pre-existing
+  distro keeps the question because it belongs to whoever set it up.
+  Rejected: DISM feature-enable plus manual distro import (re-implements
+  what `wsl --install` already does, and needs the same elevation);
+  prompting before the install (the handoff asks for silent, and UAC is
+  already the consent); auto-restarting the PC (never — the teacher may
+  have unsaved work everywhere). Untested on a truly fresh machine — this
+  dev box has WSL — so the restart path is asserted from the launcher's
+  printed lines, which is what the contract cases pin. What the mac does:
+  the three contract cases above, nothing else — the `.sh` launchers are
+  untouched. Reference: `Install-WindowsSubsystem` in `setup.ps1`,
+  `preview.ps1` (where stop mode exits before it can ever run), and
+  `deploy.ps1`.
 
 - **Build the 1.0.0 DMG only from a tree containing the deploy-flush fix in
   `scripts/build_site.py`** (Windows + shared, 2026-08-19). A Windows release

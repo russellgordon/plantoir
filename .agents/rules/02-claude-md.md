@@ -120,12 +120,14 @@ description: "Plantoir project rules, part 2 of 7 - Rules that override default 
    `main` is what teachers have, and it needs protecting from work in flight.
 
    - **`main` is what shipped.** It stays releasable at all times: release
-     tags point at `main`, plantoir.app's download links resolve against its
-     releases, and **Netlify deploys the site on every push to `main`** — so
-     pushing `main` IS deploying plantoir.app. Nothing lands there except a
-     merge from `dev`, plus the release flow's own commits (the website
-     version line). After anything lands on `main`, merge `main` back into
-     `dev` in the same session, so the two never drift.
+     tags point at `main`, and plantoir.app's download links resolve against
+     its releases. Nothing lands there except a merge from `dev`, plus the
+     release flow's own commits (the website version line). After anything
+     lands on `main`, merge `main` back into `dev` in the same session, so
+     the two never drift. (plantoir.app itself is NOT deployed by pushing —
+     the Netlify site is not connected to GitHub. `python3 website/build.py
+     --deploy` is the only way it updates, run from `main` so the live site
+     matches what shipped.)
    - **`dev` is where work integrates.** Start sessions from `dev`, branch
      off it, merge back to it. A piece merges only with its tests green and
      its write-ups done (rules 2–5).
@@ -142,9 +144,3 @@ description: "Plantoir project rules, part 2 of 7 - Rules that override default 
      or when Russell asks, never on your own initiative. Outside an iterative
      run — a one-off question, an experiment, something half-finished — the
      older rule still holds: ask first.
-
-   End every commit message with the `Co-Authored-By` trailer. The failure
-   the commit-per-piece order prevents is unchanged: one session's worth of
-   unrelated work in one working tree — forty files, a dozen decisions
-   tangled together, no way to undo one piece without unpicking the rest —
-   and a `GUI-IMPROVEMENTS.md` row with no commit behind it.

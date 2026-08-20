@@ -133,7 +133,9 @@ GitHub automatically resolves `releases/latest/download/<filename>` to the newes
                  - Update website/site.json (version & release date)
                  - Redraw social card (python scripts/brand_images.py --install-card)
                  - Rebuild site (python3 website/build.py)
-                 - Commit site/ and push to main (Netlify deploys with live links)
+                 - Commit site/ and push to main
+                 - Deploy the site: python3 website/build.py --deploy
+                   (the Netlify site is not Git-connected; pushing deploys nothing)
 ```
 
 ---

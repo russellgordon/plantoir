@@ -109,10 +109,12 @@ python scripts/brand_images.py --install-card
 python3 website/build.py
 python3 website/build.py --check
 
-# Commit and push (Netlify deploys automatically)
+# Commit and push, then deploy — the Netlify site is NOT Git-connected,
+# so pushing publishes nothing; the deploy is its own explicit step
 git add website/site.json site/ brand/
 git commit -m "Update website for v<version> release"
 git push origin main
+python3 website/build.py --deploy
 ```
 
 **Redraw the brand images in the same commit as the version line.** After
@@ -124,7 +126,7 @@ python scripts/brand_images.py --install-card
 
 This draws the og:image, the profile photos and the Bluesky banner from
 `mac-app/Plantoir.icon`, and installs the card to `site/social-card.png`
-so Netlify deploys it with the rest of the push.
+so the `--deploy` step publishes it with the rest of the site.
 
 The output is deterministic, so **the normal outcome is no diff at all** —
 `git status` stays quiet and you commit only the version line. Do not

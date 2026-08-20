@@ -7,6 +7,7 @@
   "support_email": "support@plantoir.app",
   "version": "1.0.0",
   "released": "August 2026",
+  "netlify_site_id": "67a69720-5e21-49ed-a354-adce4a75b279",
   "nav": [
     "index",
     "features",

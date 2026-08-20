@@ -9,6 +9,13 @@ Usage::
 
     python3 website/build.py             # write site/
     python3 website/build.py --check     # report problems, write nothing
+    python3 website/build.py --serve     # preview locally; rebuild on refresh
+    python3 website/build.py --deploy    # build, then publish to plantoir.app
+
+Publishing is deliberately a separate, explicit flag: the Netlify site is not
+connected to GitHub, so plantoir.app changes ONLY when --deploy (or
+website/netlify_deploy.py directly) is run. Build, look at site/ locally,
+deploy when it is right.
 
 A page is one file in ``website/pages/``: a short front matter block, then the
 body as HTML. Everything shared -- masthead, navigation, footer, the head tags
@@ -407,6 +414,87 @@ def build(check_only: bool) -> int:
     return 0
 
 
+def newest_source_time() -> float:
+    """The most recent modification time anywhere in the website sources.
+
+    Cheap enough to run per page request: the sources are a few dozen files.
+    site/ itself is excluded — it is the OUTPUT, and rebuilding touches it.
+    """
+    newest = 0.0
+    for file in WEBSITE.rglob("*"):
+        if file.is_file() and not file.name.startswith("."):
+            newest = max(newest, file.stat().st_mtime)
+    return newest
+
+
+def serve(port: int) -> int:
+    """Preview site/ locally, rebuilding whenever a source file has changed.
+
+    Each request for a page checks the sources' modification times and
+    rebuilds first if anything moved, so the loop is: edit, refresh the
+    browser, see it. Stop with Ctrl+C.
+    """
+    import functools
+    import http.server
+    import socketserver
+
+    built_from = newest_source_time()
+
+    class PreviewHandler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self) -> None:
+            nonlocal built_from
+            # Rebuild only ahead of page loads, not for every image the page
+            # then pulls in — one check per refresh, not thirty.
+            wants_page = self.path.endswith("/") or self.path.endswith(".html")
+            if wants_page:
+                current = newest_source_time()
+                if current > built_from:
+                    print("✏️  Sources changed — rebuilding…", flush=True)
+                    build(check_only=False)
+                    built_from = current
+            super().do_GET()
+
+        def end_headers(self) -> None:
+            # Without this the browser caches assets heuristically and an
+            # edited stylesheet or screenshot can survive a refresh — the
+            # copied images keep their original (old) timestamps, which
+            # makes the heuristic window days long. A preview never caches.
+            self.send_header("Cache-Control", "no-store")
+            super().end_headers()
+
+        def log_message(self, format: str, *args) -> None:
+            pass  # one line per asset drowns the rebuild messages
+
+    class PreviewServer(socketserver.ThreadingTCPServer):
+        # Without this, a just-stopped preview leaves its socket in
+        # TIME_WAIT and an immediate restart silently hops to the next
+        # port — the browser tab from last time then shows stale pages.
+        allow_reuse_address = True
+
+    handler = functools.partial(PreviewHandler, directory=str(OUTPUT))
+    last_error: OSError | None = None
+    for candidate in range(port, port + 10):
+        try:
+            with PreviewServer(("127.0.0.1", candidate), handler) as server:
+                address = f"http://localhost:{candidate}/"
+                print(f"\n🔎 Previewing at {address} — edit a source,")
+                print("   refresh the browser, and the page rebuilds. Ctrl+C stops it.")
+                # Open the browser only for a person at a terminal: a piped or
+                # scripted run (tests, agents) must not fling windows around.
+                if sys.stdout.isatty():
+                    import webbrowser
+                    webbrowser.open(address)
+                try:
+                    server.serve_forever()
+                except KeyboardInterrupt:
+                    print("\nPreview stopped.")
+                return 0
+        except OSError as error:
+            last_error = error  # port in use; try the next one
+    print(f"Could not find a free port near {port}: {last_error}", file=sys.stderr)
+    return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build plantoir.app into site/.")
     parser.add_argument(
@@ -414,8 +502,39 @@ def main() -> int:
         action="store_true",
         help="report problems without writing anything",
     )
+    parser.add_argument(
+        "--deploy",
+        action="store_true",
+        help="after a clean build, publish site/ to plantoir.app on Netlify",
+    )
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="after building, preview site/ locally, rebuilding on refresh",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8930,
+        help="port for --serve (default 8930; the next free one is tried if busy)",
+    )
     arguments = parser.parse_args()
-    return build(check_only=arguments.check)
+    if arguments.check and (arguments.deploy or arguments.serve):
+        parser.error("--check writes nothing, so there is nothing to publish or preview")
+    if arguments.deploy and arguments.serve:
+        parser.error("--serve is for looking before you publish; run --deploy after")
+    result = build(check_only=arguments.check)
+    if arguments.serve:
+        if result != 0:
+            print("Serving anyway — fix the warnings above and refresh.", file=sys.stderr)
+        return serve(arguments.port)
+    if arguments.deploy:
+        if result != 0:
+            print("Not deploying: fix the build warnings above first.", file=sys.stderr)
+            return result
+        import netlify_deploy
+        return netlify_deploy.deploy()
+    return result
 
 
 if __name__ == "__main__":

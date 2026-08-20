@@ -22,6 +22,48 @@ the git tag must match.
 > published to the wrong repository leaves the site's evergreen links serving
 > nothing.
 
+## Two platforms, one version series — and when they lag
+
+Decided 2026-08-20, the day Windows 1.1.0 was ready while the mac had no code
+changes at all. The rule that resolves every case of "which number goes on
+this build":
+
+**The version number names which CONTRACTS the build passes, never "what
+changed on this platform."** The two apps are coupled through
+[`contracts/`](contracts/README.md): a contract vintage is part of the
+version, and a teacher saying "I'm on 1.1.0" must pin down exactly one set of
+sentences and rules regardless of their OS. Three consequences:
+
+- **A platform may ship a version the other is not ready for.** The tag goes
+  up carrying the ready platform's assets; GitHub releases accept assets
+  added later, so the other platform's binary JOINS the same release when it
+  qualifies. Until then, plantoir.app's two download buttons simply point at
+  different releases — each honestly labelled. (If the catch-up work turns
+  out to change behaviour, it becomes the next patch version instead, and
+  the ready platform re-attaches unchanged.)
+- **"No code changes" does not exempt a platform from the gate.** A mac DMG
+  gets the 1.1.0 label only when a mac session has made its suite green
+  against the 1.1.0 contracts — for 1.1.0 concretely: implement the
+  teacher-made-link explainer case, retire the three obsolete WSL-setup
+  cases, run `./verify.sh` against the changed shared scripts (expect the
+  one-time image rebuild), and do the verifications MAC-HANDOFF lists. An
+  unchanged binary re-badged with a new number would claim contracts it was
+  never tested against.
+- **Release notes say "macOS: no changes" (or the reverse) plainly** when a
+  platform ships under a new number without behaviour changes. That sentence
+  is the entire cost of keeping one series, and it is cheaper than every
+  support conversation under two.
+
+**Build numbers** exist to uniquely name BITS — the trail prints
+"Plantoir 1.1.0 (build)" into problem reports, and two artifacts must never
+share a name. So: derive, never hand-maintain — `git rev-list --count HEAD`
+at bundle-build time — bump on every build that leaves the dev machine
+(every DMG and installer, including ones handed to a tester), and never
+reset the count, across marketing versions, forever. The mac's
+`CFBundleVersion` follows this today; the Windows bundle should adopt the
+same number as its version's fourth field when convenient (its trail
+currently prints the patch digit, which conflates two ideas).
+
 ## The short version
 
 For future-you, mid-school-year, who remembers nothing. The whys are below.
@@ -130,8 +172,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    the newest release's asset, so teachers click Windows or macOS and get the
    file, no GitHub in sight.
 
-6. **plantoir.app updates itself**: the site lives in `site/` in this repo, and
-   Netlify deploys it on every push.
+6. **Deploy plantoir.app deliberately**: `python3 website/build.py --deploy`
+   builds `site/` and publishes it to Netlify (delta upload; the token comes
+   from the `containerized-quartz-netlify` Keychain item, the site id from
+   `website/site.json`). The Netlify site is NOT connected to GitHub —
+   pushing this repository deploys nothing, which is why this step exists.
 
 ## Bundle format
 

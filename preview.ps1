@@ -146,148 +146,55 @@ function Normalize-HostPath([string]$p) {
     try { (Resolve-Path -LiteralPath $p).Path.TrimEnd('\','/') } catch { $p.TrimEnd('\','/') }
 }
 
-# ==================== Container runtime (Docker Engine in WSL2) ====================
-# Docker Desktop is no longer required. On Windows this script uses the Docker
-# Engine running inside WSL2 (Windows Subsystem for Linux) and installs/starts
-# it automatically as needed. If a native 'docker' command already works (for
-# example, Docker Desktop or Rancher Desktop), it is used as-is.
 
-$env:WSL_UTF8 = '1'   # make wsl.exe emit UTF-8 so PowerShell can parse its output
-$global:DockerViaWsl = $false
-$global:WslUserArgs  = @()
+# ==================== Native toolchain (no container) ====================
+# When the app's bundled runtime folder is present, everything runs directly
+# on this PC: no WSL2, no Docker, no administrator rights, no one-time
+# machine setup at all. The runtime is found through PLANTOIR_RUNTIME (set
+# by the app), falling back to the installed app's own folder so launchers
+# run by hand still find it. The container path is GONE on Windows - the
+# native runtime is the only way this launcher builds anything.
+$NATIVE_RUNTIME = $env:PLANTOIR_RUNTIME
+if (-not $NATIVE_RUNTIME) {
+    $appRuntime = Join-Path $env:LOCALAPPDATA 'Programs\Plantoir\runtime'
+    if (Test-Path (Join-Path $appRuntime 'manifest.json')) { $NATIVE_RUNTIME = $appRuntime }
+}
+if ($NATIVE_RUNTIME -and -not (Test-Path (Join-Path $NATIVE_RUNTIME 'manifest.json'))) { $NATIVE_RUNTIME = $null }
 
-function Test-NativeDockerReady {
-    if (-not (Get-Command docker -CommandType Application -ErrorAction SilentlyContinue)) { return $false }
-    try { docker info *> $null } catch { return $false }
-    return ($LASTEXITCODE -eq 0)
+# Points the shared Python at the bundled runtime and this working folder,
+# and returns the bundled interpreter's path. $WORKDIR_ID is computed below,
+# before any caller runs.
+function Enter-NativeRuntime {
+    $env:PATH = (Join-Path $NATIVE_RUNTIME 'node') + ';' + (Join-Path $NATIVE_RUNTIME 'wrangler\node_modules\.bin') + ';' + $env:PATH
+    $toolchainDir = Join-Path (Get-Location).Path '.toolchain'
+    $base = if (Test-Path (Join-Path $toolchainDir 'scripts')) { $toolchainDir } else { (Get-Location).Path }
+    $env:PLANTOIR_SCRIPTS_DIR = Join-Path $base 'scripts'
+    $env:PLANTOIR_SUPPORT_DIR = Join-Path $base 'support'
+    $env:PLANTOIR_QUARTZ_DIR  = Join-Path $NATIVE_RUNTIME 'quartz'
+    $env:PLANTOIR_EMOJI_FONT  = Join-Path $NATIVE_RUNTIME 'fonts\NotoColorEmoji.ttf'
+    $env:PLANTOIR_COURSES_DIR = Join-Path (Get-Location).Path 'courses'
+    # Build output lives OUTSIDE the working folder: teachers keep working
+    # folders in OneDrive, and a build's thousands of small files would sync
+    # and lock in place there.
+    $buildRoot = Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)
+    $env:PLANTOIR_BUILD_ROOT = $buildRoot
+    $env:PLANTOIR_WORK_DIR   = Join-Path $buildRoot 'work'
+    # The embeddable Python defaults to the ANSI code page; the scripts print
+    # their progress with emoji.
+    $env:PYTHONUTF8 = '1'
+    $env:PYTHONIOENCODING = 'utf-8'
+    return (Join-Path $NATIVE_RUNTIME 'python\python.exe')
+}
+# =========================================================================
+
+# The container path is gone on Windows: a copy without the bundled runtime
+# cannot build anything, and the fix for a teacher is a reinstall.
+if (-not $NATIVE_RUNTIME) {
+  Write-Host "ERROR: This copy of Plantoir is missing its website builder."
+  Write-Host "Reinstall Plantoir, then try again."
+  exit 1
 }
 
-function Test-WslDockerReady {
-    try { wsl $global:WslUserArgs -e docker info *> $null } catch { return $false }
-    return ($LASTEXITCODE -eq 0)
-}
-
-function Use-WslDocker {
-    $global:DockerViaWsl = $true
-    # Shadow 'docker' so every call in this script is routed through WSL.
-    # PowerShell functions take precedence over external commands.
-    # wsl.exe writes docker's stderr to OUR stderr; when a call site
-    # redirects it (*> $null), PowerShell 5.1 wraps each line in an
-    # ErrorRecord, and under ErrorActionPreference=Stop the first line
-    # would TERMINATE the script even for probes that are expected to
-    # fail (e.g. inspecting a not-yet-built image). Relax the preference
-    # inside the wrapper so stderr stays plain output.
-    # $input must be forwarded by hand: a plain function does NOT pass its
-    # pipeline input on to a native command, so "script | docker exec -i"
-    # would leave the remote process waiting forever on stdin (the --stop
-    # hang). An empty $input just gives stdin an immediate EOF, which none
-    # of the launcher's docker calls mind.
-    function global:docker {
-        $eap = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        try {
-      if ($MyInvocation.ExpectingInput) { $input | & wsl $global:WslUserArgs -e docker @args }
-      else { & wsl $global:WslUserArgs -e docker @args }
-    } finally { $ErrorActionPreference = $eap }
-    }
-    Write-Host "Using the Docker engine inside WSL2."
-}
-
-function Ensure-ContainerRuntime {
-    if (Test-NativeDockerReady) { return }
-
-    # Stop mode must NEVER start anything — no provisioning, no prompts, no
-    # waiting for an engine. Detect a running engine (native above, WSL
-    # here); when none answers, there is nothing to stop.
-    if ($STOP_MODE) {
-        if (Test-WslDockerReady) { Use-WslDocker; return }
-        $global:WslUserArgs = @('-u','root')
-        if (Test-WslDockerReady) { Use-WslDocker; return }
-        $global:WslUserArgs = @()
-        Write-Host "Nothing to stop - the website builder isn't running."
-        exit 0
-    }
-
-    if (-not (Get-Command wsl -ErrorAction SilentlyContinue)) {
-        Write-Host "ERROR: No container runtime found."
-        Write-Host "Install WSL2 (Windows Subsystem for Linux) by running this in an"
-        Write-Host "Administrator PowerShell, then reboot and re-run this script:"
-        Write-Host "  wsl --install"
-        exit 1
-    }
-
-    $distros = @()
-    try { $distros = (wsl -l -q) | Where-Object { $_ -and $_.Trim() } } catch {}
-    if (-not $distros) {
-        Write-Host "ERROR: WSL is present but no Linux distribution is installed."
-        Write-Host "Run this in PowerShell, then reboot and re-run this script:"
-        Write-Host "  wsl --install"
-        exit 1
-    }
-
-    # Already-running engine inside WSL? (Try as the default user, then as root.)
-    if (Test-WslDockerReady) { Use-WslDocker; return }
-    $global:WslUserArgs = @('-u','root')
-    if (Test-WslDockerReady) { Use-WslDocker; return }
-    $global:WslUserArgs = @()
-
-    # One-time provisioning begins here. The line below is a milestone
-    # marker the app watches for (parity with the .sh launchers' one-time
-    # "Setting up this Mac" moment).
-    Write-Host "Setting up this PC - a one-time step that runs on its own ..."
-
-    # Is the engine installed inside WSL at all?
-    $dockerInWsl = $false
-    try { wsl -e sh -c "command -v docker" *> $null; $dockerInWsl = ($LASTEXITCODE -eq 0) } catch {}
-
-    if (-not $dockerInWsl) {
-        Write-Host "The Docker engine is not installed inside WSL yet."
-        $ans = Read-Host "Install it now inside your WSL distribution? (Y/n)"
-        if ($ans -and $ans -notmatch '^(?i:y)') { Write-Host "Cancelled. A container runtime is required to continue."; exit 1 }
-        Write-Host "Installing the Docker engine inside WSL (this can take a few minutes)..."
-        wsl -u root -e sh -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io"
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "ERROR: Could not install the Docker engine inside WSL."
-            Write-Host "Check your internet connection and re-run this script - it is safe to re-run."
-            exit 1
-        }
-        $wslUser = ''
-        try { $wslUser = (wsl -e sh -c "whoami" 2>$null | Select-Object -First 1).Trim() } catch {}
-        if ($wslUser -and $wslUser -ne 'root') { try { wsl -u root -e sh -c "usermod -aG docker $wslUser" *> $null } catch {} }
-    }
-
-    Write-Host "Starting the Docker engine inside WSL..."
-    try { wsl -u root -e sh -c "service docker start" *> $null } catch {}
-
-    for ($i = 0; $i -lt 30; $i++) {
-        if (Test-WslDockerReady) { Use-WslDocker; return }
-        $global:WslUserArgs = @('-u','root')
-        if (Test-WslDockerReady) { Use-WslDocker; return }
-        $global:WslUserArgs = @()
-        Start-Sleep -Seconds 2
-    }
-
-    Write-Host "ERROR: The Docker engine inside WSL did not become ready."
-    Write-Host "Try these commands, then re-run this script:"
-    Write-Host "  wsl -u root -e sh -c 'service docker start'"
-    Write-Host "  wsl -e docker info"
-    exit 1
-}
-
-# Docker running inside WSL sees Windows folders under /mnt/<drive>/...;
-# translate host paths for bind mounts when routing through WSL.
-function Get-MountPath([string]$winPath) {
-    if (-not $global:DockerViaWsl) { return $winPath }
-    try {
-        $p = (wsl -e wslpath -a "$winPath" | Select-Object -First 1)
-        if ($p) { return $p.Trim() }
-    } catch {}
-    return $winPath
-}
-
-Ensure-ContainerRuntime
-$MOUNT_COURSES = Get-MountPath $HOST_COURSES
-# ====================================================================
 
 # ---- Container handling (mount-aware) ----
 # One container per working folder, so two folders never repoint each
@@ -334,288 +241,49 @@ $CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"
 # build, no container creation. Processes are found by WORKING
 # DIRECTORY, not port, so builds are caught as well as servers and
 # other sections' processes can never be touched (parity: preview.sh).
-if ($STOP_MODE) {
-    $dockerReady = $false
-    try { docker info *> $null; if ($LASTEXITCODE -eq 0) { $dockerReady = $true } } catch {}
-    if (-not $dockerReady) {
-        Write-Host "Nothing to stop - the website builder isn't running."
-        exit 0
-    }
-    $containerRunning = ((docker ps --format '{{.Names}}') | Where-Object { $_ -eq $CONTAINER_NAME }) -ne $null
-    if (-not $containerRunning) {
-        Write-Host "Nothing to stop - no container is running for this folder."
-        exit 0
-    }
+if ($NATIVE_RUNTIME -and $STOP_MODE) {
+    # Section processes are recognisable without /proc: the python build
+    # carries --course/--section on its command line, and the serving node's
+    # carries the section's work dir when launched with an absolute path.
+    # What that misses is a child spawned with a RELATIVE path (npx does),
+    # so every match's descendants go too, walked through the same process
+    # snapshot's parent links.
+    $buildRoot = Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)
+    $sectionNeedle = (Join-Path $buildRoot ('work\' + $COURSE + '\section' + $SECTION)).ToLowerInvariant()
     Write-Host "Stopping preview processes for $COURSE section $SECTION ..."
-    $stopScript = @'
-import os
-import signal
-import time
-
-target = os.environ["TARGET_DIR"]
-alt_target = target.replace("/teaching/courses/", "/tmp/quartz-builds/").replace("/.merged_output/", "/")
-targets = [t for t in [target, alt_target] if t]
-own_pid = os.getpid()
-
-def preview_pids():
-    """PIDs whose working directory is inside this section's output."""
-    found = []
-    for entry in os.listdir("/proc"):
-        if not entry.isdigit():
-            continue
-        pid = int(entry)
-        if pid == own_pid:
-            continue
-        try:
-            cwd = os.readlink(f"/proc/{entry}/cwd")
-        except OSError:
-            continue
-        if any(cwd == t or cwd.startswith(t + "/") for t in targets):
-            found.append(pid)
-    return found
-
-victims = preview_pids()
-for pid in victims:
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-if victims:
-    time.sleep(1)
-for pid in preview_pids():
-    try:
-        os.kill(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-print(f"Stopped {len(victims)} process(es).")
-'@
-    $targetDir = "/teaching/courses/$COURSE/.merged_output/section$SECTION"
-    $stopScript | docker exec -i -e "TARGET_DIR=$targetDir" $CONTAINER_NAME python3 -
+    $snapshot = @(Get-CimInstance Win32_Process)
+    $matched = New-Object System.Collections.Generic.HashSet[uint32]
+    foreach ($proc in $snapshot) {
+        if ($proc.Name -ne 'node.exe' -and $proc.Name -ne 'python.exe') { continue }
+        $line = [string]$proc.CommandLine
+        if (-not $line) { continue }
+        $lower = $line.ToLowerInvariant()
+        $isBuild = ($lower.Contains('build_site.py') -and $lower.Contains(('--course=' + $COURSE).ToLowerInvariant()) -and $lower.Contains(('--section=' + $SECTION).ToLowerInvariant()))
+        if ($lower.Contains($sectionNeedle) -or $isBuild) { $null = $matched.Add($proc.ProcessId) }
+    }
+    # Descendants: repeat until no new child turns up (the chain is
+    # python -> cmd -> node, so one pass is not enough).
+    do {
+        $grew = $false
+        foreach ($proc in $snapshot) {
+            if ($matched.Contains($proc.ProcessId)) { continue }
+            if ($proc.ParentProcessId -and $matched.Contains([uint32]$proc.ParentProcessId)) {
+                $null = $matched.Add($proc.ProcessId)
+                $grew = $true
+            }
+        }
+    } while ($grew)
+    $stopped = 0
+    foreach ($processId in $matched) {
+        try { Stop-Process -Id $processId -Force -ErrorAction Stop; $stopped++ } catch {}
+    }
+    Write-Host "Stopped $stopped process(es)."
     exit 0
 }
 
-# ---- The image is built HERE, from this folder's own recipe ----------
-function Get-BuildContext {
-  if (Test-Path "./Dockerfile") { return "." }
-  if (Test-Path "./.toolchain/Dockerfile") { return "./.toolchain" }
-  return $null
-}
-
-function Get-ToolchainHash([string]$context) {
-  $sha = [System.Security.Cryptography.SHA256]::Create()
-  # Hash only what the recipe is made of (parity with the .sh launchers):
-  # in the repository the context is the repo root, and build outputs or
-  # app sources must not steer the tag.
-  # Fast directory traversal with pruning of excluded folders:
-  $filesToHash = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
-  $stack = [System.Collections.Generic.Stack[string]]::new()
-  # Anchor to the launcher's own folder (the PowerShell location), NOT the
-  # process working directory: .NET path APIs resolve relative paths against
-  # Environment.CurrentDirectory, which Set-Location does not update — a run
-  # whose process CWD held a DIFFERENT (stale) .toolchain hashed that one and
-  # tagged the image with the wrong recipe. Docker children DO inherit the
-  # PowerShell location, so this keeps hash and build context pointed at the
-  # same folder.
-  $fullContext = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $context))
-  $stack.Push($fullContext)
-
-  while ($stack.Count -gt 0) {
-    $dir = $stack.Pop()
-    try {
-      foreach ($subDir in [System.IO.Directory]::GetDirectories($dir)) {
-        $dirName = [System.IO.Path]::GetFileName($subDir)
-        if ($dirName -match '^(\.git|courses|mac-app|windows-app|node_modules|\.merged_output|bin|obj|\.gemini|\.system_generated|\.agents)$') {
-          continue
-        }
-        $stack.Push($subDir)
-      }
-      foreach ($file in [System.IO.Directory]::GetFiles($dir)) {
-        $fileName = [System.IO.Path]::GetFileName($file)
-        if ($fileName -eq '.DS_Store') { continue }
-        $filesToHash.Add([System.IO.FileInfo]::new($file))
-      }
-    } catch {}
-  }
-
-  $filesToHash.Sort([System.Comparison[System.IO.FileInfo]]{ param($a, $b) [System.StringComparer]::CurrentCultureIgnoreCase.Compare($a.FullName, $b.FullName) })
-
-  $sb = [System.Text.StringBuilder]::new()
-  foreach ($fileInfo in $filesToHash) {
-    try {
-      $stream = [System.IO.File]::OpenRead($fileInfo.FullName)
-      try {
-        $fileHashBytes = $sha.ComputeHash($stream)
-        $null = $sb.Append(([System.BitConverter]::ToString($fileHashBytes) -replace '-',''))
-      } finally {
-        $stream.Dispose()
-      }
-    } catch {}
-  }
-
-  $combined = $sb.ToString()
-  $bytes = [Text.Encoding]::UTF8.GetBytes($combined)
-  return ([BitConverter]::ToString($sha.ComputeHash($bytes)) -replace '-','').Substring(0,8).ToLower()
-}
 
 
-# BuildKit is what builds the image; the apt-installed WSL engine may lack
-# the buildx plugin. Install it when missing; failing that, fall back to
-# the classic builder with BuildKit enabled (mirrors the .sh launchers).
-$script:UseBuildKitFallback = $false
-function Ensure-Buildx {
-  docker buildx version *> $null
-  if ($LASTEXITCODE -eq 0) { return }
-  if ($global:DockerViaWsl) {
-    Write-Host "Installing the image builder (BuildKit) inside WSL ..."
-    try { wsl -u root -e sh -c "apt-get update -qq >/dev/null 2>&1; apt-get install -y -qq docker-buildx >/dev/null 2>&1 || apt-get install -y -qq docker-buildx-plugin >/dev/null 2>&1" *> $null } catch {}
-    docker buildx version *> $null
-    if ($LASTEXITCODE -eq 0) { return }
-  }
-  Write-Host "WARNING: 'docker buildx' is unavailable; using the classic builder with"
-  Write-Host "         BuildKit enabled. If the built image misbehaves, install buildx."
-  $script:UseBuildKitFallback = $true
-}
 
-function Build-ImageIfMissing {
-  docker image inspect "$IMAGE" *> $null
-  if ($LASTEXITCODE -eq 0) { Write-Host "Website builder is ready."; return }
-  if (-not $BUILD_CONTEXT) {
-    Write-Host "Image '$IMAGE' is not on this machine. Build it first."
-    exit 1
-  }
-  Write-Host "Building your website builder - the first time takes a few minutes ..."
-  Ensure-Buildx
-  if ($script:UseBuildKitFallback) {
-    if ($global:DockerViaWsl) {
-      wsl @($global:WslUserArgs) -e env DOCKER_BUILDKIT=1 docker build --progress=plain -t "$IMAGE" "$BUILD_CONTEXT"
-    } else {
-      $env:DOCKER_BUILDKIT = '1'
-      docker build --progress=plain -t "$IMAGE" "$BUILD_CONTEXT"
-    }
-  } else {
-    docker buildx build --load --progress=plain -t "$IMAGE" "$BUILD_CONTEXT"
-  }
-  if ($LASTEXITCODE -ne 0) {
-    Write-Host "Could not build the website builder."
-    Write-Host "The first build needs an internet connection - try again once online."
-    exit 1
-  }
-  Write-Host "Website builder built."
-}
-
-$BUILD_CONTEXT = Get-BuildContext
-if ($OVERRIDE_IMAGE) {
-  $BUILD_CONTEXT = $null
-  $IMAGE = $OVERRIDE_IMAGE
-} elseif ($BUILD_CONTEXT) {
-  Write-Host "Checking whether your website builder is up to date..."
-  $IMAGE = "teaching-quartz:src-$(Get-ToolchainHash $BUILD_CONTEXT)"
-} else {
-  Write-Host "This folder is missing the toolchain's build recipe."
-  Write-Host "Open the folder in the app once to refresh it, or run from a repository copy."
-  exit 1
-}
-Build-ImageIfMissing
-
-
-# A free block of host ports for this folder's previews (four site ports
-# and their live-reload websocket ports).
-function Find-FreePortBlock {
-  foreach ($base in 8081, 8091, 8101, 8111, 8121, 8131) {
-    $allFree = $true
-    foreach ($offset in 0..3) {
-      if (Get-NetTCPConnection -State Listen -LocalPort ($base + $offset) -ErrorAction SilentlyContinue) { $allFree = $false; break }
-      if (Get-NetTCPConnection -State Listen -LocalPort ($base + 1000 + $offset) -ErrorAction SilentlyContinue) { $allFree = $false; break }
-    }
-    if ($allFree) { return $base }
-  }
-  return $null
-}
-
-# The one shared container from before folders each had their own.
-function Retire-LegacyContainer {
-  $names = docker ps -a --format '{{.Names}}'
-  if ($names -contains 'teaching-quartz') {
-    Write-Host "Retiring the old shared workspace container ..."
-    docker rm -f teaching-quartz *> $null
-  }
-}
-
-function Run-ContainerWithMount {
-    Retire-LegacyContainer
-    $HostBase = Find-FreePortBlock
-    if (-not $HostBase) { Write-Host "Could not find free ports for this folder's previews."; exit 1 }
-    Write-Host ("Binding host courses to container: {0} -> /teaching/courses" -f $MOUNT_COURSES)
-    docker run -dit `
-        --name "$CONTAINER_NAME" `
-        -v "${MOUNT_COURSES}:/teaching/courses" `
-        -p "$HostBase-$($HostBase + 3):8081-8084" `
-        -p "$($HostBase + 1000)-$($HostBase + 1003):9081-9084" `
-        "$IMAGE" `
-        tail -f /dev/null | Out-Null
-}
-
-# A container keeps running the version it was created from, so an update
-# only takes effect once the container itself is recreated.
-# The line below is a milestone marker the app watches for (parity with
-# preview.sh's "Starting container if needed...").
-Write-Host "Starting container if needed ..."
-$DESIRED_IMAGE_ID = (docker image inspect --format '{{.Id}}' "$IMAGE" 2>$null | Select-Object -First 1)
-$RUNNING_IMAGE_ID = (docker inspect -f '{{.Image}}' "$CONTAINER_NAME" 2>$null | Select-Object -First 1)
-
-$containerExists = ((docker ps -a --format '{{.Names}}') | Where-Object { $_ -eq $CONTAINER_NAME }) -ne $null
-if ($containerExists) {
-    # check mount
-    $CURRENT_MOUNT_SRC = $null
-    try {
-        $cinfo = docker inspect "$CONTAINER_NAME" | ConvertFrom-Json
-        if ($cinfo -and $cinfo.Count -gt 0) {
-            foreach ($m in $cinfo[0].Mounts) {
-                if ($m.Destination -eq "/teaching/courses") { $CURRENT_MOUNT_SRC = $m.Source; break }
-            }
-        }
-    } catch {}
-    $CURRENT_MOUNT_SRC = Normalize-HostPath $CURRENT_MOUNT_SRC
-    $HOST_COURSES_N = Normalize-HostPath $MOUNT_COURSES
-
-    if (-not $CURRENT_MOUNT_SRC) {
-        Write-Host "Existing container has no /teaching/courses mount; recreating with correct mount ..."
-        if ((docker ps --format '{{.Names}}' | Where-Object { $_ -eq $CONTAINER_NAME })) { docker stop "$CONTAINER_NAME" *> $null }
-        docker rm "$CONTAINER_NAME" *> $null
-        Run-ContainerWithMount
-    } elseif ($CURRENT_MOUNT_SRC -ne $HOST_COURSES_N) {
-        Write-Host "Detected different working directory:"
-        Write-Host "  Existing mount: $CURRENT_MOUNT_SRC"
-        Write-Host "  Desired mount:  $HOST_COURSES_N"
-        Write-Host "Recreating container '$CONTAINER_NAME' to point at the new folder ..."
-        if ((docker ps --format '{{.Names}}' | Where-Object { $_ -eq $CONTAINER_NAME })) { docker stop "$CONTAINER_NAME" *> $null }
-        docker rm "$CONTAINER_NAME" *> $null
-        Run-ContainerWithMount
-    } elseif ($DESIRED_IMAGE_ID -and $RUNNING_IMAGE_ID -and ($RUNNING_IMAGE_ID -ne $DESIRED_IMAGE_ID)) {
-        Write-Host "Your workspace was built from an older version; rebuilding it so the update takes effect ..."
-        if ((docker ps --format '{{.Names}}' | Where-Object { $_ -eq $CONTAINER_NAME })) { docker stop "$CONTAINER_NAME" *> $null }
-        docker rm "$CONTAINER_NAME" *> $null
-        Run-ContainerWithMount
-    } elseif (-not ((docker inspect -f '{{json .HostConfig.PortBindings}}' "$CONTAINER_NAME" 2>$null) -match '9084/tcp')) {
-        # An older container publishes only one port; published ports cannot
-        # change after creation, so recreating is the only way to add them.
-        Write-Host "Rebuilding your workspace so several previews can run at once ..."
-        if ((docker ps --format '{{.Names}}' | Where-Object { $_ -eq $CONTAINER_NAME })) { docker stop "$CONTAINER_NAME" *> $null }
-        docker rm "$CONTAINER_NAME" *> $null
-        Run-ContainerWithMount
-    } else {
-        $running = ((docker ps --format '{{.Names}}') | Where-Object { $_ -eq $CONTAINER_NAME }) -ne $null
-        if (-not $running) {
-            Write-Host "Starting existing container $CONTAINER_NAME ..."
-            docker start "$CONTAINER_NAME" *> $null
-        } else {
-            Write-Host "Container $CONTAINER_NAME is already running with correct mount."
-        }
-    }
-} else {
-    Write-Host "Creating a new container named $CONTAINER_NAME (image: $IMAGE) ..."
-    Run-ContainerWithMount
-}
 
 # ---- Validate SECTION against course_config.json ----
 Write-Host "Checking allowed timetable sections for $COURSE ..."
@@ -656,6 +324,11 @@ if ($allowed) {
 
 # ---- Announce output path ----
 $OUTPUT_PATH = "courses/{0}/.merged_output/section{1}" -f $COURSE, $SECTION
+if ($NATIVE_RUNTIME) {
+    # The real location: native builds live in the app's data folder, out of
+    # OneDrive's way, and the printed path must not claim otherwise.
+    $OUTPUT_PATH = Join-Path $env:LOCALAPPDATA ("Plantoir\builds\{0}\{1}\section{2}" -f $WORKDIR_ID, $COURSE, $SECTION)
+}
 Write-Host ("Output will be written to: {0}" -f $OUTPUT_PATH)
 
 # ---- Map flags to build_site.py args ----
@@ -671,30 +344,26 @@ $argList += "--port=$PREVIEW_PORT"
 # address is resolved from the container rather than assumed. The exact
 # phrase below is what the app watches for.
 $HOST_PREVIEW_PORT = $null
-$portLine = docker port "$CONTAINER_NAME" "$PREVIEW_PORT/tcp" 2>$null | Select-Object -First 1
-if ($portLine -and ($portLine -match ':(\d+)\s*$')) { $HOST_PREVIEW_PORT = $Matches[1] }
+# Probe a free site+websocket pair, walking 10-apart blocks (8081/8091/...).
+# build_site.py re-probes and re-announces moments before the bind - this
+# early answer only feeds the pre-build announcement below.
+if (-not $BUILD_ONLY) {
+    foreach ($candidate in @($PREVIEW_PORT, ($PREVIEW_PORT+10), ($PREVIEW_PORT+20), ($PREVIEW_PORT+30), ($PREVIEW_PORT+40), ($PREVIEW_PORT+50))) {
+        $siteBusy = Get-NetTCPConnection -State Listen -LocalPort $candidate -ErrorAction SilentlyContinue
+        $wsBusy   = Get-NetTCPConnection -State Listen -LocalPort ($candidate + 1000) -ErrorAction SilentlyContinue
+        if (-not $siteBusy -and -not $wsBusy) { $HOST_PREVIEW_PORT = $candidate; break }
+    }
+    if (-not $HOST_PREVIEW_PORT) { Write-Host "Could not find free ports for this folder's previews."; exit 1 }
+    $argList = @($argList | Where-Object { $_ -notlike '--port=*' }) + "--port=$HOST_PREVIEW_PORT"
+}
 if (-not $HOST_PREVIEW_PORT) { $HOST_PREVIEW_PORT = $PREVIEW_PORT }
 if (-not $BUILD_ONLY) {
     Write-Host ("Preview will be available at: http://localhost:{0}/" -f $HOST_PREVIEW_PORT)
 }
 
-# ---- Run build inside the container ----
-Write-Host "Running build_site.py inside the Docker container ..."
-# A terminal is what makes the container's prompts and live progress work, so
-# ask for one when there IS one. But `docker exec -t` refuses to start at all
-# when stdin is not a terminal, which is how this runs from a script, a CI
-# job, or Plantoir's MCP server — and it fails at this line, minutes into the
-# build, with nothing more useful than "the input device is not a TTY".
-# Without a terminal, run python unbuffered instead, so progress still arrives
-# line by line rather than in one lump when the build finishes.
-$interactive = -not [Console]::IsInputRedirected
-$execArgs = @("exec")
-$execArgs += if ($interactive) { "-it" } else { "-i" }
-$execArgs += @("$CONTAINER_NAME", "python3")
-if (-not $interactive) { $execArgs += "-u" }
-$execArgs += "/opt/scripts/build_site.py"
-$execArgs += $argList
-& docker @execArgs
-# Propagate the build's exit code — without this the script reports
-# success even when the run inside the container failed.
+# ---- Run the build on this PC ----
+$py = Enter-NativeRuntime
+$env:HOST_TZ_OFFSET = (Get-Date).ToString('zzz').Replace(':','')
+Write-Host "Running the website builder on this PC ..."
+& $py -u (Join-Path $env:PLANTOIR_SCRIPTS_DIR 'build_site.py') @argList
 exit $LASTEXITCODE

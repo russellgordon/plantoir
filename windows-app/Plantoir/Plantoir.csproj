@@ -9,7 +9,7 @@
     <!-- The product version: the single source the About panel reads, the
          release zip is named after, and the git tag must match (v1.0.0).
          Keep in lockstep with the mac app's marketing version. -->
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Company>Russell Gordon</Company>
     <Product>Plantoir</Product>
     <Copyright>Copyright 2026 Russell Gordon</Copyright>
@@ -17,6 +17,13 @@
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Platforms>x64</Platforms>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- SelfContained must be EXPLICIT: with a RuntimeIdentifier set,
+         `dotnet publish` has defaulted to framework-DEPENDENT since .NET 6,
+         and WindowsAppSDKSelfContained covers only the WinAppSDK half. The
+         gap shipped in 1.0.x and put an "install .NET" dialog in front of a
+         workshop of teachers - dev machines all carry runtimes, so no local
+         test ever saw it. -->
+    <SelfContained>true</SelfContained>
     <UseWinUI>true</UseWinUI>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -72,5 +79,17 @@
   <!-- Ensure the MCP server binary is always freshly published beside the app -->
   <Target Name="PublishMcpBesideApp" AfterTargets="Build">
     <MSBuild Projects="..\Plantoir.Mcp\Plantoir.Mcp.csproj" Targets="Publish" Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);PublishDir=$(TargetDir)" />
+  </Target>
+
+  <!-- The native toolchain runtime (node, python, patched Quartz, wrangler)
+       from Vendor\fetch-runtime.ps1. Mirrored with robocopy rather than
+       Content items: it holds ~24,000 files (node_modules), and that many
+       MSBuild items slows every build. Robocopy exit codes below 8 mean
+       success, hence the exit-code laundering. -->
+  <Target Name="CopyNativeRuntime" AfterTargets="Build" Condition="Exists('..\Vendor\runtime\manifest.json')">
+    <Exec Command="robocopy &quot;$(MSBuildProjectDirectory)\..\Vendor\runtime&quot; &quot;$(TargetDir)runtime&quot; /MIR /NFL /NDL /NJH /NJS /NP &amp; if %25errorlevel%25 lss 8 exit /b 0" />
+  </Target>
+  <Target Name="PublishNativeRuntime" AfterTargets="Publish" Condition="Exists('..\Vendor\runtime\manifest.json')">
+    <Exec Command="robocopy &quot;$(MSBuildProjectDirectory)\..\Vendor\runtime&quot; &quot;$(PublishDir)runtime&quot; /MIR /NFL /NDL /NJH /NJS /NP &amp; if %25errorlevel%25 lss 8 exit /b 0" />
   </Target>
 </Project>

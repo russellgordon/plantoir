@@ -1,11 +1,19 @@
 # plantoir.app
 
 The marketing site. Sources live here; **finished pages are written into
-`site/`**, which is what Netlify deploys. Nothing in this folder is served.
+`site/`**, which is what gets published. Nothing in this folder is served.
+
+Publishing is explicit: the Netlify site is NOT connected to GitHub, so
+pushing this repository deploys nothing. Build, preview `site/` locally,
+and deploy when it is right (delta upload — an unchanged site sends nothing;
+token from the `containerized-quartz-netlify` Keychain item or
+`NETLIFY_AUTH_TOKEN`, site id from `website/site.json`).
 
 ```bash
 python3 website/build.py          # write site/
 python3 website/build.py --check  # report problems, write nothing
+python3 website/build.py --serve  # preview locally; edits rebuild on refresh
+python3 website/build.py --deploy # build, then publish to plantoir.app
 ```
 
 ## What is where

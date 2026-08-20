@@ -26,3 +26,7 @@ mac-app/build/
 # ~25-35 MB of build output; the scripts pin the version.
 mac-app/Vendor/llama/
 windows-app/Vendor/llama/
+
+# The native Windows toolchain runtime (node, python, patched Quartz,
+# wrangler), fetched by Vendor/fetch-runtime.ps1 — ~600 MB of pinned output.
+windows-app/Vendor/runtime/
