@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Day 7 of 8: technical rehearsal in the space
+2. Day 8 of 9: technical rehearsal in the space
 3. Cues run; entrances and exits fixed
 4. Programme notes drafted
 5. Cool-down

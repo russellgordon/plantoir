@@ -18,4 +18,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Draft the description section.
+- [ ] Watch your work a second time, with one narrow focus. Then draft
+      the description section.

@@ -10,6 +10,7 @@ rather than assembled in June.
 **Unit 1 — The moving body**
 
 - [[The Dance Portfolio]]
+- [[Judging Your Own Work]]
 - [[Video of Yourself]]
 - [[Your Movement Journal]]
 

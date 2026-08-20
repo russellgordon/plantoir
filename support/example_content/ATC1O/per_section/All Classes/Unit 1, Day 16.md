@@ -14,7 +14,8 @@ tags:
 2. [[The Safe Dancer]] demonstrations, in pairs
 3. The five-point studio code, drafted by each student
 4. Comparing codes: what did everyone include?
-5. Cool-down
+5. Last fifteen minutes: the note from Day 15 put into your written piece
+6. Cool-down
 
 ## Things to do before our next class
 

@@ -12,7 +12,8 @@ tags:
 
 1. Warm-up: [[The Standard Warm-Up]]
 2. Working period: revision
-3. Coaching
+3. Coaching: a minute with each dancer on their own, while their group
+   works
 4. Rehearsal
 5. Cool-down
 

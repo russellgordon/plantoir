@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. The June video: [[Video of Yourself]]
+2. Launch: [[The Portfolio and Reflection]], criteria read together; then
+   the June video: [[Video of Yourself]]
 3. Everyone films the same solo they filmed in September
 4. First comparison, side by side
 5. Cool-down

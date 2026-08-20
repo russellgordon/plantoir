@@ -13,9 +13,10 @@ tags:
 1. Warm-up: [[The Standard Warm-Up]]
 2. Seminar: [[Can a Dance Change Anything|Can a Dance Change Anything?]]
 3. Positions tested against real works
-4. Cool-down
+4. Working period: yesterday's note put in, and the seminar worked into
+   your last paragraph
 5. Cool-down
 
 ## Things to do before our next class
 
-- [ ] Revise your review after the seminar.
+- [ ] Read the review out loud once before you hand it in tomorrow.

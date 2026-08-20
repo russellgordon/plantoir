@@ -13,9 +13,9 @@ tags:
 1. Warm-up: [[The Standard Warm-Up]]
 2. Seminar: [[Who Is Dance For|Who Is Dance For?]]
 3. The year's argument, revisited with everything we now know
-4. Cool-down
+4. Journal, in the studio: has your answer changed since September?
 5. Cool-down
 
 ## Things to do before our next class
 
-- [ ] Journal: has your answer changed since September?
+- [ ] Nothing tonight — tomorrow is for dancing.

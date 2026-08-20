@@ -12,7 +12,9 @@ tags:
 
 1. Warm-up: [[The Standard Warm-Up]]
 2. Portfolio conferences, one by one
-3. Others: rehearsal of anything to be re-assessed
+3. Others: [[Judging Your Own Work]] against the criteria on
+   [[The Portfolio and Reflection]], then fill what it finds — or
+   rehearse anything to be re-assessed
 4. Technique
 5. Cool-down
 
