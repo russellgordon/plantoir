@@ -6,8 +6,8 @@ enableToc: true
 ---
 > [!abstract] At a glance
 > Individual · November to April, four checkpoints · a text you choose
-> and a 2,000-word essay · assessed at each checkpoint and on the final
-> essay · part of the final 30% of the course
+> and a 2,000-word essay · the four checkpoints are marked within the
+> seventy per cent; the finished essay is part of the final thirty
 
 ## The task
 
@@ -58,6 +58,8 @@ rather than to agree, and a counter-reading engaged. The method is on
 
 ![[B1.1]]
 
+![[B4.1]]
+
 ![[B4.2]]
 
 ![[C2.5]]
@@ -70,3 +72,44 @@ rather than to agree, and a counter-reading engaged. The method is on
 
 ![[C4.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+The TALK below is checkpoint two. The OBSERVE is the day after checkpoint
+three, watching the thesis you approved yesterday being attacked. Both
+belong to the CHECKPOINTS, which are marked within the seventy per cent —
+the finished essay is part of the final thirty and is judged on the paper
+alone.
+
+OBSERVE — Unit 4, Day 7, the day after checkpoint three, the pairs trying
+to break each other's theses
+  Watch for: how a writer defends a thesis under attack. Narrowing it —
+  "then I only mean it about the last third" — is a writer's move. Adding
+  a fourth example is not; it is the same claim carrying more luggage.
+  The finished essay shows the thesis that survived and never the three
+  minutes in which it changed.
+  Going well: the thesis is being crossed out and rewritten while the
+  other person is still talking.
+  Stuck: the defence gets louder rather than smaller.
+  Record: two columns on the class list — narrowed, piled on.
+
+TALK — Unit 3, Day 10, checkpoint two, at the conferences the agenda
+already schedules
+  Ask: "Read me the entry in your log that made you change your
+  question."
+  Then: "What is missing from this log that the essay is going to need?"
+  A strong answer finds the entry, and names a gap rather than a quantity
+  — not "more quotations" but "nothing from the last eighty pages,
+  because I stopped logging once it got good". That is C1.5, determining
+  whether the material gathered is accurate, complete, and effectively
+  meets the requirements of the writing task — and the log itself cannot
+  show it to you: twelve entries look the same whether they were chosen
+  or merely collected.
+  Record: circle the entry they read out, and date it. Ask the second
+  question again at checkpoint three, Unit 4, Day 6 — the movement
+  between the two answers is the evidence.
+
+The product evidence is the four checkpoints and the essay handed in on
+Unit 4, Day 14.
+%%

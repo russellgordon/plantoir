@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[The Close Reading Essay]], day 3 — drafting period
-2. Conference: I read your first paragraph and ask one question
+1. Modelled together, ten minutes: [[Judging Your Own Work]], on a
+   paragraph belonging to nobody in this room
+2. [[The Close Reading Essay]], day 3 — drafting period
+3. Conference: I read your first paragraph and ask one question
 
 ## Things to do before our next class
 

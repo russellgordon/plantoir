@@ -13,6 +13,7 @@ tags:
 1. [[The Media Argument]], day 2 — making period: your own text, with three
    named techniques and one concession
 2. Peer test on the intended audience
+3. Two minutes with me, each pair, while the making carries on
 
 ## Things to do before our next class
 

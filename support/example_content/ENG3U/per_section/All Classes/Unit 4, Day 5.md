@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Hand in [[The Media Argument]] — day 3
-2. Gallery: every made text played or shown; audiences guessed and
+1. First ten minutes: your own 200-word note, written apart
+2. Hand in [[The Media Argument]] — day 3
+3. Gallery: every made text played or shown; audiences guessed and
    checked
 
 ## Things to do before our next class

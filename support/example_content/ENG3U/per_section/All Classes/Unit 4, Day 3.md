@@ -12,7 +12,9 @@ tags:
 
 1. Launch: [[The Media Argument]], day 1 — texts chosen and approved
 2. The analysis begun, with evidence from the text itself
+3. Last fifteen minutes, apart and in silence: question five, answered by
+   each of you on your own and handed in before you go
 
 ## Things to do before our next class
 
-- [ ] Analysis drafted to question three.
+- [ ] Your own two questions of the analysis, drafted.

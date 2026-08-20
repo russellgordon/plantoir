@@ -31,6 +31,10 @@ bring is what you can remember having thought.
 Write the entry the same day. An entry written in June about a November
 class is a memory of a memory.
 
+The entries that count towards a mark are the ones written **in class, at
+a milestone** — see [[How Marks Work]]. Everything else in here is yours,
+and it is practice, and practice is not marked.
+
 > [!tip] If journals have never worked for you
 > Three sentences: what happened in the text, what you thought, one
 > question for the writer. Three of those a week is a real journal, and

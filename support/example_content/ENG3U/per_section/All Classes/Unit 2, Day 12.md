@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Seminars: groups one and two
-2. Participation assessed for everybody
+2. Leaders write up their own seminar in the last part of the period;
+   what everybody else says in the room is evidence too — see
+   [[The Macbeth Seminar]]
 
 ## Things to do before our next class
 

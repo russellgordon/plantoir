@@ -11,6 +11,7 @@ tags:
 ## Agenda
 
 1. Seminars: groups three and four
+2. Leaders' write-ups in the last part of the period, in before you go
 
 ## Things to do before our next class
 

@@ -66,3 +66,40 @@ tags:
 
 ![[D1.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+This task is product-only on purpose: three hours, closed book, one
+paper, and nothing said or seen in the review classes belongs in this
+mark. The two days below are for the other seventy per cent — the
+evidence you may still be short of on a particular student — and for
+deciding what to reteach while the review classes are still ahead of you.
+
+OBSERVE — Unit 4, Day 17, the sight passage written under time
+  Watch for: the first four minutes. Reading twice with a pencil before
+  the pen moves, or writing from the first line. The paper shows you the
+  paragraph and never the four minutes that produced it, and it is the
+  four minutes that transfer to the examination room.
+  Going well: marks in the margin before any sentence is written.
+  Stuck: the opening sentence written during the first read.
+  Record: two columns while they work — you have nothing else to do in
+  that period.
+
+TALK — Unit 4, Day 16, while three passages per text are chosen in class
+  The agenda says reasons are given, so listen past the first one.
+  Ask: "Which of your three would you use if the question were about form
+  rather than theme?"
+  Then: "Which text can you quote least of, and what will you do about it
+  this week?"
+  A strong answer moves a passage from one use to another and can say
+  where it stretches — that is B2.3, identifying elements of style in a
+  text and explaining how they help communicate meaning. It is also the
+  fastest warning you will get of who is going to struggle in that room,
+  while there is still time to do something about it.
+  Record: initials and one text name — the weak one — on a single sheet
+  for the whole class.
+
+The product evidence is the paper itself, written in the examination
+period.
+%%

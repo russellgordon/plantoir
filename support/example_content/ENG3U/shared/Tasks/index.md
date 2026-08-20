@@ -12,4 +12,6 @@ created: __CREATED__
   essay at length, four checkpoints.
 - [[The Comparative Response]] — Unit 3. The novel beside the
   non-fiction.
+- [[The Media Argument]] — Unit 4. Read one media text closely, then make
+  one.
 - [[Final Examination]] — the final evaluation.

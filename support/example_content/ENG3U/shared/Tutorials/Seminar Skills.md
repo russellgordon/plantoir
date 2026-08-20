@@ -15,8 +15,9 @@ actually get tested.
 - **Write two questions that cannot be answered yes or no.** The best
   seminar questions begin "Why does…", "What is the effect of…", or
   "Which matters more…".
-- **Choose two passages** you will bring, with page numbers. Nobody
-  waits while you find it.
+- **Choose two passages** you will bring to any seminar — three, with
+  act, scene, and line, if you are the one leading it. Nobody waits while
+  you find it.
 
 ## During
 

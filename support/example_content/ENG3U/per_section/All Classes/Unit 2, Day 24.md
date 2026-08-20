@@ -12,6 +12,8 @@ tags:
 
 1. Hand in [[The Critical Essay]] — day 7
 2. Discussion: [[Whose Reading Counts]] — three readings of the witches
+3. Launch: [[The Independent Study]] — the five months, the four
+   checkpoints, and what is marked when
 
 ## Things to do before our next class
 

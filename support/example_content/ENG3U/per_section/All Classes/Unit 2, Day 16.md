@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Seminars: groups five and six
-2. The play finished; five minutes of silence, then writing
+1. Seminars: groups five and six — the play finished in the last of them
+2. The last fifteen minutes: five minutes of silence, then writing — the
+   leaders' write-ups, everybody else on the ending of the play
 
 ## Things to do before our next class
 

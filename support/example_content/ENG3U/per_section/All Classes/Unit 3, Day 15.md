@@ -11,6 +11,8 @@ tags:
 ## Agenda
 
 1. [[The Comparative Response]], day 3 — drafting period
+2. Check-in with me while you draft: ninety seconds each, in seating
+   order
 
 ## Things to do before our next class
 
