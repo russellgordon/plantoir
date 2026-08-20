@@ -44,6 +44,8 @@ the shape elsewhere). [[Enzyme Activity]] measures three of them.
 
 ![[B3.3]]
 
+![[B3.4]]
+
 ![[B2.3]]
 
 ![[B2.4]]

@@ -19,3 +19,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Bring one food label and work out where its energy goes.
+- [ ] Bring [[Enzyme Investigation]] to hand in next class.

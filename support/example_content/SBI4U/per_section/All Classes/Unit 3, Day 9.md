@@ -18,4 +18,3 @@ tags:
 ## Things to do before our next class
 
 - [ ] Finish the standard curve and size the unknowns.
-- [ ] Choose your topic for [[Biotechnology Brief]].

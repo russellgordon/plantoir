@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval clinic — no notes: replication, transcription, translation,
+1. First twenty minutes: the note I left on your recommendation, and the
+   row your own check named — both acted on
+2. Retrieval clinic — no notes: replication, transcription, translation,
    one mutation's consequence, and one regulatory mechanism
-2. Compare answers in pairs
+3. Compare answers in pairs
 
 ## Things to do before our next class
 

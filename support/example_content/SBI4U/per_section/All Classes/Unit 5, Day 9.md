@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Population Study]], day 3 — working period: your population and data set
-   chosen, and the model you expect to fit
-2. Conference: what would make your model wrong?
+1. [[Population Study]], day 2 — working period: your plotted series, and the
+   model you expect to fit
+2. Conference: the data set signed off, sections 3 to 6 divided, and
+   whether your series is long enough to fit anything at all
 
 ## Things to do before our next class
 

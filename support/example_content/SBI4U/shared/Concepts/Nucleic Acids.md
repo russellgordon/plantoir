@@ -36,7 +36,5 @@ and better hydrated than the reactants. Worth stating carefully, because
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B3.4]]
-
 ![[B3.5]]
 %%curriculum-end%%
