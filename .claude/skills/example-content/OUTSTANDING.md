@@ -207,3 +207,39 @@ semester's work" as often as "seventy per cent", and the pattern only matched
 the last of those. Twenty-two payloads state the split without drawing a pie,
 which is a consistency gap rather than a conformance failure; the skill
 requires the split to be STATED, and the pie is how it is best drawn.
+
+## Coverage DEPTH varies wildly, and the sweep did not level it
+
+Measured 2026-08-20 across all 37 payloads. Every one reaches 100% coverage —
+every expectation is addressed somewhere — but the share addressed **exactly
+once** runs from 0% to 54% with no principle behind the spread:
+
+| Share addressed once | Payloads |
+|---|---|
+| 0% | ADA1O, ATC1O, AVI1O, BOH4M, CGC1W, CGF3M, GLC2O, ICS3U, SNC1W, THJ2O |
+| 5–20% | CIA4U, TEJ4M, TEJ2O, TGJ2O, TEJ3M, SPH4U |
+| 21–35% | ENG2D, ICD2O, ICS4U, ENG4U, CHC2D, SBI3U, MPM2D, ENL1W, ENG3U, MTH1W, MCMPR11, SPH3U, MDM4U |
+| 36–45% | CHV2O, CHA3U, SBI4U |
+| **46%+** | **MCV4U 49%, SCH3U 50%, SCH4U 52%, MCR3U 54%, MHF4U 54%, SNC2D 54%** |
+
+The linter says "aim for two or more" and treats it as a NOTE, so `clean`
+prints either way — which is why this rode through the sweep unnoticed. Ten
+payloads met the bar completely; six are above half.
+
+**Course size does not explain it.** SPH3U has the most expectations of any
+payload (100) and sits at 28%; SNC1W has 50 and sits at 0%. SCH4U at 52% and
+SNC1W at 0% are the same subject family, revised in the same sweep, days
+apart.
+
+**Do not fix this by driving the number to zero.** Manufacturing a second
+appearance by rewording the first is convergence by synonym — failure mode
+already in the conformance brief — and produces a worse payload that scores
+better. The question for each thin code is whether a student meets it once in
+passing and never again, or whether the arc genuinely returns to it in a
+different context and the linter simply cannot see that. The first is a
+defect; the second is not.
+
+**SCH4U, SCH3U and MCV4U are already committed** at 52%, 50% and 49%. They
+were reviewed and passed, because nobody was looking at this number. They want
+a revisit before the payloads are considered done — not a rewrite, a read of
+which specific codes are thin.
