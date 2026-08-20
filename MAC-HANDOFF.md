@@ -97,6 +97,63 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+- ✅ DONE (mac, 2026-08-20). **The assistant warm-up race: it EXISTS here,
+  it is measurable, and it cannot produce the Windows symptom.** Answering
+  GUI-IMPROVEMENTS row 293's two questions with the real app rather than
+  from the code, as that row asked.
+
+  **Q1: does the mac's first turn await its warm-up? No — same as Windows
+  before their fix.** `AssistSession.startEngine()` sets `readiness = .ready`
+  and only THEN `await warmUp(…)`, and `canSend` asks nothing but
+  `readiness == .ready`. The trail shows it plainly: `the assistant was ready
+  after 0.5s`, with the ~3,400-token priming request still to run.
+
+  **Measured, small assistant, M-series, 48 GB — the same question twice:**
+  - typed after the warm-up had finished: **1.7 s**
+  - sent the instant the field enabled, racing it: **3.1 s**
+
+  So the race is real and costs about **1.4 s** on the first question, which
+  is the priming request's tail on the server's single slot
+  (`--parallel 1`). The question was answered correctly both times; nothing
+  was lost.
+
+  **Q2: is a timeout distinguishable from window-close cancellation? Yes —
+  the mac has no way to confuse them, because it never classifies errors at
+  all.** `AssistAgent.think()`'s catch has one branch: every error becomes a
+  visible `.problem` bubble AND an `assistantCouldNotAnswer` trail line.
+  There is no "this was a close, say nothing" path for a timeout to fall
+  into. Proven by killing `llama-server` mid-session: the teacher saw
+  `⚠ Could not connect to the server.` in the conversation and the trail
+  recorded `the local AI assistant could not answer — Could not connect to
+  the server.`
+
+  **Three independent reasons the Windows chain cannot complete here**, which
+  is why this is not a mac bug wearing a Windows coat:
+  1. The request timeout is **180 s** (`AssistModelClient.reply`), not a few
+     seconds — a warm-up of 2 s (small) or ~12 s (large) cannot exhaust it.
+  2. The catch cannot swallow a timeout as a close, per Q2.
+  3. **The engine's output goes to `FileHandle.nullDevice`**
+     (`AssistServerHost`), so the unread-pipe wedge Windows had to fix by
+     draining pipes cannot occur — nothing is ever buffered.
+
+  **What was NOT fixed, and why.** Making the first turn await the warm-up is
+  a real improvement worth about 1.4 s, and it is an OPTIMISATION here rather
+  than a fix: the teacher-visible defect Windows repaired (silence) does not
+  exist on this side. Doing it inside a release qualification would have made
+  the mac's v1.1.0 a behaviour change and pushed the cut to 1.1.1 for a
+  second and a half. Decided with Russell on 2026-08-20; it belongs in the
+  next version with a test that pins "cannot send until the warm-up has
+  returned".
+
+  **One diagnostics gap this turned up, for the next session rather than
+  this one.** Reason 3 is also a cost: with the engine's output going to
+  `/dev/null`, nothing llama-server says can ever reach a problem report —
+  no load errors, no slot warnings, no token counts. Windows added
+  `NoteServerLine` for exactly this. The mac should sample those lines into
+  the trail (a bounded tail, not the firehose) rather than keep discarding
+  them; it is a report-quality change, not a hang risk, which is why it is
+  not in 1.1.0.
+
 - ✅ DONE (mac, 2026-08-20). **`./verify.sh` passes against the changed
   shared scripts — all nine checks, and the npx question is settled.** Run
   from a clean clone of `dev` with the v1.1.0 tree: image built from the
@@ -178,7 +235,50 @@ rather than being deleted.
   Reference: `Enter-NativeRuntime` in the three `.ps1` launchers,
   `scripts/toolchain_paths.py`, `windows-app/Vendor/fetch-runtime.ps1`.
 
-- **Check that every finished mac task really writes a run transcript**
+- ✅ DONE (mac, 2026-08-20). **Verified against the real app: the mac writes
+  a record for every task, and the one gap in the code is unreachable here.**
+
+  **What was driven.** A scratch working folder, the Example Course in it, a
+  real preview that served the site, then `course_config.json` deliberately
+  corrupted and Preview pressed again: `preview.sh — failed (exit 1) after
+  1.0s`. `~/Library/Logs/Plantoir/runs/2026-08-20-184555-preview.txt` appeared
+  with the task, the arguments, the outcome, the whole transcript ending in
+  the JSONDecodeError, paths redacted to `/Users/person/…`, and the line
+  `Explained nothing recognised — worth a look` — the honest fallback the
+  contract's note asks for, doing its job on an unrecognised traceback.
+
+  **It is the same folder the report reads**, checked rather than assumed:
+  `ScriptRunner.writeRecordOfRun` → `ProblemReportStore.write` →
+  `runsFolderURL`, and `ProblemReportBuilder.assembleFolder` reads
+  `store.runFileURLs()` from that same store — the count is what fills in
+  "the last N tasks Plantoir ran for you". Windows's failure was these two
+  being different folders; here they are one property on one type.
+
+  **A record also exists from the FIRST moment**, which is more than was
+  asked for: the still-running preview had a 14 KB record while it was
+  serving, outcome "Still running after …". That matters for the commonest
+  report of all — "the preview is stuck" — which by definition never reaches
+  a finish path.
+
+  **The one gap, and why it is NOT worth fixing.** `ScriptRunner` assigns
+  `runScriptName` AFTER `try newProcess.run()`, so a task that failed at
+  LAUNCH would write no record and no `taskStarted` line — exactly the
+  Windows shape, and exactly what the request asked about. It cannot happen
+  here: `executableURL` is always `/bin/bash` and the script is an argument,
+  so `run()` can only throw if `/bin/bash` is missing, at which point the
+  Mac has bigger problems. Confirmed by experiment — `chmod -x preview.sh`
+  and pressing Preview still produced `started preview.sh EXC2O 1 --port
+  8081` on the trail and a record, because the executable bit of the script
+  is not consulted. **Windows is exposed where the mac is not** because it
+  launches the `.ps1` through its own host rather than through a shell that
+  always exists. Left as it is deliberately: reordering two lines to guard
+  against an unreachable case would be an untested behaviour change in a
+  release-qualification pass. Written down so nobody "fixes" the ordering
+  believing it is live, and so the asymmetry with Windows is on the record.
+
+  Everything below is the original request, kept for the reasoning.
+
+  **Check that every finished mac task really writes a run transcript**
   (Windows, 2026-08-19, branch `windows-wsl2-auto-install`). A real teacher's
   problem report arrived saying "the last 0 tasks Plantoir ran for you" after
   three failed setups: the Windows report reads `Logs\runs\*.txt`, and
