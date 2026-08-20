@@ -16,7 +16,8 @@ tags:
    gaining it, over five years, graphed
 3. Consolidate: straight line or curve — two different claims about the
    future
-4. [[The Money Decision]], day 4 — working period: your growth graph
+4. [[The Money Decision]], day 4 — working period: your growth graph, with
+   a conference with me while you draw it
 
 ## Things to do before our next class
 
