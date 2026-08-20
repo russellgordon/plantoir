@@ -49,23 +49,48 @@ this skill automates its steps 5–6 and the note-writing.
    `main` with `dev` fully merged in (`git log main..dev` is empty) — the tag
    and the website commit both land on `main` (CLAUDE.md rule 6). After the
    website push, merge `main` back into `dev` so the branches do not drift.
-5. Check `MARKETING_VERSION` in `mac-app/project.yml` against
-   `<Version>` in the csproj. **A mismatch is a QUESTION, not automatically
-   a stop** — corrected 2026-08-20, when this step still said the two move in
-   lockstep and a mismatch was a stop. `RELEASING.md`'s "Two platforms, one
-   version series" replaced that: the version names which CONTRACTS a build
-   passes, and a platform that has not passed the new contracts keeps its old
-   number until it does. So there are two readings and you must tell them
-   apart by asking which platforms this cut carries:
-   - **Both platforms shipping** — they must match, and a mismatch is a stop
-     exactly as before.
-   - **One platform shipping** (the other joins the tag later) — the lagging
-     platform's number is CORRECT where it is. Do not "fix" it to match the
-     tag: re-badging an untested binary would claim contracts it never ran
-     against, which is the precise thing the policy forbids.
+5. Check `MARKETING_VERSION` in `mac-app/project.yml` against `<Version>` in
+   the csproj. **A mismatch is a QUESTION, not automatically a stop** —
+   corrected 2026-08-20, when this step still said the two move in lockstep.
+   `RELEASING.md`'s "Two platforms, one version series" replaced that: the
+   version names which CONTRACTS a build passes, so a platform that has not
+   passed the new contracts keeps its old number until it does.
+
+   **Decide it from the ASSETS this cut attaches, never from what the two
+   files say.** The list you gathered in step 3 is the whole input; do not
+   ask which platforms are "involved", ask which binaries are going up. Then
+   exactly one of these holds:
+
+   - **Every platform whose asset is attached must read the tag's number.**
+     No exceptions and no judgement — an asset labelled anything else is a
+     stop. This is the check that catches the real mistake: a signed bundle
+     built before the bump.
+   - **A mismatch is acceptable ONLY for a platform shipping no asset in
+     this cut.** Its number is correct where it is, and lower. Do not "fix"
+     it to match the tag — re-badging a binary that never ran the new
+     contracts is the precise thing the policy forbids — and do not raise it
+     "so the files agree", because the files disagreeing IS the record of
+     which platform still owes its gate.
+   - **A lagging number that is HIGHER than the tag is always a stop**,
+     whether or not that platform ships. It means the bump landed without
+     the release, and the next cut will silently reuse a number.
+
+   **The catch-up cut has its own rule, and it is the one people get wrong.**
+   When the lagging platform later joins a tag that already exists, it is
+   shipping an asset — so the first bullet applies in full: its
+   `MARKETING_VERSION` must have been raised to that tag's number, with its
+   gate run and its suite green, BEFORE the bundle was built. The signal to
+   check is the bundle itself rather than the file: read
+   `CFBundleShortVersionString` out of the built `.app` (or `--version` from
+   the exe) and compare it with the tag, because `project.yml` can be edited
+   after a bundle is signed and the file will then lie about the artifact.
+   Done first for the macOS DMG joining v1.1.0, 2026-08-20.
 
    (`project.yml` is the source; the Xcode project is generated from it, so
-   edit `project.yml` and re-run `xcodegen generate`.)
+   edit `project.yml` and re-run `xcodegen generate`. `CFBundleVersion` is
+   NOT a version to check against the tag — it is the derived build number,
+   `git rev-list --count HEAD`, applied by `publish.sh`; `project.yml`
+   carries only a placeholder for local builds.)
 6. **Confirm the release target repository (`russellgordon/plantoir`).**
    The remote `origin` and `website/site.json` (`repo_url`) both point to
    `github.com/russellgordon/plantoir`. Confirm this with the user, then pass
