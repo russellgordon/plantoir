@@ -209,6 +209,15 @@ $COURSE_DIR_HOST  = Normalize-HostPath (Join-Path -Path (Get-Location) -ChildPat
 $MERGED_DIR_HOST  = Normalize-HostPath (Join-Path -Path $COURSE_DIR_HOST -ChildPath ".merged_output")
 $SECTION_DIR_HOST = Normalize-HostPath (Join-Path -Path $MERGED_DIR_HOST -ChildPath ("section{0}" -f $SECTION_NUM))
 $PUBLIC_DIR_HOST  = Normalize-HostPath (Join-Path -Path $SECTION_DIR_HOST -ChildPath "public")
+if ($NATIVE_RUNTIME) {
+  # Native builds land in the app's data folder, not the working folder
+  # (teachers keep working folders in OneDrive) - same derivation as
+  # Enter-NativeRuntime and toolchain_paths.merged_output_root. The first
+  # smoke-test deploy failed exactly here, on the container-era path.
+  $MERGED_DIR_HOST  = Normalize-HostPath (Join-Path $env:LOCALAPPDATA ("Plantoir\builds\{0}\{1}" -f $WORKDIR_ID, $COURSE_CODE))
+  $SECTION_DIR_HOST = Normalize-HostPath (Join-Path $MERGED_DIR_HOST ("section{0}" -f $SECTION_NUM))
+  $PUBLIC_DIR_HOST  = Normalize-HostPath (Join-Path $SECTION_DIR_HOST "public")
+}
 
 $HOST_TZ_OFFSET = (Get-Date).ToString('zzz').Replace(':','')
 Write-Host ("Host timezone offset: {0}" -f $HOST_TZ_OFFSET)

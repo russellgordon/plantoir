@@ -324,6 +324,11 @@ if ($allowed) {
 
 # ---- Announce output path ----
 $OUTPUT_PATH = "courses/{0}/.merged_output/section{1}" -f $COURSE, $SECTION
+if ($NATIVE_RUNTIME) {
+    # The real location: native builds live in the app's data folder, out of
+    # OneDrive's way, and the printed path must not claim otherwise.
+    $OUTPUT_PATH = Join-Path $env:LOCALAPPDATA ("Plantoir\builds\{0}\{1}\section{2}" -f $WORKDIR_ID, $COURSE, $SECTION)
+}
 Write-Host ("Output will be written to: {0}" -f $OUTPUT_PATH)
 
 # ---- Map flags to build_site.py args ----
