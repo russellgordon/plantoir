@@ -33,9 +33,9 @@ the shape the course has had all along.
 
 | Part | Roughly | What it asks you to do |
 | --- | --- | --- |
-| A. Counting and probability | 25% | Count arrangements and selections — including from a row of Pascal's triangle — build a sample space, and compute probabilities that are conditional, complementary, or joint |
+| A. Counting and probability | 25% | Count arrangements and selections — including from a row of Pascal's triangle — build a sample space, decide whether two events are mutually exclusive, and compute probabilities that are conditional, complementary, joint, or "A or B" |
 | B. Distributions | 25% | Recognize which distribution a situation is, build it, compute an expected value, use the normal model and a $z$-score |
-| C. Data and its collection | 30% | Separate a population from the sample that stood for it, name a sampling method and its weakness, summarize one- and two-variable data, read a regression and its residuals, interpret a margin of error |
+| C. Data and its collection | 30% | Separate a population from the sample that stood for it, name a sampling method and its weakness, summarize one- and two-variable data, read a regression and its residuals, interpret a margin of error and the confidence level printed beside it |
 | D. Reading a claim | 20% | One published claim, dissected: who was measured, what was compared, what the graph does, and what the data can carry |
 
 Part C is the largest because the middle half of this course is data,
@@ -65,7 +65,7 @@ and Part D is last because it is where all of it is for.
   own data, your own defence — is evaluated where it happens, at
   [[The Data Symposium]] and across the milestones of
   [[The Culminating Investigation]]. Nothing on this paper asks you to
-  invent a study in ninety minutes.
+  invent a study in an afternoon.
 
 ## Success criteria
 
@@ -154,10 +154,10 @@ Three hours of silent paper is the purest product evidence this course
 produces, and it is also the one occasion where the other two kinds of
 evidence are unavailable by design: a room in which every student is
 being treated identically is a room you cannot walk around asking
-questions in. So this prompt does not try. It points at the three
-review classes instead, which is where the same expectations are still
-visible in a student's hands — and where noticing something can still
-change how they spend the weekend.
+questions in. So this prompt does not try. It points at the four
+review classes instead, Days 19 to 22, where the same expectations are
+still visible in a student's hands and where noticing something can
+still change how somebody spends the weekend.
 
 OBSERVE — Unit 4, Day 19, review part one at the boards
   Watch for what happens BEFORE the pencil moves on a counting
@@ -180,11 +180,13 @@ TALK — Unit 4, Day 22, at the individual conferences already on that
 agenda
   Put an unfamiliar two-way table of a thousand people on the desk
   between you — a screening result, a returned survey, anything with
-  four cells. Ask: "Name the two different questions this table can
-  answer about somebody in the shaded row, and tell me which one a
+  four cells, with one row and one column shaded. Ask: "Out of the
+  shaded ROW, what fraction is in the shaded cell? Now out of the
+  shaded COLUMN. Those are two different questions about the same
+  people — say what each one is asking, and tell me which one a
   newspaper would print." Then, if there is time: "Which of the two
-  numbers you have just given me should be the one printed on a
-  leaflet in a waiting room, and who is harmed if it is the other?"
+  should be the one printed on a leaflet in a waiting room, and who is
+  harmed if it is the other?"
   A strong answer works from the counts in front of them rather than
   from a percentage quoted in the stem, and treats the two conditional
   probabilities as genuinely different quantities rather than as one

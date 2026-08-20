@@ -13,7 +13,8 @@ tags:
 1. Number talk: [[Estimation Duels]]
 2. [[The Culminating Investigation]], day 3 — working period. Yesterday's
    conference and your own weakest row land here first; then the plan
-   — sampling method, sample size, and the biases you expect
+   — sampling method, sample size, the biases you expect, and the two
+   attributes you will record rather than one
 3. The ethics half of the plan, in writing: the four things [[Bias]]
    says to settle before you collect from anybody
 4. Approval checkpoint: no collection starts without a plan I have

@@ -38,7 +38,7 @@ allowed and both are marked the same way.
 | Unit 2, Day 14 | One question approved, in a sentence, with a named source |
 | Unit 2, Day 17 | The plan: population, variables, method, size, expected bias |
 | Unit 3, Day 8 | Collection under way — a third of the data in hand |
-| Unit 3, Day 16 | Data collected, organized, and fully cited |
+| Unit 3, Day 16 | Data collected and fully cited — cleaning is Day 17 |
 | Unit 4, Day 10 | Analysis worked, conclusion drafted, one limitation named |
 | Unit 4, Day 15 | The written report handed in |
 | Unit 4, Days 16–17 | Presented and critiqued at the symposium |
@@ -83,20 +83,30 @@ one.
   and the sources of bias you anticipated — in the form you agreed to
   at the approval checkpoint. If you collected from people, the plan
   also settles the four things [[Bias]] lists before a single response
-  arrives: what you are asking, who will see it, how you will store
-  it, and how somebody declines without penalty. Secondary data is not
-  exempt — say how the people in it consented, or say that you cannot
-  tell.
+  arrives, and it names BOTH attributes you will record — a plan that
+  collects one column cannot produce the scatter plot the report
+  requires, and Unit 2, Day 17 is where that gets caught rather than
+  in the final fortnight. The four things are: what you are asking,
+  who will see it, how you will store it, and how somebody declines
+  without penalty. Secondary data is not exempt — say how the people
+  in it consented, or say that you cannot tell.
 - **The data**: how you [[E1.3|gathered and organized]] it, cleaned
   honestly, with every source cited per [[Citing Your Sources]].
 - **The analysis**: numerical and graphical summaries, each chosen for
   a reason you can state — a probability model, a normal model, a
   regression, a correlation, an expected value, as the question
-  demands. Two are required whatever your question: a **measure of
-  spread** as well as a measure of centre, because a mean alone hides
-  the story; and, where you have two attributes, a **scatter plot with
-  the relationship named** — linear or non-linear, strong or weak,
-  positive or negative — before any line is fitted to it. If your
+  demands. Three are required of everybody, whatever the question. A
+  **measure of spread** as well as a measure of centre, because a mean
+  alone hides the story. A **second attribute collected alongside your
+  first**, and a **scatter plot of the pair** with the relationship
+  named in words — linear or non-linear, strong or weak, positive or
+  negative — before any line is fitted to it and before any
+  correlation coefficient is quoted. And a sentence saying **which
+  kind of relationship** you think it is: cause and effect, a common
+  cause behind both, reverse cause, or coincidence. If your question
+  is a probability question, the second attribute is still required —
+  record something about each trial or each respondent that you could
+  plot against the outcome, and say what you expected to see. If your
   variable is continuous, the interval width of your histogram is a
   decision you state and defend.
 - **The conclusion**: what the data supports, in a sentence the data
@@ -153,6 +163,9 @@ use it once it exists.
 | Traceable data | Every number leads back to a citable source |
 | Collected ethically | Consent, storage and the right to decline settled — or, for secondary data, accounted for |
 | Analysis chosen, not sprayed | Each summary justified by the question |
+| Spread as well as centre | A mean or median never reported on its own |
+| Two attributes, plotted | A scatter plot of your pair, described in words before any number |
+| The relationship named | Cause, common cause, reverse cause, or coincidence — and why |
 | A conclusion the data carries | Claims sized to the evidence behind them |
 | Limits owned | Weaknesses named by you, before anyone asks |
 | Whose work is whose | Working as a pair: every section signed, and each of you able to answer for all of it |
@@ -220,9 +233,15 @@ that agenda
   Then: "Suppose you had twice as much data. Which part of your
   conclusion would change, and which part would not move at all?"
   A strong answer separates precision from bias without being given
-  the words — twice the data narrows the spread and does absolutely
-  nothing to a frame that never reached a whole group, so the
-  limitation that survives doubling is the one that matters. That is
+  the words. Watch the vocabulary here, because the better answer is
+  the one that corrects the question: more data does NOT narrow the
+  spread — the spread belongs to the population and sits there
+  whatever you sample — it narrows how far the estimate is likely to
+  sit from the truth. A student who says "the standard deviation would
+  stay about the same, the margin of error would shrink" has given the
+  strongest answer available. What doubling does absolutely nothing to
+  is a frame that never reached a whole group, so the limitation that
+  survives doubling is the one that matters. That is
   E1.5's "evaluate the strength of the evidence", and a report can
   list sample size and bias in a limitations paragraph without the
   author being able to tell you which of them more data would fix.

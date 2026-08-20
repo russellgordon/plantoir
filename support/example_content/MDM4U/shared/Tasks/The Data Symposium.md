@@ -4,6 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - tasks
+  - final-evaluation
 enableToc: true
 ---
 > [!abstract] At a glance
@@ -40,6 +41,23 @@ Then three minutes of questions from the floor. Slides are optional; a
 single well-chosen graph beats nine slides of bullet points, and every
 graph you show gets asked "what does the axis start at?" Rehearse
 once, out loud, with a timer — six minutes is shorter than it sounds.
+
+> [!warning] Nine minutes each, and only so many of them fit
+> Six minutes plus three is nine, and a seventy-five-minute period
+> holds about seven of those once the room has settled. Two days is
+> therefore about fourteen presenters. If this class is bigger than
+> that — and most are — one of two things happens, decided in the week
+> before and posted with the running order:
+>
+> - the symposium runs across **three** classes rather than two, which
+>   is the version I prefer because nothing has to be cut; or
+> - questions come down to **two** minutes rather than three, which
+>   fits about sixteen across the two days and makes the running order
+>   non-negotiable — if you are on at minute sixty, you start at
+>   minute sixty.
+>
+> What does not happen is six minutes becoming four. The whole point
+> of the thing is that an argument gets room to be made.
 
 ## The critique protocol
 

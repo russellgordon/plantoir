@@ -12,7 +12,8 @@ tags:
 ## Agenda
 
 1. Review, part two: choosing a distribution, expected value from a
-   table, standard deviation, $z$-scores, and margins of error
+   table, standard deviation, $z$-scores, and a margin of error read
+   together with the confidence level printed beside it
 2. By request: [[Distributions Practice]],
    [[Normal Distribution Practice]]
 

@@ -71,10 +71,16 @@ worth writing while it stings.
 three question analyses is signed by whoever wrote it, and each of you
 writes one of the two rewrites — so the report shows, on its face,
 which half is yours. The rest of your mark comes from the conference
-on Day 5, from your share of the five-minute presentation on Day 13,
+on Day 5, where I ask each of you about the parts you did not write,
 and from what I see across the two working periods. A pair that
 divides the survey in half and never reads the other half hands in two
-reports stapled together, and it always shows.
+reports stapled together, and it always shows — usually at that
+conference.
+
+The presentations on Day 13 are for the room, not for the mark: three
+autopsies at a time, five minutes each, questions from the other two.
+Nobody can hear nine of those at once, so nothing about how they go
+changes anybody's mark.
 
 Run [[Judging Your Own Work]] against the criteria table in the last
 ten minutes of Day 5. Day 6 is the period that exists so the weakest
@@ -91,6 +97,7 @@ row can still be fixed.
 | Privacy taken seriously | What one completed form reveals, and who was told |
 | A right-sized conclusion | One sentence the data can actually carry |
 | Whose work is whose | Each analysis signed, and one rewrite from each of you |
+| Answerable for all of it | At the Day 5 conference, each of you can account for the half you did not write |
 
 > [!warning]- When the survey is one your own school ran
 > Fair game, and often the most interesting choice — but the people
@@ -132,9 +139,10 @@ TALK — Unit 3, Day 5, at the conference already on that agenda
   Two questions, once their annotations are underway:
   "Who paid for this survey to be run, and which of its questions
   would they be most pleased with?"
-  Then: "Read me one of the original questions out loud, the way a
-  respondent hears it rather than the way you are reading it. Where
-  does somebody who is tired of being surveyed stop listening?"
+  Then: "Take one question you have marked as loaded. Give me the
+  answer a respondent would tick who agrees with the statement but
+  resents being asked it that way — and tell me which published total
+  that tick ends up inside."
   A strong answer names a mechanism instead of a mood: a middle option
   that was missing, an order that primed the answer, a word that made
   disagreeing sound unreasonable — and then says what that did to the

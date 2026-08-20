@@ -125,18 +125,22 @@ each other's arithmetic
   You are free for most of that period, and the room is already
   talking. Two questions, thirty seconds each:
   "Point at the outcome in your table that pays the most and happens
-  least. How much of the fair price is that one row responsible for —
-  most of it, about half, or hardly any?"
+  least. How much of the fair price is that one row responsible for?
+  Give me a fraction."
   "The pair you just audited priced their game differently from yours.
   Whose is closer to fair, and how did you work that out without
   redoing their arithmetic?"
-  A strong answer reasons from the weighting rather than the size of
-  the prize, and can say so without a calculator: the rare jackpot
-  usually contributes far less than it feels like it should, because
-  its payout arrives multiplied by a very small number. That is B1.2's
-  connection between the expected value and a weighted mean, heard
-  rather than read, and the handed-in table shows the arithmetic
-  without ever showing whether they can reason across it.
+  Listen for the METHOD, not for a particular number: a strong answer
+  takes that row's payout times its probability and compares it with
+  the whole expected value. Where that lands is a property of their
+  game, not a sign of understanding — on the eight-sector wheel
+  printed on this page the top prize carries five eighths of the fair
+  price, and on a scratch card the jackpot carries almost none. Both
+  answers are right, and a student who says "most of it" about a wheel
+  has done exactly what was asked. That is B1.2's connection between
+  the expected value and a weighted mean, heard rather than read, and
+  the handed-in table shows the arithmetic without ever showing
+  whether they can reason across it.
   Record: one line per pair on the seating plan, right then.
 
 The product evidence is the audit and the three-minute defence on

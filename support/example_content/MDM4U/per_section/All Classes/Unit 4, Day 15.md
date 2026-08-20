@@ -20,4 +20,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Report handed in. Run your six minutes once more against a
-      timer, out loud — the running order is on the board.
+      timer, out loud — the running order, and how long the questions
+      run, are both on the board.

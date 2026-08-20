@@ -25,13 +25,17 @@ graph LR
 
 ## Number talk
 
-Almost every class opens with ten minutes of mental mathematics — a
+Most classes open with ten minutes of mental mathematics — a
 [[Number Talks/index|number talk]] — done in heads, defended out
-loud. The exceptions are the days that need every minute of the
-period: a checkpoint, a retrieval clinic, a working period with a
-conference in it, the symposium. No pencils, no calculators, no single right method. The method
+loud. No pencils, no calculators, no single right method. The method
 you defend today becomes the method someone else reaches for
 tomorrow.
+
+About four classes in five have one. The days that do not are the ones
+that need every minute for something else: the retrieval clinics and
+the checkpoints at the end of each unit, the revision-and-journal day
+that follows each checkpoint, the symposium, and the review classes at
+the very end.
 
 ## Random groups, every day
 
