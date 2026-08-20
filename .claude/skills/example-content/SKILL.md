@@ -859,8 +859,8 @@ the linter.
    once. Anything short of N/N is a failure, not a note — the built map
    would show a red cell. The counts here and on the built page come from
    the same rule, so they must agree; if they ever differ, one of the two
-   regexes has drifted and that is the bug to fix first. Then READ one
-   TWO task pages' triangulation blocks, from different units, end to end:
+   regexes has drifted and that is the bug to fix first. Then READ TWO
+   task pages' triangulation blocks, from different units, end to end:
    the linter cannot tell a prompt naming a real day and a real question
    from boilerplate, and boilerplate is the failure mode this block has —
    which only shows up when you compare two of them. Check the days named
