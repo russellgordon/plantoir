@@ -9,6 +9,8 @@ Your journal, and the evidence you will need in January.
 - [[Your First Entry]] — written in the first week.
 - [[What a Strong Entry Looks Like]] — two real examples, with what makes
   them work.
+- [[Judging Your Own Work]] — the fifteen-minute routine for reading a
+  task's criteria table against your own draft, before I do.
 - [[Showing Growth]] — how to pair a September page with a January one.
 - [[Portfolio Checklist]] — what has to be in it before
   [[The Portfolio Conversation]].

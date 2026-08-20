@@ -17,4 +17,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Rewrite that paragraph.
+- [ ] Nothing to write. Think about what you could not answer; the
+      rewrite is next class.

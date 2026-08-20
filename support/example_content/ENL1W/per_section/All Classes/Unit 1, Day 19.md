@@ -14,7 +14,8 @@ tags:
    splice, and say what mood is made of
 2. Checkpoint, on your own: one short passage, read closely and written
    about in a paragraph
-3. Mark your own against the class standard
+3. Mark your own against the class standard — the routine from Day 13,
+   on your own this time
 
 ## Things to do before our next class
 

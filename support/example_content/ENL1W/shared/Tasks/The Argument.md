@@ -86,3 +86,48 @@ another order, take it — and say why in your journal.
 
 ![[B3.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 14, the workshop where a partner argues the other
+  side
+  Watch for: whether the objection is written down as the partner
+  actually put it, or in a softened form the writer can already answer.
+  Then: whether the writer argues back instead of writing — the ones who
+  defend out loud usually have an empty page at the end of the period.
+  Going well: a pen moving while the partner is still talking; a
+  follow-up question rather than a rebuttal.
+  Stuck: a debate. Two people enjoying themselves, nobody taking notes,
+  both leaving with what they arrived with.
+  The essay will show you which objection was answered. It cannot show
+  you that a better one was offered in this period and quietly
+  downgraded, which is the single most common way a Grade 9 argument
+  stays safe.
+  Record: class list, two ticks — wrote it as said, argued instead.
+  That is D2.5 watched: revision that SEEKS and SELECTIVELY USES
+  feedback. Selecting is the word, and selecting is what you are
+  watching.
+
+TALK — Unit 4, Day 12, the conference already on that agenda
+  Ask: "Show me a piece of evidence you found and are not going to use.
+  Why is it out?"
+  Then: "Who actually holds the other side of this — a real person, not
+  a position? What would they say that you cannot answer yet?"
+  A strong first answer gives a reason about the source or the fit —
+  it came from the group that benefits, it proves something slightly
+  different from the claim — rather than "I ran out of room". That is
+  D1.4's "identify and organize relevant content" heard, since what gets
+  left out is half of organizing it, together with C3.3, credibility and
+  significance assessed. Do not lean on D1.4's "evaluating the choices"
+  for this: those choices are of text form, genre and medium, not of
+  evidence. The essay shows what was kept and is silent about everything
+  discarded.
+  A strong second answer names somebody and admits a gap; a weak one
+  describes an imaginary opponent who is conveniently wrong.
+  Record: one line per student in the conference list, and a star
+  against anyone who admitted a gap — they are the ones to send back to
+  the evidence.
+
+The product evidence is the essay handed in on Day 16.
+%%

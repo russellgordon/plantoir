@@ -77,3 +77,62 @@ walks into this cold.
 
 ![[A1.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+This one is awkward, and it is worth naming why. On the day, product and
+conversation arrive together — the portfolio is open on the desk and the
+student is talking — and you are running the fifteen minutes, so there is
+no capacity left for watching anything. So the observation has to be
+taken in the four classes before it, and the notes you take there are
+what you carry into the conversation.
+
+OBSERVE — Unit 4, Day 19, the growth pair read aloud to a partner
+  That agenda sends them to the Showing Growth page, which prints three
+  model sentences and rules out "I tried harder" and "I understand more"
+  by name. So the vague version is already handled, and it is not what
+  you are watching for. Watch for the opposite problem: three differences
+  that ARE the three model sentences with the nouns swapped.
+  Watch for: a difference that appears on nobody's page — something about
+  this student's own habit that only they could have noticed, and that
+  usually arrives when the partner says "what do you mean?"
+  Going well: the partner asks, the answer gets sharper, and the sharper
+  version is the one that goes down on paper.
+  Stuck: the answer gets sharper out loud and the safe model sentence is
+  what gets written; or a pair reading pieces to each other and agreeing
+  they are both good.
+  The portfolio will show you the three written differences, and the
+  model sentences make it hard to tell a borrowed one from an earned one.
+  This period is where you can hear the difference.
+  Record: tick the class list where the spoken difference beat the
+  written one. That list IS your question plan for the conversations.
+  That is D3.3 watched: reflecting on what was learned at each stage and
+  suggesting steps for improvement as a text creator.
+
+TALK — Unit 4, Day 20, while they rehearse in pairs
+  Not the six published questions — they will have prepared those, which
+  is the point of publishing them. These two instead:
+  Ask: "Your partner just answered the growth question. What did they
+  claim that you could not?"
+  Then: "Which thing we did this year made the biggest difference to
+  your writing — and which one did nothing for you?"
+  Do not ask which of the six questions they find hardest: that agenda
+  sets it as the homework, so by the time you ask they will be reading
+  you an answer they wrote last night.
+  A strong first answer reports somebody else accurately and then places
+  itself against them. That is B1.1 heard — reflecting on what has been
+  said — and a portfolio cannot demonstrate listening at all. A strong
+  second answer names a practice rather than a mood — the cut, reading
+  aloud before handing in, the partner who argued the other side — and
+  the second half of it is the honest half, because a student who cannot
+  name anything that did not work has not been judging, only agreeing.
+  That is D3.3, evaluating the strategies they found helpful.
+  Record: two columns on the register — heard their partner, named a
+  practice that did nothing.
+
+The product evidence is the portfolio itself, assembled across Days 18
+and 19, and the fifteen minutes in the last week, which deliver product
+and conversation at the same time. Which is exactly why the two prompts
+above are dated before it.
+%%

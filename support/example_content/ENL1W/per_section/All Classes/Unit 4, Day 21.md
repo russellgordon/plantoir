@@ -14,7 +14,7 @@ tags:
 1. Review, part one: how texts work — story, character, point of view,
    theme, and the devices we actually used
 2. By request: [[Close Reading Practice]], [[Quotation Practice]]
-3. Open clinic on any text from the year
+3. Open clinic: any text from the year, and the fix you named on Day 18
 
 ## Things to do before our next class
 

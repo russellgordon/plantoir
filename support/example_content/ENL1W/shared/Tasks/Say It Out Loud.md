@@ -74,3 +74,52 @@ does not happen is skipping it.
 
 ![[B2.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Not on Days 11 or 12: you are running the room, and a performance is the
+worst place to try to take notes on anything but the performance.
+
+OBSERVE — Unit 3, Day 9, marking the scripts and rehearsing
+  You are already moving student to student that period, giving each of
+  them the thirty-second checkpoint that agenda promises. This is what
+  you see on the way between them, and it costs nothing extra.
+  The marked script is handed in, so the marks themselves are product.
+  What the period shows you, and the script never can, is whether they
+  were TESTED.
+  Watch for: whether the pen comes out again after somebody has heard it.
+  Crossings-out on the breath marks are the sign; so is a student who
+  stands up to try a pause rather than reading it seated at speed.
+  Going well: a mark moved because of something the listener did — or
+  did not do — at that line.
+  Stuck: a clean, beautiful script, marked at the desk in silence and
+  never spoken; or rehearsal at reading pace, which is roughly twice
+  performance pace and hides every problem.
+  Record: class list, one column, three states — moved a mark, kept a
+  clean script, has not stood up.
+  That is B1.4 watched: identifying and using oral and non-verbal
+  strategies and EVALUATING their effectiveness. The evaluating is the
+  part that happens here and nowhere else.
+
+TALK — Unit 3, Day 7, while they draft for the ear
+  Ask: "Who in this room is this three minutes for, and what do you want
+  them doing in the last ten seconds?"
+  Then: "Read me the sentence you have rewritten most. What was wrong
+  with the first version?"
+  A strong first answer names a real effect on a real listener rather
+  than "I want them to like it" — that is B1.3, purpose and audience
+  analysed and the speaking strategy adapted to them. A strong second
+  answer gives an EAR reason: it ran out of breath, the word sounded
+  wrong beside the one before it, the sentence had two ideas and the
+  listener could only hold one. That is still B1.3 — adapting the
+  strategy to the listener is the whole of the rewrite. Do not record it
+  as B1.5: precise word choice and coherent sentences are something they
+  DO, evidenced in the script and in the three minutes, and what this
+  answer adds is that the doing was deliberate.
+  Record: two columns on the class list — audience named, ear reason
+  given.
+
+The product evidence is the performance on Day 11 or Day 12 and the
+marked script handed in at the end of Day 12.
+%%

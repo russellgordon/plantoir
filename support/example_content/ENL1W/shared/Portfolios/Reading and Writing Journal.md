@@ -29,8 +29,14 @@ neatness contest. Not a place where being wrong costs you anything.
 ## How it is checked
 
 Twice a term I read a page you choose, and once a term we look through
-the whole thing together for two minutes. The [[Portfolio Checklist]]
-tells you what has to be there by January.
+the whole thing together for two minutes. None of that is marked — it is
+how I find out what to teach next. The [[Portfolio Checklist]] tells you
+what has to be there by January.
+
+The one exception is the reading log for [[The Book Club]]. Those entries
+are written in the meeting, in class, and they are part of that task's
+mark, which that page explains. Everything else in this notebook is
+yours.
 
 ## The habit that makes it work
 
