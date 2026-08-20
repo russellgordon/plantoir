@@ -80,7 +80,7 @@ that neither you nor I lose track of whose reasoning is whose.
 | Analysis | Course tools used where they fit, not sprinkled |
 | Recommendations | Specific, costed, legal, and something this client could actually start |
 | Communication | Twelve minutes that a busy person would find worth their time |
-| Fit to the client | The review answers the question the client actually asked, in a form they can use — not the question that turned out to be easiest to research |
+| Fit to the client | YOUR section answers the question the client actually asked, in a form they could use on Monday — not the question that turned out to be easiest to research |
 
 > [!warning] You are guests in someone's organization
 > Anything you are told in confidence stays out of the report unless you
@@ -142,21 +142,35 @@ TALK — Unit 4, Day 18, Day 5 of 8, the twelve-minute checkpoint
   you design for them — and which existing job changes?" A strong answer
   redistributes work rather than adding a helper, and can say which
   approach it is using and why. That is E2.2 again, heard rather than
-  written.
-  Then: "Which of the current structures is this client closest to —
-  team, network, boundaryless, or none of them — and what is that buying
-  them that a plain functional structure would not?" A strong answer
-  names the structure, names the gain, and can point at something
-  checkable that shows the gain arriving or not: the same decision
-  waiting on the same desk twice a week, two people doing the same job in
-  different departments. That is E1.2 (assess current organizational
-  structures — e.g., team, network, boundaryless — with respect to the
-  ways in which they increase productivity and competitive advantage).
+  written. Every team can answer it whatever they scoped, and that is the
+  point: the task asks a team to engage with three of the five areas, so
+  the seven codes on this page are reached by the CLASS's reviews
+  together rather than by each team's. This question is how a team that
+  scoped recruitment still gives you E2.2 — they have spent eight periods
+  inside the place and they know what the jobs contain.
+  Then, and only if a team finishes early: "Which of the current
+  structures is this client closest to — team, network, boundaryless, or
+  none of them — and where has that structure already cost them
+  something?" A strong answer names the structure and then produces the
+  bill: the same decision waiting on the same desk twice a week, two
+  people doing the same job in different departments, a customer who has
+  to be handed on three times. That is E1.2 (assess current
+  organizational structures — e.g., team, network, boundaryless — with
+  respect to the ways in which they increase productivity and competitive
+  advantage), asked from the cost side on purpose. Current Structures has
+  a section headed "What they are buying" and Day 2's agenda says "what
+  each is buying", so the gain side is a page they can recite; the cost
+  side is not written anywhere.
   Do not ask which tools the evidence calls for. That is printed as the
   second agenda item on Day 17, the class before this one.
+  Plan for ONE question, not two. Six to eight teams at twelve minutes is
+  longer than the period, which is why the agenda has the other teams
+  testing each other's findings while you work down the list; expect to
+  finish two or three teams in Day 19's working period instead, and write
+  their names down now. The first question is the one that must reach
+  everybody, because it is the mark that differs within a team.
   Record: a grid on one sheet, teams down and members across, a letter in
-  each cell. Twelve minutes per team is enough for both questions to all
-  four of them if you keep your own answers short.
+  each cell.
 
 The product evidence is the written review, the one-page implementation
 note, and the twelve-minute hand-over on Day 21. Gather nothing at the

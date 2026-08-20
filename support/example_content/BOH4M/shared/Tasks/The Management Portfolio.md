@@ -34,9 +34,21 @@ against at the end.
 | Course tools | The unit's own concepts do the analysing, named and used properly, not decorating a diary entry |
 | Usable later | The conclusion is precise enough to still mean something to you in a year |
 
-The same four rows apply to all four entries, on purpose. By the third
-one you should be able to predict what a strong entry looks like before
-you write it — which is what [[Judging Your Own Work]] is for.
+Those four rows apply to all four entries, on purpose. By the third one
+you should be able to predict what a strong entry looks like before you
+write it — which is what [[Judging Your Own Work]] is for.
+
+One entry carries a fifth row, and only that one:
+
+| Criterion | Where it applies | What earns the marks |
+| --- | --- | --- |
+| Technique used | [[A Week of Your Time]] only | You name the time-management technique you actually ran, show the block in your own seven days that it changed, and say what it did — including if it failed |
+
+That row exists because **D2.3** asks you to *demonstrate the ability to
+use time-management techniques*, which is the one place in this course
+where a habit is itself the curriculum. So the habit needs a published
+standard like everything else, and this is it. Being organised in
+general is still not marked anywhere — see [[How Marks Work]].
 
 > [!warning] Honest beats flattering, and it is not close
 > The weakest entries are the ones that decided the conclusion first:
@@ -48,16 +60,18 @@ you write it — which is what [[Judging Your Own Work]] is for.
 ## Written in class, and why
 
 Every entry is written in the period — or, for the last one, the two
-periods — that the class pages name for it, not at home. Three reasons, and they are the same three reasons a manager
-writes a review at the desk rather than on the train:
+periods — that the class pages name for it, not at home. Three reasons,
+and they are the same three reasons a manager writes a review at the
+desk rather than on the train:
 
 - It is evaluated work, so it is done where I can see it being done. A
   reflection is the easiest thing in a course to hand off to somebody
   else, and neither of us wants that conversation.
-- I read over shoulders while you write, which is the only checkpoint an
-  entry this short needs — across the five writing periods that reaches
-  everybody more than once. You get the "that sentence is a claim, where
-  is the occasion?" while there is still time to answer it.
+- I read over shoulders while you write, which is the only checkpoint
+  an entry this short needs — across the five writing periods that
+  reaches everybody more than once. You get the "that sentence is a
+  claim, where is the occasion?" while there is still time to answer
+  it.
 - The entries that get written at eleven at night are the general ones.
   The ones written in class, with the unit still on the board, are the
   specific ones.
@@ -122,11 +136,11 @@ TALK — Unit 2, Day 6, while you go round the room during the writing
   answer names something specific that was normal where they grew up and
   is not normal here. That is B1.1 (analyse the elements that shape human
   personality — cultural, social, and family influences — and their
-  impact on human behaviour). The entry itself asks them to test the
-  label against how they BEHAVE, and to say what the situation explained
-  that the label did not; it never asks where the behaviour came from,
-  which is the half of B1.1 a written profile of one person tends to
-  skip.
+  impact on human behaviour). The entry's fourth bullet asks for this in
+  writing and is where you mark it; the conversation corroborates it, and
+  is worth having because the written answer is the one students most
+  often make safe. What you hear at the desk is the version before it was
+  tidied.
   Then: "If a manager had nothing but your result, and had to put you on
   one of two teams, which would they choose — and would they be right?"
   A strong answer separates what the instrument can support from what it

@@ -23,6 +23,14 @@ course's group tasks? Cite specific moments — what you did when your
 team disagreed, when someone did not deliver, when you were wrong. Style
 you can evidence beats style you admire.
 
+**Two leaders, either side of you.** Name the leader from this course —
+from the seminars, the cases, or a classmate's
+[[The Leadership Profile|leadership profile]] — whose style is closest
+to yours, and the one furthest from it. Say what each of them would have
+done in your worst moment this term. Being able to place yourself
+between two real people is the point; placing yourself next to a label
+is not.
+
 **Where you are weakest.** Everyone has a default that fails somewhere.
 Name yours and the situation that exposes it.
 

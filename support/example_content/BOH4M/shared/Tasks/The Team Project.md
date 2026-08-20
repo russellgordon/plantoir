@@ -21,7 +21,7 @@ are not in your team.
 | Team charter | Two days after launch | How you decide, what "done" means, what happens when someone misses a commitment |
 | Stand-up record | Every working period | Three lines per person; the facilitator rotates |
 | The project itself | Last week of the unit | Delivered to its actual audience |
-| Your own account | With the project | One page: what YOU did, what you changed when the team pushed back, what you would do differently |
+| Your own account | With the project | One page: what YOU did, what you changed when the team pushed back, the technique you used to hear it, and what you would do differently |
 
 ## What is marked as yours
 
@@ -34,7 +34,12 @@ from four things, all of them individual:
 - **The stand-ups you facilitated.** The facilitator rotates; your turns
   are yours.
 - **Your one-page account**, above — about what you did, not a rating of
-  anybody else.
+  anybody else. It has to name the **technique** you used the week your
+  team disagreed — active listening, the behaviour-effect-request
+  pattern, writing it down before answering, moving it off the group
+  chat — and say what it did. Naming the technique is expectation C1.2,
+  and it is why the account is written after
+  [[Improving Communication]] rather than before it.
 - **What you say at the checkpoint conference** in the third week, where
   I ask each of you separately.
 
@@ -46,12 +51,13 @@ gather myself.
 
 ## How it is marked
 
-- **The charter, and whether you used it.** A charter written and ignored
-  is worth less than a short one you actually invoked.
-- **Process evidence** — the stand-up record, and what changed because of
-  it.
-- **The project's result**, judged by whether the audience got what was
-  promised.
+- **Your use of the charter** — the occasions you invoked it, and what
+  happened when you did. A charter written and never reached for is worth
+  less than a short one somebody actually opened.
+- **Your stand-up entries and the turns you facilitated**, and what
+  changed in the team because of them.
+- **Your part of the project's result**, judged by whether the piece you
+  owned did what the charter promised the audience it would.
 - **How you worked with the team to get it done** — how you handled the
   week your team disagreed, what you did with a blocker somebody raised.
   This one is curriculum, not a work habit: expectation B2.4 asks you to
@@ -117,7 +123,11 @@ TALK — Unit 2, Day 13, the conferences with each team already on that
   appear in no document the team produces.
   Do not ask about communication techniques here. Improving Communication
   is not taught until Day 15, two classes after this one, so on Day 13
-  you would be testing them on a lesson they have not had. Do not ask
+  you would be testing them on a lesson they have not had. C1.2 is on
+  this task and it is marked — in the one-page account, which is written
+  at the end of the unit and must name the technique the student used the
+  week their team disagreed. That is the product leg; do not go looking
+  for a conversational one before the lesson exists. Do not ask
   whether they used the charter when somebody missed a commitment,
   either; the criteria print that and they will arrive with it.
   Record: a grid on one sheet — teams down, members across — and a letter

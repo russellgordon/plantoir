@@ -29,7 +29,11 @@ thing you can hand in.
 2. **The characteristics** those decisions demonstrate — using
    [[Leadership Characteristics]], not adjectives.
 3. **The style**, named and evidenced from
-   [[Leadership Styles]], including what happened under pressure.
+   [[Leadership Styles]], including what happened under pressure — and
+   set against **one other leader**, from the class's seminar list or
+   from a classmate's profile, whose style is markedly different. The
+   comparison has to be between two real people; a person measured
+   against a definition is not a comparison.
 4. **The theory that explains them best**, argued against at least one
    alternative from [[Leadership Theories]]. This is the analytical
    centre of the task.
@@ -44,7 +48,7 @@ thing you can hand in.
 
 There is a checkpoint with me in the fourth week of the unit — bring
 your three decisions and the theory you are defending — and the class
-after it opens with time to make the one change we name.
+after it ends with fifteen minutes to make the one change we name.
 
 > [!warning] A profile is not a tribute
 > The word "inspiring" earns nothing here. What did they decide, who was
@@ -53,8 +57,6 @@ after it opens with time to make the one change we name.
 
 %%curriculum-start%%
 ## Curriculum connection
-
-![[B1.4]]
 
 ![[B3.1]]
 

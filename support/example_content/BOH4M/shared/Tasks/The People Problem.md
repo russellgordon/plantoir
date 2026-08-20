@@ -86,32 +86,37 @@ OBSERVE — Unit 3, Day 1, the twenty-five-minute working period at the
   contradicts the student's favourite explanation.
   Stuck: the spreadsheet is the only thing that has been open all period.
   Record: a tick or a dash beside each name on the seating plan, on the
-  same pass of the room as the notes.
+  same pass of the room as the notes. That pass is the whole of your
+  budget for the period — do not plan a conference on top of it.
 
-TALK — Unit 3, Day 1, while you go round leaving notes on the drafts in
-  that same period
-  Everybody gets the written note; that is the checkpoint the class page
-  promises and it takes most of the twenty-five minutes. For eight or ten
-  of them, ask the question while you are already at the desk. Choose the
-  ones whose written work has told you least so far — the rest are
-  handing you a paper tomorrow.
-  Ask: "Name the reward this workplace is actually giving — not the one
-  in the pay policy — and say what behaviour it is buying." A strong
-  answer finds something nobody designed: the shift that always gets the
-  easy route, the person whose complaints get answered fastest. That is
-  C3.3 (explain the relationship between motivation, rewards, and job
-  performance), and it is the question that separates a diagnosis from a
-  summary.
-  Then: "Of the two people in the interviews, which one is avoiding the
-  conflict — and what is the avoidance buying them?" A strong answer
-  names the style and says who pays for it. That is C2.4 (evaluate
-  conflict-management styles and their impact on a situation). Avoid the
-  can't/won't question — the task page prints it and Day 21 of Unit 2
-  taught it.
-  Record: one line per student you reach, on the day plan, right then —
-  a letter and three words. Circle the names you did not get to; the
-  seminar on Day 22 of Unit 2 and the retrieval clinic on Day 22 of Unit
-  3 are both places to catch them.
+TALK — Unit 2, Day 22, the Does Money Motivate seminar, which is the day
+  after this task is launched
+  Put the conversation in the seminar rather than in the Day 1 working
+  period, and there are two reasons. The practical one is arithmetic: a
+  written note on every draft fills most of those twenty-five minutes,
+  so a conference with each student on top of it is not a thing that can
+  happen. The better one is that the seminar is the richest C3.3
+  conversation of the whole course and, until now, none of it reached
+  anybody's mark.
+  You are chairing, so take four or five students by name across the
+  hour rather than trying to hear everyone. Nine seminars run this year;
+  keep one list and everybody is heard twice.
+  Ask: "Name the reward this workplace actually hands out — not the one
+  written in the pay policy — and say what behaviour it produces." A
+  strong answer finds something nobody designed: the shift that always
+  gets the easy route, the person whose complaints get answered fastest.
+  That is C3.3 (explain the relationship between motivation, rewards,
+  and job performance), and it is the question that separates a
+  diagnosis from a summary. They have the data pack from yesterday, so
+  the answer can be about their own scenario.
+  Then: "You have argued money would not fix it. What would you have to
+  believe about these people for money to be exactly the right answer?"
+  A strong answer can argue the case it does not hold. That is C3.2
+  (analyse the various motivational strategies used by particular
+  organizations). Avoid the can't/won't question — the task page prints
+  it and Day 21 taught it.
+  Record: four or five names down the margin of your seminar notes, a
+  letter each, as they speak. The seminar is already running itself.
 
 The product evidence is the 900-word diagnosis, handed in on Day 2 of
 Unit 3, after fifteen minutes of that period are spent making the change

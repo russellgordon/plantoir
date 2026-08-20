@@ -16,6 +16,10 @@ strengths and one real problem. You will run the annual conversation.
 Then you swap roles and run a different file, so everyone sits on both
 sides.
 
+Your observer's notes are material for you to write from, never a
+verdict on you: nobody in this room marks anybody, and what an observer
+writes changes no one's mark — see [[How Marks Work]].
+
 Ten minutes each way. A third student observes and takes notes against
 the criteria below.
 

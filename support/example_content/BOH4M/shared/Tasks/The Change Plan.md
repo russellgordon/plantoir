@@ -37,6 +37,13 @@ yours.
    would make you slow down or stop. Say which kind of control each
    measure is.
 7. **A timeline** with the first four weeks in detail.
+8. **The two ways you did not choose.** Every change can be made more
+   than one way. Describe two others, say where each idea came from —
+   your own thinking, or something the class turned up — and why you
+   rejected them. A plan with one option in it was never planned; see
+   [[Creativity in Planning]] on why the second and third ideas are
+   worth the twenty minutes, and why a group usually finds them faster
+   than one person does.
 
 ## How it is marked
 
@@ -46,6 +53,7 @@ yours.
 | Attention to resistance | Objections anticipated and answered, not dismissed |
 | Legal literacy | Specific obligations identified and built in early |
 | Control | Measures that would actually reveal a problem in time |
+| Options | More than one way was considered; the rejected two are named, sourced, and refused for a reason |
 
 > [!warning] The plan that only communicates
 > Most student change plans are an announcement plus optimism. If nothing
@@ -94,27 +102,42 @@ OBSERVE — Unit 3, Day 19, the twenty-minute working period at the end of
   was the third item on this same day's agenda, so you would be marking
   them on the lesson they had just been given.
 
-TALK — Unit 3, Day 19, while you go round leaving notes on the plans in
-  that same period
-  Everybody gets the written note; that is the checkpoint the class page
-  promises. For eight or ten of them, ask the question while you are
-  already at the desk — the students whose written work has told you
-  least so far.
-  Ask: "Which group's loss can you not compensate — and what did you
-  decide to give them instead?" A strong answer has an honest answer:
-  notice, a say in how it happens, first refusal on something else, or
-  nothing but the truth said early. That is D4.3, and the written plan
-  will not carry it, because a plan contains the objections that were
-  answered rather than the one that could not be.
-  Then: "If this organization had ignored the pressure for another two
-  years, what would have forced the change instead?" A strong answer
-  names a different element — a regulator, a retirement, a competitor —
-  and shows that the driver was a pressure rather than a whim. That is
-  D4.1 (analyse the elements that bring about change in an organization);
-  the plan states the driver, so ask for the counterfactual, not the
-  driver.
-  Record: a letter beside each name you reach, on the day plan, right
-  then, and a circle round the ones you did not.
+TALK, first half — Unit 3, Day 19, one sentence at the desk while you
+  are writing the note, not a conference
+  Twenty minutes is a note on every plan. It is not a note on every plan
+  AND a conversation with each of them, so this is deliberately one
+  question, asked standing up, and you will get through it because the
+  answer is short.
+  Ask: "They have read your announcement. Somebody puts a hand up and
+  says 'why us and not the other department?' Which of your strategies
+  answers that — and which one of them would make it worse?" A strong
+  answer ranks its own strategies against a question nobody scripted. The
+  plan cannot carry this: required content 4 asks what they will say
+  about the rumour that is ALREADY circulating, which is the question
+  they have prepared for, and this is deliberately the other one. That is
+  D4.3 (evaluate different strategies used by managers to bring about
+  acceptance of planned change) — the verb is evaluate, and ranking two
+  strategies against a live objection is evaluating.
+  Record: a letter in the margin of the plan itself, beside the
+  announcement section, as you hand it back.
+
+TALK, second half — Unit 3, Day 20, the When Control Becomes Surveillance
+  seminar, the class after the working period
+  This is where the control half of the task gets its conversation, and
+  it costs the schedule nothing because the seminar is already there. You
+  are chairing, so take four or five students by name rather than the
+  room.
+  Ask: "Your plan measures something every week. If the people being
+  measured could see that number, would it still work — and which of
+  your measures stops working the moment they can?" A strong answer
+  distinguishes a measure that survives being known from one that only
+  works while nobody is looking, and says what each does to the people
+  under it. That is D5.3 (describe the impact of internal control
+  measures — self-discipline, goal setting — and external control
+  measures on an organization). It is not the checkability question:
+  that was Day 19's third agenda item and they have had the lesson.
+  Record: four or five names down the margin of your seminar notes, a
+  letter each, as they speak.
 
 The product evidence is the plan itself, handed in on Day 22 of Unit 3,
 after the first fifteen minutes of Day 20 are spent making the change

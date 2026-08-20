@@ -93,14 +93,16 @@ OBSERVE — Unit 3, Day 12, the working period, and especially the peer
   Record: one row per pair on the day plan, and a D, an E, or an S.
 
 TALK — Unit 3, Day 12, the conferences already on that agenda
-  Ask: "What does having one plan for the whole organization buy this
-  place that three separate departmental plans would not?" A strong
-  answer names a benefit and points at where the plan collects it — two
-  departments who now know each other's dates, one budget that stopped a
-  duplicate purchase. That is D1.1 (describe the planning process and its
-  benefits to the organization: flexibility, coordination, time
-  management), asked for directly, because the task page asks for a
-  verdict on the strategy and never for what planning itself is doing.
+  Ask: "Find me two parts of this plan that clearly did not talk to each
+  other — a date that cannot work with another date, money committed
+  twice, a target one department cannot hit without another one moving
+  first." A strong answer produces the pair and says what it costs them.
+  That is D1.1 (describe the planning process and its benefits to the
+  organization: flexibility, coordination, time management) approached
+  from the failure end, which matters here: The Planning Process has a
+  section headed "What it buys", taught on Day 1 of this unit and read
+  for homework that night, so asking what planning buys would get the
+  page read back at you. Asking where it failed to buy it cannot be.
   Then: "Point me at a number in this plan that the organization is
   treating as a promise. Is it a budget or a forecast — and does the
   difference change what they should have done?" A strong answer knows
