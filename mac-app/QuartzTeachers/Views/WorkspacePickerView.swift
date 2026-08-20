@@ -57,16 +57,36 @@ struct WorkspacePickerView: View {
                     .frame(maxWidth: 460)
                     .multilineTextAlignment(.center)
 
-                Button("Set Up This Folder") {
-                    workspace.initializeWorkspace()
+                // While the setting up runs, the button SAYS so and both
+                // buttons go quiet. What it is doing takes a couple of
+                // seconds on a fast disk and much longer on a slow one —
+                // see `WorkspaceModel.isInitializingWorkspace` — and a
+                // button that stays pressable under a frozen window is how
+                // ordinary work comes to look like a hang.
+                Button {
+                    Task {
+                        await workspace.initializeWorkspaceInBackground()
+                    }
+                } label: {
+                    if workspace.isInitializingWorkspace {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Setting Up…")
+                        }
+                    } else {
+                        Text("Set Up This Folder")
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
+                .disabled(workspace.isInitializingWorkspace)
                 .accessibilityIdentifier("initializeFolderButton")
 
                 Button("Choose a Different Folder…") {
                     workspace.isChoosingWorkspace = true
                 }
+                .disabled(workspace.isInitializingWorkspace)
                 .accessibilityIdentifier("chooseFolderButton")
             } else {
                 Button("Choose Folder…") {
