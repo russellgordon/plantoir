@@ -580,6 +580,35 @@ from Phase 5 apply here too.
   everything else: 1") and put the detail in a footnote. Sweep every pie
   in a payload for this before shipping: no slice rounding to zero, no two
   slices under 3%.
+- **A pie carries the SHAPE of an answer, never an inventory. Chart the
+  split that matters and put the members of each part in prose beneath
+  it.** Past about four slices a pie stops being a picture and becomes a
+  legend with a decoration attached: the reader's eye has nowhere to
+  land, and the one comparison the page exists to make is buried among
+  nine others it does not care about. If you find yourself needing a
+  legend as tall as the chart, the content wanted a table, a list, or a
+  sentence.
+
+  ICS3U's `How Marks Work` is the worked example, and it is instructive
+  because it broke NO existing rule. Ten slices, every one legible,
+  nothing under 3%, title within length — and it still failed, because a
+  student opening that page needs one fact (seventy per cent from the
+  semester, thirty from the end) and had to reconstruct it by summing
+  eight numbers. Redrawn as two slices, with the seven tasks named in a
+  paragraph underneath, the same page answers the question in the first
+  glance and keeps every detail it had.
+
+  There is a second reason beyond legibility, and it is the one that
+  survives a bigger monitor: **per-item percentages are false precision
+  whenever the underlying numbers are a professional judgement.** The
+  split between six comparable tasks shifts with the class and with the
+  year; printing 6% against 5% presents a judgement as arithmetic and
+  invites an argument about the wrong thing. Say which piece is the heavy
+  one and why, and offer the exact numbers to anyone who asks for them.
+
+  So: keep the two mechanical rules above — they are necessary and they
+  are not sufficient. Then ask what single comparison the chart is FOR,
+  and whether a reader would see it without counting.
 - **CHEMISTRY: write it with mhchem (`\ce{...}`), never by hand.** The
   build enables the extension (`build_site.py` adds
   `import "katex/contrib/mhchem"` to `latex.ts`), so a whole equation
