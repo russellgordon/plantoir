@@ -59,6 +59,17 @@ sentences and rules regardless of their OS. Three consequences:
   the run-transcript gap that mirrors the Windows one is unreachable here
   because every task launches through `/bin/bash`. A gate that only asks
   "does it compile" would have passed both without learning either.
+
+  **A behaviour DID change before that cut, and it did not move the number
+  — here is the test that decides such cases.** Testing the candidate turned
+  up the mac blocking its main thread while setting up a new working folder,
+  which Windows 1.1.0 already handles properly. Ask: **does this bring the
+  lagging platform UP TO the number, or does it change what the number
+  means?** Windows shipped 1.1.0 with the good behaviour, so the mac lacking
+  it was the mac being behind 1.1.0 — fixing it makes the two agree on what
+  1.1.0 is, and 1.1.0 is still the right label. The answer would be the
+  opposite for a change neither platform has shipped: that one earns the
+  next number, because a teacher on Windows 1.1.0 would not have it.
 - **Release notes say "macOS: no changes" (or the reverse) plainly** when a
   platform ships under a new number without behaviour changes. That sentence
   is the entire cost of keeping one series, and it is cheaper than every
