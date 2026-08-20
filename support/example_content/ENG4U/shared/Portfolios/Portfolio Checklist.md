@@ -15,12 +15,15 @@ Copy this into your notebook — the boxes here are printed, not clickable.
 
 ## The assessed pieces, with drafts
 
-- [ ] [[The Lens Essay]] — story, craft note, and draft
-- [ ] [[The Hamlet Seminar]] — script with blocking, and the director's
-      note
+- [ ] [[The Lens Essay]] — annotations, outline with the cost paragraph,
+      draft, final
+- [ ] [[The Hamlet Seminar]] — your question, your passages, your
+      follow-up
 - [ ] [[The Critical Essay]] — outline, draft with feedback, final
-- [ ] [[The Hamlet Seminar]] — your question, your passages, your follow-up
-- [ ] [[The Comparative Essay]] — the analysis and the text you made
+- [ ] [[The Comparative Essay]] — outline, draft, final
+- [ ] [[The Adaptation Study]] — the table of differences, your analysis,
+      and your note on the text you made
+- [ ] [[The Independent Study]] — all four checkpoints, in order
 
 ## For the examination
 
@@ -31,7 +34,7 @@ Copy this into your notebook — the boxes here are printed, not clickable.
 
 > [!warning] The one people forget
 > The drafts. A final copy with nothing behind it cannot show growth, and
-> growth is what the last part of this course is judging.
+> seeing the growth is most of what [[Showing Growth]] is for.
 
 %%curriculum-start%%
 ## Curriculum connection

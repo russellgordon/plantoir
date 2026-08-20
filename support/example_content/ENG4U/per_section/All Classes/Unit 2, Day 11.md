@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Seminars: groups one and two
-2. Participation assessed for everybody
+2. Everybody not leading is assessed on the terms published in
+   [[The Hamlet Seminar]] — on what a contribution does, never on how
+   many you make
 
 ## Things to do before our next class
 

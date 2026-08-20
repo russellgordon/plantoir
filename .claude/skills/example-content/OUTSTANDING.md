@@ -65,3 +65,51 @@ The two briefs are `gs-conformance-brief.md` (417 lines, 24 failure modes)
 and `gs-review-brief.md`, both beside this file. `verify_gs.py` runs the
 mechanical checks, including a simulation of the build's own comment
 stripping to catch teacher text that would reach students.
+
+
+---
+
+# Cross-payload defects found during the sweep, deliberately not fixed
+
+Both are real, both are outside a Growing Success brief, and both need the
+live ministry document or a payload-wide sweep. A half-done sweep is worse
+than none, so no instance of either was touched.
+
+## Calendar drift in the English payloads
+
+Every English payload runs `class_weekday_step: 1` over 86 classes — September
+to mid-January — and every one of them names months outside that window:
+
+| payload | pages naming February–June |
+|---|---|
+| ENG3U | 26 |
+| ENG4U | 24 |
+| ENL1W | 20 |
+| ENG2D | 15 |
+
+ENG4U's author documented the specifics on its own payload: the independent
+study is described as "October to April", its checkpoints are dated
+"Mid-February" and "Late March", and `Showing Growth`, `Your First Entry` and
+`Portfolios/index` refer to May and June. `How This Class Works` and
+`Tasks/index` carry it too.
+
+Not every hit is a defect — a month can appear in a text, a quotation or a
+generic reference — so this needs reading per instance rather than a
+find-and-replace. The scheduling claims are the ones that mislead.
+
+## Truncated and corrupted curriculum text
+
+The skill's Phase 1 rule is verbatim or not at all. Beyond the nine pages
+recorded earlier, ENG4U's pass found two more truncated mid-sentence —
+**C1.5** ("determine whether the ideas and information") and **C3.6** ("use a
+variety of presentation features, including") — both of which sit on task
+pages. **C4.1** also has a stray teacher-prompt fragment spliced on after its
+closing parenthesis.
+
+Authors have been told not to cite any truncated code in a triangulation
+block, and none has. But a teacher following ENG4U's Critical Essay block
+opens a C4.1 page with junk on the end of it.
+
+Fixing these means re-fetching the live Ontario English curriculum. It is a
+Phase 1 job, cheap to do on its own, and it should be done before the English
+payloads are shown to anyone.

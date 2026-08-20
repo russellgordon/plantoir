@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Checkpoint, on your own: a paragraph on an unseen speech
+1. Checkpoint, on your own: a paragraph on an unseen speech, then
+   marked against the criteria by you
 2. Consolidation: what the play refuses to settle, and why that is the
    design
 

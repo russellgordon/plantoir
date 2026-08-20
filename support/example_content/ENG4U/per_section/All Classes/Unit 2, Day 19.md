@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Critical Essay]], day 1 — questions from your own
+1. [[The Lens Essay]] back. Read it beside the criteria table before
+   you look at the mark
+2. Launch: [[The Critical Essay]], day 1 — questions from your own
    annotations
-2. Concept: [[Thesis and Argument]] — the mechanism test
+3. Concept: [[Thesis and Argument]] — the mechanism test
 
 ## Things to do before our next class
 

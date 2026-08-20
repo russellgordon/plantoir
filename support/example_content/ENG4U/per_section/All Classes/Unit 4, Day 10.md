@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Defences: six students
-2. Everybody's questions assessed as participation
+2. Bring two written questions for each essay you have read; the
+   questions are half of what makes a defence worth having
 
 ## Things to do before our next class
 

@@ -5,8 +5,8 @@ created: __CREATED__
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · six class periods · 1,400–1,600 words · assessed on all
-> four categories
+> Individual · six working periods, handed in on the seventh ·
+> 1,400–1,600 words · assessed on all four categories
 
 ## The task
 
@@ -40,7 +40,7 @@ is on [[The Extended Essay]].
 | 2 | Conference; passages gathered and paraphrased |
 | 3 | Outline, including the counter-reading you will engage |
 | 4 | Draft |
-| 5 | Workshop: partner marks unsupported claims and the weakest section |
+| 5 | Workshop: a partner marks unsupported claims; then your own judgement against the table below, and the weakest section rewritten in class |
 | 6 | Rewrite; quotations and citations checked |
 
 ## How it is marked
@@ -71,3 +71,47 @@ is on [[The Extended Essay]].
 
 ![[C4.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 21, the outline period — and specifically the
+first half of it, BEFORE the concept lesson on ordering the moves. The
+agenda puts the outlining first for exactly this reason: what you see
+then is what they already do.
+  Watch for: whether the order of the moves is CHOSEN or inherited. Some
+  students number their points once, in the order the passages turned up
+  in their annotations. Others build one order, read it, and rebuild it.
+  The finished essay shows you the order that survived and never the one
+  that was rejected, so this is invisible from Sunday marking.
+  Going well: crossing out and renumbering; two attempts at where the
+  counter-reading section sits; somebody saying out loud that a point
+  cannot come before another one.
+  Stuck: a numbered list that matches the annotation order exactly, with
+  the counter-reading last because it was thought of last.
+  Record: a class list and a single tick for anyone who visibly rebuilt.
+  It is not a score — it is who to sit beside on Day 22.
+  Evidence for C1.4: identifying, sorting and ordering main ideas and
+  supporting details, and choosing the organizational pattern that suits
+  the purpose. The sorting is the half that leaves no trace.
+
+TALK — Unit 2, Day 20, the conferences already on that agenda, while the
+room gathers and paraphrases passages.
+  Ask: "What went wrong in your lens essay that you are deliberately
+  doing differently this time?" Then: "Which part of this one are you
+  planning to write last, and why that part?"
+  A strong answer names a specific move rather than a mood — that the
+  cost paragraph got written at midnight, so the counter-reading section
+  is being outlined first this time; that quotations are going in before
+  the analysis because last time the analysis got written around them.
+  That is C4.1 in conversation: insight into your own strengths and
+  weaknesses as a writer, and the strategies you found helped.
+  A student with no answer to either has not opened the lens essay you
+  handed back on Day 19, which is a five-minute problem you can fix on
+  the spot.
+  Record: initials and three words in the margin of your conference
+  list.
+
+The product arrives on its own: the essay handed in on Day 25.
+%%
+

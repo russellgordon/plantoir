@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Begin [[The Handmaid's Tale]]: the premise, and the year it was
+1. Five minutes, before anything: what do you already expect a dystopia
+   to do? Not marked — the novel spends four hundred pages arguing with
+   whatever this room brings, and I need to know what that is
+2. Begin [[The Handmaid's Tale]]: the premise, and the year it was
    written
-2. The opening chapter read aloud; the tense noticed
+3. The opening chapter read aloud; the tense noticed
 
 ## Things to do before our next class
 
