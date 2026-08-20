@@ -10,10 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. [[The Functions Symposium]], day 3 — working period: choose the work you
-   will present and what it shows about functions generally
-2. Rehearse the two minutes on another group
+1. [[The Functions Symposium]], day 2 — working period: both candidate
+   families auditioned side by side, the comparison recorded, and the
+   winning model built with every parameter tied to the situation
+2. Conferences while you work, group by group: which family lost, and
+   what beat it?
 
 ## Things to do before our next class
 
-- [ ] Presentation planned; the claim written in one sentence.
+- [ ] Each panel's author decided.
