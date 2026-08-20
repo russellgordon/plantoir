@@ -113,3 +113,52 @@ opens a C4.1 page with junk on the end of it.
 Fixing these means re-fetching the live Ontario English curriculum. It is a
 Phase 1 job, cheap to do on its own, and it should be done before the English
 payloads are shown to anyone.
+
+## Weighting pies that chart an inventory instead of the 70/30 shape
+
+Found by a cross-payload audit on 2026-08-20, after the EXC2O port. Russell's
+instruction was explicit: the mark page's pie is a 70-30 split, and the tasks
+in each part are described in prose rather than illustrated as slices.
+
+Six payloads had drifted, all of them charting per-task or per-category
+weights:
+
+| Payload | Slices | Status |
+|---|---|---|
+| ICD2O | 45/20/20/15 | fixed in flight |
+| MCR3U | 40/25/20/15 | told in flight |
+| MHF4U | 40/25/20/15 | **outstanding** |
+| TEJ2O | 45/20/20/15 | **outstanding** |
+| TEJ4M | 35/25/15/15/10 | **outstanding** |
+| MCMPR11 | 30/12/10/8/15/15/10 | **outstanding**, see below |
+
+The rule now has a mechanical check (`lint_payload.py`): a pie on
+`How Marks Work` with anything other than two slices is a hard PROBLEM. It
+lived only in prose before, which is why six payloads drifted past it while
+every one of them passed the linter.
+
+A second, softer check notes any pie anywhere with more than four slices. That
+one is deliberately a NOTE rather than a problem: "past about four" is a
+judgement, and a genuine composition — SNC1W's `Where Our Electricity Comes
+From`, the skill's own "dry air, by volume" example — can legitimately want
+five. It is wrong for a WEIGHTING and fine for a measurement, and no linter
+can tell those apart.
+
+**MCMPR11 needs a decision before it is touched.** Its seven-slice pie is the
+worst of the six, but it is not an Ontario course code, so the 70/30 rule that
+comes from Growing Success Ch. 5 POLICY may simply not apply to it. The
+mechanical check will flag it regardless, because the check keys on the page
+name rather than on the jurisdiction. Either MCMPR11 gets its own split and an
+exemption, or it should not be linted by the Ontario linter at all — do not
+quietly rewrite it to 70/30 just to make the check go green.
+
+## What the audit did NOT find
+
+Worth recording, because it was checked properly and the answer was reassuring:
+**every payload states the 70/30 split in prose.** An early pass suggested ten
+did not, but that was a broken detector — the payloads phrase it "Seventy of
+the hundred are earned across the semester" and "**Seventy per cent** is the
+semester's work" as often as "seventy per cent", and the pattern only matched
+the last of those. Twenty-two payloads state the split without drawing a pie,
+which is a consistency gap rather than a conformance failure; the skill
+requires the split to be STATED, and the pie is how it is best drawn.

@@ -58,6 +58,7 @@ def lint(course_code: str) -> int:
     # transclusions between the markers are NOT inside a comment.
     comment_pattern = re.compile(r"%%(.*?)%%", re.S)
     missing_triangulation = []
+    bulky_pies = []
     link_pattern = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
     class_sentinel = re.compile(r"created: __CREATED_CLASS_(\d+)__")
 
@@ -145,6 +146,20 @@ def lint(course_code: str) -> int:
                 problems.append(f"{rel}: a pie slice rounds to 0% — combine it into a larger one")
             elif len(crowded) > 1:
                 problems.append(f"{rel}: two pie slices under 3% will print their labels on top of each other")
+            # A pie carries the SHAPE of an answer, never an inventory. The
+            # mark page's pie is the seventy and the thirty and nothing
+            # else: per-item weights are a professional judgement that
+            # shifts with the class and the year, so printing them as
+            # slices presents a judgement as arithmetic. Six payloads had
+            # drifted to four- and five-slice weighting pies before this
+            # check existed, because the rule lived only in prose.
+            if page.stem == "How Marks Work" and len(values) != 2:
+                problems.append(
+                    f"{rel}: the mark page's pie has {len(values)} slices — it "
+                    f"must be exactly two, the 70/30 split, with the tasks "
+                    f"making up each part named in prose beneath it")
+            elif len(values) > 4:
+                bulky_pies.append((rel, len(values)))
 
         # The whole link graph, so reachability can be checked below.
         outside_fences = re.sub(r"```[\s\S]*?```", "", text)
@@ -542,6 +557,10 @@ def lint(course_code: str) -> int:
     for rel in missing_triangulation:
         print(f"note     no triangulation prompt {rel} (a hidden %% block "
               f"naming where to observe and what to ask)")
+    for rel, count in bulky_pies:
+        print(f"note     {rel} has a {count}-slice pie — past about four a pie "
+              f"is an inventory rather than a shape; fine for a real "
+              f"composition, wrong for a weighting")
     print("clean" if not problems else f"{len(problems)} problem(s)")
     return 1 if problems else 0
 

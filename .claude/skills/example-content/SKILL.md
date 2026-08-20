@@ -346,13 +346,25 @@ course" (Ch. 5 POLICY, p. 41). The `final-evaluation` page the arc already
 requires IS that thirty per cent, so it must reach across the whole course
 rather than be a fifth unit test. Name the four categories in student
 words, say that learning skills are reported separately from the mark, and
-say where the evidence comes from — all three kinds. **About half the
-payloads shipped so far predate this section** and state no 70/30 split at
-all; ADA1O, the reference implementation, is one of them, and it also folds
-"ensemble and audience skills" into a mark-weighting pie. Copy ADA1O's
-VOICE, not its scheme — where the reference implementation and this section
-disagree, this section wins, and retrofitting the older payloads is a real
-job rather than a one-page tidy.
+say where the evidence comes from — all three kinds.
+
+**This was retrofitted across every payload in August 2026, and the base
+rate is the finding worth keeping: every single course had at least one
+mark the policy forbids.** "Ensemble and audience skills : 10",
+"Seminars 10% — prepared participation", "Professionalism — on time,
+prepared, discreet", and — worst, because the class pages said "mark your
+own" — TEJ3M's "Measurement and calculation checks : 20" and MCV4U's
+"Quizzes and check-ins : 25". None of these looked wrong to the author who
+wrote them. Assume the same of yours: the mark page is where a course
+quietly grades the worker instead of the work, and it is the first page to
+audit rather than the last. ADA1O carried the first of those and no longer
+does; it is again safe to copy for VOICE, and its `How Marks Work` is now
+a worked example of the two-slice pie as well.
+
+Every payload now states the split, so a missing 70/30 is no longer the
+common failure. Two live ones remain: a pie that charts an inventory
+instead of the shape (see the mermaid rules in Phase 5), and a mark page
+promising a weighting the task arc does not actually deliver.
 
 **Triangulate: observation, conversation, product.** "Evidence of student
 achievement for evaluation is collected over time from three different
