@@ -112,13 +112,15 @@ TALK — Unit 4, Day 8, the conferences at the end of that period
 
 SEMINAR — Unit 4, Day 10, "Does an Apology Matter?", the class before this
 essay is due
-  Chairing, so record rather than observe. Redress for internment,
-  residential schools, the head tax and the LGBTQ purge is the substance of
-  E2.3 — developments affecting the relationship between governments and
-  First Nations, Métis, and Inuit individuals and communities, analysed
-  from various perspectives — and the seminar puts several students on
-  record about it the day before they hand in an essay that may not touch
-  it at all.
+  Chairing, so record rather than observe. The seminar ranges over
+  internment redress, residential schools, the head tax and the LGBTQ
+  purge, and only ONE of those is E2.3: that expectation is specifically
+  about the relationship between governments and First Nations, Métis, and
+  Inuit individuals and communities, so it is the residential schools and
+  Truth and Reconciliation strand of the discussion that counts towards it,
+  and nothing else in the list does. What a student says about the head tax
+  or the purge is worth recording, but it is E3.3 or general argument, not
+  E2.3. Getting that wrong in a gradebook is easier than it sounds.
   Listen for: whether a student can state the case against an apology
   without caricaturing it, and whether they distinguish an apology from
   what followed it. Both are the "various perspectives" clause working.

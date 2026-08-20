@@ -38,7 +38,7 @@ changes type halfway through is the commonest way an inquiry stalls.
 
 This is the entry students skip and the one worth most. When a source
 moves you off a position, write three things: what you believed, what you
-read, and what you believe now. Date it. By April you will have a record
+read, and what you believe now. Date it. By January you will have a record
 of your own reasoning that you could not reconstruct from memory.
 
 If nothing has moved you all term, that is a finding too — and usually it
@@ -46,12 +46,17 @@ means you have been reading sources that already agreed with you.
 
 ## What happens to it
 
-The notebook is one of the three pieces of [[The Portfolio Case]], and it
-is marked there — once, at the end, alongside the two reflections. What
-carries the mark is what you have written by the portfolio check in Unit
-3, and what you write in class at the milestones after it. Adding to it
-between classes is practice, it is worth doing, and it is not itself
-marked; see [[How Marks Work]].
+The notebook feeds [[The Portfolio Case]], and the rule there is the rule
+here: **what carries a mark is what you write in class at a milestone.**
+For the notebook that is two periods — the questions milestone at the end
+of Unit 1, and the check in Unit 3, where you choose your three strongest
+entries and write up what each is evidence of, with me reading it beside
+you.
+
+Everything else in here is yours. Adding to it between classes is
+practice: worth doing, never marked on its own, and the reason the two
+milestone periods are possible at all — you cannot choose your three
+strongest entries if there are only four. See [[How Marks Work]].
 
 Long before that, though, it is the thing that makes the rest possible.
 Every task in this course begins from a question and a source, and the

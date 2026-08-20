@@ -10,11 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Canada and the United States: trade, defence, and culture
-2. [[Canada and the World]] revisited
-3. Portfolio milestone, written in class: [[Skills You Are Building]],
-   piece two of [[The Portfolio Case]]
+1. Twenty minutes: Canada and the United States — trade, defence, and
+   culture, with [[Canada and the World]] revisited
+2. Notebooks out. You cannot write the next thing without yours
+3. The rest of the period, written in class: [[Skills You Are Building]],
+   the skills milestone of [[The Portfolio Case]]
 
 ## Things to do before our next class
 
-- [ ] Nothing to hand in. Bring the notebook next class for the check.
+- [ ] Nothing to hand in. The portfolio check is in two classes — bring the notebook again that day.

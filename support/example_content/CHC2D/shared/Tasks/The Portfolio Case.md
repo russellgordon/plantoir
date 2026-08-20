@@ -7,7 +7,8 @@ tags:
   - unit-1
 ---
 **Launched in the first week, marked once, at the end.** Individual. Three
-pieces, written at three milestones, in class.
+pieces, built across four milestone periods, every one of them written in
+class.
 
 Every other task in this course asks what you can establish about the past.
 This one asks what the training did to you — and it is marked on evidence,
@@ -15,24 +16,31 @@ the same way everything else is. "I got better at research" is worth
 nothing here. "I stopped using the newspaper report once I saw it was
 printed under wartime censorship" is the whole assignment in one sentence.
 
-## The three pieces
+## The four milestones
 
-| Piece | Written | What it has to do |
+| Milestone | When | What you write, in the room |
 | --- | --- | --- |
-| [[Your Inquiry Notebook]] | All term; handed over at the Unit 3 portfolio check | The running record: what you asked, what you found, where it came from, and where your thinking moved |
-| [[Skills You Are Building]] | In class, mid Unit 3 | Five paragraphs, one per link in the chain, each with a piece of your own work behind it |
-| [[Where History Leads]] | In class, after the culminating inquiry | Part one: one current issue, read as a historian reads a document. Part two: one occupation, described by what it does |
+| Questions | Last week of Unit 1 | Three questions this unit leaves you with — one factual, one comparative, one causal, each labelled |
+| Sourcing | The portfolio check, late in Unit 3 | Your three strongest [[Your Inquiry Notebook]] entries, chosen there and then, with what each one is evidence of — and one of the three must be an entry where a source changed your mind |
+| Skills | Two classes before the check | [[Skills You Are Building]]: five paragraphs, one per link in the chain, each with a piece of your own work behind it |
+| Where it goes | After the culminating inquiry | [[Where History Leads]], both parts: one current issue read as a historian reads a document, and one occupation described by what it does |
+
+The notebook itself runs all term and is never collected for a mark. What
+is marked is what you make OUT of it, in those four periods.
 
 ## What the case has to contain
 
-1. **Questions you actually asked.** Every notebook entry opens with one,
-   in question form, and says which of the three kinds it is — factual,
-   comparative, or causal. An entry that begins with an answer is a note,
-   not an inquiry.
-2. **Sources somebody else could find.** Enough of author, title, date and
-   location that the entry is still usable in January, and across the
-   notebook as a whole, more than one kind of source and more than one
-   side of an argument.
+1. **Questions you actually asked.** At the Unit 1 milestone you write
+   three, in question form, each labelled factual, comparative, or causal.
+   Keeping every notebook entry in that shape all term is the practice
+   that makes those three easy to write; it is the three that are marked.
+   A question that begins with its answer is a note, not an inquiry.
+2. **Sources somebody else could find.** At the check you choose three
+   entries and write up what each is evidence of. Between them they have
+   to show enough of author, title, date and location that a stranger
+   could follow them back, more than one kind of source, and more than one
+   side of an argument — which is why what you choose matters as much as
+   what you wrote.
 3. **Skills with evidence attached.** In [[Skills You Are Building]], each
    of the five links gets a named piece of your own work and a date. Where
    a link has no example yet, say so and name the task where you will fix
@@ -44,16 +52,18 @@ printed under wartime censorship" is the whole assignment in one sentence.
 5. **One occupation, described by its work.** Part two. A task that job
    does in an ordinary week which you have already practised here. Not a
    programme you would apply to — the work.
-6. **Three places your mind changed.** Entries showing what you believed,
-   what you read, and what you believed afterwards. If there are none,
-   say that, and say what it tells you about the sources you chose.
+6. **One place your mind changed.** One of the three entries you choose
+   at the check has to be one where a source moved you — what you
+   believed, what you read, what you believed afterwards. If you cannot
+   find one anywhere in the notebook, say so at the check, and we will
+   talk about the sources you have been choosing.
 
 ## Written in class, and why
 
-The three milestones are periods, not deadlines: the portfolio check in
-Unit 3, the skills inventory the class before it, and the closing entry
-after the culminating inquiry. **What you write in those periods is what I
-mark.**
+All four milestones are periods, not deadlines. **What you write in those
+periods is what I mark — nothing else.** The skills inventory sits two
+classes ahead of the check on purpose: what you discover writing it is
+still fixable when the check comes round.
 
 That is not an arbitrary rule. Work that carries a mark has to be done
 where I can see it is yours, and the practice you do between classes —
@@ -70,15 +80,16 @@ easier, and it is not itself marked. See [[How Marks Work]].
 | Skills, evidenced | Every claim about what you can do names a specific piece of your own work, dated |
 | Applied to now | A current issue read as a document, with the earlier episode named and the comparison's limits stated |
 | Where the work is | An occupation described by what it does in a week, matched to something you actually practised |
-| Movement | Entries that show a source changing your mind — what you believed, what you read, what you believe now |
+| Movement | One chosen entry shows a source changing your mind — what you believed, what you read, what you believe now |
 
 > [!tip] The weakest paragraph is usually the transfer one
 > Almost everyone writes "it taught me to think critically". That is a
 > phrase, not a transfer. "I looked up who paid for the study" is a
 > transfer, and it takes fewer words.
 
-[[Judging Your Own Work]] is the routine to run on this before the last
-milestone, the same as on any essay.
+The Unit 3 check is this task's checkpoint, and the last milestone is
+where you act on what it found — which is why they are three weeks apart
+rather than consecutive.
 
 %%curriculum-start%%
 ## Curriculum connection
@@ -97,44 +108,43 @@ milestone, the same as on any essay.
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 3, Day 17, the period in which the skills inventory is
-written
-  The paragraph that arrives will name a piece of the student's own work,
-  because the criteria row demands one. What it cannot tell you is where
-  the example came from.
-  Watch for: who opens the notebook. A student who stops writing, turns
-  back to October, and reads before naming an example is doing A1.2 — the
-  selecting and organizing was real, and the record can still answer a
-  question months later. A student who writes the example from memory
-  produces a paragraph that reads identically and may be perfectly true.
-  Going well: pages turned backwards; a date checked; an example abandoned
-  because the entry turned out to say something else.
-  Stuck: no notebook on the desk at all. That is not a discipline problem
-  to note down, it is the finding — this student has had no record all
-  term and the next two milestones will go the same way unless you act
-  this period.
-  Record: three columns on your day plan — read back, wrote from memory,
-  nothing to read. The third column is the one to do something about.
+OBSERVE — Unit 3, Day 17, the skills milestone, once the twenty minutes of
+Canada and the United States are done
+  Everyone has been told to have the notebook on the desk, and item 2 of
+  that agenda says so, so this is not a check on who remembered a book.
+  It is a retrieval test on the record itself.
+  Watch for: what happens when a student goes looking for the example a
+  paragraph needs. The notebook is open — the question is whether it can
+  answer a question put to it four months after it was written.
+  Going well: a date is found and checked; an example is abandoned because
+  the entry turns out to say something narrower than remembered; two
+  entries get compared.
+  Stuck: the notebook is open and nothing in it is findable — no dates, no
+  order, entries that do not say where anything came from. That is not
+  untidiness, it is A1.2: the selecting and organizing either happened or
+  it did not, and this is the only period in the course where you can see
+  the difference. Say it to the student then, because the sourcing
+  milestone is two classes away and this is still fixable.
+  Record: three columns on your day plan — found it, searched and failed,
+  wrote without looking.
 
-TALK — Unit 3, Day 19, the notebook and portfolio check already on that
-agenda
-  You are going through the notebooks anyway. Ask each student one of
-  these while their own is open in front of you.
-  Ask: "Where will you be using this in five years, if you never take
-  another history course?"
-  Then: "Why does this course make you record where every source came
-  from, when nobody outside a history class writes footnotes?"
-  The first is a prediction and the second asks a student to explain a
-  decision somebody else made, which is harder than it sounds and is not
-  the sort of question the pages have trained them for. A strong first
-  answer names a setting and an action rather than a virtue. A strong
-  second one gets past "so you do not plagiarise" to something about being
-  checkable by a stranger — which is A2.1's transfer clause, "skills that
-  can be transferred to the world of work and to everyday life", arrived
-  at rather than recited. Both answers tend to be far better spoken than
-  they will be written, so write down what you hear.
-  Record: one line each, in the notebook you are already holding, dated.
-  The student sees it, which is the point.
+TALK — Unit 3, Day 19, the notebook check, with theirs open between you
+  You are reading each notebook with its owner anyway. Two questions, and
+  neither is one the pages have answered for them.
+  Ask: "Which of your questions did you never answer — and was that
+  because you could not, or because you stopped wanting to?"
+  Then: "Point at the entry where you first wrote down something you did
+  not already believe."
+  The first is an audit of their own inquiry rather than of a source, and
+  it is A1.1 heard directly: a student who can separate a question the
+  evidence defeated from one they abandoned understands what a question
+  was FOR. The second is A1.2's last clause — sources that "reflect
+  multiple perspectives" — made concrete. A student who cannot find such
+  an entry anywhere in four months has been reading people who already
+  agreed with them, and that is worth saying out loud while there is a
+  term-end reflection still to write.
+  Record: in the notebook, in your handwriting, dated. They keep it, which
+  is the point.
 
 The product evidence is the three pieces, closing on Unit 4, Day 22.
 %%

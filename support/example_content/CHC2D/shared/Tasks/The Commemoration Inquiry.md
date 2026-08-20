@@ -64,7 +64,7 @@ marked for what somebody else wrote.
 | Significance | You argue why this matters, using the concept rather than the word |
 | Perspectives | Those who would disagree are represented fairly and answered |
 | Judgement | A recommendation someone could actually act on, with its cost named |
-| Conduct | The delivery answers what the audience actually asked, and the leave-behind is something they can use |
+| Written for its audience | Your section and the leave-behind are pitched for somebody who does not know this history and has to act on it |
 
 > [!warning] Living communities are involved in this
 > A commemoration argument is usually about somebody's ancestor,
@@ -115,11 +115,10 @@ OBSERVE — Unit 4, Day 18, the analysis period
   whether the reason is said out loud.
   Record: one line per group on your day plan — moved, narrowed, has not
   met it yet. The third group is the one to reach on Day 19.
-  The Perspectives row asks them to represent the other side fairly, and a
-  good group will. What the row cannot show is whether the other side ever
-  had a chance of winning, and that is A1.6: evaluating and synthesizing
-  findings to reach a judgement. The report shows a conclusion. It does not
-  show what the conclusion cost.
+  This is A1.6 — evaluating and synthesizing findings to reach a
+  judgement — at the one moment it is reversible. A group that moves on
+  Day 18 has three periods left to rebuild around the new answer; a group
+  that narrows has spent them already and will not tell you so.
 
 TALK — Unit 4, Day 17, the conferences on what the evidence supports
   The obvious two questions are already spent. Day 12's seminar sent them

@@ -106,13 +106,18 @@ launched
   dead, with sources, and to argue three positions — which means the room
   is talking about exactly what B2.2 and B3.1 ask for, on the last day
   before anyone has an essay to defend.
-  Listen for: a student who uses their soldier as evidence rather than as
-  decoration, and a student who can hold the separate signing of the Treaty
-  of Versailles and the 1939 debate in the same argument. The first is
-  B3.1, an individual's contribution to identities and citizenship; the
-  second is B2.2, perspectives on Canada's participation in international
-  relations. Some students will say this here and never write it — several
-  of them will choose a different question entirely tomorrow.
+  Listen for two things, and be careful which code you write beside each.
+  B2.2 covers 1914 to 1929 ONLY, so it is the separate signing of the
+  Treaty of Versailles and the seat at the League that count towards it —
+  a student who reaches for the week Parliament debated in 1939 is arguing
+  continuity and change, which is good history and is not B2.2.
+  B3.1 is about people who CONTRIBUTED to Canadian society and politics,
+  so an ordinary private's attestation paper used as evidence about cost is
+  not B3.1 however well it is used; what is B3.1 is a student who brings
+  Borden, Bourassa, Macphail, F. O. Loft, the Trades and Labour Congress or
+  the League of Indians into the argument and says what they changed.
+  Some students will say this here and never write it — several of them
+  will choose a different question entirely tomorrow.
   Record: your class list, one column, one phrase per student who spoke.
   Then a second column for who did not, because that is who to reach in
   Day 14's conference.

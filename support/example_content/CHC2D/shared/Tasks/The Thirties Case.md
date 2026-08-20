@@ -79,19 +79,21 @@ relief did not reach
   That period's stated job is acting on Day 4's conference notes, so a pair
   working steadily through what you told them is doing exactly right — this
   is not a check on whether they are busy.
-  Watch for: what a pair does with the first eligibility rule they find for
-  their own place. Whether it is read as a fact about the decade, or as a
-  decision somebody made, in a year, and could have made differently.
-  Going well: a pair asks who wrote the rule, or goes looking for the year
-  it changed.
-  Stuck: the rule pasted in and summarised in the words it uses about
-  itself — "the deserving poor", "able-bodied men" — with no gap between
-  the source's language and the pair's.
-  Record: two columns on your day plan — quoted it, questioned it.
-  The Exclusion row will get its "why", because the criteria ask for one.
-  What you are checking is whether the why came out of the record or out of
-  the student. That is the "main causes" half of C1.5, and the document set
-  is too short to show it.
+  Watch for: what a pair does with the first NUMBER they find for their
+  place. This task asks for figures, the Statistics and the Census page was
+  taught in the unit's first period, and the Depression is the decade
+  where a percentage with no denominator does the most damage.
+  Going well: the figure acquires a year and a publisher before it
+  acquires a slide; somebody asks who was counted and who was not — relief
+  rolls count households, not people, and unemployment figures of the
+  period frequently counted neither women nor farm labour.
+  Stuck: a percentage copied straight across, or two figures from
+  different years set beside each other as a trend.
+  Record: on your day plan, the first number each pair used and whether it
+  came with a year. One phrase per pair.
+  That is C1.3 — describing an economic trend and assessing its impact on
+  different groups — decided at the moment the evidence is picked up. A
+  presentation delivers the number either way, in ten confident minutes.
 
 TALK — Unit 2, Day 4, the conferences on evidence found
   Ask: "What were people in your place doing for a living in 1928 — and did

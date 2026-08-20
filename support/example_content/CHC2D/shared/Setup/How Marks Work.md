@@ -28,7 +28,7 @@ term, in the order you meet them: [[The Source Study]],
 [[The Postwar Argument]], [[The Rights Inquiry]], and
 [[The Recent Past]]. The eighth is [[The Portfolio Case]], which runs
 from the first week to the last and is marked once, at the end, on what
-you wrote at its three in-class milestones.
+you wrote at its four in-class milestones.
 
 They are not equally weighted. The two inquiries ask for more, over more
 periods, than a 600-word source study does, and the later work carries
@@ -83,6 +83,10 @@ least one working period afterwards whose stated job is acting on what
 the checkpoint found — look for it on the class pages, because it is
 written there.
 
+[[The Portfolio Case]] works the same way over a longer span: the Unit 3
+check is its checkpoint, and the closing milestone three weeks later is
+where you act on what it found.
+
 Two things are exceptions. [[The Source Study]] is short, so its
 conference and the time to act on it are both in the second half of one
 period. [[The Document Examination]] is an examination: there is no
@@ -128,10 +132,11 @@ the curriculum, in so many words.
 
 I mark the skills half of that and not the habits half. Collaboration and
 initiative are reported in the E/G/S/N column, where I will have plenty
-to say about them, and no criteria table in this course has a row for how
-you divided the work with your group. You are entitled to hold me to
-that: if a mark ever looks like it is about your conduct rather than your
-evidence, say so.
+to say about them, and **no criteria table in this course gives you marks
+for collaborating well.** Where a table mentions your partner at all, it
+is only to establish which words are yours. You are entitled to hold me
+to that: if a mark ever looks like it is about your conduct rather than
+your evidence, say so.
 
 **Your own judgement of your work, and your classmates', are not part of
 your mark.** You will judge your own work against the criteria often —
@@ -139,16 +144,19 @@ see [[Judging Your Own Work]] — and you will read each other's drafts,
 because both are the fastest ways to get better. Neither becomes a
 number. The mark is mine to determine, from evidence.
 
-**The seminars are not marked.** [[Was It Worth It|Was It Worth It?]],
+**The seminars are not a mark of their own.**
+[[Was It Worth It|Was It Worth It?]],
 [[Who Gets to Tell the Story|Who Gets to Tell the Story?]],
 [[Does an Apology Matter|Does an Apology Matter?]] and
 [[What Should a Country Remember|What Should a Country Remember?]] exist
 so that your position meets an objection before you commit it to paper.
-Come prepared anyway, for two reasons: each one lands within a few days of
-a task it makes much easier — the first, in Unit 1, the day before
-[[The War Question]] is launched — and what you say in a seminar is
-evidence about what you understand, which I write down and which counts
-the same way anything else you tell me counts.
+None of them has a weighting and none appears in the list above. Come
+prepared anyway, for two reasons. Each lands within a few days of a task
+it makes much easier — the first, in Unit 1, the day before
+[[The War Question]] is launched. And what you say in one is evidence
+about THAT task, in exactly the way what you say in a conference is: it
+can inform the mark the task carries, and it can never become a mark by
+itself.
 
 **Practice between classes is practice.** Reading a page before we
 discuss it, drafting a paragraph, finding a source — none of that is
