@@ -35,7 +35,7 @@ hoping nobody would look at.
 
 > [!example]- One row, judged honestly
 > From [[Lab Reports]]: *"Limits named honestly — the step that could have
-> misled you, roughly how much it could have moved the number, and one
+> misled you, roughly how much it could have moved the result, and one
 > change that would actually reduce it."*
 >
 > **Partly.** I wrote that the lamp warmed the water. I did not say by how
@@ -45,7 +45,7 @@ hoping nobody would look at.
 > difference at 10 cm, and add that a heat shield between lamp and beaker
 > would separate light from heat. Ten minutes.
 >
-> That entry is worth more than "looks fine" written against all six rows,
+> That entry is worth more than "looks fine" written against all seven rows,
 > and it took less time to write.
 
 ## Where this fits

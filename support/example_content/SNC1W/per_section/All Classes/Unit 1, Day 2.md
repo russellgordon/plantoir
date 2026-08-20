@@ -16,7 +16,8 @@ tags:
 2. Concept: [[WHMIS and Lab Safety]] — pictograms and the rules of this room
 3. Setup: [[Your Lab Notebook]] — set up your first pages
 4. Where the equipment lives, and the safety walk
-5. Portfolio: [[Why We Keep a Portfolio]]
+5. Portfolio: [[Why We Keep a Portfolio]], then [[Portfolio Checklist]] — the
+   standard it is judged against, read now rather than in January
 
 ## Things to do before our next class
 

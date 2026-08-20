@@ -35,10 +35,22 @@ Look back across the whole course and write about what changed in how you think.
 
 | Quality | What it looks like in your writing |
 | --- | --- |
-| A belief you can point at | The thing you used to think is stated plainly enough that a reader could have disagreed with it, and the evidence that changed it is named |
+| Claims with your own work under them | Every statement about what changed points at a specific piece, by name, that a reader could go and check |
 | Choices made about the work | Every piece you link is there for a reason about the work itself, not about the mark it received |
-| Honest about the hard part | The thing that did not work is described as it happened, and what you did next is specific enough to picture |
+| The difficulty described, not rated | What did not work, told as what happened — what you tried, what it did, what you did next — rather than how you felt about it |
 | Written for a reader | Somebody who was not in this room could follow it without you standing beside them |
+
+## Why this page lists no curriculum expectations
+
+Every other marked page in this course ends with the expectations it covers.
+This one has none, on purpose: the science curriculum has nothing to say about
+looking back at your own learning, so there is no expectation here to cover.
+
+That decides what it *is* marked on. This is marked the way any piece of
+writing is marked — whether the claims have evidence underneath them, and
+whether a reader could follow it. **It is not marked on what it admits to.**
+You cannot lose anything here for saying that something went badly. You can
+lose something for saying it went badly without saying what happened.
 
 ## Hand in
 
@@ -73,18 +85,20 @@ TALK — Unit 5, Day 14, the half hour set aside to finish it
   Everybody has their own work in front of them and you are circulating anyway.
   Do not ask the four questions on this page back at them; they have spent a
   period answering those.
-  Ask: "Point at the piece you called your best. What in it would you write
-  differently now?"
-  Then: "Which of the seven lab reports would you most want one more period
-  with, and what would you change first?"
-  A strong answer names something inside the science — the graph that should
-  have carried a line of best fit, the limit they knew about at the time and
-  left out, the conclusion that claimed more than the readings allow. A weak
-  one names presentation: neater, longer, in colour. That distinction is the
-  cheapest read on how far A1.2 actually travelled, and it takes ninety
-  seconds a student.
-  Record: two columns — named the science, named the presentation. Add the
-  names in the second column to your list for the Day 18 conferences.
+  Ask: "Somebody starts this course in February and asks you what the lab
+  reports were actually for. What do you tell them?"
+  Then: "Where in this course could somebody have got a decent mark without
+  understanding much — and what would have given them away?"
+  A strong first answer reaches for the thinking rather than the paperwork:
+  working out what your numbers will and will not let you say. A weak one says
+  practice at writing, or marks. The second question is the one worth the
+  ninety seconds — a student who can name a specific place and a specific tell
+  has understood what all of this evidence was for, and one who cannot has been
+  doing school. Neither answer is markable and neither is meant to be; what you
+  are finding out is whether the course landed, in time to say something true
+  to them at the Day 18 conference.
+  Record: two columns — named the thinking, named the paperwork. Take the
+  second column into Day 18.
 
 The product evidence is the reflection and the completed portfolio, handed in
 at the end of Unit 5, Day 14.

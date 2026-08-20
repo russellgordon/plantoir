@@ -86,9 +86,9 @@ afternoon nor one piece of writing decides your grade alone.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[A1.1]]
-
 ![[B2.2]]
+
+![[B2.6]]
 
 ![[C2.4]]
 

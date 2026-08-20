@@ -29,7 +29,11 @@ for responding to it.
    Inuit community's experience, using sources from that community wherever
    possible.
 4. **Existing responses.** What is already being tried? What is working?
-5. **Your plan.** Three actions, each with: who does it, what it costs, what it
+5. **Practices that already work.** Find a sustainable practice — one used by a
+   community rather than sold to it, and at least one of them from a First
+   Nations, Métis, or Inuit community. Say what it protects and why it works:
+   the ecological reason, not "it is traditional".
+6. **Your plan.** Three actions, each with: who does it, what it costs, what it
    would achieve, and how you would measure whether it worked.
 
 > [!tip] The most common weakness
@@ -43,9 +47,10 @@ for responding to it.
 | Understanding the science | Names the impact | Describes it | Explains the mechanism accurately | Explains it and its interactions with other systems |
 | Use of evidence | Few sources, unexamined | Sources listed | Sources evaluated for reliability | Sources compared where they disagree |
 | Communities | Mentioned generally | Described | Specific, sourced, respectful | Draws on community voices directly |
+| Practices that work | Named | Described | Explained — what it protects, and how | Set against a technical fix, honestly compared |
 | Plan | Vague actions | Actions with some detail | Costed, measurable actions | Actions with trade-offs assessed honestly |
 
-The four rows above are the whole story of the mark. Run them over your own
+The five rows above are the whole story of the mark. Run them over your own
 draft at the start of the last working period — [[Judging Your Own Work]] is
 how — and spend the rest of that period on the row you called weakest.
 
@@ -83,8 +88,10 @@ OBSERVE — Unit 2, Day 15, the working period on sustainable practices
   practice rather than a device — a burn on a schedule, a harvest left early,
   a stand of trees not cut. Plenty of Grade 9s scroll straight past it looking
   for a solar panel, because it does not look like technology to them.
-  The finished plan reads perfectly well either way; what it cannot show you is
-  the paragraph that was skimmed over on the way to a photograph of a turbine.
+  The criteria row about practices means the plan will show you who explained
+  one. What no plan can show you is the practice that was scrolled past on the
+  way to a photograph of a turbine — a plan built entirely out of technology
+  reads perfectly well, and looks like a choice rather than a miss.
   Going well: a practice written down together with the ecological reason it
   works — the equilibrium it protects, not just that it is traditional.
   Stuck: fifteen minutes of image search, and a source list of manufacturers.

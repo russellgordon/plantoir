@@ -14,9 +14,10 @@ tags:
 
 The device is built by the two of you and it is shared. **Your design log is
 yours alone**, kept in your own words, and so is your page on where the power
-comes from. I mark each of you on your own log, your own diagram, and what
-you can account for when you show the thing working. There is no common
-group mark on this task.
+comes from. I mark each of you on your own log and your own diagram, against
+the rows below — those two documents are the whole of your mark, and there is
+no common group mark on this task. The demonstration is how the class sees
+what you built; it is not separately marked.
 
 ## The task
 
@@ -111,8 +112,6 @@ on the row you called weakest.
 
 ![[D2.3]]
 
-![[D2.8]]
-
 ![[D1.1]]
 
 ![[D1.2]]
@@ -156,8 +155,8 @@ TALK — Unit 4, Day 12, the conference already on that agenda
   the second resistor added in a panic, the switch that was only ever a spare —
   and can say what they had thought it was for. Getting a component's function
   wrong and then finding out is D2.3 heard far more convincingly than getting
-  it right the first time. A strong second answer names the transformation and where
-  it goes: electrical energy into heat in the resistor, which does nothing for
+  it right the first time. A strong second answer names the transformation and
+  where it goes: electrical energy into heat in the resistor, which does nothing for
   the alarm and comes straight out of the battery. That is D2.8 heard, and it
   is the half of efficiency a working prototype never has to admit to.
   Record: two ticks per person, not per bench, on the seating plan. The bench

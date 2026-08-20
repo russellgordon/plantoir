@@ -105,21 +105,22 @@ OBSERVE — Unit 3, Day 13, the working period on the stages
   has not reached it yet. The middle column is who to sit beside on Day 14.
 
 TALK — Unit 3, Day 12, the conference already on that agenda
-  The agenda's own question — can you actually find out what it is made of —
-  is spent by the time you sit down. Two minutes, once the two elements are
-  chosen.
-  Ask: "Of your two elements, which one would be hardest to replace? What
-  would the product be like without it?"
-  Then: "If this product were built to last twice as long, which stage's
-  impact would shrink the most — and which one would not shrink at all?"
-  A strong answer to the first names a property that makes the element hard to
-  substitute — how much energy a lithium cell holds for its mass, what cobalt
-  does to a cathode — rather than saying it is rare. A strong answer to the
-  second gets that extraction and manufacture shrink per year of use, and that
-  disposal is postponed rather than reduced. Both are C1.1 heard: the impacts
-  of the life cycle assessed, with the elements and compounds actually in
-  view, and ways to minimise the negative ones suggested from the chemistry
-  rather than from a slogan.
+  Whether they can find out what it is made of is the agenda's question and
+  they will have answered it before you sit down. Start from the object
+  instead: get them to put it on the desk between you, and point at it while
+  you talk. Two minutes.
+  Ask: "Which parts of that did somebody dig out of the ground, and which parts
+  were grown?"
+  Then: "If it were built to last twice as long, which stage's impact would
+  shrink the most — and which one would not shrink at all?"
+  The first question sounds easy and is not: most of them have never once
+  thought of a phone as a mine, and the ones who sort it confidently are the
+  ones whose extraction stage will have something in it. The second separates a
+  life cycle understood as a sequence from one understood as a system — a
+  strong answer gets that extraction and manufacture shrink per year of use,
+  while disposal is postponed rather than reduced. Both are C1.1 heard: the
+  impacts of a life cycle assessed with the elements and compounds actually in
+  view, rather than a slogan about recycling.
   Record: one line per student in the margin. Note which of the two questions
   they could not start — the first one is chemistry, the second is systems
   thinking, and they fail for different reasons.

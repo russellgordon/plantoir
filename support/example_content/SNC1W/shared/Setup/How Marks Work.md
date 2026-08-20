@@ -28,8 +28,8 @@ on its own.
 The seventy is the seven marked [[Lab Reports]]; your three
 [[Science in the News]] submissions; [[Coding a Scientific Model]];
 [[Climate Change Action Plan]]; [[Product Life Cycle Analysis]];
-[[Design Challenge]]; [[Space Mission Proposal]]; and the Unit 2 test. They
-are not equally weighted — the four big tasks are each worth several of the
+[[Design Challenge]]; [[Space Mission Proposal]]; and the [[Unit 2 Test]].
+They are not equally weighted — the four big tasks are each worth several of the
 smaller pieces, because they run for a week or more and ask for everything at
 once. Ask me for the exact split whenever you want it. It is not a secret; it
 is just not the useful thing to memorise.

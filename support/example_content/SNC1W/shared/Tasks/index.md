@@ -15,6 +15,7 @@ states its success criteria before the work starts.
 - [[Lab Reports]]
 - [[Coding a Scientific Model]]
 - [[Climate Change Action Plan]]
+- [[Unit 2 Test]]
 - [[Product Life Cycle Analysis]]
 - [[Design Challenge]]
 - [[Space Mission Proposal]]

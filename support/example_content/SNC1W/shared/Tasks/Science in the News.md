@@ -39,6 +39,15 @@ Find a news article making a scientific claim, and take it apart.
 > - **A single study treated as settled.** One result is a hypothesis with
 >   evidence, not a conclusion.
 
+## One of the three has to matter to somebody
+
+At least one of your submissions must take on a **social or environmental
+issue** — something with a consequence for people, here or elsewhere: air
+quality, a drug trial, a fishery, a heat wave, a landfill. Pick that one
+deliberately rather than hoping it happens. Taking apart a claim about a
+distant galaxy is good practice; taking apart a claim that changes what
+somebody does next is the skill this course is actually after.
+
 ## For the third submission
 
 Choose an article about **artificial intelligence in science**, and additionally
@@ -63,11 +72,11 @@ beside the first and the difference read straight off. Use them with
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
 ![[A2.2]]
 
 ![[A2.4]]
-
-![[A2.5]]
 %%curriculum-end%%
 
 %%

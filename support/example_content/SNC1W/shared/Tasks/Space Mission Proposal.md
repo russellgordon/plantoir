@@ -52,7 +52,13 @@ Do not choose a weak objection to knock down.
 | Scientific accuracy | Distances, timescales, and instruments are plausible |
 | Depth of research | Real missions and real technologies cited |
 | Quality of the counter-argument | The strongest objection, fairly stated |
-| Communication | A pitch that a non-scientist would follow |
+| Communication | Your signed section, and the slide you built for it, followed by somebody who has never heard of your destination |
+
+The pitch is not separately marked. Five minutes of three people talking is
+not something I can judge fairly while I am running the room, and a mark for
+it would be a group mark by another name. What I mark is what you wrote and
+what you made — and you deliver your own section, so the room hears the
+person who wrote it.
 
 Run these four rows over your own signed sections before the rehearsal —
 [[Judging Your Own Work]] is the routine — and use the time left in that
@@ -111,10 +117,11 @@ OBSERVE — Unit 5, Day 9, the working period on constraints
   number, has not got there yet. One walk while they work.
 
 TALK — Unit 5, Day 8, the conference already on that agenda
-  The agenda's own question — what would the mission find out that we do not
-  know — is spent by the time you sit down, and so is every numbered
-  requirement on this page. Three or four minutes per group, and ask each of
-  the three in turn, because the mark is individual.
+  They will have answered what the mission would find out — that is the
+  agenda's own question, and every numbered requirement on this page is spent
+  along with it. Push on the SHAPE of the answer they are expecting instead.
+  Three or four minutes per group, and ask each of the three in turn, because
+  the mark is individual.
   Ask: "Give me the answer you are hoping for, and the answer that would be
   more interesting."
   Then: "Suppose it arrives and every instrument reads nothing at all. Is that
