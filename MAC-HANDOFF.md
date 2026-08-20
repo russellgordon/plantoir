@@ -97,7 +97,44 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
-- **Windows dropped the container entirely — shared scripts changed, run
+- ✅ DONE (mac, 2026-08-20). **`./verify.sh` passes against the changed
+  shared scripts — all nine checks, and the npx question is settled.** Run
+  from a clean clone of `dev` with the v1.1.0 tree: image built from the
+  working recipe with BuildKit, baked scripts/patches/support files verified
+  identical to the tree, the Explorer hide filter present in both Quartz
+  copies, then a real `preview.sh EXC2O 1 --full-rebuild --build-only`
+  through the launcher — 260 Markdown files parsed in 966 ms, 304 files
+  emitted, "Done processing 260 files in 1s". No behaviour on this side
+  needed changing, which is what let the mac ship 1.1.0 rather than 1.1.1.
+
+  **The npx question is answered: there is nothing left to check.** The
+  entry asked whether the container had quietly been resolving the Quartz
+  CLI from the npm registry too. It cannot any more, on either platform,
+  because the fix is in the SHARED script — `build_site.py` runs
+  `node <abs>/quartz/bootstrap-cli.mjs` at both call sites (build and
+  serve), and `deploy.py` mentions npx nowhere at all. The whole verify run
+  contains not one npx line. So the question is now unanswerable rather
+  than answered — the old behaviour is gone from the code that would have
+  produced it — and it does not matter: the pin held either way, because
+  Quartz's CLI runs the local patched `quartz/` source from CWD.
+
+  **One nit, deliberately not fixed**: `toolchain_paths.py` still defines
+  `NPX` and nothing uses it. Removing it would change the build context and
+  therefore the image tag, which costs every teacher on both platforms a
+  rebuild — for a dead constant. Fold it into the next change that touches
+  that file for a real reason.
+
+  **Two notes for whoever runs `verify.sh` next.** Its fixture,
+  `courses/EXC2O`, is gitignored, so a fresh clone has none; the script's
+  header says to install it with `./setup.sh`, but that is an interactive
+  wizard and `cp -R support/example_course/EXC2O courses/EXC2O` produces the
+  same fixture in a second. And the script deliberately LEAVES a container
+  running from `quartz-teacher:dev-test`; `docker rm -f teaching-quartz-<hash>`
+  puts the folder back on the normal image, which this session did.
+
+  Everything below is the original request, kept for the reasoning.
+
+  **Windows dropped the container entirely — shared scripts changed, run
   `./verify.sh` on the next sync** (Windows + shared, 2026-08-19, branch
   `windows-native-toolchain`). Windows now runs the whole toolchain
   natively: Node 20, Python 3.11, the patched Quartz scaffold and wrangler
