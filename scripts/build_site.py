@@ -3334,7 +3334,9 @@ def _ensure_netlify_link(output_dir: Path, course_dir: Path):
                     return
                 except Exception as e2:
                     print(f"⚠️ Could not copy .netlify folder: {e2}")
-    print("ℹ️ No .netlify folder found to link/copy (deploy diffs may be slower).")
+    # No message when there is nothing to link: that is the NORMAL state for
+    # a fresh folder, and printing "Netlify" mid-preview made a teacher read
+    # a routine build as a publishing failure (real smoke test, 2026-08-20).
 # =============================================================================
 
 # ---------------------------------------------------------------------------
