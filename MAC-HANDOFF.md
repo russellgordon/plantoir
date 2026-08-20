@@ -933,6 +933,63 @@ Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
 
+- ✅ DONE (mac, 2026-08-20). **Setting up a working folder no longer blocks
+  the main thread — the mac catching up to Windows 1.1.0, found by Russell
+  while testing the v1.1.0 candidate.**
+
+  **What was wrong.** `WorkspaceModel.initializeWorkspace()` copied the three
+  launchers, made `courses/`, and mirrored the whole build recipe
+  synchronously, called straight from the "Set Up This Folder" button. The
+  recipe is **12,091 files and 65 MB** — `support/` alone is 11,354 of them,
+  the example-content payloads and ~1,950 skeletons. Measured here (M-series,
+  NVMe): **2.4 s** for a raw `cp -R` of the three folders, **3.7–4.0 s** for
+  the real mirror, which also stats both sides of every file and sweeps the
+  destination for extras. That is a beachball over a window that says
+  nothing, and on an older disk, a USB drive or a folder the system is
+  syncing it is tens of seconds.
+
+  **The fix is yours, adopted as-is.**
+  `WorkspaceViewModel.InitializeWorkspaceAsync` wraps the mirror in
+  `Task.Run` and `Initialize_Click` disables both buttons and sets the label
+  to "Setting up…". The mac now has `initializeWorkspaceInBackground()` doing
+  the same, with the button showing a small spinner and **"Setting Up…"**.
+  Nothing here needs porting — this entry exists because **the direction was
+  Windows → mac**, which the ledger should record as readily as the reverse.
+
+  **What the mac had to work out that your version did not face**, and the
+  reason it is written down rather than left in the diff: the class is
+  main-actor isolated, so moving work off the thread meant deciding what the
+  background half is allowed to touch. It touches nothing shared. The copying
+  (`copyToolchainFiles`, `setUpFolderOnDisk`) is `nonisolated` and reads only
+  the app's own bundle — which cannot change while the app runs — and writes
+  into one folder. The once-per-run `foldersWithFreshToolchain` set is
+  **cleared before the await and set after it, both on the main actor**.
+  Rejected: making that set `nonisolated` (it is shared mutable state across
+  every window — the isolation is what makes it safe); passing `self` into
+  the detached task (the model belongs to the main actor, and the folder can
+  change under it while the copy runs, so only the URL crosses).
+
+  **One trap worth carrying back**, because it is row 279's defect one thread
+  over: the tracker must be cleared BEFORE the copy and set only AFTER it
+  succeeds. Set it first and a failed setup leaves the folder marked fresh,
+  so the next attempt skips the mirror and the folder stays without a
+  `Dockerfile` — which is exactly the "missing the toolchain's build recipe"
+  failure row 279 fixed. Worth checking `ToolchainMirror.InitializeWorkspace`
+  handles a failure the same way.
+
+  **Version note.** This is a behaviour change on the mac and the release
+  still ships as **1.1.0**, deliberately: the version names which contracts a
+  build passes, Windows 1.1.0 already behaves this way, so the mac not doing
+  it was the mac being BEHIND 1.1.0 rather than 1.1.0 meaning something new.
+  Shipping it makes the two platforms agree on the number. Decided with
+  Russell, 2026-08-20.
+
+  Reference: `WorkspaceModel.initializeWorkspaceInBackground`,
+  `WorkspacePickerView`, and
+  `WorkspaceInitializationTests.testInitializingInTheBackgroundProducesTheSameWorkspace`
+  — which pins the BUTTON's path, since the synchronous form the tests
+  previously covered is no longer the one a teacher takes. 764 tests.
+
 - ✅ DONE (mac, 2026-08-20). **The teacher-made-link case is implemented, and
   the three setup cases are retired** — the two contract requests that stood
   between the mac and the v1.1.0 tag.
