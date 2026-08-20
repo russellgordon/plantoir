@@ -12,6 +12,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 using Plantoir.Services;
 using Windows.System;
 
@@ -96,8 +97,14 @@ public sealed partial class AssistWindow : Window
     /// </summary>
     private async Task Begin()
     {
+        ActivityTrail.Note(ActivityTrail.Event.AssistantOpened,
+            "assistant opened", _course.Code, _section);
+        var startingAt = DateTime.UtcNow;
+
         if (ClaudeCodeLauncher.FindServer() is not { } server)
         {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantWouldNotStart,
+                "the assistant’s tools were missing", _course.Code, _section);
             Say("Assistant", "The Plantoir tools couldn’t be found, so there is nothing for the " +
                             "assistant to work with. Reinstalling Plantoir should put them back.");
             return;
@@ -122,6 +129,8 @@ public sealed partial class AssistWindow : Window
                 return;
             }
 
+            ActivityTrail.Note(ActivityTrail.Event.AssistantModelDownloadStarted,
+                "assistant download started", _course.Code, _section);
             var note = SayWithBar("Assistant", "Downloading the assistant…");
 
             // Reports are POSTED to this thread, so one can still be in the
@@ -144,14 +153,20 @@ public sealed partial class AssistWindow : Window
             note.Bar.Visibility = Visibility.Collapsed;
             if (!installed)
             {
+                ActivityTrail.Note(ActivityTrail.Event.AssistantModelDownloadFailed,
+                    "assistant download did not finish", _course.Code, _section);
                 note.Text.Text = "The download didn’t finish. Check the network and try opening this window again.";
                 return;
             }
+            ActivityTrail.Note(ActivityTrail.Event.AssistantModelDownloaded,
+                "assistant downloaded", _course.Code, _section);
             note.Text.Text = "The assistant is downloaded.";
         }
 
         if (!await _model.Start(null, _closing.Token))
         {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantWouldNotStart,
+                "the assistant’s engine would not start", _course.Code, _section);
             Say("Assistant", "The assistant wouldn’t start. Restarting Plantoir usually settles it.");
             return;
         }
@@ -159,6 +174,8 @@ public sealed partial class AssistWindow : Window
         _tools = await McpClient.Start(server, _folder, _course.Code, _closing.Token);
         if (_tools is null)
         {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantWouldNotStart,
+                "the assistant’s tools did not answer", _course.Code, _section);
             Say("Assistant", "The assistant started, but Plantoir’s tools didn’t answer. Try opening this window again.");
             return;
         }
@@ -217,11 +234,16 @@ public sealed partial class AssistWindow : Window
         PromptShelfHost.Content = shelf;
         PromptShelfArea.Visibility = Visibility.Visible;
 
+        ActivityTrail.Note(ActivityTrail.Event.AssistantReady,
+            $"the assistant was ready after {(DateTime.UtcNow - startingAt).TotalSeconds:F1}s",
+            _course.Code, _section);
         // Typing is available from here.
         Input.IsEnabled = true;
         SendButton.IsEnabled = true;
         Input.Focus(FocusState.Programmatic);
-        _ = WarmUp(schemas);
+        // Handed to the agent so the FIRST turn awaits it instead of racing
+        // it into a timeout on the model's single slot.
+        _agent.Priming = WarmUp(schemas);
     }
 
     /// <summary>
