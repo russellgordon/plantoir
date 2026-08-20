@@ -863,15 +863,31 @@ public sealed class AssistAgent
         return Task.FromResult(new List<Line> { new("assistant", said) });
     }
 
+    /// <summary>
+    /// The window's fire-and-forget warm-up, if one is still running. The
+    /// first turn AWAITS it rather than racing it: both share the model's
+    /// single slot, so a question sent mid-warm-up queued until it timed
+    /// out — and the warmed prompt cache makes the awaited question fast.
+    /// </summary>
+    public Task? Priming { get; set; }
+
     private async Task<List<Line>> Run(CancellationToken cancellation)
     {
         var lines = new List<Line>();
+
+        if (Priming is { } priming)
+        {
+            Priming = null;
+            try { await priming.WaitAsync(cancellation); } catch { /* warm-up is best-effort */ }
+        }
 
         for (int step = 0; step < MostStepsPerTurn; step++)
         {
             var reply = await _model.Ask(_messages, _schemas, cancellation);
             if (reply is null)
             {
+                ActivityTrail.Note(ActivityTrail.Event.AssistantCouldNotAnswer,
+                    "the assistant did not answer", _courseCode, _section);
                 lines.Add(new Line("assistant", "The assistant didn’t answer. Try again in a moment."));
                 return lines;
             }
@@ -901,6 +917,8 @@ public sealed class AssistAgent
             if (call is null) return lines;
 
             string name = call["function"]?["name"]?.GetValue<string>() ?? "";
+            ActivityTrail.Note(ActivityTrail.Event.AssistantChoseATool,
+                $"the assistant chose {name.Replace('_', ' ')}", _courseCode, _section);
             if (NeedsApproval(name))
             {
                 // The one rule this loop owns whatever the settings say. A

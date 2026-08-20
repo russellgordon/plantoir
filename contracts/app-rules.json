@@ -406,6 +406,26 @@
         "output" : "Built site not found at /courses/ICS3U/.merged_output/section1/public"
       },
       {
+        "expect" : "Part of this course folder is a link to another folder, and Windows won't let the website builder follow it. Replace the link with the real folder (the details above name which one), then try again.",
+        "output" : "OSError: [WinError 448] The path cannot be traversed because it contains an untrusted mount point: 'C:\\Users\\person\\Documents\\My Course\\courses\\ICS3U\\Media'",
+        "why" : "The toolchain creates no Windows links of its own any more, so this error can only come from a link inside the teacher's OWN folder — commonly the Obsidian trick of sharing one Media folder across vaults with a junction, which current Windows refuses to traverse. The teacher can fix it; the raw OSError reads as a crash. Windows-only output — recognising it on the mac keeps the explainer identical, same reasoning as the one-time-setup cases."
+      },
+      {
+        "expect" : "This PC needs to restart to finish getting ready. Restart it, then try setting up again — it carries on by itself.",
+        "output" : "This PC needs to restart to finish getting ready.\nRestart this PC, then try again - setup continues on its own.",
+        "why" : "Windows sometimes cannot finish adding what the website builder needs until the PC restarts. The launcher says so in plain words already; the app repeats it as the one actionable sentence so the teacher is not left reading a wall of output. Windows-only output — it can never appear on macOS, but recognising it there keeps the explainer identical on both sides rather than growing a platform switch."
+      },
+      {
+        "expect" : "Plantoir needs your permission to get this PC ready. Try again, and choose Yes when Windows asks.",
+        "output" : "ERROR: Windows permission was declined, so this PC could not be set up.",
+        "why" : "Declining the Windows permission prompt is a routine misclick, not a fault — the fix is one more try. Windows-only output, same reasoning as the restart case."
+      },
+      {
+        "expect" : "This PC couldn't get ready — check your internet connection, then try setting up again. It's safe to try as many times as you like.",
+        "output" : "ERROR: Windows could not add the feature this needs.",
+        "why" : "The one-time Windows setup downloads what it needs, so a bad connection is the common failure; saying it is safe to retry matters because the teacher has just watched something that looked serious. Windows-only output, same reasoning as the restart case."
+      },
+      {
         "expect" : null,
         "output" : "Traceback (most recent call last):\n  File \"build_site.py\", line 42\nKeyError: 'x'",
         "why" : "Recognised as nothing, so nothing is said and the app shows the output itself."

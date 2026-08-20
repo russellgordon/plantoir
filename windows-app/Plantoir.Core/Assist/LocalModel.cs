@@ -68,7 +68,12 @@ public sealed class LocalModel : IChatModel, IDisposable
         return new AssistHardwareBudget().Tier;
     }
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(2) };
+    // Six minutes, not two: first-turn prompt evaluation on a weak GPU can
+    // legitimately run past two, the thinking indicator shows a running
+    // count so a long wait is visible rather than mysterious, and a timeout
+    // here once combined with the fire-and-forget warm-up to end a turn in
+    // total silence (see Ask).
+    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(6) };
 
     /// <summary>Directory override for test isolation.</summary>
     public static string? ModelDirectoryOverride { get; set; }
@@ -344,6 +349,15 @@ public sealed class LocalModel : IChatModel, IDisposable
         {
             _serverProcess = Process.Start(startInfo);
             if (_serverProcess is null) return false;
+            // The pipes are redirected so the server never opens a console —
+            // but a redirected pipe NOBODY READS fills up, and once full the
+            // server blocks on its next log write, mid-request, looking
+            // exactly like a hung model. Drain both, keeping a short tail
+            // for diagnosis.
+            _serverProcess.OutputDataReceived += (_, e) => NoteServerLine(e.Data);
+            _serverProcess.ErrorDataReceived += (_, e) => NoteServerLine(e.Data);
+            _serverProcess.BeginOutputReadLine();
+            _serverProcess.BeginErrorReadLine();
         }
         catch
         {
@@ -368,6 +382,25 @@ public sealed class LocalModel : IChatModel, IDisposable
 
         Stop();
         return false;
+    }
+
+    private readonly object _serverLogGate = new();
+    private readonly Queue<string> _serverLog = new();
+
+    private void NoteServerLine(string? line)
+    {
+        if (string.IsNullOrEmpty(line)) return;
+        lock (_serverLogGate)
+        {
+            _serverLog.Enqueue(line);
+            while (_serverLog.Count > 60) _serverLog.Dequeue();
+        }
+    }
+
+    /// <summary>The engine's most recent chatter, for diagnosis.</summary>
+    public IReadOnlyList<string> RecentServerLog
+    {
+        get { lock (_serverLogGate) { return _serverLog.ToList(); } }
     }
 
     private async Task<bool> CheckHealthAsync(CancellationToken cancellation)
@@ -447,10 +480,24 @@ public sealed class LocalModel : IChatModel, IDisposable
         };
 
         using var content = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json");
-        using var response = await Http.PostAsync(Endpoint, content, cancellation).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode) return null;
+        try
+        {
+            using var response = await Http.PostAsync(Endpoint, content, cancellation).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return null;
 
-        string body = await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false);
-        return JsonNode.Parse(body)?["choices"]?[0]?["message"] as JsonObject;
+            string body = await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false);
+            return JsonNode.Parse(body)?["choices"]?[0]?["message"] as JsonObject;
+        }
+        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+        {
+            // The HTTP TIMEOUT, not the window closing — HttpClient reports
+            // both as the same exception type, and the difference is the
+            // teacher's whole experience: closing wants silence, a timeout
+            // wants "the assistant didn't answer". Returning null routes it
+            // to exactly that sentence in the agent. This shipped wrong: a
+            // slow first evaluation ended the turn with no reply, no error
+            // and no trail line, which a teacher reasonably called "stuck".
+            return null;
+        }
     }
 }

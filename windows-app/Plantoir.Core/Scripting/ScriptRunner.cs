@@ -93,6 +93,11 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         {
             LaunchProblem = $"This working folder is missing a piece it needs ({scriptName}). Try choosing your working folder again from the File menu.";
             Notify(nameof(LaunchProblem));
+            // A task that never started still happened to the teacher — a
+            // launch that fails silently is how a problem report arrives
+            // carrying "the last 0 tasks" after three visible failures.
+            ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
+                $"could not start {scriptName} — {LaunchProblem}");
             return;
         }
 
@@ -105,9 +110,19 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             else commandLine.Append(argument);
         }
 
+        // When the app carries the native runtime (node, python, Quartz,
+        // wrangler in its own folder), tell the launcher where it is: the
+        // launcher then builds directly on this PC — no WSL2, no container,
+        // no administrator rights. Every launcher child must get this —
+        // see NativeRuntime for the sweep that once did not.
+        IReadOnlyDictionary<string, string>? extraEnvironment = null;
+        if (NativeRuntime.Directory is { } runtimeDir)
+            extraEnvironment = new Dictionary<string, string> { ["PLANTOIR_RUNTIME"] = runtimeDir };
+
         try
         {
-            _process = ConPtyProcess.Start(commandLine.ToString(), workingDirectory);
+            _process = ConPtyProcess.Start(commandLine.ToString(), workingDirectory,
+                                           extraEnvironment: extraEnvironment);
         }
         catch (Exception error)
         {
@@ -409,6 +424,32 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         }
         ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
             $"finished {_launchedScriptName} — {outcome}{duration}");
+        SaveRunTranscript(outcome + duration);
+    }
+
+    /// <summary>
+    /// Every finished task leaves its transcript in the problem-report store,
+    /// success and failure alike — the 2026-08-19 report arrived with "the
+    /// last 0 tasks" after three failed setups, and the guessing that caused
+    /// is what this line ends. A transcript that cannot be written must never
+    /// break the task it records.
+    /// </summary>
+    private void SaveRunTranscript(string outcomeWithDuration)
+    {
+        try
+        {
+            var lines = new List<string>(Transcript.Lines);
+            string unfinished = Transcript.CurrentLine;
+            if (unfinished.Length > 0) lines.Add(unfinished);
+            DateTime startedLocal = StartedAt is { } startedAt
+                ? startedAt.ToLocalTime()
+                : DateTime.Now;
+            ProblemReportStore.Standard.SaveRunTranscript(
+                _launchedScriptName, outcomeWithDuration, startedLocal, lines);
+        }
+        catch
+        {
+        }
     }
 
     // ---- Milestones ------------------------------------------------------

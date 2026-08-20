@@ -35,6 +35,17 @@ public sealed class NewCourseCreator
         }
         _courseCode = storedCode.ToUpperInvariant();
 
+        // The launcher must exist BEFORE anything is written: writing
+        // course_config.json first and then failing to launch left a
+        // half-made course that both blocked a retry ("already exists") and
+        // stopped the folder counting as empty, so the picker no longer
+        // offered to set it up. Found by adversarial testing, 2026-08-19.
+        if (!File.Exists(Path.Combine(workspacePath, "setup.ps1")))
+        {
+            PreparationProblem = "This working folder isn't ready yet. Choose it from the File menu first, then create the course.";
+            return;
+        }
+
         try
         {
             string courseDir = Path.Combine(Workspace.CoursesDirectory(workspacePath), _courseCode);

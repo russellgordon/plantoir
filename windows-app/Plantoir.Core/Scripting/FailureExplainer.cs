@@ -8,11 +8,43 @@ namespace Plantoir.Core.Scripting;
 public static class FailureExplainer
 {
     public static string? Explanation(string output) =>
-        RateLimitExplanation(output)
+        SetupExplanation(output)
+        ?? VaultLinkExplanation(output)
+        ?? RateLimitExplanation(output)
         ?? AccountExplanation(output)
         ?? ConnectionExplanation(output)
         ?? FolderAccessExplanation(output)
         ?? MissingBuildExplanation(output);
+
+    /// <summary>
+    /// The one-time Windows setup (the launchers' Install-WindowsSubsystem)
+    /// has three ways to stop that are not faults: Windows wants a restart,
+    /// the teacher declined the permission prompt, or the download failed.
+    /// Checked FIRST because that setup's own log is echoed into the output
+    /// and could contain lines the broader matchers below would misread.
+    /// </summary>
+    /// <summary>
+    /// A Windows link (junction/symlink) inside the TEACHER's own course
+    /// folder. The toolchain itself creates none on Windows any more, so
+    /// this error can only come from their filesystem — commonly the
+    /// Obsidian trick of linking one shared Media folder into several
+    /// vaults, which current Windows refuses to traverse (WinError 448).
+    /// </summary>
+    private static string? VaultLinkExplanation(string output) =>
+        output.Contains("untrusted mount point")
+            ? "Part of this course folder is a link to another folder, and Windows won't let the website builder follow it. Replace the link with the real folder (the details above name which one), then try again."
+            : null;
+
+    private static string? SetupExplanation(string output)
+    {
+        if (output.Contains("needs to restart to finish getting ready"))
+            return "This PC needs to restart to finish getting ready. Restart it, then try setting up again — it carries on by itself.";
+        if (output.Contains("Windows permission was declined"))
+            return "Plantoir needs your permission to get this PC ready. Try again, and choose Yes when Windows asks.";
+        if (output.Contains("Windows could not add the feature this needs"))
+            return "This PC couldn't get ready — check your internet connection, then try setting up again. It's safe to try as many times as you like.";
+        return null;
+    }
 
     private static readonly string[] FolderAccessSigns =
     {

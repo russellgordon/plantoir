@@ -93,6 +93,44 @@ public class ProblemReportTests
     }
 
     [Fact]
+    public void Store_SavesRunTranscripts_RedactedAndPruned()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "PlantoirRunSaveTest-" + Guid.NewGuid());
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var store = new ProblemReportStore(tempDir);
+            var started = new DateTime(2026, 8, 19, 10, 26, 51);
+
+            string path = store.SaveRunTranscript("setup.ps1", "failed (exit code 1) after 21s", started,
+                new[] { "Setting up this PC - a one-time step that runs on its own ...", "line two" });
+
+            Assert.Single(store.RunFilePaths());
+            string saved = File.ReadAllText(path);
+            Assert.Contains("setup.ps1 — failed (exit code 1) after 21s", saved);
+            Assert.Contains("Started 2026-08-19 10:26:51.", saved);
+            Assert.Contains("Setting up this PC", saved);
+            Assert.Contains("line two", saved);
+
+            // Redaction happens on the way IN, so what is on disk is already
+            // safe to hand over.
+            string secret = store.SaveRunTranscript("deploy.ps1", "succeeded", started.AddMinutes(1),
+                new[] { "Authorization: Bearer nfp_abcdefghijklmnopqrstuvwxyz123456" });
+            Assert.DoesNotContain("nfp_abcdefghijklmnopqrstuvwxyz123456", File.ReadAllText(secret));
+
+            // Prunes past MostRetainedRuns, dropping the OLDEST files.
+            for (int i = 0; i < ProblemReportStore.MostRetainedRuns + 3; i++)
+                store.SaveRunTranscript("preview.ps1", "succeeded", started.AddHours(1).AddMinutes(i), new[] { "x" });
+            Assert.Equal(ProblemReportStore.MostRetainedRuns, store.RunFilePaths().Count);
+            Assert.DoesNotContain(store.RunFilePaths(), p => Path.GetFileName(p).StartsWith("2026-08-19 1026", StringComparison.Ordinal));
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
     public void Builder_BuildsZipWithTasksAndActivity()
     {
         string tempDir = Path.Combine(Path.GetTempPath(), "PlantoirProblemBuildTest-" + Guid.NewGuid());

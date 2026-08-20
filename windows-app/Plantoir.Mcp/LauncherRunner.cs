@@ -42,6 +42,10 @@ public sealed class LauncherRunner : ILauncherRunner
             RedirectStandardError = true,
             RedirectStandardInput = true,
         };
+        // The MCP server ships beside the app, so the same bundled runtime
+        // sits beside this executable too - point the launcher at it, or it
+        // takes the container branch (see NativeRuntime).
+        Plantoir.Core.Scripting.NativeRuntime.Apply(info);
 
         if (OperatingSystem.IsWindows())
         {

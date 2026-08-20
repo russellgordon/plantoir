@@ -42,6 +42,15 @@ public static class ProblemReportEnvironment
         }
     }
 
+    /// <summary>
+    /// Which machinery this build actually uses — read from what is on
+    /// disk, never asserted: a hard-coded "WSL2" here once had every
+    /// native-toolchain problem report claiming a subsystem the product
+    /// no longer touched.
+    /// </summary>
     public static string HelperDescription =>
-        $"llama.cpp b10435 (Vulkan) · WSL2 · .NET {Environment.Version}";
+        $"llama.cpp b10435 (Vulkan) · {ToolchainDescription} · .NET {Environment.Version}";
+
+    private static string ToolchainDescription =>
+        NativeRuntime.Directory is null ? "WSL2" : "native toolchain";
 }

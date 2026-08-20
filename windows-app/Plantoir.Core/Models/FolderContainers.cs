@@ -64,6 +64,10 @@ public static class FolderContainers
     /// </summary>
     public static void StopContainer(string folderPath)
     {
+        // A native-toolchain build has no containers to stop, and on a
+        // machine with no WSL the stub wsl.exe invoked interactively offers
+        // to INSTALL it — precisely the machinery this design removed.
+        if (Scripting.NativeRuntime.Directory is not null) return;
         string name = ContainerName(folderPath);
         RunDetached("wsl", "-e", "docker", "stop", "-t", "2", name);
     }
@@ -76,6 +80,8 @@ public static class FolderContainers
     /// </summary>
     public static void ReleaseEverythingAtQuit(IEnumerable<string> folderPaths)
     {
+        // Same rule as StopContainer: nothing to release on a native build.
+        if (Scripting.NativeRuntime.Directory is not null) return;
         var names = folderPaths.Select(ContainerName).Distinct().ToList();
         string stopPart = names.Count > 0
             ? $"docker stop -t 2 {string.Join(' ', names)} >/dev/null 2>&1; "
