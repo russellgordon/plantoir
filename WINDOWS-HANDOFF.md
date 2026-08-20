@@ -3769,26 +3769,41 @@ icon changes, that is a mac task, and the Windows `.ico`
 (`windows-app/Plantoir/Assets/make-icon.ps1`) is a separate regeneration from a
 1024 export, exactly as it is today.
 
-### Why the favicon is a different drawing from the app icon
+### The favicon IS the app icon, and that was a decision
 
-The app icon is the plant in Phosphor's **regular** weight: an outline, with a
-midrib inside each leaf. Rendered at 16 pixels those interior lines land on top
-of the outline and the mark becomes a green smudge — measured by rendering it
-and looking at it, not assumed. The favicon therefore uses the **fill** weight
-of the same glyph, which is free: `plant.svg` is three subpaths — the whole
-silhouette, then the two leaf counters — so dropping the last two and filling
-what is left is the same drawing, solid. Same tile, same gradient, same green.
+Not a reinterpretation of it. The raster sizes are literally `icon_tile()` —
+the same function that draws the tile on plantoir.app's social card — so the
+favicon cannot come to disagree with the icon in the Dock: same ramp, same
+0.703 glyph scale, same viewBox centring, same drop shadow, same
+regular-weight outline with the leaf counters open. `favicon_svg()` is that
+tile written out as vector, reading the same constants rather than typing the
+numbers again.
 
-Two alternatives were rejected, and both would look reasonable in review:
+**This was tried the other way first, and reverted on Russell's call.** The
+first version used the **fill** weight of the same glyph — `plant.svg` is three
+subpaths (the silhouette, then the two leaf counters), so dropping the last two
+gives a solid plant for free. The argument was legibility: at 16 physical
+pixels the outline's leaf midribs land on the outline and the mark goes muddy,
+which is measured rather than assumed. The argument that beat it is simpler —
+**looking like the app icon is the point of the app icon.** Record that
+direction, because the legibility case is genuinely tempting and will be made
+again.
 
-- **Outline for the big sizes, solid only for 16 and 24 inside the `.ico`.**
-  Closer to the Dock icon at 180 — but browsers that support `icon.svg` render
-  THAT at whatever size they choose, so the outline would have come back at 16
-  for most of Chrome and Firefox. One mark at every size beats fidelity at the
-  one size nobody looks at.
-- **Darkening the green for contrast.** The brand green on the cream tile is
-  about 3:1. That is thin for a hairline stroke and ample for a solid shape,
-  and the solid shape is what ships.
+If it ever does need revisiting, two dials exist and one trap:
+
+- `render_glyph`'s **`bold_units`** thickens the outline in viewBox units
+  without changing the drawing. The Instagram avatar already uses it (3.0) for
+  exactly this reason — it is stored at 320 and shown at 32.
+- The **`.ico` can carry a different drawing per size**, since each entry is a
+  separate bitmap, and `write_favicons` already renders each size natively.
+- The trap: **`icon.svg` cannot.** Browsers that support it render THAT at
+  whatever size they choose, so a per-size tactic that only touches the `.ico`
+  leaves Chrome and Firefox unaffected. And 16 physical pixels is a Windows tab
+  at 100% scaling — any Retina Mac asks for 32.
+
+One thing rejected outright: **darkening the green for contrast.** The brand
+green on the cream tile is about 3:1. The answer to a thin stroke is a thicker
+stroke, not a different colour, and the colour is not ours to change here.
 
 There is deliberately **no web manifest and no 192/512 PWA icon set**. That is
 Android home-screen and installable-app territory, not a favicon, and the
