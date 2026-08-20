@@ -155,6 +155,10 @@ def hardlink_mirror(src: Path, dst: Path) -> None:
     import shutil
     src = Path(src)
     dst = Path(dst)
+    # A junction left here by an OLDER build must go first: mkdir would
+    # accept it and iterdir would then enumerate THROUGH it — the very
+    # traversal Windows refuses (WinError 448). lstat-based, never follows.
+    remove_stale_reparse_point(dst)
     dst.mkdir(parents=True, exist_ok=True)
     src_entries = {entry.name: entry for entry in src.iterdir()}
     for existing in dst.iterdir():
@@ -191,6 +195,28 @@ def hardlink_mirror(src: Path, dst: Path) -> None:
             pass
 
 
+def remove_stale_reparse_point(path: Path) -> bool:
+    """
+    Remove a junction or symlink an OLDER build left at `path` (Windows
+    only; no-op elsewhere and for real folders). Callers must use this
+    BEFORE any exists()/stat() on the path: a stat goes THROUGH the reparse
+    point and raises WinError 448 before repair code would run, while this
+    check uses lstat, which never traverses. Removing the link never
+    touches its target.
+    """
+    if os.name != "nt" or not is_reparse_point(path):
+        return False
+    try:
+        os.rmdir(str(path))
+        return True
+    except OSError:
+        try:
+            os.unlink(str(path))
+            return True
+        except OSError:
+            return False
+
+
 def is_reparse_point(path: Path) -> bool:
     """True for junctions and symlinks alike (Windows); False elsewhere."""
     try:
@@ -203,27 +229,27 @@ def is_reparse_point(path: Path) -> bool:
 
 def link_directory(target: Path, link: Path) -> str:
     """
-    Make `link` refer to the directory `target` without copying it, and say
-    how ("symlink", "junction", or "copy").
+    Make `link` carry the directory `target`'s contents without copying the
+    bytes, and say how ("symlink", "hardlinks", or "copy").
 
-    On Linux/macOS a symlink always works. On Windows, creating a symlink
-    needs administrator rights or Developer Mode — precisely what a teacher's
-    school-managed laptop refuses — while an NTFS directory JUNCTION needs no
-    privilege at all. The copy fallback is last because for node_modules it
-    duplicates hundreds of megabytes per section.
+    On Linux/macOS a symlink always works. On Windows, NO reparse point of
+    any kind is ever created: symlinks need privileges a school-managed
+    laptop refuses, and a junction is an NTFS mount point that current
+    Windows refuses to TRAVERSE from the installed app's processes
+    (WinError 448, "untrusted mount point") — even a bare stat through one
+    dies. Both smoke-test failures of 2026-08-20 were exactly this, at two
+    different call sites, so the rule lives here at the single choke point
+    every call site uses: Windows gets a hardlink MIRROR — ordinary
+    directory entries, no privileges, no copied bytes, nothing to distrust.
     """
+    if os.name == "nt":
+        hardlink_mirror(target, link)
+        return "hardlinks"
     try:
         os.symlink(str(target), str(link))
         return "symlink"
     except OSError:
         pass
-    if os.name == "nt":
-        try:
-            import _winapi
-            _winapi.CreateJunction(str(target), str(link))
-            return "junction"
-        except Exception:
-            pass
     import shutil
     shutil.copytree(str(target), str(link), symlinks=True)
     return "copy"

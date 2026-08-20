@@ -4211,6 +4211,10 @@ def build_section_site(
 
     # Ensure npm dependencies are present (linking pre-baked node_modules if available)
     node_modules_dir = output_dir / "node_modules"
+    # A junction left by an older build dies on the very next stat (WinError
+    # 448) - repair BEFORE the exists() below ever touches it.
+    if toolchain_paths.remove_stale_reparse_point(node_modules_dir):
+        print("♻️ Replaced an older-style dependency link.")
     package_json = output_dir / "package.json"
     package_lock = output_dir / "package-lock.json"
 
