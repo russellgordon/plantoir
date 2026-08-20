@@ -321,7 +321,15 @@ backlinks.
 
 ## E. Summary: what is *not* customized
 
-Everything else is stock Quartz v4.5.0 — with one asset exception: `quartz/static/og-image.png` is overwritten every build by the generated social sharing card (see C2-13): the Markdown/OFM transformer
+Everything else is stock Quartz v4.5.0 — with five asset exceptions, all in
+`quartz/static/` and all written every build: `og-image.png` is redrawn as the
+section's social sharing card (C2-13), and `favicon.ico`, `icon.svg`,
+`apple-touch-icon.png` and `icon.png` are the site's own icon (C2-25). Two of
+those OVERWRITE files Quartz itself ships — `og-image.png` and `icon.png` —
+which is deliberate: a built site should carry no Quartz artwork, including
+where nothing links to it. (`quartz/util/og.tsx` reaches for `static/icon.png`
+when it draws generated OG images, so it now picks up Plantoir's mark too.)
+Beyond those: the Markdown/OFM transformer
 pipeline, full-text search (FlexSearch), syntax highlighting, LaTeX
 rendering, callouts, popovers, RSS/sitemap emitters, mobile layout, and
 light/dark mode. The customizations are deliberately thin wrappers around

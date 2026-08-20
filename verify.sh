@@ -51,7 +51,11 @@ while [[ $# -gt 0 ]]; do
     --no-cache)   NO_CACHE="--no-cache"; shift ;;
     --skip-build) SKIP_BUILD="true"; shift ;;
     --help|-h)
-      sed -n '4,36p' "$0" | sed 's/^# \{0,1\}//'
+      # Print the banner by finding its end rather than by a fixed line
+      # number: the range used to be hard-coded, so every line added to the
+      # comment above quietly truncated the help text from the bottom — the
+      # part that says how to install the fixture this script requires.
+      sed -n '4,/^# =\{10,\}$/p' "$0" | sed 's/^# \{0,1\}//' | sed '$d'
       exit 0 ;;
     *) echo "❌ Unknown option: $1 (see --help)"; exit 1 ;;
   esac
@@ -274,6 +278,13 @@ if [[ -f "$SITE_INDEX" ]]; then
     fi
   done
   # The root favicon.ico and quartz/static/icon.png must be OURS, byte for byte.
+  # Note what this does NOT prove: build_site.py looks for support/favicon
+  # relative to the container's WORKDIR before /opt/support/favicon, and when
+  # verify.sh runs, that WORKDIR *is* this repo — so these two lines compare
+  # the working tree with itself. What proves the IMAGE carries the right
+  # bytes is the four check_baked lines above; a teacher's working folder has
+  # .toolchain/support rather than support/, so it correctly falls through to
+  # the baked copy.
   for pair in "favicon.ico:favicon.ico" "static/icon.png:icon.png"; do
     built="$SITE_PUBLIC/${pair%%:*}"
     source_file="support/favicon/${pair##*:}"

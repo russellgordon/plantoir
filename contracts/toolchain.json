@@ -33,11 +33,11 @@
       "replaces": "quartz/components/pages/FolderContent.tsx"
     },
     {
-      "cannotBeDropped": "Without it social preview tags point to Jacky Zhao's domain when baseUrl is empty or unconfigured.",
-      "does": "Constructs OpenGraph and Twitter meta tags using the section's baseUrl when present, or page-relative paths when absent, rather than defaulting to quartz.jzhao.xyz.",
+      "cannotBeDropped": "Two things go at once. Social preview tags point to Jacky Zhao's domain when baseUrl is empty or unconfigured, AND every page falls back to the stock <link rel=\"icon\" href=\"static/icon.png\">, so each of a teacher's class sites wears the Quartz logo in the browser tab.",
+      "does": "Constructs OpenGraph and Twitter meta tags using the section's baseUrl when present, or page-relative paths when absent, rather than defaulting to quartz.jzhao.xyz. Also replaces the single stock favicon link with three page-relative ones — static/favicon.ico (sizes=32x32), static/icon.svg (type=image/svg+xml) and apple-touch-icon pointing at static/apple-touch-icon.png — in that ORDER, because a browser takes the last icon it understands, so the .ico serves older Safari and Windows shortcuts while the SVG wins wherever it is supported. The files themselves are installed by build_site.py from support/favicon.",
       "file": "Head.tsx",
       "replaces": "quartz/components/Head.tsx",
-      "whyNotStock": "Stock Quartz unconditionally constructs og:image as https://${cfg.baseUrl}/static/og-image.png, which points to Jacky Zhao's site when baseUrl defaults to quartz.jzhao.xyz and generates invalid URLs when baseUrl is empty. The patch falls back to page-relative static/og-image.png when baseUrl is not configured."
+      "whyNotStock": "Stock Quartz unconditionally constructs og:image as https://${cfg.baseUrl}/static/og-image.png, which points to Jacky Zhao's site when baseUrl defaults to quartz.jzhao.xyz and generates invalid URLs when baseUrl is empty. The patch falls back to page-relative static/og-image.png when baseUrl is not configured. Stock Quartz also links its own quartz/static/icon.png as the favicon; the patch links Plantoir's icon set instead. If Head.tsx is ever re-derived against a newer Quartz, BOTH behaviours have to come with it — the favicon links are the half with no visible symptom during development, because a local preview looks identical either way."
     },
     {
       "cannotBeDropped": "Without it fast rebuilds and quick retries fail with ENOTEMPTY errors on bind-mounted host filesystems.",
@@ -67,7 +67,7 @@
     {
       "pin": "quartz",
       "value": "v4.5.0",
-      "why": "The site generator, cloned at a tag. The patches below are written against this version; a newer Quartz means re-deriving all five."
+      "why": "The site generator, cloned at a tag. The patches below are written against this version; a newer Quartz means re-deriving all seven."
     }
   ],
   "rules": [
