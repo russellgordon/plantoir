@@ -13,7 +13,7 @@ tags:
 1. [[Persuasive Techniques in Media]] — the toolbox: what actually makes an
    image, a headline, or a thirty-second spot work on an audience
 2. Apply it as a class: name the techniques at work in two or three of the
-   ads, headlines, or clips people noticed since last class
+   ads, headlines, or clips people noticed since last class (formative)
 3. Preview: next class we take one advertisement apart in full, in small
    groups
 

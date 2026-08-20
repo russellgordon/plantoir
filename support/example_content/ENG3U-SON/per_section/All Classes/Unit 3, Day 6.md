@@ -18,4 +18,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Keep your script handy — Act 2 continues next class
+- [ ] Keep your script handy — after tomorrow's workshop, Act 2 continues
+      the class after that

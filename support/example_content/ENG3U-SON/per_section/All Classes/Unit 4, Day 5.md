@@ -14,7 +14,7 @@ tags:
    Hayden Taylor writing about identity, humour, and being Indigenous in
    Canada
 2. Reaction, in [[Your Reading Life]]: what surprised you, and where the
-   humour is doing more work than it first seems to
+   humour is doing more work than it first seems to (formative)
 
 ## Things to do before our next class
 

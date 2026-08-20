@@ -31,7 +31,8 @@ why: a group product is never the whole story of what any one student did.
 |---|---|
 | Names ONE real choice | Not "we worked hard" — a specific decision: why THIS line got the pause, why THIS character stood where |
 | Grounds it in the text | Quotes the actual line the choice responds to |
-| A short close reading | Explains what's happening in the language of one speech from your scene — word choice, rhythm, what a listener is meant to feel |
+| Interpretation backed by performance evidence | Points to a specific vocal or physical choice — a pause, a look, a change in volume — as evidence for how your group read the line, not just what the printed words say on the page |
+| One word or phrase you had to work out | Names something in your scene that wasn't immediately clear, and explains what context — the surrounding lines, the moment in the play — told you what it meant |
 | Honest reflection | Names a strategy that helped you as a speaker or listener this unit, and one thing you'd do differently |
 
 ## How to work
@@ -40,6 +41,9 @@ why: a group product is never the whole story of what any one student did.
    shared.
 2. **Day 57 — annotation and blocking.** [[Annotating for Performance]]
    from Day 47 is your starting toolkit — mark the script before you move.
+   As you annotate, flag any word or phrase in your scene that isn't
+   immediately clear, and work out its meaning from what surrounds it —
+   that's the word your Director's Note will explain later.
 3. **Day 58 — rehearsal 1.**
 4. **Day 59 — rehearsal 2.** I'll circulate with feedback on what's
    working and what isn't.
@@ -77,9 +81,10 @@ Triangulation — the evidence you will not have unless you go and get it.
 
 OBSERVE — Days 58-59, rehearsal
   Watch for: whether a group stops to fix a moment that isn't landing, or
-  runs the scene top-to-bottom every time regardless. The performance on
-  Day 61 can look polished either way if the group got lucky; rehearsal is
-  where you actually see the process.
+  runs the scene top-to-bottom every time regardless. The performance
+  criteria ask for visible preparation, and rehearsal is where you confirm
+  that claim is earned rather than lucky — a group that never adjusted
+  anything across two rehearsal days got to Day 61 some other way.
   Going well: someone stops the run and says "that pause didn't work,
   let's try it after the next line instead."
   Stuck: the same read-through repeated with no visible adjustment.

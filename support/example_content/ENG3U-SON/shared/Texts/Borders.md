@@ -5,12 +5,19 @@ created: __CREATED__
 tags:
   - texts
 ---
-Thomas King is of Cherokee and Greek ancestry, born in California and long
-based in Canada, and is one of the most influential Indigenous writers and
-scholars working today. "Borders" first appeared in an earlier form in
-*Saturday Night* magazine in 1991 and was collected, in the version we
-read, in *One Good Story, That One* (1993). It has since been adapted into
-a graphic novel illustrated by Métis artist Natasha Donovan.
+Thomas King was born in California and has lived and written in Canada for
+decades — *The Inconvenient Indian* and this story are both among the
+most widely taught pieces of Canadian writing about Indigenous experience.
+In November 2025, King publicly stated that a genealogical review he had
+commissioned found no Cherokee or other Indigenous ancestry in his family,
+correcting what he had believed and said about himself for most of his
+life. "Borders" is fiction about Blackfoot characters, written by a writer
+who no longer identifies as Indigenous himself — worth naming plainly
+before you read it, not glossing over. "Borders" first appeared in an
+earlier form in *Saturday Night* magazine in 1991 and was collected, in
+the version we read, in *One Good Story, That One* (1993). It has since
+been adapted into a graphic novel illustrated by Métis artist Natasha
+Donovan.
 
 ## Why we're reading it
 

@@ -18,13 +18,11 @@ pie showData
 
 ## Seventy: the semester's work
 
-Seventy per cent comes from the five tasks you complete across the four
+Seventy per cent comes from the four tasks you complete across the four
 units — [[Two Stories, One Thread]], [[The Weight of the Ice]], [[Staging the Unseen]],
-and [[Your Canada, Your Story]] — the fifth being the
-individually-marked companion pieces that travel alongside a group task
-(Unit 3's rhetorical analysis, for instance). Where a task is worked on in a
+and [[Your Canada, Your Story]]. Where a task is worked on in a
 group — Unit 3's scene study — the group product is not what gets marked:
-every student is evaluated individually, on their own director's note and
+every student is evaluated individually, on their own Director's Note and
 their own performed role, never on a shared score.
 
 This mark leans toward your **most consistent** level of achievement, with

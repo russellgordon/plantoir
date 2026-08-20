@@ -27,8 +27,8 @@ This is your first essay of the course. It doesn't need to be long — about
 
 ## How to work
 
-1. **Day 15 — launch.** Pick your pairing and start a thesis.
-   [[Integrating Evidence - The Quote Sandwich\|Integrating Evidence]] is today's workshop
+1. **Day 15 — launch.** Pick your pairing, start a thesis, and sketch a
+   rough outline. [[Integrating Evidence - The Quote Sandwich\|Integrating Evidence]] is today's workshop
    — you'll need it for the evidence you gather over the next few days.
 2. **Day 16 — outline.** Bring your thesis and a rough plan; I'll circulate
    and give feedback on both before you draft.

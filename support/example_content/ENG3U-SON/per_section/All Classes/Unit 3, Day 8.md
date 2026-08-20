@@ -18,4 +18,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Nothing formal — bring your script for Act 3 next class
+- [ ] Nothing formal — next class is Rhetorical Appeals, then bring your
+      script again for Act 3, the class after that

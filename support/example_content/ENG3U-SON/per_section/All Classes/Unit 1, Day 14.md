@@ -17,7 +17,7 @@ tags:
    point doesn't arrive until you can compare them.
 2. Read [[Happy Endings]] together
 3. Reading-life entry in [[Your Reading Life]]: your immediate reaction,
-   written while it's fresh
+   written while it's fresh (formative)
 4. A minute back on [[Conflict and Plot Structure]] from Day 3 — Atwood is
    doing, on purpose and in miniature, exactly what that page describes:
    choosing which events matter and what order to put them in

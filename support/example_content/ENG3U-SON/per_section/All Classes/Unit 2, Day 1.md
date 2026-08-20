@@ -18,7 +18,8 @@ tags:
    carefully looks like for this specific material, before we open it
 3. Diagnostic pre-reading quick-write: one thing you already know about this
    history, one question you're carrying in, one line about how you feel
-   opening a novel that starts here — written in class, kept, not marked
+   opening a novel that starts here — written in class, kept, not marked,
+   just so I know what this class is bringing into the novel before we start
 
 ## Things to do before our next class
 

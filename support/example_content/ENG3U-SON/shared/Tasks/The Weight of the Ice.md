@@ -56,8 +56,6 @@ specificity of what you name — not on how much you enjoyed the book.
 
 ![[B4.1]]
 
-![[C1.3]]
-
 ![[C1.4]]
 
 ![[C1.5]]

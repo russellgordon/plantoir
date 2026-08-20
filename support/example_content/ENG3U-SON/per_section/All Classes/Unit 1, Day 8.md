@@ -15,7 +15,7 @@ tags:
    ahead of time if you'd rather know the shape of it first
 2. Read [[The Lottery]] together, out loud, taking turns
 3. Reading-life entry in [[Your Reading Life]]: your immediate reaction,
-   written while it's fresh
+   written while it's fresh (formative)
 
 ## Things to do before our next class
 

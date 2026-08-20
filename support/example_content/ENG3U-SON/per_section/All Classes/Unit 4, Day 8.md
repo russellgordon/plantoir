@@ -18,7 +18,7 @@ tags:
    If you can spot ethos, pathos, and logos in a headline as easily as you
    did in a soliloquy, the skill has actually transferred.
 3. Small groups: label the appeals at work in both headlines from today's
-   pair
+   pair (formative)
 
 ## Things to do before our next class
 

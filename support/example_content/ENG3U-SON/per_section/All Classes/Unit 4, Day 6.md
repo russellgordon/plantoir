@@ -13,7 +13,7 @@ tags:
 1. Workshop: [[Finding Your Persuasive Voice]] — a craft study of how Taylor
    makes an argument funny without making it soft
 2. Try it yourself: rewrite one paragraph from your reading journal in a
-   more persuasive voice, borrowing one Taylor technique on purpose
+   more persuasive voice, borrowing one Taylor technique on purpose (formative)
 
 ## Things to do before our next class
 

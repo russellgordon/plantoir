@@ -40,7 +40,9 @@ material that is genuinely difficult.
 
 Every piece of writing you submit for a mark went through stages you also did
 in class: a thesis or a plan, a draft, a conference or checkpoint with
-feedback, a revision. > [!tip] Feedback you get is meant to be used
+feedback, a revision.
+
+> [!tip] Feedback you get is meant to be used
 > The class after a checkpoint is never a new topic — it is time built into
 > the schedule to act on what the checkpoint told you. If you skip that day,
 > you skip the whole reason the checkpoint happened.

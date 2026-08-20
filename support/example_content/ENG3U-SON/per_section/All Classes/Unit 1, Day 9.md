@@ -15,7 +15,7 @@ tags:
 2. Name the concept: [[Symbolism and Motif]]
 3. Symbol hunt, in small groups: find one other detail in the story that
    earns the label "symbol" by the page's own three tests, and be ready to
-   argue what it's a symbol *of*, using the text as evidence
+   argue what it's a symbol *of*, using the text as evidence (formative)
 
 ## Things to do before our next class
 

@@ -14,7 +14,7 @@ tags:
    taking turns — a short story by Alice Munro, and the first thing you'll
    read for this course
 2. First entry in [[Your Reading Life]]: a few sentences on your own
-   reaction, written in class while the story is still fresh
+   reaction, written in class while the story is still fresh (formative)
 3. If you're comfortable, share one reaction aloud in a small group — you
    can always pass, per [[How We Talk About Hard Things]]
 

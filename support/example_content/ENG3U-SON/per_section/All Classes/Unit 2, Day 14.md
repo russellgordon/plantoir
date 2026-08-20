@@ -12,7 +12,7 @@ tags:
 
 1. Finish the novel: we read the final pages of *Indian Horse* together
 2. Synthesis discussion — Return to the Ice: what changed for Saul, and
-   what changed in how we read him, start to finish
+   what changed in how we read him, start to finish (formative)
 
 ## Things to do before our next class
 

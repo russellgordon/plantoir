@@ -15,7 +15,7 @@ tags:
    itself, not after
 2. Read [[Borders]] together, out loud — the shortest text in the unit
 3. Reading-life entry in [[Your Reading Life]]: your immediate reaction,
-   written while it's fresh
+   written while it's fresh (formative)
 
 ## Things to do before our next class
 

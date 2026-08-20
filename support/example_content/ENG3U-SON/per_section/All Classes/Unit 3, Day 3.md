@@ -14,7 +14,7 @@ tags:
 2. Staged reading: the ghost appears on the battlements — read aloud, in
    role, pausing to check meaning as we go
 3. Quick debrief: what changed by hearing the scene instead of reading it
-   silently?
+   silently? (formative)
 
 ## Things to do before our next class
 

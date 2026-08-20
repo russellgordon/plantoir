@@ -18,5 +18,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Bring your group's scene text and your annotations from Day 13
+- [ ] Bring your group's scene text — tomorrow is annotation and blocking
 - [ ] Reread your scene once more, now with the whole play in mind

@@ -13,7 +13,7 @@ tags:
 1. Reading begins: Part One of [[Indian Horse]] — we read the opening
    chapters together in class
 2. First [[Your Reading Life]] entry for this novel: what did you notice
-   about how Saul tells his own story, right from the first page
+   about how Saul tells his own story, right from the first page (formative)
 
 ## Things to do before our next class
 

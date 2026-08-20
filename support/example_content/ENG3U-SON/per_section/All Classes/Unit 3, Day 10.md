@@ -13,7 +13,7 @@ tags:
 1. Roles assigned for Act 3
 2. Staged reading: the play-within-a-play — watch Claudius as closely as
    the players
-3. Debrief: what did Hamlet actually learn by staging this?
+3. Debrief: what did Hamlet actually learn by staging this? (formative)
 
 ## Things to do before our next class
 

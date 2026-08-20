@@ -13,7 +13,7 @@ tags:
 1. [[Tracking a Developing Theme]] — workshop: how to follow one idea as it
    changes across a whole novel, not just spot it once
 2. Apply it to *Indian Horse* so far — start tracking your own idea; you'll
-   need this before Unit 2's essay
+   need this before Unit 2's essay (formative)
 
 ## Things to do before our next class
 

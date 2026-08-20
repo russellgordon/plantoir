@@ -14,7 +14,8 @@ tags:
    [[How English Class Works]] answers that
 2. Diagnostic quick-write: an unseen paragraph, three questions — what do
    you notice, what would you ask the writer, and one line about your own
-   reading history so far. Written in class, kept, not marked.
+   reading history so far. Written in class, kept, not marked — just so I
+   know where this class is starting from before the year gets moving.
 3. A first look at [[Learning Goals]] and [[Key Links]] — the two pages
    worth knowing the location of by heart from today on
 4. [[Using This Site]] — a two-minute tour of how this site itself works,

@@ -13,7 +13,8 @@ tags:
 1. Unit 4 launch — media, persuasion, and the last stretch of the course
 2. Diagnostic quick-write: media habits — what you watch, read, and listen
    to in a typical week, and one place you suspect persuasion is working on
-   you without your noticing. Written in class, kept, not marked.
+   you without your noticing. Written in class, kept, not marked — just so
+   I know how media-literate this class already is before the unit starts.
 3. A first look at [[Your Canada, Your Story]] — the Independent Culminating
    Study this whole unit builds toward: an analytical piece and a media
    artifact on a Canadian topic of your choosing

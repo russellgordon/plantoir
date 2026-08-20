@@ -13,7 +13,7 @@ tags:
 1. [[Podcast Basics - Writing for the Ear|Podcast Basics: Writing for the Ear]]
    — how writing for listening differs from writing for reading
 2. Listen and annotate: a short podcast clip, noting what the script does
-   that a printed page couldn't
+   that a printed page couldn't (formative)
 3. Preview: next class we launch the Independent Culminating Study — the
    last major piece of the course
 

@@ -58,12 +58,13 @@ Hamlet's state of mind.
 
 ## After the seminar: write it down
 
-Before next class, pick one row from the table above and write a paragraph
-in your reading journal: what does that character's account reveal about
-their own bias, and how does knowing what they stand to gain change how
-much weight their account should carry? This is the same skill you just
-practised out loud, done again in writing, on the text itself rather than
-on a performance of it.
+In the last few minutes of class, pick one row from the table above and
+write a paragraph in your reading journal (see [[Your Reading Life]] —
+this entry is written in the room, the same as every other one): what does
+that character's account reveal about their own bias, and how does
+knowing what they stand to gain change how much weight their account
+should carry? This is the same skill you just practised out loud, done
+again in writing, on the text itself rather than on a performance of it.
 
 %%curriculum-start%%
 ## Curriculum connection

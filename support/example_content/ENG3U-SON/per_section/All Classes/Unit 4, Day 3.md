@@ -13,7 +13,7 @@ tags:
 1. Small groups: [[Deconstructing an Advertisement]] — take one advertisement
    apart piece by piece, using the techniques named last class
 2. Share out: each group names the single most persuasive choice in their
-   ad, and explains why it works
+   ad, and explains why it works (formative)
 
 ## Things to do before our next class
 

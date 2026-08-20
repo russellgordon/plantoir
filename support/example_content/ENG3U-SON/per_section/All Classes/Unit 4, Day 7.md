@@ -14,7 +14,7 @@ tags:
 2. [[Bias and Perspective in News Media]] — where a writer's own position
    shows up in what looks like straight reporting
 3. Connect the two: where does Taylor's own perspective show through, and
-   is that a weakness in the writing or the whole point of it?
+   is that a weakness in the writing or the whole point of it? (formative)
 
 ## Things to do before our next class
 

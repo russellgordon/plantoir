@@ -15,7 +15,7 @@ tags:
    keep our time focused on Hamlet's own arc. Read the full text on your
    own if you want every thread.
 2. Continue reading in role
-3. Debrief: what's changed in Hamlet since Act 1?
+3. Debrief: what's changed in Hamlet since Act 1? (formative)
 
 ## Things to do before our next class
 

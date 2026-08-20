@@ -14,7 +14,7 @@ tags:
 2. Close analysis: "To be, or not to be" — line by line, what is Hamlet
    actually weighing?
 3. Connect it back to [[Soliloquy and Dramatic Irony]] — how does this
-   speech work the same way the first one did?
+   speech work the same way the first one did? (formative)
 
 ## Things to do before our next class
 

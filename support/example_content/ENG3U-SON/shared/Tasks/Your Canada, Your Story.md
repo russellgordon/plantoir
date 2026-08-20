@@ -9,9 +9,9 @@ enableToc: true
 Your Independent Culminating Study — the piece the whole course has been
 building toward. Choose a Canadian author or a theme running through this
 semester's texts (the teacher-approved list favours Canadian and Indigenous
-voices — Wagamese, King, Taylor, and others like them are all fair game,
-and so is a theme like "what a story owes the truth" that runs across
-several authors). Produce two things:
+voices — Wagamese, Taylor, and others like them are all fair game, and so
+is a theme like "what a story owes the truth" that runs across several
+authors). Produce two things:
 
 1. **An analytical piece** — a written argument about your topic, in
    whatever form suits it (essay, extended review, script for a spoken
