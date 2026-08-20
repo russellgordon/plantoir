@@ -1,0 +1,49 @@
+{
+  "shared_folders": [
+    "Concepts",
+    "Texts",
+    "Discussions",
+    "Writing Workshops",
+    "Media Studies",
+    "Portfolios",
+    "Tasks",
+    "Setup",
+    "Style",
+    "Tutorials",
+    "Curriculum"
+  ],
+  "shared_files": [
+    "Learning Goals.md",
+    "Help Sessions.md"
+  ],
+  "per_section_folders": [
+    "All Classes"
+  ],
+  "per_section_files": [
+    "index.md",
+    "Key Links.md",
+    "Private Notes.md",
+    "Scratch Page.md"
+  ],
+  "hidden": [
+    "Curriculum",
+    "Setup",
+    "Style",
+    "Tutorials",
+    "Learning Goals.md",
+    "Help Sessions.md",
+    "Private Notes.md",
+    "Scratch Page.md"
+  ],
+  "expandable": [
+    "Concepts",
+    "Texts",
+    "Discussions",
+    "Writing Workshops",
+    "Media Studies",
+    "Portfolios",
+    "Tasks"
+  ],
+  "curriculum_folder": "Curriculum",
+  "class_weekday_step": 1
+}
