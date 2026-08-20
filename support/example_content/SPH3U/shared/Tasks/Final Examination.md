@@ -82,8 +82,8 @@ work in symbols before substituting numbers.
 
 Against the same expectations as everything else. Per [[How Marks Work]],
 this examination is part of the final thirty per cent of the course mark,
-alongside the [[Motor and Generator Report]] handed in during the last
-week of classes. Those two are deliberately unalike — one a device you built with
+alongside the [[Motor and Generator Report]], handed in before the
+review classes begin. Those two are deliberately unalike — one a device you built with
 somebody over three weeks, one three hours on paper by yourself — so that
 neither a single afternoon nor a single build decides your grade alone.
 

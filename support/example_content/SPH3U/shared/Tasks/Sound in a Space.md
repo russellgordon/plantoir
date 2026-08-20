@@ -69,7 +69,8 @@ mode.
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 4, Day 10, the measuring period with the sound meters
+OBSERVE — Unit 4, Day 11, the second working period with the meters
+(Day 10 has the conference in it; do not try to do both at once)
   Watch for: what happens to a reading that looks wrong. The criteria ask
   for the number of times they measured, so the table will tell you HOW
   MANY — what no table can tell you is which reading was thrown away and
@@ -84,10 +85,15 @@ OBSERVE — Unit 4, Day 10, the measuring period with the sound meters
   word that prompted it.
 
 TALK — Unit 4, Day 12, while the pairs are reading each other's drafts
-  Ask: "Where in this room would somebody have to be standing for your
-  recommendation to make no difference to them at all?"
+  Ask: "Suppose I take your meter away. How would you show somebody that
+  this room has the problem you say it has?"
   Then: "You measured a clap dying away. What happens to that time when
   the room is full of people, and why?"
+  A strong first answer designs a measurement rather than describing the
+  problem — clap at a paced distance from the wall and time twenty of
+  them, or find the quiet spots between two speakers and pace them out.
+  That is E2.4 used as a tool rather than recited, and the three pages
+  never ask how else it could have been shown.
   A strong second answer goes to the surface and then to the design:
   soft, irregular things absorb and scatter the wave instead of returning
   it, so less energy comes back, it dies away sooner — and therefore a

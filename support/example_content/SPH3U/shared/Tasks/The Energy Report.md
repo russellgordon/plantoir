@@ -9,7 +9,8 @@ tags:
 ---
 > [!abstract] At a glance
 > **Format:** four pages, or a recorded presentation of the same
-> substance. **Individually.** Four class periods of work time, then due.
+> substance. **Individually.** Launched, then three class periods of work
+> time, then due.
 > **Assessed on:** Knowledge, Thinking and Investigation, Communication,
 > Application.
 
@@ -117,15 +118,17 @@ TALK — Unit 3, Day 15, at the conference already on that agenda
   Ask: "Of the two sources you found, which one would say something
   different if a different organisation had paid for it — and what,
   exactly, would change?"
-  Then: "Your technology loses most of its energy at one step. If you
-  could halve that one loss, what would the efficiency become? Roughly,
-  out loud, now."
+  Then: "Make me the strongest case you can for one of the OTHER two
+  methods in your comparison table. Not a fair case — the strongest one."
   A strong first answer names the interest and says what it would move —
   the number, the boundary the number was drawn around, or which losses
   got counted — rather than calling a source biased and moving on. That
   is A1.9, and the finished report only ever shows you the sources that
-  survived. The second answer tells you whether the energy path is
-  understood or merely drawn.
+  survived.
+  The second is D2.7, compare and contrast, with the student's thumb off
+  the scale. A report argues for the choice already made; a student who
+  can argue the other side has genuinely compared, and one who cannot has
+  filled in two columns of a table without reading them.
   Record: one line per student on the conference list, a tick per
   question.
 

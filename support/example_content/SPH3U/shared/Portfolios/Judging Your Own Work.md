@@ -41,7 +41,7 @@ you were hoping nobody would look at closely.
 > disagree, and name the one thing most likely to have pushed my number
 > low. Next period.
 >
-> That entry is worth more than "looks fine" on all seven rows, and it
+> That entry is worth more than "looks fine" on all eight rows, and it
 > took less time to write.
 
 ## What this is not

@@ -154,19 +154,23 @@ friction". The number is the point.
 Triangulation — the evidence you will not have unless you go and get it.
 
 OBSERVE — Unit 3, Day 6, the test-run and filming period
-  Watch for: how many things change between one run and the next. The
-  agenda asks for one change, predicted then tested, and this is the
-  period where you find out whether that discipline exists when the track
-  is still being made to work at all. Analysis question 5 will report a
-  clean single change from every group, because that is what it asks for;
-  what the build runs show you is whether they can do it when nothing is
-  working yet. That is D2.4 — conducting an inquiry into gravitational
-  and kinetic energy — and no page can show it to you.
-  Going well: one change per run, and somebody says out loud what they
-  expect it to do before the ball is released.
-  Stuck: the loop is re-taped, the release point moves and a heavier ball
-  goes in, all before the same run, and nobody can say which of the three
-  is why it worked.
+  This period's agenda ASKS for one change, predicted then tested, so you
+  are watching whether the thing you told them to do is the thing they
+  can do — which is the point, not a trick. Building is meant to be
+  messy: re-taping the loop, moving the release point and swapping the
+  ball are all the assigned work of a build day, and none of them is a
+  fault.
+  Watch for: whether the group can SAY, afterwards, which change did it.
+  That is the whole of controlling a variable, and it survives a chaotic
+  bench perfectly well as long as somebody is keeping count. Analysis
+  question 5 will report a clean single change from every group, because
+  that is what it asks for; only the build runs show you whether they can
+  do it while nothing yet works. That is D2.4 — conducting an inquiry
+  into gravitational and kinetic energy — and no page can show it to you.
+  Going well: somebody says out loud what they expect a change to do
+  before the ball is released, and the run gets a name.
+  Stuck: three changes go in together and, when you ask, nobody in the
+  group can tell you which one is why it worked.
   Record: a tally on your day plan — runs against changes, one line per
   group.
 

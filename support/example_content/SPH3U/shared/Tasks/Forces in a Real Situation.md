@@ -88,15 +88,20 @@ OBSERVE — Unit 2, Day 12, the working period where diagrams are drawn
   fixed when it failed", initials in each.
 
 TALK — Unit 2, Day 12, at the conference already on that agenda
-  Ask: "Point at the force in your diagram you are least sure belongs
-  there. What would have to be true of the situation for it to
-  disappear?"
-  Then: "Your object is twice as heavy. Which numbers in your calculation
-  double, and which do not move at all?"
-  A strong second answer separates the force from the acceleration: for
-  the braking car the friction force doubles, the mass doubles, and the
-  deceleration does not change at all. That is C2.4 heard out loud, and a
-  two-page analysis that uses one mass never has to notice it.
+  Ask: "Tell me your situation as a story about pushes and pulls. No
+  numbers, no equation — just what is pulling on what, and what wins."
+  Then: "Now suppose I go and measure the real thing. What number would I
+  have to come back with before you would say your analysis was wrong?"
+  The first is C1.1: a technology analysed with reference to Newton's
+  laws, said aloud without the algebra to hide behind. Students who
+  understood the diagram tell a story; students who solved a template run
+  out of words in about fifteen seconds, and the finished page looks the
+  same either way.
+  A strong second answer names a quantity AND a threshold — a stopping
+  distance shorter than the friction they assumed could ever produce, a
+  tension above what the anchor is rated for. That is C2.4 run backwards,
+  and nothing in the two pages ever asks them to state the number that
+  would break their own claim.
   Record: initials and a mark for each question on the conference sheet.
 
 The product evidence is the two pages, handed in on Day 14.
