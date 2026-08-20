@@ -11,6 +11,11 @@ A lens is a piece of glass with curved faces, and everything it does to
 light is bending at those two faces. So this investigation starts with
 the bending, measures it, and only then asks the question in the title.
 
+It runs across two periods, three classes apart: **the refraction half on
+Unit 4, Day 6**, while the bending is still the thing you are arguing
+about, and **the lens half on Unit 4, Day 9**, once you can predict an
+image. One report covers both, written on Day 10 — keep your graphs.
+
 ## What you are trying to find out
 
 1. **How much does a ray bend when it crosses into a new medium, and

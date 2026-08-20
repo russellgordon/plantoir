@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Investigation: [[Evidence of a Chemical Change]] — observe before judging
-2. Post your criteria: what counted as proof that a new substance formed?
+2. Diagnostic: post your criteria — what counted as proof that a new
+   substance formed? Nothing is marked; it shows us both what this room
+   currently trusts as evidence
 3. Where the room disagreed — colour change is the weakest sign of the five
 4. Saying it precisely enough to be checked: [[Writing About Science]]
 

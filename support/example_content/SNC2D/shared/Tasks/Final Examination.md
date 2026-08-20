@@ -14,11 +14,11 @@ tags:
 
 ## What it is for
 
-Most of what you hand in this year is done with a partner, at a bench,
-with time to look things up. This is the one piece of evidence that is
-unambiguously yours. In Grade 10 it also does something else: it is
-practice at a kind of assessment that Grade 11 and 12 courses will use
-constantly, met here where the stakes are lower.
+Almost everything else you hand in this year was written with your data
+in front of you, your notes open, and me in the room. This is the one
+piece of evidence produced with none of that. In Grade 10 it also does
+something else: it is practice at a kind of assessment that Grade 11 and
+12 courses will use constantly, met here where the stakes are lower.
 
 ## What is on it
 
@@ -74,9 +74,10 @@ Two parts include data or a graph you have not seen before.
 ## How this is assessed
 
 Against the same expectations as everything else. Per [[How Marks Work]],
-this examination is part of the final 30% of the course mark alongside
-[[The Science Showcase]], so that neither one afternoon nor one
-investigation decides your grade alone.
+this examination is the larger half of the final thirty per cent of the
+course mark, and [[The Science Showcase]] is the other, so that neither
+one morning on paper nor one afternoon on your feet decides your grade
+alone.
 
 %%curriculum-start%%
 ## Curriculum connection
@@ -92,4 +93,63 @@ investigation decides your grade alone.
 ![[D3.1]]
 
 ![[D3.3]]
+
+![[E3.3]]
+
+![[E3.5]]
+
+![[E3.7]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Be clear about what this block is for. The mark on this paper comes from the
+paper, and nothing you observe or ask in the review classes changes it. What
+these two prompts get you is evidence about the SAME overall expectations,
+gathered in the last week, which is what tells you what to spend the open
+clinic on — and it is the last conversation evidence of the semester for the
+seventy per cent, where it does count.
+
+OBSERVE — Unit 4, Day 21, the diagrams drawn from memory
+  Watch for: where each pencil stops. Four diagrams, one per unit, and the
+  corrected sheet at the end of the period looks the same for a student who
+  drew it cold and one who waited for the board. That is the whole reason to
+  walk the room while they are drawing rather than after.
+  Going well: a gap left where memory ran out, the drawing continued past
+  it, and the gap filled in a different colour once the correction goes up.
+  Stuck: a blank page until the board has something on it, or a cell drawn
+  four times because it is the one they can do.
+  Record: four columns on your day plan — cell, system, ray, greenhouse —
+  and a tick in the column where the pencil stopped. One circuit while they
+  draw. Two ticks in the greenhouse column across the room and you know what
+  the Day 22 open clinic is for; that is D3.3 and B3.1 diagnosed while there
+  is still one period left to teach them in.
+
+TALK — Unit 4, Day 22, the individual conferences already on that agenda
+  You are seeing each of them anyway. Do not ask why identical copies
+  matter for growth and repair, or how the natural greenhouse effect
+  differs from the human-caused one — this page prints both, and they will
+  have rehearsed them.
+  Ask: "Put these three in order of how fast they would go wrong if the
+  natural greenhouse effect weakened by a tenth: liquid water at the poles,
+  the growing season here, the temperature outside that window. Then defend
+  the order."
+  Then: "Here is the name of a compound you have not seen this year. What
+  does that name tell you about what is in the bottle — and what does it not
+  tell you?"
+  A strong first answer puts the temperature outside the window first,
+  because that is the direct one, and then has to argue about the other two
+  — which is exactly the reasoning D3.3 asks for when it says explain its
+  importance for life. An answer that recites the mechanism instead has not
+  been asked the question. A strong second
+  answer builds the composition from the name and then stops honestly at
+  what a name cannot carry: how much is in the bottle, its concentration,
+  what state it is in. That is C3.1 heard, and it is a better test of the
+  relationship between name, formula, and composition than any paper item.
+  Record: one line each as you go, and a star against anybody whose gap you
+  can still close in the open clinic that runs in the same period.
+
+The product evidence is the paper itself, written in the examination
+period. That one arrives on its own.
+%%

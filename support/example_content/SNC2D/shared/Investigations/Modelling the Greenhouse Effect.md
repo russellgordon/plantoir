@@ -164,5 +164,7 @@ Also worth refusing to claim:
 
 ![[D2.5]]
 
+![[D2.6]]
+
 ![[A1.8]]
 %%curriculum-end%%

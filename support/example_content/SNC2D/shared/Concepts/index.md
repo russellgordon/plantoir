@@ -24,7 +24,7 @@ did to flip it. That is the Grade 10 move, and this is where it lives.
 Class pages link here. These pages do not go stale, so start here when you are
 studying, when you missed a class, or when a lab makes no sense afterwards.
 
-## The sixteen pages, by unit
+## The seventeen pages, by unit
 
 **Unit 1 — Tissues, Organs, and Systems**
 
@@ -52,6 +52,7 @@ studying, when you missed a class, or when a lab makes no sense afterwards.
 
 - [[Reflection]]
 - [[Refraction]]
+- [[Light in the Room]]
 - [[Lenses and Images]]
 
 > [!tip] Use the backlinks

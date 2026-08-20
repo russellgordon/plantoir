@@ -125,10 +125,12 @@ problem, and it needs three things:
 | The question | Clear, and answerable at the bench | Sharp enough that the design falls out of it, and worth answering |
 | Prediction | States what will happen | States a **mechanism**, and what would show the mechanism wrong |
 | Design | A fair test with the variables named | Controls chosen with reasons, and the uncontrollable ones named honestly |
-| Data | Complete, with units | Enough trials to show spread, and the spread reported |
+| Hazards, planned before you run it | Every hazard in your procedure named, with what you would do if it happened | Hazards read off the containers you will actually open, and the response matched to the amount you are actually using |
+| Data | Complete, with units, and the mass before and after every trial | Enough trials to show spread, the spread reported, and any missing mass accounted for |
+| The chemistry, said correctly | Reactant, product, precipitate, aqueous, endothermic used accurately throughout | Used accurately, and any of them restated in plain words on request |
 | Conclusion | Answers the question with the data | Justifies the answer, and says how strongly the evidence supports it |
 | Limitations | Names a source of error | Names it, says **which way** it pushed the result, and what it does not settle |
-| The recommendation | Sensible, and follows from the findings | Fits the audience, names the cost, and does not overclaim |
+| The recommendation | Sensible, follows from the findings, and rests on two sources of the right kind | Fits the audience, names the cost, and does not overclaim |
 
 ## What sinks an otherwise good investigation
 
@@ -152,6 +154,8 @@ problem, and it needs three things:
 
 ![[A1.1]]
 
+![[A1.4]]
+
 ![[A1.5]]
 
 ![[A1.10]]
@@ -160,3 +164,44 @@ problem, and it needs three things:
 
 ![[C2.4]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 15, the first bench period
+  Watch for: WHEN the balance gets used. The empty vessel has to be weighed
+  before anything is mixed, and it is the one reading that cannot be
+  recovered afterwards. By marking time every report will contain a mass
+  account, and a reconstructed one looks exactly like a measured one on the
+  page — the period is the only place the difference is visible.
+  Going well: the vessel on the balance before the reagents are collected,
+  the number written straight into the notebook, and the balance zeroed
+  again between benches rather than assumed.
+  Stuck: the mixing started first, then a hunt for the empty mass; or a mass
+  taken off the bottle's label and entered as though it had been weighed.
+  Record: two ticks per bench on your seating plan — weighed first, or
+  reconstructed. One circuit in the opening ten minutes. That is C2.4's
+  first half — comparing the values before and after — and the accounting
+  afterwards has nothing to stand on without it.
+
+TALK — Unit 2, Day 14, while you are redesigning procedures with them
+  You are already at every bench that day. Do not ask what they held
+  constant, how many trials, or what would show the mechanism wrong — the
+  task page asks all three in print, so the answers are prepared.
+  Ask: "Your bench makes a few millilitres of waste. The problem you chose
+  happens at the scale of a bridge, or a water plant, or a smokestack. Who
+  deals with the waste at THAT scale, and what do they have to do with it?"
+  Then: "Why this reaction, and not one of the others on the list? What did
+  you think you could measure here that you could not measure there?"
+  A strong first answer gets past "they recycle it" to something concrete —
+  a neutralisation step, a licensed contractor, a permit, a cost per tonne —
+  which is the environmental half of C1.1 said out loud rather than cited. A
+  strong second answer names a measurable quantity and an instrument, which
+  is A1.1 heard: the question was chosen because it could be answered, not
+  because it sounded good.
+  Record: one line per bench, two ticks. The second column is the one to
+  carry into Unit 2, Day 17.
+
+The product evidence is the report and the one-page recommendation,
+submitted at the start of Unit 2, Day 18.
+%%

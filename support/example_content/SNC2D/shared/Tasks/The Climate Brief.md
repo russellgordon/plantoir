@@ -138,3 +138,46 @@ Practice with real series first: [[Climate Data Practice]].
 
 ![[D2.9]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 14, the working period on the figure
+  Watch for: the ORDER in which the claim and the window get settled. Every
+  brief will caption its figure with a source and a period, so a badly
+  cropped record is catchable afterwards; what the finished page cannot show
+  you is whether the claim was narrowed to fit what the data said, or the
+  start year dragged until the line agreed with a claim already written.
+  Only the period at the screen tells you that.
+  Going well: the whole record plotted first, at its full length, and then
+  the hypothesis sentence rewritten smaller to match what is actually there.
+  Stuck: the same sentence on screen at the end of the period as at the
+  beginning, with the axis handles having moved four times.
+  Record: three columns on your seating plan — narrowed the claim, trimmed
+  the data, or neither yet. One circuit at the twenty-minute mark and
+  another near the end; the change between the two is the finding. That is
+  D2.4 watched rather than marked: investigating a popular hypothesis
+  against time-trend data means letting the data answer.
+
+TALK — Unit 3, Day 13, the conference already on that agenda
+  You are asking each of them about their audience anyway. Do not ask
+  whether the decision is one somebody could actually take — that is the
+  agenda item — and do not ask what values would lead a source to frame it
+  that way, which the task page prints.
+  Ask: "Take the non-scientific source you found and change one thing about
+  who wrote it — the employer, the country, or the year. What would be
+  different in the piece?"
+  Then: "Your recommendation asks your audience to spend something they had
+  other plans for. What do they cut instead of doing it — and what have you
+  put in the brief that makes that harder to choose?"
+  A strong first answer changes something specific and traces it to a
+  specific sentence or omission, rather than saying the piece would be
+  "more biased"; that is D2.9 in conversation, where a written comparison
+  usually stops at listing differences. A strong second answer shows the
+  student knows what their audience's money is currently doing, which is
+  what separates a proposal from a wish.
+  Record: two ticks per student in the conference column of your day plan.
+
+The product evidence is the two-page brief with its sources, submitted at
+the start of Unit 3, Day 16.
+%%

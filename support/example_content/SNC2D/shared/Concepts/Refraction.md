@@ -128,4 +128,6 @@ put curved surfaces on the glass and see what happens in
 ![[E3.4]]
 
 ![[E3.7]]
+
+![[E3.8]]
 %%curriculum-end%%

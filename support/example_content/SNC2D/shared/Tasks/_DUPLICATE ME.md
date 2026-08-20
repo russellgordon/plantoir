@@ -35,13 +35,42 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
-%%curriculum-start%%
-## Curriculum connection
-
 %%
 Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
 %%
 
+%%curriculum-start%%
+## Curriculum connection
+
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Products arrive on their own. Observation and conversation do not, so name
+here exactly where in THIS task they are available, on which day, and what
+to ask. Delete the guidance in brackets as you fill each line in.
+
+OBSERVE — [Unit N, Day M, and what that period actually is]
+  Watch for: [something visible only while they work, and invisible in the
+  finished piece. If the product already shows it, say instead that watching
+  corroborates what they reported.]
+  Going well: [what it looks like when it is going well]
+  Stuck: [what it looks like when it is not — and check the day's agenda is
+  not instructing the very thing you would record as stuck]
+  Record: [how to note it for a whole class in seconds — ticks on a seating
+  plan, a column on the day plan]
+
+TALK — [Unit N, Day M, preferably a conference or check-in the arc already
+  schedules; never a day you are running the room]
+  Ask: "[a real question, not printed on this page or on that day's agenda]"
+  Then: "[a second one, asking for something different in kind — a
+  prediction, a disagreement, a decision already taken, who else is affected]"
+  A strong answer [says what, and which expectation code that evidences —
+  written as plain text, because wikilinks are not allowed inside a comment]
+  Record: [how, in seconds]
+
+The product evidence is [what arrives on its own, and when].
+%%

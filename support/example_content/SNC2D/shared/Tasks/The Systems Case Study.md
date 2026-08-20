@@ -134,5 +134,57 @@ of two rather than a blank page. Format of the write-up:
 
 ![[A1.7]]
 
+![[A1.9]]
+
 ![[A2.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 14, the trade where each student challenges one
+  unsourced claim in somebody else's draft
+  Watch for: what the student does with the challenge they RECEIVE, in the
+  ten minutes after it lands. The finished study cannot tell you: a claim
+  that got a source and a claim that quietly got deleted both leave a clean
+  page behind them.
+  Going well: the laptop opens, the agency page comes back up, and either a
+  citation appears beside the sentence or the sentence gets narrower to
+  match what the source actually says.
+  Stuck: the sentence vanishes without anything being opened; or the
+  challenge gets argued away from memory, which is the same move with more
+  confidence.
+  Record: three columns on your seating plan — went and found it, cut it, or
+  talked it out. One circuit while they trade. That is A1.3 in the only place
+  it is visible: locating a relevant source under pressure, rather than
+  having one in the list.
+
+TALK — Unit 1, Day 14, the working period, before the trade starts
+  Both prompts sit on the same day for a reason: Day 14 is the first period
+  in which the technology and the public health programme exist on the page
+  at all. The Day 12 conference is too early for either — that day they are
+  still choosing a condition — and the Day 12 question is on the agenda
+  anyway, so they will have an answer ready for it. Do not ask them to argue
+  the other side of the ethical question either; the task page prints that.
+  You are already walking the room between the self-check and the trade.
+  Ask: "You came down on one side of the ethical question. What single
+  piece of evidence, if I put it in front of you tomorrow, would move you to
+  the other?"
+  Then: "Your public health programme publishes a number that makes it look
+  as though it is working. What would that same number look like in a year
+  when the programme did nothing at all?"
+  A strong answer to the first names something findable — a survival figure,
+  a consent rate, a cost per case — rather than "if it hurt people". That is
+  B1.1 heard: a position held against evidence, which is what makes it an
+  analysis rather than an opinion, and a student who cannot name anything at
+  all has usually written both sides after deciding. A strong answer to the
+  second reaches for a baseline and admits when there is not one, which is
+  the whole of B1.3's word "assess".
+  You will not get to everybody in one period, and you should not try.
+  Record: two more columns on the same seating plan you are ticking for the
+  trade — moved the disagreement, reached for a baseline — and start with
+  the students you have least conversation evidence for.
+
+The product evidence is the case study itself, submitted at the start of
+Unit 1, Day 15.
+%%
