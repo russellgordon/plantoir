@@ -7,9 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo reporting with a peer edit desk · a fortnight of desk periods
-> early in the term · one short story, at least two sources, published
-> with your name on it
+> Solo reporting with a peer edit desk · seven desk periods across two
+> weeks, early in the term · one short story, at least two sources,
+> published with your name on it
 
 ## What you are making
 
@@ -81,8 +81,6 @@ The distance between those two versions is the learning.
 ![[B3.2]]
 
 ![[B2.2]]
-
-![[D2.4]]
 %%curriculum-end%%
 
 %%

@@ -54,6 +54,7 @@ shared mark here.
 | Quality | What it looks like in your layouts |
 | --- | --- |
 | Argued hierarchy | You can defend what leads, in one breath, out loud |
+| Sketched, then built | Three paper alternatives, one chosen for a reason |
 | Design with intent | Alignment, contrast, and space are choices, not luck |
 | Sharpened headlines | Each one is true, specific, and sized to its story |
 | Complete captions | Every image says who, what, and when — correctly |
@@ -100,6 +101,8 @@ page is launched
   choose — the paper on the wall cannot tell you which. Only the first
   one has actually done B2.5, which is using hand-drawn sketches to
   compare alternatives rather than to document a decision already made.
+  The criteria row "Sketched, then built" is unjudgeable from the
+  sketches alone; this period is where it gets judged.
   Going well: three genuinely different pages, and the pencil goes back
   to a rejected one to steal something from it.
   Stuck: one page drawn three times with the photograph moved, or a

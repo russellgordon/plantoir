@@ -44,9 +44,13 @@ Publication day is ours; the mark is yours.
    logged so the improvement is visible.
 4. Assemble the channels so they speak to each other — the paper and
    the program point to the site, the social posts carry readers in —
-   and rehearse the running order once, end to end.
-5. Prepare your talk: choose the piece you will stand beside, and
-   use [[Showing Growth]] to say what got better, with proof.
+   and rehearse the running order once, end to end. Set the room up
+   the way a working crew does: cables run and taped, table edges
+   clear, nothing to trip the readers who arrive tomorrow.
+5. Prepare your talk: choose the piece you will stand beside, use
+   [[Showing Growth]] to say what got better with proof, and name one
+   work habit this newsroom could not have published without — and why
+   a working newsroom needs it, not just ours.
 6. Publish, present, and thank your readers by name.
 7. Afterwards, select five pieces from your term as a portfolio, each
    captioned with what it shows about you. Five chosen is a portfolio;
@@ -68,6 +72,8 @@ in this room — [[How Marks Work]] explains why that matters.
 | Consent | Every face and name re-cleared for the wider audience |
 | Credit | Every contributor named, in every channel, every time |
 | Growth spoken | Your talk names a real change, with evidence for it |
+| A habit named | Your talk names a habit the job needs, and why it does |
+| Set up safely | Cables run, edges cleared, before anything is plugged in |
 | Portfolio, not archive | Five pieces chosen, captioned with what each shows |
 
 ## Reflect
@@ -114,10 +120,10 @@ OBSERVE — Unit 4, Day 12, final assembly and the room set-up
   will see almost nothing. Day 12 is assembly, the run sheet, and the
   tables and cables.
   Two things are visible here and nowhere else. First, what happens to
-  the production schedule they started at the launch on Day 1 when it
-  meets a channel that is not ready: is it revised in front of
-  everyone as the run sheet gets built, or worked around while the old
-  version stays as written? The criteria row "Schedule in writing"
+  the schedule drafted on Day 2 and revised on Day 8 when it meets a
+  channel that is not ready: is it revised again in front of everyone
+  as the run sheet gets built, or worked around while the Day 8 version
+  stays as written? The criteria row "Schedule in writing"
   asks whether it was revised in writing, and a revised schedule is a
   document you can read afterwards — so what this period adds is
   corroboration: you see the revising happen, or you see a tidy-up
@@ -128,8 +134,8 @@ OBSERVE — Unit 4, Day 12, final assembly and the room set-up
   published package can never show you a trip hazard that was moved.
   Going well: somebody reads the old schedule aloud, somebody else
   crosses a line out, and the new time goes onto the run sheet.
-  Stuck: the run sheet is being written from memory with the fortnight
-  of planning still in a folder nobody has opened.
+  Stuck: the run sheet is being written from memory, with the Day 8
+  schedule still in a folder nobody has opened.
   Record: on your own copy of the run sheet, initial each revision as
   it is made, and note the two or three people who set the room up.
 
@@ -139,8 +145,9 @@ TALK — Unit 4, Day 10, while the editorial board curates and polishes
   proofing desk time on Day 11.
   "This publication has one person it could not run without this week.
   Who, and what do they do that nobody notices?"
-  Then: "Name a habit you have watched somebody in this room keep all
-  term that you have started copying."
+  Then: "If this newsroom hired one more person tomorrow, what would
+  you tell them to do in their first week that nobody would think to
+  say out loud?"
   A strong answer names the habit and the reason a newsroom needs it —
   a producer who confirms call times in writing so nobody arrives at
   the wrong door; a photographer who clears cards the night before,

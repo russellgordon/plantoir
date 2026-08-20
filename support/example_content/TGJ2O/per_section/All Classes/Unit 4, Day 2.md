@@ -16,6 +16,9 @@ tags:
 3. Studio: thumbnails first — three front pages sketched at postcard
    size before anything is typeset
 4. Consolidate: [[Design Principles]] — the focal point, argued for
+5. Last fifteen minutes: the [[Publication Day]] production schedule,
+   drafted backwards from the day readers arrive — who polishes what,
+   in which role, by when
 
 ## Things to do before our next class
 

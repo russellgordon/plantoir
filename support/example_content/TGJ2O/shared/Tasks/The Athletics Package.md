@@ -7,25 +7,30 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Teams of four with rotating roles · three real events across the
-> unit, one desk period after each · recap filed within two days of
-> the final whistle · one story, one photo set, one social post
+> Teams of four with assigned roles · one covered event, then six
+> classes of studio and desk time working it up · recap on the desk two
+> days after the final whistle · one story, one photo set, one social
+> post
 
 ## What you are making
 
 Live coverage of real school athletics — a game, a meet, a match,
-covered by your team while it happens. Each event produces a recap
-story filed within two days, a photo set with complete captions, and
-one social post that sends readers to it.
+covered by your team while it happens. The event produces a recap
+story on the desk two days later, a photo set with complete captions,
+and one social post that sends readers to it, and the newsroom
+publishes the beat together at the end of the unit.
 
-Roles rotate every event — writer, photographer, editor, producer —
-so everyone reports, shoots, and edits. Nobody holds the tripod all term.
+Your crew holds roles at the event — writer, photographer, editor,
+producer — and then swaps them for the studio and desk phases, so
+nobody only shoots and nobody only writes. They come round again on
+[[Publication Day]], with the whole newsroom rotating one last time.
+Nobody holds the tripod all term.
 
 There is no team mark on this beat. You are evaluated on the pieces
-that carry your name in each rotation — the recap you wrote, the frames
-you shot and captioned, the edits you made to somebody else's copy, the
-card you built — and on what you say in the conference at your desk.
-The crew succeeds together; the mark is yours alone.
+that carry your name — the frames you shot, the copy you wrote or
+captioned, the edits you made to somebody else's work, the card you
+built — and on what you say in the conference at your desk. The crew
+succeeds together; the mark is yours alone.
 
 ## How to work
 
@@ -43,10 +48,15 @@ The crew succeeds together; the mark is yours alone.
    unfair — a great photo of someone's worst moment stays on the card.
 5. The producer builds the social post per [[Design a Social Card]]
    and ships the package.
-6. Rotate roles and do it again. Chasing the ceiling? Cut a
-   [[Cut a Highlight Reel|highlight reel]] for the news program.
+6. Swap jobs for the studio and desk phases. Chasing the ceiling? Cut
+   a [[Cut a Highlight Reel|highlight reel]] for the news program.
+7. Before the package ships, write one line on the crew sheet naming
+   the technique that settled your crew's biggest disagreement —
+   cooperative discussion, a straight vote, or putting both versions
+   on the screen and letting them argue. Being able to name the
+   technique is part of the task, not a comment on how you got on.
 
-The desk period after each event is class time for filing and editing.
+The desk periods after the event are class time for filing and editing.
 Evaluated work gets made here, in front of me — which is also why
 nothing on a homework list is ever the marked thing, as
 [[How Marks Work]] explains.
@@ -55,20 +65,27 @@ nothing on a homework list is ever the marked thing, as
 
 | Quality | What it looks like in your package |
 | --- | --- |
-| Filed while it is news | The recap reaches readers within two days |
+| Filed while it is news | On the desk two days after the whistle |
 | Fair to both sides | Effort from both teams; nobody's worst moment |
 | Action and faces | Plays AND the people around them, in every set |
 | Complete captions | Every photo says who, what, and when — correctly |
 | Accuracy | Score, names, and quotes verified before filing |
 | Consent | Every recognisable face cleared before publication |
 | Credit | Photos and words carry the maker's name in every channel |
-| Every role held | You have filed, shot, and edited by the unit's end |
+| Teamwork named | The technique that settled a crew disagreement is named |
+| Safe on the sideline | Clear of play, gear secured, nothing underfoot |
+| Every job touched | You shot, you wrote or captioned, and you edited |
+
+The two-day rule is about the desk, not the reader. The beat publishes
+with the rest of the unit's work, so the recap has a week of editing
+ahead of it — and it still has to read as news on the day it goes out,
+which is the harder half of the test.
 
 ## Reflect
 
-After each rotation, write a [[Newsroom Journal]] entry from the role
-you just held: what did this role see that the others could not, and
-what will you hand to the next person who holds it?
+Write a [[Newsroom Journal]] entry from the role you held at the
+event: what did that role see that the others could not, and what
+would you tell whoever holds it on the next beat?
 
 > [!success]- If your event goes sideways (click to expand)
 > Rain-outs, blowouts, and forfeits are still stories — sometimes
@@ -120,7 +137,7 @@ TALK — Unit 2, Day 19, the conference already on that agenda
   Ask something other than that day's printed question about whether
   the story needs the photographs, and something other than the
   Reflect prompt on this page, which they will have written already:
-  "Something in this rotation got decided without a vote. What was it,
+  "Something on this package got decided without a vote. What was it,
   and how did it get settled?"
   Then: "Name a moment you changed your mind because of what a
   crewmate said."
