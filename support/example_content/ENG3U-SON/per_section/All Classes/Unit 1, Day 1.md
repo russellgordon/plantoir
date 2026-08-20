@@ -17,6 +17,8 @@ tags:
    reading history so far. Written in class, kept, not marked.
 3. A first look at [[Learning Goals]] and [[Key Links]] — the two pages
    worth knowing the location of by heart from today on
+4. [[Using This Site]] — a two-minute tour of how this site itself works,
+   before you need to find something on it under pressure
 
 ## Things to do before our next class
 
