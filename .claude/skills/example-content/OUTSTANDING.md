@@ -41,7 +41,15 @@ review → verified fix cycle, and the differences matter.
 
 ## Authoring interrupted mid-pass
 
-- **MDM4U**, **SPH4U** — both were mid-fix on their own self-review findings.
+- **SPH4U** — was mid-fix on its own self-review findings. Its independent
+  review has since reported (its routing failed and it arrived via the main
+  session): B3.3 transcluded on a task that never asks for a derivation, and
+  it is the only B3 code on any Tasks page, so the B3 overall rests on it; a
+  C1.2 leg written around a "measured speed" the course never measures; and
+  two legs given a section and a row but no period.
+
+*(MDM4U finished and was committed in `3191fa98`; its independent review has
+since reported and its fix round is running.)*
 
 ## Not started (16)
 
