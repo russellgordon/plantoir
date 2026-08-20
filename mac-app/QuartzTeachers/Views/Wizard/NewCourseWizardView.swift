@@ -360,7 +360,7 @@ struct NewCourseWizardView: View {
                     }
                     if ExampleContentCatalog.includesCurriculum(forCode: courseCode) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Toggle("Include Ontario curriculum pages", isOn: $includesCurriculumPages)
+                            Toggle("Include \(ExampleContentCatalog.jurisdictionName(forCode: courseCode)) curriculum pages", isOn: $includesCurriculumPages)
                                 .disabled(!prepopulatesExampleContent)
                                 .accessibilityIdentifier("curriculumToggle")
                             ExampleCaption("Every expectation as its own page, so lessons and tasks can link to exactly what they address")

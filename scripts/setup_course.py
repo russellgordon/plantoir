@@ -67,7 +67,12 @@ DEFAULT_PER_SECTION_FILES = [
 # are never published, and stay that way unless the teacher flips them.
 UNPUBLISHED_PER_SECTION_FILES = {"Private Notes.md", "Scratch Page.md"}
 
-COURSE_LOOKUP_PATH = Path("/opt/support/ontario_secondary_courses.json")
+COURSE_LOOKUP_PATHS = [
+    Path("/opt/support/ontario_secondary_courses.json"),
+    Path("/opt/support/british_columbia_secondary_courses.json"),
+    Path("support/ontario_secondary_courses.json"),
+    Path("support/british_columbia_secondary_courses.json"),
+]
 
 # ---------- NEW: Backup exclusion set ---------------------------------------
 BACKUP_DEFAULT_EXCLUDES = {
@@ -336,15 +341,24 @@ def prompt_type_list(prompt_text, default_list=None, add_md_extension=False, for
     return cleaned
 
 def get_course_name_from_json(course_code):
-    if not COURSE_LOOKUP_PATH.exists():
-        return None
-    try:
-        with open(COURSE_LOOKUP_PATH, "r", encoding="utf-8") as f:
-            course_data = json.load(f)
-        course_info = course_data.get(course_code.upper())
-        if not course_info:
-            return None
+    course_info = None
+    for path in COURSE_LOOKUP_PATHS:
+        if not path.exists():
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                course_data = json.load(f)
+            info = course_data.get(course_code.upper())
+            if info:
+                course_info = info
+                break
+        except Exception:
+            continue
 
+    if not course_info:
+        return None
+
+    try:
         print(f"\n🔎 Found course info for {course_code}:")
         formal = course_info["formal_name"]
         short = course_info["short_name"]

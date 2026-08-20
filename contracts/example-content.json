@@ -1,7 +1,7 @@
 {
   "discovery": {
     "countNote": "Count the folders rather than trusting this number.",
-    "countToday": 37,
+    "countToday": 38,
     "rule": "A code has a payload if and only if `support/example_content/<CODE>/manifest.json` exists.",
     "why": "Adding a course code is pure CONTENT — drop in a payload, no code changes anywhere. The existence of the manifest is the whole registration, and it automatically retires that code's generated skeleton."
   },

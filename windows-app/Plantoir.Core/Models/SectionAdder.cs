@@ -365,20 +365,40 @@ public static class SectionAdder
         return $"{prefix}{course.Configuration.CourseName}, Section {sectionNumber}";
     }
 
-    /// <summary>The 4th character of an Ontario course code carries its grade.</summary>
+    /// <summary>Grade label derived from course code (e.g. "ICS3U" -> "Grade 11", "MCMPR11" -> "Grade 11").</summary>
     public static string GradeLabel(string courseCode)
     {
-        if (courseCode.Length < 4) return "";
-        char c = courseCode[3];
-        if (!char.IsDigit(c)) return "";
-        return c switch
+        string trimmed = courseCode.Trim();
+        if (string.IsNullOrEmpty(trimmed)) return "";
+
+        // 1. Check for trailing 2-digit grade numbers common in BC (e.g. MCMPR11, MFMP-10, MMA--09)
+        if (trimmed.EndsWith("09", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith("-09", StringComparison.OrdinalIgnoreCase))
+            return "Grade 9";
+        if (trimmed.EndsWith("10", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith("-10", StringComparison.OrdinalIgnoreCase))
+            return "Grade 10";
+        if (trimmed.EndsWith("11", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith("-11", StringComparison.OrdinalIgnoreCase))
+            return "Grade 11";
+        if (trimmed.EndsWith("12", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith("-12", StringComparison.OrdinalIgnoreCase))
+            return "Grade 12";
+
+        // 2. Check for Ontario course codes (4th character is digit 1–4)
+        if (trimmed.Length >= 4)
         {
-            '1' => "Grade 9",
-            '2' => "Grade 10",
-            '3' => "Grade 11",
-            '4' => "Grade 12",
-            _ => "Grade ?",
-        };
+            char c = trimmed[3];
+            if (char.IsDigit(c))
+            {
+                return c switch
+                {
+                    '1' => "Grade 9",
+                    '2' => "Grade 10",
+                    '3' => "Grade 11",
+                    '4' => "Grade 12",
+                    _ => "Grade ?",
+                };
+            }
+        }
+
+        return "";
     }
 
     /// <summary>Wizard-style created stamp: 2026-08-10T14:30:00.000-0400 (offset without colon).</summary>

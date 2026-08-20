@@ -42,6 +42,8 @@ targets:
         buildPhase: resources
       - path: ../support/ontario_secondary_courses.json
         buildPhase: resources
+      - path: ../support/british_columbia_secondary_courses.json
+        buildPhase: resources
       # The launcher scripts, so the app can initialize a brand-new
       # working folder (same files export-scripts would deliver).
       - path: ../setup.sh

@@ -50,4 +50,33 @@ enum ExampleContentCatalog {
         }
         return !folderName.isEmpty
     }
+
+    /// The jurisdiction name for the example content, e.g. "Ontario" or "British Columbia".
+    static func jurisdictionName(forCode code: String) -> String {
+        guard let url = manifestURL(forCode: code) else {
+            return "Ontario"
+        }
+        guard let data = try? Data(contentsOf: url) else {
+            return "Ontario"
+        }
+        guard let decoded = try? JSONSerialization.jsonObject(with: data) else {
+            return "Ontario"
+        }
+        guard let manifest = decoded as? [String: Any] else {
+            return "Ontario"
+        }
+        if let explicit = manifest["jurisdiction_name"] as? String, !explicit.isEmpty {
+            return explicit
+        }
+        if let jurisdiction = manifest["jurisdiction"] as? String {
+            if jurisdiction.uppercased() == "BC" {
+                return "British Columbia"
+            }
+            if jurisdiction.uppercased() == "ON" {
+                return "Ontario"
+            }
+            return jurisdiction
+        }
+        return "Ontario"
+    }
 }

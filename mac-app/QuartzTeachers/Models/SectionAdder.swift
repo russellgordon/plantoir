@@ -491,25 +491,45 @@ enum SectionAdder {
         return "\(titlePrefix)\(courseName), Section \(sectionNumber)"
     }
 
-    /// The grade named by the course code's fourth character, matching the
-    /// wizard: "ICS3U" → "Grade 11". A club code like "CODING" has no grade
-    /// digit there, so no grade label at all.
+    /// The grade named by the course code, matching the wizard:
+    /// "ICS3U" → "Grade 11", "MCMPR11" → "Grade 11", "MMA--09" → "Grade 9".
+    /// A club code like "CODING" has no grade, so no grade label at all.
     static func gradeLabel(forCourseCode code: String) -> String {
-        let characters: [Character] = Array(code)
-        guard characters.count >= 4 else {
+        let trimmed: String = code.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty {
             return ""
         }
-        let gradeCharacter: Character = characters[3]
-        guard gradeCharacter.isNumber else {
-            return ""
+
+        // 1. Check for trailing 2-digit grade numbers common in BC (e.g. MCMPR11, MFMP-10, MMA--09)
+        if trimmed.hasSuffix("09") || trimmed.hasSuffix("-09") {
+            return "Grade 9"
         }
-        switch gradeCharacter {
-        case "1": return "Grade 9"
-        case "2": return "Grade 10"
-        case "3": return "Grade 11"
-        case "4": return "Grade 12"
-        default: return "Grade ?"
+        if trimmed.hasSuffix("10") || trimmed.hasSuffix("-10") {
+            return "Grade 10"
         }
+        if trimmed.hasSuffix("11") || trimmed.hasSuffix("-11") {
+            return "Grade 11"
+        }
+        if trimmed.hasSuffix("12") || trimmed.hasSuffix("-12") {
+            return "Grade 12"
+        }
+
+        // 2. Check for Ontario course codes (4th character is digit 1–4)
+        let characters: [Character] = Array(trimmed)
+        if characters.count >= 4 {
+            let gradeCharacter: Character = characters[3]
+            if gradeCharacter.isNumber {
+                switch gradeCharacter {
+                case "1": return "Grade 9"
+                case "2": return "Grade 10"
+                case "3": return "Grade 11"
+                case "4": return "Grade 12"
+                default: return "Grade ?"
+                }
+            }
+        }
+
+        return ""
     }
 
     /// The `created:` timestamp, in the same form the wizard writes:

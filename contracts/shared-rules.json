@@ -302,6 +302,16 @@
           "why": "Either case."
         },
         {
+          "code": "D1.1",
+          "expect": true,
+          "why": "BC Applied Design competency code."
+        },
+        {
+          "code": "K2.3",
+          "expect": true,
+          "why": "BC Content knowledge standard code."
+        },
+        {
           "code": "B2",
           "expect": false,
           "why": "A strand heading, not an expectation."

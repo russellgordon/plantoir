@@ -411,9 +411,9 @@ def lint(course_code: str) -> int:
         specific = set()
         overall = set()
         for page in curriculum_dir.glob("*.md"):
-            if re.fullmatch(r"[A-F]\d+\.\d+", page.stem):
+            if re.fullmatch(r"[A-Z]\d+\.\d+", page.stem):
                 specific.add(page.stem)
-            elif re.match(r"^[A-F]\d+\.\s", page.stem):
+            elif re.match(r"^[A-Z]\d+\.\s", page.stem):
                 overall.add(page.stem.split(".")[0])
 
         addressed_by = {code: set() for code in specific}
@@ -452,8 +452,8 @@ def lint(course_code: str) -> int:
                     f"a page in Tasks must transclude one of its specific expectations"
                 )
 
-    # ---- Hours: an Ontario credit is 110 hours of scheduled time, and a
-    # half credit is 55.
+    # ---- Hours: an Ontario credit is 110 hours of scheduled time (half credit is 55).
+    # In British Columbia, a standard senior secondary course is 4 credits (110–120 hours).
     #
     # One class page is one period. The final evaluation is not a class
     # page, so its hours are added separately; several review periods
@@ -461,12 +461,14 @@ def lint(course_code: str) -> int:
     # length of the final evaluation are declared in the manifest, so a
     # half credit is a stated property of the payload rather than a
     # tolerance stretched until it fits.
-    credit_value = float(manifest.get("credit_value", 1.0))
+    jurisdiction = manifest.get("jurisdiction", "ON").upper()
+    credit_value = float(manifest.get("credit_value", 4.0 if jurisdiction == "BC" else 1.0))
     final_hours = float(manifest.get("final_evaluation_hours",
                                      DEFAULT_FINAL_EVALUATION_HOURS))
-    credit_hours = FULL_CREDIT_HOURS * credit_value
-    tolerance = HOURS_TOLERANCE * credit_value
-    review_needed = max(2, round(MINIMUM_REVIEW_CLASSES * credit_value))
+    credit_multiplier = (credit_value / 4.0) if jurisdiction == "BC" else credit_value
+    credit_hours = FULL_CREDIT_HOURS * credit_multiplier
+    tolerance = HOURS_TOLERANCE * credit_multiplier
+    review_needed = max(2, round(MINIMUM_REVIEW_CLASSES * credit_multiplier))
     if class_ordinals:
         hours = len(class_ordinals) * PERIOD_MINUTES / 60 + final_hours
         if not credit_hours - tolerance <= hours <= credit_hours + tolerance:

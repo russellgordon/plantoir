@@ -19,24 +19,20 @@ NO changes for a new course code — a new payload is pure content.
 
 ## Phase 1 — Research the curriculum (verbatim or not at all)
 
-**From the LIVE site, every time.** `dcp.edu.gov.on.ca` is the source; do not
-work from a saved copy, and do not add one to this repository. A copy held here
+**From the LIVE official government portal, every time.**
+- **Ontario courses:** `dcp.edu.gov.on.ca` and `edu.gov.on.ca/eng/curriculum/secondary/`
+- **British Columbia courses:** `curriculum.gov.bc.ca` (e.g. `curriculum.gov.bc.ca/curriculum/adst/11/computer-programming` or `curriculum.gov.bc.ca/curriculum/mathematics/`)
+Do not work from a saved copy, and do not add one to this repository. A copy held here
 does not preserve the curriculum, it manufactures a stale second version of it —
-the ministry updates these documents whenever it likes. (One was kept for two
-days in August 2026 and removed for exactly this reason; see
-[`research/README.md`](../../../research/README.md).)
+the ministry updates these documents whenever it likes.
 
 Launch a research agent (WebSearch/WebFetch) to capture, from the
 Ministry's own published document, for the exact course code:
-strand titles; every OVERALL expectation (code + verbatim text); every
+strand/domain titles; every OVERALL expectation / Big Idea / Curricular Competency / Content standard (code + verbatim text); every
 SPECIFIC expectation (code + verbatim text, including the italic
-parenthetical examples); teacher prompts verbatim; the "By the end of this
-course, students will:" stems; and the citation (document title, year,
-copyright holder, the dcp.edu.gov.on.ca course URL, and the source PDF URL
-with page range). Old curricula live at
-`edu.gov.on.ca/eng/curriculum/secondary/*.pdf`; newer ones on
-`dcp.edu.gov.on.ca`. Two-column PDFs detach teacher prompts from their
-expectations — cross-check against a layout-preserving extraction. Anything
+parenthetical examples); teacher prompts verbatim; the official stems; and the citation (document title, year,
+copyright holder, official course URL, and source PDF URL
+with page range). Anything
 unverifiable gets flagged and is NOT published as Ministry wording.
 
 Save the result as a structured markdown file (see the format the ADA1O
@@ -58,7 +54,7 @@ culminating. Name class pages `Unit N, Day M.md`. Write the arc down
 before authoring — it is the skeleton everything hangs from, and
 class-page links are the schedule.
 
-**An Ontario credit is 110 hours of scheduled time, and the arc must
+**A standard secondary credit requires 110–120 hours of scheduled time (1.0 credit in Ontario, 4.0 credits in British Columbia), and the arc must
 account for all of it.** One class page is one period. At the 75-minute
 period a semestered day school runs, that is **about 86 class pages plus a
 three-hour final evaluation** — roughly 18/22/22/24 across four units,

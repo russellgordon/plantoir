@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 
 namespace Plantoir.Core.Catalogs;
 
@@ -46,10 +46,20 @@ public static class SkeletonCatalog
         try
         {
             var map = JObject.Parse(File.ReadAllText(mapPath));
-            string prefix = normalized.Length >= 3 ? normalized.Substring(0, 3) : normalized;
-            if (map["prefixes"] is JObject prefixes && prefixes[prefix]?.Type == JTokenType.String)
+            if (map["prefixes"] is JObject prefixes)
             {
-                return prefixes[prefix]!.ToString();
+                int[] prefixLengths = [5, 4, 3, 2];
+                foreach (int length in prefixLengths)
+                {
+                    if (normalized.Length >= length)
+                    {
+                        string prefix = normalized.Substring(0, length);
+                        if (prefixes[prefix]?.Type == JTokenType.String)
+                        {
+                            return prefixes[prefix]!.ToString();
+                        }
+                    }
+                }
             }
             return map["default"]?.ToString();
         }

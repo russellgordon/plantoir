@@ -826,8 +826,8 @@ def resolve_header_label(config: dict, course_code: str) -> str:
     "Ap Calc". A teacher who wants prose in that spot has "custom_short_name",
     which is their own text and is used as typed.
     """
-    grade_char = course_code[3] if len(course_code) >= 4 else ""
-    if grade_char.isdigit():
+    grade_label = get_grade_label(course_code)
+    if grade_label:
         return course_code.upper()
     # Club or otherwise non-standard code: the teacher's own short name if
     # they set one, and otherwise the code itself — in capitals.
@@ -886,6 +886,27 @@ def resolve_show_section_marker(config: dict, section_number: int) -> bool:
 GRADE_LABELS = {"1": "Grade 9", "2": "Grade 10", "3": "Grade 11", "4": "Grade 12"}
 
 
+def get_grade_label(course_code: str) -> str:
+    """
+    Derive the grade label from a course code across jurisdictions.
+    Supports Ontario (4th char 1-4) and BC (trailing 09, 10, 11, 12).
+    """
+    trimmed = (course_code or "").strip()
+    if not trimmed:
+        return ""
+    if trimmed.endswith("09") or trimmed.endswith("-09"):
+        return "Grade 9"
+    if trimmed.endswith("10") or trimmed.endswith("-10"):
+        return "Grade 10"
+    if trimmed.endswith("11") or trimmed.endswith("-11"):
+        return "Grade 11"
+    if trimmed.endswith("12") or trimmed.endswith("-12"):
+        return "Grade 12"
+    if len(trimmed) >= 4 and trimmed[3].isdigit():
+        return GRADE_LABELS.get(trimmed[3], "Grade ?")
+    return ""
+
+
 def resolve_show_grade_in_title(cfg, section_number):
     """Per-section, like the section marker; defaults on. An older config
     that stored one course-wide boolean is honoured."""
@@ -909,8 +930,9 @@ def computed_landing_title(cfg, section_number, show_marker):
     # the name already carries the grade; what to do about it — edit the
     # name or turn the switch off — is the teacher's call, never guessed.
     prefix = ""
-    if resolve_show_grade_in_title(cfg, section_number) and len(code) >= 4 and code[3].isdigit():
-        prefix = GRADE_LABELS.get(code[3], "Grade ?") + " "
+    grade_label = get_grade_label(code)
+    if resolve_show_grade_in_title(cfg, section_number) and grade_label:
+        prefix = f"{grade_label} "
     title = f"{prefix}{name}"
     if show_marker:
         title = f"{title}, Section {section_number}"
@@ -3482,8 +3504,8 @@ cited by code. If that is the case here, it is worth citing a few of them
 where they genuinely apply rather than leaving the record silent.
 """
 
-SPECIFIC_CODE = re.compile(r"^([A-F])(\d+)\.(\d+)$")
-OVERALL_FILE = re.compile(r"^([A-F]\d+)\.\s")
+SPECIFIC_CODE = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
+OVERALL_FILE = re.compile(r"^([A-Z]\d+)\.\s")
 CURRICULUM_BLOCK = re.compile(r"%%curriculum-start%%(.*?)%%curriculum-end%%", re.S)
 BLOCK_LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
 TRANSCLUSION = re.compile(r"!\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
