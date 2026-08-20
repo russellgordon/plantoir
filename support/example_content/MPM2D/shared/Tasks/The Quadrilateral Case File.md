@@ -7,8 +7,8 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Groups of three · three working periods in Week 8 · verdicts filed at
-> the end of that week · one case file per group
+> Groups of three, marked individually · three working periods in Week 8
+> · verdicts filed at the end of that week · one case file per group
 
 ## What you are making
 
@@ -43,8 +43,9 @@ the standard the file is judged against.
    to a rhombus — and say how confident you are in that measurement.
 6. File the case.
 
-The working periods are class time, and using them well is part of the
-task — [[How Marks Work]] explains how.
+The working periods are class time. The conference I hold with each of
+you during them is where reasoning that the file cannot show gets on the
+record — see [[How Marks Work]].
 
 ## Success criteria
 
@@ -56,6 +57,13 @@ task — [[How Marks Work]] explains how.
 | Labelled calculations | Each computation states what it proves |
 | An honest closing | The file names what would overturn it |
 | A readable argument | The reasoning holds without the authors present |
+
+The file is filed by the group; the mark is yours alone. It comes from
+the calculations you signed in the evidence table, the paragraph of the
+verdict you wrote, your journal entry, and what you tell me when I ask
+each of you separately in the working period. One file can therefore
+produce three different marks, and often does. A group is where an
+argument gets tested, not where a mark gets averaged.
 
 ## Reflect
 
@@ -78,3 +86,45 @@ accept from the picture alone? That gap is what this task is about.
 
 ![[B2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Three to a file and three separate marks, so put every question to one
+member at a time. Asked of the group, the loudest voice answers thrice.
+
+OBSERVE — Unit 2, Day 12, the working period where the evidence is
+gathered
+  The agenda asks them to choose the properties that would settle the
+  case before computing anything, and that choice is the thing to
+  watch, because the filed case reads the same either way — surplus
+  calculations simply never get copied out. Watch for: a group that
+  names what would settle it and then computes only that, against one
+  that computes every slope, length and midpoint available and hunts
+  the numbers for a pattern afterwards. That planning is the first half
+  of B3.3 and it is invisible in the product.
+  Going well: a short list on the board first — "if the diagonals
+  bisect AND are equal, it is a rectangle" — then the arithmetic.
+  Stuck: a full table of every measurement the shape allows, with no
+  claim attached to any row of it.
+  Record: three columns on your day plan — planned / computed then
+  looked / not started.
+
+TALK — Unit 2, Day 13, at the mid-task check on that agenda
+  Play the sceptic, one member at a time. "I do not believe your
+  diagonals bisect each other. Convince me — what did you compute, and
+  what did the two answers have to come out as?"
+  Then the same move about the sides: "What is the calculation there,
+  and what would have made you say no?"
+  A strong answer names the two diagonal midpoints, computed
+  separately, and says they had to land on the same point; then the
+  four lengths, compared as numbers rather than by eye, and what an
+  unequal pair would have ruled out. That is B3.2 — verifying a
+  characteristic of a figure by algebraic technique — heard rather than
+  read. The file shows the numbers that worked, and a member who copied
+  them across cannot say what the calculation had to produce.
+  Record: initials and two words each, on the class list, before you
+  move on.
+
+The product evidence is the case file, filed on Unit 2, Day 15.
+%%

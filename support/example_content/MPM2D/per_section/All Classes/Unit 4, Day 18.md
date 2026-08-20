@@ -11,8 +11,9 @@ tags:
 ---
 ## Agenda
 
-1. Review, part one: factor, sketch from all three forms, solve with
-   the formula, and one applied problem
+1. Review, part one, at the boards in random groups and cold — no notes
+   out: factor one, sketch one from each of the three forms, solve one
+   with the formula, and take one applied problem all the way
 2. This is the largest part of the paper and the whole of next year's
    starting assumption
 3. By request: [[Expanding and Factoring Practice]],

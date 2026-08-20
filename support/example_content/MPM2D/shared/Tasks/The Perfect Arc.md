@@ -7,8 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo or pairs · four working periods across Weeks 11 and 12 · gallery
-> of arcs at the end of Week 12 · one annotated photo, one page
+> Solo or pairs, marked individually · four working periods across
+> Weeks 11 and 12 · gallery of arcs at the end of Week 12 · one
+> annotated photo, one page
 
 ## What you are making
 
@@ -42,8 +43,9 @@ what it predicts beyond the frame, and where it should not be trusted.
    where model and photo disagree, and give heights as a range.
 6. Annotate the photo and write the page.
 
-The working periods are class time, and using them well is part of the
-task — [[How Marks Work]] explains how.
+The working periods are class time, and what you say to me while the
+model is still moving is evidence in its own right — see
+[[How Marks Work]].
 
 ## Success criteria
 
@@ -55,6 +57,11 @@ task — [[How Marks Work]] explains how.
 | Real-unit answers | Heights and distances arrive in metres |
 | Questions beyond the frame | The model predicts what the photo cannot |
 | Honest error | Disagreements are measured, and answers carry a range |
+
+If you work as a pair, the photo and the fit can be shared but the mark
+is not: yours comes from the page you wrote, the scale argument you
+signed, and what you tell me at the conference when I ask each of you on
+your own.
 
 ## Reflect
 
@@ -78,3 +85,42 @@ the world teaches you what a model is — and what it is not.
 
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 19, the working period where the equation is
+built and tested against a fourth point
+  Watch for: what happens when the fourth point misses. Some students
+  move the point, some move the model, and a few quietly revise the
+  metres-per-unit scale they defended the class before. The finished
+  page shows only the version that agreed, so this is visible today or
+  never. It is A1.1's curve of best fit as a DECISION rather than a
+  result.
+  Going well: the miss is measured and written down before anything is
+  adjusted, and the adjustment gets named on the page.
+  Stuck: points silently re-read until the numbers agree; a scale
+  changed with no note anywhere.
+  Record: three columns on your day plan — measured the miss /
+  adjusted silently / no fourth point yet.
+
+TALK — Unit 3, Day 18, at the conference that period sets aside
+  There is no equation yet on Day 18. The photograph, the axes and
+  three points read off them are all that exist, so ask about the
+  picture rather than the model. "Where did you put your origin, and
+  why there? If you had put it somewhere else, what in your equation
+  would move and what would not?"
+  Then hand the photo back: "Draw the axis of symmetry on it with your
+  finger. Is your arc really symmetric about that line, or only nearly
+  — and what would stop a real arc being symmetric?"
+  A strong answer treats the origin as a choice that shifts the vertex
+  without changing how wide the curve opens, calls the vertex and the
+  axis by their names, and can point at the camera angle, the wind or
+  the drag as the reason the two halves differ. That is A1.3 — the key
+  features of a parabola, described in the right words — heard about
+  their own photograph, before there is any algebra to read it off.
+  Record: one line per student in the margin of the class list.
+
+The product evidence is the annotated photo and the page, shown at the
+gallery walk on Unit 3, Day 21.
+%%

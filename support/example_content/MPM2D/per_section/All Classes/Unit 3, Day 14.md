@@ -16,7 +16,8 @@ tags:
    checking live with [[Using Desmos]]
 3. Consolidate + notes to your future self —
    [[Transformations of Parabolas]]
-4. Launch: [[The Perfect Arc]] — find a real arc, photograph it, model it
+4. Launch: [[The Perfect Arc]] — find a real arc, photograph it, model
+   it; we read the criteria table before anybody opens a camera
 
 ## Things to do before our next class
 

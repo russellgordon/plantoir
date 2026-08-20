@@ -17,7 +17,8 @@ tags:
 3. Consolidate + notes to your future self — [[Properties on the Grid]]
 4. Discussion: [[What Makes a Proof Convincing]] — "it looks like it"
    is not evidence
-5. Launch: [[The Quadrilateral Case File]] — four vertices, one verdict
+5. Launch: [[The Quadrilateral Case File]] — four vertices, one verdict,
+   and its criteria table read aloud today rather than on filing day
 
 ## Things to do before our next class
 
