@@ -14,6 +14,10 @@ tags:
 2. [[The Working Circuit]], day 2 — the sentence, the schematic, and every
    value justified by arithmetic
 3. Conference: which value are you least sure about?
+4. Last ten minutes, together: I take a calculation sheet from a past
+   class and judge it out loud against two rows of the task's criteria
+   table — [[Judging Your Own Work]]. You do this on your own work next
+   class, so watch how the weakest row gets named
 
 ## Things to do before our next class
 

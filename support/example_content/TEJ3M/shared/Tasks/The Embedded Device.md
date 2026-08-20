@@ -7,7 +7,7 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Pairs · two bench periods plus finishing time · a working device, its
+> Pairs · a design period and four bench periods · a working device, its
 > code, its schematic, a fault log, and one measured claim ·
 > demonstrated at the end of Unit 3
 
@@ -48,6 +48,19 @@ The criteria below, plus the framework in [[How Marks Work]]. Bench
 periods are assessed as they happen. Your [[Tech Journal]] holds the fault
 log and the trial data, and both of those are worth more here than a tidy
 final photograph.
+
+You work in pairs and you are evaluated one at a time. The device is
+shared; what is yours is your own journal — your share of the fault log,
+your trial data, the calculation behind the branch you were responsible
+for — and the conference, where either partner can be asked to trace the
+whole chain from sensor to code to actuator without help from the other.
+A pair that split the work so cleanly that neither can do that has a
+problem worth finding out about before the demonstration.
+
+Before you demonstrate, you will read your own device against the table
+below and fix the weakest row, with a period still left to do it in.
+[[Judging Your Own Work]] is the routine; it changes nothing about your
+mark and quite a lot about your device.
 
 ## Success criteria
 
@@ -95,3 +108,47 @@ is the evidence you used it.
 
 ![[D1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 16, the period where the code goes in
+  Take this in the body of the period: the last fifteen minutes of Day
+  16 belong to the self-check, and nobody is uploading anything then.
+  Watch for: how many things change between one upload and the next.
+  One edit, upload, look — or three edits, upload, and a shrug when the
+  behaviour moves. The finished program is identical either way, and the
+  fault log only ever records the faults that were recognised as faults,
+  so watching is the one thing that can corroborate it. Day 13 taught
+  this rule explicitly, which makes today the fair test of whether being
+  told it changed anybody's hands.
+  Going well: a pair says what they expect the change to do before they
+  upload it, and one of them writes the result down without being asked.
+  Stuck: the code is edited faster than it is read; the same upload
+  happens three times unchanged; nobody can say what the last edit was.
+  Record: two columns on your day plan — one change, or many. Add a dot
+  when you hear a prediction before an upload. B5.3 asks them to write,
+  test AND debug; that column is the testing half of it, caught in the
+  only place it happens.
+
+TALK — Unit 3, Day 14, the conference already on that agenda
+  Do NOT ask them to compare a microcontroller with a desktop in
+  general. That comparison is printed as a table on the concept page
+  Inside a Microcontroller, read on the first day of this unit, and half
+  of it was set as a journal prompt the same night. They will recite it.
+  Ask instead: "A client says put a laptop in the corner and be done
+  with it. For YOUR device, which row of that table would you take them
+  to first, and what number would you bring to it?"
+  Then: "Which row would you concede? Name the thing the laptop would
+  genuinely do better here."
+  A strong answer moves the general table onto a specific device and
+  gives ground on a real point instead of defending the board because it
+  is the one on the bench. That is the second half of A3.5 —
+  disadvantages as well as advantages — which the table hands them and
+  their own device does not.
+  Record: one line per pair, and circle any trade-off named with a
+  number attached.
+
+The product evidence is the device, its code, its schematic, its fault
+log and its trial data, handed in on Day 18.
+%%

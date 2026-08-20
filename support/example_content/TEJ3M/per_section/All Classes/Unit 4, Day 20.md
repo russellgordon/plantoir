@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. [[The Client Build]], day 6 — handover: another bench answers three
+1. First fifteen minutes: fix the section you marked last class, before
+   anybody else reads it
+2. [[The Client Build]], day 6 — handover: another bench answers three
    service questions from your package alone
-2. Fix what they could not find, then hand in
+3. Fix what they could not find, then hand in
 
 ## Things to do before our next class
 

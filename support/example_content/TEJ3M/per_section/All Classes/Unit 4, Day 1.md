@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Name That Part]] — the port round: name every connector on
-   the bench machine
+   the bench machine. Unmarked, and deliberately first: which connectors
+   this class already knows decides how much of the brief I have to
+   explain
 2. Concept: [[Ports and Connection Standards]] — what a standard actually
    specifies, and why a cable that fits may not work
 3. Bench time: [[Build a Machine to Spec]] — the brief restated as

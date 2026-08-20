@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Predict the Circuit]] — your own device's front end
-2. [[The Embedded Device]], day 3 — circuit built and measured before any
-   code is written
+2. [[The Embedded Device]], day 3 — the measurement your conference
+   settled on last class, set up first; then the circuit built and
+   measured, before any code is written
 
 ## Things to do before our next class
 
