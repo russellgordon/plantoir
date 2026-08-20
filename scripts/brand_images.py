@@ -2,9 +2,10 @@
 """Draw the Plantoir brand images from the Icon Composer source.
 
 One source of truth for every image that carries the Plantoir mark: the social
-card served at plantoir.app, the Bluesky and Instagram profile photos, and the
-Bluesky profile banner. All of them are drawn from ``mac-app/Plantoir.icon`` and
-the palette below, so the mark can never drift between them.
+card served at plantoir.app, the Bluesky and Instagram profile photos, the
+Bluesky profile banner, and the favicon every class site wears in the browser
+tab. All of them are drawn from ``mac-app/Plantoir.icon`` and the palette below,
+so the mark can never drift between them.
 
 The plant is rasterised from the *actual* SVG path in the .icon bundle rather
 than composited from a pre-rendered PNG. That costs us a small path parser (see
@@ -14,11 +15,16 @@ forget about.
 
 Usage::
 
-    python scripts/brand_images.py                 # -> brand/
+    python scripts/brand_images.py                 # -> brand/ and support/favicon/
     python scripts/brand_images.py --install-card  # also -> site/social-card.png
 
 ``--install-card`` overwrites the deployed og:image. Look at the output first;
 it will not be byte-identical to a hand-made card.
+
+The favicon set in ``support/favicon/`` is written on every run rather than
+behind a flag, because it SHIPS: the Docker image bakes ``support/`` and
+``scripts/build_site.py`` copies the set into every site it builds. Leaving it
+behind a flag is how it would come to disagree with the app icon.
 
 Requires Pillow, which the Docker image already installs (see Dockerfile).
 Unlike scripts/social_card.py this is a release-time tool, not part of the
@@ -39,6 +45,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 REPO = Path(__file__).resolve().parent.parent
 ICON_DIR = REPO / "mac-app" / "Plantoir.icon"
 FONTS = REPO / "support" / "fonts"
+FAVICON_DIR = REPO / "support" / "favicon"
 
 
 # ---------------------------------------------------------------------------
@@ -274,27 +281,70 @@ def _viewbox(svg_text: str) -> tuple[float, float]:
 
 def load_glyph_path() -> tuple[SvgPath, float]:
     """Return the plant path and the side of its (square) viewBox."""
-    svg = (ICON_DIR / "Assets" / "plant.svg").read_text(encoding="utf-8")
-    d = re.search(r'\sd="([^"]+)"', svg).group(1)
-    w, _ = _viewbox(svg)
+    d, w = load_glyph_data()
     return SvgPath(d), w
 
 
-def render_glyph(px: float, color, bold_units: float = 0.0):
+def load_glyph_data() -> tuple[str, float]:
+    """Return the plant's raw SVG path data and the side of its viewBox."""
+    svg = (ICON_DIR / "Assets" / "plant.svg").read_text(encoding="utf-8")
+    d = re.search(r'\sd="([^"]+)"', svg).group(1)
+    w, _ = _viewbox(svg)
+    return d, w
+
+
+def load_glyph_silhouette_data() -> tuple[str, float]:
+    """The mark's OUTER contour only, as SVG path data.
+
+    plant.svg is three subpaths in this order: the silhouette of the whole
+    plant, then the counter (the open middle) of each leaf. Dropping the last
+    two and filling what is left gives the same mark in a solid weight -- the
+    same relationship Phosphor's own "regular" and "fill" weights have, and the
+    reason the favicon can be a fill without being a different drawing.
+    """
+    d, w = load_glyph_data()
+    subpaths = [part for part in re.split(r"(?=[Mm])", d) if part.strip()]
+    return subpaths[0], w
+
+
+def glyph_ink_box(counters: bool = True) -> tuple[float, float, float, float]:
+    """(x, y, width, height) of the mark's actual ink inside its viewBox.
+
+    The viewBox is square but the plant is not: it fills 240x192 of the 256,
+    sitting low and hard against the left edge. Centring the VIEWBOX -- which
+    is what the app icon does -- therefore leaves the mark visibly low. At 16
+    pixels that is a wasted row, so the favicon centres this box instead.
+    """
+    path, _ = load_glyph_path()
+    subpaths = path.subpaths if counters else path.subpaths[:1]
+    xs: list[float] = []
+    ys: list[float] = []
+    for sp in subpaths:
+        for x, y in sp:
+            xs.append(x)
+            ys.append(y)
+    return min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
+
+
+def render_glyph(px: float, color, bold_units: float = 0.0, counters: bool = True):
     """Rasterise the plant at ``px`` wide, anti-aliased, as RGBA.
 
     ``bold_units`` strokes the outline in the fill colour, in viewBox units, to
     thicken the regular-weight glyph for small display sizes. The fill uses the
     even-odd rule (XOR of the subpath masks), which is what keeps the leaf
     counters open.
+
+    ``counters=False`` drops the two counter subpaths, giving the solid weight
+    of the same mark -- see ``load_glyph_silhouette_data``.
     """
     path, vb = load_glyph_path()
+    subpaths = path.subpaths if counters else path.subpaths[:1]
     ss = SUPERSAMPLE
     side = int(round(px * ss))
     scale = side / vb
 
     fill = Image.new("1", (side, side), 0)
-    for sp in path.subpaths:
+    for sp in subpaths:
         layer = Image.new("1", (side, side), 0)
         ImageDraw.Draw(layer).polygon([(x * scale, y * scale) for x, y in sp], fill=1)
         fill = ImageChops.logical_xor(fill, layer)
@@ -303,7 +353,7 @@ def render_glyph(px: float, color, bold_units: float = 0.0):
         stroke = Image.new("1", (side, side), 0)
         sd = ImageDraw.Draw(stroke)
         w = max(1, int(round(bold_units * scale)))
-        for sp in path.subpaths:
+        for sp in subpaths:
             pts = [(x * scale, y * scale) for x, y in sp]
             sd.line(pts + [pts[0]], fill=1, width=w, joint="curve")
         fill = ImageChops.logical_or(fill, stroke)
@@ -474,6 +524,153 @@ def build_banner() -> Image.Image:
 
 
 # ---------------------------------------------------------------------------
+# The favicon
+#
+# Every site Plantoir builds used to wear Quartz's own logo in the browser tab,
+# because Quartz ships quartz/static/icon.png and its Head links it. This set
+# replaces it, and it is a DIFFERENT drawing of the same mark for a reason
+# worth keeping:
+#
+#   * The app icon is the regular weight -- an outline plant with an open
+#     counter and a midrib inside each leaf. Rendered at 16 pixels those
+#     interior lines land on top of the outline and the mark turns to mush; it
+#     was measured by rendering it and looking, not assumed.
+#   * The solid weight survives it. At 16 it still reads as two leaves and a
+#     stem, and at 180 it is a clean fill of the same silhouette.
+#   * REJECTED: keeping the outline for the large sizes and using the solid one
+#     only for 16 and 24 inside the .ico. It would have matched the Dock icon
+#     more closely at 180 -- but browsers that support icon.svg render THAT at
+#     whatever size they like, so the outline would have come back at 16 for
+#     most of Chrome and Firefox. One mark at every size beats fidelity at the
+#     one size nobody looks at.
+#   * REJECTED: darkening the green for contrast. The brand green on the tile
+#     is about 3:1, which is thin for a hairline stroke and ample for a solid
+#     shape -- and the solid weight is what we ship.
+#
+# There is no drop shadow: at 16 pixels it is a grey smear round the mark, and
+# it costs contrast exactly where there is least to spare.
+# ---------------------------------------------------------------------------
+
+# The mark's ink width as a fraction of the tile. The app icon's own value is
+# 0.66 (0.703 of the viewBox, of which the ink is 240/256). A favicon is looked
+# at small, where margin is wasted pixels, so it runs wider.
+FAVICON_INK = 0.78
+
+# Matches icon_tile()'s empirical fit rather than the 0.2237 the Windows .ico
+# uses, so the favicon and the tile on plantoir.app's social card wear the same
+# silhouette. At 16 pixels the two radii differ by less than a pixel anyway.
+FAVICON_RADIUS_FRAC = 0.295
+
+# What goes in the .ico. 16 is a Windows tab at 100% scaling, 32 is the same
+# tab on any Retina Mac, 48 is what Windows uses for a desktop shortcut.
+ICO_SIZES = (16, 32, 48)
+
+# iOS masks apple-touch-icon.png with its own squircle, so this one is square
+# and opaque -- rounded corners would be rounded twice and the transparency
+# would show through as grey.
+APPLE_TOUCH_SIDE = 180
+
+# The general-purpose PNG. It replaces Quartz's icon.png so that nothing in a
+# built site carries somebody else's logo, even unlinked.
+ICON_PNG_SIDE = 512
+
+
+def _hex(color) -> str:
+    return "#%02X%02X%02X" % color
+
+
+def favicon_tile(side: int, rounded: bool = True) -> Image.Image:
+    """The favicon at one size: the icon's ramp, and the mark in solid weight."""
+    tile = vertical_gradient((side, side), TILE_TOP, TILE_BOTTOM).convert("RGBA")
+    if rounded:
+        tile.putalpha(rounded_mask((side, side), int(round(side * FAVICON_RADIUS_FRAC))))
+
+    _, vb = load_glyph_data()
+    ink_x, ink_y, ink_w, ink_h = glyph_ink_box(counters=False)
+    box = side * FAVICON_INK * vb / ink_w          # the viewBox side, in pixels
+    glyph = render_glyph(box, GLYPH, counters=False)
+    scale = box / vb
+    off_x = int(round(side / 2 - (ink_x + ink_w / 2) * scale))
+    off_y = int(round(side / 2 - (ink_y + ink_h / 2) * scale))
+    tile.alpha_composite(glyph, (off_x, off_y))
+    return tile
+
+
+def favicon_svg() -> str:
+    """The same tile as SVG, which is what every current browser prefers.
+
+    Written from the path data rather than traced from a bitmap, so it stays
+    the icon's own artwork at any size a browser asks for.
+    """
+    d, vb = load_glyph_silhouette_data()
+    ink_x, ink_y, ink_w, ink_h = glyph_ink_box(counters=False)
+    side = 256.0
+    scale = side * FAVICON_INK / ink_w
+    tx = side / 2 - (ink_x + ink_w / 2) * scale
+    ty = side / 2 - (ink_y + ink_h / 2) * scale
+    radius = side * FAVICON_RADIUS_FRAC
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{side:g}" height="{side:g}"'
+        f' viewBox="0 0 {side:g} {side:g}">\n'
+        f'<!-- Plantoir. Generated by scripts/brand_images.py from'
+        f' mac-app/Plantoir.icon - do not hand-edit. -->\n'
+        f'<defs><linearGradient id="plantoir-tile" x1="0" y1="0" x2="0" y2="1">'
+        f'<stop offset="0" stop-color="{_hex(TILE_TOP)}"/>'
+        f'<stop offset="1" stop-color="{_hex(TILE_BOTTOM)}"/></linearGradient></defs>\n'
+        f'<rect width="{side:g}" height="{side:g}" rx="{radius:g}" ry="{radius:g}"'
+        f' fill="url(#plantoir-tile)"/>\n'
+        f'<g transform="translate({tx:.4f} {ty:.4f}) scale({scale:.6f})">'
+        f'<path fill="{_hex(GLYPH)}" d="{d}"/></g>\n'
+        f'</svg>\n'
+    )
+
+
+def write_favicons(out: Path) -> list[str]:
+    """Write the whole favicon set. Returns one description line per file.
+
+    Every size in the .ico is drawn at that size rather than downsampled from
+    one big one: the mark is redrawn from the path at 16, so the anti-aliasing
+    is decided by the renderer instead of by a resize.
+    """
+    out.mkdir(parents=True, exist_ok=True)
+    written: list[str] = []
+
+    svg_path = out / "icon.svg"
+    svg_path.write_text(favicon_svg(), encoding="utf-8")
+    written.append(f"icon.svg  vector  {svg_path.stat().st_size} bytes")
+
+    # Largest first: Pillow skips any requested size bigger than the image it
+    # is saving FROM, so handing it the 16 first silently produced a one-entry
+    # .ico that looked fine in every viewer and was missing 32 and 48.
+    frames = [favicon_tile(size) for size in sorted(ICO_SIZES, reverse=True)]
+    ico_path = out / "favicon.ico"
+    frames[0].save(ico_path, "ICO",
+                   sizes=[(size, size) for size in ICO_SIZES],
+                   append_images=frames[1:],
+                   # BMP entries, not PNG-compressed ones. It costs about 13 KB
+                   # and buys the one thing a favicon cannot afford to get
+                   # wrong: being readable by everything, including the older
+                   # Safari that is exactly why the .ico is here at all.
+                   bitmap_format="bmp")
+    sizes_text = ", ".join(str(size) for size in ICO_SIZES)
+    written.append(f"favicon.ico  {sizes_text}  {ico_path.stat().st_size} bytes")
+
+    apple = favicon_tile(APPLE_TOUCH_SIDE, rounded=False).convert("RGB")
+    apple_path = out / "apple-touch-icon.png"
+    apple.save(apple_path, "PNG", optimize=True)
+    written.append(f"apple-touch-icon.png  {APPLE_TOUCH_SIDE}x{APPLE_TOUCH_SIDE}"
+                   f"  {apple_path.stat().st_size // 1024} KB")
+
+    png = favicon_tile(ICON_PNG_SIDE)
+    png_path = out / "icon.png"
+    png.save(png_path, "PNG", optimize=True)
+    written.append(f"icon.png  {ICON_PNG_SIDE}x{ICON_PNG_SIDE}"
+                   f"  {png_path.stat().st_size // 1024} KB")
+
+    return written
+
+
+# ---------------------------------------------------------------------------
 
 def main():
     ap = argparse.ArgumentParser(description="Draw the Plantoir brand images.")
@@ -503,6 +700,11 @@ def main():
         img.save(p, "PNG", optimize=True)
         print(f"  {p.relative_to(REPO) if p.is_relative_to(REPO) else p}  "
               f"{img.width}x{img.height}  {p.stat().st_size // 1024} KB")
+
+    favicons = write_favicons(FAVICON_DIR)
+    print(f"\n  {FAVICON_DIR.relative_to(REPO)}/ -- the icon every built site wears:")
+    for line in favicons:
+        print(f"    {line}")
 
     if args.install_card:
         dest = REPO / "site" / "social-card.png"

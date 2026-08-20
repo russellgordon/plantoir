@@ -1332,6 +1332,79 @@ LOCALES_SRC_CANDIDATES = [
     Path(__file__).resolve().parent / "support" / "locales",
 ]
 
+FAVICON_SRC_CANDIDATES = [
+    Path("support/favicon"),
+    Path("/opt/support/favicon"),
+    Path(__file__).resolve().parent.parent / "support" / "favicon",
+    Path(__file__).resolve().parent / "support" / "favicon",
+]
+
+# What goes into quartz/static, and what Head.tsx links from every page.
+# Overwriting Quartz's own icon.png is deliberate even though nothing links it
+# any more: leaving it behind would ship somebody else's logo inside a
+# teacher's site, findable by anything that goes looking.
+FAVICON_FILES = ["favicon.ico", "icon.svg", "apple-touch-icon.png", "icon.png"]
+
+
+def _find_favicon_source() -> Path | None:
+    for candidate in FAVICON_SRC_CANDIDATES:
+        if candidate.is_dir() and (candidate / "favicon.ico").is_file():
+            return candidate
+    return None
+
+
+def install_favicon(output_dir: Path, content_root: Path | None = None):
+    """
+    Give the built site Plantoir's icon instead of Quartz's.
+
+    Quartz ships `quartz/static/icon.png` — its own logo — and its Head links
+    that as the favicon, so every site a teacher published wore the Quartz mark
+    in the browser tab. The replacement set is drawn from the app icon by
+    scripts/brand_images.py and baked into the image at /opt/support/favicon.
+
+    Two destinations, and the second one is not redundant:
+
+      * `quartz/static/` is what the Static emitter copies to `public/static/`,
+        and what the <link> tags in Head.tsx point at. That covers every
+        browser that reads the page.
+      * `content/favicon.ico` is how the site gets a favicon at its ROOT.
+        Quartz's Assets emitter copies non-Markdown files out of content/
+        into public/ unchanged, and it is the only route there — the Static
+        emitter can write nothing above public/static/. The root copy is what
+        answers the implicit GET /favicon.ico that feed readers, link
+        unfurlers and older browsers make without reading the page at all.
+
+    Runs on every build rather than only on a full rebuild, so a course folder
+    built before this existed picks the icon up next time it is previewed.
+    """
+    src = _find_favicon_source()
+    if src is None:
+        print("ℹ️ Favicon set not found — leaving Quartz's own icon in place.")
+        return
+
+    static_dir = output_dir / "quartz" / "static"
+    copied = 0
+    try:
+        static_dir.mkdir(parents=True, exist_ok=True)
+        for name in FAVICON_FILES:
+            source_file = src / name
+            if not source_file.is_file():
+                continue
+            shutil.copy2(source_file, static_dir / name)
+            copied += 1
+    except Exception as e:
+        print(f"⚠️ Could not install the site icon: {e}")
+        return
+
+    if content_root is not None:
+        try:
+            shutil.copy2(src / "favicon.ico", content_root / "favicon.ico")
+        except Exception as e:
+            print(f"⚠️ Could not place favicon.ico at the site root: {e}")
+
+    print(f"🌱 Installed the Plantoir site icon ({copied} file(s) → quartz/static).")
+
+
 def install_locales(output_dir: Path):
     target = output_dir / "quartz" / "i18n" / "locales"
     src = None
@@ -4088,6 +4161,11 @@ def build_section_site(
 
     # Ensure Media symlink is present inside content/
     _ensure_media_symlink(content_root, course_dir)
+
+    # The site's own icon, into quartz/static AND the content root. Placed
+    # here because the content root is rebuilt from scratch just above, so a
+    # copy made any earlier would have been thrown away.
+    install_favicon(output_dir, content_root)
 
     section_index = section_dir / "index.md"
     if section_index.exists():

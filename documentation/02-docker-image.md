@@ -92,6 +92,11 @@ The image is layered as follows (in order):
    - `locales/` — all 27 Quartz locale files with teacher-oriented wording
      (see [customizations §D](06-quartz-customizations.md#d-locale-files-replaced-at-build-time)).
    - `Backlinks.tsx` — a patched Backlinks component installed at build time.
+   - `favicon/` — the four files a built site wears in the browser tab
+     (`icon.svg`, `favicon.ico`, `apple-touch-icon.png`, `icon.png`), drawn
+     from the app icon by `scripts/brand_images.py` and installed by
+     `build_site.py`
+     (see [customizations C2-25](06-quartz-customizations.md#c2-applied-on-every-build)).
    - `fonts/` — the eighteen bundled site fonts (`.ttf`) plus their
      licences. This is the SINGLE font source: the container draws social
      cards with the same files the macOS app bundles for its settings
