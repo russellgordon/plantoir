@@ -54,7 +54,13 @@ product, not of one platform.
 - `contracts/app-rules.json` → `failureExplanations.cases` → **the three
   one-time-Windows-setup cases** ("needs to restart to finish getting
   ready", "Windows permission was declined", "Windows could not add the
-  feature this needs"), proposed 2026-08-19. The Windows launchers now
+  feature this needs"), proposed 2026-08-19. **Superseded the same day:**
+  branch `windows-native-toolchain` deleted the Windows container path
+  entirely, so the launcher lines these cases match can no longer be
+  printed by any shipping launcher. If that branch merges, RETIRE these
+  three cases from the contract instead of implementing them (they ship
+  only in 1.0.2, whose launchers are frozen); if it does not, implement as
+  originally written below. The Windows launchers now
   install WSL2 themselves (see the entry below); these are the three
   non-fault ways that setup can stop, and the app turns each into one
   actionable sentence. The outputs can never occur on macOS — the ask is to
