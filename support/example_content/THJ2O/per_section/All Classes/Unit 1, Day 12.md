@@ -12,7 +12,8 @@ tags:
 
 1. Hand tools: [[Hand Tools]] — what each is for and how it hurts you
 2. Practice cuts and pruning on real material
-3. Cleaning and putting away
+3. Cleaning and putting away; name-the-tool round on the way out — no
+   marks
 
 ## Things to do before our next class
 

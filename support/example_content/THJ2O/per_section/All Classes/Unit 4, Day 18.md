@@ -14,6 +14,8 @@ tags:
 1. Review: biology, growth factors, and production
 2. Retrieval across all four units
 3. Practical stations
+4. Portfolio: the fixes your conference asked for. It closes in two
+   periods
 
 ## Things to do before our next class
 

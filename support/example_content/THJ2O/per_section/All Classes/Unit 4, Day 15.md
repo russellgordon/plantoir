@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish the skills record.
+- [ ] Bring in any evidence your record names but the file does not hold.

@@ -12,8 +12,9 @@ tags:
 
 1. Portfolio work period: [[The Evidence File]] assembled
 2. What is missing, found and photographed
-3. Conferences
+3. Your portfolio judged against the criteria: [[Judging Your Own Work]]
+4. Conferences
 
 ## Things to do before our next class
 
-- [ ] Fill the gaps.
+- [ ] Bring in whatever your gap list says the file is still missing.

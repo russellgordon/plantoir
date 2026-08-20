@@ -38,8 +38,20 @@ Notice what that is not — "I am good at numeracy" is a claim without an
 example. Be honest about the weak ones too: "I was late twice in October,
 so I now pack tools the period before" beats unbroken excellence.
 
-Written weekly, in about ten minutes, this becomes a section of
-[[The Evidence Portfolio]] and it is the part employers read first. Add
+How highly you rate yourself is never part of your mark — see
+[[How Marks Work]]. What is marked, in [[The Evidence Portfolio]], is
+narrower and more interesting: whether you can say **which** skills and
+habits this industry actually runs on, and **why** each one matters in
+this work. Your own record is where you get the examples to say it
+with.
+
+Write it **in class, at the milestones the schedule sets aside for it** —
+about ten minutes each time, at the end of a unit or a job, while the
+example is still in front of you. Those are the entries that count
+towards the mark; anything you add at home afterwards is yours and is
+worth doing, but it is not what I am marking. This record becomes a
+section of [[The Evidence Portfolio]] and it is the part employers read
+first. Add
 certifications as you earn them — first aid, CPR, WHMIS — and note the
 industry associations, mentoring programs, and college or apprenticeship
 routes you meet, so the path is written down before you need it.

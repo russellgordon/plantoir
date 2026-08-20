@@ -12,7 +12,8 @@ tags:
 
 1. Retrieval; then measurement: [[Measuring and Marking]]
 2. Imperial and metric on the same tape, and why both
-3. Practice: measure, mark, and cut to a line
+3. Measure, mark, and cut to a line — a diagnostic, not a mark: it
+   shows me where this class is starting from
 
 ## Things to do before our next class
 

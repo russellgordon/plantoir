@@ -12,7 +12,7 @@ tags:
 
 1. Calculating what a job needs: area, volume, and waste
 2. Working out soil for a bed and lumber for a frame
-3. Practice calculations
+3. Practice calculations, checked against a neighbour's — no marks
 
 ## Things to do before our next class
 

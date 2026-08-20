@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Log what was done and what changed.
+- [ ] Check the site log has what was done and what changed.

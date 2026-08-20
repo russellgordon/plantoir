@@ -12,8 +12,9 @@ tags:
 
 1. The one-page summary: what you can do, written for an employer
 2. [[Writing a Work Record]] applied
-3. Drafting
+3. Drafting, and the gaps your self-check turned up last period
 
 ## Things to do before our next class
 
-- [ ] Draft the summary page.
+- [ ] Read your draft summary out loud once. It is written for a
+      stranger.

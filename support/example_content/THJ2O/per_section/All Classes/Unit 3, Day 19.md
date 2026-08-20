@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish the bench log.
+- [ ] Check the bench log is complete and dated.

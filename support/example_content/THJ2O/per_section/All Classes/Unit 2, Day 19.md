@@ -12,7 +12,7 @@ tags:
 
 1. Bench work and maintenance of the trial plants
 2. Tool inspection and sharpening
-3. Evidence file check-in
+3. Evidence file check-in — feedback, not a mark
 
 ## Things to do before our next class
 

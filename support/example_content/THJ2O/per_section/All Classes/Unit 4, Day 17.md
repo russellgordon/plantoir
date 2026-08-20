@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Portfolio ready for submission.
+- [ ] Note the two things your conference asked for — next period has
+      time for them.

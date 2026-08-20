@@ -12,7 +12,8 @@ tags:
 
 1. Reading a drawing: [[Reading a Working Drawing]]
 2. Plan, elevation, scale, symbols
-3. Practice: build a small item from a drawing only
+3. Build a small item from a drawing only — no marks; where it goes
+   wrong tells us what the drawing did not say
 
 ## Things to do before our next class
 

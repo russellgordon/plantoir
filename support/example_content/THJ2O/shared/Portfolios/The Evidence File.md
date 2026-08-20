@@ -22,6 +22,10 @@ June produces a thin file.
   when the first version did not fit.
 - **Data.** Germination counts from [[The Growing Trial]], yields from
   [[The Production Run]], the log behind [[The Pest and Disease Report]].
+- **Your self-checks**, dated — the criteria you judged your own work
+  against, what you called weakest, and what you changed. See
+  [[Judging Your Own Work]]. Read end to end in June they show the
+  change over the semester better than the finished jobs do.
 - **Safety credentials.** [[The Safety Ticket]], WHMIS, first aid.
 - **Maintenance and tool logs**, which employers read closely.
 - **What other people said** — a note from a client or a supervisor.

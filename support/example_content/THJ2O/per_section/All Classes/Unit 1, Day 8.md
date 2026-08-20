@@ -12,7 +12,8 @@ tags:
 
 1. Environmental factors: [[Light, Water, Temperature, Soil]]
 2. Measuring light, temperature, and moisture in our own spaces
-3. Trial measurements
+3. Trial measurements — and I read two logs a period and write on
+   them. Feedback, not a mark
 
 ## Things to do before our next class
 

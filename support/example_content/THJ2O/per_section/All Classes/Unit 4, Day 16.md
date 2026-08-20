@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Practical revision: propagation, measurement, tool selection
-2. The three demonstration tasks practised
+2. The three demonstration tasks practised — no marks; I tell you
+   which one to spend your time on
 3. Shop and bench work
 
 ## Things to do before our next class

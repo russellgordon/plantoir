@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Update the log.
+- [ ] Check the batch measurements are in the log.

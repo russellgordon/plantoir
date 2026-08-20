@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish the growing trial write-up.
+- [ ] Write-up in next period: check sections 5 and 6 are in your own
+      hand, and signed.

@@ -12,7 +12,7 @@ tags:
 
 1. What local industry does to a community: jobs, water, air, land
 2. Ethics in the sector: animal welfare, labour, land use
-3. Class discussion
+3. Class discussion, and where the room disagreed — no marks
 
 ## Things to do before our next class
 

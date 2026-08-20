@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Log the transplanting.
+- [ ] Check the transplanting is logged, with the date.

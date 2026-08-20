@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Update the log.
+- [ ] Check today's inspection is written down.
