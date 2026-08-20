@@ -24,28 +24,31 @@ so that neither one afternoon nor one project decides this alone.
 
 ```mermaid
 pie title Where your mark comes from
-    "The Community App, through the build" : 20
-    "Code Journal, at milestones" : 12
-    "The Toolbox" : 8
-    "The Data Digest" : 8
-    "The Helper Script" : 6
-    "The Spec Sheet" : 6
-    "The Green Audit" : 5
-    "The Research Brief" : 5
-    "Final examination" : 20
-    "Launch Day and the handover" : 10
+    "The semester's work" : 70
+    "The final evaluation" : 30
 ```
 
-[[The Community App]] is the largest single thread. It runs across the
-last two units, it is built for a real person, and it is where
-everything else you have learned finally has to work at the same time.
-The earlier tasks — [[The Helper Script]], [[The Data Digest]],
-[[The Toolbox]] — are the rehearsals that make it possible.
+**The seventy** is every task you hand in during the semester, plus the
+milestone entries in your [[Code Journal]]. In roughly the order you
+meet them: [[The Spec Sheet]], [[The Helper Script]],
+[[The Data Digest]], [[The Green Audit]], [[The Toolbox]],
+[[The Research Brief]], and the five weeks of building
+[[The Community App]]. They are not equally weighted: the
+Community App is worth several of the smaller ones on its own, because
+it runs longest and asks for everything at once, and the earlier tasks
+are the rehearsals that make it possible. Ask me for the exact split
+whenever you want it — it is not a secret, it is just not the useful
+thing to memorise.
 
-The [[Code Journal]] entries that count towards that slice are the ones
-written **in class, at a milestone**. What you add at home is yours, and
-is worth doing, but practice you do between classes is practice — it is
-not something I mark.
+**The thirty** is two things, on two different days: the
+[[Final Examination]], written on paper under the same conditions as
+everyone else, and handing your project over to the person you built it
+for on [[Launch Day]]. The examination is the larger of the two.
+
+The [[Code Journal]] entries that count are the ones written **in
+class, at a milestone**. What you add at home is yours, and is worth
+doing, but practice you do between classes is practice — it is not
+something I mark.
 
 ## Four kinds of thinking, not one
 
