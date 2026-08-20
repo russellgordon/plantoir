@@ -6,8 +6,11 @@ description: Build or revise a per-course-code example-content payload (support/
 # Building example content for a course code
 
 A payload is a complete, working course a teacher keeps: real pages, a real
-semester, real curriculum. **ADA1O is the reference implementation** — when
-in doubt, open it and copy its shape. `support/example_course/EXC2O` is the
+semester, real curriculum. **ADA1O is the reference implementation** for
+page shape and voice — when in doubt, open it and copy its shape. **For the
+ASSESSMENT rules below — the three modes, the per-unit sequence, the hidden
+triangulation blocks, `How Marks Work` — the reference is `ICS3U`**, which
+was brought to them first; ADA1O predates them and does not conform yet. `support/example_course/EXC2O` is the
 older standalone example course; match its depth and warmth, not its
 mechanics.
 
