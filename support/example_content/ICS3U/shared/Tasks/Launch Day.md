@@ -119,3 +119,35 @@ more than any syntax, are what carries into whatever you do next.
 
 ![[D3.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Day 18 is a performance with visitors in the room, so this is the one
+task where you cannot circulate and confer. What you watch on the day
+IS the assessment, not evidence-gathering alongside it — budget thirty
+seconds of looking per student and nothing more. Everything else has to
+be gathered at the rehearsal the day before.
+
+OBSERVE — Unit 4, Day 18, during the demonstrations
+  Watch for one thing only: whose hands are on the keyboard. The task
+  says the client runs the demo; a student who takes it back has told
+  you something about their interface that the interface will not.
+  Going well: the student's hands stay in their lap and they narrate.
+  Stuck: "here, let me just" — note it, kindly, and move on.
+  Record: a single mark per student, client-drove or not.
+
+TALK — Unit 4, Day 17, during the rehearsal
+  Ask: "Walk me through how it is put together — what the main parts
+  are, and what each one is responsible for."
+  Then: "What was the other way you could have built it, and why is
+  this the one that is here?"
+  That is B2.2 — using the right vocabulary and the right mode of
+  expression to explain the structure of a program and to describe the
+  designs you did not choose. The rehearsal is the only place you will
+  hear it as a draft rather than as a line they have polished.
+  Record: one line each.
+
+The product evidence is the demonstration itself, and the critique the
+task already assesses.
+%%

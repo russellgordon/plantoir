@@ -12,8 +12,9 @@ tags:
 
 1. Warm-up: [[What Would You Ask]] — the questions your client will
    have next month, when you are not there
-2. Write the handover: what it does, how to run it, how to change it,
-   and what it will never do
+2. Act on last class's self-check: the weakest row first, then finish
+   the handover you drafted last class — what it does, how to run it,
+   how to change it, and what it will never do
 3. Discussion: [[Sharing What You Build]] — credit, permission, and who
    owns this now
 4. Hand in [[The Community App]] — day 15 — and begin

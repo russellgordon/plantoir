@@ -124,3 +124,29 @@ different?
 
 ![[A4.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 18, the hand-off
+  The task already sets this up: a partner runs the script while the
+  owner says nothing. That silence is the measurement.
+  Watch for: who reaches for the keyboard, and who writes down what
+  their partner hesitated at. Both scripts may work; only one of these
+  students has learned what the hand-off was for.
+  Going well: pen moves while the partner struggles.
+  Stuck: the owner narrates, or takes over.
+  Record: three columns on your day plan — wrote, watched, took over.
+
+TALK — Unit 1, Day 16, during the build from the skeleton
+  Ask: "Which part of the skeleton did you keep, and which did you
+  throw away?"
+  Then: "What went wrong the first time you changed it?"
+  A strong answer treats the skeleton as a decision rather than as
+  scaffolding to be escaped. That is B2.1 — designing from a template —
+  and a finished script that happens to match the skeleton tells you
+  nothing about whether the student chose it or never left it.
+  Record: one line each; two words is enough.
+
+The product evidence is the script handed in on Day 18.
+%%

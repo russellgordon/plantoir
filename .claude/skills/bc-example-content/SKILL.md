@@ -22,6 +22,66 @@ reading before you start. `ADA1O` remains the Ontario reference; do not use
 it as a structural template for BC's curriculum folder specifically — its
 shape is wrong for BC (see below).
 
+## Authoring is two passes, and the second one is adversarial
+
+**A primary agent writes; an adversarial sub-agent then checks its work.
+This is not optional and it is not a proofread.** Every payload, every
+revision to a payload, and every change to this skill goes through both
+passes before anybody calls it done.
+
+The reason is measured, not theoretical. Each of these was produced by a
+careful first pass that reported success, and each was found by a second
+agent briefed to disbelieve it:
+
+- A worked example written into this skill named the wrong unit and the
+  wrong days for the task it was drawn from — Unit 2 for a task that runs
+  in Unit 1 — and tied its evidence to a terminology expectation that does
+  not describe that evidence. It broke three of the six rules printed
+  directly beneath it.
+- Ten of fourteen policy citations in the same section were off by one.
+  Every quotation was real; every page number was wrong.
+- An Ontario course revised to satisfy these rules sent a teacher to observe a
+  counting period that does not exist on that day, quoted an expectation
+  as evidence-in-conversation when its verbatim text says "in writing",
+  and stated the homework rule correctly on one page while five other
+  pages went on breaking it — including a paragraph the same revision
+  had just written.
+
+None of these is the kind of mistake re-reading your own work finds. They
+read as entirely plausible, which is exactly the property that makes them
+survive a self-review and fail a teacher.
+
+**How to run the second pass:**
+
+- **Brief it to REFUTE, not to review.** Tell it to assume every factual
+  claim is misremembered until checked against a primary source, and every
+  new rule conflicts with an existing one until it has read the
+  surrounding file. "Look this over" produces praise; "find what is wrong
+  here, and do not pad" produces findings.
+- **Hand it the primary sources and say where they are** — the live page on
+  `curriculum.gov.bc.ca`, the class pages, the competency and content
+  texts in `Curriculum/`, `lint_payload.py`, `build_site.py`. A reviewer working
+  from memory reproduces the first agent's errors.
+- **Name the attack surfaces in priority order**, highest-value first. For
+  a payload that is: do the days, task names and curriculum codes a page
+  names match what the arc actually does; is every quotation verbatim and
+  every citation right; does any page contradict another; could a teacher
+  actually run each period as written.
+- **Require file:line, the claim, what is actually true, the EVIDENCE, and
+  the smallest fix** — and require CONFIRMED to be separated from
+  SUSPECTED. A finding without evidence is a second opinion, not a check.
+- **Verify what it reports before you act on it.** It is a check, not an
+  oracle: an adversarial pass in this repository was itself wrong about how
+  many payloads a defect affected, because it used a looser rule than the
+  code does. Confirm each finding against the source yourself, then fix.
+- **Do not let it edit.** It reviews; the primary agent fixes. A reviewer
+  that repairs what it finds stops looking for more.
+
+The linter is not this pass and cannot become it. It checks structure —
+links resolve, markers balance, coverage is complete — and almost nothing
+in the assessment rules is machine-checkable. A payload can be `clean` and
+still send a teacher to the wrong day on Monday.
+
 ## The one fact that changes everything: BC's curriculum is not Ontario's
 
 Ontario's curriculum documents are pre-structured almost exactly the way

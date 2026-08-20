@@ -131,3 +131,29 @@ swap — that question is the first line your usage note was missing.
 
 ![[C2.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 13, the rehearsal swap
+  Watch for: what the owner does when a neighbour cannot import their
+  toolbox from the note alone. Answering out loud patches the problem
+  and hides it; writing the answer into the note fixes it.
+  Going well: the note is being edited while the neighbour is stuck.
+  Stuck: a conversation that ends with "oh, you just have to…".
+  Record: two columns — edited the note, explained instead.
+
+TALK — Unit 3, Day 11, at the conference already on that agenda
+  The agenda already announces that the conference is about which four,
+  so open past it. Ask: "What does each one need handed to it, and what
+  does it hand back?"
+  Then: "Which of the four did you have to change the shape of once you
+  started writing it?"
+  A strong answer is in parameters and return values. A weak one says
+  what each function is for. That is A3.2 — writing subprograms with
+  parameter passing and sensible scope — and the code cannot separate a
+  student who chose the interface from one who wrote it and hoped.
+  Record: one line each, on the conference sheet.
+
+The product evidence is the toolbox handed in on Day 17.
+%%
