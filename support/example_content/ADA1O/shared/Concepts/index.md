@@ -6,8 +6,9 @@ enableToc: false
 ---
 This folder is the working vocabulary of the course — the ideas we name so we
 can use them on purpose. Nothing here is tested with a quiz. Instead, these
-words show up in feedback, in [[Drama Journal]] prompts, and in the criteria on
-[[How Marks Work]], so it pays to know them cold.
+words show up in feedback, in [[Drama Journal]] prompts, and in the success
+criteria on every task page — which is where [[How Marks Work]] says your mark
+comes from, so it pays to know them cold.
 
 Read a page when its word comes up in class, then come back after you have
 performed something and read it again. It will say more the second time.

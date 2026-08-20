@@ -16,6 +16,8 @@ tags:
 3. Notes: [[Giving and Receiving Notes]] — from the watching company
    first, then from me. Notes are taken down in writing, not argued
    with in the moment
+4. Last ten minutes: your company runs [[Judging Your Own Work]] on the
+   task's criteria and adds its own weakest row to that list
 
 ## Things to do before our next class
 

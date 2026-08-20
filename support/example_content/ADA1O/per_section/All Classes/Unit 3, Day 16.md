@@ -15,6 +15,8 @@ tags:
    stars and a wish from the group that watched them closest
 3. Journal workshop: your character, and what you now know about
    playing somebody who is not you
+4. Last twenty minutes: write your own half-page justification note for
+   [[Scene Study from a Story]] and hand it in before you leave
 
 ## Things to do before our next class
 
