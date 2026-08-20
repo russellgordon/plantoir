@@ -6,8 +6,8 @@ tags:
   - tasks
   - unit-1
 ---
-**Unit 1. Individual. Due at the end of week five.** About two pages,
-plus whatever working you did.
+**Unit 1. Individual. Handed in half-way through Day 14, at the end of
+the revision block.** About two pages, plus whatever working you did.
 
 You make one real decision using a named strategy, document the process
 as you go, and then say honestly how well the strategy served you.
@@ -64,3 +64,36 @@ Everyone can tell, including you.
 
 ![[A2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 13, on the walk round you take before the
+conferences start
+  Watch for: whether the working is being made or being illustrated. The
+  task requires the working to be handed in, so it will be there either
+  way; what the page cannot tell you is when it was produced. A2.1 asks
+  them to APPLY a strategy, and applying it looks like a mess that
+  changes.
+  Going well: something on the desk gets struck out — a criterion
+  dropped, an option added that they plainly dislike, a rank reordered.
+  Stuck: a clean page with nothing crossed out, and a student who can
+  already tell you the answer and is now assembling the reasons for it.
+  Record: a tick, a dot, or a blank beside each name on your day plan.
+
+TALK — Unit 1, Day 14, during the revision block at the start of the period
+  Ask: "Read me your criteria in the order they matter. Which one moved
+  after you first wrote it down, and what moved it?"
+  Then: "Who did you not ask, and why not?"
+  The first asks them to explain a decision they have already taken, and
+  it is the fastest test of A2.1 there is: a ranked list that never
+  changed is nearly always a list written backwards from an answer. The
+  second is A2.2's "identifying areas where more work may be needed", and
+  it is franker out loud than on the page, where the person who was
+  avoided tends not to appear at all.
+  Record: two things beside each name — the criterion that moved, and the
+  person they did not ask. Both fit in five words.
+
+The product evidence is the two pages and the working, handed in
+half-way through Day 14.
+%%

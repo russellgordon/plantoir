@@ -8,9 +8,9 @@ tags:
 ---
 The portfolio is the one thing in this course that outlasts it. It is
 where the inventory, the interview notes, the applications, the research,
-and the plan all end up, and it is half of your final evaluation. Start
-it in the first week, because a portfolio assembled in the last week is
-obviously a portfolio assembled in the last week.
+and the plan all end up, and it is what your final evaluation is argued
+from. Start it in the first week, because a portfolio assembled in the
+last week is obviously a portfolio assembled in the last week.
 
 ## What goes in it
 

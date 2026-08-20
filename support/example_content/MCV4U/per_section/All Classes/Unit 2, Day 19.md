@@ -12,7 +12,8 @@ tags:
 
 1. Checkpoint, on your own: the rules, mixed, with one from first
    principles
-2. Mark your own; revision list written
+2. Mark your own; write your revision list — the top item of it opens
+   next class
 
 ## Things to do before our next class
 

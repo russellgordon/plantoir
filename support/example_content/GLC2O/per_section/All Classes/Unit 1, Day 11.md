@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Setting a Goal You Will Keep]] — why a written goal argues back and a wish does not
-2. Launched: [[The Decision]]
-3. Choosing something genuinely undecided and genuinely yours
+1. [[How You Actually Decide]] — you already have a method
+2. Naming the strategies, and what each one is good for
+3. Trying one on a low-stakes decision, out loud
 
 ## Things to do before our next class
 
-- [ ] Confirm your decision with me in writing. One sentence.
+- [ ] Read [[How You Actually Decide]]. Bring one decision that is genuinely still open.

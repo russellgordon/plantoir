@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Draft the pathway and the supports you would use.
+- [ ] Nothing to write at home. Bring the plan as it stands, printed — next class is the checkpoint.

@@ -12,8 +12,8 @@ tags:
 
 1. Work period: [[The Budget]]
 2. Funding: earnings, savings, family, aid, and borrowing
-3. Conferences on the written argument
+3. Conferences on the written argument — the checkpoint, and you get it in writing
 
 ## Things to do before our next class
 
-- [ ] Finish the budget and the two pages for next class.
+- [ ] Nothing to hand in. The first twenty-five minutes of next class are for acting on what the conference found.

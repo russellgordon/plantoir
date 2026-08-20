@@ -16,9 +16,14 @@ tags:
    [[Chain Rule Practice]], and
    [[Exponential and Sinusoidal Derivatives Practice]]: start where
    you are weakest, per [[How to Study for Math]]
-3. Task due: [[Smooth Landing]] — defend your touchdown out loud
-4. Journal collection — read [[Showing Growth]] first, then hand in
-   your Unit 2 volume
+3. Task due: [[Smooth Landing]] — three pairs defend the touchdown to the
+   whole room, drawn at random; the rest defend to me at the stations.
+   Two minutes, and one question each, answered alone
+4. Last fifteen minutes: your own note on what the model ignores — wind,
+   weight, the pilot — written here; it belongs to the task and is marked
+   as yours
+5. On the way out: read [[Showing Growth]], then your Unit 2 volume
+   comes in
 
 ## Things to do before our next class
 

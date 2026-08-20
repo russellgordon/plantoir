@@ -12,8 +12,8 @@ tags:
 
 1. Research period: trends in your field, each with a source
 2. What counts as a source, and what is somebody's older brother
-3. Conferences
+3. Conferences in the last twenty minutes — the checkpoint on your trends and where each one came from, and you get it in writing
 
 ## Things to do before our next class
 
-- [ ] Two trends found, each with a source and a date.
+- [ ] Nothing to hand in. The next two periods are for acting on what the conference found.

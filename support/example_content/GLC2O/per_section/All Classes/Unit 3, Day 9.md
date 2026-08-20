@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. **Period 3 of 4:** the steps, the money, and the risks
-2. Summarising [[The Budget]] into one honest page
-3. One line per risk, each with a next move
+2. Summarising [[The Budget]] into one honest page, and one line per risk with a next move
+3. Conferences — every plan read against the criteria, and the checkpoint written down
 
 ## Things to do before our next class
 
-- [ ] Draft the whole plan. Bring it printed.
+- [ ] Nothing to write. Period 4 opens with the self-check, and the rest of it is the revision.
