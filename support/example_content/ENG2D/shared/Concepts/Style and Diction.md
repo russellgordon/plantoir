@@ -52,4 +52,8 @@ marks will improve a draft more than an hour of adding adjectives.
 ![[C2.6]]
 
 ![[C3.3]]
+
+![[C2.7]]
+
+![[C3.2]]
 %%curriculum-end%%

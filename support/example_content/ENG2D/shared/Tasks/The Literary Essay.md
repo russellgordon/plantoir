@@ -98,6 +98,8 @@ things somebody could check.
 ![[C3.7]]
 
 ![[C4.1]]
+
+![[C1.5]]
 %%curriculum-end%%
 
 %%

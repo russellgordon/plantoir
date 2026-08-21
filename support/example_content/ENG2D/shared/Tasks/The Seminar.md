@@ -95,6 +95,10 @@ confidence, and confidence is not on the achievement chart.
 ![[A3.1]]
 
 ![[B3.3]]
+
+![[A1.2]]
+
+![[A1.8]]
 %%curriculum-end%%
 
 %%

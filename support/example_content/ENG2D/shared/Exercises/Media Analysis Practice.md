@@ -58,4 +58,10 @@ analysis on it.
 ![[D1.3]]
 
 ![[D1.5]]
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[D3.4]]
 %%curriculum-end%%

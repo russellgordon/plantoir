@@ -87,6 +87,8 @@ This is the piece of the task that is marked as yours alone.
 ![[D4.1]]
 
 ![[D4.2]]
+
+![[A2.7]]
 %%curriculum-end%%
 
 %%

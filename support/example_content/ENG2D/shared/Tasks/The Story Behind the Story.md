@@ -73,6 +73,8 @@ Three hundred words on the decisions you made and why:
 ![[C3.3]]
 
 ![[C4.2]]
+
+![[C3.1]]
 %%curriculum-end%%
 
 %%

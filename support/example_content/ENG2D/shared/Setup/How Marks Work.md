@@ -11,6 +11,12 @@ up, and whether a reader gets to the end without going back.
 
 ## The seventy and the thirty
 
+```mermaid
+pie title Where your mark comes from
+    "The semester's work" : 70
+    "The final evaluation" : 30
+```
+
 Every Grade 10 academic credit in Ontario is built the same way.
 
 **Seventy per cent** comes from the marked work of the semester. It is not
