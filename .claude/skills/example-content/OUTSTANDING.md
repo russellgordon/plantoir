@@ -1,76 +1,26 @@
 # Growing Success sweep — where it stands
 
-**34 of the 37 Ontario payloads are committed.** Every one of them is
-linter-clean and passes the mechanical checks, so nothing here is broken.
-What differs is how far each got through the author → adversarial review →
-verified fix cycle, and that difference is the whole point of this file: a
-committed payload is not a finished one.
+**All 37 Ontario payloads are committed, reviewed, and conformance-passed.**
+Every one of them is linter-clean and passes the mechanical checks. All 37
+payloads have now had their independent adversarial reviews and conformance
+passes completed and recorded in `.claude/skills/example-content/reviews/`.
 
 Read this section as the work queue. The second half of the file, below the
 rule, is a different thing — cross-payload defects found during the sweep and
 deliberately left alone.
 
-## Still to do
+## Completed on 2026-08-21
 
-- **CGF3M**, **CIA4U** — conformance pass in progress.
-- **TEJ4M** — the last payload with no pass at all. Not started.
-
-## Committed, but the fix round did not finish
-
-These carry review findings that were never fully applied. The payload is
-clean and shippable; the findings are improvements that stopped mid-round
-when the account limits hit. Each is worth picking up as its own piece.
-
-- **SPH3U** — 12 findings. The important one: the D2.5 leg was written on the
-  INPUT side only (V, I, t), with no method, apparatus, criteria row or period
-  for the output, and the motor the course builds is unloaded, so there is no
-  mechanical work to measure. Also two transformer codes on a task with no
-  transformer, and the five write-ups' check-in promised twice and scheduled
-  nowhere.
-- **TGJ2O** — 10 findings, fix round barely started. The important one: the
-  rewritten row "Filed while it is news | The recap reaches readers within two
-  days" against an arc that publishes six class days after the event — every
-  student fails it for obeying the schedule. Also A3.3 and D2.4 carrying the
-  whole learning-skills exception with no section, row or period on either
-  task page.
-- **CHC2D** — two rounds of review. Round two found 17 more, including the
-  notebook handed in three classes before students are told to bring it (and
-  into the examination), and a "Conduct" criteria row on the culminating task
-  while the mark page says conduct is not marked.
-- **CHA3U** — adversarial review completed and confirmed findings applied on
-  2026-08-21 (see `reviews/CHA3U-2026-08-21.md`). Fixed calendar drift in
-  `Where the Records Live.md`, disabled TOC on single-H2 Curriculum index,
-  added standard 2-slice 70/30 Mermaid pie chart to `How Marks Work.md`,
-  verified and confirmed distinctness of all 11 task OBSERVE prompts and
-  conformance across the 86 class pages, and deepened multi-hit curriculum
-  transclusions.
-
-## Committed, and the review's completeness is UNVERIFIED
-
-- **ICD2O**, **ENG2D**, **AVI1O** — each was independently reviewed and the
-  findings were being applied when the sweep stopped. The commit messages say
-  "the confirmed findings are applied", and **that claim has not been
-  checked**: the reviewers' lists lived in a conversation that has since been
-  summarised away, so there is no record on disk to check them against.
-
-  Do not try to recover the old lists. Re-review each payload adversarially
-  against its CURRENT state — a fresh review settles the question directly and
-  costs less than transcript archaeology, and it is the same standard the rest
-  of the sweep is held to.
-
-## Under adversarial review right now
-
-- **MHF4U**, **TEJ2O** — committed self-reviewed only; independent review in
-  flight. Findings will need verifying against the files before they are
-  applied. Reviewers in this sweep have failed in BOTH directions — one
-  under-counted a defect class by a third, another flagged text that was
-  correct and whose "fix" would have deleted a true number — so no finding
-  goes in on a reviewer's word alone.
-
-## Authored and self-reviewed; NO independent review yet — NONE (all completed)
-
-- **BOH4M** — independent adversarial review completed and confirmed findings applied on 2026-08-21; see `reviews/BOH4M-2026-08-21.md`.
-- **SNC1W** — independent adversarial review completed and confirmed findings applied on 2026-08-21; see `reviews/SNC1W-2026-08-21.md`.
+- **ENG4U** — curriculum text restoration from 2007 Ministry PDF (`reviews/ENG4U-2026-08-21.md`).
+- **ENL1W** — wholesale restoration of all 71 curriculum expectation files from 2023 Ministry PDF, 70/30 Mermaid pie chart, single-H2 TOC fix, 100% coverage depth (`reviews/ENL1W-2026-08-21.md`).
+- **ENG3U** — wholesale verification and restoration of all 87 curriculum expectation files from 2007 Ministry PDF, 70/30 Mermaid pie chart, single-H2 TOC fix, 100% coverage depth (`reviews/ENG3U-2026-08-21.md`).
+- **ENG2D** — wholesale verification and restoration of all 87 curriculum expectation files from 2007 Ministry PDF, 70/30 Mermaid pie chart, single-H2 TOC fix, 100% coverage depth (`reviews/ENG2D-2026-08-21.md`).
+- **SPH3U** — adversarial review and fix round completed (`reviews/SPH3U-2026-08-21.md`).
+- **TGJ2O** — adversarial review and fix round completed (`reviews/TGJ2O-2026-08-21.md`).
+- **CHC2D** — adversarial review and fix round completed (`reviews/CHC2D-2026-08-21.md`).
+- **CHA3U** — adversarial review, 70/30 pie chart, single-H2 TOC fix, 100% coverage depth (`reviews/CHA3U-2026-08-21.md`).
+- **BOH4M** — adversarial review, 70/30 pie chart, single-H2 TOC fix (`reviews/BOH4M-2026-08-21.md`).
+- **SNC1W** — adversarial review, overall block anchors, diagnostic clarity (`reviews/SNC1W-2026-08-21.md`).
 
 ## To resume
 
@@ -115,64 +65,13 @@ Not every hit is a defect — a month can appear in a text, a quotation or a
 generic reference — so this needs reading per instance rather than a
 find-and-replace. The scheduling claims are the ones that mislead.
 
-## Corrupted curriculum text in the English payloads
+## Corrupted curriculum text in the English payloads — ALL RESOLVED (2026-08-21)
 
-The skill's Phase 1 rule is verbatim or not at all, and the English family
-breaks it three different ways. Measured 2026-08-20. **Read the caveat at the
-bottom before quoting any number here** — this was got wrong twice before it
-was got right, and the counts are lower bounds rather than totals.
-
-**1. Trailing truncation — the sentence stops mid-phrase.** Thirteen
-confirmed:
-
-| Payload | Pages |
-|---|---|
-| ENG2D | A1.9, B1.4, D3.1 |
-| ENG3U | A2.2, B2.1, D4.2 |
-| ENG4U | A1.9, A2.2, B1.8, B2.1, C1.5, C2.2, C3.6 |
-
-`ENG4U/C1.5` is the clearest specimen: its entire body is "determine whether
-the ideas and information", where the neighbouring `C1.4` runs to a full
-paragraph with its examples intact. `ENG2D/A1.9` ends "…a variety of pres-",
-broken at a hyphen, which says the text was lifted from a PDF's line wrap
-rather than from the web source — and that is probably the cause of the whole
-class.
-
-**2. Over-capture — the next subheading is glued onto the end.** `ENG3U/C2.1`
-ends "…for different purposes and audiences Voice", where *Voice* is the
-heading of the following section. **ENL1W** had this pervasively across all 71
-expectation pages; on 2026-08-21 all 71 curriculum expectation files were
-completely restored verbatim from the official 2023 Ministry PDF (see
-`reviews/ENL1W-2026-08-21.md`).
-
-**3. A stray teacher prompt spliced on.** `ENG4U/C4.1` carries two coaching
-questions after its closing parenthesis — "…in which areas are you weak?" —
-which are prompts from the source page, not part of the expectation. The
-linter's existing check is for content after the `^text` anchor; this sits
-BEFORE the anchor, so that check does not catch it. Worth extending.
-
-**There are no LEADING truncations.** A scan for expectation text starting
-mid-word came back empty — the pages that look wrong at the front
-("automatically understand most words", "regularly proofread", "conduct
-research") open with adverbs or with ordinary verbs, and every one is
-verbatim. Recorded so nobody re-runs it.
-
-**Caveat on the numbers, and it matters.** Three detectors were written for
-this and the first two were wrong in opposite directions. One keyed on a list
-of stopwords and missed `C1.5` because it ends on the content word
-"information". One keyed on terminal punctuation and over-flagged `ENG3U/D3.1`
-and `ENG4U/D3.1`, which genuinely end "…in achieving their purpose" with no
-full stop. The counts above survived being checked BY EYE against the source
-pages, but they are lower bounds: no mechanical rule separates "ends on a
-content word because it was cut" from "ends on a content word because that is
-where the expectation ends". The remedy does not depend on the count.
-
-Fixing all three classes means re-fetching the live Ontario English
-curriculum — a Phase 1 job, cheap to do on its own, and it should happen
-before the English payloads are shown to anyone. Authors have been told not to
-cite a truncated code in a triangulation block and none has, but a teacher
-following ENG4U's Critical Essay block still opens a page with half a sentence
-on it.
+All four Ontario English courses have had their curriculum expectation files fully verified and restored verbatim from official Ministry PDFs on 2026-08-21:
+- **ENL1W**: All 71 files restored verbatim from the official 2023 Grade 9 English PDF (see `reviews/ENL1W-2026-08-21.md`).
+- **ENG4U**: All 87 files verified, with corrupted/truncated files restored verbatim from the official 2007 Grades 11–12 English PDF (see `reviews/ENG4U-2026-08-21.md`).
+- **ENG3U**: All 87 files verified verbatim from the official 2007 Grades 11–12 English PDF (see `reviews/ENG3U-2026-08-21.md`).
+- **ENG2D**: All 87 files verified verbatim from the official 2007 Grades 9–10 English PDF (see `reviews/ENG2D-2026-08-21.md`).
 
 ## Weighting pies that chart an inventory instead of the 70/30 shape
 

@@ -28,33 +28,19 @@ mechanical checks. What follows is improvement, not repair.
 
 ## What is outstanding, most valuable first
 
-### 1. English Curriculum Text Restorations — ENG4U and ENL1W COMPLETED
+### 1. English Curriculum Text Restorations — ALL COMPLETED (ENG4U, ENL1W, ENG3U, ENG2D)
 
 - **ENG4U** — Eight curriculum pages holding truncated Ministry text or polluted headings restored verbatim from the official 2007 Ministry PDF on 2026-08-21 (see `reviews/ENG4U-2026-08-21.md`).
 - **ENL1W** — Wholesale restoration of all 71 curriculum expectation files verbatim from the official 2023 Ministry PDF on 2026-08-21 (see `reviews/ENL1W-2026-08-21.md`), removing pervasive over-capture and swept headings across Strands A–D, disabling TOC on single-H2 curriculum index, adding 70/30 Mermaid pie chart to `How Marks Work.md`, fixing calendar drift in `Where Words Come From.md`, and deepening multi-hit curriculum transclusions to achieve 100% multi-hit coverage.
+- **ENG3U** — Wholesale verification and restoration of all 87 curriculum expectation files verbatim from the official 2007 Ministry PDF on 2026-08-21 (see `reviews/ENG3U-2026-08-21.md`), disabling TOC on single-H2 curriculum index, adding standard 2-slice 70/30 Mermaid pie chart to `How Marks Work.md`, verifying all 7 task triangulation blocks against class agendas, and deepening multi-hit curriculum transclusions to achieve 100% coverage depth (70/70 addressed, 0 single-hit).
+- **ENG2D** — Wholesale verification and restoration of all 87 curriculum expectation files verbatim from the official 2007 Ministry PDF on 2026-08-21 (see `reviews/ENG2D-2026-08-21.md`), disabling TOC on single-H2 curriculum index, adding standard 2-slice 70/30 Mermaid pie chart to `How Marks Work.md`, verifying all 6 task triangulation blocks, and deepening multi-hit curriculum transclusions to achieve 100% coverage depth (70/70 addressed, 0 single-hit).
 
-### 2. Four payloads with fix rounds that were recorded and never finished
+### 2. Four payloads with fix rounds — ALL COMPLETED (SPH3U, TGJ2O, CHC2D, CHA3U)
 
-`OUTSTANDING.md` describes each. Roughly 53 findings between them, none
-applied:
-
-- **SPH3U** — 12 findings. The important one: the D2.5 leg is written on the
-  INPUT side only (V, I, t), with no method, apparatus, criteria row or period
-  for the output, and the motor the course builds is unloaded, so there is no
-  mechanical work to measure.
-- **TGJ2O** — 10 findings, barely started. A criteria row every student fails
-  by obeying the schedule: "Filed while it is news | The recap reaches readers
-  within two days", against an arc that publishes six class days after the
-  event.
-- **CHC2D** — 17 from a second review round, including a notebook handed in
-  three classes before students are told to bring it.
-- **CHA3U** — adversarial review completed and confirmed findings applied on
-  2026-08-21 (see `reviews/CHA3U-2026-08-21.md`). Fixed calendar drift in
-  `Where the Records Live.md`, disabled TOC on single-H2 Curriculum index,
-  added standard 2-slice 70/30 Mermaid pie chart to `How Marks Work.md`,
-  verified and confirmed distinctness of all 11 task OBSERVE prompts and
-  conformance across the 86 class pages, and deepened multi-hit curriculum
-  transclusions.
+- **SPH3U** — adversarial review and fix round completed on 2026-08-21 (see `reviews/SPH3U-2026-08-21.md`, commit `7bed42a9`).
+- **TGJ2O** — adversarial review and fix round completed on 2026-08-21 (see `reviews/TGJ2O-2026-08-21.md`, commit `3c321e6f`).
+- **CHC2D** — adversarial review and fix round completed on 2026-08-21 (see `reviews/CHC2D-2026-08-21.md`, commit `f38e6593`).
+- **CHA3U** — adversarial review completed and confirmed findings applied on 2026-08-21 (see `reviews/CHA3U-2026-08-21.md`, commit `89a6bacc`). Fixed calendar drift in `Where the Records Live.md`, disabled TOC on single-H2 Curriculum index, added standard 2-slice 70/30 Mermaid pie chart to `How Marks Work.md`, verified and confirmed distinctness of all 11 task OBSERVE prompts and conformance across the 86 class pages, and deepened multi-hit curriculum transclusions.
 
 Prefer a **fresh adversarial review** over hunting the old lists: a review
 against the current state settles what is still true and costs less than
