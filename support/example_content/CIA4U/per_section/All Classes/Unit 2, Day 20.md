@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Defences, second half
+1. Defences, second half, on the same terms
 2. What the class found — where interventions worked, where they backfired, and, with [[Efficiency and Equity]], what we were actually disagreeing about
 
 ## Things to do before our next class

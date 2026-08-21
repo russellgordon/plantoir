@@ -37,8 +37,12 @@ Canada — the economic cycle, stakeholder demands, the responsibilities
 shared with provinces, infrastructure, debt service. Say which of those
 constrains your recommendation.
 
-**The monetary side.** D3.1 and D3.2 ask what the Bank of Canada can do and
-how money and interest rates transmit to the economy. The policy rate was
+**The monetary side, which is two questions and not one.** D3.1 asks what
+the Bank of Canada can do — the rate, the money supply, the exchange rate.
+D3.2 asks something different: by what route that reaches a household or a
+firm, and how long it takes. Answer both; a brief that lists the tools and
+never traces one to a spending decision has done half of this. The policy
+rate was
 held at 2.25% on 15 July 2026 with the next fixed announcement date of
 2 September 2026 — retrieve the current one from series `V39079` before you
 submit, and say what it is on the day you write.
@@ -63,6 +67,10 @@ you early.
 - **A constraint named on each side.** One fiscal factor from D2.1 and one
   monetary mechanism from D3.1 that genuinely bear on this recommendation,
   with the current rate retrieved and dated.
+- **The route traced, not just the lever named.** D3.2: follow that
+  mechanism from the Bank to somebody who actually changes what they spend,
+  and say how many months it takes. A lever with no route attached is a
+  list, not an argument.
 - **Influence assessed, not listed.** Who will try to move this decision,
   by what means, and which of those means is actually likely to work.
 - **Two risks and an early indicator for each.** Named series, not moods.
@@ -72,8 +80,13 @@ you early.
   without help, and it can come from anywhere in the brief — judged
   against the five above, exactly as the writing is.
 - **Your own paragraphs, initialled.** Every paragraph carries the
-  initials of whoever wrote it, and all four parts carry paragraphs from
-  both of you. I mark you on the paragraphs with your initials.
+  initials of whoever wrote it, and all four parts — the fiscal side, the
+  monetary side, the politics, and what could go wrong — carry paragraphs
+  from both of you. Inside the monetary side that means both of you write
+  on the tools AND on the route they travel, because those are the two
+  separate things D3.1 and D3.2 ask for, and splitting them between you
+  puts each of you a whole expectation short. I mark you on the paragraphs
+  with your initials.
 
 ## Working in pairs, marked individually
 

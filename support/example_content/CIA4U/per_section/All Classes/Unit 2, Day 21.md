@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. [[The Intervention Argument]] papers handed in
-2. [[A Model of Your Own]] conferences, one at a time
+2. [[A Model of Your Own]] conferences, one at a time — two minutes each, which is why the two questions are chosen in advance
 3. While the conferences run: retrieval across Unit 2 — the firm, the structure, the failure, the remedy
 4. Then, at your own pace: one market from Units 1 and 2 analysed end to end
 

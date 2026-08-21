@@ -49,7 +49,11 @@ questions.**
   or corrects one, and whether anybody is charged for the cost or paid
   for the benefit. Every programme on the list above has third parties;
   if yours appears not to, you have drawn the boundary of the transaction
-  too widely.
+  too widely. Say as well whether any of the third parties you named bears
+  an ENVIRONMENTAL cost or gains an environmental benefit — and if none
+  does, say why not. That question gets asked of a dental benefit and a
+  retrofit programme alike; only one of them has an interesting answer,
+  and finding out which is the work.
 - **Effectiveness assessed, not asserted.** C3.2 asks you to assess
   programmes designed to narrow income inequality. That means an
   evaluation with a comparison group, or an honest statement that none

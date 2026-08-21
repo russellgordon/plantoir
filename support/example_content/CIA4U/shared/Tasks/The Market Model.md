@@ -21,7 +21,7 @@ series — the model is only interesting if it can be checked.
 
 ## What to produce
 
-**A short report (about 1,000 words) and a five-minute presentation.**
+**A short report (about 1,000 words) and a four-minute presentation.**
 
 Your report has to do four things.
 
