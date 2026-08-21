@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 enableToc: true
 ---
-Ten poems across the year, each read beside something it argues with.
+Ten poems across the semester, each read beside something it argues with.
 
 | Poem | Poet | Read beside |
 | --- | --- | --- |

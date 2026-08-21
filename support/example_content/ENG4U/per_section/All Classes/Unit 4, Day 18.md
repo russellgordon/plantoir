@@ -13,7 +13,7 @@ tags:
 
 1. Review, part three: testimony, dystopia, the frame — then the
    comparative essay under time
-2. Then the habit that ran through the year: claim, mechanism, evidence,
+2. Then the habit that ran through the semester: claim, mechanism, evidence,
    objection
 
 ## Things to do before our next class

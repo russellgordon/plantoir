@@ -21,13 +21,13 @@ read your essay.
 
 | Checkpoint | When | What is due |
 | --- | --- | --- |
-| **1. The choice** | Mid-October | Text approved, plus a paragraph on why this one |
-| **2. The reading** | Early December | Annotations, a passage log of at least sixteen entries, three candidate questions |
-| **3. The argument** | Mid-February | Thesis with a mechanism, a full outline, three secondary sources logged with your own sentence on each |
-| **4. The draft** | Late March | A complete draft, workshopped in class |
+| **1. The choice** | Late September | Text approved, plus a paragraph on why this one |
+| **2. The reading** | Early November | Annotations, a passage log of at least sixteen entries, three candidate questions |
+| **3. The argument** | Early December | Thesis with a mechanism, a full outline, three secondary sources logged with your own sentence on each |
+| **4. The draft** | Early January | A complete draft, workshopped in class |
 
-Each is assessed. They exist because the failure mode of a six-month
-project is invisible until April, and completely fixable in December.
+Each is assessed. They exist because the failure mode of a semester-long
+project is invisible until January, and completely fixable in November.
 
 ## The essay
 

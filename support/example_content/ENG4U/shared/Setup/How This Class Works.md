@@ -30,14 +30,14 @@ repeatedly.
 
 [[The Independent Study]] is the largest single piece of work in the
 course: a text you choose, read alone, research, write about at length,
-and then defend out loud. It runs from October to April with four
+and then defend out loud. It runs from September to January with four
 checkpoints, and it is deliberately close to first-year university work —
-including in how badly it goes if it is started in March.
+including in how badly it goes if it is started in December.
 
 ## Talking
 
 You will speak in every class, lead a seminar, and defend your
-independent study aloud in April. If that
+independent study aloud in January. If that
 is difficult, come and tell me in the first week and we will build to it
 deliberately. [[Seminar Skills]] has the moves.
 

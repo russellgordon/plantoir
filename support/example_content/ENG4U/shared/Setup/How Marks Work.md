@@ -18,6 +18,12 @@ evidence rather than averaged from the first week onwards. An argument
 you could not make in September and can make now is evidence of what you
 can do now, and now is the thing a mark is supposed to describe.
 
+```mermaid
+pie title Where your mark comes from
+    "The semester's work" : 70
+    "The final evaluation" : 30
+```
+
 The remaining **thirty per cent** is the final evaluation, in two very
 different rooms: the [[Final Examination]], three hours of which nearly
 half is on texts you have never seen, and the finished essay and oral

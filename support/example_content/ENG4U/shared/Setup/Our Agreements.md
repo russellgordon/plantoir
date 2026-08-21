@@ -18,7 +18,7 @@ enableToc: true
 
 ## The texts, and what they deal with
 
-This year includes a play about grief, surveillance, and a young man
+This course includes a play about grief, surveillance, and a young man
 contemplating suicide, and a novel about a state built on the control of
 women's bodies, including sexual violence. Every text page names what it
 deals with.
