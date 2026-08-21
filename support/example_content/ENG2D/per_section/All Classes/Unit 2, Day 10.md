@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. [[The Scene, Staged]], day 3 — blocking period: where people stand and
-   who moves first
-2. Concept: [[Dramatic Form]] revisited — the last image before the
+1. [[The Scene, Staged]], day 3 — blocking period: where people stand,
+   who moves first, and where the eyes go
+2. I come round every group and leave one note; you use it on the first
+   run of the rehearsal, day 4 of this task
+3. Concept: [[Dramatic Form]] revisited — the last image before the
    lights go down
 
 ## Things to do before our next class

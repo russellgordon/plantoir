@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Scene, Staged]], day 1 — groups and scenes chosen
+1. Launch: [[The Scene, Staged]], day 1 — the criteria table read, then
+   groups and scenes chosen
 2. What staging means: cuts, blocking, delivery, silence
 3. First read-through in groups
 

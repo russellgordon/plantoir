@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Media Deconstruction]], day 1 — texts chosen and
-   approved
+1. Launch: [[The Media Deconstruction]], day 1 — the criteria table read,
+   then texts chosen and approved
 2. The analysis begun, with evidence from the text itself
 
 ## Things to do before our next class

@@ -30,8 +30,10 @@ Copy this into your notebook — the boxes here are printed, not clickable.
 - [ ] [[Showing Growth]] — the pair, and three named differences
 
 > [!warning] The one people forget
-> The drafts. A final copy with nothing behind it cannot show growth, and
-> growth is what the last part of this course is judging.
+> The drafts. Nothing in this folder carries a mark — but a final copy
+> with nothing behind it leaves you nothing to set beside it in
+> [[Showing Growth]], and that pair is the only place you get to see how
+> far the term actually moved you.
 
 %%curriculum-start%%
 ## Curriculum connection
