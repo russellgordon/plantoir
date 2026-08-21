@@ -166,6 +166,26 @@ rather than being deleted.
   them; it is a report-quality change, not a hang risk, which is why it is
   not in 1.1.0.
 
+  **✅ Landed later the same day** — GUI-IMPROVEMENTS row 299, branch
+  `issue/assist-engine-log`, with a full section in `WINDOWS-HANDOFF.md`.
+  Both streams go to a FILE rather than a pipe, so the no-blocking-read
+  property that made `nullDevice` safe is kept structurally rather than
+  promised; a bounded tail is sampled when the engine fails to start, every
+  fifteen seconds while the window is open, and at teardown. Capped at
+  twelve lines a conversation.
+
+  **This is a request back to Windows, and it will turn your suite red.**
+  `contracts/shared-rules.json` → `activityTrail.mustRecord` gained
+  **`assistant engine said`**, so the list pin fails until `Plantoir.Core`'s
+  `ActivityTrail.Event` gains the same entry. Nothing is broken; the case is
+  waiting for you. The hard half is already there —
+  `LocalModel.NoteServerLine` and `RecentServerLog` keep a 60-line ring
+  buffer of exactly this output, and nothing yet puts any of it on the trail.
+  **Re-measure the healthy-start noise on your own engine build before
+  copying the filter**: warnings are excluded here because the Metal build
+  prints six benign ones at every start (five a CORS block, one a token-type
+  quirk), and a Vulkan or CPU build may not print the same six.
+
 - ✅ DONE (mac, 2026-08-20). **`./verify.sh` passes against the changed
   shared scripts — all nine checks, and the npx question is settled.** Run
   from a clean clone of `dev` with the v1.1.0 tree: image built from the

@@ -3816,6 +3816,103 @@ then; and because a cancelled request leaves the slot's cache in a state we
 would then be reasoning about rather than observing. Not worth it for a
 fraction of a second.
 
+## What the engine says now reaches a problem report — without a pipe (2026-08-20)
+
+Answering the gap `MAC-HANDOFF.md` recorded the same day. Until now
+`AssistServerHost` sent `llama-server`'s stdout and stderr to
+`FileHandle.nullDevice`, so a report from a teacher whose assistant was
+misbehaving could carry **nothing the engine had said** — no load error, no
+slot warning, no timing. Windows already had `NoteServerLine` for this. The
+mac now samples too, and the interesting part is what it does INSTEAD of a
+pipe, and how narrow the filter is.
+
+**A file, not a pipe, and the pipe is the trap.** `nullDevice` was never
+laziness: a redirected pipe nobody drains fills up, and the engine then blocks
+on its next log write, mid-request, looking exactly like a hung model. That is
+the wedge Windows had to fix by draining both streams, and discarding the
+output is precisely why the mac never had it. Swapping in a `Pipe` would have
+traded a diagnostics gap for that bug. So both streams now go to ONE FILE in
+the temporary directory, and a bounded tail is read **when somebody asks** —
+never on the engine's timetable. A write to a file has no reader to wait for.
+`AssistEngineLogTests.testTheEnginesOutputIsNeverReadThroughAPipe` pins it by
+reading the source for `Pipe(` and `readabilityHandler`, because every other
+test in the file would pass with the wedge back in.
+
+`AssistServerHost.lines(in:since:atMost:)` is a free function taking the mark
+by reference, so each look reports what arrived SINCE the last one; it reads at
+most the recent 64 KB however long the engine has run, drops the part-line that
+skipping ahead lands on, and resets a mark left past the end of a file that has
+shrunk. `stop()` closes the handle but deliberately LEAVES the file — the
+engine-never-became-ready path calls `stop()` before anybody has looked, and
+the reason it never became ready is the last thing in there. `discardEngineLog()`
+is the separate step, and a sweep on start removes anything older than a day
+that a force-kill left behind.
+
+**The filter is narrow, and the narrowness is measured, not guessed.** Driven
+against the bundled engine on this Mac (llama.cpp b10435, Qwen2.5-1.5B, 2026-08-20):
+
+- Lines carry a severity letter as their **second field** —
+  `0.46.018.667 E srv send_error: …` — so `E` is the signal.
+- **Warnings are deliberately NOT recorded.** A perfectly healthy start prints
+  **six** of them: five are a CORS block warning that all origins are allowed
+  and no API key is set (which cannot matter on a server bound to 127.0.0.1),
+  and one is `control-looking token: 128247 '</s>' was not control-type`, a
+  quirk of the weights. Recording warnings would have spent the entire budget
+  on noise before the teacher asked anything.
+- A word test sits beside the severity test as a fallback, matching `error`,
+  `exception`, `failed`, `failure`. The severity field is this build's format
+  and a future build could drop it; and it is what catches
+  `W srv operator(): got exception: …`, the one warning worth having. Verified
+  that none of the six healthy-start lines contain any of those words.
+
+Two lines were provoked deliberately and both are caught: a malformed request
+body (`got exception: … parse error`) and an over-long prompt
+(`E srv send_error: … request (20030 tokens) exceeds the available context size
+(8192 tokens), try increasing it`).
+
+**When it samples.** Three moments, all in `AssistSession`:
+
+1. **The engine never became ready** — the tail is taken with the filter OFF,
+   because then every line is the diagnosis, ordinary ones included.
+2. **Every fifteen seconds while the window is open**, filtered. Sampling only
+   at teardown would have been simpler and would have missed the case this is
+   FOR: a teacher whose assistant is misbehaving right now, filing a report
+   without closing anything. The loop ends itself once the cap is reached, so a
+   badly behaved engine costs a fixed amount of work rather than a permanent one.
+3. **On `finish()`**, before the log is discarded.
+
+**Capped at twelve lines per conversation.** The trail is deliberately coarse —
+it is a record of what the TEACHER did, and its failure mode is that the one
+line that mattered ends up on page forty. Twelve is enough for a model that
+will not load and nowhere near enough to bury a morning's work. Lines are cut
+to 200 characters, and go through `LogRedactor` on the way in like everything
+else — which matters here, because the engine prints the model's full path.
+
+### This adds a contract event, and the Windows suite will go red
+
+`contracts/shared-rules.json` → `activityTrail.mustRecord` gained
+**`assistant engine said`**, and `ActivityTrail.Event` gained the matching
+case. The test that compares the two lists runs on both platforms, so
+**`Plantoir.Tests` will fail until `Plantoir.Core`'s event list gains the same
+entry.** That is the mechanism working, not damage: it is a request, and it is
+written up in `MAC-HANDOFF.md` as one.
+
+The work on your side is small, because the hard half is already there.
+`LocalModel.NoteServerLine` and `RecentServerLog` already keep a 60-line ring
+buffer of exactly this output. What is missing is that nothing puts any of it
+on the trail. Add the event, sample `RecentServerLog` at the three moments
+above, and reuse the filter — **but re-measure the healthy-start noise on your
+own engine build before trusting the warning rule.** Vulkan and CPU builds
+print different startup lines from the Metal one, and the whole reason
+warnings are excluded here is a specific set of six lines that may not be your
+six. Say what you measured.
+
+One difference worth keeping rather than closing: Windows drains into memory
+because it must (a redirected pipe has to be read), while the mac writes to a
+file because it can. Do not "bring the mac into line" by switching it to a
+pipe — the file is what makes the no-blocking-read property structural rather
+than a promise about always having a reader attached.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
