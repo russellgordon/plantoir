@@ -2,6 +2,8 @@
 title: Our Agreements
 publish: true
 created: __CREATED__
+tags:
+  - setup
 enableToc: true
 ---
 ## What we agree to
@@ -36,7 +38,12 @@ declines to explain something, that refusal is part of the text.
 
 The non-fiction unit reads Thomas King's *The Inconvenient Indian*
 alongside it, which argues about exactly this — how stories about
-Indigenous people have been told in North America, and by whom.
+Indigenous people have been told in North America, and by whom. King was
+read as a Cherokee writer for his whole career, and in November 2025 he
+accepted genealogical findings that he has no Indigenous ancestry. We
+keep the book and we stop calling him an Indigenous writer, and the
+question that leaves open is one we work on rather than one we get past.
+[[The Inconvenient Indian]] sets it out before you read a word of him.
 
 ## Using AI honestly
 

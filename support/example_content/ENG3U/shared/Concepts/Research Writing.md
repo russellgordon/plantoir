@@ -2,7 +2,8 @@
 title: Research Writing
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - concepts
 ---
 Research writing is argument with other people's work in it. The
 difference from an ordinary essay is not the number of sources; it is
@@ -12,13 +13,17 @@ that you now have to manage voices other than your own.
 
 | Move | Looks like |
 | --- | --- |
-| **Support** | "As Fee argues, the novel's orality is a formal choice rather than a stylistic one (18)." |
-| **Extend** | "Fee's account of orality explains the interviews but not the dream sequences, where…" |
+| **Support** | "As one critic argues, the novel's orality is a formal choice rather than a stylistic one." |
+| **Extend** | "That account of orality explains the interviews but not the dream sequences, where…" |
 | **Complicate** | "That reading holds for the first half; after the funeral the novel does the opposite." |
 | **Disagree** | "This underestimates how much the novel withholds — see chapter nine." |
 
 The first is the weakest and the most common. The other three are what
 research writing is *for*.
+
+"One critic" is a placeholder here and a fault in your own writing: name
+them and give the page. A reader judges a claim partly by whose it is,
+and has to be able to go and check it — see [[Citing Sources]].
 
 ## The two failures
 

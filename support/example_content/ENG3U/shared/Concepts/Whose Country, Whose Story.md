@@ -27,11 +27,15 @@ called Canadian, and who decided?
 [[Monkey Beach]] is a novel by Eden Robinson, who is Haisla and Heiltsuk,
 set in her own community. [[The Inconvenient Indian]] is Thomas King's
 argument about how stories about Indigenous people have been told in
-North America, and by whom.
+North America, and by whom — written, as it turned out, from a position
+its author did not hold. See that page before you read it.
 
-Reading them together produces a question the course keeps returning to:
-what happens when a story about a community is finally told from inside
-it, and what does that reveal about the ones told from outside?
+Reading them together produces a question the course keeps returning to,
+and the pairing now asks it twice over: what happens when a story about a
+community is told from inside it, and what happens to an argument about
+who gets to tell it when the arguer was not who he said he was? The
+second question does not cancel the first, and it is not a reason to stop
+reading King. It is the reason this unit is worth a month.
 
 ## What we do not do
 

@@ -12,9 +12,9 @@ tags:
 
 1. 3.1–3.3: Banquo, and the second murder
 2. What has changed in how Macbeth plans
-3. Poem: "Letter to Sir John A. Macdonald", read beside a play about a
-   crown
+3. Who is not told, and what the play does with that
 
 ## Things to do before our next class
 
-- [ ] Journal: what the poem does that an argument could not.
+- [ ] Journal: the moment Macbeth stops needing to be persuaded, with
+      the passage.
