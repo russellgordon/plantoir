@@ -3860,6 +3860,108 @@ There is deliberately **no web manifest and no 192/512 PWA icon set**. That is
 Android home-screen and installable-app territory, not a favicon, and the
 teacher's site is neither.
 
+## Suppressing Netlify's own ad badge (entry 300)
+
+Netlify can inject a "Powered by Netlify" badge — and a matching pre-launch
+toolbar — into any public site on a free-tier project. Confirmed live
+2026-08-21: their own rollout table has free-plan projects created
+2026-08-19 or later default it **ON**. Every class site this project
+publishes to Netlify was about to start wearing an ad in front of students,
+with no code involved and nothing here to notice it happening.
+
+**There is no API lever.** Netlify's published OpenAPI spec
+(`https://raw.githubusercontent.com/netlify/open-api/master/swagger.yml`,
+6,074 lines, read in full) has nothing named `badge`, `powered_by`, or
+`premium` anywhere on the `Site` object. The only documented control is a
+per-project dashboard toggle — Project configuration → General → Powered by
+Netlify badge — which does not scale to hundreds of teachers' class sites
+and cannot be driven by `deploy.py`'s existing REST calls.
+
+**The one automatic lever Netlify itself documents**: the badge only
+executes through an inline `<script>` their edge injects into the response
+HTML, and a Content-Security-Policy whose `script-src` omits
+`'unsafe-inline'` makes the browser refuse to run it —
+<https://docs.netlify.com/manage/projects/powered-by-netlify-badge/> states
+plainly that "Neither the badge nor the pre-launch toolbar appears, and no
+other project functionality is affected."
+
+### The risk that had to be ruled out first
+
+A blanket `script-src` restriction is only safe if the site's OWN inline
+scripts still work. Before writing a line of the fix, a real built site
+(`courses/EXC2O/.merged_output/section1/public/`, 294 pages) was checked
+directly:
+
+- The dark-mode-before-paint script — the one that matters most, since
+  getting it wrong means every page flashes the wrong theme — is already
+  **external** (`prescript.js`). Safe.
+- Search, graph view, the SPA router — all external (`postscript.js`). Safe.
+- Quartz DOES emit 3 inline `<script>` blocks per page: a search-index
+  prefetch trigger (content varies only by folder depth — a handful of
+  variants), a callout-collapse handler, and a Mermaid pan/zoom script (the
+  latter two byte-identical on every page). None embed secret or
+  teacher-specific data.
+
+### The design, and what was rejected
+
+`write_netlify_headers_file()` (in `scripts/deploy.py`) scans the ACTUAL
+built `public/` folder at deploy time — every `.html` file, every unique
+inline `<script>` body, SHA-256-hashed, plus any cross-origin
+`<script src="https://…">` host — and writes `public/_headers` with a policy
+built from what is really there:
+
+```
+/*
+  Content-Security-Policy: script-src 'self' 'sha256-…' 'sha256-…' … https://cdn.jsdelivr.net;
+```
+
+Only `script-src` is set, never `default-src` — nothing else about a page
+(images, fonts, styles, network requests) is touched. It runs on the
+Netlify path only (Cloudflare Pages and `local_folder` don't have this
+badge), right after any production rebuild and right before the
+delta-deploy manifest is built, so `_headers` rides along in the same SHA-1
+manifest as every other file — no separate upload step.
+
+Two designs were considered and rejected:
+
+1. **A hardcoded hash allow-list for Quartz's own known scripts.** Rejected
+   because it goes stale the moment Quartz's bundling changes on a version
+   bump — a silent breakage discovered only when a teacher reports a dead
+   page — and it does nothing for a teacher who pastes their own
+   `<script>` into a note for some embed. Scanning the real build handles
+   both automatically, at the cost of nothing more than a directory walk on
+   an already-built site.
+2. **Patching Quartz's TSX components so every inline script becomes an
+   external file**, matching what already happens for `prescript.js`
+   (`patches/Head.tsx` filters resources by `loadTime` and only THAT
+   resource gets rendered `src=`). Rejected because Quartz's source isn't
+   vendored here — it's cloned fresh at Docker build time
+   (`Dockerfile:27`) — so this would mean chasing down, in upstream
+   TypeScript this repo doesn't keep a copy of, whichever components emit
+   the callout-collapse and Mermaid scripts, and re-verifying the patch on
+   every future Quartz version bump. The scanning approach needs none of
+   that: it observes output, not implementation.
+
+Deterministic build to build (same content ⇒ same hashes ⇒ same file),
+which is the same property `documentation/07-deployment.md`'s "Why
+determinism matters" section already requires of everything else in
+`public/`, for the same delta-deploy reason. Verified against the real
+Example Course build: 5 unique inline-script hashes (2 static, 3 folder-depth
+variants of the search-prefetch trigger), 1 cross-origin host
+(`cdn.jsdelivr.net`, KaTeX's autorender script).
+
+Tested in `scripts/test_deploy_netlify_headers.py` — pure stdlib, no Docker,
+no network — and wired into `verify.sh` as a fast pre-check that runs before
+the (slow) image build, so a broken change here fails in milliseconds.
+
+A teacher who clicks "Show details" during a deploy sees plain-language
+lines explaining what this step is doing and that it checked the site's own
+scripts first, so it reads as something deliberate rather than as
+unexplained new console noise.
+
+**Shared Python — nothing to mirror.** Windows inherits this the moment
+`deploy.py` is next synced; there is no C# equivalent to write.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
