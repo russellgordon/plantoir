@@ -16,6 +16,12 @@ Every Grade 12 credit in Ontario is built the same way.
 | The term's work | 70% | Spread across the whole semester |
 | The final evaluation | 30% | [[The Case Examination]], three hours, at the end |
 
+```mermaid
+pie title Where your mark comes from
+    "The semester's work" : 70
+    "The final evaluation" : 30
+```
+
 The seventy is not an average of everything you have ever handed in. It
 leans towards your **most recent and most consistent** work, because the
 question a mark answers is what you can do now, not what you could do in
