@@ -15,4 +15,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Two passages marked for your seminar.
+- [ ] Mark two passages from the banquet scene you would want a room to
+      argue about. Groups and acts are assigned next class.

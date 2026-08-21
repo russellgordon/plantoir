@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. [[The Independent Study]], checkpoint two: annotations, passage log,
+1. [[The Independent Study]], day 3 of 10 — checkpoint two:
+   annotations, passage log,
    three candidate questions
 2. Conferences; the rest of the room reads
 

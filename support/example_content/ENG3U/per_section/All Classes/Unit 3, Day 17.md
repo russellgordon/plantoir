@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Hand in [[The Comparative Response]] — day 5
+1. Hand in [[The Comparative Response]] — day 5 of 5
 2. Discussion: [[What Is Canadian Literature For]]
 
 ## Things to do before our next class

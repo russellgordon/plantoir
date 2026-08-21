@@ -12,7 +12,7 @@ tags:
 
 1. Tutorial: [[Seminar Skills]] — the moves, practised on one passage
 2. Whole-class seminar led by me, as the model
-3. [[The Macbeth Seminar]], day 2 — groups and acts assigned
+3. [[The Macbeth Seminar]], day 2 of 6 — groups and acts assigned
 
 ## Things to do before our next class
 

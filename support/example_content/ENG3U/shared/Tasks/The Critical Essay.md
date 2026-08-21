@@ -5,7 +5,7 @@ created: __CREATED__
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · six class periods · 1,200–1,400 words · assessed on all
+> Individual · seven periods, the last of them the hand-in · 1,200–1,400 words · assessed on all
 > four categories
 
 ## The task
@@ -41,6 +41,14 @@ a conclusion that says what follows. The detail is on [[The Essay]].
 | 4 | Draft |
 | 5 | Workshop: partner marks unsupported claims and the weakest paragraph |
 | 6 | Rewrite; quotations and citations checked |
+
+## The margin note
+
+A hundred and fifty words, written in the first ten minutes of the day it
+is due: which of the six periods actually changed the essay, and what you
+would do differently on the next one. It is marked as writing, like
+anything else here, and it is the shortest thing on this page that will
+still be useful to you in the examination room.
 
 ## How it is marked
 

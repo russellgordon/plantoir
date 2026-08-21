@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Comparative Response]], day 4 — workshop: your partner marks
+1. [[The Comparative Response]], day 4 of 5 — workshop: your partner marks
    every place the comparison exists without doing any work
 2. [[Judging Your Own Work]] against the criteria, on your own
 3. Rewrite the paragraph where the comparison is weakest

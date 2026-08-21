@@ -35,6 +35,23 @@ whole text, at least two secondary sources used to extend or complicate
 rather than to agree, and a counter-reading engaged. The method is on
 [[Research Writing]]. It is handed in on Unit 4, Day 14.
 
+## The defence, and the note
+
+Two small things at the end, and neither is a formality.
+
+**Two minutes, out loud, on Unit 4, Day 14 or 15.** Your claim, the piece
+of evidence you would not give up, and the objection you found hardest.
+No slides. This is the only place in the final thirty per cent where I
+hear you think rather than read you thinking, and for some of you it is
+where your argument is at its clearest.
+
+**Three hundred words, handed in with the essay.** Which reading
+strategies actually moved this forward and which you abandoned; what the
+passage log did for you that annotating alone did not; and — reading your
+own first checkpoint beside the finished essay — what you can now do as a
+writer that you could not do in November. Write it after the essay is
+finished, not before.
+
 ## How it is marked
 
 | Category | What I am looking for |
@@ -42,7 +59,7 @@ rather than to agree, and a counter-reading engaged. The method is on
 | Knowledge | The whole text, known well enough that your evidence comes from all of it |
 | Thinking | An argument that could only have come from reading this text closely |
 | Communication | Sustained organisation across 2,000 words, which is a different skill from 700 |
-| Application | Research integrated, cited, and used for something |
+| Application | Research integrated, cited, and used for something; the argument survives being said out loud to a room |
 
 > [!warning] The failure mode, stated in advance
 > Choosing in November, reading in January. The checkpoints catch it. If
@@ -51,6 +68,10 @@ rather than to agree, and a counter-reading engaged. The method is on
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A2.3]]
+
+![[A3.1]]
 
 ![[C1.3]]
 

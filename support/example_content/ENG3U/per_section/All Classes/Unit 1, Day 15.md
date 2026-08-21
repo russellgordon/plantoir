@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Hand in [[The Close Reading Essay]] — day 5
+1. Hand in [[The Close Reading Essay]] — day 5 of 5
 2. Three essays read aloud; the room names the mechanism in each
 3. Tutorial: [[Getting Unstuck]], and [[Getting Help]]; [[Help Sessions]]
    explained

@@ -16,7 +16,7 @@ Copy this into your notebook — the boxes here are printed, not clickable.
 - [ ] [[Your First Entry]], untouched
 - [ ] At least twenty-five journal entries, dated
 - [ ] Annotated copies of the short stories and of two acts of the play
-- [ ] Passage notes for your seminar novel, with page numbers
+- [ ] Passage notes for your seminar act, with act, scene, and line
 - [ ] Your vocabulary page
 - [ ] Your [[Judging Your Own Work]] entries, one for each of the four
       essays

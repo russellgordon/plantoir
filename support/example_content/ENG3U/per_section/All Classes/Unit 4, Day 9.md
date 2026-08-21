@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Independent Study]] — drafting period, in silence
+1. [[The Independent Study]], day 5 of 10 — drafting period, in silence
 
 ## Things to do before our next class
 

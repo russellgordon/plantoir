@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Critical Essay]], day 4 — drafting period
+1. [[The Critical Essay]], day 4 of 7 — drafting period
 2. Reference: [[The Essay]] open on the desk
 
 ## Things to do before our next class

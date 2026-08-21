@@ -5,7 +5,7 @@ created: __CREATED__
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · four class periods · 900 words · assessed on Thinking,
+> Individual · five periods, the last of them the hand-in · 900 words · assessed on Thinking,
 > Knowledge, and Communication
 
 ## The task

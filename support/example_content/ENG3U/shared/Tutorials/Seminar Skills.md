@@ -23,9 +23,9 @@ actually get tested.
 
 | Move | Sounds like |
 | --- | --- |
-| Open with evidence | "On page 84 he says… which suggests…" |
+| Open with evidence | "At 1.7.1 he says \"If it were done…\" — which suggests…" |
 | Build | "That connects to what Amir said about…" |
-| Complicate | "That works for chapter two, but what about the ending?" |
+| Complicate | "That works for Act 1, but what about the banquet?" |
 | Invite | "Sara, you had a different reading of that scene." |
 | Steelman | "The strongest version of that argument is…, and even then…" |
 | Concede | "You are right, and it changes my claim to…" |

@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Seminars: groups five and six — the play finished in the last of them
+1. [[The Macbeth Seminar]], day 6 of 6 — seminars: groups five and six.
+   The play is finished in the last of them
 2. The last fifteen minutes: five minutes of silence, then writing — the
    leaders' write-ups, everybody else on the ending of the play
 

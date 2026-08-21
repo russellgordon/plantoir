@@ -29,8 +29,21 @@ tags:
   different shapes.
 - **Five minutes of planning** before the essay. Every year the strongest
   essays have a visible plan in the margin.
-- **Analysis longer than quotation**, under pressure, which is a habit
-  rather than a decision.
+- **Analysis longer than quotation**, under pressure. Practised often
+  enough now that it should not cost you thinking time in the room.
+
+## How it is marked
+
+The same four categories as everything else, on writing produced under
+time. What changes is not the standard but the conditions, and the
+criteria say so.
+
+| Category | What I am looking for |
+| --- | --- |
+| Knowledge | The studied texts are known accurately enough to be quoted from memory and used precisely |
+| Thinking | An unseen passage is read for what it does, not summarised; the essay's claim is arguable and the evidence is chosen |
+| Communication | Organised under time — a plan behind the essay, paragraphs that do one job each, a reader who never has to reread |
+| Application | The method built on texts we studied together works on a text met for the first time this morning |
 
 ## How to prepare
 

@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Independent Study]] — rewrite period; citations checked
+1. [[The Independent Study]], day 9 of 10 — rewrite period; citations checked
 2. Conferences on request
 
 ## Things to do before our next class

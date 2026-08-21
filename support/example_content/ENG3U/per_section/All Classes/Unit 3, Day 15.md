@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Comparative Response]], day 3 — drafting period
+1. [[The Comparative Response]], day 3 of 5 — drafting period
 2. Check-in with me while you draft: ninety seconds each, in seating
    order
 

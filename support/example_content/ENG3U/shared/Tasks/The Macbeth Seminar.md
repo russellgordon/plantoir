@@ -5,13 +5,19 @@ created: __CREATED__
 enableToc: true
 ---
 > [!abstract] At a glance
-> Prepared in threes · one 30-minute seminar led by your group, plus
-> speaking in the others · marked one person at a time, never as a group ·
+> Prepared in threes · six periods, three of them seminar days · one
+> 25-minute seminar led by your group, plus speaking in the others · marked one person at a time, never as a group ·
 > assessed on Communication, Thinking, and Knowledge
 
 ## The task
 
 Lead a discussion of one act of *Macbeth* that the room wants to be in.
+
+Six groups, five acts, three seminar days with two groups in each. Acts 1
+and 5 are each taken by two groups on the same day, from different halves
+of the act and with different questions — which is not a compromise. Two
+readings of the same act, an hour apart, is the clearest evidence this
+course offers that a text does not have one meaning waiting to be found.
 
 ## What your group brings
 
@@ -34,7 +40,7 @@ steelman, concede.
 The preparation is shared; the mark is not. There is no group mark on
 this task. Each of you owns two things of your own:
 
-1. **A named ten minutes** of the half-hour, with the passage that goes
+1. **A named eight minutes** of the twenty-five, with the passage that goes
    with it. Say at the start who is leading which.
 2. **Your own one-page write-up**: your question, the passage you led on,
    what the room did with it, and the answer you did not expect. Written
@@ -56,7 +62,7 @@ be.
 | --- | --- |
 | Knowledge | The question and passages show the act has been read closely |
 | Thinking | The discussion goes somewhere it could not have gone without your preparation |
-| Communication | You listen, respond to what was said, and make room |
+| Communication | Your turn answers what was actually said, and leaves a question the next speaker can pick up |
 
 > [!tip] Questions that have worked in this room
 > "Where does the play stop being about ambition?" · "Is Lady Macbeth's
@@ -109,12 +115,15 @@ TALK — Unit 2, Day 10, while questions are approved one group at a time
   what is on the page there?"
   Then: "Nobody else will have read this act as closely as your three
   have. What is your first two minutes for?"
-  A strong answer treats the half-hour as something built for a
+  A strong answer treats the twenty-five minutes as something built for a
   particular room: it knows where the resistance is meant to come from,
   and what has to happen before anybody will risk an opinion in public.
   That is A2.3, communicating in a structure and style effective for the
-  purpose, subject matter, and audience. The seminar itself cannot
-  separate a designed half-hour from a generous room; this minute can.
+  purpose, subject matter, and audience. You will hear A2.3 again in the
+  seminar itself, and more fully — but the seminar cannot tell you whether
+  the structure was designed or the room was generous, and this minute
+  can. Two hearings of one expectation, which is what recency and
+  consistency are supposed to rest on.
   Record: one line per group on the approval sheet, and a plus where the
   question had already occurred to them.
 
