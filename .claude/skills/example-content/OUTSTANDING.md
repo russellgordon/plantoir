@@ -43,27 +43,13 @@ Both are real, both are outside a Growing Success brief, and both need the
 live ministry document or a payload-wide sweep. A half-done sweep is worse
 than none, so no instance of either was touched.
 
-## Calendar drift in the English payloads
+## Calendar drift in the English payloads — ALL RESOLVED (2026-08-21)
 
-Every English payload runs `class_weekday_step: 1` over 86 classes — September
-to mid-January — and every one of them names months outside that window:
-
-| payload | pages naming February–June |
-|---|---|
-| ENG3U | 26 |
-| ENG4U | 24 |
-| ENL1W | 20 |
-| ENG2D | 15 |
-
-ENG4U's author documented the specifics on its own payload: the independent
-study is described as "October to April", its checkpoints are dated
-"Mid-February" and "Late March", and `Showing Growth`, `Your First Entry` and
-`Portfolios/index` refer to May and June. `How This Class Works` and
-`Tasks/index` carry it too.
-
-Not every hit is a defect — a month can appear in a text, a quotation or a
-generic reference — so this needs reading per instance rather than a
-find-and-replace. The scheduling claims are the ones that mislead.
+All four Ontario English payloads (`ENG4U`, `ENG3U`, `ENL1W`, `ENG2D`) have had their calendar drift audited, independently adversarially reviewed, and aligned to the 86-class semestered calendar (September to mid-January):
+- **ENG4U**: Aligned Independent Study timeline from "October–April" / "six months" to September–January, corrected checkpoint table dates (Late September, Early November, Early December, Early January), updated portfolio/review milestones from June/May to January, corrected review/poetry references from "year" to "semester/course", and added standard 70/30 Mermaid pie chart to `How Marks Work.md`.
+- **ENL1W**: Fixed schedule anachronism in Unit 3 Day 17 (pairing September with November rather than January), updated portfolio/review references from "year" to "semester/course".
+- **ENG3U**: Aligned Independent Study Checkpoint 1 submission/approval between task page and Unit 2 Day 26.
+- **ENG2D**: Clarified multi-day seminar presentation part numbers on Unit 3 Days 8, 9, and 11 (`day 3 (part 1 of 3)`, etc.), aligned literacy test guidance in `The Literacy Test.md`.
 
 ## Corrupted curriculum text in the English payloads — ALL RESOLVED (2026-08-21)
 
