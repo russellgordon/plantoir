@@ -94,6 +94,10 @@ touches a source is not, and it is obvious on day two.
 ![[D3.1]]
 
 ![[A2.6]]
+
+![[D1.3]]
+
+![[D3.2]]
 %%curriculum-end%%
 
 %%

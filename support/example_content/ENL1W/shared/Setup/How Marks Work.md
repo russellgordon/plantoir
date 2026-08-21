@@ -27,6 +27,12 @@ all four at once, which is part of why it comes last.
 
 Every Grade 9 credit in Ontario is built the same way.
 
+```mermaid
+pie title Where your mark comes from
+    "The semester's work" : 70
+    "The final evaluation" : 30
+```
+
 **Seventy per cent** comes from the work of the semester: the five tasks
 you hand in — [[Who You Are, in Three Hundred Words]], [[The Book Club]],
 [[Say It Out Loud]], [[The Fact Check]], and [[The Argument]]. They are

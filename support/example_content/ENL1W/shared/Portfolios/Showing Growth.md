@@ -52,4 +52,6 @@ see in the two pieces without you explaining it.
 ![[C3.8]]
 
 ![[A1.2]]
+
+![[A3.1]]
 %%curriculum-end%%

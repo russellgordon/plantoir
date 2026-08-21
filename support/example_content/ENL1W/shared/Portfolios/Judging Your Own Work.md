@@ -73,3 +73,11 @@ have run it often enough that the answers are already written down, in
 your [[Reading and Writing Journal]], in your own words. People who have
 never done it spend the first five minutes of that conversation
 inventing opinions about their own writing, and it shows.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D1.5]]
+
+![[D3.3]]
+%%curriculum-end%%

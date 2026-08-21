@@ -59,4 +59,6 @@ mountain. Ask of any opening: *why here?* The answer is nearly always
 ![[C1.3]]
 
 ![[C3.1]]
+
+![[C2.1]]
 %%curriculum-end%%

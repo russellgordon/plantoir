@@ -74,6 +74,8 @@ between drafting and editing impossible to fake.
 ![[D2.2]]
 
 ![[B3.1]]
+
+![[D1.2]]
 %%curriculum-end%%
 
 %%

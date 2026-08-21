@@ -85,6 +85,12 @@ another order, take it — and say why in your journal.
 ![[B3.2]]
 
 ![[B3.3]]
+
+![[D1.2]]
+
+![[D2.4]]
+
+![[D3.1]]
 %%curriculum-end%%
 
 %%

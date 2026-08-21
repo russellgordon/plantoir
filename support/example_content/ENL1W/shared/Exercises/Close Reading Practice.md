@@ -66,4 +66,6 @@ stress a different one.
 ![[C2.3]]
 
 ![[C3.1]]
+
+![[C2.4]]
 %%curriculum-end%%

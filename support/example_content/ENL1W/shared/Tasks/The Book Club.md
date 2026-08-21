@@ -88,6 +88,10 @@ contribution is not part of it. See [[How Marks Work]].
 ![[A3.2]]
 
 ![[C1.1]]
+
+![[B1.2]]
+
+![[C2.2]]
 %%curriculum-end%%
 
 %%
