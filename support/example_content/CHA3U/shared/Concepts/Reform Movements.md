@@ -63,5 +63,7 @@ into [[North and South]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C1.1]]
+
 ![[C2.2]]
 %%curriculum-end%%

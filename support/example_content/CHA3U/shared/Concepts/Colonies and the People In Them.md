@@ -65,5 +65,9 @@ on to matter.
 
 ![[B1.2]]
 
+![[B3.1]]
+
 ![[B3.2]]
+
+![[B3.3]]
 %%curriculum-end%%

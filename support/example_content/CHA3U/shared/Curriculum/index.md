@@ -2,7 +2,7 @@
 title: Curriculum
 publish: true
 created: __CREATED__
-enableToc: true
+enableToc: false
 ---
 Everything this course does points at one or more of these expectations,
 from **CHA3U — American History, Grade 11, University Preparation**.

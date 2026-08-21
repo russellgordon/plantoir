@@ -60,5 +60,7 @@ Set this beside the conflicts in [[Wars Before the Revolution]], and use
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B2.1]]
+
 ![[B2.3]]
 %%curriculum-end%%

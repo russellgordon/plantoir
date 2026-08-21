@@ -73,4 +73,6 @@ read John Ross's petition as its authors meant it.
 ## Curriculum connection
 
 ![[C2.1]]
+
+![[C3.4]]
 %%curriculum-end%%

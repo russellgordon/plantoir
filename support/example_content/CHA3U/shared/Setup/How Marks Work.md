@@ -18,6 +18,12 @@ January if it is plainly there by then. **Thirty per cent** comes from a
 final evaluation at the end, which has to reach across the whole course
 rather than test the last unit.
 
+```mermaid
+pie title Where your mark comes from
+    "The semester's work" : 70
+    "The final evaluation" : 30
+```
+
 **The seventy** is the work of the four units. In the order you meet it:
 [[The Source Study]], [[The Colonies Compared]], [[The Revolution Question]],
 [[Slavery and the Nation]], [[The Union Divided]],

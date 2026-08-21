@@ -53,8 +53,13 @@ applied:
   event.
 - **CHC2D** — 17 from a second review round, including a notebook handed in
   three classes before students are told to bring it.
-- **CHA3U** — 14, including five of eleven OBSERVE prompts being one probe in
-  five costumes.
+- **CHA3U** — adversarial review completed and confirmed findings applied on
+  2026-08-21 (see `reviews/CHA3U-2026-08-21.md`). Fixed calendar drift in
+  `Where the Records Live.md`, disabled TOC on single-H2 Curriculum index,
+  added standard 2-slice 70/30 Mermaid pie chart to `How Marks Work.md`,
+  verified and confirmed distinctness of all 11 task OBSERVE prompts and
+  conformance across the 86 class pages, and deepened multi-hit curriculum
+  transclusions.
 
 Prefer a **fresh adversarial review** over hunting the old lists: a review
 against the current state settles what is still true and costs less than

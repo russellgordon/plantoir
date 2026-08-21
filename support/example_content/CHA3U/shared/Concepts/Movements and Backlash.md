@@ -74,9 +74,13 @@ right tool and [[Rights and Movements]] the right place to argue it out.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E1.1]]
+
 ![[E2.1]]
 
-![[E3.3]]
-
 ![[E2.2]]
+
+![[E3.2]]
+
+![[E3.3]]
 %%curriculum-end%%

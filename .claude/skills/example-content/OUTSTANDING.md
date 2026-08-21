@@ -37,10 +37,13 @@ when the account limits hit. Each is worth picking up as its own piece.
   notebook handed in three classes before students are told to bring it (and
   into the examination), and a "Conduct" criteria row on the culminating task
   while the mark page says conduct is not marked.
-- **CHA3U** — reviewed against a moving target (files changed mid-review; the
-  reviewer said so and pinned a timestamp). 14 findings including a Document
-  Examination OBSERVE whose window ends where the observed behaviour would
-  start, and five of eleven OBSERVE prompts being one probe in five costumes.
+- **CHA3U** — adversarial review completed and confirmed findings applied on
+  2026-08-21 (see `reviews/CHA3U-2026-08-21.md`). Fixed calendar drift in
+  `Where the Records Live.md`, disabled TOC on single-H2 Curriculum index,
+  added standard 2-slice 70/30 Mermaid pie chart to `How Marks Work.md`,
+  verified and confirmed distinctness of all 11 task OBSERVE prompts and
+  conformance across the 86 class pages, and deepened multi-hit curriculum
+  transclusions.
 
 ## Committed, and the review's completeness is UNVERIFIED
 
