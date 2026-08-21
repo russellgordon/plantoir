@@ -66,6 +66,11 @@
         "why": "The one assistant failure that leaves nothing else behind - no turn, no tool, no output."
       },
       {
+        "carries": "course, section, and one line the engine itself printed - shortened, and redacted like every other line on the trail",
+        "event": "assistant engine said",
+        "why": "Until this existed a report from a teacher whose assistant was misbehaving could carry nothing the engine had said, because both its streams went to the null device. That was not laziness: a redirected pipe nobody drains fills up and blocks the engine mid-request, which is exactly what wedged the Windows server, so the output must never be read on the engine's timetable. It goes to a FILE, and a bounded tail of it is sampled onto the trail - never the firehose. What is sampled is deliberately narrow, and the narrowness was measured against a real engine: a healthy start prints six warnings that are pure noise here (a CORS block that cannot matter on a loopback-only server, and a token-type quirk in the weights), so warnings are NOT recorded. Errors are, along with any line naming an error or an exception - which is the shape of the two lines worth having, 'request (20030 tokens) exceeds the available context size' and 'got exception'. When the engine never becomes ready at all, the tail is taken whatever it says, because then every line is the diagnosis."
+      },
+      {
         "carries": "course, section, and the sentence the teacher typed, on its own marked line",
         "event": "assistant asked",
         "why": "Recorded the moment the teacher's words are ACCEPTED, above every branch below it - not when the message goes to the model, and not when an answer comes back. Two different bugs came from placing it lower: a sentence matching a fixed shape returns early and never reaches the model, so a whole class of input left no trace at all; and an engine that failed, or one still thinking when the teacher gave up, lost the sentence that caused the trouble. It is also what the report's checkbox keys off, so recording it late made the checkbox vanish for somebody who had plainly just used the assistant. The general rule: record what the teacher did where they did it, above every branch, never at a later point that can be skipped."

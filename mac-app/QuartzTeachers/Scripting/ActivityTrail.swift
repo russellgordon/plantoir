@@ -44,6 +44,7 @@ nonisolated enum ActivityTrail {
         case assistantOpened = "assistant opened"
         case assistantReady = "assistant ready"
         case assistantWouldNotStart = "assistant would not start"
+        case assistantEngineSaid = "assistant engine said"
         case assistantAsked = "assistant asked"
         case assistantChoseATool = "assistant chose a tool"
         case assistantCouldNotAnswer = "assistant could not answer"
