@@ -145,6 +145,18 @@ rather than being deleted.
   next version with a test that pins "cannot send until the warm-up has
   returned".
 
+  **✅ Landed later the same day** — GUI-IMPROVEMENTS row 298, branch
+  `issue/assist-warm-up-gate`. `canSend` now requires `hasFinishedWarmUp`,
+  and `AssistWarmUpTests` pins it against a stub engine that holds its
+  answer. One correction to send back the other way, because it changes what
+  the fix should be claimed to do: **3.1 ≈ 1.4 + 1.7 is the signature of two
+  requests strictly serialised on one slot**, so the 1.4 s is moved out of
+  the answer and into the wait rather than saved — measured from the window
+  opening, the total is unchanged. What it buys is that nothing depends on
+  the engine's behaviour with two requests in flight, and that the trail's
+  first `assistant chose a tool` timing is no longer polluted by leftover
+  warm-up.
+
   **One diagnostics gap this turned up, for the next session rather than
   this one.** Reason 3 is also a cost: with the engine's output going to
   `/dev/null`, nothing llama-server says can ever reach a problem report —
