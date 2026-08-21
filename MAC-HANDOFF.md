@@ -483,6 +483,109 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **The Windows hero pair had three separate bugs, found by actually looking
+  at it next to the mac's** (Windows, 2026-08-21, commit "Fix Windows hero
+  image: stray border pixels, tiny windows, and an empty Obsidian sidebar").
+  Russell asked directly: "compare the macOS hero image to the Windows hero
+  image captures and you will see what I mean" — and looking, rather than
+  reasoning about the code, is how all three were actually found and fixed.
+  - **A hairline of the window's own border was baked into every card.**
+    `DWMWA_EXTENDED_FRAME_BOUNDS` (used because `GetWindowRect` includes an
+    invisible resize border — already known, see the entry below) excludes
+    that invisible border but NOT the thin accent border Windows 11 draws
+    directly on the window, so the raw grab kept 1 DIP of that border colour
+    on all four edges. It reads as near-black (52-54, 52-54, 52-54) in BOTH
+    appearances, since it is the system border colour, not the app's — so it
+    shows as stray dark pixels once composited onto the page's own
+    background, worst on the light cards. Measured identically on all three
+    window kinds (Obsidian, Plantoir, Edge) in both themes: exactly 2 real
+    pixels at this machine's 2x scale, i.e. 1 DIP. Fixed by cropping that
+    border off before masking the corners, and shrinking the corner-radius
+    mask to match (`BORDER_DIPS`, `photograph()` in `hero_windows.py`). If
+    the mac's own captures ever show a comparable hairline, this is the shape
+    of bug to look for — but `screencapture -l` returning a window with its
+    corners already transparent (rule 1 in the marketing-screenshots skill)
+    means the mac has never had a border baked into the bitmap to begin with.
+  - **The card size was a REAL-PIXEL cap, so it didn't scale with the
+    display.** `card_geometry()`'s 1680x960 cap was tuned on a
+    1920x1080-at-150% machine, where it read as "almost the whole screen"
+    (1120x672 DIPs out of a 1280x672 DIP work area). The same 1680x960 REAL
+    pixels on a 200%-scaled screen is only 840x480 DIPs — a physically small
+    window whose UI barely shows anything, which is exactly what "you can
+    barely see anything in each window" was describing. Re-expressed the cap
+    in DIPs (`CARD_WIDTH_DIP = 1120`, `CARD_HEIGHT_DIP = 640` — the size the
+    old cap actually was, in points, on the machine it was tuned on) and
+    multiplied by `scale_factor()` at capture time, so a card occupies the
+    same fraction of the desktop on any display. Cards went from 1680x960 to
+    2240x1280 real pixels on this (200%-scaled) machine; nothing changes on a
+    100%-scaled one.
+  - **Obsidian's sidebar was three collapsed folder names, because nothing
+    ever told it to be anything else.** The mac's rich sidebar (several
+    folders open, real class notes visible) turned out to depend on nothing
+    reproducible — no fold state is stored anywhere in a vault's
+    `.obsidian/` (checked `workspace.json` by hand; there is no
+    `expandedFolders` key or equivalent), so it can only be Electron's own
+    per-machine local storage remembering what Russell has manually browsed
+    on that Mac over time. That is not something a fresh Windows vault has
+    ever had a reason to accumulate, and setting the file-explorer leaf's
+    `autoReveal: true` in `workspace.json` before launch was NOT sufficient
+    on its own — it visibly expanded the active note's ancestors but settled
+    mid-scroll, short of the note itself, and repeated waits up to 6s did not
+    change where it stopped. What worked, tested with `autoReveal` explicitly
+    OFF to confirm it does not depend on that setting at all: Obsidian's own
+    **"Reveal current file in navigation" command**, fired through the
+    command palette (`Ctrl+P`, type the name, Enter) once the window is
+    placed at its final size. It deterministically expands every ancestor
+    folder AND scrolls to the note, highlighted, regardless of any persisted
+    per-vault state — which is also why it is the right fix rather than the
+    `autoReveal` setting: it does not depend on Electron local storage that a
+    fresh machine will never have. New helper `reveal_active_file()` in
+    `hero_windows.py`, called from `capture_obsidian()`. **Worth knowing if
+    the mac's demo vault is ever reprovisioned from scratch** (a new machine,
+    or `~/Desktop/Teaching` deleted and rebuilt): the mac's own rich sidebar
+    would come back collapsed too, for the identical reason, and the same
+    command would be the fix there — nothing about it is Windows-specific,
+    it just happened to be found here because Windows had no accumulated
+    local-storage state to be masking the bug.
+  - **A pre-existing risk, found while testing this and fixed alongside it**:
+    `capture_edge()`'s `stop("msedge.exe")` (`taskkill /F /IM msedge.exe`)
+    kills every Edge process on the machine, scratch profile or not. On a
+    machine where Edge is also someone's real browser — which it was, on
+    this one, mid-session — that silently closes whatever they had open.
+    New `stop_matching(process_name, command_line_contains)` uses
+    `Get-CimInstance Win32_Process` to filter by command line before
+    killing, so only the process launched against our own
+    `--user-data-dir=EDGE_PROFILE` is touched; verified live with a
+    non-matching filter first (confirmed zero processes selected) before
+    trusting it against the real one. **Not extended to `Obsidian.exe` or
+    `Plantoir.exe`** in this pass — Plantoir is explicitly pre-authorised to
+    be force-closed on Windows regardless (`CLAUDE.md`, "An agent working on
+    Windows may close a running Plantoir without asking"), and no real
+    Obsidian was running to be at risk here. If the mac's own Safari capture
+    ever needs an equivalent, it already has one structurally: the `⎚`
+    profile keeps scratch state separate from Russell's own Safari, so a
+    `killall Safari` (if it has one) is not the same class of risk to begin
+    with.
+  - **Left unresolved, and NOT chased further**: the Plantoir card's native
+    title bar came back light in a dark-appearance capture, 4 runs out of 4
+    in this session, including with an extra 3s settle after `write_theme()`
+    before launch (ruling out a simple registry-propagation race).
+    `ShowHeroWindowAsync` (`MarketingShotCapturer.cs`) sets `RequestedTheme`
+    on the content root and the progress view, which is why the MENU BAR and
+    everything below it renders correctly dark — but nothing there touches
+    the native caption's dark-mode attribute, which is presumably meant to
+    follow the OS registry `write_theme()` already sets before launch. Why
+    that isn't landing is unknown: possibly a genuine gap (no explicit
+    `DwmSetWindowAttribute(..., DWMWA_USE_IMMERSIVE_DARK_MODE, ...)` call
+    anywhere in this codepath), possibly specific to capturing over RDP,
+    where this session ran. `site/img/hero-windows-dark.png` ships with this
+    flaw rather than being blocked on it — the three bugs above are the ones
+    Russell asked about and are confirmed fixed; the title bar is a smaller,
+    separate defect for a future session to chase, on a physical console
+    rather than RDP if possible, to rule that variable out first.
+  - Reference: `website/shots/hero_windows.py` (`photograph`, `card_geometry`,
+    `reveal_active_file`, `stop_matching`).
+
 - **Windows marketing shots re-taken, a Windows hero pair added, and an
   already-known theming bug re-fixed the right way** (Windows, 2026-08-20).
   - **What changed**: Russell redeployed the demo sites and initially asked
