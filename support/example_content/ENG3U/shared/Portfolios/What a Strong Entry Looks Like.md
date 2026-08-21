@@ -13,9 +13,11 @@ Two entries about the same class.
 
 ## Strong
 
-> 2.1–2.2. What struck me: Macbeth cannot say "murder". He says "it",
-> "the deed", "this business" — eleven substitutions before the killing
-> and none after. Lady Macbeth says "blood" plainly in the next scene.
+> 2.1–2.2. What struck me: Macbeth will not call the murder his. He says
+> "it", "the deed", "this business", and when the word does surface it
+> belongs to somebody else — a personified "withered murder" in the
+> soliloquy, a voice that cries it through the wall. Lady Macbeth says
+> "blood" plainly in the same scene.
 >
 > In discussion I argued that the evasions show guilt. Devon said they
 > show planning — you cannot say the word out loud in a house full of

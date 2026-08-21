@@ -19,7 +19,7 @@ page is how to choose the text you will live with.
 
 ## A starting list
 
-| Text | Writer | Why it rewards ten weeks |
+| Text | Writer | Why it rewards two months |
 | --- | --- | --- |
 | *Fifteen Dogs* | André Alexis | A philosophical premise executed exactly; won the Giller Prize in 2015 |
 | *The Break* | Katherena Vermette (Métis) | Multiple narrators, one night, and a community's response |

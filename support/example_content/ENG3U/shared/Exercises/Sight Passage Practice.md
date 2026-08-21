@@ -5,8 +5,9 @@ created: __CREATED__
 tags:
   - exercises
 ---
-Unseen passages, answered under time. This is the examination's largest
-single section and the one that improves fastest with practice.
+Unseen passages, answered under time. Prose and poetry together are
+forty-five per cent of the examination — more than any other part of it,
+and the part that improves fastest with practice.
 
 **1.** Read this and answer in one sentence each: what has happened, and
 how do you know?

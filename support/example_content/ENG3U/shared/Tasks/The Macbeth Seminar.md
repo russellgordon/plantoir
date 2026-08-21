@@ -16,11 +16,11 @@ enableToc: true
 
 Lead a discussion of one act of *Macbeth* that the room wants to be in.
 
-Six groups, five acts, three seminar days with two groups in each. Acts 1
-and 5 are each taken by two groups on the same day, from different halves
-of the act and with different questions — which is not a compromise. Two
-readings of the same act, an hour apart, is the clearest evidence this
-course offers that a text does not have one meaning waiting to be found.
+Six groups, five acts, three seminar days with two groups in each. Act 1
+is taken by two groups on the same day, from different halves of it and
+with different questions — which is not a compromise. Two readings of the
+same act, half an hour apart, is the clearest evidence this course offers
+that a text does not have one meaning waiting to be found.
 
 ## What your group brings
 
@@ -46,8 +46,10 @@ this task. Each of you owns two things of your own:
 1. **A named eight minutes** of the twenty-five, with the passage that goes
    with it. Say at the start who is leading which.
 2. **Your own one-page write-up**: your question, the passage you led on,
-   what the room did with it, and the answer you did not expect. Written
-   in the last part of that same period and handed in before you leave.
+   what the room did with it, and the answer you did not expect — plus the
+   one thing you would do differently the next time you have the floor.
+   Written in the last part of that same period and handed in before you
+   leave.
 
 ## Speaking in the other seminars
 

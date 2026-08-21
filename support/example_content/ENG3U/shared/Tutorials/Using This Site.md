@@ -20,7 +20,8 @@ serves. Follow one and you land on the page that explains it properly.
 
 **The bottom of a page says where else it is used.** "When did we do
 this?" lists every page that links to the one you are reading — which is
-how you find the four classes that used [[Thesis and Argument]] without keeping a list.
+how you find the four classes that used [[Thesis and Argument]]
+without keeping a list.
 
 > [!tip] On your phone
 > The folder list hides behind the menu icon at the top left, and the

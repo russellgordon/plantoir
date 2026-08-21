@@ -2,6 +2,7 @@
 title: Sentence and Style
 publish: true
 created: __CREATED__
+enableToc: true
 tags:
   - concepts
 ---

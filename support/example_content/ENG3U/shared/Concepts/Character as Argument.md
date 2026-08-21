@@ -2,6 +2,7 @@
 title: Character as Argument
 publish: true
 created: __CREATED__
+enableToc: true
 tags:
   - concepts
 ---

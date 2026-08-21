@@ -20,9 +20,11 @@ enableToc: true
 
 Thomas King published this book as a Cherokee writer, and it was read
 that way — an argument about Indigenous people made from inside. In
-November 2025 a genealogist working for the Tribal Alliance Against
-Frauds, which King did not commission, traced both sides of his family
-and found no Cherokee and no other Indigenous ancestry. King accepted the
+October 2025 King wrote to the Tribal Alliance Against Frauds himself,
+asking to put the question to rest. Their genealogist traced his father's
+ancestry down both branches it could have come through — the King line,
+and the line of Elvin Hunt, the grandfather his father learned about late
+— and found no Cherokee in either. King accepted the
 finding. Writing in the *Globe and Mail* on 24 November 2025 he said
 there was "no Cherokee on the King side. No Cherokee on the Hunt side,"
 and that he would rest in his mother's Greek family.

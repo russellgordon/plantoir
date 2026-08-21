@@ -7,7 +7,7 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · ten weeks, four checkpoints · a text you choose and a
+> Individual · Units 2 to 4, four checkpoints · a text you choose and a
 > 2,000-word essay · the four checkpoints are marked within the seventy
 > per cent; the finished essay is part of the final thirty
 
@@ -26,7 +26,7 @@ essay you have written. See
 | **3. The argument** | Unit 4, Day 6 | Thesis with a mechanism, an outline, and two secondary sources logged |
 | **4. The draft** | Unit 4, Day 12 | A complete draft, workshopped in class |
 
-Each checkpoint is assessed. They exist because a ten-week project done
+Each checkpoint is assessed. They exist because a project this long done
 in the last fortnight reads exactly like one, and because the fix is easy
 in November and impossible in January.
 
@@ -51,8 +51,10 @@ where your argument is at its clearest.
 strategies actually moved this forward and which you abandoned; what the
 passage log did for you that annotating alone did not; and — reading your
 own first checkpoint beside the finished essay — what you can now do as a
-writer that you could not do in November. Write it after the essay is
-finished, not before.
+writer that you could not do in November. Add two sentences on the
+defence once you have given it: what your voice did well in those two
+minutes, and what you would work on before the next time you have to say
+an argument out loud. Write it after the essay is finished, not before.
 
 ## How it is marked
 
@@ -85,11 +87,7 @@ finished, not before.
 
 ![[B4.2]]
 
-![[C2.5]]
-
 ![[C2.7]]
-
-![[C3.6]]
 
 ![[C4.2]]
 

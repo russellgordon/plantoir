@@ -5,7 +5,7 @@ created: __CREATED__
 tags:
   - reading
 ---
-Eight poems, spread across the year rather than blocked, each read beside
+Eight poems, spread across the course rather than blocked, each read beside
 something else.
 
 | Poem | Poet | Read beside |

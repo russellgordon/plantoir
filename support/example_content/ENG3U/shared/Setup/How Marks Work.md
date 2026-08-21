@@ -21,12 +21,14 @@ paragraph you could not write at the start and can write now is evidence
 of what you can do now, which is the thing a mark is supposed to
 describe.
 
-The remaining **thirty per cent** is the final evaluation, and it is two
+The remaining **thirty per cent** is the final evaluation, and it is three
 things in two very different rooms: the [[Final Examination]], written
 under examination conditions on texts you have not seen, and the finished
-essay of [[The Independent Study]], ten weeks with a text you chose.
-Deliberately different, so that neither one afternoon nor one essay
-decides this alone.
+essay of [[The Independent Study]], two months with a text you chose, and
+the two minutes in which you defend that essay out loud. Deliberately
+different, so that neither one afternoon nor one essay decides this
+alone — and so that the last thing this course asks for is not only
+something written.
 
 **The seventy** is everything else that is handed in and marked:
 [[The Close Reading Essay]], [[The Macbeth Seminar]],
@@ -40,10 +42,10 @@ it. It is not a secret; it is just not the useful thing to memorise.
 
 ## The independent study, and why it is weighted where it is
 
-It runs across ten weeks with four checkpoints, and each checkpoint is
-assessed — those four belong to the seventy, and only the finished essay
-counts in the thirty. A student who does the whole thing in the last
-fortnight produces something that reads exactly like a thing done in a
+It runs across two months with four checkpoints, and each checkpoint is
+assessed — those four belong to the seventy; the finished essay and the
+defence of it are the parts that count in the thirty. A student who does
+the whole thing in the last fortnight produces something that reads exactly like a thing done in a
 fortnight, and the checkpoints exist to make that visible early enough to
 fix.
 
