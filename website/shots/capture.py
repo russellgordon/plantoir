@@ -48,7 +48,7 @@ from images import (  # noqa: E402
     WIDEST_WINDOW_PIXELS,
 )
 from composite import fan, side_by_side, diagonal_hero, FIGURE_WIDTH    # noqa: E402
-from safari import SafariWindow, verify_appearance  # noqa: E402
+from safari import SafariWindow, verify_appearance, verify_address_bar  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent.parent
 WEBSITE = REPO / "website"
@@ -600,6 +600,7 @@ def capture_parts(window: "SafariWindow", suffix: str) -> None:
         destination = PARTS / f"home-{course['code'].lower()}-{suffix}.png"
         window.capture(destination)
         verify_appearance(destination, suffix == "dark", course["code"])
+        verify_address_bar(destination, course["code"])
         print(f"   part {destination.name}")
 
 
@@ -703,6 +704,7 @@ def capture_search(window: "SafariWindow", shot: dict, suffix: str) -> None:
     destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
     window.capture(destination)
     verify_appearance(destination, suffix == "dark", shot["id"])
+    verify_address_bar(destination, shot["id"])
     prepare(destination, WIDEST_WINDOW_PIXELS)
     print(f"   saved {destination.name}")
 
@@ -750,6 +752,7 @@ def capture_sites(workspace: Path) -> None:
                     window.capture(destination)
                     # Before the resize, while the page is still full size.
                     verify_appearance(destination, dark, shot["id"])
+                    verify_address_bar(destination, shot["id"])
                     prepare(destination, WIDEST_WINDOW_PIXELS)
                     print(f"   saved {destination.name}")
 
@@ -898,8 +901,12 @@ def preflight_permissions() -> None:
     )
 
     try:
+        # `get version`, NOT `activate`. Any Apple Event to Safari raises the
+        # same "wants access to control Safari" dialog, and this one does not
+        # bring Safari forward — `activate` fronted whatever the teacher had
+        # open, in whatever profile, in the middle of a capture run.
         subprocess.run(
-            ["osascript", "-e", 'tell application "Safari" to activate'],
+            ["osascript", "-e", 'tell application "Safari" to get version'],
             capture_output=True, text=True, timeout=60,
         )
     except subprocess.TimeoutExpired:

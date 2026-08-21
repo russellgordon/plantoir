@@ -100,6 +100,16 @@ is answered two other ways now, neither of which costs an address bar:
   submenu instead, and `open_profile_window` handles both, matching by NAME
   rather than position because that menu's indices shift when a profile is
   added.
+- **`verify_address_bar`**, which stops the run when a shot caught the
+  address field focused with its URL selected in blue. Focus is taken out of
+  the field with Command-F then Escape — the find bar takes focus off the
+  toolbar, and dismissing it hands focus to the web content. **Escape alone
+  is not enough**, and that is why this check exists: Escape in a focused
+  address field reverts the text and LEAVES THE FIELD FOCUSED, which worked
+  often enough to be believed and made the fault a race rather than a bug.
+  Measured: a deliberately focused capture reads 3.6% of the toolbar as
+  selection blue, a clean one 0.000–0.008%, against a 0.4% threshold.
+
 - **`verify_appearance`**, which checks every capture and stops the run when
   a page came out light in a dark pass or the other way round. It reads the
   median luminance of a band well inside the content: measured across the
@@ -134,7 +144,10 @@ partway through a hands-off `--app` run — which is the opposite of useful.
 The two dialogs, so you recognise them if one is slow to appear:
 
 - **"iTerm2 wants access to control Safari."** Tripped with a one-line
-  `osascript` call to Safari.
+  `osascript` call to Safari — `get version`, deliberately, NOT `activate`.
+  Activating brought the teacher's own Safari windows to the front, in
+  whatever profile they were in, in the middle of a capture run. Any Apple
+  Event raises the same dialog, so there is no reason to steal focus for it.
 - **"XCTest is trying to Enable UI Automation."** Tripped by running the
   fixture-based smoke test (`QuartzTeachersUITests/testSidebarShowsExampleCourse`)
   — fast and self-contained, chosen for speed rather than for anything it

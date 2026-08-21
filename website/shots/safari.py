@@ -138,6 +138,14 @@ def open_profile_window(profile: str) -> bool:
     return True
 
 
+# Where to click to take focus out of the address field — a fraction of the
+# window, so it follows a resize. 0.80 across is the empty margin to the right
+# of a class site's text column, and 0.55 down is below the header and above
+# the footer: background on every page this harness photographs.
+MARGIN_ACROSS = 0.80
+MARGIN_DOWN = 0.55
+
+
 class WrongAppearance(SystemExit):
     """A capture came out light in a dark pass, or the other way round."""
 
@@ -174,6 +182,56 @@ def page_is_dark(path: Path) -> bool:
             median = value
             break
     return median < DARK_BELOW
+
+
+class AddressBarSelected(SystemExit):
+    """A capture caught the address field focused, with its URL selected."""
+
+
+def address_bar_selection(path: Path) -> float:
+    """How much of the toolbar strip is macOS selection blue, 0 to 1.
+
+    A focused address field draws its text on a saturated blue selection.
+    Nothing else in a Safari toolbar is that colour — the chrome is grey in
+    both appearances and the traffic lights are red, amber and green — so a
+    run of strongly blue pixels up there means the field is selected.
+
+    Deliberately a MEASURE rather than a yes/no, so the threshold lives with
+    the caller and a borderline case can be printed rather than guessed at.
+    """
+    with Image.open(path) as opened:
+        image = opened.convert("RGB")
+    strip = image.crop((0, 0, image.width, max(1, int(image.height * 0.05))))
+    blue = 0
+    total = 0
+    for red, green, blue_value in strip.getdata():
+        total += 1
+        # Blue clearly ahead of both other channels, and bright enough to be
+        # a selection rather than a dark blue glyph.
+        if blue_value > 120 and blue_value - red > 55 and blue_value - green > 35:
+            blue += 1
+    if total == 0:
+        return 0.0
+    return blue / total
+
+
+def verify_address_bar(path: Path, what: str) -> None:
+    """Stop the run when a shot caught the address field selected.
+
+    This exists because the old Escape-only defocus worked MOST of the time,
+    which is the worst amount: shots came out clean often enough that the
+    ones that did not looked like bad luck rather than a fault. A measure
+    that stops the run turns "sometimes ugly" into "never ships".
+    """
+    fraction = address_bar_selection(path)
+    if fraction < 0.004:
+        return
+    raise AddressBarSelected(
+        f"{what} was photographed with its address bar selected "
+        f"({fraction:.1%} of the toolbar is selection blue, in {path.name}).\n"
+        f"Focus did not leave the address field — see "
+        f"SafariWindow.unfocus_address_bar, which clicks the page's right margin."
+    )
 
 
 def verify_appearance(path: Path, expect_dark: bool, what: str) -> None:
@@ -305,11 +363,26 @@ class SafariWindow:
         self.unfocus_address_bar()
 
     def unfocus_address_bar(self) -> None:
-        """Escape, so the address field is not selected in the photograph.
+        """Take focus OUT of the address field, so it is not selected in the
+        photograph.
 
         A new window opens with the address field focused, and loading a page
-        programmatically does not move focus — every capture then shows the
-        full URL selected in blue, which reads as somebody mid-edit.
+        programmatically does not move focus — the capture then shows the full
+        URL selected in blue, which reads as somebody caught mid-edit.
+
+        **Escape alone is not enough, and that is the whole point of this
+        method.** Escape in a focused address field reverts the text to the
+        loaded URL and LEAVES THE FIELD FOCUSED, with the URL selected — the
+        very thing being prevented. It appeared to work often enough to be
+        believed, which made it a race rather than a bug: some shots came out
+        clean and some did not.
+
+        So focus is moved somewhere it can be SEEN to be: a click in the
+        page's own right-hand margin. `MARGIN_ACROSS` is 0.80 of the way
+        across the window, which on a class site at these dimensions is empty
+        background beside the text column — no link to follow, no word to
+        select. The click lands in the page, which is where focus belongs
+        while a page is being photographed.
         """
         osascript(
             f'tell application "Safari"\n'
@@ -318,6 +391,16 @@ class SafariWindow:
             f'end tell\n'
             'tell application "System Events" to key code 53'
         )
+        time.sleep(0.3)
+        # Command-F then Escape: the find bar takes focus out of the address
+        # field, and dismissing it hands focus to the WEB CONTENT rather than
+        # back to the toolbar. Keyboard only — no coordinates to drift, and
+        # nothing on the page to click by accident.
+        osascript(
+            'tell application "System Events" to keystroke "f" using command down'
+        )
+        time.sleep(0.4)
+        osascript('tell application "System Events" to key code 53')
         time.sleep(0.4)
 
     def press(self, keystroke: str, using: str = "") -> None:

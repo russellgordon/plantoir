@@ -140,15 +140,25 @@ class MarketingScreenshotCase: XCTestCase {
         let process: Process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
         process.arguments = ["-x", "-o", "-l", "\(windowNumber)", temporaryURL.path]
+        // Its own words, kept: "status 1" alone sent one investigation looking
+        // at window numbers when the answer was a permission.
+        let complaints: Pipe = Pipe()
+        process.standardError = complaints
         do {
             try process.run()
-            process.waitUntilExit()
         } catch {
             XCTFail("Could not run screencapture for the \"\(name)\" shot: \(error.localizedDescription)")
             return
         }
+        let said: String = String(
+            data: complaints.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8
+        )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            XCTFail("screencapture failed (status \(process.terminationStatus)) for the \"\(name)\" shot.")
+            XCTFail(
+                "screencapture failed (status \(process.terminationStatus)) for the \"\(name)\" shot"
+                + " — window \(windowNumber), it said: \(said.isEmpty ? "nothing" : said)"
+            )
             return
         }
         guard let data: Data = try? Data(contentsOf: temporaryURL),
