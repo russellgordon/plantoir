@@ -52,8 +52,9 @@ need.
 
 ## Log it
 
-The last minutes belong to your [[Dev Journal]] — what you built, what
-broke, what you would try next. Every professional developer keeps one
+When a period ends with "log it" on the agenda, the last minutes belong
+to your [[Dev Journal]] — what you built, what broke, what you would try
+next. Every professional developer keeps one
 in some form; yours starts now.
 
 > [!tip] If you were away

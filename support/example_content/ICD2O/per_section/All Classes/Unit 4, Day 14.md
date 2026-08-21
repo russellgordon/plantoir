@@ -11,9 +11,13 @@ tags:
 ---
 ## Agenda
 
-1. Second dress run, timed, with the failure plans deliberately
+1. First twenty minutes: your growth statement, written here from your
+   [[Dev Journal]] — [[Showing Growth]] is the method, and the quotes
+   have to be real ones. You have just watched your own work run end to
+   end, which is the best moment to write it
+2. Second dress run, timed, with the failure plans deliberately
    triggered — somebody unplugs something and you carry on
-2. Front of house rehearses: greeting, programmes, and the order of
+3. Front of house rehearses: greeting, programmes, and the order of
    demonstrations
 
 ## Things to do before our next class

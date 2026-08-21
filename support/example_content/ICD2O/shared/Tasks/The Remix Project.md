@@ -7,9 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo or pairs · three working periods · remixes demoed in a short
+> Solo or pairs · six working periods · remixes demoed in a short
 > class showcase during the final period · one changed program plus a
-> before-and-after write-up
+> before-and-after write-up that is yours alone
 
 ## What you are making
 
@@ -29,6 +29,17 @@ of paint, not a remix.
 You hand in the remixed program and a **before-and-after write-up**:
 what the original did, what yours does, what you changed, and why.
 
+If you work in a pair the program is shared, but the write-up is
+**yours alone** — written separately, in your own words, naming which
+changes were yours and which were your partner's. That write-up, and
+what you say at the showcase, are what your own mark is built from;
+there is no shared mark on this task. Two periods set time aside for
+writing it — a slot mid-build and a longer one at the end — so nobody
+ends up copying a partner's paragraphs at eleven at night. For a pair,
+the three rows below that describe the program — meaningfully new,
+still readable, an honest demo — are read against the changes your
+write-up claims as yours, not against the file as a whole.
+
 ## How to work
 
 1. Choose your base program and read it *completely* before touching
@@ -41,9 +52,10 @@ what the original did, what yours does, what you changed, and why.
    [[Debugging Step by Step]] is the way through.
 4. Write the before-and-after as you go, including what broke on the
    way; the detours are the most interesting part of the story.
-5. Demo at the showcase: original behaviour first, then yours. The
-   working periods are class time, and using them well is part of the
-   task — [[How Marks Work]] explains how.
+5. Demo at the showcase: original behaviour first, then yours. Most of
+   the remixing happens in the working periods, where a stall is
+   something I can walk over to — [[How Marks Work]] explains why what
+   I watch counts.
 
 ## Success criteria
 
@@ -55,6 +67,7 @@ what the original did, what yours does, what you changed, and why.
 | Errors worked through | One error and its resolution appear in the story |
 | Still readable | A stranger could find your changes and follow them |
 | An honest demo | The showcase shows before and after, bugs included |
+| Your own part named | The write-up says which changes were yours and which were your partner's |
 
 ## Reflect
 
@@ -78,3 +91,42 @@ steal for your own programs from now on.
 
 ![[C2.6]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 9, the paired workday on the base program
+  Watch for: whether anybody reads the original before touching it.
+  The write-up's "what the original did" paragraph can be reconstructed
+  from the finished file on the last night, and reads identically
+  either way. Day 7's mapping and Day 8's conference show you the same
+  thing earlier; this is the last period where the answer can still
+  change how somebody works.
+  Going well: the navigator reads a block out loud and predicts what
+  it does before the driver types anything; a pair scrolls up to a
+  subprogram they are not editing.
+  Stuck: the file is opened at the bottom and edited immediately, with
+  no part of it read aloud before the first keystroke.
+  Record: a tick beside each pair on your class list for reading first,
+  and a circle round the ones who did not. The circles are who you sit
+  with on Day 10.
+
+TALK — Unit 3, Day 8, at the conference the agenda already schedules
+  Ask: "If I deleted the subprogram you are not planning to touch,
+  what would stop working?"
+  Then: "Where in this file will your change break something that is
+  nowhere near it?"
+  Both are C3.1 heard out loud — analysing existing code for its
+  components and outcomes — and neither can be answered from the part
+  of the program the student has been living in. A strong first answer
+  names the subprogram, what calls it, and what the caller would be
+  left holding; a weak one says "nothing, I don't use it". A strong
+  second answer names a shared variable, a file, or a value two parts
+  both rely on — still C3.1, and the thing that turns a modification
+  into a rewrite when nobody sees it coming.
+  Record: one line each in your day plan, and circle anybody who
+  answered "nothing" — that is the pair to visit first on Day 9.
+
+The product evidence is the remixed program, your own before-and-after
+write-up, and the Day 14 showcase.
+%%

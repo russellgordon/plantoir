@@ -10,11 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Last class: the semester's best bugs, chosen by vote
-2. Course feedback, written and anonymous
-3. What to take next, and where the free programs are — the groups and
-   contests worth your time
+1. Warm-up: [[Tech Headlines]]
+2. Retrieval clinic, the last one: a loop, a conditional, a subprogram,
+   and a security question — cold, in pairs, on paper. Nothing here is
+   marked; this one is about what is still there in June
+3. Compare and correct together
 
 ## Things to do before our next class
 
-- [ ] Go and build something over the break, for nobody but yourself.
+- [ ] Nothing to hand in. Bring the bug you are proudest of surviving.

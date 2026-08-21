@@ -35,13 +35,41 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
-%%curriculum-start%%
-## Curriculum connection
-
 %%
 Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
+This comment sits OUTSIDE the curriculum markers on purpose: everything between
+them is deleted for a teacher who declines curriculum pages, and a note nested
+inside would disappear with it.
 %%
+
+%%curriculum-start%%
+## Curriculum connection
 
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+Fill this in for your own task before you run it. Nothing between these
+markers is ever published; it is a note to yourself, for the days the
+task is actually happening. Write it in plain text: a link written here
+is stripped before anybody can follow it, does nothing for the coverage
+map, and fails the payload linter.
+
+OBSERVE — name the unit, the day, and what that period is for
+
+  Watch for:
+  Going well:
+  Stuck:
+  Record:
+
+TALK — name a conference or check-in the schedule already gives you
+
+  Ask:
+  Then:
+  A strong answer sounds like:
+  Record:
+
+The product evidence is:
+%%

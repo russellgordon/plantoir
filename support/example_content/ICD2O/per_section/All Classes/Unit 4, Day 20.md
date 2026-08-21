@@ -10,11 +10,15 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: [[Tech Headlines]]
-2. Retrieval clinic, last one: a loop, a conditional, a subprogram, and
-   a security question — cold, in pairs, on paper
-3. Compare and correct together
+1. Celebrate: the semester's best bugs, and the demos that beat them —
+   chosen by vote
+2. Course feedback, written and anonymous
+3. Where this goes next, found by you rather than told to you: two
+   concrete paths each — a course, an apprenticeship, a free program, a
+   contest — what it actually takes to get into each, and why that one.
+   Read them out in the last twenty minutes; I will add the ones nobody
+   found
 
 ## Things to do before our next class
 
-- [ ] Journal: what you would tell September-you.
+- [ ] Bring one field you care about. The last class starts there.

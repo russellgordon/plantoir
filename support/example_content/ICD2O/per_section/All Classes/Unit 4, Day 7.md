@@ -13,7 +13,7 @@ tags:
 1. Warm-up: [[Tech Headlines]] — who gets written about, and who does not?
 2. Discussion: [[Can a Machine Be Biased]], then [[Whose Innovations Count]]
 3. Compare and name it: [[Bias and Accessibility in Technology]]
-4. First round of [[The Innovation Brief]] presentations
+4. [[The Innovation Brief]], day 7 — first round of presentations
 5. Launch our culminating task: [[Launch Day]]
 6. Log it in your [[Dev Journal]]
 

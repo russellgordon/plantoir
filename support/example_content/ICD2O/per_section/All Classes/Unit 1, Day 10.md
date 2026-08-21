@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Predict the Output]]
-2. [[The Algorithm Field Guide]], day 6 — working period: each entry tested on
+2. [[The Algorithm Field Guide]], day 5 — working period: each entry tested on
    somebody who has never done that task
 3. Rewrite the step that confused them — that step was always the bug
 

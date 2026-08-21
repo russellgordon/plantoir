@@ -10,7 +10,8 @@ sustained look **across** your whole [[Dev Journal]], written in the
 final week. Every other entry looked at a single day. This one reads
 the entire record and answers the only question a course can really
 be measured by: *what do you leave with that you did not arrive
-with?*
+with?* Nothing in it is marked — see [[How Marks Work]] — which is the
+whole reason it is worth writing straight.
 
 ## Before you write
 
