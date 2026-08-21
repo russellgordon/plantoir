@@ -13,6 +13,7 @@ here needs the image.
 """
 import base64
 import hashlib
+import inspect
 import tempfile
 import unittest
 from pathlib import Path
@@ -135,6 +136,42 @@ class WriteHeadersFileTests(unittest.TestCase):
             second = (public_dir / "_headers").read_text(encoding="utf-8")
 
             self.assertEqual(first, second)
+
+
+class CloudflareIsNeverTouchedTests(unittest.TestCase):
+    """
+    Cloudflare Pages (and local_folder, which never even reaches deploy.py)
+    must never pay any cost for a problem that is Netlify's alone — not a
+    slower deploy, not an extra file, not an extra console line. That
+    guarantee currently rests on main()'s cloudflare branch RETURNING before
+    any Netlify-only code runs, including badge suppression. Pinned
+    structurally here so a future refactor that moves the badge-suppression
+    call earlier fails loudly instead of shipping a silent regression that
+    also ruins the clean A/B comparison between destinations (deploying
+    identical content to both, to check whether a suspected breakage is
+    caused by this feature).
+    """
+
+    def test_the_cloudflare_branch_returns_before_badge_suppression_runs(self):
+        source = inspect.getsource(deploy.main)
+        cloudflare_branch_at = source.index('if args.target == "cloudflare":')
+        # The return that ends that branch specifically, not some other
+        # return elsewhere in main().
+        cloudflare_return_at = source.index("return", cloudflare_branch_at)
+        badge_call_at = source.index("write_netlify_headers_file(public_dir)")
+
+        self.assertLess(
+            cloudflare_return_at, badge_call_at,
+            "write_netlify_headers_file() must only be reachable AFTER the "
+            "cloudflare branch's own return — a Cloudflare Pages deploy "
+            "must never execute this code at all."
+        )
+
+    def test_publish_to_cloudflare_never_calls_the_headers_writer(self):
+        # Belt and suspenders: the function Cloudflare's path actually calls
+        # has no route to the badge-suppression code either.
+        source = inspect.getsource(deploy.publish_to_cloudflare)
+        self.assertNotIn("write_netlify_headers_file", source)
 
 
 if __name__ == "__main__":

@@ -3959,6 +3959,23 @@ lines explaining what this step is doing and that it checked the site's own
 scripts first, so it reads as something deliberate rather than as
 unexplained new console noise.
 
+**Cloudflare Pages pays nothing for a problem that's Netlify's alone**
+(confirmed 2026-08-21, in response to exactly this question). It was
+already true by construction — `main()`'s `if args.target == "cloudflare":`
+branch calls `publish_to_cloudflare()` and returns before reaching the
+Netlify site lookup, the token check, or the badge-suppression call, and
+`local_folder` never invokes `deploy.py` at all — but that guarantee rested
+only on code ORDER, silently, so `CloudflareIsNeverTouchedTests` in
+`scripts/test_deploy_netlify_headers.py` now pins it structurally: one test
+asserts the cloudflare branch's `return` appears before the
+`write_netlify_headers_file()` call site in `main()`'s source, a second
+asserts `publish_to_cloudflare()`'s own source never mentions that
+function at all. A future refactor that moves badge suppression earlier
+fails these tests instead of shipping a silent regression. This also keeps
+Cloudflare a clean control group on purpose: deploying identical content to
+both destinations is a direct way to check whether a suspected site
+breakage is caused by this feature rather than by the build itself.
+
 **Shared Python — nothing to mirror.** Windows inherits this the moment
 `deploy.py` is next synced; there is no C# equivalent to write.
 

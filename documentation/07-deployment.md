@@ -157,6 +157,19 @@ covered under "Why determinism matters" above. Tested in
 `scripts/test_deploy_netlify_headers.py` (no Docker needed — `verify.sh`
 runs it before the image build).
 
+**Cloudflare Pages and `local_folder` pay nothing for this.** It is a
+problem Netlify created, so only a Netlify deploy should carry the cost —
+Cloudflare's `publish_to_cloudflare()` returns from `main()` before this
+code is even reachable, and `local_folder` never invokes `deploy.py` at
+all. No extra file, no extra console line, no extra time on either path.
+This also keeps them a clean control group: deploying identical content to
+both Netlify and Cloudflare is a direct way to check whether a suspected
+breakage on a site is caused by this feature specifically, rather than by
+the build itself. Pinned structurally in
+`CloudflareIsNeverTouchedTests` in `scripts/test_deploy_netlify_headers.py`,
+so a future refactor that moves the badge-suppression call earlier fails
+that test rather than shipping a silent regression.
+
 ### Rate limiting
 
 Netlify's API rate-limits aggressively enough that a class-worth of teachers
