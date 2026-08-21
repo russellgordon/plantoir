@@ -243,13 +243,17 @@ particular: [[Polymers]]. The reference table:
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.7]]
+
+![[A1.12]]
+
 ![[B1.1]]
 
 ![[B1.2]]
 
 ![[B2.2]]
 
-![[A1.7]]
+![[B3.4]]
 %%curriculum-end%%
 
 %%

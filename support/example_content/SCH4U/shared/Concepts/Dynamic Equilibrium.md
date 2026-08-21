@@ -90,7 +90,19 @@ know what the number in them is a statement about.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E1.1]]
+
+![[E1.2]]
+
+![[E2.1]]
+
+![[E2.3]]
+
+![[E2.4]]
+
 ![[E3.1]]
 
 ![[E3.2]]
+
+![[E3.4]]
 %%curriculum-end%%

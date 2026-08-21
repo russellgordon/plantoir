@@ -383,5 +383,7 @@ bench: [[Disturbing an Equilibrium]]. Where question 7 is going:
 
 ![[E3.5]]
 
+![[E3.6]]
+
 ![[E3.7]]
 %%curriculum-end%%

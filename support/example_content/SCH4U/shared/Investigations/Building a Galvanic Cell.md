@@ -243,9 +243,15 @@ catch nearly everybody once. Practice:
 %%curriculum-start%%
 ## Curriculum connection
 
-![[F2.4]]
+![[A1.2]]
 
 ![[F2.2]]
 
-![[A1.2]]
+![[F2.4]]
+
+![[F3.2]]
+
+![[F3.3]]
+
+![[F3.4]]
 %%curriculum-end%%

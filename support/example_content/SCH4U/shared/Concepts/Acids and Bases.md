@@ -190,6 +190,8 @@ measurement: [[Buffers and Titration Curves]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E3.5]]
+
 ![[E3.6]]
 
 ![[E3.7]]

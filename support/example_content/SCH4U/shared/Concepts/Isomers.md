@@ -136,5 +136,7 @@ themselves are sorted in [[Functional Groups]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B2.3]]
+
 ![[B3.5]]
 %%curriculum-end%%

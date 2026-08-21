@@ -251,9 +251,13 @@ is in [[Calorimetry]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
+![[A1.4]]
+
+![[A1.13]]
+
 ![[D2.6]]
 
 ![[D3.4]]
-
-![[A1.13]]
 %%curriculum-end%%

@@ -179,6 +179,14 @@ getting an enthalpy you cannot measure directly, and
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A2.1]]
+
+![[A2.2]]
+
+![[C1.1]]
+
+![[C1.2]]
+
 ![[D1.1]]
 
 ![[D1.2]]

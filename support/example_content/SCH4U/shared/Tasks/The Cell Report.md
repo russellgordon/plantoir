@@ -101,7 +101,13 @@ technology before you read properly, and which number changed your mind?
 
 ![[F1.2]]
 
+![[F2.2]]
+
 ![[F2.3]]
+
+![[F3.5]]
+
+![[F3.6]]
 %%curriculum-end%%
 
 %%

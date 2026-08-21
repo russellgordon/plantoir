@@ -333,6 +333,8 @@ Reading the booklet's tables: [[Reading an Equilibrium Table]].
 ![[E1.2]]
 
 ![[E2.5]]
+
+![[E3.8]]
 %%curriculum-end%%
 
 %%

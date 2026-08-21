@@ -260,13 +260,17 @@ Where the ideas came from: [[Intermolecular Forces]],
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.3]]
+
 ![[C1.1]]
 
 ![[C1.2]]
 
 ![[C2.5]]
 
-![[A1.3]]
+![[C2.6]]
+
+![[C3.5]]
 %%curriculum-end%%
 
 %%

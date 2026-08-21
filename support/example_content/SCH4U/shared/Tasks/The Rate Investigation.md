@@ -281,11 +281,15 @@ arithmetic: [[Rates of Reaction]], [[Rate Law Practice]], and
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.7]]
+
+![[A1.10]]
+
+![[D1.1]]
+
 ![[D1.2]]
 
 ![[D2.8]]
-
-![[A1.10]]
 %%curriculum-end%%
 
 %%

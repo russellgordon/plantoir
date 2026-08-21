@@ -23,6 +23,12 @@ leans towards your **most recent and most consistent** work rather than
 averaging September against January. The remaining thirty per cent comes
 from a final evaluation at the end of the course.
 
+```mermaid
+pie title Where your mark comes from
+    "The semester's work" : 70
+    "The final evaluation" : 30
+```
+
 **The seventy** is three things, and nothing else:
 
 - the five term tasks — [[The Property Prediction]],

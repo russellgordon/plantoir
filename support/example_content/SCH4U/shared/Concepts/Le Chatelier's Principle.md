@@ -157,7 +157,9 @@ equilibrium that runs in every glass of water in the building.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[E3.3]]
-
 ![[E2.2]]
+
+![[E3.1]]
+
+![[E3.3]]
 %%curriculum-end%%

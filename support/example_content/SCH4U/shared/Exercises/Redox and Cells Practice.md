@@ -419,5 +419,7 @@ a cell yourself: [[Building a Galvanic Cell]].
 
 ![[F2.3]]
 
+![[F2.4]]
+
 ![[F2.6]]
 %%curriculum-end%%
