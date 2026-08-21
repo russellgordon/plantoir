@@ -61,7 +61,7 @@ Neither your judgement of your own work nor a classmate's is any part
 of your mark — see [[How Marks Work]]. That is deliberate and it cuts
 both ways: nothing you write here can cost you anything, which is
 exactly what makes it safe to write it honestly. The same goes for the
-bench checks at the end of each unit, which you mark yourself.
+bench checks that close the first three units, which you mark yourself.
 
 What it changes is the work. A walk-round that leads to a fix is the
 cheapest mark improvement available in this course, and by January it

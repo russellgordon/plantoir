@@ -16,6 +16,7 @@ tags:
 3. Checkpoint: while you work I read each bench's binder-so-far against
    the criteria table and leave one written note
 4. Practise: [[Troubleshooting Practice]] — the order you check things in
+5. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

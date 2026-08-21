@@ -17,6 +17,7 @@ tags:
 3. Checkpoint: while you work I read each group's circuit and
    code-so-far against the criteria table and leave one written note
 4. Tutorial: [[Getting Unstuck]] — the three things to try before asking
+5. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

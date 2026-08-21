@@ -31,8 +31,8 @@ the order you meet them: [[The Build Sheet]], [[The Network Job]],
 [[The Gadget]], and [[The Refurb Report]] — plus the milestone entries
 in your [[Tech Journal]], collected at the end of each unit. The four
 are not equally weighted. The Gadget and The Refurb Report carry more
-than the earlier two, because they run longer and ask for everything at
-once, and because they are the more recent evidence of what you can do.
+than the earlier two, because they ask for everything at once, and
+because they are the more recent evidence of what you can do.
 Ask me for the exact split any time you want it; it is not a secret, it
 is just not the useful thing to memorise.
 
@@ -46,17 +46,16 @@ left you with, rather than what one unit did.
 The [[Tech Journal]] entries that carry a mark are the ones written
 **in class, at the bench, in the last minutes of a bench day** — the
 days whose agenda ends by sending you to your journal. What you add at
-home is
-yours, and it is worth doing, but practice you do between classes is
-practice, and I do not mark it.
+home is yours, and it is worth doing, but practice you do between
+classes is practice, and I do not mark it.
 
 Two other things you do often carry no mark at all, deliberately. The
-**bench checks** at the end of each unit are marked by you, against the
-class standard, and exist to tell you what to practise. So does every
-warm-up. Nothing you or a classmate scores can move your percentage —
-that decision is mine, made from evidence, and [[Judging Your Own Work]]
-explains why keeping it that way is what makes an honest self-check
-safe to write.
+**bench checks** that close the first three units are marked by you,
+against the class standard, and exist to tell you what to practise. So
+does every warm-up. Nothing you or a classmate scores can move your
+percentage — that decision is mine, made from evidence, and
+[[Judging Your Own Work]] explains why keeping it that way is what makes
+an honest self-check safe to write.
 
 ## Four kinds of thinking, not one
 
@@ -83,9 +82,10 @@ you.
 reports, journal entries. **What I watch you do** is the second: which
 end of the cable you reach for, whether you measure before you blame
 the code, whether the tester goes on the finished run or the offcut.
-**What you tell me** is the third — the conferences at each task's
-checkpoint are not a progress check, they are evidence in their own
-right, and some of what you understand will only ever show up there.
+**What you tell me** is the third — the conference each task schedules,
+where I come to your bench and ask, is not a progress check; it is
+evidence in its own right, and some of what you understand will only
+ever show up there.
 
 If your hands are slower than your head, the conference is often where
 the strongest evidence of the week comes from. That is not a

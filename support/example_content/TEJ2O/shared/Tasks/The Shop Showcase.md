@@ -46,19 +46,23 @@ with an entry behind it.
    [[Final Reflection]] in step 6 grows straight out of it.
 4. Rehearse with a partner playing a guest who knows nothing — then
    with one playing a guest who knows everything. Both will come.
-5. Showcase evening: artifact on the bench, documentation open, talk
-   ready, questions welcome. Powered demos run the [[Safety in the Lab]]
-   habits in front of guests exactly as on a Tuesday.
+5. Stage the bench the period before, so a guest can look at everything
+   and reach into nothing. Then showcase evening: artifact on the bench,
+   documentation open, talk ready, questions welcome. Powered demos run
+   the [[Safety in the Lab]] habits in front of guests exactly as on a
+   Tuesday.
 6. Afterwards, the writing: your [[Final Reflection]] is drafted in
    class on the day we debrief the evening, and finished in class in
    our last period, journal open beside you. It is the long form of the
    growth statement, and it is part of this task, not an afterword.
 
 Every bench period is class time on purpose: work that carries a mark
-gets done here, where I can watch it happen and you can ask. Day 14's
-conference is this task's checkpoint — I leave you one written note
-against the criteria table below — and Day 15 opens with fifteen
-minutes for acting on it.
+gets done here, where I can watch it happen and you can ask. Day 14 is
+a conference with nothing written down — the fault story, out loud. The
+checkpoint is Day 15, once the documentation, the staged bench and a
+draft growth statement exist to be read: I leave you one written note against
+the criteria table below, and Day 16 opens with fifteen minutes for
+acting on it.
 
 ## Success criteria
 
@@ -66,12 +70,12 @@ minutes for acting on it.
 | --- | --- |
 | A working narrative | What it is, how it works, what went wrong |
 | Proof on the bench | Guests can check any claim in the open package |
-| An organised portfolio | Files gathered, sensibly named, backed up twice |
+| An organised portfolio | Files gathered, sensibly named, backed up in a second place |
 | An honest fault story | The thing that went wrong is told with its diagnosis |
 | Evidence of growth | Early journal entries paired with late ones |
 | Habits named with evidence | Two Skills Passport habits, each with an entry behind it |
 | A reflection that cites itself | Two dated entries behind each claim, and one named route out of this course |
-| Safe habits on display | Power off before a panel moves, guests kept clear of live benches |
+| A bench staged safely | Set up so a guest can look at everything and reach into nothing, power off before any panel moves |
 
 ## Reflect
 
@@ -106,7 +110,8 @@ Triangulation — the evidence you will not have unless you go and get it.
 This is the thirty per cent, so it is the one place where thin evidence
 costs the most — and showcase evening is no use to you for gathering
 any, because you will be steering guests and watching the power bars.
-Both of these happen before it.
+Everything below happens before it, and so does the safe-bench row: it
+is judged at staging on Day 15, not from the floor on the night.
 
 OBSERVE — Unit 4, Day 15, the documentation-and-backup period
   Watch for: whether the second copy is ever OPENED. Making a backup
@@ -120,7 +125,8 @@ OBSERVE — Unit 4, Day 15, the documentation-and-backup period
   Stuck: a copy dragged onto a drive nobody has opened, and forty files
   still called whatever the camera called them.
   Record: initials on the showcase floor plan, ticked when you see a
-  file opened from the second copy.
+  file opened from the second copy — you are walking the benches for the
+  checkpoint note anyway, so this costs you nothing extra.
   That is B1.3. A backed-up portfolio and a portfolio somebody has
   restored from look identical until the day one of them is needed.
 
@@ -140,6 +146,10 @@ TALK — Unit 4, Day 14, the conference already on that agenda
   choosing materials because of what they evidence.
   Record: two ticks per student on the seating plan, one per question,
   plus the route they named in one word.
+  A whole class of solo stations will not fit in one period. Take the
+  students you did not reach on Day 16, while the talks are being
+  rehearsed bench to bench, and date each name so you can see who is
+  still missing.
 
 The product evidence is the artifact, the documentation, the talk on
 Day 17, and the reflection handed in on the last day. Those arrive on

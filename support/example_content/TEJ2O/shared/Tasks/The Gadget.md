@@ -20,10 +20,11 @@ own idea is welcome if you can pitch it in one sentence.
 [[Control Something with Code]] the software ones; now, as
 [[Code Meets Hardware]] promised, they build something together.
 
-The gadget ships with a service package: the circuit diagram, code
-with comments a stranger could follow, and a **demonstrated failure
-mode** — on demo day you show it working, show one way it fails or
-once failed, and walk the room through how you traced the fault.
+The gadget ships with a service package: the circuit diagram, the
+truth table for the decision it makes, code with comments a stranger
+could follow, and a **demonstrated failure mode** — on demo day you
+show it working, show one way it fails or once failed, and walk the
+room through how you traced the fault.
 
 ## How to work
 
@@ -32,14 +33,22 @@ once failed, and walk the room through how you traced the fault.
 2. Diagram the circuit before building it. Predict what each part
    will do, [[Predict the Circuit]]-style, and let
    [[Electronics Fundamentals]] check the arithmetic first.
-3. Build on the breadboard, [[Anti-Static Habits]] on, measuring as
+3. Write the decision down as a truth table before a wire moves: every
+   combination of what your gadget senses, and what it does for each
+   one. Then find the fundamental gate whose own table matches yours —
+   AND, OR, NOT, NOR, NAND or XOR — and derive that gate's table beside
+   your own to show they agree. [[Digital Logic Gates]] and
+   [[Gates in Hardware]] are where you met them; a gadget whose
+   decision cannot be written this way is usually two decisions.
+4. Build on the breadboard, [[Anti-Static Habits]] on, measuring as
    you go — a reading taken now is a diagnosis saved later.
-4. Write the code in passes: make the simplest thing happen, then add
+5. Write the code in passes: make the simplest thing happen, then add
    the decisions and repetition the gadget needs. Comment as you go.
-5. Trace the whole chain — code to interface to circuit to output —
+   The condition you write is the truth table from step 3, in Python.
+6. Trace the whole chain — code to interface to circuit to output —
    until you can narrate every link. When it misbehaves, and it will,
    [[Debugging Basics]] and [[Getting Unstuck]] are the way through.
-6. Log every fault you chase — **each of you keeps your own log**,
+7. Log every fault you chase — **each of you keeps your own log**,
    dated, saying what you tried and what the gadget did — then rehearse
    the demo: working run, failure mode, diagnosis story, service
    package on the bench.
@@ -69,6 +78,7 @@ time. What is yours alone:
 | --- | --- |
 | A gadget that works | The one-sentence job is done, repeatably, on demand |
 | A diagram that matches | The circuit on paper is the circuit on the board |
+| A decision you can prove | The gadget's truth table, beside the fundamental gate whose table matches it |
 | Readable code | Comments let a stranger follow every decision and loop |
 | A traced system | Any member can narrate code to circuit to output |
 | An earned diagnosis | The failure is shown; its cause found, not guessed |
@@ -142,6 +152,9 @@ TALK — Unit 3, Day 22, while the fault documentation is being written
   never once looked at the system as a whole.
   Record: initials plus H or S in the margin of the fault log you are
   reading — whether they reasoned from hardware or from software.
+  Twenty separate answers will not fit in one period; item 3, the
+  rehearsal on the next bench, is what frees you for the second half of
+  the room.
 
 The product evidence is the gadget, the service package, and the
 demonstration on Day 23. Those arrive on their own.

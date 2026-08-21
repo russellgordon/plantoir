@@ -11,9 +11,10 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Name That Part]] — components from your own gadgets
-2. First fifteen minutes at the bench: act on yesterday's note, then walk your own
-   gadget against the criteria table — [[Judging Your Own Work]], and
-   the weakest row written down before you touch a wire
+2. First fifteen minutes at the bench: act on yesterday's note, then
+   walk your own gadget against the criteria table —
+   [[Judging Your Own Work]], and the weakest row written down before
+   you touch a wire
 3. Safety notes, then bench time: [[The Gadget]] workday — build,
    wire, test, repeat
 4. When it fights back: [[Debugging Basics]] and [[Getting Unstuck]] —

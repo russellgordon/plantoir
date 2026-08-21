@@ -15,6 +15,7 @@ tags:
    technician would
 3. Rehearse the demonstration on the next bench — they ask one hard
    question each, and no part of that reaches anybody's mark
+4. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

@@ -14,6 +14,7 @@ tags:
 2. Bench time: measure every value in your own circuit and compare with
    the calculation
 3. Practise: [[Electronics Calculations Practice]] to the end
+4. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

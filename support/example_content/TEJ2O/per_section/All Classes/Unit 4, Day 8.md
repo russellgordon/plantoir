@@ -16,6 +16,7 @@ tags:
 3. Checkpoint: while you work I read each report draft against the
    criteria table and leave one written note
 4. The honest verdict: repair, upgrade, or recycle, with the numbers
+5. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

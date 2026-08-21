@@ -30,20 +30,28 @@ survive the question "why?" three times in a row.
    is, what it claims, what it actually does when powered. Work the
    habits from [[Troubleshooting Practice]]: symptom, test, finding,
    next test. No conclusions on day one.
-2. Open it up — power off and unplugged, strap clipped to the mat,
+2. Ask what the machine is FOR. Every retired machine did somebody's
+   work: find out whose, and what that work is — from whoever donated
+   it, from the profile that came with it, and from the machine itself.
+   Write down what that work would be like without a computer in it, and
+   what changed in it when computers arrived. A verdict written without
+   knowing the job is a guess with a price on it.
+   [[Computers in Every Job]] is the background.
+3. Open it up — power off and unplugged, strap clipped to the mat,
    boards lifted by their edges, the [[Anti-Static Habits]] and
    [[Safety in the Lab]] absolutes in full force, and a partner within
    reach. [[Take It Apart]] taught you the disassembly discipline;
    here it earns its keep, on somebody else's property.
-3. Refurbish what the evidence supports: clean, reseat, replace, and —
+4. Refurbish what the evidence supports: clean, reseat, replace, and —
    if the verdict is heading toward repair — reinstall a working
    system, as practised in [[Install an Operating System]].
-4. Build the environmental case. [[E-Waste and the Environment]] and
+5. Build the environmental case. [[E-Waste and the Environment]] and
    [[Where Does Old Tech Go]] supply what disposal really costs, and
    [[Repair or Replace]] frames the argument. Name the actual local
    agency or partner that would take this machine.
-5. Write the report for the owner: findings, work done, verdict, and
-   the environmental case. [[Writing About Technology]] is the guide.
+6. Write the report for the owner: findings, work done, the job the
+   machine does, the verdict, and the environmental case.
+   [[Writing About Technology]] is the guide.
 
 Every bench period is class time on purpose: work that carries a mark
 gets done here, where I can watch it happen and you can ask. On Day 8 I
@@ -59,6 +67,7 @@ a word more of the report gets written.
 | Safe bench habits | Power off and unplugged, strap to the mat, boards by the edges, partner in reach |
 | Work fits the evidence | Refurbishing matches what the assessment found |
 | A defended verdict | The verdict survives "why?" three times over |
+| The work behind the machine | What this machine is used for, what that work would be like without it, and what changed in it when computers arrived |
 | An environmental case | Real costs and a named local agency or partner |
 | Written for the owner | A non-technician could act on it tomorrow |
 
@@ -85,8 +94,6 @@ about it? Noticing your own thumb on the scale is a trade skill.
 ![[B1.1]]
 
 ![[C2.1]]
-
-![[C2.2]]
 
 ![[D1.1]]
 
@@ -115,7 +122,7 @@ OBSERVE — Unit 4, Day 6, the full-assessment period with the utilities
   maintenance functions, not merely named. A screenshot in a report
   proves it was opened.
 
-TALK — Unit 4, Day 9, while the reports are being written
+TALK — Unit 4, Day 9, the per-bench round the agenda already schedules
   Ask: "Suppose the owner ignores you and buys new. Name one harm that
   decision causes that your report does not mention anywhere."
   Then: "What would the owner have to tell you to flip your verdict?"

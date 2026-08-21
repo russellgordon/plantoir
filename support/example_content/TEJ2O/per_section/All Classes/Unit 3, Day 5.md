@@ -15,6 +15,7 @@ tags:
    schematic you have not seen before
 3. What a schematic assumes you already know — hands up for every
    symbol that stopped you; the count decides tomorrow's opening
+4. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

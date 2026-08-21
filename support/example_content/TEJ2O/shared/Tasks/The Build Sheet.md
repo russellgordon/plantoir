@@ -8,8 +8,8 @@ enableToc: true
 ---
 > [!abstract] At a glance
 > Pairs · launched Unit 1, Day 4 · four bench periods on Days 12, 14,
-> 15 and 16 · client meeting on Day 17 · one build sheet, one
-> fifteen-minute client meeting
+> 15 and 16 · client meeting, revision and hand-in on Day 17 · one build
+> sheet, one fifteen-minute client meeting
 
 ## What you are making
 
@@ -42,8 +42,10 @@ turns, and reading the numbers honestly is the whole game:
    published requirements are the test, not your optimism.
 5. Find your sources yourself — manuals, spec sheets, support pages —
    and cite every number. [[Finding Answers Online]] shows the way.
-6. Client meeting: another bench, acting as your client, reads the
-   sheet and pushes back. Revise, and record what changed and why.
+6. Client meeting, on Day 17: another bench, acting as your client,
+   reads the sheet and pushes back. The fifteen minutes after it are for
+   revising — record what changed and why, then hand the sheet in
+   before you leave.
 
 Every one of those periods is class time, and that is on purpose: work
 that carries a mark gets done here, where I can watch it happen and you
@@ -61,7 +63,7 @@ neither of you anything. Two things are yours alone:
   the client meeting you answer for those lines yourself. Where both
   sets of initials sit on a line, either of you may be asked.
 - **Your own journal entry**, written at the bench in the last minutes
-  of the period the sheet is finished in.
+  of Day 16, the period the sheet itself is written in.
 
 ## Success criteria
 
@@ -95,10 +97,6 @@ choice was easy was not listening to its client.
 ![[B1.2]]
 
 ![[B4.3]]
-
-![[A1.4]]
-
-![[D1.2]]
 %%curriculum-end%%
 
 %%
@@ -138,6 +136,11 @@ TALK — Unit 1, Day 15, the per-pair round the agenda already schedules
   cheapest.
   Record: two ticks per STUDENT in the seating-plan margin — one for
   the source, one for the trade-off.
+  Asking both partners separately is twice as many conversations as
+  there are pairs, and one period does not hold them. Day 16's
+  compatibility check is the overflow — you are walking the benches for
+  the OBSERVE note anyway, and this is the question to ask while you are
+  standing there.
 
 The product evidence is the sheet handed in on Day 17. That one arrives
 on its own.

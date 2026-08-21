@@ -15,6 +15,7 @@ tags:
 3. Where the notes failed you: fix the notes before you leave. I read
    over two shoulders while you do — no marks in it; it tells me whose
    rebuild we slow down next time
+4. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

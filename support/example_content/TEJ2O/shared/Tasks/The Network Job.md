@@ -40,7 +40,12 @@ binder, the job is not done, however well the network runs.
 5. Verify like a technician: prove with the verification utilities
    that every machine sees every other, and record the outputs.
 6. Assemble the binder: room sketch, labelled cable map, address
-   table, test results, honest known-issues list. Then hand it over.
+   table, test results, honest known-issues list — and an access page,
+   built from the permission decisions you wrote down when you made the
+   share: who may read what, and why. Add one line on what it would be
+   wrong to do with the access you were given.
+   [[Security and Ethics]] and [[Locked Down or Wide Open]] are where
+   that argument was had. Then hand it over.
 
 Cutters and crimpers are real tools, and cable work happens under
 desks and up ladders — [[Safety in the Lab]] opens every period and
@@ -72,14 +77,17 @@ person it should be reporting on. Yours comes from:
 | Working addresses | Every machine reaches every other, proof kept |
 | Services delivered | Files move between rooms in both directions |
 | A serviceable binder | Another bench answers questions from it alone |
+| Access written down | Who may read what, why, and what a technician must not do with it |
 | Safe tool habits | Cutters capped when idle, offcuts binned as made, nobody under a desk alone |
 | A section signed by you | Your part of the binder is named, signed, and answerable |
+| An answer you can give | Any service question, any part of the job, answered by whoever is asked |
 
 ## Reflect
 
 Your [[Tech Journal]] entry, written at the bench before tools away:
-what did the tester catch that your eyes missed, and what changes next time you crimp? A cable that failed and
-got remade is better evidence of learning than one that worked first.
+what did the tester catch that your eyes missed, and what changes next
+time you crimp? A cable that failed and got remade is better evidence
+of learning than one that worked first.
 
 > [!success]- If the binder feels like busywork (click to expand)
 > Imagine yourself hired next year to fix this network, with only the
@@ -98,8 +106,6 @@ got remade is better evidence of learning than one that worked first.
 ![[A2.4]]
 
 ![[D2.1]]
-
-![[D2.2]]
 
 ![[B3.3]]
 
@@ -142,6 +148,10 @@ TALK — Unit 2, Day 17, while the binders are being written
   apart.
   Record: one word per STUDENT beside their name on the address table —
   the part of the address they pointed at first.
+  Three to a bench is twenty-odd separate conversations, which is more
+  than one period holds. Take half the benches on Day 16, where the
+  checkpoint already has you standing at each one, and the rest on Day
+  17 — date each name so you can see who is still missing.
 
 The product evidence is the binder handed over on Day 18. That one
 arrives on its own.

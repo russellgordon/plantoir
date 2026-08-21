@@ -15,6 +15,7 @@ tags:
    which end, which mistake. I am counting failure patterns, not
    cables; nothing here is marked
 3. Re-crimp until two cables pass in a row
+4. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

@@ -12,14 +12,13 @@ enableToc: true
 
 ## What you are making
 
-A technician's log of your course: one short entry on every bench day,
-written in the last minutes of class while your hands still remember —
-[[How the Lab Runs]] reserves that time on purpose, and every bench
-day's agenda ends by sending you to your journal, so that nobody has to
-find the time at home. Ten
-honest minutes beats thirty performed ones, and entries are
-**private**: I read them; other students never do. It only works if
-you can admit you have no idea why the machine boots now.
+A technician's log of your course: one short entry on every bench day —
+the days whose agenda ends by sending you to your journal — written in
+the last minutes of class while your hands still remember.
+[[How the Lab Runs]] reserves that time on purpose, so that nobody has
+to find it at home. Ten honest minutes beats thirty performed ones, and
+entries are **private**: I read them; other students never do. It only
+works if you can admit you have no idea why the machine boots now.
 
 > [!important] The entries that carry a mark are the ones written here
 > A journal is collected at the end of each unit, and what I mark are

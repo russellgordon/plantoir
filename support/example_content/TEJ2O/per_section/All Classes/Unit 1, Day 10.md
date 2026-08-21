@@ -15,6 +15,7 @@ tags:
    diagnosed in the written order rather than by swapping parts
 3. Practise: [[Troubleshooting Practice]], first section — I collect
    nothing, I walk and look at which question stalls the most benches
+4. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 
