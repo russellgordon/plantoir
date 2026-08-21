@@ -28,15 +28,10 @@ mechanical checks. What follows is improvement, not repair.
 
 ## What is outstanding, most valuable first
 
-### 1. ENG4U carries the same PDF-scrape damage ENG2D had
+### 1. English Curriculum Text Restorations — ENG4U and ENL1W COMPLETED
 
-Eight ENG2D curriculum pages held Ministry text truncated mid-clause or
-polluted with headings from the next page — `A1.9` ended on the hyphen of a
-line break, and `B1`, an OVERALL expectation and the first thing a student
-meets on `Learning Goals`, stopped at "a variety of literary, informational,".
-Fixed in `8a2ce0f8`. **ENG2D's reviewer reports ENG4U has the identical
-defect, and that ENG3U is clean.** The route is proven and written up below;
-this is the cheapest high-value item left.
+- **ENG4U** — Eight curriculum pages holding truncated Ministry text or polluted headings restored verbatim from the official 2007 Ministry PDF on 2026-08-21 (see `reviews/ENG4U-2026-08-21.md`).
+- **ENL1W** — Wholesale restoration of all 71 curriculum expectation files verbatim from the official 2023 Ministry PDF on 2026-08-21 (see `reviews/ENL1W-2026-08-21.md`), removing pervasive over-capture and swept headings across Strands A–D, disabling TOC on single-H2 curriculum index, adding 70/30 Mermaid pie chart to `How Marks Work.md`, fixing calendar drift in `Where Words Come From.md`, and deepening multi-hit curriculum transclusions to achieve 100% multi-hit coverage.
 
 ### 2. Four payloads with fix rounds that were recorded and never finished
 

@@ -140,13 +140,10 @@ class.
 
 **2. Over-capture — the next subheading is glued onto the end.** `ENG3U/C2.1`
 ends "…for different purposes and audiences Voice", where *Voice* is the
-heading of the following section. **ENL1W has this pervasively** — at least 16
-of its 59 expectation pages, and the true figure is higher because the
-detector misses any heading containing a lowercase word ("Online Safety,
-Well-Being, and Etiquette"). ENL1W is the 2023 curriculum, whose expectations
-carry no bracketed examples, so the "ends with `)`" signal that finds the
-problem in the 2007 courses does not exist there. Treat ENL1W's Curriculum
-folder as needing a wholesale re-fetch rather than a page-by-page repair.
+heading of the following section. **ENL1W** had this pervasively across all 71
+expectation pages; on 2026-08-21 all 71 curriculum expectation files were
+completely restored verbatim from the official 2023 Ministry PDF (see
+`reviews/ENL1W-2026-08-21.md`).
 
 **3. A stray teacher prompt spliced on.** `ENG4U/C4.1` carries two coaching
 questions after its closing parenthesis — "…in which areas are you weak?" —
@@ -234,9 +231,9 @@ once** runs from 0% to 54% with no principle behind the spread:
 
 | Share addressed once | Payloads |
 |---|---|
-| 0% | ADA1O, ATC1O, AVI1O, BOH4M, CGC1W, CGF3M, GLC2O, ICS3U, SNC1W, THJ2O |
+| 0% | ADA1O, ATC1O, AVI1O, BOH4M, CGC1W, CGF3M, ENL1W, GLC2O, ICS3U, SNC1W, THJ2O |
 | 5–20% | CIA4U, TEJ4M, TEJ2O, TGJ2O, TEJ3M, SPH4U |
-| 21–35% | ENG2D, ICD2O, ICS4U, ENG4U, CHC2D, SBI3U, MPM2D, ENL1W, ENG3U, MTH1W, MCMPR11, SPH3U, MDM4U |
+| 21–35% | ENG2D, ICD2O, ICS4U, ENG4U, CHC2D, SBI3U, MPM2D, ENG3U, MTH1W, MCMPR11, SPH3U, MDM4U |
 | 36–45% | CHV2O, CHA3U, SBI4U |
 | **46%+** | **MCV4U 49%, SCH3U 50%, SCH4U 52%, MCR3U 54%, MHF4U 54%, SNC2D 54%** |
 
