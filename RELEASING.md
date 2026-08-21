@@ -6,16 +6,6 @@ assets.** The product version lives in ONE place — `<Version>` in
 `mac-app/project.yml` must say the same number. The About panels read them and
 the git tag must match.
 
-> **No release has ever been cut.** `git tag` is empty and the GitHub releases
-> list is empty, so the first run of this checklist ships **1.0.0**, which
-> `Plantoir.csproj` already declares — there is nothing to bump. The release
-> notes summarise the product rather than a delta. Note also that
-> `website/site.json` already reads version 1.0.0, released August 2026, and
-> the built page's macOS download link already points at
-> `releases/latest/download/…`: that link is dead until the first release
-> exists. The Windows card deliberately says "Coming soon" rather than linking
-> to an asset that has never been published.
-
 > **Which repository?** plantoir.app's download links resolve against
 > `github.com/russellgordon/plantoir`, which matches `origin`. Pass
 > `-R russellgordon/plantoir` explicitly to every `gh` command — a release
@@ -53,12 +43,33 @@ sentences and rules regardless of their OS. Three consequences:
   (Windows only), 2026-08-20; the procedure is in the `cut-release` skill.
 - **"No code changes" does not exempt a platform from the gate.** A mac DMG
   gets the 1.1.0 label only when a mac session has made its suite green
-  against the 1.1.0 contracts — for 1.1.0 concretely: implement the
-  teacher-made-link explainer case, retire the three obsolete WSL-setup
-  cases, run `./verify.sh` against the changed shared scripts (expect the
-  one-time image rebuild), and do the verifications MAC-HANDOFF lists. An
-  unchanged binary re-badged with a new number would claim contracts it was
-  never tested against.
+  against the 1.1.0 contracts. An unchanged binary re-badged with a new
+  number would claim contracts it was never tested against.
+
+  **Worked example, 2026-08-20 — the gate this rule was written for, run.**
+  The mac's list was: implement the teacher-made-link explainer case, retire
+  the three obsolete WSL-setup cases, run `./verify.sh` against the changed
+  shared scripts, and do the two verifications `MAC-HANDOFF.md` listed. All
+  four came back green and **none of them required a behaviour change**, so
+  the DMG joined v1.1.0 rather than becoming 1.1.1. The verifications are
+  the part worth copying: both were "prove it against the real app", and
+  both found something a code read alone would have got wrong — the
+  assistant's warm-up race IS present on the mac (measured: 1.7 s warm
+  against 3.1 s racing it) but cannot produce the failure Windows fixed, and
+  the run-transcript gap that mirrors the Windows one is unreachable here
+  because every task launches through `/bin/bash`. A gate that only asks
+  "does it compile" would have passed both without learning either.
+
+  **A behaviour DID change before that cut, and it did not move the number
+  — here is the test that decides such cases.** Testing the candidate turned
+  up the mac blocking its main thread while setting up a new working folder,
+  which Windows 1.1.0 already handles properly. Ask: **does this bring the
+  lagging platform UP TO the number, or does it change what the number
+  means?** Windows shipped 1.1.0 with the good behaviour, so the mac lacking
+  it was the mac being behind 1.1.0 — fixing it makes the two agree on what
+  1.1.0 is, and 1.1.0 is still the right label. The answer would be the
+  opposite for a change neither platform has shipped: that one earns the
+  next number, because a teacher on Windows 1.1.0 would not have it.
 - **Release notes say "macOS: no changes" (or the reverse) plainly** when a
   platform ships under a new number without behaviour changes. That sentence
   is the entire cost of keeping one series, and it is cheaper than every
@@ -69,9 +80,18 @@ sentences and rules regardless of their OS. Three consequences:
 share a name. So: derive, never hand-maintain — `git rev-list --count HEAD`
 at bundle-build time — bump on every build that leaves the dev machine
 (every DMG and installer, including ones handed to a tester), and never
-reset the count, across marketing versions, forever. The mac's
-`CFBundleVersion` follows this today; the Windows bundle should adopt the
-same number as its version's fourth field when convenient (its trail
+reset the count, across marketing versions, forever.
+
+**The mac does this in `publish.sh`**, which passes
+`CURRENT_PROJECT_VERSION=$(git rev-list --count HEAD)` to `xcodebuild`;
+`project.yml` carries `"0"` as a placeholder for local builds, and
+`Info.plist` reads `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)`
+rather than repeating their values. **This paragraph claimed the mac
+"follows this today" from the day it was written until 2026-08-20, and it
+was not true**: both plist keys were the literal `1.0.0`, so every 1.0.0
+build also reported build 1.0.0 and no two artifacts could be told apart.
+Found while qualifying the mac for v1.1.0. The Windows bundle should adopt
+the same number as its version's fourth field when convenient (its trail
 currently prints the patch digit, which conflates two ideas).
 
 ## The short version

@@ -64,6 +64,45 @@ final class WorkspaceInitializationTests: XCTestCase {
         // Tidy the wizard flag so this test leaves no UI behind.
         workspace.isShowingNewCourseWizard = false
     }
+
+    /// The path the BUTTON takes, which is not the one above.
+    ///
+    /// Setting up a folder copies the whole build recipe — 12,091 files —
+    /// and doing that on the main thread beachballs the window with nothing
+    /// on screen to say why. The button therefore calls the background form,
+    /// and this pins that it produces exactly the same folder and leaves no
+    /// "setting up" state behind. Without it, only the synchronous form the
+    /// button no longer uses would be covered.
+    @MainActor
+    func testInitializingInTheBackgroundProducesTheSameWorkspace() async throws {
+        let folderURL: URL = try makeTemporaryFolder()
+        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        workspace.chooseWorkspace(at: folderURL)
+
+        XCTAssertFalse(workspace.isInitializingWorkspace, "Nothing is being set up before the button is pressed")
+        await workspace.initializeWorkspaceInBackground()
+
+        XCTAssertFalse(workspace.isInitializingWorkspace, "The button must not be left saying \"Setting Up…\" forever")
+        XCTAssertNil(workspace.workspaceProblem)
+        XCTAssertFalse(workspace.workspaceCanBeInitialized, "The folder should now validate as a working folder")
+        XCTAssertTrue(workspace.isShowingNewCourseWizard, "A fresh folder should lead straight into creating a course")
+
+        let fileManager: FileManager = FileManager.default
+        let scriptNames: [String] = ["setup.sh", "preview.sh", "deploy.sh"]
+        for scriptName in scriptNames {
+            let scriptPath: String = folderURL.appendingPathComponent(scriptName).path
+            XCTAssertTrue(fileManager.isExecutableFile(atPath: scriptPath), "\(scriptName) should be copied in, executable")
+        }
+        XCTAssertTrue(fileManager.fileExists(atPath: folderURL.appendingPathComponent("courses").path))
+        XCTAssertTrue(
+            fileManager.fileExists(
+                atPath: folderURL.appendingPathComponent(".toolchain").appendingPathComponent("Dockerfile").path
+            ),
+            "The .toolchain build recipe must be mirrored by the background path too — row 279's defect, one thread over"
+        )
+
+        workspace.isShowingNewCourseWizard = false
+    }
 }
 
 /// Remembering the working folder across launches.

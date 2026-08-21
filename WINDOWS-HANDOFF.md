@@ -3701,6 +3701,41 @@ disappears; and never behind a warning, because the failure is silent and the
 consequence is a teacher's private notes on a public site. If a future change
 adds another such guard, it goes in the Dockerfile and it fails closed.
 
+## The three one-time-setup explainer cases are retired (2026-08-20)
+
+Answering the request in `MAC-HANDOFF.md` rather than leaving it half-done:
+the mac implemented ONE of the two failure-explanation cases proposed from
+that side and **retired the other three**.
+
+- **Implemented here**: the teacher-made-link case. `FailureExplainer.swift`
+  now recognises `untrusted mount point` and says the contract's sentence,
+  checked first exactly as `FailureExplainer.cs` checks it. The output cannot
+  occur on macOS; the mapping exists so the two explainers stay one list of
+  troubles rather than growing a platform switch, which is the reasoning the
+  proposal itself gave.
+- **Retired**: "needs to restart to finish getting ready", "Windows permission
+  was declined", "Windows could not add the feature this needs". They are gone
+  from `contracts/app-rules.json`. The proposal named this outcome as
+  conditional on `windows-native-toolchain` merging; it merged, the container
+  path went with it, and no shipping launcher prints those lines any more.
+  They survive only in 1.0.2, whose launchers are frozen and whose app already
+  recognises them.
+
+**What that means for `SetupExplanation` in `Plantoir.Core`.** It is no longer
+pinned by anything. Delete it when the launcher code that produced those lines
+goes, rather than keeping the only implementation of a rule nothing tests — a
+matcher for output nothing can print reads, to the next person, as a live code
+path.
+
+**And one difference the sync found but did not close.**
+`FailureExplainer.cs` recognises a folder-access failure ("Plantoir couldn't
+read every file in this working folder…") that the mac has never recognised
+and no contract case pins — so the two apps genuinely differ here and nothing
+would catch it. It was left alone on purpose: the sync was a release
+qualification, and adding a sentence would have made the mac's build a
+behaviour change. If that explanation is worth having, propose the case and
+let both suites go red; that is the mechanism working.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
