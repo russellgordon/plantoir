@@ -3962,8 +3962,7 @@ the first time piece 2 actually tries to deploy to it. Both the wizard's
 `additionalDeployTargets` with the identical two checks the primary
 already ran.
 
-### What Windows needs from this (no urgency — piece 2 has not shipped
-either)
+### What Windows needs from this
 
 `windows-app/Plantoir.Core/Models/CourseConfiguration.cs` needs the
 equivalent `AdditionalDeployTargets` property, with the identical
@@ -3971,11 +3970,136 @@ omit-when-empty write rule (checked by
 `AdditionalDeployTargetsTests.testWritingAnEmptyAdditionalTargetsListOmitsTheKeyEntirely`
 on the mac side — port that assertion, it is the one easy to get wrong).
 `windows-app/Plantoir/Views/PublishingChoiceView.cs` needs the equivalent
-toggle section. Since Deploy's own behaviour has not changed on either
-platform yet, there is no cross-platform inconsistency live today — but a
-`course_config.json` a teacher edits on one platform should mean the same
-thing when opened on the other, so this is worth doing before piece 2
-lands anywhere, not after.
+toggle section. **Piece 2 (below) has now shipped on the mac** — Deploy
+really does publish to every configured destination there now, so a
+`course_config.json` written by a Windows teacher with `additional_deploy_
+targets` set, opened on the mac, would now actually redundantly deploy —
+which makes this genuinely urgent rather than a someday item: a Windows
+teacher who cannot configure a second destination is simply missing the
+feature, and a Mac teacher's config edited on Windows (schema written, but
+never acted on there) is a real cross-platform inconsistency, not a
+hypothetical one.
+
+## Redundant deploy targets — piece 2: Deploy publishes to every
+configured destination (entry 301)
+
+Piece 1 (above) built the schema and the settings UI; this is where Deploy
+itself changed. A course with no additional destinations configured — the
+overwhelming majority — behaves **exactly** as it always has: same single
+console, same progress bar, same "Live URL" link, same wording, byte for
+byte. A course with 2–3 configured destinations now gets an actual
+redundant deploy: each destination gets its own `deploy.sh` run, in
+sequence, and one failing does not stop the others.
+
+### Why sequential, and why one `ScriptRunner` per destination
+
+Both were open questions when this was designed (see the earlier
+conversation in this repo's history) and both were decided explicitly,
+not defaulted into:
+
+- **Sequential, not parallel**, for this first version. Netlify already
+  rate-limits aggressively on CONCURRENT uploads within a single
+  destination's own file transfers (measured and documented in
+  `documentation/07-deployment.md`'s "Rate limiting" section) — running
+  two or three destinations' uploads at once, each already juggling its
+  own concurrency, was judged too much unknown interaction for a first
+  version. Nothing about the design prevents parallelizing later if it
+  proves worth the complexity.
+- **One `ScriptRunner` per destination, never one shared runner reused
+  across legs.** This was the single most important implementation
+  decision, because the wrong choice fails SILENTLY. `ScriptRunner`'s
+  `publishedSiteURL(in:)` / `publishedFolderURL(in:)` only ever scan
+  THAT runner's own transcript tail. Route two destinations through one
+  reused `ScriptRunner` (even with `keepingTranscript: true`, which is
+  what makes a build-then-deploy pair read as one console today) and the
+  SECOND destination's "Live URL:" or "PUBLISHED_FOLDER=" line silently
+  overwrites the first's — the teacher would see only the last
+  destination's link, with the first one's simply gone, no error anywhere.
+  `MultiDestinationDeployRunner.Leg` gives each destination its own
+  runner specifically to avoid this.
+
+### The build happens exactly once
+
+`BuildFreshness.needsRebuild` is checked ONCE, before the destination
+loop starts — never per destination. If the site is stale, the FIRST
+destination's own run gets the combined build-and-deploy milestone list
+(`TaskMilestones.buildAndDeploy` / `.buildAndDeployToCloudflare` /
+`.buildAndDeployToFolder`, exactly the lists that already existed for the
+single-destination case) via `keepingTranscript: true`, so the build and
+that leg's deploy still read as one console, exactly as today. Every
+SUBSEQUENT destination always uses the deploy-only milestone list — by
+the time leg 2 runs, the site is already current. A failed shared build
+stops the WHOLE run (`Leg.buildFailed`) rather than letting every
+remaining destination deploy the same stale content, which would not be
+redundancy, it would be the same mistake published twice.
+
+### One sequencer, four callers
+
+`MultiDestinationDeployRunner.run(...)` is called from all four places a
+deploy can start, so none of them can drift the way `DeployCommand.
+arguments` itself once warned against (built separately in two places, one
+silently sent a Cloudflare course to Netlify):
+
+1. `SectionDetailView.deployAndWait()` — the toolbar button, and the
+   assistant when a section window is open (same choke-point as before).
+2. `AssistToolchainWork.deploy()` — the assistant with no window on
+   screen (Claude Code over MCP, or a scheduled deploy invoking the app
+   headlessly).
+3. `ScheduledDeploy.oneShotCommand(...)` — NOT a Swift caller of the
+   sequencer at all, since this path runs unattended with the app closed.
+   Instead, `scheduleDeploy(...)` now builds one `deployArgumentsList`
+   entry per destination (`CourseConfiguration.allDeployDestinations`,
+   same order as the other three callers) and `oneShotCommand` bakes ONE
+   shell line per destination into the generated script, none chained
+   with `&&` — a destination failing must not stop the others' shell
+   lines from running, the shell-script equivalent of the Swift
+   sequencer's own "one leg failing doesn't stop the loop" rule. Only a
+   failed BUILD (`$READY`) still skips every deploy line, matching the
+   Swift side's `Leg.buildFailed` early-exit.
+4. `ScheduledDeploy.problem(...)` — the pre-flight refusal check, run
+   when the teacher SCHEDULES the deploy, not when it fires. Generalized
+   to check every configured destination, not only the primary — an
+   additional Cloudflare target with no Account ID, or an additional
+   folder with no valid path, now refuses scheduling up front, with new
+   wording ("also deploys to a folder…") kept deliberately separate from
+   the PRIMARY destination's existing, contract-referenced wording, which
+   is untouched, so no existing check against this function needed to
+   change.
+
+### Wording: unchanged for the overwhelming majority, three new sentences
+for the rest
+
+`MultiDestinationDeployRunner.result(...)` is the one place that decides
+which sentence a teacher (or the assistant, relaying it) hears.
+`destinationCount <= 1` — true for every course that has not opted into
+redundancy — ALWAYS uses the original `AssistWording.deployed` /
+`.deployDidNotFinish`, unchanged, word for word: a teacher who never
+touched this feature must never see a different sentence. For 2+
+destinations, three new `AssistWording` functions cover the three real
+outcomes: all succeeded (`deployedToMultipleDestinations`), some
+succeeded and some did not (`deployPartiallySucceeded`, naming which
+failed — the failed-destination list is joined into words by
+`MultiDestinationDeployRunner.joinedWithAnd`, OUTSIDE `AssistWording`,
+since that table holds only whole sentences and never list-joining logic
+— see its own doc comment), and none succeeded
+(`deployToMultipleDestinationsDidNotFinish`). A build failure is reported
+identically regardless of destination count — "could not be built", never
+"did not finish", which would wrongly suggest the upload failed rather
+than the build.
+
+### The checklist UI
+
+`DeployDestinationChecklist` — a small new view, one row per configured
+destination with a symbol (pending / spinning / done / failed) and its
+name — appears above the existing `TaskProgressView` ONLY when
+`deployRunner.legs.count > 1`. `TaskProgressView` itself is unmodified: it
+is shared with the course-creation wizard and the preview panel, so
+reshaping it for multi-destination deploy would have affected both of
+those unrelated callers. Instead it is bound to
+`deployRunner.activeRunner` — whichever leg is current, or the first leg
+before anything starts — which for a single-destination course is
+indistinguishable from binding directly to a plain `ScriptRunner`, the
+same as it always was.
 
 ## Testing
 

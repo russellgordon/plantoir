@@ -184,7 +184,7 @@ final class ScheduledDeployTests: XCTestCase {
         // The work itself is unchanged; it moved into a file the app runs.
         let command: String = ScheduledDeploy.oneShotCommand(
             courseCode: "ICS3U", sectionNumber: 1,
-            workspaceURL: workspaceURL, deployArguments: arguments
+            workspaceURL: workspaceURL, deployArgumentsList: [arguments]
         )
         let scriptPath: String = workspaceURL.appendingPathComponent("deploy.sh").path
         XCTAssertTrue(command.contains("'\(scriptPath)'"), "The agent runs this folder's own deploy.sh")
@@ -271,7 +271,7 @@ final class ScheduledDeployTests: XCTestCase {
             courseCode: "ICS3U",
             sectionNumber: 1,
             workspaceURL: workspaceURL,
-            deployArguments: ["ICS3U", "1"]
+            deployArgumentsList: [["ICS3U", "1"]]
         )
         let plistPath: String = ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1).path
         let label: String = ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1)
@@ -547,7 +547,7 @@ final class ScheduledDeployTests: XCTestCase {
             courseCode: "ICS3U",
             sectionNumber: 1,
             workspaceURL: URL(fileURLWithPath: "/Users/someone/Class Websites"),
-            deployArguments: ["ICS3U", "1"]
+            deployArgumentsList: [["ICS3U", "1"]]
         )
 
         guard let buildAt = command.range(of: "preview.sh"),

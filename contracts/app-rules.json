@@ -366,7 +366,7 @@
         "why" : "A folder deploy never touches a web host, so no target and no account are passed even when an account ID exists."
       }
     ],
-    "note" : "Given a course's configuration, what deploy.sh is asked to do. One place must decide this in each app — on the mac it is DeployCommand.arguments, shared by the Deploy button, the assistant and the scheduled-deploy alarm. Built separately anywhere and this happens: the assistant path never passed --target cloudflare, and a Cloudflare course deployed to Netlify. Nothing failed; the site simply appeared on the wrong host. Netlify passes NO target flag at all — it is the launcher's default, and every course written before Cloudflare existed relies on that."
+    "note" : "Given a course's configuration, what deploy.sh is asked to do. One place must decide this in each app — on the mac it is DeployCommand.arguments, shared by the Deploy button, the assistant and the scheduled-deploy alarm. Built separately anywhere and this happens: the assistant path never passed --target cloudflare, and a Cloudflare course deployed to Netlify. Nothing failed; the site simply appeared on the wrong host. Netlify passes NO target flag at all — it is the launcher's default, and every course written before Cloudflare existed relies on that. A course can configure more than one destination now (additional_deploy_targets, in file-formats.json) — Deploy walks them in order and calls this same argument-building logic once per destination, so every case above still applies per leg; there is no separate multi-destination argument shape to test."
   },
   "failureExplanations" : {
     "cases" : [

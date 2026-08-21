@@ -83,6 +83,33 @@ nonisolated enum AssistWording {
         return "The deploy of \(course) Section \(section) did not finish. " + AssistWording.whereTheOutputIs
     }
 
+    /// Said only when a course has MORE THAN ONE deploy destination
+    /// configured and every one of them succeeded — a course with exactly
+    /// one destination (the overwhelming majority) always uses `deployed`
+    /// above instead, unchanged, so nothing about a teacher's experience
+    /// changes unless they opted into redundancy.
+    static func deployedToMultipleDestinations(course: String, section: String, destinationCount: Int) -> String {
+        return "\(course) Section \(section) is deployed to all \(destinationCount) destinations you "
+             + "configured. Students can reach it now."
+    }
+
+    /// Said when a multi-destination deploy finished with SOME destinations
+    /// succeeding and others not. `failedDestinations` is already joined
+    /// into words ("Cloudflare Pages" or "Cloudflare Pages and your
+    /// folder") by the caller, which is the one place that knows the list —
+    /// this table only ever holds whole sentences, never list-joining logic.
+    static func deployPartiallySucceeded(course: String, section: String, failedDestinations: String) -> String {
+        return "\(course) Section \(section) deployed to some of its destinations, but not "
+             + "\(failedDestinations). " + AssistWording.whereTheOutputIs
+    }
+
+    /// Said when a multi-destination deploy finished and NONE of its
+    /// destinations succeeded.
+    static func deployToMultipleDestinationsDidNotFinish(course: String, section: String) -> String {
+        return "The deploy of \(course) Section \(section) did not finish, on any of its destinations. "
+             + AssistWording.whereTheOutputIs
+    }
+
     /// Said when the section's own window is already running something. The
     /// Deploy button is simply greyed out then; the assistant reaches this by
     /// pressing a button a teacher could not have pressed, and needs a

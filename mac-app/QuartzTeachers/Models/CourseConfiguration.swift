@@ -128,6 +128,30 @@ class CourseConfiguration {
         }
     }
 
+    /// One place this course publishes to — either the primary
+    /// (`deployTarget`) or one of `additionalDeployTargets`, both reduced
+    /// to the same shape so a deploy can walk one plain list instead of
+    /// treating the primary as a special case.
+    struct DeployDestination: Equatable {
+        var type: String
+        var path: String
+    }
+
+    /// Every destination this course publishes to, in deploy order — the
+    /// primary first, then each additional target in the order it was
+    /// added. This is the one list a multi-destination deploy walks; the
+    /// primary is not special beyond going first, which is only how the
+    /// "Live URL" link on a finished deploy is chosen.
+    var allDeployDestinations: [DeployDestination] {
+        var result: [DeployDestination] = [
+            DeployDestination(type: deployTarget, path: deployFolderPath),
+        ]
+        for target in additionalDeployTargets {
+            result.append(DeployDestination(type: target.type, path: target.path))
+        }
+        return result
+    }
+
     /// Removes `type` from `targets` if present — the one place that knows
     /// how to keep a primary choice and an additional-targets list from
     /// ever agreeing on the same destination twice. Used by this class's

@@ -13,6 +13,16 @@
 > Whichever is chosen, the thing published is the same built
 > `public/` folder; only the transport differs. The two newer
 > destinations are described at the end of this page.
+>
+> **A course can publish to more than one destination now, for
+> redundancy** — see `additional_deploy_targets` in
+> [the config reference](08-course-config-reference.md). `deploy.py`
+> itself is unaware of this: it still does exactly one destination per
+> invocation, exactly as below. Redundancy is entirely an APP-layer
+> concern — the app (or the scheduled-deploy shell script it writes)
+> simply invokes `deploy.py` once per configured destination, in
+> sequence, and one destination failing does not stop the others. See
+> `mac-app/QuartzTeachers/Scripting/MultiDestinationDeployRunner.swift`.
 
 [◀ Previous: Quartz Customizations](06-quartz-customizations.md) · [Back to index](README.md) · [Next: course_config.json Reference ▶](08-course-config-reference.md)
 
