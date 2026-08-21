@@ -14,10 +14,8 @@ tags:
 2. Discussion: [[Can a Machine Be Biased]], then [[Whose Innovations Count]]
 3. Compare and name it: [[Bias and Accessibility in Technology]]
 4. [[The Innovation Brief]], day 7 — first round of presentations
-5. Launch our culminating task: [[Launch Day]]
-6. Log it in your [[Dev Journal]]
+5. Log it in your [[Dev Journal]]
 
 ## Things to do before our next class
 
-- [ ] Read [[Launch Day]] and name the real user your artifact serves.
 - [ ] Journal: where bias could creep into an artifact like yours.

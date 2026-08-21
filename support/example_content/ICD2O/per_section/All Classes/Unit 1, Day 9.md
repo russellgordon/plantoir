@@ -15,7 +15,8 @@ tags:
    [[Files and the Cloud]]
 3. Discussion: [[Who Owns Your Data]] — where your files actually live
 4. [[The Algorithm Field Guide]], day 4 — workday in pairs, driver and
-   navigator: assemble and illustrate what you have documented so far
+   navigator: assemble and illustrate what you have documented so far,
+   then decompose the task you are designing and write its first draft
 5. Log it in your [[Dev Journal]]
 
 ## Things to do before our next class

@@ -9,9 +9,10 @@ enableToc: true
 > [!abstract] At a glance
 > Solo, with one paired workday · four working periods early in the
 > course · entries tested on
-> a real reader in the last of them, and the original design run by a
-> classmate on presentation day · three documented algorithms plus one
-> original design, in a small illustrated guide
+> a real reader in the last of them, the original designed and first
+> run in class on day 5, and run again by a classmate on presentation
+> day · three documented algorithms plus one original design, in a
+> small illustrated guide
 
 ## What you are making
 

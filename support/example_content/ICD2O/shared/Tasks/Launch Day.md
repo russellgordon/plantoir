@@ -10,7 +10,7 @@ enableToc: true
 > [!abstract] At a glance
 > Solo · four working periods and two dress runs in the final weeks ·
 > the launch itself is in the last full week of building · one artifact,
-> one growth statement, one defended conversation
+> one growth statement, one design defended at the Day 12 questions
 
 ## What you are making
 
@@ -27,8 +27,11 @@ Either way, five things must be present: a **plan** (what the core is,
 and the pieces it breaks into), a **user-needs statement** (who they
 are, and what they need), a **working core**, an honest
 **known-limits list**, and **documentation clear enough for a stranger
-to reuse your work**. The launch itself: a short demo, a defended
-conversation, and a **growth statement** built from your [[Dev Journal]].
+to reuse your work**. The launch itself: a short demo, the questions
+your guests ask, and a **growth statement** built from your
+[[Dev Journal]]. The design you defend in conversation is defended on
+day 5, in the questions I ask while the room documents — the launch is
+too busy for it, and this page's teacher notes say so.
 
 This is the course's final evaluation — the thirty per cent described
 in [[How Marks Work]] — which is why it asks for the whole of the
@@ -150,8 +153,8 @@ TALK — Unit 4, Day 12, the period given over to the documentation
 Day 15 is where the "demo that lands" row is judged, and that much you
 can do while hosting — a demo is watched, not conversed with. What you
 cannot do that day is hold a conversation: the defended-design evidence
-is the Day 12 conference above, not anything you overhear at the
-launch.
+is the Day 12 questioning above, asked while the room documents, not
+anything you overhear at the launch.
 
 The product evidence is the artifact, the documentation, and the growth
 statement.

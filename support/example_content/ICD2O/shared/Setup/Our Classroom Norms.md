@@ -44,8 +44,9 @@ coat of paint; they are the profession's own working norms, learned
 early.
 
 - [ ] Read this page with a parent or guardian.
-- [ ] Bring one norm you would add — we finalise the list together in
-  Week 1 and it stays linked from every task.
+- [ ] Bring one norm you would add — we finalise the list together on
+  our third class, and this page is where the agreed list lives for the
+  rest of the course.
 
 %%curriculum-start%%
 ## Curriculum connection
