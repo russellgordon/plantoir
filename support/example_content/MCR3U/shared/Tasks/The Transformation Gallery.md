@@ -75,11 +75,19 @@ spent on whatever you find.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.3]]
+
+![[A1.4]]
+
+![[A1.5]]
+
+![[A1.6]]
+
+![[A1.7]]
+
 ![[A1.8]]
 
 ![[A1.9]]
-
-![[A1.3]]
 %%curriculum-end%%
 
 %%

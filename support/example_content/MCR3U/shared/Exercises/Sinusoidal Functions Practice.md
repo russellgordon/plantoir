@@ -91,7 +91,29 @@ throughout.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D2.1]]
+
+![[D2.2]]
+
+![[D2.3]]
+
+![[D2.4]]
+
+![[D2.5]]
+
+![[D2.6]]
+
+![[D2.7]]
+
 ![[D2.8]]
 
+![[D3.1]]
+
+![[D3.2]]
+
+![[D3.3]]
+
 ![[D3.4]]
+
+![[D3.5]]
 %%curriculum-end%%
