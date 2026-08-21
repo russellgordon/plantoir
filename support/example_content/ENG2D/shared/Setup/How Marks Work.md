@@ -125,7 +125,7 @@ carries a shared mark.
 - On [[The Seminar]] your group leads one discussion, and there is no
   group mark on it: your follow-up is yours, and so is what you do in the
   five seminars you do not lead.
-- On [[The Media Deconstruction]] the analysis and the made text are the
+- On [[The Media Deconstruction]] the analysis and the made texts are the
   pair's. The note you write in class on the revision day is yours alone,
   and it is the part that carries your individual mark.
 

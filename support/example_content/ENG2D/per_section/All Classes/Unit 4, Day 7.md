@@ -10,11 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. [[The Media Deconstruction]], day 3 — making period: the text you
-   produce, with three named techniques
+1. [[The Media Deconstruction]], day 3 — making period: the primary text
+   and companion adaptation, using three named techniques
 2. Last fifteen minutes: I come round every pair and leave one note on the
    analysis; you act on it in the revision period next class
 
 ## Things to do before our next class
 
-- [ ] Draft of your made text.
+- [ ] Draft of your primary text and companion adaptation.

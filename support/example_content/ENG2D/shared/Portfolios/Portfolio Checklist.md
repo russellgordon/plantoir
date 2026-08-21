@@ -20,7 +20,8 @@ Copy this into your notebook — the boxes here are printed, not clickable.
       note
 - [ ] [[The Literary Essay]] — outline, draft with feedback, final
 - [ ] [[The Seminar]] — your question, your passages, your follow-up
-- [ ] [[The Media Deconstruction]] — the analysis and the text you made
+- [ ] [[The Media Deconstruction]] — the analysis and the paired texts
+      you made
 
 ## For the examination
 

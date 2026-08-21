@@ -5,14 +5,15 @@ created: __CREATED__
 enableToc: true
 ---
 > [!abstract] At a glance
-> Pairs · five class periods · one analysis of about 600 words, one media
-> text you make, and a note of your own · assessed on Thinking,
-> Application, and Communication
+> Pairs · five class periods · one analysis of about 600 words, two linked
+> media texts (primary and companion adaptation), and a note of your own ·
+> assessed on Thinking, Application, and Communication
 
 ## The task
 
-Take apart a media text that works on you, then make one of your own
-using the same techniques deliberately.
+Take apart a media text that works on you, then make two linked media texts
+of your own using the same techniques deliberately for different audiences
+and purposes.
 
 ## Part one: the analysis
 
@@ -30,27 +31,38 @@ Answer, with evidence from the text itself:
    [[Media Forms and Techniques]] and say what each does.
 5. What is left out?
 
-## Part two: the text you make
+## Part two: the texts you make
 
-A poster, a thirty-second video, a front page, or a social card — using
-at least three of the techniques you identified, aimed at an audience you
-name. It may sell, argue, warn, or persuade; it may not lie.
+Produce two linked media texts for two different audiences and purposes,
+using the techniques you identified deliberately:
+
+1. **Your primary text**: a poster, a thirty-second video, a front page, or
+   a social card — using at least three of the techniques you analysed,
+   aimed at a primary audience you name (e.g., teenagers, customers, voters).
+   It may sell, argue, warn, or persuade; it may not lie.
+2. **Your companion adaptation**: a second, smaller text (a social card, a
+   captioned flyer, or a notice) adapted from the first for a **distinct
+   second audience** with a different purpose (e.g., informing parents,
+   reassuring neighbours, or engaging younger students), shifting conventions
+   to suit them.
 
 ## Part three: your own note
 
 Two hundred words, written in class on the revision day, one per person.
 This is the piece of the task that is marked as yours alone.
 
-- **Your audience**, named as people rather than as an age bracket.
-- **The form you chose** — poster, video, front page, social card — and
-  why that form for those people rather than another one.
-- **Your three techniques**, and which of the three did the most work.
+- **Your two audiences and purposes**, named as real people and intents rather
+  than as abstract categories.
+- **The forms and conventions you chose** for each text, and why those forms
+  fit those specific people.
+- **Your techniques**, and how they were adapted between the primary text and
+  the companion piece.
 - **Two things you can already do as a reader or a writer** that you used
-  while making this.
-- **What you would do differently** if you made a second one, and why.
+  while making these.
+- **What you would do differently** if you made another adaptation, and why.
 
 > [!important] There is no group mark on this task
-> The analysis and the made text are the pair's work. Your note is yours,
+> The analysis and the made texts are the pair's work. Your note is yours,
 > it is written in class, and it is the part of this task that carries
 > your individual mark.
 
@@ -59,9 +71,9 @@ This is the piece of the task that is marked as yours alone.
 | Category | What I am looking for |
 | --- | --- |
 | Thinking | The analysis reads the text rather than describing it; the "left out" answer is specific |
-| Application | The made text uses its techniques on purpose rather than by accident |
-| Communication | All three parts are clear, and the audience the made text is aimed at is identifiable from the text itself |
-| Application, in your note | The form is justified for those particular people, the three techniques are named and ranked, two reading or writing skills you used are named, and the change you would make is specific |
+| Application | The made texts use their techniques on purpose across both audiences rather than by accident |
+| Communication | All parts are clear; the two distinct audiences and purposes are identifiable from the texts themselves |
+| Application, in your note | Both forms and purposes are justified for those particular audiences, techniques and adaptations are explained, two reading or writing skills are named, and next steps are specific |
 
 > [!important] The ethics line
 > You may persuade. You may not fabricate: no invented statistics, no
@@ -143,6 +155,6 @@ TALK — Unit 4, Day 5, while the room researches what its text left out
   Record: pairs list, two initials and one word each — the second
   audience they named. Blank is the useful entry.
 
-The products arrive on their own: the analysis, the made text and each
+The products arrive on their own: the analysis, the made texts and each
 partner's own note, handed in on Unit 4, Day 9.
 %%
