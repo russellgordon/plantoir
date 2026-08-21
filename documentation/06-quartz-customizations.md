@@ -103,7 +103,7 @@ Forgetting the flag therefore leaves a page visible, which is a far kinder
 mistake than a page disappearing without anybody noticing. The switch itself
 is C1-13 — the image carries the filter, the build points the config at it.
 
-### A5. `Head.tsx` (open-graph metadata & base URL fallback)
+### A5. `Head.tsx` (open-graph metadata, base URL fallback & the site's icon)
 
 Stock behaviour: `og:image` is constructed unconditionally as
 `https://${cfg.baseUrl}/static/og-image.png`. When `baseUrl` defaults to
@@ -118,6 +118,20 @@ Changes:
    when `baseUrl` is absent.
 3. Guards `twitter:domain`, `og:url`, and `twitter:url` so they are emitted
    only when `hasBaseUrl` is true.
+4. Replaces the single stock `<link rel="icon" href="static/icon.png">` with
+   three tags, so the tab carries Plantoir's mark instead of Quartz's:
+
+   ```html
+   <link rel="icon" href="./static/favicon.ico" sizes="32x32"/>
+   <link rel="icon" href="./static/icon.svg" type="image/svg+xml"/>
+   <link rel="apple-touch-icon" href="./static/apple-touch-icon.png"/>
+   ```
+
+   Order is load-bearing — a browser takes the LAST icon it understands, so
+   the `.ico` (older Safari, Windows shortcuts) goes first and the SVG wins
+   wherever it is supported. All three paths stay page-relative via
+   `baseDir`, the same way the og-image fallback does, so a site served from
+   a subfolder still finds them. The files themselves arrive in C2-25.
 
 ---
 
@@ -233,6 +247,7 @@ build means a re-run of the setup wizard (or a hand edit of
 | C2-22 | **Backlinks "structural pages" set** | `quartz/components/Backlinks.tsx` | Rewrites the `const structural = new Set<string>([…])` block behind the `// CQ4T-STRUCTURAL-ANCHOR` comment in `support/Backlinks.tsx`, inserting the course's curriculum folder name and `Curriculum Coverage` in both title and slug form. Those pages link to everything by nature, so without this every content page's backlinks panel is dominated by the curriculum index and the generated coverage map — noise that buries the pages a teacher actually wants to see listed. |
 | C2-23 | **Page title text shrinking & navbar vertical centering** | `quartz/styles/base.scss` (appended) | Prevents the navbar course code and section number from wrapping onto a second line on mobile by dynamically scaling the page title font size (`clamp(0.875rem, 4.5vw, 1.75rem)`) down to 50% of its original size and setting `white-space: nowrap`, while vertically centering the course emoji, code, section, and the light/dark mode toggle button with the adjacent search field. |
 | C2-24 | **Deploy domain & `baseUrl` sync** | `quartz.config.ts` | Sets `baseUrl` to the section's actual public domain (from advanced custom domains, `.netlify_sites/`, or `.cloudflare_sites/`), or clears it when unpublished. Ensures OpenGraph (`og:image`, `og:url`) and Twitter card tags point to the teacher's live site rather than the stock `quartz.jzhao.xyz` default. |
+| C2-25 | **The site's icon** | `quartz/static/{favicon.ico,icon.svg,apple-touch-icon.png,icon.png}`, `content/favicon.ico` | `install_favicon()` copies the generated set from `/opt/support/favicon` (see `scripts/brand_images.py`, which draws it from `mac-app/Plantoir.icon`). `icon.png` is overwritten rather than merely unlinked, so a built site carries no Quartz logo even where nothing points at one. `favicon.ico` is installed TWICE on purpose: the `static/` copy is what the A5 tags link, while the CONTENT-ROOT copy is the only way to get a file to `public/favicon.ico` — Quartz's Assets emitter copies non-Markdown files out of `content/` unchanged, and the Static emitter cannot write above `public/static/`. That root copy is what answers the implicit `GET /favicon.ico` made by feed readers, link unfurlers and older browsers that never read the page. It runs after the content folder is rebuilt from scratch, because a copy made any earlier is deleted a few lines later — silently, since the page still looks correct. |
 
 ### C3. Content-level transformations (every build)
 
@@ -306,7 +321,15 @@ backlinks.
 
 ## E. Summary: what is *not* customized
 
-Everything else is stock Quartz v4.5.0 — with one asset exception: `quartz/static/og-image.png` is overwritten every build by the generated social sharing card (see C2-13): the Markdown/OFM transformer
+Everything else is stock Quartz v4.5.0 — with five asset exceptions, all in
+`quartz/static/` and all written every build: `og-image.png` is redrawn as the
+section's social sharing card (C2-13), and `favicon.ico`, `icon.svg`,
+`apple-touch-icon.png` and `icon.png` are the site's own icon (C2-25). Two of
+those OVERWRITE files Quartz itself ships — `og-image.png` and `icon.png` —
+which is deliberate: a built site should carry no Quartz artwork, including
+where nothing links to it. (`quartz/util/og.tsx` reaches for `static/icon.png`
+when it draws generated OG images, so it now picks up Plantoir's mark too.)
+Beyond those: the Markdown/OFM transformer
 pipeline, full-text search (FlexSearch), syntax highlighting, LaTeX
 rendering, callouts, popovers, RSS/sitemap emitters, mobile layout, and
 light/dark mode. The customizations are deliberately thin wrappers around

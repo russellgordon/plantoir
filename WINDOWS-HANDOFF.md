@@ -3736,6 +3736,130 @@ qualification, and adding a sentence would have made the mac's build a
 behaviour change. If that explanation is worth having, propose the case and
 let both suites go red; that is the mechanism working.
 
+## Every built site wears the Plantoir icon, not Quartz's
+
+Added 2026-08-20, merged to `dev` 2026-08-21 — after the Windows container was
+retired, so the delivery half of this is written against the runtime that
+actually exists on that side now.
+
+**Shared Python and shared assets: nothing to port.** Both halves already
+reach Windows by routes that were built before this feature existed —
+`Vendor/fetch-runtime.ps1` copies `patches/Head.tsx` into the bundled Quartz
+scaffold exactly as the Dockerfile does for the container, and
+`Plantoir.csproj`'s `..\..\support\**` glob carries `support/favicon/`
+unfiltered. Two parts are still worth knowing, because one is a trap and one
+is an asymmetry you cannot fix from your side.
+
+Until this, every class site a teacher published showed **Quartz's logo** in the
+browser tab. Quartz ships `quartz/static/icon.png` and its `Head` links that as
+the favicon; nobody had replaced it. A teacher who publishes four sections had
+four tabs wearing somebody else's mark.
+
+### What is in the site now
+
+`support/favicon/` holds four generated files, baked into the image by the
+existing `COPY support/ /opt/support/`, and `build_site.py`'s
+`install_favicon()` copies them on **every** build (not only a full rebuild, so
+folders built before this heal themselves):
+
+| File | Where it goes | Who reads it |
+|---|---|---|
+| `icon.svg` | `public/static/` | Every current browser. Sharp at any size. |
+| `favicon.ico` | `public/static/` **and `public/`** | Older Safari; Windows shortcuts. 16/32/48, BMP entries. |
+| `apple-touch-icon.png` | `public/static/` | iOS "Add to Home Screen". 180x180, square, opaque. |
+| `icon.png` | `public/static/` | Nothing links it. It overwrites Quartz's, so the site carries no Quartz logo even unlinked. |
+
+`patches/Head.tsx` links the first three, in that order, with paths relative to
+the page (`baseDir`) so a site served from a subfolder still finds them. Order
+is load-bearing: a browser takes the LAST icon it understands, so the `.ico`
+goes first and the SVG wins wherever it is supported.
+
+### The trap: there are two emitters, and only one can write to the root
+
+`favicon.ico` is installed **twice**, and the second copy is not redundant.
+
+- Quartz's **Static** emitter copies `quartz/static/` to `public/static/`. That
+  is where the `<link>` tags point, and it covers every browser that reads the
+  page.
+- Nothing that emitter can do puts a file at `public/favicon.ico`. The only
+  route to the site ROOT is the **Assets** emitter, which copies every
+  non-Markdown file out of `content/` into `public/` unchanged. So
+  `install_favicon()` also drops `favicon.ico` into the content root — which is
+  why the call sits AFTER the content folder is rebuilt from scratch, not in
+  the ALWAYS block above it. A copy made any earlier is deleted a few lines
+  later and the failure is invisible: the page still looks right, and only the
+  implicit `GET /favicon.ico` that feed readers, link unfurlers and older
+  browsers make (without reading the page at all) comes back 404.
+
+**The source folder is resolved through `toolchain_paths.SUPPORT_DIR`**, not a
+hard-coded `/opt/support`. That was corrected when this merged: it was written
+while Windows still ran in a container, and a literal `/opt` would have found
+nothing natively — the site would have built cleanly, said nothing, and worn
+the Quartz logo. Anything else that reaches for a bundled file belongs on the
+same shim.
+
+`verify.sh` now asserts both halves separately — the four files exist, the root
+`favicon.ico` and `static/icon.png` are byte-identical to `support/favicon/`,
+and `index.html` links all three. It is a mac-only gate (bash, and it expects
+`docker`), so on Windows the equivalent is to publish a section and look at the
+tab. A site can have every file and still show the
+Quartz logo if `patches/Head.tsx` did not make it into the image, so
+`check_baked patches/Head.tsx` was added at the same time (it had never been
+checked).
+
+### The asymmetry: the favicon can only be regenerated on the mac
+
+The artwork's source of truth is `mac-app/Plantoir.icon` — the Icon Composer
+bundle, mac-only. `scripts/brand_images.py` reads the plant's SVG path straight
+out of it and draws every image that carries the mark, the favicon included, so
+the mark cannot drift between the social card, the profile avatars and the
+browser tab. It needs only Pillow, but it needs that `.icon` folder, so
+**a Windows session cannot regenerate the set** — the same direction as
+`--write-contracts`. Treat `support/favicon/*` as data you receive. If the app
+icon changes, that is a mac task, and the Windows `.ico`
+(`windows-app/Plantoir/Assets/make-icon.ps1`) is a separate regeneration from a
+1024 export, exactly as it is today.
+
+### The favicon IS the app icon, and that was a decision
+
+Not a reinterpretation of it. The raster sizes are literally `icon_tile()` —
+the same function that draws the tile on plantoir.app's social card — so the
+favicon cannot come to disagree with the icon in the Dock: same ramp, same
+0.703 glyph scale, same viewBox centring, same drop shadow, same
+regular-weight outline with the leaf counters open. `favicon_svg()` is that
+tile written out as vector, reading the same constants rather than typing the
+numbers again.
+
+**This was tried the other way first, and reverted on Russell's call.** The
+first version used the **fill** weight of the same glyph — `plant.svg` is three
+subpaths (the silhouette, then the two leaf counters), so dropping the last two
+gives a solid plant for free. The argument was legibility: at 16 physical
+pixels the outline's leaf midribs land on the outline and the mark goes muddy,
+which is measured rather than assumed. The argument that beat it is simpler —
+**looking like the app icon is the point of the app icon.** Record that
+direction, because the legibility case is genuinely tempting and will be made
+again.
+
+If it ever does need revisiting, two dials exist and one trap:
+
+- `render_glyph`'s **`bold_units`** thickens the outline in viewBox units
+  without changing the drawing. The Instagram avatar already uses it (3.0) for
+  exactly this reason — it is stored at 320 and shown at 32.
+- The **`.ico` can carry a different drawing per size**, since each entry is a
+  separate bitmap, and `write_favicons` already renders each size natively.
+- The trap: **`icon.svg` cannot.** Browsers that support it render THAT at
+  whatever size they choose, so a per-size tactic that only touches the `.ico`
+  leaves Chrome and Firefox unaffected. And 16 physical pixels is a Windows tab
+  at 100% scaling — any Retina Mac asks for 32.
+
+One thing rejected outright: **darkening the green for contrast.** The brand
+green on the cream tile is about 3:1. The answer to a thin stroke is a thicker
+stroke, not a different colour, and the colour is not ours to change here.
+
+There is deliberately **no web manifest and no 192/512 PWA icon set**. That is
+Android home-screen and installable-app territory, not a favicon, and the
+teacher's site is neither.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
