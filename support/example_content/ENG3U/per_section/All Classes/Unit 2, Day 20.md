@@ -12,7 +12,9 @@ tags:
 
 1. [[The Critical Essay]], day 3 of 7 — outline, including the counter-reading
    paragraph
-2. Trade outlines: your partner marks the claim that is really a summary
+2. Trade outlines: your partner marks the claim that is really a
+   summary. Their verdict is not a number and never becomes one — it is
+   the cheapest repair available to you this week
 
 ## Things to do before our next class
 

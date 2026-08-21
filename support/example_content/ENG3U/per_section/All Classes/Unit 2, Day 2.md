@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Practise: [[Paraphrase Practice]], first two
+1. Practise: [[Paraphrase Practice]], first two — no marks, and no need
+   for a clean copy; it tells me whether the six moves have landed or
+   want another period
 2. 1.4–1.5: Lady Macbeth's letter scene, and who has already decided
 3. Concept: [[Character as Argument]] — Banquo as the control
 

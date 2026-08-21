@@ -12,6 +12,8 @@ tags:
 ## Agenda
 
 1. Review, part three: planning and opening an essay in fifteen minutes
+   — a rehearsal, marked by nobody, and the last one before it is done
+   for real
 2. Then the habit that ran through the course: claim, mechanism,
    evidence, objection
 

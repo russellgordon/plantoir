@@ -15,7 +15,9 @@ tags:
 3. Tutorial: [[Getting Unstuck]], and [[Getting Help]]; [[Help Sessions]]
    explained
 4. Poem: "The Cariboo Horses" — setting as claim, from [[Poetry Unit]]
-5. Practise: [[Sight Passage Practice]], first two, under time
+5. Practise: [[Sight Passage Practice]], first two, under time —
+   unmarked, and deliberately timed: it tells you what the examination
+   will feel like while there is a whole course left in which to fix it
 
 ## Things to do before our next class
 

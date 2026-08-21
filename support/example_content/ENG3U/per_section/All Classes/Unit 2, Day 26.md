@@ -12,7 +12,10 @@ tags:
 
 1. Retrieval warm-up — no notes: four passages placed and explained
 2. Checkpoint, on your own: a paragraph on an unseen speech from the play
-3. Mark your own against the class standard; revision list written
+3. Mark your own against the class standard; revision list written.
+   Nothing today is recorded — taken together, the warm-up and the
+   paragraph tell you which is the problem: knowing the play, or
+   writing about it
 4. Consolidation: what a tragedy is for, argued rather than defined
 5. Look ahead: [[Monkey Beach]], a novel that refuses to explain itself,
    and [[The Inconvenient Indian]], a book that argues about a country

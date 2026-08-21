@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Tutorial: [[Seminar Skills]] — the moves, practised on one passage
-2. Whole-class seminar led by me, as the model
+2. Whole-class seminar led by me, as the model — a rehearsal, and it
+   carries no mark; the six that follow are the ones assessed
 3. [[The Macbeth Seminar]], day 2 of 6 — groups and acts assigned
 
 ## Things to do before our next class

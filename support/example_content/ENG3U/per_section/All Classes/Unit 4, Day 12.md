@@ -15,7 +15,8 @@ tags:
 2. A partner marks: unsupported claims, source stacking, the weakest
    paragraph
 3. Then on your own: [[Judging Your Own Work]], and the sentence saying
-   what you will change tomorrow
+   what you will change tomorrow. The checkpoint is assessed; what your
+   partner wrote on your draft and what you decided here are not
 
 ## Things to do before our next class
 

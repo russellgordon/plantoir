@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. [[The Critical Essay]], day 5 of 7 — workshop: unsupported claims marked
-2. [[Judging Your Own Work]] against the criteria, on your own
+2. [[Judging Your Own Work]] against the criteria, on your own —
+   nothing here is marked, and item 3 is the reason: the change is the
+   point, not the verdict
 3. Weakest paragraph rewritten in class, in the rest of the period
 
 ## Things to do before our next class

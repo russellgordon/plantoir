@@ -13,7 +13,9 @@ tags:
 1. Tutorial: [[Research and Sources]] — secondary sources, and what they
    are good for
 2. Concept: [[Research Writing]] — support, extend, complicate, disagree
-3. Practise: [[Source Use Practice]]
+3. Practise: [[Source Use Practice]] — not marked, and worth doing
+   badly first: the independent study is where getting this wrong is
+   expensive
 
 ## Things to do before our next class
 
