@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -66,6 +67,18 @@ final class AssistToolRunner {
     /// an agent would leave one on the machine running the suite.
     private let launchControl: LaunchControlRunning
 
+    /// Opens a new "Plantoir" window — present ONLY for the local in-app
+    /// assistant (threaded in from `AssistWindowView`'s own `@Environment
+    /// (\.openWindow)`), nil for every other caller.
+    ///
+    /// MCP (`Plantoir --mcp-stdio`) never constructs a Scene graph at all —
+    /// `openWindow` would have nothing to act on — and a scheduled deploy
+    /// runs with the app closed. Both keep the old silent fallback. Only
+    /// the local assistant can make good on "do the same thing as pressing
+    /// the Deploy button", because it alone is running inside a real,
+    /// on-screen app session.
+    private let openMainWindow: (@MainActor () -> Void)?
+
     /// The backup this conversation has already made of each course it has
     /// changed, by course code.
     ///
@@ -112,11 +125,13 @@ final class AssistToolRunner {
     init(workspace: WorkspaceModel,
          siteWork: AssistSiteWork? = nil,
          today: CalendarDay = CalendarDay.today(),
-         launchControl: LaunchControlRunning = LaunchControl()) {
+         launchControl: LaunchControlRunning = LaunchControl(),
+         openMainWindow: (@MainActor () -> Void)? = nil) {
         self.workspace = workspace
         self.siteWork = siteWork ?? AssistToolchainWork(workspace: workspace)
         self.today = today
         self.launchControl = launchControl
+        self.openMainWindow = openMainWindow
     }
 
     // MARK: - Functions
@@ -1019,6 +1034,100 @@ final class AssistToolRunner {
         )
     }
 
+    /// Makes a real window show this section, for the LOCAL assistant only
+    /// — `deploy_section` and `bring the preview up to date` both call this
+    /// before falling back to running silently, so asking through the
+    /// assistant does the same thing pressing the button would: a console,
+    /// a progress header, a live-site link, all on screen.
+    ///
+    /// Reuses an already-open window on the same working folder if one
+    /// exists — the common case, since the assistant is almost always
+    /// opened FROM an already-open window's sidebar — rather than opening
+    /// a new one every time. Only opens a fresh window when none is open
+    /// at all (`openMainWindow`, present only for the local assistant).
+    ///
+    /// Returns once `SectionWindowControllers` has actually registered a
+    /// controller for the section, or gives up after a short wait — moving
+    /// `.selection` is not itself the section appearing: `SectionDetailView`
+    /// still has to mount and run its own `.onAppear` on a real SwiftUI
+    /// render pass before there is anything to press.
+    /// Not private: `pollInterval`/`maxAttempts` let a test drive this
+    /// without a multi-second real-time wait, and the "already-open window
+    /// is reused, `openMainWindow` never called" behavior needs to be
+    /// checked directly — the eventual `SectionWindowControllers`
+    /// registration this waits for only ever happens from a REAL
+    /// `SectionDetailView` mounting, which no unit test can produce.
+    func revealSectionOnScreen(
+        course: Course, sectionNumber: Int,
+        pollInterval: Duration = .milliseconds(50), maxAttempts: Int = 40
+    ) async -> Bool {
+        guard let openMainWindow, let folder = workspace.workspaceURL else {
+            return false
+        }
+
+        var target: WorkspaceModel? = AssistToolRunner.openWindowModel(forFolderPath: folder.path)
+
+        if target == nil {
+            // Snapshot who is already open, by identity — the NEW window's
+            // model is whichever one appears in `windowModels` that was not
+            // here before, not (yet) one we can find by folder path.
+            let alreadyOpen: [ObjectIdentifier] = WorkspaceModel.windowModels.map { ObjectIdentifier($0) }
+            openMainWindow()
+            var freshModel: WorkspaceModel?
+            for _ in 0..<maxAttempts {
+                for model in WorkspaceModel.windowModels where !alreadyOpen.contains(ObjectIdentifier(model)) {
+                    freshModel = model
+                    break
+                }
+                if freshModel != nil {
+                    break
+                }
+                try? await Task.sleep(for: pollInterval)
+            }
+            // A brand-new window's own WorkspaceModel starts with no
+            // folder at all — `WindowRootView` creates it bare and its own
+            // `onAppear` only GUESSES a folder (`adoptFolderForNewWindow`,
+            // keyed off whichever window was most recently key in
+            // AppKit's own terms). This assistant's workspace already
+            // KNOWS the right folder — there is no reason to leave a
+            // fresh window guessing at it, or to trust the guess when we
+            // have the actual answer. Set it directly, unconditionally: a
+            // mid-session window never goes through the launch-time
+            // restoration-claim path this could otherwise race with (see
+            // `WindowRootView.attemptClaim`'s own comment — "a mid-session
+            // window inherits nothing" from that path), so nothing else
+            // is going to set this window's folder out from under us.
+            if let freshModel {
+                freshModel.adoptRestoredPath(folder.path)
+                target = freshModel
+            }
+        }
+
+        guard let target else {
+            return false
+        }
+
+        target.selection = SidebarSelection.section(course.code, sectionNumber)
+        NSApp.activate(ignoringOtherApps: true)
+        target.window?.makeKeyAndOrderFront(nil)
+
+        for _ in 0..<maxAttempts {
+            if sectionWindow(for: course, sectionNumber: sectionNumber) != nil {
+                return true
+            }
+            try? await Task.sleep(for: pollInterval)
+        }
+        return sectionWindow(for: course, sectionNumber: sectionNumber) != nil
+    }
+
+    /// An already-open window's model working in this folder, if one exists.
+    static func openWindowModel(forFolderPath path: String) -> WorkspaceModel? {
+        for model in WorkspaceModel.windowModels where model.workspaceURL?.path == path {
+            return model
+        }
+        return nil
+    }
+
     /// Stop the preview before changing files. Returns whether one was up.
     ///
     /// Called BEFORE the writes, which is the whole point of it being a
@@ -1048,19 +1157,27 @@ final class AssistToolRunner {
     /// NOW, and the running preview is precisely the stale thing being
     /// complained about.
     ///
-    /// Two paths, and which one runs depends on whether a section window is
-    /// open — not on a flag anyone passes:
+    /// Two paths, and which one runs depends on whether a section window
+    /// ends up open — not on a flag anyone passes. The LOCAL assistant
+    /// tries `revealSectionOnScreen` first when none is open yet, exactly
+    /// as `deploySection` does (see its own doc comment for why):
     ///
-    /// * **A window is open.** Its own Preview is started, which builds AND
+    /// * **A window is open** (already, or because the local assistant just
+    ///   put one there). Its own Preview is started, which builds AND
     ///   serves. Nothing else builds, because starting it builds: doing a
     ///   `--build-only` pass first would build the same site twice and make a
     ///   teacher wait through both.
-    /// * **No window is open.** Nobody can be shown anything, so the site is
-    ///   brought up to date on disk and the answer says so plainly rather than
+    /// * **No window is open**, and either nothing could open one (MCP, a
+    ///   scheduled deploy) or the local assistant tried and it did not work
+    ///   out in time. Nobody can be shown anything, so the site is brought
+    ///   up to date on disk and the answer says so plainly rather than
     ///   claiming a preview that does not exist.
     private func bringThePreviewUpToDate(
         for course: Course, sectionNumber: Int
     ) async -> String {
+        if sectionWindow(for: course, sectionNumber: sectionNumber) == nil {
+            _ = await revealSectionOnScreen(course: course, sectionNumber: sectionNumber)
+        }
         if let window = sectionWindow(for: course, sectionNumber: sectionNumber) {
             // Stop whatever is running first, and WAIT for it. "Preview" means
             // show me this section as it is now, so a preview already up is
@@ -1245,8 +1362,15 @@ final class AssistToolRunner {
     /// working directory, so a stop still finishing when the build begins
     /// kills the build.
     ///
-    /// With no window open there is nothing to press, and `siteWork` runs the
-    /// launcher itself — the path Claude Code and a 6:30 a.m. alarm take.
+    /// **With no window open, the LOCAL assistant opens one.** `openMainWindow`
+    /// is present only on that path (never MCP, never a scheduled deploy —
+    /// see its own doc comment); `revealSectionOnScreen` puts the section on
+    /// screen exactly as if the teacher had clicked it in the sidebar, and
+    /// this proceeds through the button's own path from there. Only when
+    /// that genuinely cannot happen — MCP, a scheduled deploy, or the local
+    /// assistant failing to get a window on screen in time — does `siteWork`
+    /// run the launcher itself, silently: the path Claude Code and a 6:30
+    /// a.m. alarm take.
     private func deploySection(_ arguments: [String: Any]) async -> AssistToolOutcome {
         let found: Result<Located, AssistToolRefusal> = locate(arguments)
         guard case .success(let located) = found else {
@@ -1256,6 +1380,14 @@ final class AssistToolRunner {
         _ = await stopThePreviewBeforeWriting(
             for: located.course, sectionNumber: located.sectionNumber
         )
+
+        // The local assistant can put the section on screen itself, so a
+        // deploy it starts looks exactly like one the button started —
+        // console, progress header and live-site link included, not a
+        // spinner in the chat beside a window saying nothing is running.
+        if sectionWindow(for: located.course, sectionNumber: located.sectionNumber) == nil {
+            _ = await revealSectionOnScreen(course: located.course, sectionNumber: located.sectionNumber)
+        }
 
         let result: AssistSiteWorkResult
         if let window = sectionWindow(for: located.course, sectionNumber: located.sectionNumber) {

@@ -423,9 +423,26 @@ the actual human procedure; and the wait is not politeness, because stopping a
 preview kills that section's processes by working directory and would
 otherwise take the deploy's build with it.
 
-With no window open there is nothing to press. Then the assistant runs the
-launcher itself — the path Claude Code takes over MCP, and the path a deploy
-scheduled for 6:30 a.m. takes when nobody is awake.
+**With no window open, the LOCAL assistant opens one** rather than running
+silently — this used to be unconditional, and a teacher who asked the local
+assistant to deploy while no section window happened to be open would watch
+a deploy actually happen, with no visible sign of it anywhere: the chat
+answered, but nothing on screen ever moved. `AssistToolRunner.
+revealSectionOnScreen` reuses an already-open window on the same folder if
+one exists (the common case — the assistant is almost always opened FROM
+an already-open window's sidebar), or opens a fresh one otherwise, sets its
+selection to the section that was asked about, brings it to the front, and
+waits briefly for `SectionWindowControllers` to actually register it before
+proceeding — moving `.selection` is not the same thing as the section
+having appeared; `SectionDetailView` still has to mount on a real SwiftUI
+render pass first.
+
+This capability — `openMainWindow`, an `@Environment(\.openWindow)` action
+threaded down from `AssistWindowView` — exists ONLY for the local assistant.
+MCP (`Plantoir --mcp-stdio`) never constructs a Scene graph at all, so there
+is no window for it to open; a scheduled deploy runs with the app closed.
+Both keep the old silent fallback, unchanged — `siteWork` runs the launcher
+itself, the path Claude Code over MCP and a 6:30 a.m. alarm still take.
 
 ---
 
