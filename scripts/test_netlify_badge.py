@@ -52,6 +52,27 @@ class NetlifyBadgeModuleTests(unittest.TestCase):
             self.assertIn("Content-Security-Policy: script-src 'self'", text)
             self.assertNotIn("default-src", text)
 
+    def test_allows_unsafe_eval_but_never_unsafe_inline(self):
+        """
+        'unsafe-eval' has to be in the policy — Quartz's Explorer sidebar
+        (patches/explorer.inline.ts) builds its sort/filter/map functions via
+        `new Function(...)`, and without it every page's sidebar silently
+        stayed empty on a real Netlify deploy while Cloudflare (no CSP at
+        all) was unaffected — caught by A/B testing the two targets and
+        reading the browser's own `unhandledrejection`. 'unsafe-inline' must
+        stay absent regardless, since that is the one keyword Netlify's own
+        badge needs to render at all — the two are independent CSP keywords,
+        and adding the former must never let the latter back in.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<script>1+1;</script>", encoding="utf-8")
+            netlify_badge.write_netlify_headers_file(public_dir)
+
+            text = (public_dir / "_headers").read_text(encoding="utf-8")
+            self.assertIn("'unsafe-eval'", text)
+            self.assertNotIn("'unsafe-inline'", text)
+
 
 class DeployPyReExportsTheSameFunctionsTests(unittest.TestCase):
     """

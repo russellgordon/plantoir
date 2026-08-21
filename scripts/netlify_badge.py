@@ -23,6 +23,23 @@ behaviour, not a fixed list — it holds even if Quartz's own scripts change
 on a version bump, and it does not depend on knowing in advance what a
 teacher chose to embed.
 
+'unsafe-eval' is included deliberately, and is a SEPARATE keyword from the
+'unsafe-inline' this whole policy exists to omit — Netlify's badge needs
+'unsafe-inline' specifically ("the script runs in an inline frame"), so
+adding 'unsafe-eval' does not let it back in. It has to be there anyway:
+Quartz's own Explorer sidebar (patches/explorer.inline.ts) builds its
+sort/filter/map functions from `data-data-fns` JSON via
+`new Function("return " + source)()` — a `new Function` call is exactly
+what 'unsafe-eval' governs. Without it, every page's sidebar silently
+stayed empty on Netlify (Cloudflare, with no CSP at all, was unaffected) —
+found by A/B testing the two deploy targets side by side and reading the
+real `unhandledrejection` the browser threw: "Refused to evaluate a string
+as JavaScript because 'unsafe-eval' ... is not an allowed source of
+script." The three inline scripts this module hash-allows all checked out
+fine; the break was in vendored Quartz code this policy never touched
+directly, which is why hash-checking each inline script's content missed
+it — the violation was a *capability* (eval), not a script identity.
+
 Extracted from scripts/deploy.py so both it and website/netlify_deploy.py
 (the plantoir.app marketing site's own Netlify deploy, which is exposed to
 the identical badge) can share one implementation instead of two copies
@@ -86,7 +103,7 @@ def write_netlify_headers_file(public_dir: Path) -> int:
     inline scripts the policy had to account for, purely for the deploy log.
     """
     hash_sources, host_sources = _collect_inline_script_policy(public_dir)
-    policy = "script-src 'self' " + " ".join(hash_sources + host_sources) + ";"
+    policy = "script-src 'self' 'unsafe-eval' " + " ".join(hash_sources + host_sources) + ";"
     block = f"/*\n  Content-Security-Policy: {policy}\n"
 
     headers_path = public_dir / "_headers"
