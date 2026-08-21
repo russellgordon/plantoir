@@ -13,7 +13,7 @@ tags:
 
 1. Review, part two: exact values, sinusoids sketched and read,
    the tangent function, identities proved, equations solved
-2. By request: [[Radian Measure Practice]],
+2. By request: [[Radian Measure Practice]], [[Sinusoid Practice]],
    [[Identities and Equations Practice]]
 
 ## Things to do before our next class

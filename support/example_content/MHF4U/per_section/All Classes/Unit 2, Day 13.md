@@ -16,9 +16,12 @@ tags:
    question sharply
 3. Consolidation boards: everything Unit 2 knows about
    $\frac{p(x)}{q(x)}$, one board per group
-4. Journal: run the [[Journal Checklist]] before collection next
-   class
+4. Ten minutes, in class: your milestone journal entry for this task —
+   what your model ignores, and which of those omissions would change
+   your recommendation
 
 ## Things to do before our next class
 
-- [ ] Journal in next class — Unit 2 volume complete, checklist run.
+- [ ] Unit 2 volume of your journal complete, with the
+      [[Journal Checklist]] run over it. It is collected on the first
+      day of the next unit.

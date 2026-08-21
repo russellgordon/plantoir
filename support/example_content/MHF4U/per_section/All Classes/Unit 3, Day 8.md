@@ -19,6 +19,8 @@ tags:
 4. Sinusoids in radians: sketch $y = 3\cos(2x) - 1$, then state its
    amplitude, period, and phase shift — the recipe survives the new
    unit
+5. Clinic: [[Sinusoid Practice]] to the end, the reciprocal questions
+   included
 
 ## Things to do before our next class
 

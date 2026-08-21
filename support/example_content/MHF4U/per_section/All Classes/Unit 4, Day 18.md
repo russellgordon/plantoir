@@ -13,7 +13,10 @@ tags:
 1. [[The Functions Symposium]] — present your signature function to
    our invited guests
 2. Guests circulate; every group answers the same question: why is
-   this the right model, and where does it stop being one?
+   this the right model, and where does it stop being one? I come to
+   every station once, hear the part of the defence that is yours, and
+   ask you one question of my own — that is the evaluation, and it is
+   individual
 3. Begin [[Final Reflection]] while the symposium is fresh
 4. Journal collection — [[Journal Checklist]] and [[Showing Growth]]
    are your last look before handing it in

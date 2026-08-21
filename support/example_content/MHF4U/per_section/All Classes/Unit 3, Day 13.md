@@ -13,7 +13,8 @@ tags:
 1. Number talk: [[Estimation Duels]]
 2. Clinic: the identity the room found hardest, worked at the boards
    from both sides
-3. Then alone: two proofs, marked together
+3. Then alone: two proofs, marked together at the boards — nothing
+   from today is collected
 
 ## Things to do before our next class
 

@@ -16,8 +16,9 @@ tags:
    and the tunnel argued live
 3. Debrief: [[When Will I Use This]] — engineers really do begin with
    constraints and a family of curves
-4. Journal entry: the constraint that fought back hardest, and how
-   the algebra finally enforced it
+4. Ten minutes, in class: your milestone journal entry for this task —
+   the constraint that fought back hardest, and how the algebra finally
+   enforced it
 5. Look ahead: next class we divide — bring your instincts about
    $\frac{1}{x}$
 

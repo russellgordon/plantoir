@@ -10,10 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Number talk: [[Graph Talks]]
-2. [[The Signature Function]], day 5 — working period: the write-up and the
-   rate-of-change analysis of your own model
-3. Trade and challenge one claim each
+1. [[The Signature Function]], day 5 — working period: ten minutes
+   alone with [[Judging Your Own Work]] first, then whatever your
+   conference asked for, then the write-up and the rate-of-change
+   analysis of your own model
+2. Last ten minutes, in class: your milestone journal entry for this
+   task — the rival family you rejected, and what finally decided it
 
 ## Things to do before our next class
 
