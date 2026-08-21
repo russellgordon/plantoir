@@ -148,10 +148,6 @@ problem, and it needs three things:
 %%curriculum-start%%
 ## Curriculum connection
 
-![[C1.1]]
-
-![[C1.2]]
-
 ![[A1.1]]
 
 ![[A1.4]]
@@ -160,9 +156,15 @@ problem, and it needs three things:
 
 ![[A1.10]]
 
+![[C1.1]]
+
+![[C1.2]]
+
 ![[C2.1]]
 
 ![[C2.4]]
+
+![[C2.6]]
 %%curriculum-end%%
 
 %%

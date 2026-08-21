@@ -191,9 +191,11 @@ Prediction against measurement:
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
+![[A1.13]]
+
 ![[E2.4]]
 
 ![[E2.6]]
-
-![[A1.13]]
 %%curriculum-end%%

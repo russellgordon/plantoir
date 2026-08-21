@@ -160,11 +160,25 @@ Also worth refusing to claim:
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.8]]
+
 ![[D2.2]]
 
 ![[D2.5]]
 
 ![[D2.6]]
 
-![[A1.8]]
+![[D2.7]]
+
+![[D3.2]]
+
+![[D3.4]]
+
+![[D3.5]]
+
+![[D3.6]]
+
+![[D3.7]]
+
+![[D3.8]]
 %%curriculum-end%%

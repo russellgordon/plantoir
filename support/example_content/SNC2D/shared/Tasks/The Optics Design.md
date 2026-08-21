@@ -223,6 +223,8 @@ Reference: [[Lenses and Images]], [[Reflection]], [[Refraction]], and
 ![[E3.1]]
 
 ![[E3.2]]
+
+![[E3.4]]
 %%curriculum-end%%
 
 %%

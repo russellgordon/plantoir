@@ -279,11 +279,15 @@ will need all of this for [[The Climate Brief]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.9]]
+
 ![[D2.1]]
 
 ![[D2.3]]
 
+![[D2.4]]
+
 ![[D2.8]]
 
-![[A1.9]]
+![[D2.9]]
 %%curriculum-end%%

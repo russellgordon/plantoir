@@ -12,6 +12,12 @@ guessing at it in January.
 
 ## The seventy and the thirty
 
+```mermaid
+pie title Where your mark comes from
+    "The semester's work" : 70
+    "The final evaluation" : 30
+```
+
 **Seventy per cent** of your mark comes from work spread across the whole
 semester. It is not an average of September against January: it leans
 towards your **most recent and most consistent** work, because what you can

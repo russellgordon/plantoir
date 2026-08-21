@@ -208,6 +208,8 @@ this page first.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C2.6]]
+
 ![[C3.5]]
 
 ![[C3.6]]

@@ -155,7 +155,13 @@ the system does not respond in a simple straight line:
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D1.1]]
+
+![[D1.2]]
+
 ![[D3.4]]
+
+![[D3.5]]
 
 ![[D3.6]]
 

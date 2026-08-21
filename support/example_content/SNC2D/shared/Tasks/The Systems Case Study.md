@@ -124,19 +124,27 @@ of two rather than a blank page. Format of the write-up:
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B1.1]]
-
-![[B1.3]]
-
-![[B2.7]]
-
 ![[A1.3]]
 
 ![[A1.7]]
 
 ![[A1.9]]
 
+![[A1.11]]
+
 ![[A2.1]]
+
+![[A2.2]]
+
+![[B1.1]]
+
+![[B1.2]]
+
+![[B1.3]]
+
+![[B2.5]]
+
+![[B2.7]]
 %%curriculum-end%%
 
 %%

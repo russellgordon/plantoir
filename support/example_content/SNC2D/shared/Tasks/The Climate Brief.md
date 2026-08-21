@@ -130,13 +130,27 @@ Practice with real series first: [[Climate Data Practice]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.3]]
+
+![[A1.7]]
+
 ![[D1.1]]
 
 ![[D1.2]]
 
+![[D2.1]]
+
+![[D2.3]]
+
 ![[D2.4]]
 
+![[D2.7]]
+
+![[D2.8]]
+
 ![[D2.9]]
+
+![[D3.2]]
 %%curriculum-end%%
 
 %%
