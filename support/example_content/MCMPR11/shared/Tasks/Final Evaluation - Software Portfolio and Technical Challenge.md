@@ -128,3 +128,22 @@ Choose **two** of the following real-world software engineering ethical crises a
 
 ![[T1.4]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 17, during the final evaluation orientation and code review walkthrough
+  Watch for: how students identify edge-case bugs in the legacy reservoir telemetry script without executing the code.
+  Going well: students quickly spot division by zero on empty lists, unhandled negative depth readings, and fragile string concatenation.
+  Stuck: treating the script as functional based on variable naming without tracing logic on paper.
+  Record: note who independently identified all three latent defects on the diagnostic sheet.
+
+TALK — Unit 4, Day 18, during one-on-one portfolio review and technical defense
+  Ask: "In Part B, how does your flood dispatch allocation algorithm ensure that Tier 1 emergency requests are fully satisfied before lower tiers receive inventory?"
+  Then: "In Part C, what ethical duty does a programmer have when pressure from management conflicts with public safety standards?"
+  The first assesses K1.8 and K1.11: defending algorithmic decisions and allocation data structures in conversation.
+  The second assesses T1.2 and T1.4: articulating ethical frameworks and developer liability.
+  Record: one line per student in the final assessment record.
+
+The product evidence is the completed refactored code (Part A), flood dispatch program (Part B), technical ethics essay (Part C), and cumulative software portfolio in the Learning Journey Log.
+%%

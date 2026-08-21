@@ -114,3 +114,22 @@ Discuss with your partner and answer in your [[Learning Journey Log]]:
 
 ![[T1.4]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 20, while pairs are implementing list accumulators and rolling window calculations
+  Watch for: how partners divide driver and navigator roles when writing the 24-hour moving average algorithm.
+  Going well: accumulator variables are cleanly initialized outside loops, and index arithmetic is checked against list boundaries before slicing.
+  Stuck: off-by-one errors when computing moving averages, or attempting to modify the data list in-place while iterating over it.
+  Record: mark on the seating plan which pairs successfully quarantined corrupted sensor rows without halting the data ingestion pipeline.
+
+TALK — Unit 2, Day 21, during the anomaly detection testing and ethics case study discussion
+  Ask: "How does your pipeline distinguish between a single faulty sensor reading and a sustained 48-hour marine heatwave?"
+  Then: "If your employer asked you to smooth out dissolved oxygen telemetry to hide a localized industrial fish kill, what code of ethics governs your response?"
+  The first assesses D4.4 and K1.6: explaining nested list filtering and statistical threshold algorithms verbally.
+  The second assesses T1.2 and T1.4: professional responsibility, developer whistleblowing, and public data integrity.
+  Record: note key arguments and student reasoning in the course tracking log.
+
+The product evidence is the Python data pipeline script, exported cleaned CSV and incident JSON files, and reflection in the Learning Journey Log.
+%%

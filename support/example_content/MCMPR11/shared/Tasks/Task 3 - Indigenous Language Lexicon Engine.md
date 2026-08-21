@@ -115,3 +115,22 @@ Discuss in your submission:
 
 ![[T1.4]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 20, while students are implementing nested dictionary lookups and Unicode character normalization
+  Watch for: how students structure the inverted index mapping English definitions back to Hul'q'umi'num' root morphemes.
+  Going well: search queries normalize combining diacritics using unicodedata rather than hardcoding fragile character replacement maps.
+  Stuck: key errors on missing words, or attempting to use mutable lists as dictionary keys.
+  Record: note who correctly implemented the Leitner box interval transitions and file serialization.
+
+TALK — Unit 3, Day 21, during inverted index testing and OCAP data sovereignty reviews
+  Ask: "Why does an inverted index provide faster search performance than iterating through a list of dictionary entries?"
+  Then: "How does your data export model ensure that the First Nations community retains sovereign ownership and possession of their linguistic heritage?"
+  The first assesses D4.1, K1.4, and K1.7: analyzing algorithm complexity and dictionary lookups in spoken dialogue.
+  The second assesses T1.4: applying Indigenous data sovereignty principles to software architecture.
+  Record: two sentences per student in the unit conferencing notes.
+
+The product evidence is the Python lexicon engine code, persistent JSON study state, and OCAP data stewardship statement in the Learning Journey Log.
+%%

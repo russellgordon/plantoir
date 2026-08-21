@@ -135,3 +135,22 @@ If a navigation app underestimates travel time by 3 hours in the North Shore Mou
 
 ![[T1.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 16, while students are implementing Naismith pace calculations and elevation penalty algorithms
+  Watch for: how students decompose the multi-variable risk rules and structure nested branching before writing Python code.
+  Going well: edge cases like negative distance or summit elevations exceeding 4000 m are caught by defensive input guards before calculations run.
+  Stuck: copy-pasting repetitive if statements without structuring boolean operators or mixing up elevation units (metres vs kilometres).
+  Record: note on the seating chart who independently handled compound boundary conditions and who required prompting on environmental lapse rate formulas.
+
+TALK — Unit 1, Day 17, during the test matrix verification and peer sanity checks
+  Ask: "If a hiker inputs a summit temperature of 2°C with 25 mm of precipitation at 1500 m, how does your code decide between high hypothermia risk and an avalanche warning? Walk me through the branch condition that fires."
+  Then: "Why is a false sense of safety in wilderness navigation software more dangerous than an outright crash?"
+  The first checks D2.3 and K1.8 heard out loud: whether the student can trace compound boolean logic without guessing.
+  The second checks T1.2: understanding the real-world safety consequences of algorithmic assumptions.
+  Record: two sentences per conversation on the daily tracking sheet.
+
+The product evidence is the Python expedition advisory script, test matrix execution results, and reflection entry in the Learning Journey Log.
+%%

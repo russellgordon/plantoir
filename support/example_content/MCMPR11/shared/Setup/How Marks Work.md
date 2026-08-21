@@ -14,29 +14,29 @@ growth, and what your work does — all of it inside your control.
 
 ```mermaid
 pie title Where evidence comes from
-    "Wildfire Early Warning Dashboard" : 30
-    "Indigenous Language Lexicon Engine" : 12
-    "Salish Sea Marine Sensor Tracker" : 10
-    "Pacific Trail Route Planner" : 8
-    "Code Journal and reflection" : 15
-    "Quizzes and check-ins" : 15
-    "Daily practice and collaboration" : 10
+    "Coursework and computational projects" : 70
+    "Culminating project" : 30
 ```
 
-The culminating project, **Task 4: Wildfire Early Warning Dashboard**, is the largest single 
-piece of the course. It runs across the last unit, integrating everything you've learned to 
-address a critical BC reality. The three earlier tasks — **Task 1: Pacific Trail Route Planner**, 
-**Task 2: Salish Sea Marine Sensor Tracker**, and **Task 3: Indigenous Language Lexicon Engine** — 
-are the rehearsals that make it possible.
+**The coursework (70%)** consists of the three progressive projects you develop
+across Units 1 through 3 — [[Task 1 - Pacific Trail Route Planner]],
+[[Task 2 - Salish Sea Marine Sensor Tracker]], and
+[[Task 3 - Indigenous Language Lexicon Engine]] — together with the reflective
+entries in your [[Learning Journey Log]]. Each project builds practical
+computational competence and ethical awareness across BC contexts before you
+tackle the capstone.
 
-**Quizzes** are short, frequent, low-stakes, and re-attemptable after new learning. They 
-exist to find out what needs work, not to close the book on it.
+**The culminating project (30%)** is [[Task 4 - Wildfire Early Warning Dashboard]],
+a multi-module emergency management system and technical showcase developed across
+the final unit that brings together algorithmic modeling, automated testing, and
+critical infrastructure ethics.
 
-**Reflection** is your [[Learning Journey Log]], where a broken build turns into evidence of learning — 
-often the strongest evidence you have.
+**Check-ins and code tracing** are short, diagnostic, and low-stakes. They exist
+to find out what needs work before project deadlines, not to close the book on it.
 
-**Daily practice** is the small stuff done consistently: warm-up predictions committed to in 
-ink, driving and navigating fairly in pairs, the question that unlocked a neighbour's bug.
+**Reflection** is your [[Learning Journey Log]], where a broken build turns into
+evidence of learning — often the strongest evidence you have. Strong programmers
+document their pivots and explain why their final design works.
 
 > [!important] Small and used beats ambitious and broken
 > On every task, and most of all on the culminating project, a modest program that works 

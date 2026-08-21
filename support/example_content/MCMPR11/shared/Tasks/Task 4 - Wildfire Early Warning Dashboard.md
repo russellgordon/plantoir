@@ -129,3 +129,22 @@ Accounting software (Horizon) contained silent bugs that recorded phantom financ
 
 ![[T1.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 8, while students integrate telemetry parsing and the Canadian Forest Fire Weather Index module
+  Watch for: how students decouple modules, manage function imports, and verify intermediate fuel moisture calculations against reference test data.
+  Going well: calculations are broken into discrete pure functions, and missing sensor readings produce defensive warnings rather than unhandled tracebacks.
+  Stuck: tight coupling with monolithic scripts, global variable leakage across modules, or circular import dependencies.
+  Record: note on the milestone board who has green unit test runs across all 6 FWI mathematical models.
+
+TALK — Unit 4, Day 12, during integration testing and emergency alert dispatch reviews
+  Ask: "Walk me through how your test_suite.py proves that the Initial Spread Index formula produces correct results under extreme wind gusts."
+  Then: "How did lessons from the CrowdStrike outage or Horizon scandal shape your error handling and audit logging?"
+  The first assesses D5.3, K1.11, and K1.15: evaluating test harness architecture and numerical verification orally.
+  The second assesses T1.1 and T1.2: articulating software engineering ethics and developer accountability.
+  Record: two sentences per team in the culminating evaluation record.
+
+The product evidence is the multi-module Python codebase, automated test suite, sample exported incident advisories, and technical reflection in the Learning Journey Log.
+%%
