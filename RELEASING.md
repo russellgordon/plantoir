@@ -94,6 +94,21 @@ Found while qualifying the mac for v1.1.0. The Windows bundle should adopt
 the same number as its version's fourth field when convenient (its trail
 currently prints the patch digit, which conflates two ideas).
 
+## Landed since v1.1.0 — ships in the next release
+
+Features that are **complete, merged to `dev`, and waiting only for a tag**.
+This is a reading aid, not a source of truth: the release notes are drafted
+from the commits since the last tag, so anything merged is carried whether or
+not it is listed here. What the list buys is the thing commits do not say —
+whether a teacher will notice, and whether both platforms have it.
+
+**Clear this list when the tag goes up**, in the same commit that moves the
+version line. A list that survives its own release is worse than no list.
+
+| Landed | What a teacher sees | Platforms | Log |
+|---|---|---|---|
+| 2026-08-21 | Class sites carry the Plantoir icon in the browser tab, instead of Quartz's logo. Also at the site root, and as the Home Screen icon on iOS. | Both — shared Python and shared assets; no app code changed on either side. First preview after updating rebuilds the website builder once. | [298, 299](GUI-IMPROVEMENTS.md) |
+
 ## The short version
 
 For future-you, mid-school-year, who remembers nothing. The whys are below.

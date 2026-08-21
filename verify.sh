@@ -22,7 +22,8 @@ set -euo pipefail
 #      ./preview.sh EXC2O 1 --image quartz-teacher:dev-test --full-rebuild --build-only
 #      so the container is recreated FROM THE DEV-TEST IMAGE and a full static
 #      build of the Example Course runs through the real launcher.
-#   6. Confirms the built site exists and the running container uses the
+#   6. Confirms the built site exists, that it carries and links Plantoir's
+#      own icon rather than Quartz's, and that the running container uses the
 #      dev-test image, then prints a PASS/FAIL summary.
 #
 # Usage:
@@ -50,7 +51,11 @@ while [[ $# -gt 0 ]]; do
     --no-cache)   NO_CACHE="--no-cache"; shift ;;
     --skip-build) SKIP_BUILD="true"; shift ;;
     --help|-h)
-      sed -n '4,36p' "$0" | sed 's/^# \{0,1\}//'
+      # Print the banner by finding its end rather than by a fixed line
+      # number: the range used to be hard-coded, so every line added to the
+      # comment above quietly truncated the help text from the bottom — the
+      # part that says how to install the fixture this script requires.
+      sed -n '4,/^# =\{10,\}$/p' "$0" | sed 's/^# \{0,1\}//' | sed '$d'
       exit 0 ;;
     *) echo "❌ Unknown option: $1 (see --help)"; exit 1 ;;
   esac
@@ -202,8 +207,15 @@ check_baked scripts/deploy.py             /opt/scripts/deploy.py
 check_baked patches/Explorer.tsx          /opt/quartz/quartz/components/Explorer.tsx
 check_baked patches/FolderContent.tsx     /opt/quartz/quartz/components/pages/FolderContent.tsx
 check_baked patches/explorer.inline.ts    /opt/quartz/quartz/components/scripts/explorer.inline.ts
+# Head.tsx carries the <link rel="icon"> tags, so a stale copy in the image is
+# how a site would quietly go back to wearing the Quartz logo.
+check_baked patches/Head.tsx              /opt/quartz/quartz/components/Head.tsx
 check_baked support/Backlinks.tsx         /opt/support/Backlinks.tsx
 check_baked support/colour_schemes.json   /opt/support/colour_schemes.json
+check_baked support/favicon/favicon.ico   /opt/support/favicon/favicon.ico
+check_baked support/favicon/icon.svg      /opt/support/favicon/icon.svg
+check_baked support/favicon/apple-touch-icon.png /opt/support/favicon/apple-touch-icon.png
+check_baked support/favicon/icon.png      /opt/support/favicon/icon.png
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
 # -------------------- 4b. The hide filter must be IN THE IMAGE --------------------
@@ -243,13 +255,52 @@ else
 fi
 
 # -------------------- 6. Post-flight checks --------------------
-SITE_INDEX="courses/EXC2O/.merged_output/section1/public/index.html"
+SITE_PUBLIC="courses/EXC2O/.merged_output/section1/public"
+SITE_INDEX="$SITE_PUBLIC/index.html"
 if [[ -f "$SITE_INDEX" && "$SITE_INDEX" -nt "$STAMP_FILE" ]]; then
   pass "Built site is present and freshly generated ($SITE_INDEX)"
 else
   fail "Built site missing or stale at $SITE_INDEX"
 fi
 rm -f "$STAMP_FILE"
+
+# -------------------- 6b. The site wears Plantoir's icon, not Quartz's --------------------
+# Two halves that fail independently: the FILES have to be emitted (static/ by
+# the Static emitter, the root copy by the Assets emitter out of content/), and
+# the PAGE has to link them. A site can have all four files and still show the
+# Quartz logo if Head.tsx did not make it into the image.
+if [[ -f "$SITE_INDEX" ]]; then
+  ICON_OK="true"
+  for asset in static/icon.svg static/favicon.ico static/apple-touch-icon.png static/icon.png favicon.ico; do
+    if [[ ! -f "$SITE_PUBLIC/$asset" ]]; then
+      fail "Built site is missing $asset"
+      ICON_OK="false"
+    fi
+  done
+  # The root favicon.ico and quartz/static/icon.png must be OURS, byte for byte.
+  # Note what this does NOT prove: build_site.py looks for support/favicon
+  # relative to the container's WORKDIR before /opt/support/favicon, and when
+  # verify.sh runs, that WORKDIR *is* this repo — so these two lines compare
+  # the working tree with itself. What proves the IMAGE carries the right
+  # bytes is the four check_baked lines above; a teacher's working folder has
+  # .toolchain/support rather than support/, so it correctly falls through to
+  # the baked copy.
+  for pair in "favicon.ico:favicon.ico" "static/icon.png:icon.png"; do
+    built="$SITE_PUBLIC/${pair%%:*}"
+    source_file="support/favicon/${pair##*:}"
+    if [[ -f "$built" ]] && ! cmp -s "$built" "$source_file"; then
+      fail "$built is not $source_file — the site is carrying a different icon"
+      ICON_OK="false"
+    fi
+  done
+  for needle in 'static/icon.svg' 'static/favicon.ico' 'apple-touch-icon'; do
+    if ! grep -q "$needle" "$SITE_INDEX"; then
+      fail "index.html does not link $needle"
+      ICON_OK="false"
+    fi
+  done
+  [[ "$ICON_OK" == "true" ]] && pass "Built site carries and links the Plantoir icon (tab, root, Apple touch)"
+fi
 
 RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo '(none)')"
 if [[ "$RUNNING_IMAGE" == "$DEV_TEST_IMAGE" ]]; then
