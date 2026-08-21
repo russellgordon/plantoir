@@ -266,60 +266,47 @@ were reviewed and passed, because nobody was looking at this number. They want
 a revisit before the payloads are considered done — not a rewrite, a read of
 which specific codes are thin.
 
-## Overall expectation pages that say "None"
+## Overall expectation pages that say "None" — DONE 2026-08-20
 
-Found by AVI1O's adversarial reviewer on 2026-08-20, and **re-measured on
-2026-08-20 after the first count proved wrong in both directions.** The body
-of every OVERALL expectation page is the literal word `None`:
+All 40 are fixed. ATC1O (10), AVI1O (9), CGC1W (10) and THJ2O (11) now carry
+the Ministry's verbatim wording; SNC1W and EXC2O were already done.
 
-| Payload | Empty overalls | The Ministry document to fetch |
-|---|---|---|
-| ATC1O | 10 — A1–A4, B1–B3, C1–C3 | The Arts, Grades 9–10 (2010) — **Dance**, not visual art |
-| AVI1O | 9 — A1–A3, B1–B3, C1–C3 | The Arts, Grades 9–10 (2010) — Visual Arts |
-| CGC1W | 10 — A1, A2, B1, B2, C1, C2, D1, D2, E1, E2 | Exploring Canadian Geography (2024) |
-| THJ2O | 11 — A1–A4, B1, B2, C1–C3, D1, D2 | Technological Education, Grades 9–10 (2009) — **Green Industries** |
+**Keep this section for the sourcing, which was the hard part.** If another
+payload ever needs its overalls, this is the route:
 
-**40 pages across four payloads.** Two entries from the original list are
-already done and must not be redone: **SNC1W** carries real Ministry text on
-all ten overalls, and **EXC2O** inherited that through the port. The earlier
-table claiming six payloads was counting a defect that two of them no longer
-had.
+- **`dcp.edu.gov.on.ca` course pages cannot be fetched whole.** They are ~6 MB
+  Angular pages and every fetch comes back truncated, which is exactly how a
+  confident paraphrase gets written by accident. Do not work from one.
+- **The expectations are not in the page HTML either** — only the strand
+  titles are. The page calls an API for the rest:
+  `https://ws.api.dcp.edu.gov.on.ca/content/api/items?system.codename=<code>`.
+  Query the codename `<course>___strands___oe_se_pdf` and the response carries
+  an official Ministry asset URL: a PDF titled "Overall and Specific
+  Expectations — <course>". That is the clean source for any CURRENT course.
+- **Older courses are not on that API at all.** THJ2O is a 2009 Grade 10
+  broad-based technology course superseded in 2024, so it has no entry, and
+  both edu.gov.on.ca paths for the 2009 Technological Education PDF now return
+  a soft 404 — an HTML "page not found" served with status 200, which a script
+  will happily save as a .pdf. Check `file`, not the status code.
+  **THJ2O's eleven therefore came from a school-board mirror of the Ministry
+  PDF** (dpcdsb.org), corroborated by its intact Ministry running footer and by
+  the page number matching the document's own table of contents. That is weaker
+  provenance than the other three and is worth one confirmation against a
+  printed copy if one is ever to hand.
+- **Parse by the decimal, not by indentation.** An overall is a code with no
+  decimal (`A1.`), a specific is a code with one (`A1.1`). Indentation is
+  inconsistent between pages of the same document — CGC1W's E2 heading is
+  indented where the other nine are flush left, and an indentation rule silently
+  dropped it while reporting nine of ten as a success.
+- **Two documents, two shapes.** In the 2010 Arts and 2024 Geography documents
+  the overall carries its strand name ("A1. The Creative Process: apply the
+  creative process to…"). In the 2009 Technological Education document it does
+  not — the overall is a bare sentence, and the names on the payload's pages
+  come from the SPECIFIC expectation subheadings. A parser written for one
+  returns zero rows on the other.
+- **Assert the strand name from the payload's own filename before writing.**
+  ATC1O is Dance and AVI1O is Visual Arts; their A1 strands share the name "The
+  Creative Process" and share no text. Dropping the dance wording into the art
+  course would read perfectly and be wrong, and the filename check is what makes
+  that impossible rather than merely unlikely.
 
-**THJ2O is Green Industries, not Hospitality and Tourism.** The earlier note
-in this file said Hospitality, which would have sent a fixer to the wrong
-document to copy eleven expectations that look authoritative and are for
-another course entirely. Hospitality and Tourism is TFJ. THJ2O's own
-`About These Expectations.md` says Green Industries, and it also carries a
-warning that the 2009 document was superseded in 2024–25.
-
-**You do not have to go looking for the source.** Every one of these payloads
-already names its official URL in its own
-`shared/Curriculum/About These Expectations.md`, along with the Ministry PDF
-where one exists. Start there rather than searching.
-
-**Checking this yourself: strip the anchor first.** The body of a broken page
-is `None ^text`, not `None`. A comparison against the string "None" reports
-every page as healthy and the whole defect as fixed — which is exactly what
-happened on the first attempt at re-measuring it. Strip `^text`, then compare.
-
-This is the most VISIBLE defect left in the payloads. `Learning Goals.md`
-carries a heading reading `## In the Ministry's words` and then transcludes the
-overalls — so a student opens that page and is shown the word "None" once per
-strand. The Curriculum Coverage heat map's strand headers are empty for the
-same reason.
-
-The specific expectations (A1.1, A1.2, …) are fine everywhere — this is the
-overalls only. ICS3U is the model of the correct shape: its
-`A1. Data Types and Expressions.md` carries "demonstrate the ability to use
-different data types, including one-dimensional arrays, in computer programs;"
-followed by the `^text` anchor.
-
-**Do not write these from memory.** Phase 1 is verbatim or not at all, and an
-overall expectation is exactly the kind of sentence that is easy to paraphrase
-convincingly and wrongly.
-
-Cheap to do as one Phase 1 job — four fetches and forty short files — and it
-should happen before any payload is shown to anyone. Pair it with the English
-truncation work above; both are the same kind of task. Note that
-`dcp.edu.gov.on.ca` course pages are long enough that a single fetch of the
-whole page comes back truncated; fetch per strand, or use the Ministry PDF.
