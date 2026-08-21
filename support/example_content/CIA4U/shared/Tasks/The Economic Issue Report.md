@@ -22,8 +22,7 @@ recommend.
 
 ## What to produce
 
-**A report of about 1,800 words and a twelve-minute presentation with
-questions taken.**
+**A report of about 1,800 words and a twelve-minute presentation delivered to a policy panel of peers, with questions taken and trade-offs defended out loud.**
 
 | Part | What it must do |
 | --- | --- |
@@ -42,8 +41,8 @@ questions taken.**
   means the conclusion follows from the evidence rather than sitting beside
   it. Evidence that cut against you gets named and weighed, not omitted.
 - **Communication for the audience.** A1.7 asks for a form fit to purpose:
-  a report reads differently from a twelve-minute talk, and both are being
-  assessed.
+  a report reads differently from a presentation to a policy panel, and
+  both are being assessed.
 - **The concepts of economic thinking, used.** A2.3 — economic
   significance, cause and effect, stability and variability, economic
   perspective. Not listed in a paragraph; used to structure the analysis.
@@ -116,6 +115,7 @@ TALK — Unit 4, Day 13, the conferences already on that agenda
   Record: the event in three words on the conference list, and a cross
   where nothing came. Come back to those students on Day 15.
 
-The product evidence is the report and the presentation on Day 16. Do
-not plan to gather anything else that period: you are hosting.
+The product evidence is the report and the presentation on Day 16,
+delivered in concurrent policy panels of five or six students while you
+circulate. Do not plan to gather anything else that period: you are hosting.
 %%
