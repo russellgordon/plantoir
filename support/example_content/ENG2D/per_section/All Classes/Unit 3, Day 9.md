@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Seminar]], day 3 — seminars: groups three and four
+1. [[The Seminar]], day 3 (part 2 of 3) — seminars: groups three and four
 2. Reading period with the novel
 
 ## Things to do before our next class

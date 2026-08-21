@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. [[The Seminar]], day 3 — seminars begin: groups one and two
+1. [[The Seminar]], day 3 (part 1 of 3) — seminars begin: groups one and
+   two
 2. What you do in a seminar you are not leading is marked too, per
    [[The Seminar]]
 

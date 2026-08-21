@@ -47,7 +47,7 @@ formats — the news report, then the opinion piece, then a full practice
 under timed conditions.
 
 > [!note] If you are worried about it
-> Come and tell me in September rather than in March. Accommodations,
+> Come and tell me in September rather than in December. Accommodations,
 > extra practice, and a plan are all straightforward when there is time,
 > and this is a test that rewards preparation more than talent.
 
