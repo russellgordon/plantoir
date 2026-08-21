@@ -4,14 +4,14 @@ publish: true
 created: __CREATED__
 enableToc: true
 ---
-Six poems, read aloud, spread across the year rather than blocked into a
-unit — because a poem beside a play or a novel does more than a poem
-beside five other poems.
+Six poems, read aloud, spread across the semester rather than blocked
+into a unit — because a poem beside a play or a novel does more than a
+poem beside five other poems.
 
 | Poem | Poet | Read beside |
 | --- | --- | --- |
 | Sonnet 130 ("My mistress' eyes…") | William Shakespeare | *Romeo and Juliet*, as an antidote to its own imagery |
-| "Letter to Sir John A. Macdonald" | Marilyn Dumont (Métis) | The unit on perspective and whose account survives |
+| "Letter to Sir John A. Macdonald" | Marilyn Dumont (Métis) | Perspective, beside the novel: whose account survives |
 | "The Bull Moose" | Alden Nowlan | The short-story unit: an ending that reorganises the poem |
 | "Blues Spiritual for Mammy Prater" | Dionne Brand | Style and diction: what plain words can carry, and how a photograph becomes an argument |
 | "The Cariboo Horses" | Al Purdy | Setting as argument: a landscape that is not scenery |

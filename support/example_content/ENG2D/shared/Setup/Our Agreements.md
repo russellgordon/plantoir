@@ -24,9 +24,9 @@ argument productive rather than merely loud.
 
 ## The texts, and what they deal with
 
-This year includes a play about a feud that kills children, a novel about
-a community cut off during a collapse, short fiction about violence and
-grief, and media that is designed to move you without your noticing.
+This course includes a play about a feud that kills children, a novel
+about a community cut off during a collapse, short fiction about violence
+and grief, and media that is designed to move you without your noticing.
 Every text page names what it deals with at the top.
 
 If you need to step out of a class, step out. You do not need to explain,
@@ -61,6 +61,4 @@ rule professionals work under and it costs you nothing.
 ![[A1.2]]
 
 ![[A2.1]]
-
-![[D3.2]]
 %%curriculum-end%%

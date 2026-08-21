@@ -17,8 +17,8 @@ using the same techniques deliberately.
 ## Part one: the analysis
 
 Choose **one** text: an advertisement, a trailer, a documentary segment,
-a front page, or a piece of political communication. Not one you find
-stupid — one that works.
+a front page, a feed you screenshot yourself, or a piece of political
+communication. Not one you find stupid — one that works.
 
 Answer, with evidence from the text itself:
 

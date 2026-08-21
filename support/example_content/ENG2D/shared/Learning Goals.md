@@ -5,9 +5,9 @@ created: __CREATED__
 transcludeTitleSize: h2
 excludeBacklinks: true
 ---
-Grade 10 academic English is the year the work stops being about whether
-you understood and starts being about whether you can prove it. By June
-you will be able to:
+Grade 10 academic English is where the work stops being about whether
+you understood and starts being about whether you can prove it. By
+January you will be able to:
 
 **Read a text you have never seen and build an argument about it** —
 with evidence chosen rather than found, and an objection answered.

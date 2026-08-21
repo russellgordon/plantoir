@@ -20,14 +20,23 @@ writing.
 You are not required to act well. You are required to make choices and
 execute them:
 
-- **Cuts.** You may cut lines. Every cut is an argument about what the
-  scene is for.
+- **Cuts, or one adaptation.** You may cut lines; every cut is an
+  argument about what the scene is for. You may instead take up to ten
+  of them and put them into contemporary English, which is the harder
+  argument: the new words have to do what the verse was doing — its
+  rhythm, its register, its image — and not merely say what it said.
 - **Blocking.** Where people stand, who moves toward whom, who is left
   alone on stage.
 - **Delivery.** Which words carry the meaning — see
   [[Shakespeare's Language]] for how the verse tells you.
-- **Setting and props**, if you want them. A scene set now is a claim
-  about the play's relevance; a scene set in 1595 is also a claim.
+- **What the audience can see that is not a body.** A prop, a costume
+  piece, a chair placed where it has to be walked around, a light left
+  on. **At least one**, chosen rather than found; and where you use
+  several they have to argue the same thing rather than compete, which
+  is the harder part. The director's note says what yours argue. A scene
+  set now is a claim about the play's relevance; a scene set in 1595 is
+  also a claim; and a bare stage with one object standing on it is the
+  loudest of the three.
 - **Faces and hands.** Where the eyes go, what the hands are doing, who
   is looked at and who is pointedly not. In a room this size these carry
   as much as the words do, and they are the half of a performance an
@@ -41,8 +50,11 @@ rehearsal and finish it in class on the two performance days, so the piece
 that carries your individual mark is not written at midnight:
 
 1. **Your reading of the scene** in one sentence.
-2. **Three choices you made** and what each one shows.
-3. **One line you cut** and the argument for cutting it.
+2. **Three choices you made** and what each one shows. One of them is
+   what we could see that was not a body: what it was, and what it
+   argues.
+3. **One line you cut, or the passage you adapted**, and the argument
+   for it.
 4. **What you would do differently with another two weeks.**
 5. **Two things you can already do as a reader or a writer** that made
    this scene better to listen to — and where each of them shows.
@@ -52,6 +64,8 @@ that carries your individual mark is not written at midnight:
 | Category | What I am looking for |
 | --- | --- |
 | Communication | Your part of the scene reaches the audience: the lines you speak, or the choice you were responsible for, arrives with its sense intact — and what your face, hands and eyes are doing agrees with it |
+| Communication, in the words | The cut, or the adaptation, that you argue for in your note is one that works: what is left of a cut scene reads on its own, and contemporary words keep what the verse was doing — rhythm, register and image, not only meaning |
+| Communication, in what we can see | What is on stage that is not a body supports the scene rather than decorating it — and where there is more than one thing, they are doing the same job. Your note says what they argue |
 | Thinking | The staging is an interpretation, defended in the note with evidence from the text |
 | Application | The choices use what we learned about dramatic form, not just enthusiasm, and the note names two reading or writing skills you brought to the staging |
 
@@ -79,8 +93,6 @@ the unit.
 ![[B2.1]]
 
 ![[A3.2]]
-
-![[A1.7]]
 
 ![[A2.5]]
 

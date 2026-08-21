@@ -5,8 +5,8 @@ created: __CREATED__
 enableToc: true
 ---
 > [!abstract] At a glance
-> Groups of four · one 25-minute seminar led by your group, plus
-> participation in everybody else's · a question, two passages, and a
+> Groups of four · one 25-minute seminar led by your group, plus what
+> you contribute in everybody else's · a question, two passages, and a
 > written follow-up · assessed on Communication, Thinking, and Knowledge
 
 ## The task

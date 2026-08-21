@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 enableToc: true
 ---
-Nine folders and a landing page.
+Ten folders and a landing page.
 
 | Folder | What lives there |
 | --- | --- |
@@ -16,7 +16,12 @@ Nine folders and a landing page.
 | **Discussions** | The arguments, with the positions laid out |
 | **Portfolios** | The journal and the evidence of growth |
 | **Tutorials** | How to do a specific thing |
+| **Style** | How to write about literature, and what this site can do |
 | **Setup** | How the room runs |
+
+The curriculum expectations are the one thing kept out of the sidebar.
+They arrive at the foot of the pages that use them, which is the only
+place they are any use.
 
 ## The landing page
 
@@ -26,9 +31,9 @@ work backwards; every class page links to everything that class used.
 ## Why concepts live apart from classes
 
 Because an idea meets you once and gets used eleven times. Irony turns up
-in a short story in October, in *Romeo and Juliet* in November, and in an
-advertisement in April. It is explained properly once — [[Irony]] — and
-every class that uses it links there.
+in a short story in September, in *Romeo and Juliet* in October, and in
+an advertisement in December. It is explained properly once — [[Irony]] —
+and every class that uses it links there.
 
 > [!tip] Search beats clicking
 > <kbd>⌘</kbd> + <kbd>K</kbd> or <kbd>Ctrl</kbd> + <kbd>K</kbd>, three

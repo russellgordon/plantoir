@@ -12,7 +12,8 @@ tags:
 
 1. Launch: [[The Scene, Staged]], day 1 — the criteria table read, then
    groups and scenes chosen
-2. What staging means: cuts, blocking, delivery, silence
+2. What staging means: cuts or one adaptation, blocking, delivery,
+   silence, and what the audience will be able to see
 3. First read-through in groups
 
 ## Things to do before our next class
