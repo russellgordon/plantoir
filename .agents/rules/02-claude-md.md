@@ -130,7 +130,16 @@ description: "Plantoir project rules, part 2 of 7 - Rules that override default 
      matches what shipped.)
    - **`dev` is where work integrates.** Start sessions from `dev`, branch
      off it, merge back to it. A piece merges only with its tests green and
-     its write-ups done (rules 2–5).
+     its write-ups done (rules 2–5). **Merging into `dev` is not finished
+     until `git push origin dev` — push in the same session, right after the
+     merge.** A merge that stays local is invisible to every other machine
+     and every other session: found 2026-08-21, when a Windows session
+     merged a hero-image fix into its local `dev` and reported it done, and a
+     mac clone made from `origin/dev` minutes later had none of it, because
+     the commits had never left the Windows machine. If `git push` is
+     rejected because the remote moved, `git fetch` and read what changed
+     before merging or force-pushing anything — never push over work you
+     have not looked at.
    - **One issue branch per coherent piece**, branched off `dev`: named
      `issue/<number>-<slug>` when a GitHub issue exists, `issue/<slug>` when
      not. "A coherent piece" keeps its old meaning — one thing a teacher
@@ -138,9 +147,10 @@ description: "Plantoir project rules, part 2 of 7 - Rules that override default 
      whole afternoon. Merge with `--no-ff` so the piece stays one readable
      unit in history, and delete the branch after it merges.
    - **Autonomy moves with the model.** Committing as you go on the issue
-     branch and merging a finished piece into `dev` are the standing order —
-     no per-session permission, exactly as commit-to-main used to be. Merging
-     `dev` into `main` is PUBLISHING: do it during a requested release cut,
-     or when Russell asks, never on your own initiative. Outside an iterative
-     run — a one-off question, an experiment, something half-finished — the
-     older rule still holds: ask first.
+     branch, merging a finished piece into `dev`, and pushing `dev` are the
+     standing order — no per-session permission, exactly as commit-to-main
+     used to be. Merging `dev` into `main` is PUBLISHING: do it during a
+     requested release cut, or when Russell asks, never on your own
+     initiative. Outside an iterative run — a one-off question, an
+     experiment, something half-finished — the older rule still holds: ask
+     first.
