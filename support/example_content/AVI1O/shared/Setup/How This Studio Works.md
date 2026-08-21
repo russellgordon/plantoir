@@ -35,9 +35,10 @@ you read before and after — not instead.
 
 Some of you have drawn since you could hold a pencil and some have not
 made anything since Grade 6. Both are normal here. The experienced will be
-asked for range and risk; the beginners will be asked for commitment and
-honest looking. Neither starts ahead in the marks — [[How Marks Work]]
-shows you why.
+asked for range and risk; everybody is asked for exactly what the criteria
+table on each task names, and none of those rows is about how much you
+knew in September. Neither of you starts ahead in the marks —
+[[How Marks Work]] shows you why.
 
 ## The shape of the year
 

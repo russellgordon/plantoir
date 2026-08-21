@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Introductions, and a drawing before anything is explained
+1. Introductions, and a drawing before anything is explained — not for
+   marks: it tells me where this class is starting from, and you will
+   want it back at the end
 2. How the studio runs: [[How This Studio Works]] and [[Our Studio Agreement]]
 3. What to bring: [[What to Bring]]; a tour of the site: [[Using This Site]]
 

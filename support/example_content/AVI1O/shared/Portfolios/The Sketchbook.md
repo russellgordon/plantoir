@@ -49,7 +49,9 @@ picture into a document.
 
 Little and often beats a panicked evening. Ten minutes a day drawing the
 uninteresting things in front of you will do more for your hand than a
-weekend of effort, and [[The Sketchbook Habit]] is how it gets assessed.
+weekend at it. None of that is marked — [[The Sketchbook Habit]] is
+assessed on the pages made in studio periods, and it says which ones —
+but it is what makes those pages worth reading.
 
 Everything in this book eventually feeds [[The Portfolio]].
 [[Making Marks]] is where the loosest pages come from, and

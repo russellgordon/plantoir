@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Studio time
+1. Studio time: acting on the mid-point critique
 2. Typography by hand: legibility at distance
 3. Conferences
 

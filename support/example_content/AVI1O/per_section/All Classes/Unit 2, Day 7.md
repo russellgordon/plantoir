@@ -11,9 +11,10 @@ tags:
 ## Agenda
 
 1. Studio time: a second state of your block
-2. What changed between states — the sketchbook record
+2. What changed between states — both states into the sketchbook before
+   you leave
 3. Conferences
 
 ## Things to do before our next class
 
-- [ ] Both states filed in the sketchbook.
+- [ ] Read [[Sculpture]].

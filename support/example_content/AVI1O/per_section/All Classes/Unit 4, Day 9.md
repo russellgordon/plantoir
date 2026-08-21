@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Studio time: finishing
+1. Studio time: finishing, and acting on the critique
 2. What 'finished' means, and how to tell
 3. Conferences
 

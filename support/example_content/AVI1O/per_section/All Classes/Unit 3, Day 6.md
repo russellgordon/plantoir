@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Contemporary work: what changes when the artist is alive
-2. Studio time
+2. Studio time: drafting, with the work in front of you
 3. Peer reading of drafts
 
 ## Things to do before our next class

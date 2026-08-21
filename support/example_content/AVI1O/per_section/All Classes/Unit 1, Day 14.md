@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. [[Giving Feedback]] practised in threes
-2. Studio time
+2. What the critique said, written into the sketchbook here — then
+   studio time acting on it
 3. Conferences
 
 ## Things to do before our next class

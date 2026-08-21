@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Period 5 of 8: curating
+1. Period 5 of 8: curating, and each of you takes a wall or a bay
 2. Grouping, sequence, sight lines, and light
-3. The show planned on paper
+3. The show planned on paper, and your three lines on who it is for
 
 ## Things to do before our next class
 

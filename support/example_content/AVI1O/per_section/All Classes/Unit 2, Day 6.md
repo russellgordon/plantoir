@@ -12,8 +12,9 @@ tags:
 
 1. Printing: registration, pressure, and the edition
 2. Studio time: pulling prints
-3. Clearing up ink properly
+3. Last fifteen minutes: the printmaking trial annotated, then clearing
+   up ink properly
 
 ## Things to do before our next class
 
-- [ ] Annotate the printmaking trial.
+- [ ] Nothing tonight.

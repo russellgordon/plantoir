@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Label your sketchbook pages by stage.
+- [ ] Read [[The Creative Process]] to the end.

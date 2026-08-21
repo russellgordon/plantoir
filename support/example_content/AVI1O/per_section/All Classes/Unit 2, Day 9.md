@@ -12,8 +12,9 @@ tags:
 
 1. Studio time: sculpture
 2. Working around a form — drawing what you have built
-3. Dust, tools, and safety
+3. Last fifteen minutes: the sculpture trial annotated; then dust,
+   tools, and safety
 
 ## Things to do before our next class
 
-- [ ] Annotate the sculpture trial.
+- [ ] Look at three sculptures and note how each one stands up.

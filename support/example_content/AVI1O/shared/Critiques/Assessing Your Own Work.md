@@ -58,6 +58,4 @@ and [[The Portfolio and Reflection]] is where this writing is assessed.
 ## Curriculum connection
 
 ![[B1.4]]
-
-![[A1.2]]
 %%curriculum-end%%

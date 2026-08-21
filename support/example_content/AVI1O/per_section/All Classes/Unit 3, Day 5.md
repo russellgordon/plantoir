@@ -11,8 +11,10 @@ tags:
 ## Agenda
 
 1. Historical work: what changes when you know the date
-2. Studio time: interpretation drafting
-3. Conferences
+2. [[Assessing Your Own Work]] — judging against intention, modelled on
+   a piece of mine
+3. Studio time: interpretation drafting
+4. Conferences
 
 ## Things to do before our next class
 

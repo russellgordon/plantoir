@@ -11,11 +11,12 @@ tags:
 ## Agenda
 
 1. [[The Elements Study]] handed in and displayed
-2. Gallery walk with written feedback
+2. Gallery walk with written feedback, and notes for the paragraph you
+   will write on somebody else's study
 3. Terminology check: naming what we see
 4. Getting a usable image of your work for handing in:
    [[Photographing Artwork for Submission]]
 
 ## Things to do before our next class
 
-- [ ] Write the accompanying page of writing.
+- [ ] Bring your notes from the gallery walk.
