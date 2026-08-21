@@ -10,12 +10,16 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: [[Predict the Circuit]] — measure before you claim
-2. Bench time: measure every value in your own circuit and compare with
-   the calculation
-3. Practise: [[Electronics Calculations Practice]] to the end
-4. Tools away, log it in your [[Tech Journal]]
+1. Warm-up: [[Predict the Circuit]] — breadboard vs permanent joint
+2. Safety check: iron in stand, glasses on, ventilation running —
+   [[Safety in the Lab]]
+3. Bench time: [[Soldering a Circuit]] — solder discrete components,
+   inspect the fillet, and verify continuity with a multimeter
+4. Measure and compare: check live circuit values against
+   [[Electronics Calculations Practice]]
+5. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 
-- [ ] Finish the practice set.
+- [ ] Finish [[Electronics Calculations Practice]].
+- [ ] Journal: the difference between a breadboard connection and a soldered joint.

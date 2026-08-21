@@ -31,6 +31,10 @@ including your teacher.
   never trouble; see [[Getting Help]].
 - **Nobody works alone** on powered projects. A partner within arm's
   reach is part of the equipment.
+- **Soldering irons are $350^\circ\text{C}$ and silent.** The iron lives in
+  its stand whenever it is not in your fingers — never set a hot iron down on
+  the bench. Safety glasses on before the station turns on, fume ventilation
+  running, and wash hands with soap after handling solder.
 
 ## Why this is not just rules
 
@@ -52,4 +56,6 @@ feels normal.
 ![[D1.1]]
 
 ![[D1.2]]
+
+![[B2.2]]
 %%curriculum-end%%
