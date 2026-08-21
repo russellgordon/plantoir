@@ -56,6 +56,35 @@ you early.
 > that takes a clear position and names its risks is stronger than one that
 > is impossible to disagree with — and it is far easier to mark generously.
 
+## How it is marked
+
+- **A recommendation, in one sentence, that somebody could act on.** Not a
+  topic and not a range of options.
+- **A constraint named on each side.** One fiscal factor from D2.1 and one
+  monetary mechanism from D3.1 that genuinely bear on this recommendation,
+  with the current rate retrieved and dated.
+- **Influence assessed, not listed.** Who will try to move this decision,
+  by what means, and which of those means is actually likely to work.
+- **Two risks and an early indicator for each.** Named series, not moods.
+- **Two pages, and the cutting shows.** What stayed is what changes the
+  decision.
+- **Your own answer at the delivery.** One question from the floor, taken
+  without help, on your own sections — judged against the five above,
+  exactly as the writing is.
+
+## Working in pairs, marked individually
+
+Two authors, two marks. Divide the brief so that each of you writes and
+signs named sections — the fiscal side and the politics, say, against
+the monetary side and the risks — and put on the page who wrote what.
+The recommendation at the top is agreed between the two of you, and it is
+not marked as a thing on its own. What I mark on each of your papers is
+whether YOUR sections actually carry that recommendation, and your own
+answer when a question comes from the floor at the delivery.
+
+Neither the sections nor the answer is shared, and nothing your partner
+or anyone on the floor says about your work is part of your mark.
+
 Build from [[Reading a Budget]], [[Circular Flow]],
 [[The Money Multiplier and Monetary Policy]] and
 [[Aggregate Supply and Demand]].
@@ -71,3 +100,36 @@ Build from [[Reading a Budget]], [[Circular Flow]],
 
 ![[D3.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 18, the policy brief work period
+  Watch for: what comes OUT. Two pages is a hard limit and the cutting
+  is the assignment, but the finished brief shows only what stayed —
+  never what was removed, and never which partner wanted to keep it.
+  Going well: a paragraph is deleted and the pair can still say what it
+  was doing there.
+  Stuck: the font gets smaller.
+  Record: a stroke beside each pair on the day plan at the moment the
+  page count drops. Nothing else — this one is quick or it does not
+  happen.
+
+TALK — Unit 3, Day 19, the conferences already on that agenda, after
+the peer challenge
+  Ask each partner separately: "Your partner wrote the monetary half. If
+  the Bank moved the other way next month, which sentence of YOUR half
+  would you have to rewrite?"
+  Then: "Which of your two named risks would you spot first in the data,
+  and how many months late would you be?"
+  The first is D3.2 — how monetary policy actually reaches the economy —
+  asked of the partner who did not write that section, which is the one
+  question a co-written brief cannot answer for you. The second turns
+  D3.1's transmission lags onto the pair's own recommendation; a strong
+  answer names an indicator and a publication delay rather than a
+  feeling.
+  Record: one line per pair, with the indicator named, on the conference
+  sheet.
+
+The product evidence is the brief itself, delivered on Day 20 or Day 21.
+%%

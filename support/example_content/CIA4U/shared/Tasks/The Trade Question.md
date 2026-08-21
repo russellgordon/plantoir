@@ -52,6 +52,19 @@ Name the winners and the losers by industry and region, with evidence.
 > cent and raised the Canadian-dollar cost of the imported components in
 > it." Two effects, one sentence, both sourced. That is the standard.
 
+## How it is marked
+
+- **The theory chosen, and where it fails.** Both halves. A case that
+  fits its theory perfectly usually means the case was picked to fit.
+- **A dated rate, used.** The exchange-rate movement is retrieved,
+  dated, and traced through to a consequence on each side of the trade.
+- **Both directions named.** Exporters and importers move opposite ways.
+  A paper that notices only one of them has done half the work.
+- **Winners and losers by industry and region.** With evidence, and with
+  the total gain kept separate from the question of who received it.
+- **One decision that went the other way.** A reshoring, a protection, a
+  buy-local movement — named, dated, and explained rather than mentioned.
+
 Build from [[Comparative Advantage]] and [[The Tariff Year]].
 
 %%curriculum-start%%
@@ -63,3 +76,38 @@ Build from [[Comparative Advantage]] and [[The Tariff Year]].
 
 ![[E2.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 7, the trade question work period, the day before
+the hand-in
+  Watch for: who is still choosing. The paper names one trade
+  relationship and reads as though it were always the one; nothing in it
+  shows that it was the third pair of economies tried, settled on the
+  day before it was due. This is the single best predictor of who will
+  hand in thin work, and it is only visible now.
+  Going well: the relationship is fixed, the tables are named on the
+  desk, and the writing is about the theory rather than about the topic.
+  Stuck: a fresh search for a different pair of economies, this late.
+  Record: a tick per name on the class list for "topic settled". Anybody
+  without one gets five minutes from you before the period ends — that
+  is the whole point of noticing today.
+
+TALK — Unit 4, Day 5, the conferences on the research period
+  Ask: "Your theory says these two economies should trade this good in
+  this direction. Read me the year in your data where that shows most
+  clearly, and the year where it shows least."
+  Then: "Who in Canada would most like this trade to stop, and what is
+  their strongest argument?"
+  The first is E1.1 — the theories as claims that are reflected in actual
+  trading practice, tested against the student's own series rather than
+  restated. The second is E2.1, how globalisation shapes what individuals,
+  firms and governments decide; a strong answer gives the opposition its
+  strongest form rather than its easiest one, and often turns into the
+  "decision that went the other way" the task requires.
+  Record: on the research-period list, the year they pointed at, and
+  three words for who wants it stopped.
+
+The product evidence is the analysis handed in on Day 8.
+%%

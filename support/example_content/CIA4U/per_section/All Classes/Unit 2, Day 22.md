@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval across Unit 2: the firm, the structure, the failure, the remedy
-2. Units 1 and 2 mixed — one market analysed end to end against the clock
-3. Looking ahead: the same reasoning, now for a whole economy
+1. [[A Model of Your Own]] revised, here, in the light of yesterday's conference
+2. Retrieval across Unit 2: the firm, the structure, the failure, the remedy
+3. Units 1 and 2 mixed — one market analysed end to end against the clock
+4. Looking ahead: the same reasoning, now for a whole economy
 
 ## Things to do before our next class
 
-- [ ] Nothing tonight.
+- [ ] Bring [[A Model of Your Own]] to hand in next class.

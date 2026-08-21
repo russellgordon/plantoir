@@ -40,7 +40,9 @@ another one: the reasoning is portable, and the job titles are not the
 measure of where it goes.
 
 The test you will keep applying is in [[Judging an Economic Claim]]; the
-demonstration is [[The Economic Issue Report]].
+demonstration is [[The Economic Issue Report]]. This page is written in
+class, in the period after that report is delivered, and
+[[The Notebook and Portfolio]] says what it is judged on.
 
 %%curriculum-start%%
 ## Curriculum connection

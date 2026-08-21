@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Development measured: GDP per capita against the Human Development Index
-2. Why two countries with similar output rank differently
-3. Trade question work period
+2. Why two countries with similar output rank differently — two minutes in writing, collected
+3. Trade question work period: your Day 5 conference acted on, starting with what came off worst
 
 ## Things to do before our next class
 

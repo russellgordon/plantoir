@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. [[Index Numbers and Real Versus Nominal]] — an index is a comparison, not a quantity
-2. One nominal series deflated to real, by hand, once
+2. One nominal series deflated to real, by hand, once — I check every answer before you leave
 3. Launch: [[The Indicators Report]]
 
 ## Things to do before our next class

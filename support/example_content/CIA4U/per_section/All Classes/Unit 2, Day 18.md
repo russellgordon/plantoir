@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. [[Incentives]] returned to: what does your intervention pay people to do?
-2. Work period
+2. Work period: your Day 17 conference acted on, starting with whatever came off worst
 3. The seminar defence rehearsed in pairs
 
 ## Things to do before our next class

@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. [[The Market Model]] presented — the model first, then what the market really did
-2. The pair whose model was wrong explains why, which is the interesting part
+2. Each partner takes one question of their own; the pair whose model was wrong explains why, which is the interesting part
 3. Launch: [[A Model of Your Own]] for the portfolio
 
 ## Things to do before our next class

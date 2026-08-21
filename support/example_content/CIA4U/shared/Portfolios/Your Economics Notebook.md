@@ -19,7 +19,7 @@ the one example that stops a listener misunderstanding it.
 **One figure a week.** Take a number from a current release — the
 Consumer Price Index, the Labour Force Survey, real GDP — and write the
 value, the reference period, the release date, and the table number. By
-April you will have a series you built yourself, and you will have
+January you will have a series you built yourself, and you will have
 noticed revisions: data is produced rather than found.
 
 **The citations.** A statistical table is documented like any source:
@@ -41,6 +41,12 @@ That last line separates a notebook from a scrapbook. Use the vocabulary
 of the course in those two sentences. Where the tables live is set out in
 [[Where Canadian Economic Data Lives]]; testing what you collect is
 [[Judging an Economic Claim]].
+
+The weekly entries are practice and are not marked. What is marked is
+the milestone entry you write in class at the end of each of the first
+three units, from a table you have not seen — and this notebook, open
+beside you, is what makes that quick. [[The Notebook and Portfolio]]
+sets out what those entries are judged on.
 
 %%curriculum-start%%
 ## Curriculum connection

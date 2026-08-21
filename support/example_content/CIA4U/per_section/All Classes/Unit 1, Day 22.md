@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval across Unit 1: scarcity, cost, the curve, the market, elasticity
-2. [[Your Economics Notebook]] checked — three dated figures should be in it by now
-3. Looking ahead: the same market diagram, with a firm inside it
+1. Milestone entry, written here from a table you have not seen — [[The Notebook and Portfolio]]
+2. [[Your Economics Notebook]] open beside you while you write it; that is what it is for
+3. Retrieval across Unit 1: scarcity, cost, the curve, the market, elasticity
+4. Looking ahead: the same market diagram, with a firm inside it
 
 ## Things to do before our next class
 

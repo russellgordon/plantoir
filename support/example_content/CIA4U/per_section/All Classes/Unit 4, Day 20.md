@@ -13,7 +13,7 @@ tags:
 
 1. Review: an argument built from evidence in twenty minutes
 2. Assumptions stated, trade-off named, recommendation defended
-3. The first twenty minutes of [[The Data Examination]], practised
+3. The first twenty-five minutes of [[The Data Examination]], practised
 
 ## Things to do before our next class
 

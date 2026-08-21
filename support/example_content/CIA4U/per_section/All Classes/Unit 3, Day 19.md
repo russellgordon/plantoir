@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Peer challenge: another pair attacks your brief
-2. Revision in the room, while the objection is still fresh
+2. [[Judging Your Own Work]] run against the brief's own criteria, on your own
 3. Conferences
+4. Revision in the room, while the objection is still fresh
 
 ## Things to do before our next class
 

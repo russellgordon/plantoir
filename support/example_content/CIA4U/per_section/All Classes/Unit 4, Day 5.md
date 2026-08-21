@@ -12,7 +12,7 @@ tags:
 
 1. Exchange rates: what moves the Canada–US rate, and what a lower dollar does to each side
 2. The balance of payments: current account and capital account
-3. Trade question research period
+3. Trade question research period; conferences on whether your case really fits the theory you chose
 
 ## Things to do before our next class
 

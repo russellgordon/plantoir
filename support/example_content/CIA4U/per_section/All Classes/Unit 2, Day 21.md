@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. [[The Intervention Argument]] papers handed in
-2. [[A Model of Your Own]] conferences — the portfolio piece checked while there is still time
-3. Notebook check: dated figures, with sources
+2. Milestone entry, written here from a table you have not seen — [[The Notebook and Portfolio]]
+3. [[A Model of Your Own]] conferences run while you write
 
 ## Things to do before our next class
 
-- [ ] Portfolio up to date.
+- [ ] Nothing written tonight. Next class is the period for revising [[A Model of Your Own]] after your conference.

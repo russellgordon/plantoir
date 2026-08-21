@@ -68,3 +68,40 @@ Build from [[Why Governments Intervene]], [[Efficiency and Equity]] and
 
 ![[C3.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 16, the intervention argument work period
+  Watch for: whether the opposing case a student drafted for Day 13's
+  homework is out on the desk, and whether anything on it is marked as
+  the point they cannot answer. The finished paper contains one opposing
+  case; nothing in it shows whether that is the case they actually
+  feared or a weaker one substituted once the verdict was settled.
+  Going well: the Day 13 sheet is out, written on, with one point
+  circled or underlined.
+  Stuck: the opposing case is being written now, after the verdict, from
+  a blank page.
+  Record: two ticks per name on the day plan — sheet out, and something
+  on it singled out.
+
+TALK — Unit 2, Day 17, the conferences already on that agenda
+  Ask: "Two years from now the evaluation comes back and says it did not
+  work. What would you want changed first — the programme, or the way it
+  was measured?"
+  Then: "Your programme narrows income inequality by some amount. What
+  is the smallest amount that would still make it worth its cost, and
+  how did you pick that number?"
+  Both go at C3.2's second clause — assessing how effective a programme
+  designed to narrow income inequality actually is. A paper can assert
+  effectiveness; only the conversation shows whether the student has a
+  threshold in mind and can say where the number came from. A strong answer
+  keeps the size of the effect separate from the confidence in it, and
+  says which of the two the verdict actually rests on.
+  Record: two boxes on the conference sheet — threshold named, source of
+  the number given.
+
+The product evidence is the paper handed in on Day 21. The five-minute
+defence on Day 19 or Day 20 is evidence too, but you will be running the
+room then, so do not plan to gather anything else in those periods.
+%%

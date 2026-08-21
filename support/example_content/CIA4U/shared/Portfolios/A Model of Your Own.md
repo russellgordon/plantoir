@@ -44,7 +44,8 @@ where it stops working is worth more than one presented as the truth.
 > October, which changes one side of the comparison and not the other.
 
 The reasoning underneath is in [[Opportunity Cost]]; the model you will
-have met first is [[Supply and Demand]].
+have met first is [[Supply and Demand]]. What this piece is judged on,
+and when it is due, is on [[The Notebook and Portfolio]].
 
 %%curriculum-start%%
 ## Curriculum connection

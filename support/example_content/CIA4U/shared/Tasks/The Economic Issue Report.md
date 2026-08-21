@@ -77,3 +77,37 @@ Everything in the course feeds this. [[The Tariff Year]],
 
 ![[E3.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 11, period 3 of 8, gathering the data
+  Watch for: what happens to a series a student rejects. The report will
+  cite the three that survived; the map of what was opened, read and put
+  down again exists only in this room, and it is the best single
+  indicator of who will finish well.
+  Going well: a rejected table gets a reason written beside its number —
+  "wrong reference period", "quarterly, I need monthly" — in four words.
+  Stuck: eleven tabs open, nothing written down, and the same search
+  typed a third time.
+  Record: a number and a letter per student on the day plan — how many
+  tables they had open, and R if any rejection had a reason attached.
+
+TALK — Unit 4, Day 13, the conferences already on that agenda
+  Ask: "Somebody who agrees with your recommendation for entirely the
+  wrong reason is about to quote you. What in your report would you
+  point them at to stop them?"
+  Then: "Which event outside Canada in the last two years would have
+  made your issue look different if it had gone the other way?"
+  The first is A1.6 under pressure — evaluating and synthesising findings
+  into a conclusion means knowing which evidence the conclusion rests on
+  and which it does not. The second is E2.2, the significance of
+  international events and developments for the Canadian economy, and a
+  strong answer names an event and the channel it travelled by — a
+  price, a rate, a supply route — rather than a mood.
+  Record: the event in three words on the conference list, and a cross
+  where nothing came. Come back to those students on Day 15.
+
+The product evidence is the report and the presentation on Day 16. Do
+not plan to gather anything else that period: you are hosting.
+%%

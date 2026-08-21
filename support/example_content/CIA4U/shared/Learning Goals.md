@@ -17,7 +17,7 @@ finished making it.
 not evidence in economics, because the thing it measures has already
 moved. Name the table or the series, not just the institution.
 
-## By June you should be able to
+## By January you should be able to
 
 - **Build a model and say what it holds still** — supply and demand,
   costs and the firm, aggregate supply and demand, comparative

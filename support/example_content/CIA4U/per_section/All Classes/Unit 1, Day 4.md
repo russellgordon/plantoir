@@ -12,7 +12,7 @@ tags:
 
 1. Scarcity is not poverty: [[Scarcity and Choice]], with the four factors of production named
 2. [[Opportunity Cost]] — the next best alternative, not the sum of everything you did not do
-3. Six real decisions, opportunity cost stated for each in one sentence
+3. Six real decisions, opportunity cost stated for each in one sentence — exit ticket, and I read them before Day 5
 
 ## Things to do before our next class
 

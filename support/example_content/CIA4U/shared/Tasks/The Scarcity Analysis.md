@@ -66,3 +66,39 @@ Build from [[Scarcity and Choice]], [[Opportunity Cost]] and
 
 ![[B1.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 9, the scarcity analysis work period
+  Watch for: whether the source document is actually open while the
+  'what was given up' section is being written. The finished analysis
+  names and costs a next-best alternative either way, because the
+  criteria demand one — what you cannot tell from the page is whether it
+  came off a staff report or was reasoned out afterwards to fill the
+  row. Observation is what corroborates the citation.
+  Going well: two documents open, and the alternative arrives with a
+  figure already attached to it.
+  Stuck: one document open — the decision that was taken — and the
+  alternative being invented from first principles.
+  Record: two columns on your day plan, document open and alternative
+  sourced, initials down the side.
+
+TALK — Unit 1, Day 9, the conferences on the 'given up' section that
+are already on that agenda
+  Ask: "Read me the sentence in your analysis that a member of that
+  board would object to first."
+  Then: "The option that lost — who was speaking for it, and what were
+  they weighing that your analysis does not mention?"
+  A strong first answer picks a sentence and can say whether the
+  objection would be about a fact or about a value, which is B1.2's
+  positive-and-normative distinction working inside the student's own
+  argument rather than in an exercise. The second is B1.1's third
+  question — for whom to produce — applied to the case the way this task
+  applies it. The written analysis names a next-best alternative because
+  the criteria demand one; it almost never says whose alternative it was.
+  Record: one word on your class list for the group they named, and a
+  cross where nothing came.
+
+The product evidence is the analysis handed in on Day 10.
+%%
