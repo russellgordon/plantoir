@@ -7,7 +7,8 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · seven periods, the last of them the hand-in · 1,200–1,400 words · assessed on all
+> Individual · seven periods, the last of them the hand-in ·
+> 1,200–1,400 words · assessed on all
 > four categories
 
 ## The task

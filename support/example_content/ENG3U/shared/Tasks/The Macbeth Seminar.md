@@ -8,8 +8,9 @@ enableToc: true
 ---
 > [!abstract] At a glance
 > Prepared in threes · six periods, three of them seminar days · one
-> 25-minute seminar led by your group, plus speaking in the others · marked one person at a time, never as a group ·
-> assessed on Communication, Thinking, and Knowledge
+> 25-minute seminar led by your group, plus speaking in the others ·
+> marked one person at a time, never as a group · assessed on
+> Communication, Thinking, and Knowledge
 
 ## The task
 

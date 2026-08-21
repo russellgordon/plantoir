@@ -7,7 +7,8 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · five periods, the last of them the hand-in · 900 words · assessed on Thinking,
+> Individual · five periods, the last of them the hand-in · 900 words ·
+> assessed on Thinking,
 > Knowledge, and Communication
 
 ## The task
