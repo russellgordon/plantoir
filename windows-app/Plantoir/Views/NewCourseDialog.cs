@@ -116,9 +116,23 @@ public sealed class NewCourseDialog : ContentDialog
     private bool StructureComesFromExampleContent =>
         _prepopulate && ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode);
 
-    public NewCourseDialog(MainWindow window)
+    // Set only by the marketing-shot capture harness, which forces a theme
+    // per WINDOW while the app-wide theme never moves -- see
+    // MarketingShotCapturer.ThemedBrush for why that means the resource
+    // lookups below cannot use Application.Current.Resources[key] directly
+    // whenever this is non-null. Null in the live app, where the ambient
+    // app theme already IS the theme the teacher sees.
+    private readonly ElementTheme? _captureTheme;
+
+    private Brush ThemedResource(string key) =>
+        _captureTheme is ElementTheme forced
+            ? MarketingShotCapturer.ThemedBrush(key, forced)
+            : (Brush)Application.Current.Resources[key];
+
+    public NewCourseDialog(MainWindow window, ElementTheme? captureTheme = null)
     {
         _window = window;
+        _captureTheme = captureTheme;
         _creator = new NewCourseCreator(new ScriptRunner(System.Threading.SynchronizationContext.Current));
         _nameCatalog = CourseNameCatalog.Load(BundledToolchain.SupportPath("ontario_secondary_courses.json"));
 
@@ -132,7 +146,7 @@ public sealed class NewCourseDialog : ContentDialog
         _validationText = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+            Foreground = ThemedResource("SystemFillColorCriticalBrush"),
             Visibility = Visibility.Collapsed,
         };
         _sectionsCaption = FormBuilders.ExampleCaption("e.g. 1,3 — comma-separated");
@@ -141,7 +155,7 @@ public sealed class NewCourseDialog : ContentDialog
             FontSize = 12,
             TextWrapping = TextWrapping.Wrap,
             Visibility = Visibility.Collapsed,
-            Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"],
+            Foreground = ThemedResource("SystemFillColorCautionBrush"),
         };
         _gradeWarningSlot = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
         _structureCaption = FormBuilders.ExampleCaption("Defaults are fine for most courses");
@@ -251,7 +265,7 @@ public sealed class NewCourseDialog : ContentDialog
         form.Children.Add(new Border
         {
             Child = invitation,
-            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+            Background = ThemedResource("CardBackgroundFillColorDefaultBrush"),
             CornerRadius = new CornerRadius(8),
         });
 
@@ -637,12 +651,12 @@ public sealed class NewCourseDialog : ContentDialog
         if (problem is null)
         {
             _sectionsCaption.Text = "e.g. 1,3 — comma-separated";
-            _sectionsCaption.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+            _sectionsCaption.Foreground = ThemedResource("TextFillColorSecondaryBrush");
         }
         else
         {
             _sectionsCaption.Text = problem;
-            _sectionsCaption.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
+            _sectionsCaption.Foreground = ThemedResource("SystemFillColorCautionBrush");
         }
     }
 
@@ -651,7 +665,7 @@ public sealed class NewCourseDialog : ContentDialog
         string? warning = CourseConfiguration.GradeInTitleWarning(
             _nameBox.Text, _codeBox.Text.Trim().ToUpperInvariant(), _showsGrade);
         _gradeWarningSlot.Text = warning ?? "";
-        _gradeWarningSlot.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
+        _gradeWarningSlot.Foreground = ThemedResource("SystemFillColorCautionBrush");
         _gradeWarningSlot.Visibility = warning is null ? Visibility.Collapsed : Visibility.Visible;
     }
 

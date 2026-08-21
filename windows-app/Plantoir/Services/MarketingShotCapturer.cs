@@ -101,12 +101,19 @@ public static class MarketingShotCapturer
         }
         catch (Exception ex)
         {
+            // Exiting 0 here made a mid-capture crash invisible: capture_windows.py's
+            // subprocess.run(..., check=True) only raises on a NONZERO exit, so a
+            // failure that struck the very first window still printed "Every
+            // screenshot now has an authentic Windows twin" and left every
+            // remaining image as a stale leftover from whatever run last touched
+            // it -- discovered 2026-08-20 when a resource-lookup bug silently
+            // aborted two capture attempts in a row and both were reviewed as if
+            // they were fresh. The failure was always in the log
+            // (%TEMP%\marketing_capture.log); it just never reached the exit code.
             Log($"Capture failed: {ex}");
+            Environment.Exit(1);
         }
-        finally
-        {
-            Environment.Exit(0);
-        }
+        Environment.Exit(0);
     }
 
     /// <summary>
@@ -329,7 +336,7 @@ public static class MarketingShotCapturer
         window.Workspace.Selection = new SidebarSelection.CourseItem("ENG2D");
         await Task.Delay(400);
 
-        var dialog = new NewCourseDialog(window);
+        var dialog = new NewCourseDialog(window, theme);
         dialog.RequestedTheme = theme;
         dialog.StageForCapture("SBI3U", "1, 2");
 
@@ -347,8 +354,8 @@ public static class MarketingShotCapturer
         {
             Width = 540,
             MaxHeight = 680,
-            Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
-            BorderBrush = (Brush)Application.Current.Resources["SurfaceStrokeColorDefaultBrush"],
+            Background = ThemedBrush("SolidBackgroundFillColorBaseBrush", theme),
+            BorderBrush = ThemedBrush("SurfaceStrokeColorDefaultBrush", theme),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(24, 20, 24, 20),
@@ -469,7 +476,12 @@ public static class MarketingShotCapturer
         window.Activate();
 
         await Task.Delay(500);
-        window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 1);
+        // Section 2, not 1 -- the embedded image at siteImagePath is
+        // site-eng2d-windows-*.png, which capture_windows.py now takes from
+        // the eng2d-s2-2026-gordon site (Russell's 2026-08-20 redeploy). The
+        // toolbar has to agree with what is actually pictured underneath it,
+        // or the shot reads "ENG2D-S1" over a page that says "Section 2".
+        window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 2);
         await Task.Delay(400);
 
         if (window.DetailPresenter.Content is SectionDetailView detail)
@@ -554,6 +566,55 @@ public static class MarketingShotCapturer
         await Task.Delay(600);
         await SaveWindowContentToPngAsync(window, outputPath);
         window.Close();
+    }
+
+    /// <summary>
+    /// A HARDCODED literal for one theme, not a live resource lookup. Two
+    /// live approaches were tried and measured to fail, both logged in
+    /// %TEMP%\marketing_capture.log:
+    ///   1. Application.Current.RequestedTheme = theme -- throws
+    ///      COMException 0x80131515 at the WinRT boundary. WinUI does not
+    ///      support changing the app-wide theme after launch.
+    ///   2. Indexing Application.Current.Resources.ThemeDictionaries, and
+    ///      then (once App.xaml turned out to merge XamlControlsResources
+    ///      rather than declare ThemeDictionaries itself) recursively
+    ///      searching MergedDictionaries for it -- both resolved "Light"
+    ///      (the app's ambient theme at that point) but threw "No 'Dark'
+    ///      theme dictionary found" for the other one. WinUI appears to
+    ///      only materialize the ACTIVE theme's dictionary regardless of how
+    ///      it's reached, so asking for the theme the app isn't currently in
+    ///      fails no matter the path to it.
+    /// These are approximate Fluent 2 values, not pulled from the resource
+    /// system at all -- fine here, since this only feeds a screenshot, where
+    /// "reads clearly against its background" is the bar, not a pixel-exact
+    /// design token.
+    /// </summary>
+    public static Brush ThemedBrush(string key, ElementTheme theme)
+    {
+        bool dark = theme == ElementTheme.Dark;
+        Windows.UI.Color color = key switch
+        {
+            "SolidBackgroundFillColorBaseBrush" => dark
+                ? Windows.UI.Color.FromArgb(255, 32, 32, 32)
+                : Windows.UI.Color.FromArgb(255, 243, 243, 243),
+            "CardBackgroundFillColorDefaultBrush" => dark
+                ? Windows.UI.Color.FromArgb(255, 56, 56, 56)
+                : Windows.UI.Color.FromArgb(255, 255, 255, 255),
+            "SurfaceStrokeColorDefaultBrush" => dark
+                ? Windows.UI.Color.FromArgb(255, 61, 61, 61)
+                : Windows.UI.Color.FromArgb(255, 224, 224, 224),
+            "SystemFillColorCriticalBrush" => dark
+                ? Windows.UI.Color.FromArgb(255, 255, 153, 164)
+                : Windows.UI.Color.FromArgb(255, 196, 43, 28),
+            "SystemFillColorCautionBrush" => dark
+                ? Windows.UI.Color.FromArgb(255, 255, 200, 61)
+                : Windows.UI.Color.FromArgb(255, 157, 93, 0),
+            "TextFillColorSecondaryBrush" => dark
+                ? Windows.UI.Color.FromArgb(255, 197, 197, 197)
+                : Windows.UI.Color.FromArgb(255, 118, 118, 118),
+            _ => throw new ArgumentException($"ThemedBrush has no hardcoded value for '{key}'.", nameof(key)),
+        };
+        return new SolidColorBrush(color);
     }
 
     private static void ConfigureWindow(Window window, int width, int height, ElementTheme theme)
