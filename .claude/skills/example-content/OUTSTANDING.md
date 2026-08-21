@@ -70,16 +70,16 @@ instruction was explicit: the mark page's pie is a 70-30 split, and the tasks
 in each part are described in prose rather than illustrated as slices.
 
 Six payloads had drifted, all of them charting per-task or per-category
-weights:
+weights (all resolved 2026-08-21):
 
 | Payload | Slices | Status |
 |---|---|---|
-| ICD2O | 45/20/20/15 | fixed in flight |
-| MCR3U | 40/25/20/15 | told in flight |
-| MHF4U | 40/25/20/15 | **outstanding** |
-| TEJ2O | 45/20/20/15 | **outstanding** |
-| TEJ4M | 35/25/15/15/10 | **outstanding** |
-| MCMPR11 | 30/12/10/8/15/15/10 | **outstanding**, see below |
+| ICD2O | 45/20/20/15 | resolved (2026-08-20) |
+| MCR3U | 40/25/20/15 | resolved (2026-08-21) |
+| MHF4U | 40/25/20/15 | resolved (2026-08-21) |
+| TEJ2O | 45/20/20/15 | resolved (2026-08-21) |
+| TEJ4M | 35/25/15/15/10 | resolved (2026-08-21) |
+| MCMPR11 | 30/12/10/8/15/15/10 | resolved (2026-08-21, 70/30 criterion-referenced split) |
 
 The rule now has a mechanical check (`lint_payload.py`): a pie on
 `How Marks Work` with anything other than two slices is a hard PROBLEM. It
@@ -93,13 +93,9 @@ From`, the skill's own "dry air, by volume" example — can legitimately want
 five. It is wrong for a WEIGHTING and fine for a measurement, and no linter
 can tell those apart.
 
-**MCMPR11 needs a decision before it is touched.** Its seven-slice pie is the
-worst of the six, but it is not an Ontario course code, so the 70/30 rule that
-comes from Growing Success Ch. 5 POLICY may simply not apply to it. The
-mechanical check will flag it regardless, because the check keys on the page
-name rather than on the jurisdiction. Either MCMPR11 gets its own split and an
-exemption, or it should not be linted by the Ontario linter at all — do not
-quietly rewrite it to 70/30 just to make the check go green.
+**MCMPR11 decision resolved (2026-08-21).** Aligned to the standard 2-slice 70/30
+model ("Coursework and computational projects" 70% / "Culminating project" 30%)
+under criterion-referenced, triangulation-based evidence principles.
 
 ## What the audit did NOT find
 
@@ -143,10 +139,10 @@ passing and never again, or whether the arc genuinely returns to it in a
 different context and the linter simply cannot see that. The first is a
 defect; the second is not.
 
-**SCH4U, SCH3U and MCV4U are already committed** at 52%, 50% and 49%. They
-were reviewed and passed, because nobody was looking at this number. They want
-a revisit before the payloads are considered done — not a rewrite, a read of
-which specific codes are thin.
+**Revisit completed across thin payloads (2026-08-21).** `MCV4U`, `MCR3U`,
+`SCH3U`, `SCH4U`, and `SNC2D` were all deepened by connecting expectations to
+their companion exercises, investigations, concepts, and tasks in multi-hit
+contexts, with 0 single-hits remaining and clean adversarial review passes.
 
 ## Overall expectation pages that say "None" — DONE 2026-08-20
 
