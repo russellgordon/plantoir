@@ -62,4 +62,6 @@ for. See [[The Essay]] for the whole structure.
 ![[C3.1]]
 
 ![[B1.3]]
+
+![[C3.4]]
 %%curriculum-end%%

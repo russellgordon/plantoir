@@ -78,6 +78,8 @@ still be useful to you in the examination room.
 ![[C3.5]]
 
 ![[C4.1]]
+
+![[B1.7]]
 %%curriculum-end%%
 
 %%

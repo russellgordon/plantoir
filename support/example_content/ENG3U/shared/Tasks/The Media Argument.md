@@ -91,6 +91,10 @@ You work in a pair and there is no pair mark. Two things are yours alone:
 ![[D2.1]]
 
 ![[D2.2]]
+
+![[A2.7]]
+
+![[D1.4]]
 %%curriculum-end%%
 
 %%

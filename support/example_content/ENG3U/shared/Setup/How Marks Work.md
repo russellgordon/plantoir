@@ -13,6 +13,12 @@ follow it without going back.
 
 ## The seventy and the thirty
 
+```mermaid
+pie title Where your mark comes from
+    "The semester's work" : 70
+    "The final evaluation" : 30
+```
+
 Every Grade 11 university credit in Ontario is built the same way.
 **Seventy per cent** of your mark comes from work spread across the whole
 course, and it leans towards your **most recent and most consistent**

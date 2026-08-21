@@ -65,3 +65,9 @@ point.
 One last move worth making: read your judgement aloud to the person next
 to you. You will hear the rows where you were being generous before they
 say anything.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A3.2]]
+%%curriculum-end%%

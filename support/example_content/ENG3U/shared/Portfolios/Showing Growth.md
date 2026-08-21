@@ -42,4 +42,6 @@ something a reader could see in the two pieces.
 ![[A3.2]]
 
 ![[D4.1]]
+
+![[C2.5]]
 %%curriculum-end%%

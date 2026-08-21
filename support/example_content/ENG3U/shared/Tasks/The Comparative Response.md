@@ -62,6 +62,8 @@ period rather than after.
 
 ![[C2.4]]
 
+
+![[C3.1]]
 %%curriculum-end%%
 
 %%

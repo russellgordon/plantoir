@@ -58,4 +58,6 @@ just harder to read.
 ![[C2.6]]
 
 ![[C3.3]]
+
+![[B3.3]]
 %%curriculum-end%%
