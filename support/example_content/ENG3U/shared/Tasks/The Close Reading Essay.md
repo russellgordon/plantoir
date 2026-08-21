@@ -59,10 +59,6 @@ room for an introduction that clears its throat.
 ![[B2.3]]
 
 ![[C2.6]]
-
-![[C3.6]]
-
-![[B3.1]]
 %%curriculum-end%%
 
 %%

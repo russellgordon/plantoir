@@ -62,8 +62,6 @@ a conclusion that says what follows. The detail is on [[The Essay]].
 
 ![[B1.3]]
 
-![[C3.2]]
-
 ![[C3.3]]
 
 ![[C3.5]]

@@ -4,8 +4,8 @@ publish: true
 created: __CREATED__
 enableToc: true
 ---
-One notebook, all year, for annotation notes, drafting, and the record of
-what you can now do.
+One notebook, all semester, for annotation notes, drafting, and the
+record of what you can now do.
 
 ## What goes in
 
@@ -28,8 +28,8 @@ bring is what you can remember having thought.
 
 ## The habit
 
-Write the entry the same day. An entry written in June about a November
-class is a memory of a memory.
+Write the entry the same day. An entry written in January about a
+September class is a memory of a memory.
 
 The entries that count towards a mark are the ones written **in class, at
 a milestone** — see [[How Marks Work]]. Everything else in here is yours,

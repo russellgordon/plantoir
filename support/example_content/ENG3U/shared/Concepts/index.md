@@ -18,6 +18,10 @@ created: __CREATED__
 - [[Whose Country, Whose Story]]
 - [[Reading Non-Fiction]]
 
+**Media**
+
+- [[Media Texts and Their Arguments]]
+
 **Writing**
 
 - [[Thesis and Argument]]

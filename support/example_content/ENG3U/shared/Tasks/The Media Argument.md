@@ -6,9 +6,9 @@ enableToc: true
 ---
 > [!abstract] At a glance
 > Made in pairs, marked one person at a time · three class periods — one
-> to analyse, one to make, one for the gallery · an analysis of about 700
-> words and one media text you produce · assessed on Thinking,
-> Application, and Communication
+> to analyse, one to make, one to act on the feedback and show it · an
+> analysis of about 700 words and one short media text you produce, made
+> in class · assessed on Thinking, Application, and Communication
 
 ## Part one: the analysis
 
@@ -23,9 +23,15 @@ answer, with evidence from the text itself:
 
 ## Part two: the text you make
 
-A three-minute audio segment, a short documentary sequence, or a
-designed campaign — arguing something you actually believe, to a named
-audience, using at least three techniques you identified.
+A ninety-second audio segment, one designed piece — poster, page, feed —
+or a storyboarded sequence of six frames, arguing something you actually
+believe, to a named audience, using at least three techniques you
+identified.
+
+Short on purpose. You get the making period and the one after it, in
+this room, and what you hand in is what those periods produced — not an
+evening's work I never saw you do. Ninety seconds that know exactly what
+they are beat three minutes with one good idea in them.
 
 ## Whose mark is whose
 
@@ -38,8 +44,9 @@ You work in a pair and there is no pair mark. Two things are yours alone:
    anybody as one agreed answer.
 2. **Your own 200-word note**: your audience, the techniques you argued
    for, the concession you wanted, and the one choice you are least sure
-   about. Written on your own, in the first ten minutes of the day it is
-   due, without reading each other's first.
+   about, and one thing your reading or listening this term taught you
+   that you used here. Written on your own, in the first ten minutes of
+   the day it is due, without reading each other's first.
 
 ## How it is marked
 
@@ -69,7 +76,11 @@ You work in a pair and there is no pair mark. Two things are yours alone:
 
 ![[D4.2]]
 
-![[A2.4]]
+![[D1.1]]
+
+![[D1.2]]
+
+![[D1.3]]
 
 ![[D1.5]]
 

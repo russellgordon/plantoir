@@ -6,7 +6,7 @@ enableToc: true
 ---
 > [!abstract] At a glance
 > **William Shakespeare**, around 1606 · the shortest of the tragedies ·
-> read across eight weeks, aloud, and seminared
+> read across sixteen classes, aloud, and seminared
 
 > [!warning] What this text deals with
 > Murder, including of a child; the psychological collapse of two

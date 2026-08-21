@@ -5,9 +5,9 @@ created: __CREATED__
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · November to April, four checkpoints · a text you choose
-> and a 2,000-word essay · the four checkpoints are marked within the
-> seventy per cent; the finished essay is part of the final thirty
+> Individual · ten weeks, four checkpoints · a text you choose and a
+> 2,000-word essay · the four checkpoints are marked within the seventy
+> per cent; the finished essay is part of the final thirty
 
 ## The task
 
@@ -19,21 +19,21 @@ essay you have written. See
 
 | Checkpoint | When | What is due |
 | --- | --- | --- |
-| **1. The choice** | Mid-November | Your text, approved, plus a paragraph on why |
-| **2. The reading** | Late January | Annotations, a passage log of at least twelve entries, and three candidate questions |
-| **3. The argument** | Early March | Thesis with a mechanism, an outline, and two secondary sources logged |
-| **4. The draft** | Early April | A complete draft, workshopped in class |
+| **1. The choice** | Unit 2, Day 25 | Your text, approved, plus a paragraph on why |
+| **2. The reading** | Unit 3, Day 10 | Annotations, a passage log of at least twelve entries, and three candidate questions |
+| **3. The argument** | Unit 4, Day 6 | Thesis with a mechanism, an outline, and two secondary sources logged |
+| **4. The draft** | Unit 4, Day 12 | A complete draft, workshopped in class |
 
-Each checkpoint is assessed. They exist because a five-month project done
-in the last fortnight reads exactly like one, and because the fix is
-easy in January and impossible in April.
+Each checkpoint is assessed. They exist because a ten-week project done
+in the last fortnight reads exactly like one, and because the fix is easy
+in November and impossible in January.
 
 ## The essay
 
 Two thousand words. A thesis with a mechanism, evidence from across the
 whole text, at least two secondary sources used to extend or complicate
 rather than to agree, and a counter-reading engaged. The method is on
-[[Research Writing]].
+[[Research Writing]]. It is handed in on Unit 4, Day 14.
 
 ## How it is marked
 
@@ -45,9 +45,9 @@ rather than to agree, and a counter-reading engaged. The method is on
 | Application | Research integrated, cited, and used for something |
 
 > [!warning] The failure mode, stated in advance
-> Choosing in November, reading in April. The checkpoints catch it. If
+> Choosing in November, reading in January. The checkpoints catch it. If
 > you are behind at checkpoint two, say so at checkpoint two — every plan
-> made then has worked; the ones made in April are triage.
+> made then has worked; the ones made in January are triage.
 
 %%curriculum-start%%
 ## Curriculum connection

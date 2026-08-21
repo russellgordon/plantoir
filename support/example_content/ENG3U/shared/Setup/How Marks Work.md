@@ -22,7 +22,7 @@ describe.
 The remaining **thirty per cent** is the final evaluation, and it is two
 things in two very different rooms: the [[Final Examination]], written
 under examination conditions on texts you have not seen, and the finished
-essay of [[The Independent Study]], five months with a text you chose.
+essay of [[The Independent Study]], ten weeks with a text you chose.
 Deliberately different, so that neither one afternoon nor one essay
 decides this alone.
 
@@ -38,7 +38,7 @@ it. It is not a secret; it is just not the useful thing to memorise.
 
 ## The independent study, and why it is weighted where it is
 
-It runs across five months with four checkpoints, and each checkpoint is
+It runs across ten weeks with four checkpoints, and each checkpoint is
 assessed — those four belong to the seventy, and only the finished essay
 counts in the thirty. A student who does the whole thing in the last
 fortnight produces something that reads exactly like a thing done in a

@@ -12,8 +12,8 @@ tags:
 ## Agenda
 
 1. Review, part three: planning and opening an essay in fifteen minutes
-2. Then the habit that ran through the year: claim, mechanism, evidence,
-   objection
+2. Then the habit that ran through the course: claim, mechanism,
+   evidence, objection
 
 ## Things to do before our next class
 

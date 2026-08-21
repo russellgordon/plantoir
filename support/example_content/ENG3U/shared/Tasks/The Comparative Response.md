@@ -59,11 +59,6 @@ period rather than after.
 
 ![[C2.4]]
 
-![[D1.1]]
-
-![[D1.2]]
-
-![[B3.2]]
 %%curriculum-end%%
 
 %%

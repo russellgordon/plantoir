@@ -64,7 +64,6 @@ tags:
 
 ![[C3.5]]
 
-![[D1.3]]
 %%curriculum-end%%
 
 %%

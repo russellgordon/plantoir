@@ -4,8 +4,8 @@ publish: true
 created: __CREATED__
 enableToc: true
 ---
-[[The Independent Study]] runs from November to April. This page is how
-to choose the text you will live with.
+[[The Independent Study]] runs from early November to early January. This
+page is how to choose the text you will live with.
 
 ## The rules
 
@@ -18,7 +18,7 @@ to choose the text you will live with.
 
 ## A starting list
 
-| Text | Writer | Why it rewards a term |
+| Text | Writer | Why it rewards ten weeks |
 | --- | --- | --- |
 | *Fifteen Dogs* | André Alexis | A philosophical premise executed exactly; won the Giller Prize in 2015 |
 | *The Break* | Katherena Vermette (Métis) | Multiple narrators, one night, and a community's response |
@@ -33,9 +33,10 @@ to choose the text you will live with.
 ## Pitching something else
 
 Bring the book, tell me what you think it is doing, and say why it will
-still interest you in March. Most pitches are accepted. The ones that are
-not are usually too short to sustain 2,000 words, or already written
-about by half the internet in a form you would have to fight.
+still interest you in January, when you are writing about it. Most
+pitches are accepted. The ones that are not are usually too short to
+sustain 2,000 words, or already written about by half the internet in a
+form you would have to fight.
 
 > [!tip] The choice that goes wrong
 > Choosing the shortest book on the list. The essay is the same length

@@ -6,7 +6,7 @@ created: __CREATED__
 ## The method
 
 1. **Choose a pair** — the same kind of writing, months apart. A
-   September paragraph and a May paragraph about a text.
+   September paragraph and a January paragraph about a text.
 2. **Read both aloud, in order.**
 3. **Name three differences** concretely. Not "better" — what is better?
 4. **Point at the cause.** What did you learn or practise that produced

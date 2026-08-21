@@ -55,3 +55,9 @@ paraphrase them in the right-hand column. Mark the two you could not do.
 > [!success]- Answer 6
 > The marks are the point. Bring them; fifteen lines with two marks is a
 > better period than forty lines skimmed.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B3.2]]
+%%curriculum-end%%
