@@ -35,13 +35,42 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
-%%curriculum-start%%
-## Curriculum connection
-
 %%
 Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
+
+(This note sits OUTSIDE the curriculum markers on purpose. Anything between them is
+removed for a teacher who chose not to have curriculum pages, and a note kept inside
+would disappear with them.)
 %%
+
+%%curriculum-start%%
+## Curriculum connection
 
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+A mark is meant to rest on three kinds of evidence: what students make, what you
+watch them do at the bench, and what they tell you when you stop beside them. The
+first arrives on its own. Fill in the other two here, for THIS task. Nobody else
+ever sees this note — it is a comment, so it never reaches the website.
+
+OBSERVE — Unit ?, Day ?, which bench period
+  Watch for: something visible only while the work is happening, and gone by the
+  time the thing is finished. If you cannot name one, the task may be worth
+  reopening.
+  Going well:
+  Stuck:
+  Record: how you will note it in a few seconds, for a whole shop.
+
+TALK — Unit ?, Day ?, ideally a conference the schedule already has
+  Ask: a real question, in the words you would actually say
+  Then: a second one, of a different shape
+  A strong answer sounds like: and which expectation you would be hearing.
+  Record:
+
+The product evidence is: what gets handed in, and when.
+%%

@@ -17,6 +17,7 @@ The hub is [[Tech Journal]]. The pages below support it in order:
 | --- | --- |
 | [[Your First Entry]] | Week one, facing a blank page |
 | [[What a Strong Entry Looks Like]] | Once the habit exists |
+| [[Judging Your Own Work]] | Partway through any task, with a period still to run |
 | [[Journal Checklist]] | Before each unit's collection |
 | [[Showing Growth]] | Mid-course, when old entries become evidence |
 | [[Final Reflection]] | The last week, reading the whole record |

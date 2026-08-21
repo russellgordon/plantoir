@@ -7,16 +7,28 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · all course · one entry per bench day · collected each unit
+> Individual · all course · one entry per bench day, written in class ·
+> collected at the end of each unit
 
 ## What you are making
 
-A technician's log of your course: one short entry after every bench
-day, written in the last minutes of class while your hands still
-remember — [[How the Lab Runs]] reserves that time on purpose. Ten
+A technician's log of your course: one short entry on every bench day,
+written in the last minutes of class while your hands still remember —
+[[How the Lab Runs]] reserves that time on purpose, and every bench
+day's agenda ends by sending you to your journal, so that nobody has to
+find the time at home. Ten
 honest minutes beats thirty performed ones, and entries are
 **private**: I read them; other students never do. It only works if
 you can admit you have no idea why the machine boots now.
+
+> [!important] The entries that carry a mark are the ones written here
+> A journal is collected at the end of each unit, and what I mark are
+> the bench-day entries written in class. Prompts in the "before our
+> next class" list are practice — worth doing, and never marked, so a
+> unit where you wrote none of them and all of your bench-day entries
+> is a complete journal. That is not generosity, it is the rule:
+> practice you do between classes is not something a mark may be built
+> from. [[How Marks Work]] says the same thing from the other end.
 
 ## How entries work
 
@@ -38,12 +50,13 @@ routing from [[Cable Habits]] beats a paragraph about tidiness.
 
 ## Success criteria and collection
 
-The journal comes in each unit, read against these criteria —
-[[Journal Checklist]] turns them into a self-check before handing in.
+The journal comes in at the end of each unit, read against these
+criteria — [[Journal Checklist]] turns them into a self-check before
+handing in, and [[Judging Your Own Work]] is the routine for using it.
 
 | Quality | What it looks like |
 | --- | --- |
-| Regularity | An entry for every bench day, written close to it |
+| Regularity | An entry for every bench day in the unit, written that day |
 | Honesty | Real trouble recorded, not just victories |
 | Precision | Faults named and located, not just felt |
 | Growth | "Try next" items reappear as things actually tried |

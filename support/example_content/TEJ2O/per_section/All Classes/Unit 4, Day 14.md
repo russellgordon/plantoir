@@ -13,7 +13,9 @@ tags:
 1. Warm-up: [[Name That Part]] — showcase round
 2. Bench time: [[The Shop Showcase]], day 2 — artifact chosen, and the
    story you will tell about it
-3. Conference: which fault did you trace, and can you explain it?
+3. Conference and checkpoint: which fault did you trace, and can you
+   explain it? — you leave with one written note from me against the
+   showcase criteria table
 
 ## Things to do before our next class
 

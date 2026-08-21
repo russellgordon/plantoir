@@ -13,7 +13,9 @@ tags:
 1. Warm-up: [[Spot the Hazard]] — a live network cabinet
 2. Bench time: [[Share Files Across the Network]] — a share, permissions,
    and the errors when they are wrong
-3. Break it on purpose, and record the exact message
+3. Break it on purpose, and record the exact message — a wrong
+   permission is the cheapest teacher in this room, and no mark rides
+   on it
 
 ## Things to do before our next class
 

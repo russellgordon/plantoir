@@ -12,7 +12,9 @@ tags:
 
 1. Warm-up: [[Name That Part]] — the parts from your own teardown
 2. Bench time: reassemble what you took apart, from your own notes
-3. Where the notes failed you: fix the notes before you leave
+3. Where the notes failed you: fix the notes before you leave. I read
+   over two shoulders while you do — no marks in it; it tells me whose
+   rebuild we slow down next time
 
 ## Things to do before our next class
 

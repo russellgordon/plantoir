@@ -7,8 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo, with a bench partner nearby · four bench periods across Weeks
-> 15 and 16 · verdicts delivered in Week 16 · one machine, one report
+> Solo, with a bench partner nearby · launched Unit 4, Day 1 · six
+> bench periods on Days 4 to 9 · report handed in on Day 10 · one
+> machine, one report
 
 ## What you are making
 
@@ -29,10 +30,11 @@ survive the question "why?" three times in a row.
    is, what it claims, what it actually does when powered. Work the
    habits from [[Troubleshooting Practice]]: symptom, test, finding,
    next test. No conclusions on day one.
-2. Open it up — power off and unplugged, strap on, the
-   [[Anti-Static Habits]] and [[Safety in the Lab]] absolutes in full
-   force, and a partner within reach. [[Take It Apart]] taught you the
-   disassembly discipline; here it earns its keep.
+2. Open it up — power off and unplugged, strap clipped to the mat,
+   boards lifted by their edges, the [[Anti-Static Habits]] and
+   [[Safety in the Lab]] absolutes in full force, and a partner within
+   reach. [[Take It Apart]] taught you the disassembly discipline;
+   here it earns its keep, on somebody else's property.
 3. Refurbish what the evidence supports: clean, reseat, replace, and —
    if the verdict is heading toward repair — reinstall a working
    system, as practised in [[Install an Operating System]].
@@ -43,15 +45,18 @@ survive the question "why?" three times in a row.
 5. Write the report for the owner: findings, work done, verdict, and
    the environmental case. [[Writing About Technology]] is the guide.
 
-The bench periods are class time, and using them well is part of the
-task — [[How Marks Work]] explains how.
+Every bench period is class time on purpose: work that carries a mark
+gets done here, where I can watch it happen and you can ask. On Day 8 I
+read each report draft against the criteria table below and leave one
+written note; Day 9 opens with fifteen minutes for acting on it, before
+a word more of the report gets written.
 
 ## Success criteria
 
 | Quality | What it looks like in your report |
 | --- | --- |
 | An honest intake | Findings recorded before opinions formed, tests named |
-| Safe bench habits | Power off, strap on, partner near — without reminders |
+| Safe bench habits | Power off and unplugged, strap to the mat, boards by the edges, partner in reach |
 | Work fits the evidence | Refurbishing matches what the assessment found |
 | A defended verdict | The verdict survives "why?" three times over |
 | An environmental case | Real costs and a named local agency or partner |
@@ -59,7 +64,8 @@ task — [[How Marks Work]] explains how.
 
 ## Reflect
 
-Your [[Tech Journal]] entry: where did you catch yourself wanting a
+Your [[Tech Journal]] entry, written at the bench before tools away:
+where did you catch yourself wanting a
 particular verdict before the evidence was in, and what did you do
 about it? Noticing your own thumb on the scale is a trade skill.
 
@@ -85,4 +91,44 @@ about it? Noticing your own thumb on the scale is a trade skill.
 ![[D1.1]]
 
 ![[B4.4]]
+
+![[B2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 6, the full-assessment period with the utilities
+  Watch for: whether the output of a utility is READ or merely
+  produced. A number copied off the screen into the intake record; a
+  surprising result that sends them back for a second check; a scroll
+  that slows down. The report shows only the findings that survived to
+  the verdict, so it cannot tell you whether the ones that did not
+  survive were ever looked at.
+  Going well: a student runs a second utility because the first one
+  disagreed with what they expected.
+  Stuck: the utility is launched, glanced at, closed — and the verdict
+  turns out to have been decided on Day 4, before any of this ran.
+  Record: one letter beside each bench on the machine inventory, R for
+  read and S for skimmed.
+  That is B4.4, which asks for utility software USED to perform
+  maintenance functions, not merely named. A screenshot in a report
+  proves it was opened.
+
+TALK — Unit 4, Day 9, while the reports are being written
+  Ask: "Suppose the owner ignores you and buys new. Name one harm that
+  decision causes that your report does not mention anywhere."
+  Then: "What would the owner have to tell you to flip your verdict?"
+  A strong first answer reaches past the bin to the making of the
+  replacement — what gets mined, shipped and burned so that a new
+  machine exists — which is the half of C1.1 a disposal-focused report
+  usually leaves out. A strong second answer names a fact about how the
+  machine is actually used or paid for that would change the
+  arithmetic; a weak one defends the verdict harder, which is a
+  preference wearing a verdict's clothes.
+  Record: one line per student on the machine inventory — the harm they
+  named, in three words.
+
+The product evidence is the report handed in on Day 10. That one
+arrives on its own.
+%%

@@ -11,10 +11,11 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Which One Doesn't Belong]] — four gadget designs
-2. Bench time: [[The Gadget]] — a second feature, tested before it is
-   added to the first
-3. Bench time: [[The Gadget]], day 4 — the code, written in small pieces that
-   each get tested
+2. Bench time: [[The Gadget]], day 4 — the code, written in small pieces
+   that each get tested, and a second feature added only once the first
+   still works with it there
+3. Checkpoint: while you work I read each group's circuit and
+   code-so-far against the criteria table and leave one written note
 4. Tutorial: [[Getting Unstuck]] — the three things to try before asking
 
 ## Things to do before our next class

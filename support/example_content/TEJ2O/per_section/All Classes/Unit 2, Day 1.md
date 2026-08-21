@@ -10,7 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: [[Name That Part]] — networking hardware edition
+1. Diagnostic, nothing recorded: [[Name That Part]] — networking
+   hardware edition — then one question: what do you already believe
+   happens when a file crosses the room? What the room believes today
+   sets how long we spend on addressing
 2. Safety notes, then unbox the switch together — meet the hardware
    before anyone names it
 3. Bench time: [[Crimp and Test a Cable]] begins — eight tiny wires,

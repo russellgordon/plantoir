@@ -7,8 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Benches of three · five bench periods across Weeks 8 and 9 ·
-> handover in Week 9 · one working network, one service binder
+> Benches of three · launched Unit 2, Day 6 · planning slot on Day 8 ·
+> five bench periods on Days 13 to 17 · handover on Day 18 · one
+> working network, one service binder
 
 ## What you are making
 
@@ -41,9 +42,26 @@ binder, the job is not done, however well the network runs.
 6. Assemble the binder: room sketch, labelled cable map, address
    table, test results, honest known-issues list. Then hand it over.
 
-Cutters and crimpers are real tools — [[Safety in the Lab]] opens
-every period, [[Spot the Hazard]] eyes on all week. Bench periods are
-class time; using them well counts, as [[How Marks Work]] explains.
+Cutters and crimpers are real tools, and cable work happens under
+desks and up ladders — [[Safety in the Lab]] opens every period and
+[[Spot the Hazard]] keeps your eyes in all week. Every bench period is
+class time on purpose: work that carries a mark gets done here, where I
+can watch it happen and you can ask. On Day 16 I read each bench's
+binder-so-far against the criteria table below and leave one written
+note; Day 17 opens with fifteen minutes for acting on it.
+
+## Your own mark
+
+Three technicians, three marks. A shared one would hide exactly the
+person it should be reporting on. Yours comes from:
+
+- **Your named section of the binder.** Each of you owns and signs one
+  — the cable map, the address table, or the test results and
+  known-issues list — and it is read as your writing.
+- **The handover answer you give.** At handover the receiving bench may
+  put its service question to any one of you, about any part of the
+  job, including the part you did not write.
+- **Your own journal entry**, written at the bench before tools away.
 
 ## Success criteria
 
@@ -54,12 +72,13 @@ class time; using them well counts, as [[How Marks Work]] explains.
 | Working addresses | Every machine reaches every other, proof kept |
 | Services delivered | Files move between rooms in both directions |
 | A serviceable binder | Another bench answers questions from it alone |
-| Safe tool habits | Tools handled safely, benches clear, no reminders |
+| Safe tool habits | Cutters capped when idle, offcuts binned as made, nobody under a desk alone |
+| A section signed by you | Your part of the binder is named, signed, and answerable |
 
 ## Reflect
 
-Your [[Tech Journal]] entry: what did the tester catch that your eyes
-missed, and what changes next time you crimp? A cable that failed and
+Your [[Tech Journal]] entry, written at the bench before tools away:
+what did the tester catch that your eyes missed, and what changes next time you crimp? A cable that failed and
 got remade is better evidence of learning than one that worked first.
 
 > [!success]- If the binder feels like busywork (click to expand)
@@ -83,4 +102,47 @@ got remade is better evidence of learning than one that worked first.
 ![[D2.2]]
 
 ![[B3.3]]
+
+![[D1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Three to a bench, so the conversation is where the INDIVIDUAL evidence
+comes from. Ask each technician separately and write three names.
+
+OBSERVE — Unit 2, Day 15, cabling day
+  Watch for: the ORDER a bench works in. Does the tape measure come out
+  before the cutters and the label get written before the cable leaves
+  the bench, or is the run cut first and identified afterwards by
+  pulling on it? The finished binder shows tidy lengths and neat labels
+  either way — this is the only period where you can see which of the
+  two produced them.
+  Going well: a run measured in place, cut once, labelled at both ends
+  before it is threaded anywhere.
+  Stuck: three unlabelled ends on the floor and a bench arguing about
+  which one goes to the far room.
+  Record: bench number in the margin of your room sketch, with M or C —
+  measured first, or cut first.
+  That is B3.1 in the doing. The binder proves a network was installed;
+  only the period tells you whether it was installed by method.
+
+TALK — Unit 2, Day 17, while the binders are being written
+  Ask, of each technician on their own: "Read me the address on this
+  machine, and tell me which part of it the machine in the other room
+  shares with it."
+  Then: "The studio hires a fourth person next month. What has to
+  change, and what does not?"
+  A strong answer takes the address apart — this part is the network,
+  this part is the machine — and on the second says the new machine
+  needs its own unique number and the others need nothing done to them.
+  That is A2.4 heard rather than read; an address table copied into a
+  binder is silent about whether the writer can take a single address
+  apart.
+  Record: one word per STUDENT beside their name on the address table —
+  the part of the address they pointed at first.
+
+The product evidence is the binder handed over on Day 18. That one
+arrives on its own.
+%%

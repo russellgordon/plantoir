@@ -12,7 +12,8 @@ tags:
 
 1. Warm-up: [[Which One Doesn't Belong]] — four cable faults
 2. Bench time: the tester's verdicts, diagnosed one by one — which pin,
-   which end, which mistake
+   which end, which mistake. I am counting failure patterns, not
+   cables; nothing here is marked
 3. Re-crimp until two cables pass in a row
 
 ## Things to do before our next class
