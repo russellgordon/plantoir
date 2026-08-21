@@ -48,12 +48,23 @@ near-identical tones fight?
 
 ## How it is assessed
 
+You work in a pair and you are marked as an individual. Name the half
+of the proof you wrote, write your own milestone journal entry on the
+due date, and answer for your own work when I ask — those three are
+what carries your mark.
+
 Per [[How Marks Work]], the reasoning is the product: a proof with
 an honest gap, found and named by its own authors, outranks a
 flawless chain copied from elsewhere. On the due date your pair
-plays the beats, shows the model, and defends the identity live. The
-[[Math Journal]] entry on where the stopwatch and the model
-disagreed completes the evidence.
+plays the beats, shows the model, and defends the identity live. Ten
+minutes of that class are set aside for your milestone journal entry
+on where the stopwatch and the model parted company — written there,
+in the room, and belonging to this task rather than to your
+[[Math Journal]].
+
+Run [[Judging Your Own Work]] against the table below on day 4, in the
+ten minutes set aside for it, while there is still time in that period
+to act on what it finds.
 
 ## Success criteria
 
@@ -139,8 +150,8 @@ TALK — Unit 3, Day 16, at the conference already on that agenda
   of the pieces, and it is a question their graph can settle in thirty
   seconds if they think to try it.
 
-  Record: one line per student on your class list. The pair's name is no use
-  to you here.
+  Record: one line per student on your class list. Two names on one line
+  is the note you will not be able to use.
 
 The product evidence is the demonstration on Day 18, the proof handed in with
 it, and the milestone entry written in class that day.

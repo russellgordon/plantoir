@@ -7,8 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Whole class plus invited guests · one class period · marked as an
-> individual · your signature function, presented and defended live
+> Whole class plus invited guests · two preparation periods plus the
+> symposium itself · marked as an individual · your signature
+> function, presented and defended live
 
 ## What you are making
 

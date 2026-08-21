@@ -48,18 +48,20 @@ the conference, and the part of the defence you give at the symposium.
 ## How it is assessed
 
 This is the culminating task, and per [[How Marks Work]] it is
-assessed on reasoning, growth, and communication: the defence at the
-symposium is where the evidence lives, not in the polish of the
-poster. Your [[Math Journal]] across the whole semester is the
-growth record — the entry on why you chose this phenomenon, written
-at launch, gets its answer in your [[Final Reflection]]. Ten minutes of
-the last working period are set aside for your milestone journal entry
-on the rival family you rejected and what finally decided it; that entry
-belongs to this task.
+assessed on reasoning, growth, and communication: the argument in
+your write-up is where the evidence lives, not the polish of the
+poster. The defence itself is judged separately, at
+[[The Functions Symposium]]. Your [[Math Journal]] across the whole
+semester is the growth record — the entry on why you chose this
+phenomenon, written at launch, gets its answer in your
+[[Final Reflection]]. Ten minutes of the last working period are set
+aside for your milestone journal entry on the rival family you
+rejected and what finally decided it; that entry belongs to this
+task.
 
 The same period opens with [[Judging Your Own Work]], run against the
-table below, so that whatever you find still has a period to be mended
-in.
+table below, so that what you find has the rest of that period to be
+mended in.
 
 ## Success criteria
 

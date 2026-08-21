@@ -70,8 +70,9 @@ your notes hold what YOU need to remember about them.
 ## Check your understanding
 
 Class ends with two or three questions you try alone, and your
-[[Math Journal]]. Not collected, not marked — nothing in this course
-puts a number on them, as [[How Marks Work]] sets out. They exist so
+[[Math Journal]]. The questions are not collected, and nothing here
+carries a mark — the journal comes in each unit to be read, not
+scored, as [[How Marks Work]] sets out. They exist so
 that you, rather than a paper at the end of the unit, are the first to
 know what stuck and what needs [[Getting Help|another pass]].
 

@@ -58,7 +58,6 @@ with you.
 - **One question describes a situation in words** and asks for a sketch
   showing the rate of change, then a verification at three points.
   [[Rates of Change in the World]] has the technique.
-
 - **One composition with its domain**, where the domain of $f(g(x))$ is
   not the domain of either piece by itself.
 - **One rational function sketched from its equation**, with every
@@ -178,8 +177,8 @@ would be a nicer note than a true one. What the four review classes give you
 is different and still worth the minutes — the last chance to find a
 misconception while there are periods left to spend on it, and the last
 chance to tell a student where they stand while they can still do something
-about it. Both change what you TEACH on Days 21 to 23 rather than what you
-write in a mark book.
+about it. Both change what you TEACH in the classes that follow them
+rather than what you write in a mark book.
 
 OBSERVE — Unit 4, Day 20, the review clinic at the boards
 

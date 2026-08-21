@@ -19,9 +19,10 @@ tags:
 4. Ten minutes, in class: your milestone journal entry for this task —
    the constraint that fought back hardest, and how the algebra finally
    enforced it
-5. Look ahead: next class we divide — bring your instincts about
-   $\frac{1}{x}$
+5. Look ahead: at the start of the next unit we divide — bring your
+   instincts about $\frac{1}{x}$
 
 ## Things to do before our next class
 
-- [ ] Reread your Unit 1 entries — the journal comes in next class.
+- [ ] Reread your Unit 1 entries — the journal comes in on the first
+      day of the next unit.

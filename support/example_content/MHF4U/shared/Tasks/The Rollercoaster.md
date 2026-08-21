@@ -46,6 +46,11 @@ exactly is the ride $15$ m high?* — a polynomial equation — and
 
 ## How it is assessed
 
+You work in a pair and you are marked as an individual. Put your
+initials beside each constraint paragraph you wrote, write your own
+milestone journal entry on the due date, and answer for your own work
+at the boards — those three are what carries your mark.
+
 Per [[How Marks Work]], the reasoning is the product: a profile that
 misses one constraint, with the miss measured and the fix argued,
 outranks a perfect curve that cannot say why it works. On the due
@@ -55,8 +60,8 @@ that fought back hardest — written there, in the room, and belonging to
 this task rather than to your [[Math Journal]].
 
 Before any of that, run [[Judging Your Own Work]] against the table
-below while there is still a working period left to act on what it
-finds.
+below, in the ten minutes set aside on day 5 — while there is still
+time in that period to act on what it finds.
 
 ## Success criteria
 

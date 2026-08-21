@@ -10,8 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[The Functions Symposium]], day 2 — working period: choose what you will
-   present, one piece from each strand
+1. [[The Functions Symposium]], day 2 — working period: build your
+   station — the graph, the data, the fitted equation, and what you
+   will say first
 2. Rehearse the two questions every station must answer
 3. Trade with the station beside you and challenge one claim each —
    better heard here than from a guest

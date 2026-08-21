@@ -55,13 +55,13 @@ talking nor one morning of writing should decide a semester by itself.
 ## Feedback, and where it lands
 
 Each of the four tasks has a conference with me inside one of its
-working periods, and a full working period follows it, given over to
-acting on what that conference found. On three of the four that is the
-first thing on the agenda; on [[The Signature Function]] it comes after
-ten minutes of self-check. On [[The Rollercoaster]] the conference is
-about which constraint decides the degree; on [[Safe Concentration]] it
-is what your model claims at $t = 0$; on [[The Sound of Two Waves]] it
-is whether your predicted period survived the recording; on
+working periods, and the task time in the next working period opens
+with acting on what that conference found — on
+[[The Signature Function]], after ten minutes of self-check. On
+[[The Rollercoaster]] the conference is about which constraint decides
+the degree; on [[Safe Concentration]] it is what your model claims at
+$t = 0$; on [[The Sound of Two Waves]] it is whether your predicted
+period survived the throb you timed; on
 [[The Signature Function]] it is what your function claims outside your
 data. None of those is a progress check. Each one is a piece of the
 evidence in its own right, and the period afterwards is where you act.
