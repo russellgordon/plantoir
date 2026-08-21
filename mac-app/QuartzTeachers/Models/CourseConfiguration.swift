@@ -541,19 +541,59 @@ class CourseConfiguration {
         setNestedValue(emoji, forKey: "emojis", childKey: "sections", entryKey: "section\(sectionNumber)")
     }
 
-    /// The teacher's own domain for a section's published site — shown in
-    /// links to the live site in place of the address Netlify assigns.
-    /// Empty when the Netlify address is used as-is.
-    func customDomain(forSection sectionNumber: Int) -> String {
+    /// The teacher's own domain for ONE DESTINATION of a section's
+    /// published site — shown in links to that destination's live site in
+    /// place of the address it would otherwise be assigned (a
+    /// `.netlify.app` or `.pages.dev` subdomain). Empty when that
+    /// destination's own address is used as-is.
+    ///
+    /// Keyed by destination TYPE, not just by section: a course publishing
+    /// to both Netlify and Cloudflare Pages for redundancy may want a
+    /// domain on one and not the other. A single section-wide domain (the
+    /// shape this replaces) had to guess which destination it was for and
+    /// got applied to every destination regardless — the reported bug this
+    /// shape exists to fix ("only Cloudflare, the second deploy target, is
+    /// visible" had a sibling: a Netlify-only domain silently overriding
+    /// the Cloudflare link too).
+    ///
+    /// Reads an OLDER shape too: `custom_domains.sections.sectionN` used
+    /// to be a bare string, written before a course could have more than
+    /// one destination. That value is treated as belonging to the
+    /// section's PRIMARY destination (`deployTarget`) — the only
+    /// destination that existed when it could have been set — and is
+    /// invisible to every other destination type, which is exactly
+    /// correct for a course that has never touched additional
+    /// destinations at all.
+    func customDomain(forSection sectionNumber: Int, destinationType: String) -> String {
         let sectionsMap: [String: Any] = nestedDictionary(forKey: "custom_domains", childKey: "sections")
-        if let stored = sectionsMap["section\(sectionNumber)"] as? String {
-            return stored
+        guard let stored = sectionsMap["section\(sectionNumber)"] else {
+            return ""
+        }
+        if let perDestination = stored as? [String: Any] {
+            return perDestination[destinationType] as? String ?? ""
+        }
+        // Old shape: a bare string, meant for whichever destination was
+        // primary when it was set — never for any other type.
+        if let legacyDomain = stored as? String, destinationType == deployTarget {
+            return legacyDomain
         }
         return ""
     }
 
-    func setCustomDomain(_ domain: String, forSection sectionNumber: Int) {
-        setNestedValue(domain, forKey: "custom_domains", childKey: "sections", entryKey: "section\(sectionNumber)")
+    func setCustomDomain(_ domain: String, forSection sectionNumber: Int, destinationType: String) {
+        let sectionsMap: [String: Any] = nestedDictionary(forKey: "custom_domains", childKey: "sections")
+        let sectionKey: String = "section\(sectionNumber)"
+        var perDestination: [String: Any] = [:]
+        if let existing = sectionsMap[sectionKey] as? [String: Any] {
+            perDestination = existing
+        } else if let legacyDomain = sectionsMap[sectionKey] as? String, !legacyDomain.isEmpty {
+            // A stray old-shape string, meant for the primary destination,
+            // is carried forward into the new shape rather than silently
+            // dropped the first time ANY destination's domain is set here.
+            perDestination[deployTarget] = legacyDomain
+        }
+        perDestination[destinationType] = domain
+        setNestedValue(perDestination, forKey: "custom_domains", childKey: "sections", entryKey: sectionKey)
     }
 
     /// A typed or pasted domain, reduced to just the domain: whitespace

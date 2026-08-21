@@ -92,10 +92,26 @@ def resolve_section_domain(course_dir: Path, config: dict, section_number: int) 
     """
     section_key = f"section{section_number}"
 
-    # 1. Custom domain from course_config.json
+    # 1. Custom domain from course_config.json — keyed by destination type
+    # since a course may publish to more than one place at once, but the
+    # baseUrl baked into THIS build (sitemap, RSS, social-card absolute
+    # URLs) can only ever be one value. Reads the PRIMARY destination's own
+    # domain, matching what the "Live URL" link on a finished deploy has
+    # always pointed at — the mac/Windows apps' "Advanced" custom-domain
+    # fields are per-destination for exactly this reason (a Netlify-only
+    # domain must never leak into a Cloudflare Pages leg's own link), and
+    # the primary is the one destination this single build is canonically
+    # published as. An older, single-string shape is read as-is: it was
+    # written back when a course could only ever have one destination, so
+    # there was only ever one destination it could have meant.
     custom_domains = config.get("custom_domains", {})
     if isinstance(custom_domains, dict):
-        section_custom_domain = (custom_domains.get("sections") or {}).get(section_key)
+        section_domains = (custom_domains.get("sections") or {}).get(section_key)
+        if isinstance(section_domains, dict):
+            primary_destination_type = config.get("deploy_target") or "netlify"
+            section_custom_domain = section_domains.get(primary_destination_type)
+        else:
+            section_custom_domain = section_domains
         if section_custom_domain:
             cleaned = clean_base_url(section_custom_domain)
             if cleaned:

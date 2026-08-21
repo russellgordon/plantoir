@@ -592,12 +592,6 @@ struct SectionDetailView: View {
 
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
 
-        // When this section has a custom domain, the live-site link shown
-        // after publishing wears it instead of the Netlify address.
-        let customDomain: String = CourseConfiguration.normalizedCustomDomain(
-            course.configuration.customDomain(forSection: sectionNumber)
-        )
-
         // Let the rest of the app know this course is mid-publish (so,
         // for example, Add Section… declines until it finishes) — ONE
         // bracket around the whole sequence of destinations, not one per
@@ -626,7 +620,6 @@ struct SectionDetailView: View {
             destinations: destinations,
             cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
             workingDirectory: workspaceURL,
-            customDomainForLinks: customDomain.isEmpty ? nil : customDomain,
             needsBuild: needsBuild
         )
 

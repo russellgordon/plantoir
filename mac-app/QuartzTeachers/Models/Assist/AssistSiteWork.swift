@@ -170,7 +170,6 @@ final class AssistToolchainWork: AssistSiteWork {
             destinations: destinations,
             cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
             workingDirectory: workspaceURL,
-            customDomainForLinks: nil,
             needsBuild: needsBuild
         )
 

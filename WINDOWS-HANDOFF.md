@@ -4159,6 +4159,142 @@ list every succeeded destination's own link once the whole run is done,
 and stop a title from naming one destination after the fact — not this
 Swift.
 
+## Custom domain: per-destination, not per-section, or one host's domain leaks onto another's (entry 303)
+
+Row 304 (above) fixed the multi-destination deploy PANEL showing only the
+last destination's live link. "Advanced → Custom domain" in Course
+Settings had the identical bug one layer up, and worse: it was applied
+SILENTLY at deploy time rather than merely misdisplayed. One section-wide
+domain (`custom_domains.sections.sectionN`, a bare string) was substituted
+onto EVERY destination's link — a domain meant only for Netlify was also
+swapped onto the Cloudflare Pages leg's own address, a Cloudflare project
+that in the overwhelming majority of real cases does not answer to that
+DNS record at all.
+
+Reported directly, asking for exactly the shape row 302 already
+established for the same underlying problem: "ask the user which deploy
+target this applies to. Whatever target exists that is not using a custom
+domain should still show the default assigned to that service."
+
+### The new shape
+
+`custom_domains.sections.sectionN` is now a map keyed by destination TYPE:
+
+```json
+{
+  "custom_domains": {
+    "sections": {
+      "section1": {
+        "netlify": "ics3u.school.ca",
+        "cloudflare_pages": "ics3u-mirror.school.ca"
+      }
+    }
+  }
+}
+```
+
+Never a `local_folder` key — a domain is something a browser visits, and a
+folder is not, so `CourseConfiguration.customDomain(forSection:
+destinationType:)` is simply never called with that type from the UI (the
+settings view filters `allDeployDestinations` to exclude it before
+building any field at all).
+
+**An OLDER shape is still read**: `custom_domains.sections.sectionN` used
+to be a bare string, written before a course could have more than one
+destination. That value is treated as belonging to the section's PRIMARY
+destination (`deployTarget`) — the only destination that existed when it
+could have been set — and is invisible to every other type. Setting a
+SECOND destination's domain migrates a bare string it finds into the new
+per-type shape rather than silently discarding it (`CourseConfiguration.
+setCustomDomain`, `mac-app/QuartzTeachers/Models/CourseConfiguration.swift`).
+
+### The settings UI
+
+`SectionSettingsView`'s "Advanced" disclosure now shows one field per
+destination that can have a domain (never `local_folder`), via
+`ForEach(customDomainDestinations, id: \.type)`. The LABEL stays plain
+"Custom domain" — byte-identical to what a course has always shown — for
+the overwhelming majority (exactly one destination); only once there is
+more than one does it become "`<Service>` custom domain"
+(`SectionSettingsView.customDomainFieldLabel(destination:destinationCount:)`).
+The CAPTION is a smaller, separate fix that applies even in the
+single-destination case: it used to hardcode "the Netlify address"
+unconditionally, so a course whose one destination was Cloudflare Pages
+was told to "leave empty to use the Netlify address" — simply wrong.
+`customDomainCaption(forDestinationType:)` always names the real service.
+
+### The deploy-time fix — resolved per LEG, not passed in once
+
+`MultiDestinationDeployRunner.run()` no longer takes a
+`customDomainForLinks: String?` parameter at all. It used to be resolved
+ONCE by the caller and applied to every leg's `ScriptRunner` identically —
+which is the actual mechanism of the bug. Now `run()` resolves the domain
+itself, per leg, inside its own loop:
+
+```swift
+let domainForThisDestination: String = CourseConfiguration.normalizedCustomDomain(
+    course.configuration.customDomain(forSection: sectionNumber, destinationType: destination.type)
+)
+runner.customDomainForLinks = domainForThisDestination.isEmpty ? nil : domainForThisDestination
+```
+
+A genuine, incidental bonus this produced: `AssistSiteWork.swift` (the
+assistant's headless deploy path, no section window on screen) was passing
+`customDomainForLinks: nil` UNCONDITIONALLY — the assistant never wore a
+teacher's custom domain, even for an ordinary single-destination course.
+Removing the parameter meant every caller now resolves it the same way,
+fixing that silently for free.
+
+### The Python side — one baseUrl per build, so it follows the PRIMARY only
+
+`build_site.py`'s `resolve_section_domain()` decides the baseUrl baked
+into a build's sitemap, RSS feed, and social-card absolute URLs. A single
+build's `public/` folder is uploaded to EVERY configured destination (see
+row 303's "a build runs exactly once, fused into the first destination's
+own progress") — so unlike the Swift GUI's per-destination LINK DISPLAY,
+there is no way for the baseUrl itself to be different per destination; it
+is one value baked into the actual files. The fix there reads the new
+dict shape through the PRIMARY destination's own entry (`config.get
+("deploy_target")`), matching what the "Live URL" link on a finished
+deploy has always pointed at — an old bare string is read as-is,
+unchanged. This needed its own test file
+(`scripts/test_build_site_domain_resolution.py`) run against the real
+built image rather than the host-side fast pre-checks the other Python
+tests here use, because `build_site.py` imports `frontmatter`, which lives
+only inside the container.
+
+### What Windows needs from this — a real cross-platform risk, not just a schema gap
+
+This is NOT merely "Windows hasn't caught up to a new key yet." Windows's
+`CourseConfiguration.CustomDomain`/`SetCustomDomain`
+(`windows-app/Plantoir.Core/Models/CourseConfiguration.cs:279-283`) still
+read and write the bare-string shape unconditionally, via `NestedString`/
+`SetNestedValue`. Two distinct failure modes follow from the SAME course
+file being opened on both platforms:
+
+- **Read side (degrades, does not crash)**: `NestedString` type-checks for
+  a `JValue` of `JTokenType.String` and returns `""` for anything else,
+  including the new shape's `JObject` — so a Windows teacher opening a
+  course a mac teacher has multi-destination-enabled sees their custom
+  domain silently VANISH (read as never set), not an error.
+- **Write side (genuine data loss)**: `SetNestedValue` always writes a
+  plain string. A Windows teacher who edits and saves ANY custom-domain
+  field on such a course — even just retyping the same value — CLOBBERS
+  the whole per-destination map back down to one bare string, discarding
+  every other destination's domain the mac side had configured. This is
+  not a display glitch; it is data a Windows session would actually
+  destroy on write.
+
+Windows needs the equivalent per-destination-type shape — reading the new
+dict form (falling back to the primary destination's own key, mirroring
+`build_site.py`'s own migration logic) and writing per-destination-type
+rather than one flat string — before it is safe for a course to move
+between the two apps once BOTH multi-destination deploy and more than one
+custom domain are in play. There is no urgency purely from "Windows has no
+`MultiDestinationDeployRunner` yet" (true, and fine on its own), but the
+read/write asymmetry above is a real risk today, for any course a teacher
+happens to open on both platforms.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have

@@ -37,7 +37,7 @@ A representative example:
   "show_section_marker": { "sections": { "section1": true, "section3": false } },
   "show_grade_in_title": { "sections": { "section1": true, "section3": false } },
   "color_schemes": { "section1": "nordic-frost", "section3": "mlb-toronto-blue-jays" },
-  "custom_domains": { "sections": { "section1": "ics3u.myschool.ca" } }
+  "custom_domains": { "sections": { "section1": { "netlify": "ics3u.myschool.ca" } } }
 }
 ```
 
@@ -65,7 +65,7 @@ A representative example:
 | `show_section_marker.sections.section<N>` | bool | setup | build (page title + computed landing title) | Whether the header shows `S<N>` and the computed landing title carries ", Section N". The build also accepts several legacy shapes (plain bool, flat map, alternate key names). |
 | `show_grade_in_title.sections.section<N>` | bool (default `true`) | app (per-section settings) — the wizard never writes it, it only honours an existing value when generating a section's starting `index.md` title | build (computed landing title) | Whether the landing title leads with the grade ("Grade 11 …"). Deliberately literal — the switch alone decides; the app shows an orange warning when the name already contains the grade label. A legacy course-wide bool is honoured. |
 | `color_schemes.section<N>` | string | setup | build → `quartz.config.ts` colors + social card | Scheme id from `support/colour_schemes.json` (43 available). The section's social sharing card is drawn in this scheme too. |
-| `custom_domains.sections.section<N>` | string | app (Advanced, per-section settings) | app (published-site links) | The teacher's own domain for the section's published site. Links after a deploy swap the Netlify host for it (path preserved, https). `deploy.py` does not consume it; the domain itself is configured on Netlify. Entries are normalized (scheme and path stripped) on the way in. |
+| `custom_domains.sections.section<N>` | object (per-destination-type map, e.g. `{"netlify": "…", "cloudflare_pages": "…"}`) | app (Advanced, per-section settings — one field per configured destination) | app (published-site links, per destination) + `build_site.py` (baseUrl, via the PRIMARY destination's own entry only — one build's sitemap/RSS/social-card links can only follow one domain) | The teacher's own domain for ONE destination of the section's published site. Links after a deploy swap that destination's own host for it (path preserved, https) — never another destination's. An OLDER shape (a bare string, from before a course could have more than one destination) is still read, as the domain for whichever destination is currently primary (`deploy_target`). The domain itself must already be configured with that host (Netlify/Cloudflare Pages) — this key only changes what Plantoir LINKS to. Entries are normalized (scheme and path stripped) on the way in. |
 | `prepopulate_example_content` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the ready-made payload for this course code. |
 | `use_skeleton` | bool | setup | setup (remembered on a re-run) | Whether the teacher took the subject skeleton instead. Mutually exclusive with the key above — a course gets one starting content source or neither. |
 | `include_curriculum_pages` | bool | setup | setup | Whether the curriculum folder was installed. Declining it strips the `%%curriculum-start%%`…`%%curriculum-end%%` passages from every payload page and unlinks inline expectation references. |

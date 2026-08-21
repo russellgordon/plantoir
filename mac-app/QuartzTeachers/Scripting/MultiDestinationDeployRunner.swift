@@ -177,7 +177,6 @@ class MultiDestinationDeployRunner {
         destinations: [CourseConfiguration.DeployDestination],
         cloudflareAccountID: String,
         workingDirectory: URL,
-        customDomainForLinks: String?,
         needsBuild: Bool
     ) async {
         legs = []
@@ -195,7 +194,13 @@ class MultiDestinationDeployRunner {
             currentLegIndex = index
             let destination: CourseConfiguration.DeployDestination = legs[index].destination
             let runner: ScriptRunner = legs[index].runner
-            runner.customDomainForLinks = customDomainForLinks
+            // Each destination wears ONLY its own custom domain — a
+            // domain meant for Netlify must never leak onto the Cloudflare
+            // leg's own link just because they deployed together.
+            let domainForThisDestination: String = CourseConfiguration.normalizedCustomDomain(
+                course.configuration.customDomain(forSection: sectionNumber, destinationType: destination.type)
+            )
+            runner.customDomainForLinks = domainForThisDestination.isEmpty ? nil : domainForThisDestination
 
             let buildsFirst: Bool = index == 0 && needsBuild
             if buildsFirst {
