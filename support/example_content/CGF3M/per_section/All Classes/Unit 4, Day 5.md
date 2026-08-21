@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Plot both profiles on one set of axes tonight, in two colours.
+- [ ] Bring the notebook and September's pages. Tomorrow opens with ten minutes to finish today's, and we plot the two profiles together.

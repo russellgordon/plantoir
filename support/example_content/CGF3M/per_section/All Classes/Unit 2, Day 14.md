@@ -12,7 +12,7 @@ tags:
 
 1. [[Drought and Heat]] — four droughts sharing one word, and the Drought Monitor's D0 to D4
 2. The 2021 heat dome: 49.6 °C at Lytton known within the hour, 619 deaths confirmed nearly a year later
-3. The urban heat island measured in our own yard — asphalt, grass and shade, surface and air
+3. The urban heat island measured in our own yard — asphalt, grass and shade, surface and air, then readings compared across groups. Feedback only
 
 ## Things to do before our next class
 

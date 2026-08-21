@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Profiles plotted to scale and compared across the pairs
-2. Naming what we watched: [[Weathering, Erosion, and Deposition]] — break down, pick up, set down
-3. Roundness and sorting read back as evidence of which agent last touched that sediment
+1. First ten minutes: yesterday's field pages finished here, where the marked record is written
+2. Profiles plotted to scale and compared across the pairs — feedback only, nothing recorded
+3. Your field sketch of the site tidied and handed in with its reflection, written here — the first sheet in [[A Map of Your Own]]
+4. Naming what we watched: [[Weathering, Erosion, and Deposition]] — break down, pick up, set down, with roundness and sorting read back as evidence of which agent last touched that sediment
 
 ## Things to do before our next class
 

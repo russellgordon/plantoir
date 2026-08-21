@@ -9,7 +9,8 @@ tags:
 One physical notebook, carried to every field day, kept for the whole
 course. It is the only record of what you actually saw, and by January it
 will be the difference between a report built on evidence and a report
-built on memory.
+built on memory. It is marked as part of
+[[The Field and Map Portfolio]].
 
 ## What goes on a page
 
@@ -35,13 +36,20 @@ Draw the profile, label the units, add a scale and an arrow for north,
 and mark where you were standing. Then photograph the same thing, and
 write the photo number next to the sketch.
 
-## What it is marked on
+## What it is marked on, and when it is written
 
-Completeness, honesty and usefulness — not neatness. A notebook that
-records a measurement you later realised was wrong, with a note saying
-so, is worth more than one that quietly omits it. Crossing something out
-with a single line and leaving it readable is standard practice in field
-science for exactly that reason.
+The field pages are what carry the mark, and they are judged on whether
+the record is complete, candid and usable — not on whether it is neat. A
+notebook that records a measurement you later realised was wrong, with a
+note saying so, is worth more than one that quietly omits it. Crossing
+something out with a single line and leaving it readable is standard
+practice in field science for exactly that reason.
+
+Those pages are written in the field and finished in the first ten
+minutes of the next class, which is on the agenda for every day after a
+field day. Nothing marked here is written at home. Anything else you keep
+in the same book — a seminar note, a thought after a reading — is yours
+and is never marked.
 
 > [!tip] Write it down there, not afterwards
 > Every experienced field geographer has lost a day's data to "I'll

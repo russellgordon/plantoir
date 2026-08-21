@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Retrieving the lake level and the nearest streamflow record: [[Where the Data Lives]]
-2. [[Judging a Source]] — who, why, when, who paid — applied to four things we find in ten minutes
+2. [[Judging a Source]] — who, why, when, who paid — applied to four things we find in ten minutes, argued out loud and nothing recorded
 3. The habit that starts today: every figure carries an agency, a year, and the date you retrieved it
 
 ## Things to do before our next class

@@ -12,7 +12,7 @@ tags:
 
 1. Tōhoku, second half: direct deaths set beside disaster-related deaths, from two Japanese bodies
 2. Fukushima prefecture, where the evacuation and its aftermath killed more people than the wave
-3. [[Hazard, Exposure, Vulnerability]] returned to — which column does a four-year evacuation belong in?
+3. [[Hazard, Exposure, Vulnerability]] returned to — which column does a four-year evacuation belong in? Argued in threes, nothing recorded
 
 ## Things to do before our next class
 

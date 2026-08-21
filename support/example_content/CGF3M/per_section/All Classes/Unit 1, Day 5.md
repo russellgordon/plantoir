@@ -12,7 +12,7 @@ tags:
 
 1. Contours from first principles: [[Reading a Topographic Map]] on a 1:50 000 sheet of this area
 2. The V-points-upstream rule used to find drainage direction on an extract with nothing labelled
-3. Delineate the watershed containing the school, in pencil, and defend where you put the divide
+3. Delineate the watershed containing the school, in pencil, and defend where you put the divide — feedback only, nothing recorded
 
 ## Things to do before our next class
 

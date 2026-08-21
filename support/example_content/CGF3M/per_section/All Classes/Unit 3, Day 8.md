@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Write the farmer's answers up close to verbatim tonight, with the date on them.
+- [ ] Bring the notebook. Tomorrow opens with ten minutes to finish today's pages, because what is marked is written in the field and completed in the room.

@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. The hearing, second half
+1. The hearing, second half — same rule, a question from the floor to every speaker
 2. What the class decided, and where two pairs on the same case reached opposite positions
 3. Where the disagreement was about evidence, and where it was about values
 

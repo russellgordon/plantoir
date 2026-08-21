@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Repeat your first station's readings from the notebook and check every one is legible tonight.
+- [ ] Bring the notebook. Tomorrow opens with ten minutes to finish today's pages, and legibility is easiest to repair while you still remember what it says.

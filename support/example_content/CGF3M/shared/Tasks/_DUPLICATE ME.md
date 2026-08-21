@@ -49,3 +49,32 @@ would disappear with them.)
 
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Products arrive on their own. Observation and conversation do not, so
+write down here where in THIS task they are available, before you run it
+for the first time. Name the real class page, not a plausible one, and
+keep it to plain text — no links, because this block is invisible on the
+site but is still read by the tools that build it.
+
+OBSERVE — <Unit N, Day M, and what is happening that period>
+  Watch for: <something visible only while they work, and invisible in
+  the finished product. If you cannot name one, ask whether the task
+  gives you anything to watch.>
+  Going well:
+  Stuck:
+  Record: <how, in seconds, for a whole class>
+
+TALK — <Unit N, Day M — prefer a conference or check-in the schedule
+  already has, and never a performance day when you are running the room>
+  Ask: <a real question, not printed anywhere the students have read>
+  Then: <a second one, and what a strong answer sounds like>
+  <Tie it to a curriculum code this task already lists, and check the
+  wording of that expectation actually describes the answer you would
+  hear.>
+  Record:
+
+The product evidence is <what arrives, and on which day>.
+%%
