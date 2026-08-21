@@ -266,27 +266,47 @@ were reviewed and passed, because nobody was looking at this number. They want
 a revisit before the payloads are considered done — not a rewrite, a read of
 which specific codes are thin.
 
-## Overall expectation pages that say "None" — including the example course
+## Overall expectation pages that say "None"
 
-Found by AVI1O's adversarial reviewer on 2026-08-20 and confirmed across the
-whole tree. **The body of every OVERALL expectation page is the literal word
-`None`** in six places:
+Found by AVI1O's adversarial reviewer on 2026-08-20, and **re-measured on
+2026-08-20 after the first count proved wrong in both directions.** The body
+of every OVERALL expectation page is the literal word `None`:
 
-| Payload | Empty overalls |
-|---|---|
-| ATC1O | 10 — A1–A4, B1–B3, C1–C3 |
-| AVI1O | 9 — A1–A3, B1–B3, C1–C3 |
-| CGC1W | 10 — A1, A2, B1, B2, C1, C2, D1, D2, E1, E2 |
-| SNC1W | 10 — same shape |
-| THJ2O | 11 — A1–A4, B1, B2, C1–C3, D1, D2 |
-| **EXC2O** | **10 — inherited from SNC1W by the port** |
+| Payload | Empty overalls | The Ministry document to fetch |
+|---|---|---|
+| ATC1O | 10 — A1–A4, B1–B3, C1–C3 | The Arts, Grades 9–10 (2010) — **Dance**, not visual art |
+| AVI1O | 9 — A1–A3, B1–B3, C1–C3 | The Arts, Grades 9–10 (2010) — Visual Arts |
+| CGC1W | 10 — A1, A2, B1, B2, C1, C2, D1, D2, E1, E2 | Exploring Canadian Geography (2024) |
+| THJ2O | 11 — A1–A4, B1, B2, C1–C3, D1, D2 | Technological Education, Grades 9–10 (2009) — **Green Industries** |
+
+**40 pages across four payloads.** Two entries from the original list are
+already done and must not be redone: **SNC1W** carries real Ministry text on
+all ten overalls, and **EXC2O** inherited that through the port. The earlier
+table claiming six payloads was counting a defect that two of them no longer
+had.
+
+**THJ2O is Green Industries, not Hospitality and Tourism.** The earlier note
+in this file said Hospitality, which would have sent a fixer to the wrong
+document to copy eleven expectations that look authoritative and are for
+another course entirely. Hospitality and Tourism is TFJ. THJ2O's own
+`About These Expectations.md` says Green Industries, and it also carries a
+warning that the 2009 document was superseded in 2024–25.
+
+**You do not have to go looking for the source.** Every one of these payloads
+already names its official URL in its own
+`shared/Curriculum/About These Expectations.md`, along with the Ministry PDF
+where one exists. Start there rather than searching.
+
+**Checking this yourself: strip the anchor first.** The body of a broken page
+is `None ^text`, not `None`. A comparison against the string "None" reports
+every page as healthy and the whole defect as fixed — which is exactly what
+happened on the first attempt at re-measuring it. Strip `^text`, then compare.
 
 This is the most VISIBLE defect left in the payloads. `Learning Goals.md`
 carries a heading reading `## In the Ministry's words` and then transcludes the
 overalls — so a student opens that page and is shown the word "None" once per
 strand. The Curriculum Coverage heat map's strand headers are empty for the
-same reason. EXC2O matters most: it is the example course, the one a teacher
-meets first and the one the marketing screenshots come from.
+same reason.
 
 The specific expectations (A1.1, A1.2, …) are fine everywhere — this is the
 overalls only. ICS3U is the model of the correct shape: its
@@ -296,15 +316,10 @@ followed by the `^text` anchor.
 
 **Do not write these from memory.** Phase 1 is verbatim or not at all, and an
 overall expectation is exactly the kind of sentence that is easy to paraphrase
-convincingly and wrongly. Fetch each course's overalls from the live Ontario
-curriculum:
+convincingly and wrongly.
 
-- ATC1O, AVI1O — The Arts, Grades 9–10 (2010)
-- CGC1W — Canadian Geography, Grade 9 (2022)
-- SNC1W — Science, Grade 9 (2022) — then re-port into EXC2O, or copy the ten
-  files across, since EXC2O's Curriculum folder is a straight copy
-- THJ2O — Hospitality and Tourism, Grade 10
-
-Cheap to do as one Phase 1 job — five fetches and about fifty short files —
-and it should happen before any payload is shown to anyone. Pair it with the
-English truncation work above; both are the same kind of task.
+Cheap to do as one Phase 1 job — four fetches and forty short files — and it
+should happen before any payload is shown to anyone. Pair it with the English
+truncation work above; both are the same kind of task. Note that
+`dcp.edu.gov.on.ca` course pages are long enough that a single fetch of the
+whole page comes back truncated; fetch per strand, or use the Ministry PDF.
