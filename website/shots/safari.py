@@ -19,13 +19,27 @@ from pathlib import Path
 
 from PIL import Image
 
+class AppleScriptFailed(RuntimeError):
+    """An osascript call failed, WITH what it said about why."""
+
+
 def osascript(script: str) -> str:
+    """Run one AppleScript and answer with its output.
+
+    A failure raises with osascript's own complaint attached. Without that,
+    a stale window id and a locked-up Safari and a typo in a URL all arrive
+    as the same bare "non-zero exit status 1" — which cost one capture run
+    its diagnosis.
+    """
     result = subprocess.run(
         ["osascript", "-e", script],
         capture_output=True,
         text=True,
-        check=True,
     )
+    if result.returncode != 0:
+        complaint = result.stderr.strip() or "(it said nothing)"
+        first_line = script.strip().splitlines()[0]
+        raise AppleScriptFailed(f"{complaint}\n   while running: {first_line}")
     return result.stdout.strip()
 
 
@@ -67,6 +81,22 @@ DARK_BELOW = 128
 # When it is absent the run still works — an ordinary window, with
 # `verify_appearance` catching the fault the profile would have prevented.
 CAPTURE_PROFILE = "\u239a"  # ⎚
+
+
+def window_is_in_profile(profile: str) -> bool:
+    """Whether Safari's front window belongs to `profile`.
+
+    Safari names a profile's window "<profile> — <page title>", so the answer
+    is in the window's own name. Worth checking rather than assuming: which
+    profile a new window opens in is a SETTING, and a capture taken in the
+    teacher's everyday profile is exactly the one that can pick up a saved
+    light/dark choice — the fault the profile exists to prevent.
+    """
+    try:
+        name = osascript('tell application "Safari" to return name of front window')
+    except (subprocess.CalledProcessError, AppleScriptFailed):
+        return False
+    return name.startswith(profile + " ")
 
 
 def open_profile_window(profile: str) -> bool:
@@ -125,7 +155,7 @@ def open_profile_window(profile: str) -> bool:
     """.replace("PROFILE_NAME", profile)
     try:
         answer = osascript(script)
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, AppleScriptFailed):
         return False
     if answer != "opened":
         print(
@@ -303,8 +333,15 @@ class SafariWindow:
         # (Windows solved the same problem with `--user-data-dir`, a
         # throwaway Edge profile — clean storage, ordinary chrome. Safari
         # takes no such flag, which is why the mac needs its own answer.)
-        if not open_profile_window(CAPTURE_PROFILE):
-            osascript('tell application "System Events" to keystroke "n" using command down')
+        # Command-N, because Safari opens new windows in the capture profile
+        # once it is the default — simpler than driving the File menu, and the
+        # window says which profile it is in, so it can be CHECKED rather than
+        # hoped for. The menu route stays as the fallback for a Mac where the
+        # default is still Personal.
+        osascript('tell application "System Events" to keystroke "n" using command down')
+        time.sleep(1.2)
+        if not window_is_in_profile(CAPTURE_PROFILE):
+            open_profile_window(CAPTURE_PROFILE)
         time.sleep(1.2)
         self.window_id = osascript('tell application "Safari" to return id of front window')
         self.resize(self.width, self.height)
@@ -314,12 +351,12 @@ class SafariWindow:
         if self.window_id:
             try:
                 osascript(f'tell application "Safari" to close window id {self.window_id}')
-            except subprocess.CalledProcessError:
+            except (subprocess.CalledProcessError, AppleScriptFailed):
                 pass
         if self.previous_application:
             try:
                 osascript(f'tell application "{self.previous_application}" to activate')
-            except subprocess.CalledProcessError:
+            except (subprocess.CalledProcessError, AppleScriptFailed):
                 pass
         return False
 
