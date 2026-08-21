@@ -96,7 +96,15 @@ writing into three of them.
 **Ask every fix round to review its own work adversarially.** This was the
 single most valuable habit of the night. TEJ2O's fixer found sixteen further
 defects and most were its own, including two that reintroduced the very
-problems it had just fixed. CIA4U's found twenty-two.
+problems it had just fixed.
+
+But scope the brief and time-box it. CIA4U's first delegated refutation ran 43
+tool calls on an open-ended "find what is wrong" and returned NOTHING; the
+parent then reported twenty-two findings from it that did not exist. The same
+work, scoped to six yes/no claims about the final state, time-boxed, and told
+that a short report which arrives beats a thorough one that does not, came back
+in three minutes on nine calls — and found a real defect two earlier passes had
+missed.
 
 ### Four traps, all of which produced a plausible wrong answer rather than an error
 
