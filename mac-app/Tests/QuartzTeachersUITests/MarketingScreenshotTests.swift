@@ -107,35 +107,68 @@ class MarketingScreenshotCase: XCTestCase {
             parkPointer(in: window)
         }
 
-        // Capture the native window directly via screencapture -o -l (the programmatic
-        // equivalent of Command-Shift-4, Spacebar, Option-Click). This captures the window's
-        // native transparent rounded corners and subpixel anti-aliasing directly from CoreGraphics,
-        // without desktop background pixels showing at the corner curves.
-        if let windowNumber: Int = windowNumber(matching: window.frame, forOwner: "Plantoir") {
-            let tempURL: URL = URL(fileURLWithPath: NSTemporaryDirectory())
-                .appendingPathComponent("plantoir-shot-\(UUID().uuidString).png")
-            let process: Process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-            process.arguments = ["-x", "-o", "-l", "\(windowNumber)", tempURL.path]
-            do {
-                try process.run()
-                process.waitUntilExit()
-                if process.terminationStatus == 0,
-                   let data: Data = try? Data(contentsOf: tempURL),
-                   let image: NSImage = NSImage(data: data) {
-                    try? FileManager.default.removeItem(at: tempURL)
-                    let attachment: XCTAttachment = XCTAttachment(image: image)
-                    attachment.name = name
-                    attachment.lifetime = .keepAlways
-                    add(attachment)
-                    return
-                }
-            } catch {
-                // Fall through to window.screenshot() below.
-            }
+        // ONE way of taking a picture, and this is it: `screencapture -o -l`,
+        // the programmatic form of Command-Shift-4, Space, Option-click. It
+        // asks CoreGraphics for the WINDOW, so what comes back has the real
+        // rounded corners already transparent and antialiased, whatever is in
+        // front of it and whatever is behind it.
+        //
+        // **There is deliberately no fallback.** There used to be: any
+        // stumble here — no window number, the process throwing, the PNG not
+        // decoding — fell through to `window.screenshot()`, XCUITest's own
+        // capture. That is a RECTANGLE: it bakes the corner curves against
+        // whatever was behind them, which arrives as opaque black specks,
+        // invisible on a dark page and obvious on a light one. It happened
+        // silently, so a run could file a mix of good and bad shots with
+        // nothing to say which was which, and `mask_window_corners` grew in
+        // the Python to paper over the difference.
+        //
+        // A marketing screenshot is not worth having if it is the wrong
+        // picture, so a failure here stops the run and says why. The remedy
+        // is always the same: the window was not where the test thought it
+        // was, so fix the frame rather than accept a lesser capture.
+        guard let windowNumber: Int = windowNumber(matching: window.frame, forOwner: "Plantoir") else {
+            XCTFail(
+                "No Plantoir window matches \(window.frame) for the \"\(name)\" shot, so it cannot be "
+                + "photographed the only way this harness photographs. Nothing was saved."
+            )
+            return
         }
 
-        let attachment: XCTAttachment = XCTAttachment(screenshot: window.screenshot())
+        let temporaryURL: URL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("plantoir-shot-\(UUID().uuidString).png")
+        let process: Process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        process.arguments = ["-x", "-o", "-l", "\(windowNumber)", temporaryURL.path]
+        // Its own words, kept: "status 1" alone sent one investigation looking
+        // at window numbers when the answer was a permission.
+        let complaints: Pipe = Pipe()
+        process.standardError = complaints
+        do {
+            try process.run()
+        } catch {
+            XCTFail("Could not run screencapture for the \"\(name)\" shot: \(error.localizedDescription)")
+            return
+        }
+        let said: String = String(
+            data: complaints.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8
+        )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            XCTFail(
+                "screencapture failed (status \(process.terminationStatus)) for the \"\(name)\" shot"
+                + " — window \(windowNumber), it said: \(said.isEmpty ? "nothing" : said)"
+            )
+            return
+        }
+        guard let data: Data = try? Data(contentsOf: temporaryURL),
+              let image: NSImage = NSImage(data: data) else {
+            XCTFail("screencapture wrote nothing readable for the \"\(name)\" shot.")
+            return
+        }
+        try? FileManager.default.removeItem(at: temporaryURL)
+
+        let attachment: XCTAttachment = XCTAttachment(image: image)
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)

@@ -43,6 +43,86 @@ Then check, in this order:
    `<code>-s1-2026-gordon.netlify.app`. A 404 means the demo sites need
    publishing again (`capture.py --publish`), not that the capture is broken.
 
+## Two rules about HOW a picture is taken
+
+Both were paid for in ugly screenshots that shipped, and neither is a
+preference to be weighed against convenience.
+
+**1. One capture method, and it is `screencapture -o -l <window number>`.**
+That is macOS's own window capture — the programmatic form of
+Command-Shift-4, Space, Option-click. It asks CoreGraphics for the WINDOW, so
+what comes back has the real rounded corners already transparent and
+antialiased, independent of what is in front of or behind it. Measured: the
+four corner pixels of such a capture read `(0, 0, 0, 0)`.
+
+There used to be a second method. `MarketingScreenshotTests.save` fell
+through to XCUITest's `window.screenshot()` whenever the window number could
+not be found — a RECTANGLE capture, which bakes the corner curves against
+whatever was behind them and hands back **opaque black specks**, invisible on
+a dark page and obvious on a light one. It did this SILENTLY, so a run could
+file a mix of good and bad shots with nothing to say which was which, and
+`mask_window_corners` grew in the Python to paper over the difference. Both
+are gone. A failure now stops the run and names the shot.
+
+So: **if black corners ever appear again, the capture went wrong — find out
+why it did not go through `screencapture -l`.** Do not paint over them, and
+do not add a fallback "just in case": a marketing screenshot is not worth
+having if it is the wrong picture.
+
+**2. NEVER capture in a Safari private window.** Safari marks a private
+window with a dark address bar, deliberately. On plantoir.app that is a black
+band across the top of every class-site shot, sitting beside shots that do
+not have one, and no visitor can be told why.
+
+The private window was there for a real reason, and the reason still stands:
+a class site remembers a light/dark choice in `localStorage["theme"]`, and a
+choice saved during ordinary browsing once overrode the appearance a dark
+pass had set machine-wide — one course photographed light in a dark run. It
+is answered two other ways now, neither of which costs an address bar:
+
+- **A Safari profile named `⎚`** (U+239A CLEAR SCREEN SYMBOL), if one
+  exists — separate storage, history and cookies, ordinary chrome. This is
+  the same answer Windows gets from `--user-data-dir`. It is made by hand,
+  once per Mac: Safari ▸ Settings ▸ Profiles ▸ Start Using Profiles, named
+  exactly that one character. Safari offers no way to make one
+  programmatically. The run says so when it is missing and carries on in an
+  ordinary window.
+
+  **The one-character name is the point, not a whim.** Safari puts the
+  profile's name in the window's toolbar, so a profile called "Screenshots"
+  would stamp that word across the top of every class site on plantoir.app —
+  a caption about our photography, in a picture meant to be about a
+  teacher's website. Keep it a single glyph if you ever rename it, and
+  change `CAPTURE_PROFILE` in `safari.py` to match.
+
+  Safari's File menu grows a flat `New ⎚ Window` item when the profile
+  exists (verified on Safari 26.6); older builds may use a `New Window`
+  submenu instead, and `open_profile_window` handles both, matching by NAME
+  rather than position because that menu's indices shift when a profile is
+  added.
+- **`verify_address_bar`**, which stops the run when a shot caught the
+  address field focused with its URL selected in blue. Focus is taken out of
+  the field with Command-F then Escape — the find bar takes focus off the
+  toolbar, and dismissing it hands focus to the web content. **Escape alone
+  is not enough**, and that is why this check exists: Escape in a focused
+  address field reverts the text and LEAVES THE FIELD FOCUSED, which worked
+  often enough to be believed and made the fault a race rather than a bug.
+  Measured: a deliberately focused capture reads 3.6% of the toolbar as
+  selection blue, a clean one 0.000–0.008%, against a 0.4% threshold.
+
+- **`verify_appearance`**, which checks every capture and stops the run when
+  a page came out light in a dark pass or the other way round. It reads the
+  median luminance of a band well inside the content: measured across the
+  sixteen class-site shots on the site today, light pages median 248–249 and
+  dark ones 17–21, against a threshold of 128 — decisive, not a judgement
+  call.
+
+Deleting the saved theme instead was investigated and does not work: Safari's
+website data lives in a TCC-protected container (`Operation not permitted`
+without Full Disk Access), and setting the value needs `do JavaScript`, which
+Safari refuses unless "Allow JavaScript from Apple Events" is turned on by
+hand in the Develop menu.
+
 ## Two permissions you cannot grant
 
 Every invocation of `capture.py` — `--app`, `--sites`, `--provision`,
@@ -64,7 +144,10 @@ partway through a hands-off `--app` run — which is the opposite of useful.
 The two dialogs, so you recognise them if one is slow to appear:
 
 - **"iTerm2 wants access to control Safari."** Tripped with a one-line
-  `osascript` call to Safari.
+  `osascript` call to Safari — `get version`, deliberately, NOT `activate`.
+  Activating brought the teacher's own Safari windows to the front, in
+  whatever profile they were in, in the middle of a capture run. Any Apple
+  Event raises the same dialog, so there is no reason to steal focus for it.
 - **"XCTest is trying to Enable UI Automation."** Tripped by running the
   fixture-based smoke test (`QuartzTeachersUITests/testSidebarShowsExampleCourse`)
   — fast and self-contained, chosen for speed rather than for anything it

@@ -20,38 +20,23 @@ WIDEST_WINDOW_PIXELS = 1700
 WIDEST_PHONE_PIXELS = 720
 
 
-# macOS rounds a window's corners, and a window screenshot bakes those curves
-# against whatever was behind them — which comes out as opaque BLACK specks at
-# all four corners, invisible on a dark page and obvious on a light one. The
-# radius is in points; it is scaled to the capture below.
-WINDOW_CORNER_RADIUS_POINTS = 11
-
-
-def mask_window_corners(path: Path, width_in_points: int) -> Path:
-    """Make a window capture's four corners transparent with antialiasing."""
-    from PIL import ImageChops
-
-    with Image.open(path) as opened:
-        image = opened.convert("RGBA")
-
-    scale = max(1, round(image.width / width_in_points)) if width_in_points else 2
-    radius = WINDOW_CORNER_RADIUS_POINTS * scale
-
-    # 4x supersampling ensures smooth subpixel antialiasing at the corner curves
-    ss_scale = 4
-    big_size = (image.width * ss_scale, image.height * ss_scale)
-    big_mask = Image.new("L", big_size, 0)
-    ImageDraw.Draw(big_mask).rounded_rectangle(
-        [(0, 0), (big_size[0] - 1, big_size[1] - 1)],
-        radius=radius * ss_scale,
-        fill=255,
-    )
-    mask = big_mask.resize(image.size, Image.Resampling.LANCZOS)
-
-    combined_alpha = ImageChops.multiply(image.split()[3], mask)
-    image.putalpha(combined_alpha)
-    image.save(path, format="PNG")
-    return path
+# There is NO corner masking here any more, and that is the point.
+#
+# There used to be a `mask_window_corners` that made each shot's four corners
+# transparent with a guessed 11-point radius. It existed because the app-window
+# shots could arrive from XCUITest's `window.screenshot()`, a RECTANGLE capture
+# that bakes the corner curves against whatever was behind them and hands back
+# opaque black specks.
+#
+# Every shot is now taken with `screencapture -o -l <window number>` — macOS's
+# own window capture — and that already returns the curve antialiased with the
+# corners at alpha 0. Measured, rather than assumed: the four corner pixels of
+# such a capture read (0, 0, 0, 0). Masking a correct capture is not harmless,
+# either: it multiplies a GUESSED radius over a real one, which erodes the
+# curve when the guess is generous and leaves a fringe when it is mean.
+#
+# If black corners ever come back, the capture is wrong — find out why it did
+# not go through `screencapture -l` instead of painting over it here.
 
 
 def prepare(path: Path, widest: int = WIDEST_WINDOW_PIXELS) -> Path:
