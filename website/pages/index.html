@@ -24,22 +24,22 @@ body_class: home
          an asset without updating these hrefs (and vice versa) — the names
          are pinned in RELEASING.md.
 
-         The macOS card is PINNED to v1.0.0 on purpose. Under the two-platform
-         policy (RELEASING.md, "Two platforms, one version series") a platform
-         may lag a tag, and v1.1.0 carries no DMG — so the evergreen URL would
-         404 for macOS the moment 1.1.0 became the latest release. When the mac
-         joins 1.1.0, put this card back on releases/latest/download/ and
-         delete the note below. -->
-    <a class="dl" href="{{repo_url}}/releases/download/v1.0.0/Plantoir-macOS.dmg">
+         BOTH cards are evergreen again as of 2026-08-20, when the macOS DMG
+         joined v1.1.0. The macOS card had been PINNED to v1.0.0 while that
+         release carried no DMG, because the evergreen URL 404s for a platform
+         whose asset is missing from the newest release. If a platform ever
+         lags a tag again: pin its card to the last release that HAS the
+         asset, say so on the card, and un-pin it the moment the platform
+         catches up — see RELEASING.md, "Two platforms, one version series". -->
+    <a class="dl" href="{{repo_url}}/releases/latest/download/Plantoir-macOS.dmg">
       <span class="platform">macOS</span>
-      <span class="meta">macOS 15 or later, Apple silicon &middot; version 1.0.0</span>
+      <span class="meta">macOS 15 or later, Apple silicon</span>
     </a>
     <a class="dl" href="{{repo_url}}/releases/latest/download/PlantoirSetup.exe">
       <span class="platform">Windows</span>
       <span class="meta">Windows 10 or 11, 64-bit</span>
     </a>
   </div>
-  <p class="version-note">The Mac version is on 1.0.0 for now — the 1.1.0 update for macOS is coming soon.</p>
   <!-- AUTO-UPDATED when a release is cut: the version and date come from
        website/site.json, which the cut-release skill rewrites. -->
   <p class="version-note">Version {{version}} &middot; Released {{released}} &middot; <a href="{{repo_url}}/releases">All releases</a></p>
