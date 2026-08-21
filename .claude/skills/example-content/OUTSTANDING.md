@@ -1,22 +1,25 @@
-# Growing Success sweep — outstanding work when the account limits hit
+# Growing Success sweep — where it stands
 
-Every payload below is **linter-clean and passes the mechanical checks**, so
-none is broken. Each is at a different point in the author → adversarial
-review → verified fix cycle, and the differences matter.
+**34 of the 37 Ontario payloads are committed.** Every one of them is
+linter-clean and passes the mechanical checks, so nothing here is broken.
+What differs is how far each got through the author → adversarial review →
+verified fix cycle, and that difference is the whole point of this file: a
+committed payload is not a finished one.
 
-## Authored and self-reviewed; NO independent review yet
+Read this section as the work queue. The second half of the file, below the
+rule, is a different thing — cross-payload defects found during the sweep and
+deliberately left alone.
 
-- **SNC1W** — its own pass plus a sub-agent found 18 defects, all fixed.
-  Created `Tasks/Lab Reports.md` for seven investigations whose eleven
-  expectations were marked but invisible to the coverage map. Dropped C2.6
-  as the one code no investigation asserts.
-- **BOH4M** — its own pass found 18. Removed two outright policy breaches: a
-  "Team review — each member's account of what the team did well and badly"
-  feeding individual marks, and a "Professionalism — on time, prepared,
-  discreet" criterion. Found The People Problem was an evaluated task with no
-  class working period at all.
+## Still to do
 
-## Reviewed; fix round started and did not finish
+- **CGF3M**, **CIA4U** — conformance pass in progress.
+- **TEJ4M** — the last payload with no pass at all. Not started.
+
+## Committed, but the fix round did not finish
+
+These carry review findings that were never fully applied. The payload is
+clean and shippable; the findings are improvements that stopped mid-round
+when the account limits hit. Each is worth picking up as its own piece.
 
 - **SPH3U** — 12 findings. The important one: the D2.5 leg was written on the
   INPUT side only (V, I, t), with no method, apparatus, criteria row or period
@@ -39,33 +42,52 @@ review → verified fix cycle, and the differences matter.
   Examination OBSERVE whose window ends where the observed behaviour would
   start, and five of eleven OBSERVE prompts being one probe in five costumes.
 
-## Authoring interrupted mid-pass
+## Committed, and the review's completeness is UNVERIFIED
 
-- **SPH4U** — was mid-fix on its own self-review findings. Its independent
-  review has since reported (its routing failed and it arrived via the main
-  session): B3.3 transcluded on a task that never asks for a derivation, and
-  it is the only B3 code on any Tasks page, so the B3 overall rests on it; a
-  C1.2 leg written around a "measured speed" the course never measures; and
-  two legs given a section and a row but no period.
+- **ICD2O**, **ENG2D**, **AVI1O** — each was independently reviewed and the
+  findings were being applied when the sweep stopped. The commit messages say
+  "the confirmed findings are applied", and **that claim has not been
+  checked**: the reviewers' lists lived in a conversation that has since been
+  summarised away, so there is no record on disk to check them against.
 
-*(MDM4U finished and was committed in `3191fa98`; its independent review has
-since reported and its fix round is running.)*
+  Do not try to recover the old lists. Re-review each payload adversarially
+  against its CURRENT state — a fresh review settles the question directly and
+  costs less than transcript archaeology, and it is the same standard the rest
+  of the sweep is held to.
 
-## Not started (16)
+## Under adversarial review right now
 
-ATC1O · AVI1O · CGC1W · CGF3M · CIA4U · ENG2D · ENG4U · ICD2O · MCR3U ·
-MHF4U · MTH1W · SBI4U · SCH4U · SNC2D · TEJ2O · TEJ4M
+- **MHF4U**, **TEJ2O** — committed self-reviewed only; independent review in
+  flight. Findings will need verifying against the files before they are
+  applied. Reviewers in this sweep have failed in BOTH directions — one
+  under-counted a defect class by a third, another flagged text that was
+  correct and whose "fix" would have deleted a true number — so no finding
+  goes in on a reviewer's word alone.
 
-CGC1W was dispatched and its author died before writing anything — the
-payload is untouched, not half-edited.
+## Authored and self-reviewed; NO independent review yet
+
+- **SNC1W** — its own pass plus a sub-agent found 18 defects, all fixed.
+  Created `Tasks/Lab Reports.md` for seven investigations whose eleven
+  expectations were marked but invisible to the coverage map. Dropped C2.6
+  as the one code no investigation asserts.
+- **BOH4M** — its own pass found 18. Removed two outright policy breaches: a
+  "Team review — each member's account of what the team did well and badly"
+  feeding individual marks, and a "Professionalism — on time, prepared,
+  discreet" criterion. Found The People Problem was an evaluated task with no
+  class working period at all.
 
 ## To resume
 
 The two briefs are `gs-conformance-brief.md` (417 lines, 24 failure modes)
 and `gs-review-brief.md`, both beside this file. `verify_gs.py` runs the
 mechanical checks, including a simulation of the build's own comment
-stripping to catch teacher text that would reach students.
+stripping to catch teacher text that would reach students. Both scripts take
+a COURSE CODE, not a path — passing a path makes them report a payload that
+does not exist, which prints as a clean pass on an empty set.
 
+Commit each payload as it passes, with its own commit and its own pathspec.
+The sweep has already had one near miss where a bulk `git add` staged six
+payloads with agents still writing into them.
 
 ---
 
