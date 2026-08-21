@@ -173,6 +173,16 @@ class WorkspaceModel {
     /// True while the New Course wizard sheet should be shown.
     var isShowingNewCourseWizard: Bool = false
 
+    /// True while a freshly chosen folder is being set up.
+    ///
+    /// Setting up a folder mirrors the whole build recipe into it, and that
+    /// is 12,091 files and 65 MB — 2.4 seconds of pure copying on a fast
+    /// NVMe, and far longer on an older disk, a USB drive or a folder the
+    /// system is syncing. Done on the main thread it is a beachball with
+    /// nothing on screen to explain it, which reads as a hang rather than
+    /// as work. The button watches this to say so instead.
+    var isInitializingWorkspace: Bool = false
+
     /// The courses discovered inside `<workspace>/courses/`.
     var courses: [Course] = []
 
@@ -441,10 +451,30 @@ class WorkspaceModel {
     /// and, through the image-mismatch check, recreates the container.
     /// One updater (the app) now drives every layer.
     func refreshToolchain(in workspaceURL: URL) {
+        WorkspaceModel.mirrorToolchain(into: workspaceURL)
+    }
+
+    /// The mirror itself, as a static so it can run on a background thread
+    /// without touching a model another thread owns. It reads only the app's
+    /// own bundle and the folder, plus the shared once-per-run set above.
+    static func mirrorToolchain(into workspaceURL: URL) {
+        if !shouldMirrorToolchain(into: workspaceURL) {
+            return
+        }
+        noteToolchainMirrored(into: workspaceURL)
+        let changed: Int = copyToolchainFiles(into: workspaceURL)
+        if changed > 0 {
+            AppLog.interface.info("refreshed .toolchain in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(changed) file(s)")
+        }
+    }
+
+    /// Whether the mirror has anything to do — the once-per-folder-per-run
+    /// question, which reads the shared set and so stays on the main actor.
+    static func shouldMirrorToolchain(into workspaceURL: URL) -> Bool {
         let fileManager: FileManager = FileManager.default
         // Only a folder that is already a workspace gets a toolchain.
         if !fileManager.fileExists(atPath: workspaceURL.appendingPathComponent("preview.sh").path) {
-            return
+            return false
         }
 
         let toolchainURL: URL = workspaceURL.appendingPathComponent(".toolchain")
@@ -463,10 +493,25 @@ class WorkspaceModel {
         // going away. (Before the mirror was made cheap it was 3.8 s.)
         if WorkspaceModel.foldersWithFreshToolchain.contains(workspaceURL.path) &&
            fileManager.fileExists(atPath: dockerfileURL.path) {
-            return
+            return false
         }
-        WorkspaceModel.foldersWithFreshToolchain.insert(workspaceURL.path)
+        return true
+    }
 
+    /// Records that this folder's mirror is up to date for this run.
+    static func noteToolchainMirrored(into workspaceURL: URL) {
+        WorkspaceModel.foldersWithFreshToolchain.insert(workspaceURL.path)
+    }
+
+    /// The copying itself — the expensive half, and the only half that has
+    /// to leave the main thread.
+    ///
+    /// `nonisolated` on purpose: it reads the app's own bundle, which cannot
+    /// change while the app runs, and writes into one folder. It touches no
+    /// model state and no shared set, so there is nothing here for a
+    /// background thread to race against. Answers how many files it wrote.
+    nonisolated static func copyToolchainFiles(into workspaceURL: URL) -> Int {
+        let toolchainURL: URL = workspaceURL.appendingPathComponent(".toolchain")
         var changed: Int = 0
         var rootFiles: [String] = ["Dockerfile"]
         rootFiles += ["setup.sh", "preview.sh", "deploy.sh"]
@@ -484,13 +529,11 @@ class WorkspaceModel {
                 changed += WorkspaceModel.syncDirectory(from: sourceURL, to: toolchainURL.appendingPathComponent(folderName))
             }
         }
-        if changed > 0 {
-            AppLog.interface.info("refreshed .toolchain in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(changed) file(s)")
-        }
+        return changed
     }
 
     /// Copies one file when the destination differs or is missing.
-    static func syncFile(from sourceURL: URL, to destinationURL: URL) -> Int {
+    nonisolated static func syncFile(from sourceURL: URL, to destinationURL: URL) -> Int {
         let fileManager: FileManager = FileManager.default
 
         // The cheap question first: same size, same modification date.
@@ -536,7 +579,7 @@ class WorkspaceModel {
     /// reading 122 MB to answer a question two stat calls almost always
     /// answer correctly. The dates only line up because `syncFile` stamps
     /// what it writes — see `copyModificationDate`.
-    static func filesLookIdentical(_ oneURL: URL, _ otherURL: URL) -> Bool {
+    nonisolated static func filesLookIdentical(_ oneURL: URL, _ otherURL: URL) -> Bool {
         let wanted: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey]
         guard let one = try? oneURL.resourceValues(forKeys: wanted),
               let other = try? otherURL.resourceValues(forKeys: wanted),
@@ -558,7 +601,7 @@ class WorkspaceModel {
 
     /// Gives the copy the original's modification date, so the cheap check
     /// recognises it next time.
-    static func copyModificationDate(from sourceURL: URL, to destinationURL: URL) {
+    nonisolated static func copyModificationDate(from sourceURL: URL, to destinationURL: URL) {
         guard let date = try? sourceURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
             return
         }
@@ -579,7 +622,7 @@ class WorkspaceModel {
     ///
     /// Returns nil when the file is not inside the folder at all, which the
     /// callers treat as "not mine to touch".
-    static func relativePath(of fileURL: URL, under folderURL: URL) -> String? {
+    nonisolated static func relativePath(of fileURL: URL, under folderURL: URL) -> String? {
         let candidates: [(String, String)] = [
             (fileURL.path, folderURL.path),
             (fileURL.resolvingSymlinksInPath().path, folderURL.resolvingSymlinksInPath().path),
@@ -592,7 +635,7 @@ class WorkspaceModel {
         return nil
     }
 
-    static func syncDirectory(from sourceURL: URL, to destinationURL: URL) -> Int {
+    nonisolated static func syncDirectory(from sourceURL: URL, to destinationURL: URL) -> Int {
         let fileManager: FileManager = FileManager.default
         var changed: Int = 0
 
@@ -1191,13 +1234,71 @@ class WorkspaceModel {
         guard let workspaceURL else {
             return
         }
+        // Kept synchronous for callers that are not driving an interface —
+        // the tests, chiefly, which assert what lands on disk and would
+        // otherwise have to await a background thread to find out.
+        //
+        // The tracker is cleared first because a folder being set up has no
+        // toolchain yet, whatever an earlier folder of the same path in this
+        // run of the app may have had — the defect row 279 fixed.
+        WorkspaceModel.foldersWithFreshToolchain.remove(workspaceURL.path)
+        let problem: String? = WorkspaceModel.setUpFolderOnDisk(at: workspaceURL)
+        if problem == nil {
+            WorkspaceModel.noteToolchainMirrored(into: workspaceURL)
+        }
+        finishInitializing(at: workspaceURL, problem: problem)
+    }
+
+    /// The same setup, with the copying done OFF the main thread.
+    ///
+    /// This is what the button calls. The work is 12,091 files and 65 MB —
+    /// see `isInitializingWorkspace` — and on the main thread that is a
+    /// beachball over a window that says nothing, which a teacher reads as a
+    /// hang rather than as work. Windows reached the same conclusion first
+    /// and fixed it the same way (`InitializeWorkspaceAsync`, whose button
+    /// says "Setting up…"); this is the mac catching up to it.
+    ///
+    /// The folder is read once, up front, and the background work is given
+    /// nothing but that URL — so it cannot see a `workspaceURL` the teacher
+    /// changed while it ran, and everything that touches the model happens
+    /// back on the main actor afterwards.
+    @MainActor
+    func initializeWorkspaceInBackground() async {
+        guard let workspaceURL, !isInitializingWorkspace else {
+            return
+        }
+        isInitializingWorkspace = true
+        let startedAt: Date = Date()
+        // Both touches of the shared tracker happen HERE, on the main actor,
+        // never inside the detached work — see `setUpFolderOnDisk`.
+        WorkspaceModel.foldersWithFreshToolchain.remove(workspaceURL.path)
+        let problem: String? = await Task.detached(priority: .userInitiated) {
+            return WorkspaceModel.setUpFolderOnDisk(at: workspaceURL)
+        }.value
+        if problem == nil {
+            WorkspaceModel.noteToolchainMirrored(into: workspaceURL)
+        }
+        AppLog.interface.info(
+            "set up \(LogRedactor.redacting(workspaceURL.path), privacy: .public) in \(String(format: "%.2f", Date().timeIntervalSince(startedAt)), privacy: .public)s"
+        )
+        isInitializingWorkspace = false
+        finishInitializing(at: workspaceURL, problem: problem)
+    }
+
+    /// Everything setting up a folder writes to DISK, and nothing else.
+    ///
+    /// `nonisolated` and touching no model state: it runs on a background
+    /// thread, so anything it read from `self` — or from the shared
+    /// once-per-run set — would be a race. Its caller does that bookkeeping
+    /// on the main actor, on either side of this. Answers with the problem
+    /// to report, or nil.
+    nonisolated static func setUpFolderOnDisk(at workspaceURL: URL) -> String? {
         let fileManager: FileManager = FileManager.default
 
         let scriptNames: [String] = ["setup.sh", "preview.sh", "deploy.sh"]
         for scriptName in scriptNames {
             guard let bundledURL = Bundle.main.url(forResource: scriptName, withExtension: nil) else {
-                workspaceProblem = "Part of the app’s built-in setup files is missing (\(scriptName)) — please reinstall the app."
-                return
+                return "Part of the app’s built-in setup files is missing (\(scriptName)) — please reinstall the app."
             }
             let destinationURL: URL = workspaceURL.appendingPathComponent(scriptName)
             do {
@@ -1207,8 +1308,7 @@ class WorkspaceModel {
                 try fileManager.copyItem(at: bundledURL, to: destinationURL)
                 try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destinationURL.path)
             } catch {
-                workspaceProblem = "Could not set up this folder: \(error.localizedDescription)"
-                return
+                return "Could not set up this folder: \(error.localizedDescription)"
             }
         }
 
@@ -1218,12 +1318,23 @@ class WorkspaceModel {
                 withIntermediateDirectories: true
             )
         } catch {
-            workspaceProblem = "Could not create the courses folder: \(error.localizedDescription)"
-            return
+            return "Could not create the courses folder: \(error.localizedDescription)"
         }
 
-        WorkspaceModel.foldersWithFreshToolchain.remove(workspaceURL.path)
-        refreshToolchain(in: workspaceURL)
+        // The build recipe itself — the expensive part, and the reason this
+        // runs off the main thread.
+        _ = WorkspaceModel.copyToolchainFiles(into: workspaceURL)
+        return nil
+    }
+
+    /// Reports the outcome and moves the teacher on. Main actor only: it
+    /// writes model state the interface is watching.
+    @MainActor
+    private func finishInitializing(at workspaceURL: URL, problem: String?) {
+        if let problem {
+            workspaceProblem = problem
+            return
+        }
         reloadCourses()
 
         // The natural next step in a fresh folder is creating a course.

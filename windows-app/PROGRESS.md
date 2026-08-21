@@ -88,6 +88,30 @@ plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
 
 ## Known rough edges for the next session
 
+- **The native (containerless) toolchain is the new Windows architecture**
+  (branch `windows-native-toolchain`, 2026-08-19). Run
+  `Vendoretch-runtime.ps1` once before building - it fetches Node 20,
+  Python 3.11 embeddable, patched Quartz with win-x64 node_modules, wrangler
+  and the emoji font into `Vendor
+untime` (~600 MB, gitignored), which the
+  build robocopy-mirrors beside the app. The launchers run natively whenever
+  `PLANTOIR_RUNTIME` (set by `ScriptRunner`) or the installed app's own
+  runtime folder exists; without it they still take the WSL2/Docker path,
+  which is slated for deletion once the app-driven flow is verified. Builds
+  land in `%LOCALAPPDATA%\Plantoiruilds\<folder-id>` (OneDrive-safe).
+  Verified by hand: native build (57 s cold), serve (HTTP 200), stop (kills
+  the tree, frees both ports), Netlify delta deploy (117 files) - all with
+  no container. Not yet verified: the app-driven flow end to end, and the
+  wizard's msvcrt keyboard path under ConPTY.
+- **The fresh-PC path is verified in place; only the restart-pending
+  variant is not.** The launchers' `Install-WindowsSubsystem` (branch
+  `windows-wsl2-auto-install`, 2026-08-19) was driven end to end on this
+  machine after removing its WSL package and distro: stub state detected,
+  WSL + Ubuntu installed on one UAC click, engine provisioned silently,
+  image built, container mounted — stopping only at the wizard's TTY, which
+  the app provides. Not driven: the restart-pending branch (this machine's
+  VM-platform features were already enabled, so no reboot was demanded);
+  it is asserted from its printed lines, which the contract cases pin.
 - The toolbar can still truncate at narrow widths. The window minimum **is**
   enforced at 900×600 (`MainWindow.xaml.cs`, `PreferredMinimumWidth` /
   `PreferredMinimumHeight`); the opening size is not 900×600 but a share of

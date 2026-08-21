@@ -9,6 +9,13 @@ import signal
 import json
 import re
 from pathlib import Path
+
+# The embeddable Python used by the native Windows runtime replaces
+# sys.path wholesale (python311._pth), so the script's own folder must
+# be added by hand before sibling imports. Harmless everywhere else.
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+import toolchain_paths
 from datetime import datetime, timezone
 import threading
 import time
@@ -54,12 +61,7 @@ def patch_quartz_locale(quartz_config_path: Path, locale_code: str):
                 new_src = src
 
         if n > 0 and new_src != src:
-            result = subprocess.run(
-                ["tee", str(quartz_config_path)],
-                input=new_src.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(quartz_config_path), new_src.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to set locale in quartz.config.ts:", result.stderr.decode())
             else:
@@ -165,12 +167,7 @@ def patch_quartz_base_url(quartz_config_path: Path, base_url: str):
         new_src, n = pattern.subn(_repl, src, count=1)
 
         if n > 0 and new_src != src:
-            result = subprocess.run(
-                ["tee", str(quartz_config_path)],
-                input=new_src.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(quartz_config_path), new_src.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to set baseUrl in quartz.config.ts:", result.stderr.decode())
             else:
@@ -256,12 +253,7 @@ def patch_typography_fonts(quartz_config_path: Path, header_font: str, body_font
             new_content = new_content2
 
         if changed:
-            result = subprocess.run(
-                ["tee", str(quartz_config_path)],
-                input=new_content.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(quartz_config_path), new_content.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to update typography fonts in quartz.config.ts:", result.stderr.decode())
             else:
@@ -294,12 +286,7 @@ def patch_internal_link_highlight(base_scss_path: Path):
         new_content = pattern.sub(replacement, content)
 
         if new_content != content:
-            result = subprocess.run(
-                ["tee", str(base_scss_path)],
-                input=new_content.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(base_scss_path), new_content.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to patch base.scss internal link highlight:", result.stderr.decode())
             else:
@@ -343,12 +330,7 @@ def append_transclusion_styles(base_scss_path: Path):
             return
 
         new_content = content + block
-        result = subprocess.run(
-            ["tee", str(base_scss_path)],
-            input=new_content.encode("utf-8"),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
+        result = toolchain_paths.write_file(str(base_scss_path), new_content.encode("utf-8"))
         if result.returncode != 0:
             print("❌ Failed to append transclusion styles to base.scss:", result.stderr.decode())
         else:
@@ -584,12 +566,7 @@ def patch_date_format(date_tsx_file_path: Path):
         new_content = pattern.sub(replacement, content)
 
         if new_content != content:
-            result = subprocess.run(
-                ["tee", str(date_tsx_file_path)],
-                input=new_content.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(date_tsx_file_path), new_content.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to patch Date.tsx date format:", result.stderr.decode())
             else:
@@ -626,12 +603,7 @@ def patch_list_page_meta_width(list_page_scss_path: Path):
         new_content = pattern.sub(replacement, content)
 
         if new_content != content:
-            result = subprocess.run(
-                ["tee", str(list_page_scss_path)],
-                input=new_content.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(list_page_scss_path), new_content.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to patch listPage.scss .meta width:", result.stderr.decode())
             else:
@@ -660,12 +632,7 @@ def adjust_created_modified_priority(config_path: Path):
         )
 
         if new_content != content:
-            result = subprocess.run(
-                ["tee", str(config_path)],
-                input=new_content.encode(),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(config_path), new_content.encode())
             if result.returncode != 0:
                 print("❌ Failed to update CreatedModifiedDate priority:", result.stderr.decode())
             else:
@@ -723,12 +690,7 @@ def patch_default_date_type(quartz_config_path: Path):
                     end = i  # position after closing brace
                     new_txt = txt[:end] + ",\n    " + inject_block + "\n" + txt[end:]
             if new_txt != txt:
-                result = subprocess.run(
-                    ["tee", str(quartz_config_path)],
-                    input=new_txt.encode("utf-8"),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
+                result = toolchain_paths.write_file(str(quartz_config_path), new_txt.encode("utf-8"))
                 if result.returncode != 0:
                     print("❌ Failed to inject configuration.defaultDateType:", result.stderr.decode())
                 else:
@@ -771,12 +733,7 @@ def patch_default_date_type(quartz_config_path: Path):
 
         new_txt = txt[:brace_open+1] + inner2 + txt[brace_close:]
         if new_txt != txt:
-            result = subprocess.run(
-                ["tee", str(quartz_config_path)],
-                input=new_txt.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(quartz_config_path), new_txt.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to patch configuration.defaultDateType:", result.stderr.decode())
             else:
@@ -984,7 +941,7 @@ def update_page_title(config_path: Path, header_label: str, section_number: int,
 
     if updated:
         content = ''.join(new_lines)
-        result = subprocess.run(["tee", str(config_path)], input=content.encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = toolchain_paths.write_file(str(config_path), content.encode())
         if result.returncode != 0:
             print("⚠️ Error updating pageTitle in quartz.config.ts:", result.stderr.decode())
         else:
@@ -1012,7 +969,7 @@ def toggle_custom_og_images(config_path: str, enable: bool):
 
     if changed:
         content = ''.join(modified_lines)
-        result = subprocess.run(["tee", config_path], input=content.encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = toolchain_paths.write_file(config_path, content.encode())
         if result.returncode != 0:
             print("⚠️ Error updating quartz.config.ts:", result.stderr.decode())
         else:
@@ -1088,12 +1045,7 @@ def update_quartz_layout(quartz_layout_path: Path, hidden_components: list):
             + content[insert_at:]
         )
 
-    result = subprocess.run(
-        ["tee", str(quartz_layout_path)],
-        input=new_content.encode("utf-8"),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
+    result = toolchain_paths.write_file(str(quartz_layout_path), new_content.encode("utf-8"))
     if result.returncode != 0:
         print("❌ Failed to write omit list to quartz.layout.ts:", result.stderr.decode())
     else:
@@ -1112,12 +1064,7 @@ def inject_custom_footer_components(quartz_layout_path: Path, footer_component_p
             layout_content
         )
 
-        result = subprocess.run(
-            ["tee", str(quartz_layout_path)],
-            input=modified_layout.encode(),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
+        result = toolchain_paths.write_file(str(quartz_layout_path), modified_layout.encode())
         if result.returncode != 0:
             print("❌ Failed to update quartz.layout.ts:", result.stderr.decode())
         else:
@@ -1143,12 +1090,7 @@ def inject_custom_footer_components(quartz_layout_path: Path, footer_component_p
             flags=re.DOTALL
         )
 
-        result = subprocess.run(
-            ["tee", str(footer_component_path)],
-            input=modified_code.encode(),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
+        result = toolchain_paths.write_file(str(footer_component_path), modified_code.encode())
         if result.returncode != 0:
             print("❌ Failed to update Footer.tsx:", result.stderr.decode())
         else:
@@ -1159,7 +1101,7 @@ def inject_custom_footer_components(quartz_layout_path: Path, footer_component_p
 
 COLOUR_JSON_CANDIDATES = [
     Path("support/colour_schemes.json"),
-    Path("/opt/support/colour_schemes.json"),
+    toolchain_paths.SUPPORT_DIR / "colour_schemes.json",
     Path(__file__).resolve().parent.parent / "support" / "colour_schemes.json",
     Path(__file__).resolve().parent / "support" / "colour_schemes.json",
 ]
@@ -1259,12 +1201,7 @@ def apply_color_scheme_to_quartz_config(quartz_config_path: Path, scheme_colors:
             count=1
         )
 
-    result = subprocess.run(
-        ["tee", str(quartz_config_path)],
-        input=updated.encode(),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
+    result = toolchain_paths.write_file(str(quartz_config_path), updated.encode())
     if result.returncode != 0:
         print("⚠️ Error writing colors to quartz.config.ts:", result.stderr.decode())
     else:
@@ -1273,7 +1210,7 @@ def apply_color_scheme_to_quartz_config(quartz_config_path: Path, scheme_colors:
 
 BACKLINKS_TS_CANDIDATES = [
     Path("support/Backlinks.tsx"),
-    Path("/opt/support/Backlinks.tsx"),
+    toolchain_paths.SUPPORT_DIR / "Backlinks.tsx",
     Path(__file__).resolve().parent.parent / "support" / "Backlinks.tsx",
     Path(__file__).resolve().parent / "support" / "Backlinks.tsx",
 ]
@@ -1327,14 +1264,17 @@ def install_patched_backlinks(output_dir: Path):
 
 LOCALES_SRC_CANDIDATES = [
     Path("support/locales"),
-    Path("/opt/support/locales"),
+    toolchain_paths.SUPPORT_DIR / "locales",
     Path(__file__).resolve().parent.parent / "support" / "locales",
     Path(__file__).resolve().parent / "support" / "locales",
 ]
 
 FAVICON_SRC_CANDIDATES = [
     Path("support/favicon"),
-    Path("/opt/support/favicon"),
+    # Not a hard-coded /opt: Windows now runs these scripts NATIVELY, with no
+    # container at all, and points this at the app's bundled runtime through
+    # PLANTOIR_SUPPORT_DIR. Inside the container the default is still /opt/support.
+    toolchain_paths.SUPPORT_DIR / "favicon",
     Path(__file__).resolve().parent.parent / "support" / "favicon",
     Path(__file__).resolve().parent / "support" / "favicon",
 ]
@@ -1903,13 +1843,7 @@ def remove_graph_from_right(layout_path: Path):
 
         if new_content != content:
             # Use tee to avoid silent write failures in this environment
-            subprocess.run(
-                ["tee", str(layout_path)],
-                input=new_content.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
-            )
+            toolchain_paths.write_file(str(layout_path), new_content.encode("utf-8"))
             if not _GRAPH_REMOVAL_LOGGED:
                 print(f"🗑️  Removed Graph component from {layout_path}")
                 _GRAPH_REMOVAL_LOGGED = True
@@ -1935,12 +1869,7 @@ def patch_folder_page_title(folder_page_path: Path):
         new_content = pattern.sub(r'\1`${folder}`\2', content)
 
         if new_content != content:
-            result = subprocess.run(
-                ["tee", str(folder_page_path)],
-                input=new_content.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(folder_page_path), new_content.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to patch folderPage.tsx:", result.stderr.decode())
             else:
@@ -1967,12 +1896,7 @@ def patch_folder_content_defaults(folder_content_path: Path):
         new_content = pattern.sub(r'\1false', content)
 
         if new_content != content:
-            result = subprocess.run(
-                ["tee", str(folder_content_path)],
-                input=new_content.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(folder_content_path), new_content.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to patch FolderContent.tsx:", result.stderr.decode())
             else:
@@ -2014,12 +1938,7 @@ def patch_content_meta_options(date_tsx_file_path: Path, show_reading_time: bool
         )
 
         if new_content != content:
-            result = subprocess.run(
-                ["tee", str(date_tsx_file_path)],
-                input=new_content.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(date_tsx_file_path), new_content.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to patch ContentMeta.tsx to adjust reading time estimates:", result.stderr.decode())
             else:
@@ -2825,12 +2744,7 @@ def patch_render_page_transclude_title(render_page_tsx_path: Path):
                 print('ℹ️ Could not locate target \'tagName: "h1"\' to replace in renderPage.tsx (no change).')
                 return
 
-        result = subprocess.run(
-            ["tee", str(render_page_tsx_path)],
-            input=replaced.encode("utf-8"),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
+        result = toolchain_paths.write_file(str(render_page_tsx_path), replaced.encode("utf-8"))
         if result.returncode != 0:
             print("❌ Failed to patch renderPage.tsx for transcludeTitleSize:", result.stderr.decode())
         else:
@@ -2936,12 +2850,7 @@ def patch_explorer_tsx_expand_behavior(explorer_tsx_path: Path):
                 changed = True
 
         if changed:
-            result = subprocess.run(
-                ["tee", str(explorer_tsx_path)],
-                input=src.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(explorer_tsx_path), src.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to patch Explorer.tsx:", result.stderr.decode())
             else:
@@ -3002,12 +2911,7 @@ def patch_explorer_inline_expand_on_navigate(inline_path: Path):
             pass
 
         if changed:
-            result = subprocess.run(
-                ["tee", str(inline_path)],
-                input=src.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(inline_path), src.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to patch explorer.inline.ts:", result.stderr.decode())
             else:
@@ -3123,12 +3027,7 @@ def patch_folder_click_behavior(quartz_layout_path: Path, expand_on_name: bool):
             changed = True
 
         if changed and new_content != content:
-            result = subprocess.run(
-                ["tee", str(quartz_layout_path)],
-                input=new_content.encode("utf-8"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            result = toolchain_paths.write_file(str(quartz_layout_path), new_content.encode("utf-8"))
             if result.returncode != 0:
                 print("❌ Failed to patch folderClickBehavior:", result.stderr.decode())
             else:
@@ -3149,6 +3048,29 @@ def _ensure_media_symlink(content_root: Path, course_dir: Path):
     link_path = content_root / "Media"
     target_abs = (course_dir / "Media").resolve()
 
+    if os.name == "nt":
+        # No junction here: it is an NTFS mount point, and current Windows
+        # refuses to TRAVERSE user-made mount points while enumerating
+        # directories (WinError 448) - the coverage builder's walk over
+        # content/ died on exactly this in the first real end-user test.
+        # Hardlinks carry the same no-copy economics with nothing for the
+        # OS to distrust. An old-style link left by a previous build is
+        # replaced first (rmtree on a junction removes only the link).
+        if link_path.is_symlink() or toolchain_paths.is_reparse_point(link_path):
+            try:
+                if link_path.is_dir():
+                    os.rmdir(link_path)
+                else:
+                    link_path.unlink()
+            except OSError as e:
+                print(f"⚠️ Could not replace the old 'Media' link at {link_path}: {e}")
+        try:
+            toolchain_paths.hardlink_mirror(Path(str(target_abs)), link_path)
+            print(f"🔗 Mirrored Media into the build (hardlinks): {link_path} -> {target_abs}")
+        except Exception as e:
+            print(f"❌ Failed to mirror Media at {link_path}: {e}")
+        return
+
     # If a file/dir already exists at link_path, remove it first (carefully)
     if link_path.exists() or link_path.is_symlink():
         try:
@@ -3162,8 +3084,8 @@ def _ensure_media_symlink(content_root: Path, course_dir: Path):
             print(f"⚠️ Could not remove existing 'Media' at {link_path}: {e}")
 
     try:
-        os.symlink(str(target_abs), link_path)
-        print(f"🔗 Created symlink: {link_path} -> {target_abs}")
+        how = toolchain_paths.link_directory(Path(str(target_abs)), link_path)
+        print(f"🔗 Created Media link ({how}): {link_path} -> {target_abs}")
     except Exception as e:
         print(f"❌ Failed to create Media symlink at {link_path}: {e}")
 
@@ -3184,13 +3106,11 @@ def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
                 stderr=subprocess.DEVNULL,
             )
             if res.returncode != 0:
-                if dst_public.exists():
-                    shutil.rmtree(dst_public)
-                shutil.copytree(src_public, dst_public, symlinks=True)
+                toolchain_paths.mirror_tree(src_public, dst_public)
         except Exception:
-            if dst_public.exists():
-                shutil.rmtree(dst_public)
-            shutil.copytree(src_public, dst_public, symlinks=True)
+            # No rsync on this host (Windows native): incremental mirror,
+            # because this runs on every tick of the preview sync watcher.
+            toolchain_paths.mirror_tree(src_public, dst_public)
 
     if (output_dir / "course_config.json").exists():
         try:
@@ -3479,7 +3399,7 @@ def _ensure_netlify_link(output_dir: Path, course_dir: Path):
     for src in candidates:
         if src.exists() and src.is_dir():
             try:
-                os.symlink(str(src.resolve()), dst)
+                toolchain_paths.link_directory(src.resolve(), Path(dst))
                 print(f"🔗 Linked .netlify → {src}")
                 return
             except Exception as e:
@@ -3490,7 +3410,9 @@ def _ensure_netlify_link(output_dir: Path, course_dir: Path):
                     return
                 except Exception as e2:
                     print(f"⚠️ Could not copy .netlify folder: {e2}")
-    print("ℹ️ No .netlify folder found to link/copy (deploy diffs may be slower).")
+    # No message when there is nothing to link: that is the NORMAL state for
+    # a fresh folder, and printing "Netlify" mid-preview made a teacher read
+    # a routine build as a publishing failure (real smoke test, 2026-08-20).
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -3966,12 +3888,12 @@ def build_section_site(
 
     port: int = 8081,
 ):
-    base_dir = Path("/teaching/courses")
+    base_dir = toolchain_paths.COURSES_DIR
     course_dir = base_dir / course_code
     section_name = f"section{section_number}"
 
     visible_output_root = course_dir / "merged_output"
-    hidden_output_root = course_dir / ".merged_output"
+    hidden_output_root = toolchain_paths.merged_output_root(course_dir)
 
     if visible_output_root.exists() and not hidden_output_root.exists():
         try:
@@ -3987,7 +3909,7 @@ def build_section_site(
     # Use fast container-local ext4 storage (/tmp/quartz-builds/<COURSE>/section<N>)
     # for the build workspace so that node_modules, AST walks, and esbuild run at native
     # speed without crossing the slow 9P/virtiofs host bind mount.
-    output_dir = Path("/tmp/quartz-builds") / course_code / section_name
+    output_dir = toolchain_paths.WORK_DIR / course_code / section_name
     config_file = course_dir / "course_config.json"
 
     if not course_dir.exists():
@@ -4036,7 +3958,7 @@ def build_section_site(
     for folder in shared_paths:
         print(f" - {folder.name}")
 
-    quartz_src = Path("/opt/quartz")
+    quartz_src = toolchain_paths.QUARTZ_DIR
 
     # Fresh/full rebuild path
     if full_rebuild or not output_dir.exists():
@@ -4046,14 +3968,16 @@ def build_section_site(
         output_dir.mkdir(parents=True, exist_ok=True)
         print(f"📂 Created fresh (internal) output directory: {output_dir}")
 
-        print(f"📦 Staging Quartz scaffold on container storage from {quartz_src}...")
+        print(f"📦 Staging the website builder's files from {quartz_src}...")
         for item in quartz_src.iterdir():
             dest = output_dir / item.name
             if item.name == "node_modules":
-                try:
-                    os.symlink(str(item), dest)
-                except Exception:
-                    shutil.copytree(item, dest, symlinks=True)
+                # link_directory, not os.symlink: symlinks need privileges a
+                # school-managed Windows account lacks, and the old fallback
+                # silently copied ~430 MB of dependencies per section.
+                how = toolchain_paths.link_directory(item, dest)
+                if how == "copy":
+                    print("  (node_modules copied rather than linked - links need privileges this account lacks)")
             elif item.is_dir():
                 shutil.copytree(item, dest, symlinks=False)
                 print(f"  📁 Copied directory: {item.name}")
@@ -4319,7 +4243,7 @@ def build_section_site(
     # --------------------------------------------------------------------------
 
     # Ensure patched Head.tsx is present in output_dir so social cards never point to quartz.jzhao.xyz
-    head_src = Path("/opt/quartz/quartz/components/Head.tsx")
+    head_src = toolchain_paths.QUARTZ_DIR / "quartz" / "components" / "Head.tsx"
     head_dst = output_dir / "quartz" / "components" / "Head.tsx"
     if head_src.is_file() and head_dst.parent.is_dir():
         try:
@@ -4368,6 +4292,10 @@ def build_section_site(
 
     # Ensure npm dependencies are present (linking pre-baked node_modules if available)
     node_modules_dir = output_dir / "node_modules"
+    # A junction left by an older build dies on the very next stat (WinError
+    # 448) - repair BEFORE the exists() below ever touches it.
+    if toolchain_paths.remove_stale_reparse_point(node_modules_dir):
+        print("♻️ Replaced an older-style dependency link.")
     package_json = output_dir / "package.json"
     package_lock = output_dir / "package-lock.json"
 
@@ -4377,26 +4305,30 @@ def build_section_site(
     )
 
     if needs_install:
-        if Path("/opt/quartz/node_modules").exists() and not force_npm_install:
+        if (toolchain_paths.QUARTZ_DIR / "node_modules").exists() and not force_npm_install:
             print("📦 Linking pre-baked dependencies from image...")
             if node_modules_dir.exists() or node_modules_dir.is_symlink():
                 try:
                     node_modules_dir.unlink()
                 except Exception:
                     shutil.rmtree(node_modules_dir, ignore_errors=True)
-            try:
-                os.symlink("/opt/quartz/node_modules", node_modules_dir)
-            except Exception:
-                shutil.copytree("/opt/quartz/node_modules", node_modules_dir, symlinks=True)
+            how = toolchain_paths.link_directory(toolchain_paths.QUARTZ_DIR / "node_modules", node_modules_dir)
+            if how == "copy":
+                print("   (copied rather than linked - links need privileges this account lacks)")
         else:
             print("\n📦 Installing dependencies...")
-            subprocess.run(["npm", "install", "--no-audit", "--silent"], cwd=output_dir, check=True)
+            subprocess.run([toolchain_paths.NPM, "install", "--no-audit", "--silent"], cwd=output_dir, check=True)
     else:
         print("✅ Skipping npm install (dependencies already present)")
 
     # ===========================
     # Build or Preview (server?)
     # ===========================
+    # The scaffold's own CLI by ABSOLUTE path: `npx quartz` resolves the
+    # CLI from the npm registry (a project's own bin is never linked into
+    # its node_modules/.bin), which needs network and floats the version.
+    # The absolute path also puts the section's work dir on the serve
+    # process's command line - what the native stop matches on.
     env = os.environ.copy()
     env.setdefault("TZ", "UTC")
     env.setdefault("SOURCE_DATE_EPOCH", "1704067200")  # 2024-01-01T00:00:00Z
@@ -4405,7 +4337,7 @@ def build_section_site(
         # Static build ONLY (single build)
         print("\n🏗️  Building static site with Quartz → public/")
         safe_clean_public_dir(output_dir / "public")
-        subprocess.run(["npx", "quartz", "build", "--concurrency", "1"], cwd=output_dir, env=env, check=True)
+        subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1"], cwd=output_dir, env=env, check=True)
 
         public_dir = output_dir / "public"
         if not public_dir.exists():
@@ -4421,10 +4353,36 @@ def build_section_site(
         ws_port = port + 1000
         kill_existing_quartz(port)
         kill_existing_quartz(ws_port)
+        if os.name == "nt":
+            # Natively, ports are HOST-GLOBAL and the launcher's probe ran
+            # minutes ago, before the build - two folders building at once
+            # both get told 8081 and the loser dies on EADDRINUSE. Probe
+            # again here, moments before the bind, walking the same
+            # 10-apart blocks; the app follows the LAST announced address,
+            # so the re-announcement below is the one that counts. (In the
+            # container the port is a fixed mapping - never walk it there.)
+            import socket
+
+            def _port_is_free(candidate: int) -> bool:
+                try:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                        probe.bind(("", candidate))
+                    return True
+                except OSError:
+                    return False
+
+            for candidate in range(port, port + 60, 10):
+                if _port_is_free(candidate) and _port_is_free(candidate + 1000):
+                    if candidate != port:
+                        print(f"Port {port} is busy with another preview; using {candidate} instead.")
+                        port = candidate
+                        ws_port = port + 1000
+                    break
+            print(f"Preview will be available at: http://localhost:{port}/")
         print(f"\n🚀 Launching Quartz preview on http://localhost:{port}\n")
         safe_clean_public_dir(output_dir / "public")
         _start_public_sync_watcher(output_dir, host_output_dir)
-        subprocess.run(["npx", "quartz", "build", "--concurrency", "1", "--serve", "--port", str(port), "--wsPort", str(ws_port)], cwd=output_dir, env=env, check=True)
+        subprocess.run(["node", str(output_dir / "quartz" / "bootstrap-cli.mjs"), "build", "--concurrency", "1", "--serve", "--port", str(port), "--wsPort", str(ws_port)], cwd=output_dir, env=env, check=True)
 
 def main():
     parser = argparse.ArgumentParser(description="Build Quartz site for a course section (preview by default; use --build-only for a static build without preview).")

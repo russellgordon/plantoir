@@ -42,7 +42,25 @@ public static class MarketingShotCapturer
         catch { }
     }
 
-    public static async Task RunAsync(string outputDir)
+    /// <summary>
+    /// Photograph the app windows, optionally for one appearance only.
+    ///
+    /// One appearance per PROCESS, with the OS switched to it first, is the
+    /// only way these come out right. Setting RequestedTheme on the window's
+    /// content changes what the controls draw, but every brush fetched as
+    /// Application.Current.Resources["..."] still resolves against the theme
+    /// the APP launched in — so a dark capture came back with a white dialog
+    /// card carrying white text, and assistant bubbles in light grey on a
+    /// dark window. Chasing those brush by brush (tried first: hardcoding
+    /// approximate literals in ThemedBrush) works but keeps drifting from the
+    /// real design tokens and needs re-chasing for every new brush anyone
+    /// adds; one process per appearance makes every themed resource resolve
+    /// exactly the way a teacher's copy resolves it, because the situation is
+    /// the same one. capture_windows.py switches Windows into each appearance
+    /// before launching this with --theme, and puts the colour mode back in a
+    /// finally.
+    /// </summary>
+    public static async Task RunAsync(string outputDir, string? onlyTheme = null)
     {
         try
         {
@@ -65,7 +83,12 @@ public static class MarketingShotCapturer
             ProvisionDemoWorkspace(workspacePath);
             Log($"Workspace provisioned at {workspacePath}");
 
-            foreach (var theme in new[] { ElementTheme.Light, ElementTheme.Dark })
+            ElementTheme[] wanted = onlyTheme is null
+                ? new[] { ElementTheme.Light, ElementTheme.Dark }
+                : new[] { onlyTheme.Equals("dark", StringComparison.OrdinalIgnoreCase)
+                              ? ElementTheme.Dark : ElementTheme.Light };
+
+            foreach (var theme in wanted)
             {
                 string themeName = theme == ElementTheme.Dark ? "dark" : "light";
                 Log($"--- Capturing theme: {themeName} ---");
@@ -101,12 +124,19 @@ public static class MarketingShotCapturer
         }
         catch (Exception ex)
         {
+            // Exiting 0 here made a mid-capture crash invisible: capture_windows.py's
+            // subprocess.run(..., check=True) only raises on a NONZERO exit, so a
+            // failure that struck the very first window still printed "Every
+            // screenshot now has an authentic Windows twin" and left every
+            // remaining image as a stale leftover from whatever run last touched
+            // it -- discovered 2026-08-20 when a resource-lookup bug silently
+            // aborted two capture attempts in a row and both were reviewed as if
+            // they were fresh. The failure was always in the log
+            // (%TEMP%\marketing_capture.log); it just never reached the exit code.
             Log($"Capture failed: {ex}");
+            Environment.Exit(1);
         }
-        finally
-        {
-            Environment.Exit(0);
-        }
+        Environment.Exit(0);
     }
 
     /// <summary>

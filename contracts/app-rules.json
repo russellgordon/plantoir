@@ -406,6 +406,11 @@
         "output" : "Built site not found at /courses/ICS3U/.merged_output/section1/public"
       },
       {
+        "expect" : "Part of this course folder is a link to another folder, and Windows won't let the website builder follow it. Replace the link with the real folder (the details above name which one), then try again.",
+        "output" : "OSError: [WinError 448] The path cannot be traversed because it contains an untrusted mount point: 'C:\\Users\\person\\Documents\\My Course\\courses\\ICS3U\\Media'",
+        "why" : "The toolchain creates no Windows links of its own any more, so this error can only come from a link inside the teacher's OWN folder — commonly the Obsidian trick of sharing one Media folder across vaults with a junction, which current Windows refuses to traverse. The teacher can fix it; the raw OSError reads as a crash. Windows-only output — it can never appear on macOS, and the mac recognises it anyway so that the two explainers stay ONE list of troubles rather than growing a platform switch. (The alternative, a `platform` field on every case, was rejected as machinery for a handful of lines.) This is the only Windows-only case left: three one-time-setup cases sat beside it until 2026-08-20, when the native Windows toolchain removed the launcher lines they matched."
+      },
+      {
         "expect" : null,
         "output" : "Traceback (most recent call last):\n  File \"build_site.py\", line 42\nKeyError: 'x'",
         "why" : "Recognised as nothing, so nothing is said and the app shows the output itself."

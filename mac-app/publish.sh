@@ -11,6 +11,12 @@
 # The version comes from ONE place in mac-app:
 # MARKETING_VERSION in project.yml (which matches <Version> in Plantoir.csproj).
 #
+# The BUILD number is derived here rather than stored anywhere, because its
+# only job is to name BITS uniquely: two artifacts must never share a name,
+# and a hand-maintained number is one somebody forgets. `git rev-list --count
+# HEAD` rises with every commit, never resets, and carries across marketing
+# versions forever — see "Build numbers" in RELEASING.md.
+#
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -94,11 +100,18 @@ BUILD_DIR="${HERE}/build"
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
 
+# The build number, derived from history rather than stored. A tree with no
+# git (a downloaded tarball, say) still builds — it just gets 0, which is
+# the same placeholder project.yml carries for local builds.
+BUILD_NUMBER="$(git -C "${HERE}" rev-list --count HEAD 2>/dev/null || echo 0)"
+echo "   - Build number: ${BUILD_NUMBER} (git rev-list --count HEAD)"
+
 xcodebuild -project Plantoir.xcodeproj \
   -scheme Plantoir \
   -configuration Release \
   -derivedDataPath "${BUILD_DIR}/DerivedData" \
   ENABLE_HARDENED_RUNTIME=YES \
+  CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
   build
 
 APP_SOURCE="${BUILD_DIR}/DerivedData/Build/Products/Release/Plantoir.app"

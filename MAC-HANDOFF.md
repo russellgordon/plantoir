@@ -51,9 +51,26 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
-**Nothing waiting right now.** This section exists so that when something is,
-it is the first thing read here — and so a red mac suite is instantly
-explicable rather than alarming.
+> **v1.1.0 cut sheet (Windows assets ready, 2026-08-20).** The verified
+> Windows artifacts live on the Windows machine and will be uploaded FROM
+> there (`gh` is authed there) once the tag exists — so cut the release as a
+> DRAFT, tell Russell, and publish after the assets attach. Hashes for the
+> notes' SHA-256 table:
+> `PlantoirSetup.exe` 224.5 MB
+> `9990bcacade548a35cbd5b11f65dbf79d4a0236eeeee4d4d0e5322204c96527e` ·
+> `Plantoir-win-x64.zip` 379.9 MB
+> `b141c7ac30116c9836334e90472e5a2527fb4e50629c56d4c2f258f437cbb1ba`.
+> Built from commit 8e9faab0, proven by five clean-machine smoke tests
+> (install → course → preview → assistant → deploy, no .NET/WSL/Docker on
+> the machine). The macOS DMG does NOT ship in this cut — see RELEASING.md
+> "Two platforms, one version series": the mac joins v1.1.0 after the gate
+> list below is green.
+
+
+**Nothing is outstanding.** Both cases proposed for v1.1.0 were cleared on
+2026-08-20 — one implemented, three retired — and the reasoning for each is in
+the ledger below under "The teacher-made-link case is implemented, and the
+three setup cases are retired".
 
 The mechanism, in one paragraph. `Plantoir --write-contracts` runs on the mac,
 so the Windows side cannot regenerate the derived halves of
@@ -79,6 +96,245 @@ outstanding.
 
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
+
+- ✅ DONE (mac, 2026-08-20). **The assistant warm-up race: it EXISTS here,
+  it is measurable, and it cannot produce the Windows symptom.** Answering
+  GUI-IMPROVEMENTS row 293's two questions with the real app rather than
+  from the code, as that row asked.
+
+  **Q1: does the mac's first turn await its warm-up? No — same as Windows
+  before their fix.** `AssistSession.startEngine()` sets `readiness = .ready`
+  and only THEN `await warmUp(…)`, and `canSend` asks nothing but
+  `readiness == .ready`. The trail shows it plainly: `the assistant was ready
+  after 0.5s`, with the ~3,400-token priming request still to run.
+
+  **Measured, small assistant, M-series, 48 GB — the same question twice:**
+  - typed after the warm-up had finished: **1.7 s**
+  - sent the instant the field enabled, racing it: **3.1 s**
+
+  So the race is real and costs about **1.4 s** on the first question, which
+  is the priming request's tail on the server's single slot
+  (`--parallel 1`). The question was answered correctly both times; nothing
+  was lost.
+
+  **Q2: is a timeout distinguishable from window-close cancellation? Yes —
+  the mac has no way to confuse them, because it never classifies errors at
+  all.** `AssistAgent.think()`'s catch has one branch: every error becomes a
+  visible `.problem` bubble AND an `assistantCouldNotAnswer` trail line.
+  There is no "this was a close, say nothing" path for a timeout to fall
+  into. Proven by killing `llama-server` mid-session: the teacher saw
+  `⚠ Could not connect to the server.` in the conversation and the trail
+  recorded `the local AI assistant could not answer — Could not connect to
+  the server.`
+
+  **Three independent reasons the Windows chain cannot complete here**, which
+  is why this is not a mac bug wearing a Windows coat:
+  1. The request timeout is **180 s** (`AssistModelClient.reply`), not a few
+     seconds — a warm-up of 2 s (small) or ~12 s (large) cannot exhaust it.
+  2. The catch cannot swallow a timeout as a close, per Q2.
+  3. **The engine's output goes to `FileHandle.nullDevice`**
+     (`AssistServerHost`), so the unread-pipe wedge Windows had to fix by
+     draining pipes cannot occur — nothing is ever buffered.
+
+  **What was NOT fixed, and why.** Making the first turn await the warm-up is
+  a real improvement worth about 1.4 s, and it is an OPTIMISATION here rather
+  than a fix: the teacher-visible defect Windows repaired (silence) does not
+  exist on this side. Doing it inside a release qualification would have made
+  the mac's v1.1.0 a behaviour change and pushed the cut to 1.1.1 for a
+  second and a half. Decided with Russell on 2026-08-20; it belongs in the
+  next version with a test that pins "cannot send until the warm-up has
+  returned".
+
+  **One diagnostics gap this turned up, for the next session rather than
+  this one.** Reason 3 is also a cost: with the engine's output going to
+  `/dev/null`, nothing llama-server says can ever reach a problem report —
+  no load errors, no slot warnings, no token counts. Windows added
+  `NoteServerLine` for exactly this. The mac should sample those lines into
+  the trail (a bounded tail, not the firehose) rather than keep discarding
+  them; it is a report-quality change, not a hang risk, which is why it is
+  not in 1.1.0.
+
+- ✅ DONE (mac, 2026-08-20). **`./verify.sh` passes against the changed
+  shared scripts — all nine checks, and the npx question is settled.** Run
+  from a clean clone of `dev` with the v1.1.0 tree: image built from the
+  working recipe with BuildKit, baked scripts/patches/support files verified
+  identical to the tree, the Explorer hide filter present in both Quartz
+  copies, then a real `preview.sh EXC2O 1 --full-rebuild --build-only`
+  through the launcher — 260 Markdown files parsed in 966 ms, 304 files
+  emitted, "Done processing 260 files in 1s". No behaviour on this side
+  needed changing, which is what let the mac ship 1.1.0 rather than 1.1.1.
+
+  **The npx question is answered: there is nothing left to check.** The
+  entry asked whether the container had quietly been resolving the Quartz
+  CLI from the npm registry too. It cannot any more, on either platform,
+  because the fix is in the SHARED script — `build_site.py` runs
+  `node <abs>/quartz/bootstrap-cli.mjs` at both call sites (build and
+  serve), and `deploy.py` mentions npx nowhere at all. The whole verify run
+  contains not one npx line. So the question is now unanswerable rather
+  than answered — the old behaviour is gone from the code that would have
+  produced it — and it does not matter: the pin held either way, because
+  Quartz's CLI runs the local patched `quartz/` source from CWD.
+
+  **One nit, deliberately not fixed**: `toolchain_paths.py` still defines
+  `NPX` and nothing uses it. Removing it would change the build context and
+  therefore the image tag, which costs every teacher on both platforms a
+  rebuild — for a dead constant. Fold it into the next change that touches
+  that file for a real reason.
+
+  **Two notes for whoever runs `verify.sh` next.** Its fixture,
+  `courses/EXC2O`, is gitignored, so a fresh clone has none; the script's
+  header says to install it with `./setup.sh`, but that is an interactive
+  wizard and `cp -R support/example_course/EXC2O courses/EXC2O` produces the
+  same fixture in a second. And the script deliberately LEAVES a container
+  running from `quartz-teacher:dev-test`; `docker rm -f teaching-quartz-<hash>`
+  puts the folder back on the normal image, which this session did.
+
+  Everything below is the original request, kept for the reasoning.
+
+  **Windows dropped the container entirely — shared scripts changed, run
+  `./verify.sh` on the next sync** (Windows + shared, 2026-08-19, branch
+  `windows-native-toolchain`). Windows now runs the whole toolchain
+  natively: Node 20, Python 3.11, the patched Quartz scaffold and wrangler
+  ship inside the app's own folder (built by
+  `windows-app/Vendor/fetch-runtime.ps1`, pins mirroring the Dockerfile's),
+  and the launchers run the shared Python directly when that runtime is
+  present. WHY: WSL2 needs admin rights, Windows feature changes and a
+  reboot — school-managed laptops refuse all three, and a teacher hit
+  exactly that in front of an audience twice in one day. Rejected: porting
+  the Python to C# (kills the shared-scripts contract and invites permanent
+  drift); keeping a WSL2 fallback (Russell chose deletion once verified —
+  two paths means two test surfaces forever).
+
+  **What the mac must know about the shared files:**
+  - `scripts/toolchain_paths.py` is new: every fixed path (`/opt/*`,
+    `/teaching/courses`) now routes through it. Container defaults are
+    byte-identical to before; the native path overrides via `PLANTOIR_*`
+    env vars the mac never sets. The Dockerfile COPYies it — image hash
+    changes, so the first mac preview after sync does a one-time rebuild.
+  - The 26 `tee` subprocess writes are plain writes now (`write_file`),
+    the Media/node_modules/.netlify links go through `link_directory`
+    (symlink first — the mac's behaviour is unchanged), and
+    `_sync_public_to_host` falls back to an incremental pure-Python mirror
+    only when rsync is absent (it never is, in the container).
+  - **The Quartz CLI is invoked as `node <abs>/quartz/bootstrap-cli.mjs`
+    instead of `npx quartz`** — measured on Windows, `npx` resolved the CLI
+    from the npm REGISTRY into its cache (a project's own bin never lands
+    in its node_modules/.bin), which needed network and floated off the
+    v4.5.0 pin. The container was almost certainly doing the same thing
+    quietly; check a container build log for an `npx` cache line if you
+    want the confirmation. Correctness held only because Quartz's CLI runs
+    the local patched `quartz/` source from CWD.
+  - `setup_course.py`'s keyboard reader imports termios where it exists,
+    msvcrt where it does not; POSIX behaviour identical.
+
+  Numbers (this machine, Ryzen-class x64, NVMe): first native build of the
+  199-page example course **57 s cold** including scaffold staging; Quartz
+  parse+emit 5 s; delta deploy to Netlify 117 files, ~40 s. The container
+  path's equivalent on this same machine paid a one-time ~8 min image
+  build plus WSL2 provisioning before the first build could start.
+  Reference: `Enter-NativeRuntime` in the three `.ps1` launchers,
+  `scripts/toolchain_paths.py`, `windows-app/Vendor/fetch-runtime.ps1`.
+
+- ✅ DONE (mac, 2026-08-20). **Verified against the real app: the mac writes
+  a record for every task, and the one gap in the code is unreachable here.**
+
+  **What was driven.** A scratch working folder, the Example Course in it, a
+  real preview that served the site, then `course_config.json` deliberately
+  corrupted and Preview pressed again: `preview.sh — failed (exit 1) after
+  1.0s`. `~/Library/Logs/Plantoir/runs/2026-08-20-184555-preview.txt` appeared
+  with the task, the arguments, the outcome, the whole transcript ending in
+  the JSONDecodeError, paths redacted to `/Users/person/…`, and the line
+  `Explained nothing recognised — worth a look` — the honest fallback the
+  contract's note asks for, doing its job on an unrecognised traceback.
+
+  **It is the same folder the report reads**, checked rather than assumed:
+  `ScriptRunner.writeRecordOfRun` → `ProblemReportStore.write` →
+  `runsFolderURL`, and `ProblemReportBuilder.assembleFolder` reads
+  `store.runFileURLs()` from that same store — the count is what fills in
+  "the last N tasks Plantoir ran for you". Windows's failure was these two
+  being different folders; here they are one property on one type.
+
+  **A record also exists from the FIRST moment**, which is more than was
+  asked for: the still-running preview had a 14 KB record while it was
+  serving, outcome "Still running after …". That matters for the commonest
+  report of all — "the preview is stuck" — which by definition never reaches
+  a finish path.
+
+  **The one gap, and why it is NOT worth fixing.** `ScriptRunner` assigns
+  `runScriptName` AFTER `try newProcess.run()`, so a task that failed at
+  LAUNCH would write no record and no `taskStarted` line — exactly the
+  Windows shape, and exactly what the request asked about. It cannot happen
+  here: `executableURL` is always `/bin/bash` and the script is an argument,
+  so `run()` can only throw if `/bin/bash` is missing, at which point the
+  Mac has bigger problems. Confirmed by experiment — `chmod -x preview.sh`
+  and pressing Preview still produced `started preview.sh EXC2O 1 --port
+  8081` on the trail and a record, because the executable bit of the script
+  is not consulted. **Windows is exposed where the mac is not** because it
+  launches the `.ps1` through its own host rather than through a shell that
+  always exists. Left as it is deliberately: reordering two lines to guard
+  against an unreachable case would be an untested behaviour change in a
+  release-qualification pass. Written down so nobody "fixes" the ordering
+  believing it is live, and so the asymmetry with Windows is on the record.
+
+  Everything below is the original request, kept for the reasoning.
+
+  **Check that every finished mac task really writes a run transcript**
+  (Windows, 2026-08-19, branch `windows-wsl2-auto-install`). A real teacher's
+  problem report arrived saying "the last 0 tasks Plantoir ran for you" after
+  three failed setups: the Windows report reads `Logs\runs\*.txt`, and
+  nothing ever wrote that folder — the reading side was tested against
+  hand-made files, so the gap passed every test. Windows now saves every
+  finished task's transcript from `ScriptRunner`'s finish path (redacted on
+  the way in, pruned to the newest 20, header matching the trail's
+  "finished … — outcome" sentence). The ask here is a VERIFICATION, not a
+  port: drive one real failing task on the mac and confirm a file appears in
+  the folder its report actually reads — the failure mode is precisely that
+  the tests cannot see this. Reference:
+  `ProblemReportStore.SaveRunTranscript`, `ScriptRunner.NoteTaskFinished`,
+  `ProblemReportTests.Store_SavesRunTranscripts_RedactedAndPruned`.
+
+- ✅ DONE (mac, 2026-08-20) — **RETIRED rather than implemented.** The three
+  explainer sentences were never added here, and must not be: the same
+  session that proposed them deleted the Windows container path, so no
+  shipping launcher can print the lines they match. The three cases are gone
+  from `contracts/app-rules.json` → `failureExplanations.cases`; Windows's
+  own `SetupExplanation` is now unpinned by the contract and should be
+  deleted along with the launcher code it reads, not kept as the only
+  implementation of a rule nothing tests. See the ledger entry "The
+  teacher-made-link case is implemented, and the three setup cases are
+  retired". Everything below is the original request, kept for the reasoning.
+
+  **The Windows launchers now install WSL2 themselves — the mac owes only
+  the three explainer sentences** (Windows, 2026-08-19, branch
+  `windows-wsl2-auto-install`). What it fixed: a teacher on a PC with no
+  WSL2 hit "ERROR: WSL is present but no Linux distribution is installed"
+  plus an instruction to open an Administrator PowerShell — it failed live
+  in front of an audience on 2026-08-19. This was the Windows analogue of
+  the mac's zero-prerequisite Colima bootstrap, called for by
+  `WINDOWS-HANDOFF.md`'s "Container engine" note (entry 72), and it now
+  exists: each `.ps1` launcher's `Install-WindowsSubsystem` runs one
+  elevated `wsl --install -d Ubuntu --no-launch` (retrying with
+  `--web-download` for Store-blocked school machines), detects
+  restart-pending by USABILITY rather than exit code (the exit code is 0 on
+  that path), and reports the three non-fault stops in plain words. WHY the
+  choices: `--no-launch` because Ubuntu's first-run username wizard would
+  otherwise block a non-interactive run forever — the distro runs as root,
+  fine for an appliance no teacher opens; UAC is announced first ("Watch
+  for a Windows permission prompt") because it is the one step that cannot
+  be silent; a distro installed BY the run is provisioned without the
+  Docker-engine question (the mac never asks either), while a pre-existing
+  distro keeps the question because it belongs to whoever set it up.
+  Rejected: DISM feature-enable plus manual distro import (re-implements
+  what `wsl --install` already does, and needs the same elevation);
+  prompting before the install (the handoff asks for silent, and UAC is
+  already the consent); auto-restarting the PC (never — the teacher may
+  have unsaved work everywhere). Untested on a truly fresh machine — this
+  dev box has WSL — so the restart path is asserted from the launcher's
+  printed lines, which is what the contract cases pin. What the mac does:
+  the three contract cases above, nothing else — the `.sh` launchers are
+  untouched. Reference: `Install-WindowsSubsystem` in `setup.ps1`,
+  `preview.ps1` (where stop mode exits before it can ever run), and
+  `deploy.ps1`.
 
 - **Build the 1.0.0 DMG only from a tree containing the deploy-flush fix in
   `scripts/build_site.py`** (Windows + shared, 2026-08-19). A Windows release
@@ -226,6 +482,96 @@ rather than being deleted.
   green suite as proof.
 
 ## For awareness — no mac code needed
+
+- **Windows marketing shots re-taken, a Windows hero pair added, and an
+  already-known theming bug re-fixed the right way** (Windows, 2026-08-20).
+  - **What changed**: Russell redeployed the demo sites and initially asked
+    for ENG2D's screenshot source to move to `eng2d-s2-2026-gordon` — that
+    turned out to be a mistake caught minutes later ("the eng2d website
+    should be s1 like the other courses"), so `website/shots/capture_windows.py`'s
+    `DEMO_COURSES` table stayed as it already was: `eng2d-s1-2026-gordon`,
+    matching MCV4U and SCH3U on section 1, and matching the identical table
+    in `capture.py`. The images were still re-shot (a fresh Netlify deploy
+    can change page content even with the URL unchanged), so this is not a
+    no-op even though the table's end value is the same as before. **No mac
+    action needed** — nothing here changes what `capture.py`'s own table
+    should point at.
+  - **A dialog theming bug surfaced during the re-shoot, and turned out to
+    already be found and fixed — on a branch that was never merged.**
+    `NewCourseDialog`'s "New to this?" card (and the harness's own synthetic
+    dialog card around it) read `Application.Current.Resources["key"]`
+    directly in code, which resolves against the theme the app LAUNCHED in,
+    not a window's local `RequestedTheme` override. `dev`'s capture harness
+    runs both appearances from one launched-light process, so the Dark
+    capture rendered a still-light card with barely-legible text. Confirmed
+    capture-harness-only: nothing in the live app sets `RequestedTheme`
+    anywhere, so a teacher never sees this. Two live fixes were tried here
+    first and rejected — `Application.Current.RequestedTheme = theme` after
+    launch throws `COMException 0x80131515` (WinUI does not support changing
+    the app-wide theme at runtime), and indexing
+    `Resources.ThemeDictionaries` (directly, then recursively through
+    `MergedDictionaries`) resolves only whichever theme the app is ambiently
+    in — then hardcoding approximate Fluent 2 literals as a third attempt,
+    which worked but was never committed. **All three were abandoned** on
+    finding `ac96888c` ("Photograph each appearance from its own process, so
+    the dark shots are dark") on the unmerged `new-screenshots` branch (5
+    commits, Russell, 2026-08-19, 48 behind `dev` at the time) — the actual
+    fix, already reasoned through: launch `Plantoir.exe --capture-marketing-shots
+    --theme <light|dark>` as a SEPARATE process per appearance, with Windows'
+    own colour mode switched first (`capture_windows.py` now imports
+    `read_theme`/`write_theme` from `hero_windows.py`, which already had
+    them). Every themed resource then resolves the way a teacher's copy
+    resolves it, because the situation genuinely is a teacher's copy in that
+    appearance — no brush-by-brush chasing, and no approximation. **Ported
+    forward instead of merging the branch**: the branch was 48 commits stale
+    (predates the v1.1.0 release and the mac's own screenshot re-shoot), so
+    its 26-image commit was left behind and only the code changes were
+    carried over by hand.
+  - **A second commit on that branch was also worth carrying forward**:
+    `dd6f3fe9` fixed the SAME class of bug in `hero_windows.py` — the
+    Obsidian card was hardcoded to `section2/.../Unit 4, Day 23`, which held
+    only until the next redeploy moved the site to Day 22 and nothing
+    noticed. `hero_windows.py` now has `most_recent_class()`, which reads the
+    live site's front page at capture time and falls back to a named
+    constant only if the site is unreachable. Also picked up: `SECTION = 1`
+    (was hardcoded to section 2, while Plantoir and Edge were both showing
+    section 1 — a second three-cards-disagree bug, independent of the class
+    number one), and a fresh Edge scratch profile per launch (a reused
+    profile let Edge restore the previous pass's tab after being
+    force-killed, so the dark hero card came back showing the same page
+    twice).
+  - **The hero pair itself was also just plain missing from `dev`** —
+    `website/shots/hero_windows.py` existed (added by `99c7bb36`, the commit
+    that also gave plantoir.app its platform-conditional hero serving), but
+    `site/img/hero-windows-light.png` / `-dark.png` did not, because the run
+    that produced them was ONLY on `new-screenshots`. Regenerated fresh here
+    rather than pulled from that branch, so they reflect today's redeploy and
+    the section/class fixes above. Windows visitors were seeing the mac's
+    hero image (`build.py`'s platform fallback) until this landed.
+  - **A related bug, worth knowing regardless of the theming question and
+    not on the old branch at all**: `MarketingShotCapturer.RunAsync` caught
+    its own exceptions, logged them, and still called `Environment.Exit(0)`
+    either way — so a mid-capture crash was invisible to
+    `capture_windows.py`'s `subprocess.run(..., check=True)`, which reported
+    success with whatever images happened to exist, stale ones included.
+    This hid two of the three rejected theming fixes above from the exit
+    code entirely; both were only visible in `%TEMP%\marketing_capture.log`.
+    Now exits 1 on failure. **A second, independent instance of the same
+    swallow was in `capture_windows.py` itself**: `Start-Process -Wait` does
+    not forward the child's exit code to `powershell.exe`'s own, so even
+    with the C# fix a crash still would not have surfaced — fixed with
+    `-PassThru; exit $p.ExitCode`. Worth a glance on the mac only if
+    `capture.py` has an analogous "subprocess exit code stands in for a
+    success check" assumption anywhere; nothing here suggests it does.
+  - **`new-screenshots` (local and `origin/new-screenshots`) is now safe to
+    delete** — its useful commits are carried forward as described above,
+    and its one 26-image commit is superseded by today's re-shoot. Left in
+    place rather than deleted here, since it is Russell's own branch.
+  - Reference: `windows-app/Plantoir/Services/MarketingShotCapturer.cs`
+    (`RunAsync`, `CaptureNewCourseWindow`), `windows-app/Plantoir/App.xaml.cs`
+    (the `--theme` argument), `website/shots/capture_windows.py`
+    (`DEMO_COURSES`, `capture_app_windows`), `website/shots/hero_windows.py`
+    (`most_recent_class`, `SECTION`, `capture_edge`).
 
 - **plantoir.app now has a Windows hero composite, and `deploy_site_name`
   turned out not to be a key** (Windows, 2026-08-19, commit "Give the Windows
@@ -676,6 +1022,108 @@ is what happened to the test-race item, sitting here for three days with
 Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
+
+- ✅ DONE (mac, 2026-08-20). **Setting up a working folder no longer blocks
+  the main thread — the mac catching up to Windows 1.1.0, found by Russell
+  while testing the v1.1.0 candidate.**
+
+  **What was wrong.** `WorkspaceModel.initializeWorkspace()` copied the three
+  launchers, made `courses/`, and mirrored the whole build recipe
+  synchronously, called straight from the "Set Up This Folder" button. The
+  recipe is **12,091 files and 65 MB** — `support/` alone is 11,354 of them,
+  the example-content payloads and ~1,950 skeletons. Measured here (M-series,
+  NVMe): **2.4 s** for a raw `cp -R` of the three folders, **3.7–4.0 s** for
+  the real mirror, which also stats both sides of every file and sweeps the
+  destination for extras. That is a beachball over a window that says
+  nothing, and on an older disk, a USB drive or a folder the system is
+  syncing it is tens of seconds.
+
+  **The fix is yours, adopted as-is.**
+  `WorkspaceViewModel.InitializeWorkspaceAsync` wraps the mirror in
+  `Task.Run` and `Initialize_Click` disables both buttons and sets the label
+  to "Setting up…". The mac now has `initializeWorkspaceInBackground()` doing
+  the same, with the button showing a small spinner and **"Setting Up…"**.
+  Nothing here needs porting — this entry exists because **the direction was
+  Windows → mac**, which the ledger should record as readily as the reverse.
+
+  **What the mac had to work out that your version did not face**, and the
+  reason it is written down rather than left in the diff: the class is
+  main-actor isolated, so moving work off the thread meant deciding what the
+  background half is allowed to touch. It touches nothing shared. The copying
+  (`copyToolchainFiles`, `setUpFolderOnDisk`) is `nonisolated` and reads only
+  the app's own bundle — which cannot change while the app runs — and writes
+  into one folder. The once-per-run `foldersWithFreshToolchain` set is
+  **cleared before the await and set after it, both on the main actor**.
+  Rejected: making that set `nonisolated` (it is shared mutable state across
+  every window — the isolation is what makes it safe); passing `self` into
+  the detached task (the model belongs to the main actor, and the folder can
+  change under it while the copy runs, so only the URL crosses).
+
+  **One trap worth carrying back**, because it is row 279's defect one thread
+  over: the tracker must be cleared BEFORE the copy and set only AFTER it
+  succeeds. Set it first and a failed setup leaves the folder marked fresh,
+  so the next attempt skips the mirror and the folder stays without a
+  `Dockerfile` — which is exactly the "missing the toolchain's build recipe"
+  failure row 279 fixed. Worth checking `ToolchainMirror.InitializeWorkspace`
+  handles a failure the same way.
+
+  **Version note.** This is a behaviour change on the mac and the release
+  still ships as **1.1.0**, deliberately: the version names which contracts a
+  build passes, Windows 1.1.0 already behaves this way, so the mac not doing
+  it was the mac being BEHIND 1.1.0 rather than 1.1.0 meaning something new.
+  Shipping it makes the two platforms agree on the number. Decided with
+  Russell, 2026-08-20.
+
+  Reference: `WorkspaceModel.initializeWorkspaceInBackground`,
+  `WorkspacePickerView`, and
+  `WorkspaceInitializationTests.testInitializingInTheBackgroundProducesTheSameWorkspace`
+  — which pins the BUTTON's path, since the synchronous form the tests
+  previously covered is no longer the one a teacher takes. 764 tests.
+
+- ✅ DONE (mac, 2026-08-20). **The teacher-made-link case is implemented, and
+  the three setup cases are retired** — the two contract requests that stood
+  between the mac and the v1.1.0 tag.
+
+  **Implemented: the teacher-made-link case.** `FailureExplainer` on this side
+  now recognises `untrusted mount point` and says the same sentence Windows
+  says, word for word from the contract. It is checked FIRST, matching
+  `FailureExplainer.cs`'s order, though nothing here depends on that: no other
+  matcher looks at a WinError 448. This output cannot occur on macOS and the
+  mapping is here anyway, for the reason the request gave — the two explainers
+  stay ONE list of troubles rather than growing a platform switch.
+
+  **Retired: the three one-time-Windows-setup cases.** Removed from
+  `contracts/app-rules.json` rather than implemented, taking the branch the
+  proposal itself named: `windows-native-toolchain` merged, the container path
+  went with it, and no shipping launcher prints "needs to restart to finish
+  getting ready", "Windows permission was declined" or "Windows could not add
+  the feature this needs" any more. They survive only in 1.0.2, whose
+  launchers are frozen and whose app already recognises them.
+
+  **Why retire rather than keep them harmlessly.** A contract case is a claim
+  that both apps must behave this way, and a case no launcher can trigger
+  teaches the next reader that a dead code path is load-bearing — the same
+  failure as stale advice, one file over. Rejected: keeping them "in case the
+  container path comes back" (it is deleted, and a case is cheap to re-add
+  from this entry); keeping them on the mac only (the whole point of the
+  mapping was that the two lists match).
+
+  **What Windows should do with `SetupExplanation`.** It is now unpinned by
+  the contract. Delete it when the launcher code it reads goes, rather than
+  leaving the only implementation of a rule nothing tests.
+
+  **One difference the sync surfaced and did NOT close**:
+  `FailureExplainer.cs` has a `FolderAccessExplanation` ("Plantoir couldn't
+  read every file in this working folder…") that the mac has never had and no
+  contract case pins. It is left alone deliberately — porting it is a
+  behaviour change, no mac teacher has reported the trouble, and doing it
+  inside a release-qualification pass would have pushed this cut to 1.1.1 for
+  a sentence nobody asked for. It belongs in the contract either way: whoever
+  picks it up should propose the case first and let both suites go red.
+
+  Reference here: `mac-app/QuartzTeachers/Scripting/FailureExplainer.swift` →
+  `vaultLinkExplanation`, run by `AppRulesContractTests` →
+  `testFailuresAreExplainedAsTheContractSays`. 763 tests, 0 failures.
 
 - **Windows app brought into full parity with shared contracts and macOS features**
   (Windows, 2026-08-17, branch `windows-sync`). All 466 tests pass on Windows

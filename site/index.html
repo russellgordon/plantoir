@@ -92,14 +92,45 @@
 
 <figure class="shot shot-composite">
     <picture>
-      <source srcset="./img/hero-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="./img/hero-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="./img/hero-light.webp" type="image/webp">
-      <img src="./img/hero-light.png" alt="Three overlapping windows in a diagonal cascade: Markdown notes in Obsidian on the left, Plantoir deploying the site in the middle, and the finished class website in Safari on the right."
+      <source srcset="./img/hero-dark.webp" data-win-srcset="./img/hero-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="./img/hero-dark.png" data-win-srcset="./img/hero-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="./img/hero-light.webp" data-win-srcset="./img/hero-windows-light.webp" type="image/webp">
+      <img src="./img/hero-light.png" data-win-src="./img/hero-windows-light.png" alt="Three overlapping windows in a diagonal cascade: Markdown notes in Obsidian on the left, Plantoir deploying the site in the middle, and the finished class website in Safari on the right."
            width="850" height="661" loading="lazy" decoding="async">
     </picture>
     <figcaption>From your notes in Obsidian, through Plantoir, to a live class website.</figcaption>
 </figure>
+
+<hr class="rule">
+
+<section>
+  <h2>Download</h2>
+  <div class="downloads">
+    <!-- releases/latest/download/ is EVERGREEN: GitHub serves the newest
+         release's asset as long as the asset NAME stays stable. Never rename
+         an asset without updating these hrefs (and vice versa) — the names
+         are pinned in RELEASING.md.
+
+         BOTH cards are evergreen again as of 2026-08-20, when the macOS DMG
+         joined v1.1.0. The macOS card had been PINNED to v1.0.0 while that
+         release carried no DMG, because the evergreen URL 404s for a platform
+         whose asset is missing from the newest release. If a platform ever
+         lags a tag again: pin its card to the last release that HAS the
+         asset, say so on the card, and un-pin it the moment the platform
+         catches up — see RELEASING.md, "Two platforms, one version series". -->
+    <a class="dl" href="https://github.com/russellgordon/plantoir/releases/latest/download/Plantoir-macOS.dmg">
+      <span class="platform">macOS</span>
+      <span class="meta">macOS 15 or later, Apple silicon</span>
+    </a>
+    <a class="dl" href="https://github.com/russellgordon/plantoir/releases/latest/download/PlantoirSetup.exe">
+      <span class="platform">Windows</span>
+      <span class="meta">Windows 10 or 11, 64-bit</span>
+    </a>
+  </div>
+  <!-- AUTO-UPDATED when a release is cut: the version and date come from
+       website/site.json, which the cut-release skill rewrites. -->
+  <p class="version-note">Version 1.1.0 &middot; Released August 2026 &middot; <a href="https://github.com/russellgordon/plantoir/releases">All releases</a></p>
+</section>
 
 <hr class="rule">
 
@@ -157,29 +188,6 @@
     <figcaption>Every expectation in the course, shaded by how well it is covered.</figcaption>
 </figure>
   <p>Because it's built from your own pages each time the site is built, it can't drift from the course the way a planning spreadsheet does. Useful throughout the school year, and ready whenever a department head or principal asks.</p>
-</section>
-
-<hr class="rule">
-
-<section>
-  <h2>Download</h2>
-  <div class="downloads">
-    <!-- These links are EVERGREEN: GitHub's releases/latest/download/ serves
-         the newest release's asset as long as the asset NAME stays stable.
-         Never rename the assets without updating these hrefs (and vice
-         versa) — the names are pinned in RELEASING.md. -->
-    <a class="dl" href="https://github.com/russellgordon/plantoir/releases/latest/download/Plantoir-macOS.dmg">
-      <span class="platform">macOS</span>
-      <span class="meta">macOS 15 or later, Apple silicon</span>
-    </a>
-    <a class="dl" href="https://github.com/russellgordon/plantoir/releases/latest/download/PlantoirSetup.exe">
-      <span class="platform">Windows</span>
-      <span class="meta">Windows 10 or 11, 64-bit</span>
-    </a>
-  </div>
-  <!-- AUTO-UPDATED when a release is cut: the version and date come from
-       website/site.json, which the cut-release skill rewrites. -->
-  <p class="version-note">Version 1.0.0 &middot; Released August 2026 &middot; <a href="https://github.com/russellgordon/plantoir/releases">All releases</a></p>
 </section>
 
 <hr class="rule">

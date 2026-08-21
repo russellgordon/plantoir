@@ -14,6 +14,9 @@ struct FailureExplainer {
     /// A plain-language reason for the failure, or nil when the output
     /// shows nothing recognisable.
     static func explanation(in output: String) -> String? {
+        if let reason = vaultLinkExplanation(in: output) {
+            return reason
+        }
         if let reason = rateLimitExplanation(in: output) {
             return reason
         }
@@ -25,6 +28,29 @@ struct FailureExplainer {
         }
         if let reason = missingBuildExplanation(in: output) {
             return reason
+        }
+        return nil
+    }
+
+    /// A link (junction or symlink) inside the TEACHER's own course folder
+    /// that Windows refuses to traverse.
+    ///
+    /// This output can never appear on macOS — it is a Windows error, from a
+    /// Windows filesystem — and the mapping is here anyway so that the two
+    /// apps' explainers stay the same list of troubles rather than growing a
+    /// platform switch for a handful of lines. See the contract's note on the
+    /// case; the alternative, a `platform` field on every case, was rejected.
+    ///
+    /// The trouble itself is the teacher's to fix: the toolchain creates no
+    /// links of its own on Windows any more, so a link inside a course folder
+    /// is one they made — commonly the Obsidian trick of sharing a single
+    /// Media folder across several vaults. Left unexplained, the raw OSError
+    /// reads as Plantoir crashing.
+    static func vaultLinkExplanation(in output: String) -> String? {
+        if output.contains("untrusted mount point") {
+            return "Part of this course folder is a link to another folder, and Windows won't let "
+                 + "the website builder follow it. Replace the link with the real folder (the "
+                 + "details above name which one), then try again."
         }
         return nil
     }

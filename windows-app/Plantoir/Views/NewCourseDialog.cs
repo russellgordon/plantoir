@@ -677,7 +677,11 @@ public sealed class NewCourseDialog : ContentDialog
 
     private void OnCloseButton(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
-        if (_creator.IsCreating) _creator.Runner.Terminate();
+        // StopByUser, not Terminate: closing the dialog is an ending the
+        // teacher asked for, and the trail must say so. The 2026-08-19
+        // problem report logged this as "failed (exit code -1)", which sent
+        // the investigation toward a launcher fault that never existed.
+        if (_creator.IsCreating) _creator.Runner.StopByUser();
     }
 
     private async System.Threading.Tasks.Task StartCreation()

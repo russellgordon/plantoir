@@ -17,6 +17,37 @@ body_class: home
 <hr class="rule">
 
 <section>
+  <h2>Download</h2>
+  <div class="downloads">
+    <!-- releases/latest/download/ is EVERGREEN: GitHub serves the newest
+         release's asset as long as the asset NAME stays stable. Never rename
+         an asset without updating these hrefs (and vice versa) — the names
+         are pinned in RELEASING.md.
+
+         BOTH cards are evergreen again as of 2026-08-20, when the macOS DMG
+         joined v1.1.0. The macOS card had been PINNED to v1.0.0 while that
+         release carried no DMG, because the evergreen URL 404s for a platform
+         whose asset is missing from the newest release. If a platform ever
+         lags a tag again: pin its card to the last release that HAS the
+         asset, say so on the card, and un-pin it the moment the platform
+         catches up — see RELEASING.md, "Two platforms, one version series". -->
+    <a class="dl" href="{{repo_url}}/releases/latest/download/Plantoir-macOS.dmg">
+      <span class="platform">macOS</span>
+      <span class="meta">macOS 15 or later, Apple silicon</span>
+    </a>
+    <a class="dl" href="{{repo_url}}/releases/latest/download/PlantoirSetup.exe">
+      <span class="platform">Windows</span>
+      <span class="meta">Windows 10 or 11, 64-bit</span>
+    </a>
+  </div>
+  <!-- AUTO-UPDATED when a release is cut: the version and date come from
+       website/site.json, which the cut-release skill rewrites. -->
+  <p class="version-note">Version {{version}} &middot; Released {{released}} &middot; <a href="{{repo_url}}/releases">All releases</a></p>
+</section>
+
+<hr class="rule">
+
+<section>
   <h2>What it is</h2>
   <p>A <em>plantoir</em> is a dibber — the simple hand tool that opens a hole at the right depth so a seedling can be set in and take root. This app does the same for teaching materials.</p>
   <p>Write in Obsidian, preview locally, publish when you're ready. No content management system, no fifteen clicks to post a handout, and no platform holding your work hostage when you move schools.</p>
@@ -52,29 +83,6 @@ body_class: home
   <p>Plantoir answers that from the material itself. Tag a lesson with the expectations it addresses, and each build draws a map of the whole course — every expectation shaded by how many pages reach it.</p>
   {{shot:coverage}}
   <p>Because it's built from your own pages each time the site is built, it can't drift from the course the way a planning spreadsheet does. Useful throughout the school year, and ready whenever a department head or principal asks.</p>
-</section>
-
-<hr class="rule">
-
-<section>
-  <h2>Download</h2>
-  <div class="downloads">
-    <!-- These links are EVERGREEN: GitHub's releases/latest/download/ serves
-         the newest release's asset as long as the asset NAME stays stable.
-         Never rename the assets without updating these hrefs (and vice
-         versa) — the names are pinned in RELEASING.md. -->
-    <a class="dl" href="{{repo_url}}/releases/latest/download/Plantoir-macOS.dmg">
-      <span class="platform">macOS</span>
-      <span class="meta">macOS 15 or later, Apple silicon</span>
-    </a>
-    <a class="dl" href="{{repo_url}}/releases/latest/download/PlantoirSetup.exe">
-      <span class="platform">Windows</span>
-      <span class="meta">Windows 10 or 11, 64-bit</span>
-    </a>
-  </div>
-  <!-- AUTO-UPDATED when a release is cut: the version and date come from
-       website/site.json, which the cut-release skill rewrites. -->
-  <p class="version-note">Version {{version}} &middot; Released {{released}} &middot; <a href="{{repo_url}}/releases">All releases</a></p>
 </section>
 
 <hr class="rule">

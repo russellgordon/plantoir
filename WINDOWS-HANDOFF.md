@@ -3701,12 +3701,54 @@ disappears; and never behind a warning, because the failure is silent and the
 consequence is a teacher's private notes on a public site. If a future change
 adds another such guard, it goes in the Dockerfile and it fails closed.
 
+## The three one-time-setup explainer cases are retired (2026-08-20)
+
+Answering the request in `MAC-HANDOFF.md` rather than leaving it half-done:
+the mac implemented ONE of the two failure-explanation cases proposed from
+that side and **retired the other three**.
+
+- **Implemented here**: the teacher-made-link case. `FailureExplainer.swift`
+  now recognises `untrusted mount point` and says the contract's sentence,
+  checked first exactly as `FailureExplainer.cs` checks it. The output cannot
+  occur on macOS; the mapping exists so the two explainers stay one list of
+  troubles rather than growing a platform switch, which is the reasoning the
+  proposal itself gave.
+- **Retired**: "needs to restart to finish getting ready", "Windows permission
+  was declined", "Windows could not add the feature this needs". They are gone
+  from `contracts/app-rules.json`. The proposal named this outcome as
+  conditional on `windows-native-toolchain` merging; it merged, the container
+  path went with it, and no shipping launcher prints those lines any more.
+  They survive only in 1.0.2, whose launchers are frozen and whose app already
+  recognises them.
+
+**What that means for `SetupExplanation` in `Plantoir.Core`.** It is no longer
+pinned by anything. Delete it when the launcher code that produced those lines
+goes, rather than keeping the only implementation of a rule nothing tests — a
+matcher for output nothing can print reads, to the next person, as a live code
+path.
+
+**And one difference the sync found but did not close.**
+`FailureExplainer.cs` recognises a folder-access failure ("Plantoir couldn't
+read every file in this working folder…") that the mac has never recognised
+and no contract case pins — so the two apps genuinely differ here and nothing
+would catch it. It was left alone on purpose: the sync was a release
+qualification, and adding a sentence would have made the mac's build a
+behaviour change. If that explanation is worth having, propose the case and
+let both suites go red; that is the mechanism working.
+
 ## Every built site wears the Plantoir icon, not Quartz's
 
-Added 2026-08-20. **Shared Python, a shared Dockerfile and shared assets, so
-Windows inherits the whole thing with nothing to port** — but two parts of it
-are worth knowing, because one is a trap and one is an asymmetry you cannot fix
-from your side.
+Added 2026-08-20, merged to `dev` 2026-08-21 — after the Windows container was
+retired, so the delivery half of this is written against the runtime that
+actually exists on that side now.
+
+**Shared Python and shared assets: nothing to port.** Both halves already
+reach Windows by routes that were built before this feature existed —
+`Vendor/fetch-runtime.ps1` copies `patches/Head.tsx` into the bundled Quartz
+scaffold exactly as the Dockerfile does for the container, and
+`Plantoir.csproj`'s `..\..\support\**` glob carries `support/favicon/`
+unfiltered. Two parts are still worth knowing, because one is a trap and one
+is an asymmetry you cannot fix from your side.
 
 Until this, every class site a teacher published showed **Quartz's logo** in the
 browser tab. Quartz ships `quartz/static/icon.png` and its `Head` links that as
@@ -3749,9 +3791,18 @@ goes first and the SVG wins wherever it is supported.
   implicit `GET /favicon.ico` that feed readers, link unfurlers and older
   browsers make (without reading the page at all) comes back 404.
 
+**The source folder is resolved through `toolchain_paths.SUPPORT_DIR`**, not a
+hard-coded `/opt/support`. That was corrected when this merged: it was written
+while Windows still ran in a container, and a literal `/opt` would have found
+nothing natively — the site would have built cleanly, said nothing, and worn
+the Quartz logo. Anything else that reaches for a bundled file belongs on the
+same shim.
+
 `verify.sh` now asserts both halves separately — the four files exist, the root
 `favicon.ico` and `static/icon.png` are byte-identical to `support/favicon/`,
-and `index.html` links all three. A site can have every file and still show the
+and `index.html` links all three. It is a mac-only gate (bash, and it expects
+`docker`), so on Windows the equivalent is to publish a section and look at the
+tab. A site can have every file and still show the
 Quartz logo if `patches/Head.tsx` did not make it into the image, so
 `check_baked patches/Head.tsx` was added at the same time (it had never been
 checked).
