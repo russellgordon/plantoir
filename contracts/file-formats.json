@@ -2,6 +2,11 @@
   "courseConfigKeys": {
     "keys": [
       {
+        "key": "additional_deploy_targets",
+        "type": "array of objects ({type, path})",
+        "why": "Extra destinations a course ALSO publishes to, beyond `deploy_target` (the primary) — for redundancy against one host having a bad day. `type` uses the same spellings as `deploy_target`; `path` is only present for `local_folder` entries. ABSENT (not `[]`) for every course that has not opted in, so a course nobody has touched writes the exact same file it always has."
+      },
+      {
         "example": "ICS3U",
         "key": "course_code",
         "type": "string"

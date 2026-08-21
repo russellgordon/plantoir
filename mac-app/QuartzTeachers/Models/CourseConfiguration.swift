@@ -43,7 +43,14 @@ class CourseConfiguration {
             let stored: String = stringValue(forKey: "deploy_target")
             return stored.isEmpty ? "netlify" : stored
         }
-        set { values["deploy_target"] = newValue }
+        set {
+            values["deploy_target"] = newValue
+            // A destination can never be both primary and additional at
+            // once — deploying to the same place twice makes no sense.
+            additionalDeployTargets = CourseConfiguration.pruningAdditionalTargets(
+                additionalDeployTargets, ofType: newValue
+            )
+        }
     }
 
     /// The folder local-folder deploys publish into; each section lands
@@ -61,6 +68,142 @@ class CourseConfiguration {
     /// True when this course deploys to Cloudflare Pages.
     var deploysToCloudflare: Bool {
         return deployTarget == "cloudflare_pages"
+    }
+
+    /// One additional (non-primary) destination this course also
+    /// publishes to, for redundancy — `deployTarget` remains the primary.
+    /// `type` uses the same spellings as `deployTarget`; `path` is only
+    /// meaningful when `type` is "local_folder".
+    struct AdditionalDeployTarget: Equatable {
+        var type: String
+        var path: String
+    }
+
+    /// The three destinations Plantoir knows how to publish to, in the
+    /// order they are offered — shared by the primary picker and the
+    /// additional-targets list, so "one of each type" has a single place
+    /// that defines what a "type" even is.
+    static let knownDeployTargetTypes: [String] = ["netlify", "cloudflare_pages", "local_folder"]
+
+    /// Extra places this course ALSO publishes to, beyond `deployTarget` —
+    /// for redundancy against one host having a bad day, never a
+    /// replacement for the primary choice: `deployTarget` still decides
+    /// where the "Live URL" link on a finished deploy points.
+    ///
+    /// Empty for every course that has not opted in, which is the
+    /// overwhelming majority: the key is OMITTED from `course_config.json`
+    /// entirely rather than written as `[]`, so a course nobody has
+    /// touched writes the exact same file this app has always written.
+    /// At most one entry per known type, and never a type that already
+    /// IS the primary — `deployTarget` already covers that one.
+    var additionalDeployTargets: [AdditionalDeployTarget] {
+        get {
+            guard let rawList = values["additional_deploy_targets"] as? [[String: Any]] else {
+                return []
+            }
+            var result: [AdditionalDeployTarget] = []
+            for entry in rawList {
+                guard let type = entry["type"] as? String, !type.isEmpty else {
+                    continue
+                }
+                let path = entry["path"] as? String ?? ""
+                result.append(AdditionalDeployTarget(type: type, path: path))
+            }
+            return result
+        }
+        set {
+            if newValue.isEmpty {
+                values.removeValue(forKey: "additional_deploy_targets")
+                return
+            }
+            var encoded: [[String: Any]] = []
+            for target in newValue {
+                var entry: [String: Any] = ["type": target.type]
+                if !target.path.isEmpty {
+                    entry["path"] = target.path
+                }
+                encoded.append(entry)
+            }
+            values["additional_deploy_targets"] = encoded
+        }
+    }
+
+    /// Removes `type` from `targets` if present — the one place that knows
+    /// how to keep a primary choice and an additional-targets list from
+    /// ever agreeing on the same destination twice. Used by this class's
+    /// own `deployTarget` setter (so Course Settings, which binds straight
+    /// to this model, can never reach the inconsistent state) and by
+    /// `PublishingChoiceView`'s picker (so the wizard's plain `@State`,
+    /// which is not backed by a `CourseConfiguration` until course
+    /// creation, keeps the same guarantee live on screen). A plain
+    /// function rather than a method on an instance, so it is testable
+    /// without standing up either a model or a rendered view.
+    static func pruningAdditionalTargets(
+        _ targets: [AdditionalDeployTarget], ofType type: String
+    ) -> [AdditionalDeployTarget] {
+        var result: [AdditionalDeployTarget] = []
+        for target in targets where target.type != type {
+            result.append(target)
+        }
+        return result
+    }
+
+    /// Types available to add as an ADDITIONAL target: every known type
+    /// except whichever one is already primary — a course cannot list the
+    /// same destination twice.
+    func availableAdditionalDeployTargetTypes() -> [String] {
+        var result: [String] = []
+        for type in CourseConfiguration.knownDeployTargetTypes where type != deployTarget {
+            result.append(type)
+        }
+        return result
+    }
+
+    /// Whether `type` is currently configured as an additional target.
+    func hasAdditionalDeployTarget(ofType type: String) -> Bool {
+        for target in additionalDeployTargets where target.type == type {
+            return true
+        }
+        return false
+    }
+
+    /// The stored path for an additional local-folder target, or "" when
+    /// that type is not configured (or is not "local_folder", which never
+    /// has one).
+    func additionalDeployTargetPath(ofType type: String) -> String {
+        for target in additionalDeployTargets where target.type == type {
+            return target.path
+        }
+        return ""
+    }
+
+    /// Turns an additional target on or off. Turning one off drops it
+    /// entirely, including any path it carried — re-enabling it later
+    /// starts from a blank path rather than resurrecting the old one, so
+    /// a stale folder from months ago can never come back silently.
+    func setAdditionalDeployTarget(_ enabled: Bool, ofType type: String) {
+        var targets: [AdditionalDeployTarget] = []
+        for target in additionalDeployTargets where target.type != type {
+            targets.append(target)
+        }
+        if enabled {
+            targets.append(AdditionalDeployTarget(type: type, path: ""))
+        }
+        additionalDeployTargets = targets
+    }
+
+    /// Updates the folder path for an additional local-folder target. A
+    /// no-op if that type is not currently enabled as an additional target.
+    func setAdditionalDeployTargetPath(_ path: String, ofType type: String) {
+        var targets: [AdditionalDeployTarget] = []
+        for target in additionalDeployTargets {
+            if target.type == type {
+                targets.append(AdditionalDeployTarget(type: type, path: path))
+            } else {
+                targets.append(target)
+            }
+        }
+        additionalDeployTargets = targets
     }
 
     /// What is wrong with the Cloudflare Account ID, or nil when it is

@@ -63,7 +63,8 @@ struct CourseSettingsView: View {
                     PublishingChoiceView(
                         deployTarget: $configuration.deployTarget,
                         deployFolderPath: $configuration.deployFolderPath,
-                        cloudflareAccountID: $settings.cloudflareAccountID
+                        cloudflareAccountID: $settings.cloudflareAccountID,
+                        additionalDeployTargets: $configuration.additionalDeployTargets
                     )
                 } header: {
                     FormSectionHeader("Deploying")
@@ -182,10 +183,29 @@ struct CourseSettingsView: View {
     /// would quietly have nowhere to go, and would only say so much later.
     var savingProblem: String? {
         if course.configuration.deployTarget == "local_folder" {
-            return CourseConfiguration.deployFolderProblem(forPath: course.configuration.deployFolderPath)
+            if let problem = CourseConfiguration.deployFolderProblem(forPath: course.configuration.deployFolderPath) {
+                return problem
+            }
         }
         if course.configuration.deploysToCloudflare {
-            return CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID)
+            if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
+                return problem
+            }
+        }
+        // Every ADDITIONAL destination gets the same check — a redundancy
+        // target with no valid folder or credential would otherwise only
+        // fail the first time a deploy actually reached it.
+        for target in course.configuration.additionalDeployTargets {
+            if target.type == "local_folder" {
+                if let problem = CourseConfiguration.deployFolderProblem(forPath: target.path) {
+                    return problem
+                }
+            }
+            if target.type == "cloudflare_pages" {
+                if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
+                    return problem
+                }
+            }
         }
         return nil
     }

@@ -3860,6 +3860,123 @@ There is deliberately **no web manifest and no 192/512 PWA icon set**. That is
 Android home-screen and installable-app territory, not a favicon, and the
 teacher's site is neither.
 
+## Redundant deploy targets — piece 1: schema and configuration (entry 300)
+
+Motivated directly by the Netlify ad-badge fix (its own entry 300, on the
+`issue/netlify-badge-suppression` branch): if a host has a bad day, real
+redundancy needs a second copy of the site ALREADY live, not a scramble to
+reconfigure a new destination after the fact. Russell pushed back on the
+first design sketched for this (a chevron on the Deploy button to pick a
+*different* single destination) — that is a faster manual redeploy, not
+redundancy, since nothing keeps a second destination current until someone
+notices a problem and switches. The corrected design: **a course can
+configure more than one deploy destination, and deploying publishes to
+every configured one.**
+
+This is piece 1 of 2, done: **the config schema and the wizard/settings UI
+to configure additional destinations.** The Deploy button itself is
+UNCHANGED — it still publishes to `deployTarget` (the primary) only. Piece
+2 (not started) teaches it to publish to every configured destination.
+
+### The schema
+
+```json
+{
+  "deploy_target": "netlify",
+  "additional_deploy_targets": [
+    { "type": "cloudflare_pages" },
+    { "type": "local_folder", "path": "/Users/teacher/Sites" }
+  ]
+}
+```
+
+`deploy_target` is unchanged — same key, same meaning, same default. The new
+`additional_deploy_targets` key is an array of `{type, path}` objects,
+`type` using the identical spellings as `deploy_target`; `path` is present
+only for a `local_folder` entry (Netlify's and Cloudflare's credentials
+live in per-teacher app settings already, not per-course, so neither needs
+one). **Omitted entirely — never written as `[]` — for every course that
+has not opted in**, which is the overwhelming majority: the file an
+untouched course writes is byte-identical to what it always wrote. This
+was the whole point of "the default remains pick one."
+
+**One of each of the three known types, maximum, never two of the same
+type.** A destination can never be listed as both primary AND additional at
+once. That invariant lives in exactly one place —
+`CourseConfiguration.pruningAdditionalTargets(_:ofType:)`, a plain static
+function, not a method on an instance — called from two call sites that
+need it for different reasons:
+
+- `CourseConfiguration.deployTarget`'s own setter, so Course Settings
+  (which binds its picker straight to the live model) can never reach the
+  inconsistent state.
+- `PublishingChoiceView`'s picker `onChange`, so the WIZARD's plain
+  `@State` — which has no `CourseConfiguration` to route through until the
+  course is actually created — gets the identical guarantee live on
+  screen. `NewCourseWizardView.buildConfigurationDictionary()` also prunes
+  once more, defensively, at the point it actually writes the file, so the
+  file on disk is correct even in a hypothetical future case where the
+  view's own `onChange` did not fire before Create was clicked.
+
+A plain function was chosen deliberately over an instance method so it is
+testable without standing up either a live model or a rendered view — see
+`AdditionalDeployTargetsTests.testPruningAdditionalTargetsDropsOnlyTheMatchingType`.
+The first version of that test tried to exercise this by mutating a plain
+property on the `HeldPublishingChoice` test harness and expecting the
+pruning to have happened — it silently could not, because
+`HeldPublishingChoice` is a plain class with no logic of its own, and
+`.onChange` only fires on an actually-rendered SwiftUI view. The test would
+have passed for the wrong reason if the assertion direction had been
+different; testing the plain function directly is the fix, not a
+workaround.
+
+### The UI
+
+`PublishingChoiceView` — already shared by the wizard and Course
+Settings — gained a new section below the existing primary picker: "Also
+publish to, for redundancy", with one `Toggle` per known type that is not
+the current primary. Each toggle, switched on, reveals the SAME detail
+fields (Cloudflare Account ID + help + 25 MB caption, or the folder field +
+Choose… button) that the primary picker's own conditional block shows for
+that type — factored out into two `private` subviews
+(`CloudflareDetailFields`, `LocalFolderDetailFields`) so the primary and
+additional cases read from one definition each and cannot drift apart.
+They are never on screen at the same time for the same type, by
+construction — `availableAdditionalDeployTargetTypes` already excludes
+whichever type is primary.
+
+**A toggle that is already on does not disappear from the list.** The
+first test written for "all three slots filled" assumed the additional
+list would show only types NOT yet added, and asserted it went empty once
+all three were configured — that is wrong for a toggle list: every other
+toggle in this app stays visible and shows its own state, and a
+redundancy toggle that vanished the moment you turned it on would be the
+one control that did not. Fixed the test, not the view.
+
+**Validation matches the primary's, for the same reason the primary's
+exists**: an additional Cloudflare target with no Account ID, or an
+additional local-folder target with no valid path, blocks Save/Create —
+exactly like the primary case already does — rather than failing silently
+the first time piece 2 actually tries to deploy to it. Both the wizard's
+`validate()` and Settings' `savingProblem` gate loop over
+`additionalDeployTargets` with the identical two checks the primary
+already ran.
+
+### What Windows needs from this (no urgency — piece 2 has not shipped
+either)
+
+`windows-app/Plantoir.Core/Models/CourseConfiguration.cs` needs the
+equivalent `AdditionalDeployTargets` property, with the identical
+omit-when-empty write rule (checked by
+`AdditionalDeployTargetsTests.testWritingAnEmptyAdditionalTargetsListOmitsTheKeyEntirely`
+on the mac side — port that assertion, it is the one easy to get wrong).
+`windows-app/Plantoir/Views/PublishingChoiceView.cs` needs the equivalent
+toggle section. Since Deploy's own behaviour has not changed on either
+platform yet, there is no cross-platform inconsistency live today — but a
+`course_config.json` a teacher edits on one platform should mean the same
+thing when opened on the other, so this is worth doing before piece 2
+lands anywhere, not after.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
