@@ -96,11 +96,11 @@ TALK — Unit 3, Day 5, the conferences already on that agenda
   outside the frame — and understands that a reading which nothing could
   break is not a reading. That is B1.3 in conversation: interpretation
   tied to what is actually in the work. The second question suits this
-  day, which is early — the description is drafted for homework
-  afterwards — and it is the more useful of the two, because the part a
-  student cannot explain is where B1.2 is really tested. An answer of
-  "nothing" means they have stopped looking; a good answer names a
-  specific thing and is annoyed by it.
+  day, which is early — the description is drafted in studio today — and
+  it is the more useful of the two, because the part a student cannot
+  explain is where B1.2 is really tested. An answer of "nothing" means
+  they have stopped looking; a good answer names a specific thing and is
+  annoyed by it.
   Record: two words per student on the class list — the feature they
   named, and the thing they could not explain.
 

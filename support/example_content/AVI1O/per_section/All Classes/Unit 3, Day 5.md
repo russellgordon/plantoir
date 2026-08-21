@@ -13,10 +13,10 @@ tags:
 1. Historical work: what changes when you know the date
 2. [[Assessing Your Own Work]] — judging against intention, modelled on
    a piece of mine
-3. Studio time: interpretation drafting, beginning with your work's
-   date, place and who it was made for
+3. Studio time: initial reaction written cold, then drafting the
+   description and cultural context with your work in front of you
 4. Conferences
 
 ## Things to do before our next class
 
-- [ ] Draft the description.
+- [ ] Bring one question about your work's cultural context or artist.
