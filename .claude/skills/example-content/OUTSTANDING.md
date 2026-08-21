@@ -67,14 +67,9 @@ when the account limits hit. Each is worth picking up as its own piece.
   correct and whose "fix" would have deleted a true number — so no finding
   goes in on a reviewer's word alone.
 
-## Authored and self-reviewed; NO independent review yet
+## Authored and self-reviewed; NO independent review yet — NONE (all completed)
 
-- **BOH4M** — its own pass found 18. Removed two outright policy breaches: a
-  "Team review — each member's account of what the team did well and badly"
-  feeding individual marks, and a "Professionalism — on time, prepared,
-  discreet" criterion. Found The People Problem was an evaluated task with no
-  class working period at all.
-
+- **BOH4M** — independent adversarial review completed and confirmed findings applied on 2026-08-21; see `reviews/BOH4M-2026-08-21.md`.
 - **SNC1W** — independent adversarial review completed and confirmed findings applied on 2026-08-21; see `reviews/SNC1W-2026-08-21.md`.
 
 ## To resume
