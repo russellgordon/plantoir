@@ -59,4 +59,8 @@ into [[The Commemoration Inquiry]].
 ## Curriculum connection
 
 ![[E3.4]]
+
+![[C3.4]]
+
+![[E2.1]]
 %%curriculum-end%%

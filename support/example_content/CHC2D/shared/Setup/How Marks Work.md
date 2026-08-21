@@ -22,6 +22,12 @@ you could do with one in the second week.
 course, which has to reach across the whole of it rather than test the
 last unit.
 
+```mermaid
+pie title Where your mark comes from
+    "The semester's work" : 70
+    "The final evaluation" : 30
+```
+
 **The seventy** is eight pieces of work. Seven are handed in through the
 term, in the order you meet them: [[The Source Study]],
 [[The War Question]], [[The Thirties Case]], [[The Wartime Decision]],
