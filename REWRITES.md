@@ -65,12 +65,9 @@ Prefer a **fresh adversarial review** over hunting the old lists: a review
 against the current state settles what is still true and costs less than
 archaeology. That is what was done for ICD2O, ENG2D and AVI1O, and it worked.
 
-### 3. Two payloads never independently reviewed
+### 3. One payload never independently reviewed
 
-**SNC1W** and **BOH4M** were authored and self-reviewed only. A pass that
-reviews its own work produces praise rather than findings — CIA4U's author
-said exactly that about itself, and the review that followed found ten
-confirmed defects, three of the four worst created by that very pass.
+**BOH4M** was authored and self-reviewed only. (SNC1W's independent adversarial review was completed and applied on 2026-08-21; see `reviews/SNC1W-2026-08-21.md`.) A pass that reviews its own work produces praise rather than findings — CIA4U's author said exactly that about itself, and the review that followed found ten confirmed defects, three of the four worst created by that very pass.
 
 ### 4. Deferred items, each named in its review file
 

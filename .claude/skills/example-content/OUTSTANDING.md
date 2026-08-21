@@ -69,15 +69,13 @@ when the account limits hit. Each is worth picking up as its own piece.
 
 ## Authored and self-reviewed; NO independent review yet
 
-- **SNC1W** — its own pass plus a sub-agent found 18 defects, all fixed.
-  Created `Tasks/Lab Reports.md` for seven investigations whose eleven
-  expectations were marked but invisible to the coverage map. Dropped C2.6
-  as the one code no investigation asserts.
 - **BOH4M** — its own pass found 18. Removed two outright policy breaches: a
   "Team review — each member's account of what the team did well and badly"
   feeding individual marks, and a "Professionalism — on time, prepared,
   discreet" criterion. Found The People Problem was an evaluated task with no
   class working period at all.
+
+- **SNC1W** — independent adversarial review completed and confirmed findings applied on 2026-08-21; see `reviews/SNC1W-2026-08-21.md`.
 
 ## To resume
 
