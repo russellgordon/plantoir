@@ -77,6 +77,30 @@ final class AssistSession {
     /// window that merely WATCHED must not cancel that.
     private var startedTheDownload: Bool = false
 
+    /// Whether the priming request has come BACK.
+    ///
+    /// Not whether it was sent — the distinction is the whole point. The
+    /// window announces itself ready as soon as the engine answers `/health`,
+    /// which is several seconds before the ~3,400-token warm-up has finished
+    /// reading the tool definitions, and the engine serves one request at a
+    /// time (`--parallel 1`). A first question sent into that gap does not go
+    /// faster for having been sent early: it queues behind the warm-up on the
+    /// server's single slot. Measured on an M-series Mac, 48 GB, the small
+    /// assistant, the same question twice: **1.7 s** asked after the warm-up
+    /// had returned, **3.1 s** asked the instant the field enabled.
+    ///
+    /// So the turn waits for this instead of racing it — see `canSend`.
+    private(set) var hasFinishedWarmUp: Bool = false
+
+    /// Everything waiting for the warm-up to come back.
+    ///
+    /// A teacher who presses Return during those few seconds must not have
+    /// the keystroke swallowed — "a key that silently does nothing reads as a
+    /// dropped keystroke" is already the rule the composer's arrow keys
+    /// follow, and it applies just as much here. `waitUntilWarmedUp()` parks
+    /// them here and they are resumed together the moment the warm-up ends.
+    private var warmUpWaiters: [CheckedContinuation<Void, Never>] = []
+
     // MARK: - Computed properties
 
     /// The model this window is running.
@@ -112,10 +136,18 @@ final class AssistSession {
     /// mid-run would interleave with the tool calls of the first — so the
     /// send waits even though the typing does not.
     var canSend: Bool {
-        guard readiness == .ready, let agent else {
+        guard readiness == .ready, hasFinishedWarmUp, let agent else {
             return false
         }
         return !agent.isBusy
+    }
+
+    /// The gap between the window saying it is ready and the warm-up coming
+    /// back — the only time `canSend` is false while `canAcceptTyping` is
+    /// true, and the reason the send button shows a spinner rather than
+    /// simply being dimmed for no visible reason.
+    var isWarmingUp: Bool {
+        return readiness == .ready && !hasFinishedWarmUp
     }
 
     /// Whether there is a way back to how this section was when the
@@ -248,35 +280,19 @@ final class AssistSession {
         case .ready:
             guard let baseURL = host.baseURL else {
                 readiness = .failed(reason: "The assistant's engine started but gave no address.")
+                finishWarmUp()
                 return
             }
-            // The assistant window is its own window, so it gets its own
-            // workspace pointed at the same folder rather than reaching into
-            // the main window's. The tools take the course and section as
-            // arguments — the same shape the MCP server uses — so the runner
-            // needs the folder, not this window's particular section.
-            let workspace: WorkspaceModel = WorkspaceModel()
-            workspace.adoptRestoredPath(workingFolder.path)
-            let runner: AssistToolRunner = AssistToolRunner(workspace: workspace)
-            self.toolRunner = runner
-            let agent: AssistAgent = AssistAgent(
-                courseCode: courseCode,
-                sectionNumber: sectionNumber,
-                client: AssistModelClient(baseURL: baseURL),
-                tools: runner,
-                planMode: AssistPlanMode(tier: tier)
-            )
-            self.agent = agent
-            readiness = .ready
             ActivityTrail.note(
                 .assistantReady,
                 String(format: "the assistant was ready after %.1fs", Date().timeIntervalSince(startedAt)),
                 course: courseCode, section: sectionNumber
             )
-            await warmUp(client: AssistModelClient(baseURL: baseURL), runner: runner)
+            await beginConversation(baseURL: baseURL)
 
         case .failed(let reason):
             readiness = .failed(reason: reason)
+            finishWarmUp()
             ActivityTrail.note(
                 .assistantWouldNotStart,
                 "the assistant would not start — " + reason,
@@ -285,11 +301,76 @@ final class AssistSession {
 
         case .stopped, .starting:
             readiness = .failed(reason: "The assistant's engine did not become ready.")
+            finishWarmUp()
             ActivityTrail.note(
                 .assistantWouldNotStart,
                 "the assistant did not become ready",
                 course: courseCode, section: sectionNumber
             )
+        }
+    }
+
+    /// Build the conversation on an engine that is already answering, say so,
+    /// and prime it — in that order, with the first turn held until the
+    /// priming request has come back.
+    ///
+    /// **Split out of `startEngine()` because the ORDER is the behaviour.**
+    /// `startEngine()` cannot be driven by a test without spawning a real
+    /// `llama-server`, so the one thing worth pinning here — that a turn
+    /// cannot start before the warm-up returns — would have been untestable
+    /// where it lives. This takes an address instead of making one, so a test
+    /// can hand it a stubbed endpoint that holds its answer and watch
+    /// `canSend` stay false while it does.
+    func beginConversation(baseURL: URL) async {
+        // The assistant window is its own window, so it gets its own
+        // workspace pointed at the same folder rather than reaching into
+        // the main window's. The tools take the course and section as
+        // arguments — the same shape the MCP server uses — so the runner
+        // needs the folder, not this window's particular section.
+        let workspace: WorkspaceModel = WorkspaceModel()
+        workspace.adoptRestoredPath(workingFolder.path)
+        let runner: AssistToolRunner = AssistToolRunner(workspace: workspace)
+        self.toolRunner = runner
+        let agent: AssistAgent = AssistAgent(
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            client: AssistModelClient(baseURL: baseURL),
+            tools: runner,
+            planMode: AssistPlanMode(tier: tier)
+        )
+        self.agent = agent
+        // Ready enough to TYPE into, deliberately, and not yet ready to send
+        // from: the box has to accept the keyboard while the warm-up runs or
+        // a teacher spends those seconds unable to start writing.
+        readiness = .ready
+        await warmUp(client: AssistModelClient(baseURL: baseURL), runner: runner)
+    }
+
+    /// Wait until the priming request has come back. Returns at once once it
+    /// has, so a caller never has to ask first.
+    func waitUntilWarmedUp() async {
+        if hasFinishedWarmUp {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            warmUpWaiters.append(continuation)
+        }
+    }
+
+    /// The warm-up is over — whether it answered, failed, or never ran.
+    ///
+    /// Called on every path out of starting up, including the failures.
+    /// A window that gave up on its engine still has to release anybody
+    /// waiting on this, or a Return pressed a moment earlier waits forever.
+    private func finishWarmUp() {
+        if hasFinishedWarmUp {
+            return
+        }
+        hasFinishedWarmUp = true
+        let waiting: [CheckedContinuation<Void, Never>] = warmUpWaiters
+        warmUpWaiters = []
+        for continuation in waiting {
+            continuation.resume()
         }
     }
 
@@ -302,10 +383,16 @@ final class AssistSession {
     /// Doing it while they are still reading the promise card and deciding
     /// what to type makes it free.
     ///
-    /// It is deliberately fire-and-forget: if it fails, the first real message
-    /// simply pays the cost itself, which is exactly what would have happened
-    /// anyway. Nothing is shown to the teacher either way.
+    /// Its FAILURE is fire-and-forget: if the priming request comes back an
+    /// error, the first real message simply pays the cost itself, which is
+    /// exactly what would have happened anyway. Nothing is shown to the
+    /// teacher either way.
+    ///
+    /// Its TIMING is not. The first turn waits for this to return — see
+    /// `hasFinishedWarmUp` — so `finishWarmUp()` runs on the way out however
+    /// this ends, which is why it is in a `defer` rather than at the bottom.
     private func warmUp(client: AssistModelClient, runner: AssistToolRunner) async {
+        defer { finishWarmUp() }
         var definitions: [AssistToolDefinition] = []
         for definition in runner.definitions {
             definitions.append(definition.namingTheRealCourse(courseCode))
@@ -358,6 +445,10 @@ final class AssistSession {
         if startedTheDownload {
             store.cancel()
         }
+        // Anybody still parked on the warm-up is let go here rather than left
+        // waiting on a window that has gone. `canSend` is false from this
+        // point on regardless, so nothing they were waiting to do can happen.
+        finishWarmUp()
         host?.stop()
         host = nil
         agent = nil

@@ -51,6 +51,12 @@ struct AssistWindowView: View {
     /// having to click into it first.
     @FocusState private var isComposerFocused: Bool
 
+    /// Whether a send is already parked, waiting for the warm-up to finish.
+    ///
+    /// One at a time: pressing Return twice during those few seconds must ask
+    /// one question, not two.
+    @State private var isHoldingForWarmUp: Bool = false
+
     // MARK: - Initializer
 
     init(courseCode: String, sectionNumber: Int, workingFolder: URL) {
@@ -66,6 +72,20 @@ struct AssistWindowView: View {
     }
 
     // MARK: - Computed properties
+
+    /// Whether pressing send would do anything — either straight away, or by
+    /// holding the message until the warm-up lets go of the engine.
+    ///
+    /// The warm-up case is included deliberately. `session.canSend` is false
+    /// for the few seconds between the window announcing itself ready and the
+    /// priming request coming back, and a send button that is simply dead for
+    /// that stretch would swallow the first Return a fast teacher presses.
+    private var isSendAvailable: Bool {
+        if typing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return false
+        }
+        return session.canSend || session.isWarmingUp
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -339,10 +359,9 @@ struct AssistWindowView: View {
                 .onSubmit {
                     // Ignored while the assistant is mid-run: it does one
                     // thing at a time, and a second request would interleave
-                    // with the first one's tool calls.
-                    if session.canSend {
-                        Task { await send(typing) }
-                    }
+                    // with the first one's tool calls. During the warm-up it
+                    // is held rather than ignored — see `sendOrHold()`.
+                    sendOrHold()
                 }
                 // Up and Down walk what has been asked before, the way a
                 // Terminal does.
@@ -389,13 +408,24 @@ struct AssistWindowView: View {
                 .accessibilityIdentifier("assistInputField")
 
             Button {
-                Task { await send(typing) }
+                sendOrHold()
             } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title2)
+                // A spinner while the engine is still reading its tool
+                // definitions, so the wait has something to look at. Without
+                // it the button is an ordinary arrow that quietly does not
+                // answer for a second or two, which reads as a broken button
+                // rather than as a machine getting ready.
+                if session.isWarmingUp {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 22, height: 22)
+                } else {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.title2)
+                }
             }
             .buttonStyle(.plain)
-            .disabled(!session.canSend || typing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(!isSendAvailable)
             .accessibilityIdentifier("assistSendButton")
         }
         // A continuous rounded rectangle rather than a Capsule: at one line
@@ -478,6 +508,36 @@ struct AssistWindowView: View {
     private func show(_ recalled: String) {
         lastRecalled = recalled
         typing = recalled
+    }
+
+    /// Send what is in the box, or hold it until the warm-up lets go.
+    ///
+    /// The engine serves one request at a time, and the ~3,400-token priming
+    /// request has the slot for the first couple of seconds. A question sent
+    /// into that gap does not arrive sooner for having been sent sooner — it
+    /// queues behind the warm-up — so the send waits for the slot instead of
+    /// competing for it. What the teacher sees is unchanged: they press
+    /// Return once, and their message goes.
+    ///
+    /// The box is read AFTER the wait rather than captured before it, so
+    /// anything typed during those seconds goes with the message rather than
+    /// being left behind in a field that has apparently just been sent.
+    private func sendOrHold() {
+        if session.canSend {
+            Task { await send(typing) }
+            return
+        }
+        guard session.isWarmingUp, !isHoldingForWarmUp else {
+            return
+        }
+        isHoldingForWarmUp = true
+        Task {
+            await session.waitUntilWarmedUp()
+            isHoldingForWarmUp = false
+            if session.canSend {
+                await send(typing)
+            }
+        }
     }
 
     private func send(_ text: String) async {

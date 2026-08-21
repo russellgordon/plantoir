@@ -3736,6 +3736,86 @@ qualification, and adding a sentence would have made the mac's build a
 behaviour change. If that explanation is worth having, propose the case and
 let both suites go red; that is the mechanism working.
 
+## The first turn waits for the warm-up — and what that is and is not worth (2026-08-20)
+
+The mac now does what Windows already did: **a turn cannot start before the
+priming request has come back.** Windows arrived here fixing a teacher-visible
+defect (row 293 — a first question ending in silence). The mac arrived here as
+an optimisation, and the honest arithmetic below is the part worth carrying
+back, because it changes what anybody should claim for this change.
+
+**What the mac does now.** `AssistSession` gained `hasFinishedWarmUp`, set in a
+`defer` inside `warmUp(...)` so it opens however the priming request ends —
+answered, refused, or never sent. `canSend` requires it. `readiness` still
+becomes `.ready` before the warm-up runs, so the box accepts the keyboard the
+whole time; only SENDING waits. The sequencing moved into a new
+`beginConversation(baseURL:)`, split out of `startEngine()` for one reason:
+`startEngine()` spawns a real `llama-server` and cannot be driven by a test, so
+the one rule worth pinning lived somewhere no test could reach it.
+`AssistWarmUpTests` now drives `beginConversation` against a stub engine on a
+real socket that holds its answer until the test lets go, and asserts `canSend`
+is false for the whole of that gap. Deleting the gate from `canSend` fails it.
+
+**The arithmetic, which is the useful part.** The measurement in row 295 was
+1.7 s for a question asked after the warm-up returned and 3.1 s for the same
+question asked the instant the field enabled — on an M-series Mac, 48 GB, the
+small assistant. 3.1 ≈ 1.4 + 1.7, and that is not a coincidence: it is the
+signature of two requests being **strictly serialised** on the engine's single
+slot (`--parallel 1`). So holding the send does not make the answer arrive
+sooner. Measured from the moment the window opens, the total is the same
+either way; the 1.4 s is MOVED out of the answer and into the wait, not saved.
+Do not sell this to anybody as 1.4 s of speed.
+
+**What it is actually worth**, in the order the reasons matter:
+
+1. **Nothing depends on how the engine behaves under contention.** Two
+   concurrent requests against a one-slot server is a shape whose behaviour is
+   the engine's business, not ours, and it is the shape that turned into
+   silence on Windows for unrelated reasons. One request in flight at a time
+   is a property, not a hope.
+2. **The trail's per-tool seconds become comparable.** `assistant chose a tool`
+   records how long the turn took, and routing has no automated gate anywhere
+   in this product — that figure is the only place a regression shows. Before
+   this, a first turn's seconds silently included however much warm-up was
+   left, so the first row of every conversation was noise. Now it is a
+   measurement.
+3. **The two apps behave the same way**, which is worth something on its own.
+
+**The trap, and it is the reason this is not a two-line change.** Gating
+`canSend` alone gives you a dead send button for the length of the warm-up —
+about two seconds on the small assistant and about twelve on the large one. A
+teacher who types fast and presses Return in that window gets *nothing*, and
+has to press again once the button silently comes back. That is a worse defect
+than the one being fixed, and it is the same failure the composer's arrow keys
+already have a rule about: **a key that silently does nothing reads as a
+dropped keystroke.** So the mac added two things beside the gate:
+
+- `AssistSession.waitUntilWarmedUp()`, which parks callers on a continuation
+  and releases them together when the warm-up ends — including from `finish()`,
+  so a window closed mid-warm-up does not leave a send waiting forever.
+- `sendOrHold()` in `AssistWindowView`, which sends immediately when it can and
+  otherwise parks one (and only one) send until the gate opens. It reads the
+  box AFTER the wait rather than capturing it before, so anything typed during
+  those seconds goes with the message instead of being stranded in a field that
+  has apparently just been sent.
+- The send button shows a small spinner while `session.isWarmingUp`, so the
+  wait has something to look at rather than being an ordinary arrow that
+  quietly does not answer.
+
+**If `AssistWindow.xaml.cs` disables its send affordance during `Priming`,
+check it for the same trap** — the fix is cheap and the symptom (one swallowed
+Return, once per window, only for fast typists) is exactly the kind that gets
+reported as "it ignored me" months later and reproduces for nobody.
+
+**Rejected: cancelling the warm-up when the teacher sends.** It looks like the
+version that genuinely saves time — abort the priming request, give the real
+one the slot, keep whatever prefix the warm-up already cached. It was not done
+because the saving is only the warm-up's remaining GENERATION (a handful of
+tokens), the prompt evaluation being the expensive part and already spent by
+then; and because a cancelled request leaves the slot's cache in a state we
+would then be reasoning about rather than observing. Not worth it for a
+fraction of a second.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
