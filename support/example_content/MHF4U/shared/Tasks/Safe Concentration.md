@@ -89,6 +89,8 @@ day, while there is still time in the period to act on it.
 
 ![[C3.6]]
 
+![[C3.7]]
+
 ![[C4.1]]
 
 ![[C4.2]]

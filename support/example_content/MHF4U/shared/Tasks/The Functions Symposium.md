@@ -41,9 +41,9 @@ you one question of my own.
 
 Per [[How Marks Work]], communication is the evidence today: precise
 vocabulary, representations chosen for the audience in front of you,
-and honesty about the model's limits. This is one half of the final
-thirty per cent of your mark, the [[Final Examination]] being the other
-and larger half.
+and honesty about the model's limits. This is the smaller of the two
+pieces that make up the final thirty per cent of your mark; the
+[[Final Examination]] is the larger.
 
 Guests leave written feedback and it is worth reading, but no
 visitor's opinion is part of anybody's mark — the evaluation is mine and

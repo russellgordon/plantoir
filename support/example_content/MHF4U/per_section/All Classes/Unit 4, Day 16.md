@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. [[The Signature Function]], day 5 — working period: ten minutes
+1. [[The Signature Function]], day 4 — working period: ten minutes
    alone with [[Judging Your Own Work]] first, then whatever your
    conference asked for, then the write-up and the rate-of-change
    analysis of your own model

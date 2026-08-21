@@ -72,6 +72,7 @@ time in that period to act on what it finds.
 | Gentle by design | Multiplicity chosen on purpose, and explained |
 | Exact where it counts | The $15$ m crossings solved, not read off |
 | An honest interval | The tunnel stretch defended with a sign argument and test values |
+| A miss you measured | Any constraint not perfectly met, measured rather than glossed, with the fix argued |
 | An entry that names the fight | The milestone entry names the constraint that resisted, what you tried, and the algebra that finally enforced it |
 
 > [!success]- If the ends will not both sit at $10$ m

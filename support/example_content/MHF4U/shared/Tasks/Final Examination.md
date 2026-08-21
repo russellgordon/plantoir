@@ -42,6 +42,12 @@ with you.
   the period of $y = a\sin(k(x-d)) + c$ is $\tfrac{2\pi}{|k|}$.
 - **One tangent-function question**, where there is no amplitude and
   the period is $\pi$. It is testing whether you noticed.
+- **One ratio you evaluate with your calculator**, from a radian
+  measure given as a decimal rather than as a multiple of $\pi$ — a
+  reciprocal ratio among them, so the calculator's missing keys matter.
+- **One sinusoid whose equation you write from its graph**, reading the
+  four parameters off the picture rather than the picture off the
+  equation.
 - **One logarithmic graph to transform**, with the equation of the
   asymptote, the domain and the range stated afterwards — the parameters
   behave exactly as [[The Same Four Parameters]] says, and the asymptote

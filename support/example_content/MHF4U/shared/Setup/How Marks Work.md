@@ -36,7 +36,7 @@ day it is handed in. That entry belongs to its task, not to your
 has to do.
 
 The four do not weigh the same. [[The Signature Function]] carries the
-most: it is the culminating task, it runs across six periods, the
+most: it is the culminating task, it runs across four periods, the
 phenomenon is yours rather than mine, and it asks for a family defended
 against a rival, two different rates of change, and an honest edge.
 [[Safe Concentration]] carries the least — one data table, one model, one

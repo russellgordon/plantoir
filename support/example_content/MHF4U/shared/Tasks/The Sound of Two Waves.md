@@ -72,6 +72,7 @@ to act on what it finds.
 | --- | --- |
 | Ears first | The throb timed before the algebra explains it |
 | A proof that holds | Each step justified, no "clearly" anywhere, and the claim tested at special angles before it was trusted |
+| A gap you found first | Any weak step named by you before I find it, and what you did about it |
 | A tested prediction | Beat frequency predicted, measured, reconciled |
 | Letters that speak | Every parameter tied to something audible |
 | A musical answer | Harmony and dissonance explained by the model |

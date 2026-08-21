@@ -42,6 +42,8 @@ the conference, and the part of the defence you give at the symposium.
       [[Rates of Change]] — the average one over an interval you can
       say why you chose, the instantaneous one estimated by shrinking
       intervals until the answer stops moving in the digit that matters
+- [ ] One data point set aside BEFORE fitting, then used to test the
+      finished model — and what that test showed
 - [ ] The model's domain of honesty stated — where it breaks, and why
 - [ ] Defence rehearsed for [[The Functions Symposium]]
 
@@ -71,6 +73,7 @@ mended in.
 | An argued family | The rival model taken seriously, then beaten |
 | A measured misfit | Model-versus-data disagreement stated in units |
 | Rates that mean | Both rates interpreted in the phenomenon's units |
+| A model that was tested | One point held back before fitting, and what it said afterwards |
 | Honest edges | The model's breaking point named, not hidden |
 | An entry that names the rival | The milestone entry says which family you rejected and what decided it |
 
@@ -125,20 +128,24 @@ OBSERVE — Unit 4, Day 15, the first half of the working period
 
 TALK — Unit 4, Day 15, at the conference already on that agenda
 
-  Ask: "Somebody at the next desk says everything is really exponential
-  underneath if you watch it long enough. Argue with them about yours."
+  Ask: "Make the strongest case you can FOR the family you rejected —
+  the best version of it, not a straw one. Then tell me what kills it."
 
   Then: "Your instantaneous rate came out of shrinking an interval. How
   small did you go before you stopped, and how did you know that was small
   enough?"
 
-  The first is a disagreement rather than a report, and disagreements pull
-  out reasoning that a write-up flattens. A strong answer says what the data
-  would have to DO for the exponential claim to be right — no ceiling, a
-  constant ratio between equal steps, no turning back — and then says what
-  their own numbers actually do instead. A weak one repeats the family's name
-  and its shape. That is D3.1 heard: comparing the characteristics of
-  candidate families rather than announcing the winner.
+  Arguing the losing side is the move a write-up flattens, and it is a
+  different one from the refusal rehearsed at the dress rehearsal on Day 12 —
+  deliberately, because a question a student has already answered once is a
+  prompt rather than a probe. A strong answer gives the rival its real
+  strength — what the data would have to DO for it to be right: no ceiling, a
+  constant ratio between equal steps, no turning back — and only then names
+  the feature of their own numbers that rules it out. A weak one cannot say
+  anything good about the rejected family at all, which usually means it was
+  never in the running and the choice was made by shape. That is D3.1 heard:
+  comparing the characteristics of candidate families rather than announcing
+  the winner.
 
   Then listen, on the second, for a stopping rule rather than a number. The
   strong answer is that the successive average rates stopped changing in the
