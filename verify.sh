@@ -224,6 +224,7 @@ check_baked() {
 check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py
+check_baked scripts/netlify_badge.py      /opt/scripts/netlify_badge.py
 check_baked patches/Explorer.tsx          /opt/quartz/quartz/components/Explorer.tsx
 check_baked patches/FolderContent.tsx     /opt/quartz/quartz/components/pages/FolderContent.tsx
 check_baked patches/explorer.inline.ts    /opt/quartz/quartz/components/scripts/explorer.inline.ts

@@ -52,6 +52,10 @@ COPY scripts/setup_course.py /opt/scripts/setup_course.py
 COPY scripts/build_site.py /opt/scripts/build_site.py
 COPY scripts/deploy.py /opt/scripts/deploy.py
 COPY scripts/social_card.py /opt/scripts/social_card.py
+# deploy.py's Netlify ad-badge suppression lives in this sibling module —
+# deploy.py imports it by bare name, which only resolves if it is baked in
+# beside it.
+COPY scripts/netlify_badge.py /opt/scripts/netlify_badge.py
 
 # Bake the Explorer's hide filter into the image.
 #
