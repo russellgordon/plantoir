@@ -30,7 +30,7 @@ introduction than meeting it cold at the end.
 
 | Quality | What that looks like on the paper |
 | --- | --- |
-| Explaining rather than naming | "It is a chemical change" earns little; the evidence that makes it one earns the marks. The same is true of every part of this paper |
+| Explaining rather than naming | "It disrupts the ecosystem" earns little; the mechanism (e.g. bioaccumulation, altered nitrogen cycling, or lost habitat) that disrupts it earns the marks. The same is true of every part of this paper |
 | Claims with their evidence attached | Every "because" points at something — a number off the graph, an arrow on the web, a step in the cycle |
 | Diagrams that carry information | Arrows labelled with what moves along them, not just drawn. An unlabelled cycle is a picture of a circle |
 | Honest limits | Where a graph or a food web does not support the claim you were asked about, saying so is the right answer, not a dodged one |

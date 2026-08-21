@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Diagnostic, two minutes: the solar system drawn from memory, to scale.
-   Keep it in your notebook — nobody's is right, and that is what today is
-   for
+   Keep it in your notebook, no marks — what I see decides where we set the
+   baseline for scale before we build the distances map
 2. Investigation: [[Scale Model of the Solar System]] — begin Earth and space
 3. Calculate every distance before anyone leaves the room
 4. On the field: walk it, mark each planet, photograph the line
