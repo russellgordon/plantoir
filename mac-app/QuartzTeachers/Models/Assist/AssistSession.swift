@@ -425,7 +425,7 @@ final class AssistSession {
     /// page forty. Twelve is enough for a model that will not load (the
     /// reason is in the last handful of lines) and nowhere near enough to
     /// bury a morning's work.
-    private static let mostEngineLinesOnTheTrail: Int = 12
+    static let mostEngineLinesOnTheTrail: Int = 12
 
     /// How often to look in on the engine while the window is open.
     ///
@@ -475,27 +475,51 @@ final class AssistSession {
         guard let host else {
             return
         }
+        let toRecord: [String] = AssistSession.engineLinesWorthRecording(
+            from: host.engineLinesSinceLastLook(),
+            keepingEverything: keepingEverything,
+            alreadyRecorded: engineLinesRecorded
+        )
+        for line in toRecord {
+            engineLinesRecorded += 1
+            ActivityTrail.note(
+                .assistantEngineSaid,
+                "the assistant's engine said: " + line,
+                course: courseCode, section: sectionNumber
+            )
+        }
+    }
+
+    /// Which of the engine's lines go on the trail, already shortened.
+    ///
+    /// Separated from the writing so the two decisions that matter — what is
+    /// worth keeping, and how much of it — can be checked against real engine
+    /// output without an engine. The alternative was a rule that only a
+    /// running `llama-server` could exercise, which is the same as a rule
+    /// nothing checks.
+    static func engineLinesWorthRecording(
+        from lines: [String],
+        keepingEverything: Bool,
+        alreadyRecorded: Int,
+        cap: Int = AssistSession.mostEngineLinesOnTheTrail
+    ) -> [String] {
         var worthKeeping: [String] = []
-        for line in host.engineLinesSinceLastLook() {
+        for line in lines {
             if keepingEverything || AssistSession.readsLikeATrouble(line) {
                 worthKeeping.append(line)
             }
         }
+
         // The LAST few, not the first: when an engine gives up, the reason is
         // at the bottom of what it wrote.
-        var index: Int = max(0, worthKeeping.count - AssistSession.mostEngineLinesOnTheTrail)
+        let roomLeft: Int = max(0, cap - alreadyRecorded)
+        var index: Int = max(0, worthKeeping.count - roomLeft)
+        var chosen: [String] = []
         while index < worthKeeping.count {
-            if engineLinesRecorded >= AssistSession.mostEngineLinesOnTheTrail {
-                return
-            }
-            engineLinesRecorded += 1
-            ActivityTrail.note(
-                .assistantEngineSaid,
-                "the assistant's engine said: " + AssistSession.shortened(worthKeeping[index]),
-                course: courseCode, section: sectionNumber
-            )
+            chosen.append(AssistSession.shortened(worthKeeping[index]))
             index += 1
         }
+        return chosen
     }
 
     /// Whether a line the engine wrote is worth a teacher's trail.

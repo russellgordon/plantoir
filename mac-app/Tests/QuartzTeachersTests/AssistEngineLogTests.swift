@@ -128,17 +128,7 @@ final class AssistEngineLogTests: XCTestCase {
             XCTAssertTrue(AssistSession.readsLikeATrouble(line), "This is exactly the line a report is for: \(line)")
         }
 
-        let healthyStart: [String] = [
-            "0.07.300.122 W srv  llama_server: -----------------",
-            "0.07.300.127 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set",
-            "0.07.300.127 W srv  llama_server: this can be a security risk (cross-origin attacks)",
-            "0.07.300.127 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655",
-            "0.07.488.084 W load: control-looking token: 128247 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden",
-            "0.07.990.066 I srv  llama_server: model loaded",
-            "0.18.295.148 I slot print_timing: id  0 | task 0 | prompt eval time =      58.58 ms /    33 tokens",
-            "0.07.986.963 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'",
-        ]
-        for line in healthyStart {
+        for line in AssistEngineLogTests.healthyStart {
             XCTAssertFalse(AssistSession.readsLikeATrouble(line), "A healthy start must leave the trail alone: \(line)")
         }
     }
@@ -155,7 +145,97 @@ final class AssistEngineLogTests: XCTestCase {
         XCTAssertTrue(cut.hasSuffix("…"))
     }
 
+    // MARK: - How much of it reaches the trail
+
+    /// A healthy start puts NOTHING on the trail. This is the case that
+    /// decides whether the feature is useful or a nuisance: it runs on every
+    /// conversation, and a version of it that wrote six lines every time
+    /// would bury the teacher's own actions for no gain.
+    func testAHealthyStartPutsNothingOnTheTrail() {
+        let recorded: [String] = AssistSession.engineLinesWorthRecording(
+            from: AssistEngineLogTests.healthyStart,
+            keepingEverything: false,
+            alreadyRecorded: 0
+        )
+        XCTAssertEqual(recorded, [])
+    }
+
+    /// An engine that never became ready is the one case where the filter is
+    /// turned off, because then the ordinary lines are the diagnosis too.
+    func testAnEngineThatNeverStartedGivesUpItsWholeTail() {
+        let recorded: [String] = AssistSession.engineLinesWorthRecording(
+            from: AssistEngineLogTests.healthyStart,
+            keepingEverything: true,
+            alreadyRecorded: 0
+        )
+        XCTAssertEqual(recorded.count, AssistEngineLogTests.healthyStart.count)
+        XCTAssertEqual(recorded.last, AssistEngineLogTests.healthyStart.last)
+    }
+
+    /// The cap holds across looks, not just within one — the sampler runs
+    /// every fifteen seconds, so a per-look cap would be no cap at all.
+    func testTheCapHoldsAcrossSeparateLooks() {
+        var trouble: [String] = []
+        var index: Int = 0
+        while index < 40 {
+            trouble.append("0.46.0\(index) E srv    send_error: task id = \(index), error: something went wrong")
+            index += 1
+        }
+
+        let first: [String] = AssistSession.engineLinesWorthRecording(
+            from: trouble, keepingEverything: false, alreadyRecorded: 0
+        )
+        XCTAssertEqual(first.count, AssistSession.mostEngineLinesOnTheTrail)
+        XCTAssertEqual(
+            first.last, trouble.last,
+            "When more arrived than there is room for, the RECENT end is what is kept — an engine's reason for giving up is the last thing it writes."
+        )
+
+        let second: [String] = AssistSession.engineLinesWorthRecording(
+            from: trouble,
+            keepingEverything: false,
+            alreadyRecorded: AssistSession.mostEngineLinesOnTheTrail
+        )
+        XCTAssertEqual(second, [], "The budget was already spent; a later look must not spend it again.")
+
+        let partway: [String] = AssistSession.engineLinesWorthRecording(
+            from: trouble, keepingEverything: false, alreadyRecorded: AssistSession.mostEngineLinesOnTheTrail - 3
+        )
+        XCTAssertEqual(partway.count, 3)
+    }
+
+    /// One trouble line among a normal start reaches the trail on its own,
+    /// shortened, with none of the start around it.
+    func testOneTroubleLineAmongAHealthyStartIsWhatIsKept() {
+        let overflow: String = "0.46.018.667 E srv    send_error: task id = 3, error: request (20030 tokens) exceeds the available context size (8192 tokens), try increasing it"
+        var mixed: [String] = AssistEngineLogTests.healthyStart
+        mixed.append(overflow)
+        mixed.append("0.46.018.670 I slot      release: id  0 | task 3 | stop processing: n_tokens = 34, truncated = 0")
+
+        let recorded: [String] = AssistSession.engineLinesWorthRecording(
+            from: mixed, keepingEverything: false, alreadyRecorded: 0
+        )
+        XCTAssertEqual(recorded, [overflow])
+    }
+
     // MARK: - Functions
+
+    /// What this engine prints when everything is fine, taken verbatim from
+    /// a real run on this Mac (llama.cpp b10435, Qwen2.5-1.5B, 2026-08-20).
+    static let healthyStart: [String] = [
+        "0.07.299.773 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)",
+        "0.07.300.122 W srv  llama_server: -----------------",
+        "0.07.300.127 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set",
+        "0.07.300.127 W srv  llama_server: this can be a security risk (cross-origin attacks)",
+        "0.07.300.127 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655",
+        "0.07.488.084 W load: control-looking token: 128247 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden",
+        "0.07.953.283 I cmn          init: llama threadpool init, n_threads = 4",
+        "0.07.986.963 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'",
+        "0.07.990.066 I srv  llama_server: model loaded",
+        "0.07.990.069 I srv  llama_server: listening on http://127.0.0.1:8791",
+        "0.18.295.148 I slot print_timing: id  0 | task 0 | prompt eval time =      58.58 ms /    33 tokens",
+        "0.18.295.176 I slot      release: id  0 | task 0 | stop processing: n_tokens = 34, truncated = 0",
+    ]
 
     private func makeLog(holding text: String) throws -> URL {
         let logURL: URL = FileManager.default.temporaryDirectory

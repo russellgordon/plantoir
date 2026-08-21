@@ -3802,6 +3802,11 @@ dropped keystroke.** So the mac added two things beside the gate:
   wait has something to look at rather than being an ordinary arrow that
   quietly does not answer.
 
+**Verified on the real app** (MCV4U section 1, small assistant, 2026-08-20):
+the spinner shows while the engine reads its tool definitions and becomes the
+arrow again when it is done, and a Return pressed the instant the box came
+alive was not swallowed — it went through and was answered.
+
 **If `AssistWindow.xaml.cs` disables its send affordance during `Priming`,
 check it for the same trap** — the fix is cheap and the symptom (one swallowed
 Return, once per window, only for fast typists) is exactly the kind that gets
@@ -3887,6 +3892,21 @@ line that mattered ends up on page forty. Twelve is enough for a model that
 will not load and nowhere near enough to bury a morning's work. Lines are cut
 to 200 characters, and go through `LogRedactor` on the way in like everything
 else — which matters here, because the engine prints the model's full path.
+
+**Verified end to end on the real app**, because none of the unit tests can
+prove the wiring holds. A healthy conversation left the trail untouched, which
+is the result that matters most — the filter is doing its job. An over-long
+prompt then produced, about six seconds later:
+
+```
+23:23:36 · MCV4U/1 · the local AI assistant could not answer — The assistant's engine answered with an error (400).
+23:23:42 · MCV4U/1 · the assistant's engine said: 0.56.869.873 E srv    send_error: task id = 114, error: request (11965 tokens) exceeds the available context size (8192 tokens), try increasing it
+```
+
+The first line is what a report carried BEFORE this change, on its own: an HTTP
+status and nothing else. The second is the sentence that explains it. That pair
+is the whole argument for the feature. The temporary log folder was empty after
+quitting, so `discardEngineLog()` does clean up.
 
 ### This adds a contract event, and the Windows suite will go red
 
