@@ -483,6 +483,66 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Windows marketing shots re-taken for the section-2 ENG2D redeploy, and a
+  theming bug in the capture harness fixed along the way** (Windows,
+  2026-08-20).
+  - **What changed**: Russell redeployed the demo sites; ENG2D's screenshot
+    source moved from `eng2d-s1-2026-gordon` to `eng2d-s2-2026-gordon`
+    (MCV4U and SCH3U stayed on section 1). `website/shots/capture_windows.py`'s
+    `DEMO_COURSES` table was updated to match, same as the note beside the
+    identical table in `capture.py` already asks for. **No mac action
+    needed** — the mac's own table still points at `eng2d-s1-2026-gordon` and
+    that is fine unless this side also wants the section-2 content; nothing
+    here forces the two platforms' screenshots to source the same section.
+  - **A dialog theming bug was found and fixed, not caused by the URL
+    change** — `MarketingShotCapturer.CaptureNewCourseWindow` sets a
+    PER-WINDOW `RequestedTheme`, but `NewCourseDialog`'s "New to this?" card
+    (and the harness's own synthetic dialog card around it) read
+    `Application.Current.Resources["key"]` directly in code, which resolves
+    against the APP-WIDE theme, not the window's local override. In the Dark
+    capture this rendered a still-light card with barely-legible text over
+    the dark chrome around it — a real bug, but confirmed to be
+    capture-harness-only: `RequestedTheme` is set nowhere else in the app, so
+    a teacher never sees per-window theme divergence from the live app.
+  - **Two fixes tried and REJECTED, both left as comments at the call site
+    since they read as reasonable next attempts and are not**:
+    (1) `Application.Current.RequestedTheme = theme` after launch — throws
+    `COMException 0x80131515` at the WinRT boundary; WinUI does not support
+    changing the app-wide theme at runtime. (2) Indexing
+    `Application.Current.Resources.ThemeDictionaries["Light"/"Dark"]`
+    directly, then (once `App.xaml` turned out to merge `XamlControlsResources`
+    rather than declare `ThemeDictionaries` itself) recursively searching
+    `MergedDictionaries` for it — both resolved whichever theme the app was
+    ambiently in but threw "Cannot find a resource with the given key" for
+    the other one. WinUI appears to only materialize the ACTIVE theme's
+    dictionary regardless of how it is reached, so asking for the theme the
+    app is not currently in fails no matter the path to it. **The fix that
+    shipped**: `MarketingShotCapturer.ThemedBrush` hardcodes approximate
+    Fluent 2 literal colours per theme (matching the precedent already in
+    `ConfigureWindow`'s `#F3F3F3`/`#202020` page backgrounds) rather than
+    resolving anything live — acceptable here because this only feeds a
+    screenshot, where "reads clearly" is the bar, not a pixel-exact token.
+  - **A related bug, worth knowing regardless of the theming question**:
+    `MarketingShotCapturer.RunAsync` caught its own exceptions, logged them,
+    and still called `Environment.Exit(0)` either way — so a mid-capture
+    crash was invisible to `capture_windows.py`'s `subprocess.run(...,
+    check=True)`, which reported success with whatever images happened to
+    exist, stale ones included. This hid the theming bug's own two failed
+    fix attempts from the exit code entirely; both were only visible in
+    `%TEMP%\marketing_capture.log`. Now exits 1 on failure. **A second,
+    independent instance of the same swallow was in `capture_windows.py`
+    itself**: `Start-Process -Wait` does not forward the child's exit code
+    to `powershell.exe`'s own, so even with the C# fix a crash still would
+    not have surfaced — fixed with `-PassThru; exit $p.ExitCode`. Worth a
+    glance on the mac only if `capture.py` has an analogous
+    "subprocess exit code stands in for a success check" assumption
+    anywhere; nothing here suggests it does.
+  - Reference: `windows-app/Plantoir/Services/MarketingShotCapturer.cs`
+    (`ThemedBrush`, `CaptureNewCourseWindow`, `RunAsync`),
+    `windows-app/Plantoir/Views/NewCourseDialog.cs` (`ThemedResource`),
+    `website/shots/capture_windows.py` (`DEMO_COURSES`,
+    `capture_app_windows`).
+
 - **plantoir.app now has a Windows hero composite, and `deploy_site_name`
   turned out not to be a key** (Windows, 2026-08-19, commit "Give the Windows
   marketing shots a hero composite, and fix three fixtures").
