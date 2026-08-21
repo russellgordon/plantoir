@@ -115,7 +115,7 @@ TALK — Unit 4, Day 20, while they rehearse in pairs
   is the point of publishing them. These two instead:
   Ask: "Your partner just answered the growth question. What did they
   claim that you could not?"
-  Then: "Which thing we did this year made the biggest difference to
+  Then: "Which thing we did this semester made the biggest difference to
   your writing — and which one did nothing for you?"
   Do not ask which of the six questions they find hardest: that agenda
   sets it as the homework, so by the time you ask they will be reading

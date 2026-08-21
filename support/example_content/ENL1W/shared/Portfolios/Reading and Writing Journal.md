@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 enableToc: true
 ---
-One notebook, kept all year, for two purposes: to think on paper, and to
+One notebook, kept all semester, for two purposes: to think on paper, and to
 leave a trail of what you can now do that you could not in September.
 
 ## What goes in it
