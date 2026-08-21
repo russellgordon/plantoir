@@ -22,4 +22,5 @@ tags:
 
 ## Things to do before our next class
 
+- [ ] [[The Independent Study]] checkpoint one submitted and approved.
 - [ ] Collect your copy of *Monkey Beach*. We open it together next class.

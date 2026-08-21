@@ -21,7 +21,7 @@ essay you have written. See
 
 | Checkpoint | When | What is due |
 | --- | --- | --- |
-| **1. The choice** | Unit 2, Day 25 | Your text, approved, plus a paragraph on why |
+| **1. The choice** | Unit 2, Day 26 | Your text, approved, plus a paragraph on why |
 | **2. The reading** | Unit 3, Day 10 | Annotations, a passage log of at least twelve entries, and three candidate questions |
 | **3. The argument** | Unit 4, Day 6 | Thesis with a mechanism, an outline, and two secondary sources logged |
 | **4. The draft** | Unit 4, Day 12 | A complete draft, workshopped in class |
