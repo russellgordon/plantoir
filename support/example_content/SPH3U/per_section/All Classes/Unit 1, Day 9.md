@@ -14,9 +14,8 @@ tags:
 2. Skill: [[Writing a Lab Report]] — the sections, and where the marks
    actually are
 3. The analysis section is the report; the procedure is not
-4. Before you leave: bring me what you have of the [[Measuring g]]
-   analysis and I will name its weakest row, while there is still time
-   tonight to do something about it
+4. Bring the analysis to me during the period; I will name its weakest
+   row while the rest of the period is still there to fix it
 
 ## Things to do before our next class
 

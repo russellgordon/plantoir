@@ -58,10 +58,11 @@ without a number in it is not a physics argument.
 One of those numbers is a transformer. Your coil makes electricity at a
 few volts; the line on the road outside carries it at several thousand,
 and something brings it back down again before it reaches this building.
-Work out the turns ratio each of those two transformers needs, say which
-is the step-up and which the step-down, and explain in three sentences
-what the grid buys by doing it — in terms of the current in the wire,
-not in terms of the word "efficiency".
+Describe the physical components of each transformer (the iron core and
+coils), work out the turns ratio each needs, say which is the step-up
+and which the step-down, and explain in three sentences what the grid
+buys by doing it — in terms of the current in the wire, not in terms of
+the word "efficiency".
 
 ## Who does what
 
@@ -78,8 +79,8 @@ are two people who have each done half the reading.
 
 | Category | What I am looking for |
 | --- | --- |
-| Knowledge | The diagram shows current, field and force with their directions consistent, and the right-hand rule you used is named |
-| Knowledge | The two turns ratios are calculated, the step-up and the step-down are named the right way round, and the reason the grid transforms at all is given in terms of the current in the wire |
+| Knowledge | The diagram shows current, field and force with their directions consistent, the right-hand rule used is named, and the roles of the motor and generator components (coil, brushes/cradles, magnets) are explained |
+| Knowledge | The components and electromagnetic operation of step-up and step-down transformers are described, the two turns ratios are calculated, and the reason the grid transforms at all is given in terms of the current in the wire |
 | Thinking | The energy your motor consumed is computed from a measured potential difference, a measured current and a timed run — and the account of where it went RANKS its candidates, with a reason, instead of listing them |
 | Thinking | The improvement reports a prediction made before the measurement, and the result whether or not it survived |
 | Application | Part 3 explains YOUR generator, not generators in general, and connects it to how the electricity in the room was made |
@@ -108,8 +109,6 @@ are two people who have each done half the reading.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D2.5]]
-
 ![[F1.2]]
 
 ![[F2.6]]
@@ -117,6 +116,10 @@ are two people who have each done half the reading.
 ![[F2.7]]
 
 ![[F2.8]]
+
+![[F3.5]]
+
+![[F3.6]]
 
 ![[F3.8]]
 %%curriculum-end%%

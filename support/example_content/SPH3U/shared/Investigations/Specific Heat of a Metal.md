@@ -44,7 +44,7 @@ because the equation already says one gained and one lost.
 
 ## Analysis
 
-1. Compare with the accepted value for your metal. Percent difference?
+1. Compare with the accepted value for your metal. Per cent difference?
 2. Your value will probably be LOW. Why does heat lost to the room and to
    the calorimeter itself push it that way rather than the other?
 3. Water's specific heat is about ten times most metals'. What does that

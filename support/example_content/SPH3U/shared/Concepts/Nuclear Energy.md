@@ -21,7 +21,7 @@ control rods and a moderator.
 
 The products weigh slightly less than what went in. That missing mass
 appears as energy, at the exchange rate $E = mc^2$. "Slightly" is doing
-real work in that sentence: a fraction of a percent of the mass, but
+real work in that sentence: a fraction of a per cent of the mass, but
 $c^2$ is an enormous number.
 
 ## Radiation and half-life
@@ -37,6 +37,10 @@ makes this a local question rather than an abstract one. See
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[D3.6]]
+
+![[D3.9]]
 
 ![[D3.10]]
 

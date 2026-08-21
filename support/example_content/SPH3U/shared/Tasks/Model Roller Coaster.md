@@ -143,9 +143,11 @@ friction". The number is the point.
 
 ![[D2.4]]
 
-![[D2.5]]
+![[D3.1]]
 
-![[D2.6]]
+![[D3.3]]
+
+![[D3.4]]
 
 ![[D3.5]]
 %%curriculum-end%%

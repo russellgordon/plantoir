@@ -45,5 +45,7 @@ how much energy left as heat.
 
 ![[D2.10]]
 
-![[D3.9]]
+![[D3.3]]
+
+![[D3.8]]
 %%curriculum-end%%

@@ -61,7 +61,7 @@ who have each done half of the thinking.
 | The data is honest | Every trial is there, including the one you did not like; the spread is reported, not just the mean |
 | The instrument was chosen, not just used | Where there was a choice of method you recommend one and say what it cost you in precision, range or time; where there was not, you name the instrument that limited your result and what you would use instead |
 | The graph earns its axes | You say why THAT quantity is on the vertical axis, and what its slope is physically |
-| The analysis goes past the number | Percent difference from the accepted or expected value, where there is one; the largest source of error named, with the direction it pushes your result; and one change that would reduce it |
+| The analysis goes past the number | Per cent difference from the accepted or expected value, where there is one; the largest source of error named, with the direction it pushes your result; and one change that would reduce it |
 | The conclusion is justified, not just stated | It claims what your uncertainty allows and no more — "consistent with 9.8 within our uncertainty" and "we measured 9.8" are different sentences — and it says WHY the number landed where it did, in the physics the investigation was testing |
 | The hazards are named | One or two lines saying what in this method could have hurt somebody, and what you did about it — the way a real method section does it |
 | Somebody could repeat it | Enough method that a reader could get your numbers, in the past tense, without "human error" appearing anywhere |

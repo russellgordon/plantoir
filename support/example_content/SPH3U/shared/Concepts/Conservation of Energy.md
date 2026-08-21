@@ -38,9 +38,9 @@ good conclusion, and the reason [[Efficiency and Power]] exists.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D2.4]]
+
 ![[D2.5]]
 
-![[D3.5]]
-
-![[D3.6]]
+![[D3.1]]
 %%curriculum-end%%

@@ -38,7 +38,7 @@ of 20 is what makes stopwatch timing good enough — see
 
 - Video: your table of position and time, and the graph with its slope.
 - Pendulum: length, time for 20 swings, at least three trials.
-- Both: your value of $g$ with an uncertainty, and the percent difference
+- Both: your value of $g$ with an uncertainty, and the per cent difference
   from $9.8\ \text{m/s}^2$.
 
 ## Analysis

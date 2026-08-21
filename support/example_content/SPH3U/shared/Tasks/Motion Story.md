@@ -59,15 +59,17 @@ draw and your answer to step 4 are yours.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B1.1]]
+
+![[B2.1]]
+
 ![[B2.2]]
 
 ![[B2.6]]
 
-![[B3.3]]
+![[B3.1]]
 
-![[B1.1]]
-
-![[B1.2]]
+![[A1.11]]
 %%curriculum-end%%
 
 %%
