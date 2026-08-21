@@ -21,6 +21,10 @@ deliberately left alone.
 - **CHA3U** — adversarial review, 70/30 pie chart, single-H2 TOC fix, 100% coverage depth (`reviews/CHA3U-2026-08-21.md`).
 - **BOH4M** — adversarial review, 70/30 pie chart, single-H2 TOC fix (`reviews/BOH4M-2026-08-21.md`).
 - **SNC1W** — adversarial review, overall block anchors, diagnostic clarity (`reviews/SNC1W-2026-08-21.md`).
+- **CIA4U** — Unit 4 Day 16 presentation timing resolved via concurrent policy panels of 5-6 students (12 min per presenter), preserving individual defense and fitting the 75-minute period (`reviews/CIA4U-2026-08-20.md`).
+- **TEJ2O** — Added `Soldering a Circuit` lab, updated `Safety in the Lab` with soldering safety rules and B2.2 transclusion, updated Labs index and Unit 3 Days 6–7 schedule, fully satisfying B2.1 soldering requirement (`reviews/TEJ2O-2026-08-20.md`).
+- **ENG2D** — Expanded `The Media Deconstruction` to produce primary text and companion adaptation for distinct audiences and purposes, fully satisfying D3.4 (`reviews/ENG2D-2026-08-20.md`).
+- **AVI1O** — Aligned `The Interpretation` to in-class studio drafting standard across Unit 3 Days 4–7, restricting homework to prep/review (resolving finding 14, `reviews/AVI1O-2026-08-20.md`).
 
 ## To resume
 

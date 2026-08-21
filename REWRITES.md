@@ -50,14 +50,12 @@ archaeology. That is what was done for ICD2O, ENG2D and AVI1O, and it worked.
 
 **BOH4M**'s independent adversarial review was completed and confirmed findings applied on 2026-08-21; see `reviews/BOH4M-2026-08-21.md`. (SNC1W was completed on 2026-08-21; see `reviews/SNC1W-2026-08-21.md`.) All 37 Ontario payloads have now had their independent adversarial reviews and conformance passes completed.
 
-### 4. Deferred items, each named in its review file
+### 4. Deferred items, each named in its review file — ALL COMPLETED
 
-- **CIA4U** — Unit 4 Day 16 asks thirty students for twelve-minute
-  culminating presentations in one 75-minute period. An overrun of nearly
-  five, pre-existing, needs an arc decision.
-- **TEJ2O** — B2.1 requires soldering and nothing in the payload solders.
-- **ENG2D** — D3.4 has no period free anywhere in its task.
-- **AVI1O** — finding 14; closing it is a restructure, not a policy fix.
+- **CIA4U** — Unit 4 Day 16 presentation timing resolved by structuring delivery into concurrent policy panels of five or six students (12 min per presenter), preserving individual defense and fitting the 75-minute period; verified by adversarial review.
+- **TEJ2O** — Added `Soldering a Circuit` lab covering discrete component soldering, inspection, and continuity testing; updated `Safety in the Lab` with soldering protocols and B2.2 transclusion; updated Labs index and Unit 3 Days 6–7 schedule, fully satisfying B2.1; verified by adversarial review.
+- **ENG2D** — Expanded `The Media Deconstruction` to require producing both a primary media text and a companion adaptation for distinct audiences and purposes, updating Part 3 individual note and rubric criteria, fully satisfying D3.4; verified by adversarial review.
+- **AVI1O** — Shifted Critical Analysis Process drafting stages for `The Interpretation` into Unit 3 Days 5–7 studio class time, restricting homework to preparation and review to align with the payload's in-class drafting standard (finding 14); verified by adversarial review.
 
 ## How to work, and the traps that cost real time
 
