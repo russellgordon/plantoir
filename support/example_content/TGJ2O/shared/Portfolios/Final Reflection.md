@@ -56,4 +56,6 @@ taught — date it, quote your own words, then show the now:
 ![[D2.3]]
 
 ![[D2.4]]
+
+![[D2.5]]
 %%curriculum-end%%

@@ -109,11 +109,11 @@ that naming is marked like anything else in the curriculum. What is
 marked is the technique and your account of it, never whether you were
 easy to work with.
 
-That is the whole of it. The course does teach what work habits this
-industry runs on — see [[Careers in Communications]] — but that is
-knowledge about the field, examinable the way any other knowledge is,
-and no judgement about your own reliability goes anywhere near your
-percentage.
+The course also teaches what work habits this industry runs on — see
+[[Careers in Communications]] and the habit named in your talk on
+[[Publication Day]]. That is [[D2.4|knowledge about the field]],
+examinable the way any other knowledge is, and no judgement about your
+own reliability goes anywhere near your percentage.
 
 ### Deadlines, honestly
 

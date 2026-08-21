@@ -52,4 +52,6 @@ Treat your earlier entries the way a story treats sources:
 ## Curriculum connection
 
 ![[B1.2]]
+
+![[D2.5]]
 %%curriculum-end%%
