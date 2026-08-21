@@ -237,14 +237,14 @@ PAGE = """<title>Ontario Course Codes in Plantoir</title>
   (<code>support/ontario_secondary_courses.json</code>). A recognized code fills in the
   formal and short course names, and brings a starter structure chosen for its
   subject — folders, sidebar, a curriculum page, and a term's worth of empty
-  class pages to write into. __BUILT_COUNT__ of them go further and arrive as a
+  class pages to write into. <span id="exampleCountProse">0</span> of them go further and arrive as a
   complete course, already written. Any code not listed here is treated as a club
   or custom course.</p>
   <div class="controls">
     <input type="search" id="filter" placeholder="Filter by code, name, or subject&hellip;" aria-label="Filter courses">
     <span class="count" id="count">__COUNT__ courses</span>
     <label class="example-filter"><input type="checkbox" id="exampleOnly">
-      only courses that arrive fully written (__BUILT_COUNT__)</label>
+      only courses that arrive fully written (<span id="exampleCount">0</span>)</label>
   </div>
   <nav class="letters" aria-label="Jump to first code starting with letter">__LETTERS__</nav>
 </div></header>
@@ -279,6 +279,13 @@ __ROWS__
     noResults.style.display = shown === 0 ? "block" : "none";
   }
   filterField.addEventListener("input", applyFilters);
+  // Counted from the table rather than written by hand: this page shipped
+  // twice with a stale figure because the badges were updated and a separate
+  // hard-coded number was not.
+  const withExample = document.querySelectorAll('tr[data-example="1"]').length;
+  document.getElementById("exampleCount").textContent = String(withExample);
+  document.getElementById("exampleCountProse").textContent = String(withExample);
+
   exampleOnly.addEventListener("change", applyFilters);
 </script>
 """
@@ -297,7 +304,6 @@ def main():
 
     page = PAGE
     page = page.replace("__COUNT__", f"{len(catalogue):,}")
-    page = page.replace("__BUILT_COUNT__", str(len(built)))
     page = page.replace("__LETTERS__", letter_links)
     page = page.replace("__ROWS__", "\n".join(rows))
 
