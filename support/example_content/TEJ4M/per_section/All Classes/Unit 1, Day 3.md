@@ -19,7 +19,8 @@ tags:
    [[Writing a Specification]] — constraints, interfaces, and the
    acceptance test that settles an argument before it starts
 4. Rewrite the request as a specification another bench could build
-   from, then trade and hunt for the holes
+   from, then trade and hunt for the holes. Feedback only — nothing
+   from today is collected
 5. Practise: [[Specification Practice]]. Then today's entry — start
    from [[Your First Entry]] if last year feels far away
 

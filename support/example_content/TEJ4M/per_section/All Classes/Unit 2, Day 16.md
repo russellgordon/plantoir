@@ -12,7 +12,8 @@ tags:
 
 1. Warm-up: [[Read the Schematic]] — your own logic block
 2. Bench: build it, verify every row, and measure the propagation delay
-3. When gates beat code, and when they do not
+3. When gates beat code, and when they do not. Bench record for
+   [[Design and Build a Logic Block]] in at tools-away
 
 ## Things to do before our next class
 

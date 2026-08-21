@@ -18,7 +18,8 @@ tags:
    edges into bytes, and bytes into an argument about who spoke first
 4. Name it: [[Communication Buses]] — addressing, acknowledgement, and
    what stops working when you add one more device to the wire
-5. Practise: [[Bus and Protocol Practice]]
+5. Practise: [[Bus and Protocol Practice]], and the bench record in at
+   tools-away
 
 ## Things to do before our next class
 

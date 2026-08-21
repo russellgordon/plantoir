@@ -12,7 +12,8 @@ tags:
 
 1. Warm-up: [[Predict the Circuit]] — unit-two finale
 2. Consolidation: sensor to number on one page, built by the room
-3. Look ahead: what happens when the number decides something
+3. Journals in for Unit 2. Run [[Journal Checklist]] over yours first
+4. Look ahead: what happens when the number decides something
 
 ## Things to do before our next class
 

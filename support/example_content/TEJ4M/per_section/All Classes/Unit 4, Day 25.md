@@ -14,7 +14,8 @@ tags:
    anonymised, on the board, and the room says what it will do
 2. Design reviews, fifteen minutes each, at your own bench with your
    calculations open. The questions come from the published list in
-   [[The Engineering Review]], so none of them is a surprise
+   [[The Engineering Review]], so none of them is a surprise. Nothing
+   here is marked — the findings are the whole point
 3. Build period. Every review finding is written into the build log
    with the decision you made about it, including the ones you
    declined and why

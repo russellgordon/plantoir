@@ -7,7 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · all course · one entry per bench day · collected each unit
+> Individual · all course · one entry per bench day, written in class ·
+> collected at the end of Units 1, 2 and 3, and for the last time with
+> [[Final Reflection]] at [[The Engineering Review]]
 
 ## What you are making
 
@@ -80,8 +82,19 @@ you knew you would need it, which is the only kind anybody believes.
 
 ## Success criteria and collection
 
-Collected at the end of each unit and read against these criteria.
-[[Journal Checklist]] turns them into a self-check to run first.
+Collected on the last class of Units 1, 2 and 3, and for the last time
+at [[The Engineering Review]] with [[Final Reflection]] attached. Read
+against these criteria; [[Journal Checklist]] turns them into a
+self-check to run first.
+
+**The entries that carry a mark are the ones written in class** — at
+tools-away on a bench day, and in the periods this course sets aside
+for the journal. That is not an administrative rule: work that carries
+a mark is done here, where I can see it happen, and nobody's mark
+should depend on what they have at home. A journal prompt in a "things
+to do before our next class" list is a question to bring back to your
+next entry, not something I read for a mark, and anything you add
+between classes is yours.
 
 | Quality | What it looks like |
 | --- | --- |

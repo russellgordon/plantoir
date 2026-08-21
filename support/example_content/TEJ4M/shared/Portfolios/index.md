@@ -30,9 +30,16 @@ order you will need them:
 | --- | --- |
 | [[Your First Entry]] | Week one, facing a blank page |
 | [[What a Strong Entry Looks Like]] | Once the habit exists |
+| [[Judging Your Own Work]] | The period before a task is handed in |
 | [[Journal Checklist]] | Before each unit's collection |
 | [[Showing Growth]] | Mid-course, when old entries become evidence |
 | [[Final Reflection]] | The last week, reading the whole record |
+
+One of those pages is not about the journal at all.
+[[Judging Your Own Work]] is the inspection you run against a task's
+own criteria table before you hand it in, and it lives here because it
+runs on the same evidence the journal has been collecting — and because
+it is the same habit pointed at something else.
 
 Entries take ten minutes and feel trivial while you are writing them.
 The value arrives months later, when your capstone documentation needs

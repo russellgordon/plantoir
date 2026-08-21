@@ -13,7 +13,8 @@ tags:
 1. Warm-up: [[Read the Waveform]] — no notes, timed
 2. Bench check, on your own: a loop analysed, a state diagram drawn, and
    a timing budget defended
-3. Mark your own; note what to practise
+3. Mark your own against the posted answers; the score is yours and I
+   never see it. Note what to practise
 
 ## Things to do before our next class
 

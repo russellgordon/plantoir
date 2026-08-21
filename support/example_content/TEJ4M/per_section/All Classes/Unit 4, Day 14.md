@@ -11,8 +11,11 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Name That Part]] — storage round
-2. [[The Deployment]], day 2 — the purchasing recommendation, costed against
-   the criteria, including where the responsible choice costs more
+2. First job of the period: cut what yesterday's checkpoint said the
+   client does not need, and say in the requirements document why
+3. [[The Deployment]], day 2 — the purchasing recommendation, costed
+   against the criteria, including where the responsible choice costs
+   more
 
 ## Things to do before our next class
 

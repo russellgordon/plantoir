@@ -11,10 +11,14 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Name That Part]] — no notes, timed
-2. Bench check, on your own: a requirement rewritten, a tolerance stack,
-   and a derating decision
-3. Mark your own; note what to practise
+2. [[Judging Your Own Work]] on your own specification: every row
+   marked, the weakest one named, the fix written as a job
+3. [[The Specification]], day 5 — the revision period. Your own
+   findings first, then the other bench's report, then my checkpoint
+   comments
+4. Specifications in at the end of the period
 
 ## Things to do before our next class
 
-- [ ] Journal: which of the three you slow down for.
+- [ ] Journal: what you changed after the peer check, and what the
+      change cost you.

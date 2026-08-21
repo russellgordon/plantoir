@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Which One Doesn't Belong]] — four sample rates
-2. Practise: [[Sampling and Resolution Practice]] — aliasing, quantisation,
-   and the smallest change you can see
+2. Practise: [[Sampling and Resolution Practice]] — aliasing,
+   quantisation, and the smallest change you can see. Last ten minutes,
+   the two questions the room split on, worked on the board
 3. Consolidate: [[Sampling and Resolution]]
 
 ## Things to do before our next class

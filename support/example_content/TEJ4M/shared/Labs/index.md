@@ -39,6 +39,11 @@ the agreement in [[Safety in the Lab]], and it holds in all ten.
 | [[Stand Up a Service]] | Services, users, and a permission matrix tested from the next bench |
 | [[Design and Test a Network]] | A requirement, an address plan, and tests a stranger can run |
 
+Each of the ten produces one [[The Bench Record|bench record]], written
+at the bench in the period the lab runs and handed in at tools-away.
+That page carries the criteria all ten are read against, so it is worth
+a proper read in September and a glance before each lab afterwards.
+
 > [!tip] The results table is the lab
 > Photographs are nice; the table is the evidence. Fill it in at the
 > bench, in pen, while the circuit is still in front of you — a number
