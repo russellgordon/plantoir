@@ -92,6 +92,13 @@ else
   cat /tmp/verify_deploy_headers_test.log
 fi
 
+if (cd scripts && python3 test_netlify_badge.py) >/tmp/verify_netlify_badge_test.log 2>&1; then
+  pass "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
+else
+  fail "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
+  cat /tmp/verify_netlify_badge_test.log
+fi
+
 # -------------------- 1. Container runtime (shared Colima) --------------------
 # Maintainer variant: assumes Colima and the Docker CLI are installed (the
 # teacher-facing launchers handle installation). Never stops a running VM.

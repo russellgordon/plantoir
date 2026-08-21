@@ -16,6 +16,15 @@ python3 website/build.py --serve  # preview locally; edits rebuild on refresh
 python3 website/build.py --deploy # build, then publish to plantoir.app
 ```
 
+plantoir.app is itself a free-tier Netlify project, so `--deploy` also writes
+`site/_headers` — a Content-Security-Policy that keeps Netlify's own
+"Powered by Netlify" ad badge off the site, the identical fix
+`scripts/deploy.py` applies to every class site (see
+`documentation/07-deployment.md`, "Suppressing Netlify's own ad badge"). The
+scanning logic lives once, in `scripts/netlify_badge.py`, and
+`website/netlify_deploy.py` imports it rather than carrying its own copy;
+`website/test_netlify_deploy_headers.py` covers the wiring.
+
 ## What is where
 
 | File | What it is |

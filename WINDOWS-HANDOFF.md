@@ -3979,6 +3979,29 @@ breakage is caused by this feature rather than by the build itself.
 **Shared Python — nothing to mirror.** Windows inherits this the moment
 `deploy.py` is next synced; there is no C# equivalent to write.
 
+**Update 2026-08-21: this now also covers plantoir.app.** The marketing
+site (`website/`) is a second free-tier Netlify project exposed to the
+identical badge, with its own deploy path (`website/netlify_deploy.py`, run
+via `python3 website/build.py --deploy`) that has nothing to do with either
+app. Rather than duplicate the ~90 lines of scanning logic a second time,
+`_collect_inline_script_policy()` and `write_netlify_headers_file()` moved
+out of `deploy.py` into a new sibling module, `scripts/netlify_badge.py`,
+with `deploy.py` re-exporting both names so its own call site and
+`scripts/test_deploy_netlify_headers.py` (which does `import deploy` and
+calls `deploy.write_netlify_headers_file`) are unchanged. `netlify_deploy.py`
+imports the same module by adding `scripts/` to `sys.path` — the identical
+trick `deploy.py` already uses for `toolchain_paths` — and calls it on
+`site/` right before its own delta-deploy manifest is built, mirroring
+where `deploy.py` calls it on `public/`. Covered by
+`scripts/test_netlify_badge.py` (the module in isolation, plus an identity
+check that `deploy.py`'s re-export is the same function object) and
+`website/test_netlify_deploy_headers.py` (the wiring, against a temp folder
+standing in for `site/`).
+
+This is host/CI-side Python only — not part of either app — so it is an
+**awareness note, not something to port**: there is no C# equivalent to
+write here either, on either side of this update.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
