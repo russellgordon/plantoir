@@ -12,8 +12,8 @@ tags:
 
 1. Warm-up: first reactions to three works, written before discussion —
    I read them to find out what this class already notices
-2. [[The Critical Analysis Process]] — the four moves, labelled in your
-   sketchbook as we use them
+2. [[The Critical Analysis Process]] — the four stages, labelled in
+   your sketchbook as we use them
 3. [[Looking Twice]] in practice
 
 ## Things to do before our next class

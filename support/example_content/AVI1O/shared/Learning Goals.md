@@ -3,8 +3,7 @@ title: Learning Goals
 publish: true
 created: __CREATED__
 ---
-What you should be able to do by the end of AVI1O, in plain words first
-and in the Ministry's words underneath.
+What you should be able to do by the end of AVI1O, in plain words.
 
 ## By June you should be able to
 

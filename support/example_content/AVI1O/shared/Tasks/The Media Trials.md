@@ -6,7 +6,7 @@ tags:
   - tasks
   - unit-2
 ---
-**Due: the end of Unit 2.** Individual. A set of trials, annotated.
+**Due: the middle of Unit 2.** Individual. A set of trials, annotated.
 
 Before you can choose a medium, you have to know how it behaves. This
 task is a deliberate tour of the four the course is built on, plus the

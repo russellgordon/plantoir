@@ -7,8 +7,9 @@ tags:
   - unit-1
 ---
 **Checked three times across the term — once in each of Units 1, 2 and
-3 — and marked twice: at the end of Unit 1, and again in Unit 4 when
-the portfolio is assembled.** Individual.
+3 — and marked twice: at the end of Unit 1, and again in Unit 4, in the
+period where the portfolio is being assembled. Both markings belong to
+the seventy; neither is part of the final evaluation.** Individual.
 
 The sketchbook is where the work happens before the work. It is marked
 on evidence of thinking, not on finished pictures.
@@ -17,17 +18,18 @@ on evidence of thinking, not on finished pictures.
 
 The pages that carry the mark are the ones made in studio periods, and
 the class page for each of them says so: the thumbnails on the second
-day, the stages of the creative process labelled in Unit 1 and of a
-critique in Unit 3, the two states of the print block, the same texture
-attempted in four media, the plan for the body of work, and the note
-after each of the first two pieces of the body of work saying what it
-taught the next one. Every one of those is finished before you leave
-the room. The three checks are where I read them with you.
+day, the stages of the creative process labelled in Unit 1 and of the
+critical analysis process in Unit 3, the two states of the print block,
+the same texture attempted in four media, the plan for the body of work,
+and the note after each of the first two pieces of the body of work
+saying what it taught the next one. Every one of those is finished
+before you leave the room. The three checks are where I read them with you.
 
 The first marking, at the end of Unit 1, can only read what Unit 1 has
 given you: the record, the range, the failures kept, and the stages of
-the creative process. The stages of a critique join the terminology row
-at the second marking, because Unit 3 is where you learn to name them.
+the creative process. The stages of the critical analysis process join
+the terminology row at the second marking, because Unit 3 is where you
+learn to name them.
 
 What you add between classes is yours. It is worth doing, and doing it
 is most of how anyone gets better at drawing, and it is still not what I
@@ -43,7 +45,8 @@ mark. Practice is practice.
 - **What went wrong**, kept rather than torn out.
 - **Things you noticed** — a shadow, a shop sign, a texture.
 - **The stages named.** Label where you are in the creative process, and
-  where you are in a critique — see [[The Creative Process]].
+  where you are in the critical analysis process — see
+  [[The Creative Process]] and [[The Critical Analysis Process]].
 
 ## What is marked
 
@@ -52,7 +55,7 @@ mark. Practice is practice.
 | A record over time | Pages are dated, and a reader can follow one idea changing from one page to the next |
 | Thinking | Ideas developed across pages, not single finished drawings |
 | Range | Several options on the page before one is chosen |
-| Terminology | The stages of the creative process and of a critique named with the right terms, and used to say where a page sits |
+| Terminology | The stages of the creative process and of the critical analysis process named with the right terms, and used to say where a page sits |
 | What did not work | The attempts you abandoned are still in the book, with a note on what they taught |
 
 > [!warning] A sketchbook is not a gallery

@@ -13,7 +13,8 @@ tags:
 1. [[Assessing Your Own Work]] turned on a Unit 2 piece of your own
 2. The same move against a published table: your interpretation draft
    and the criteria on [[The Interpretation]] — [[Judging Your Own Work]]
-3. Studio time: acting on the peer reading and on your own judgement
+3. Studio time: acting on the peer reading and on your own judgement,
+   with the aesthetic judgement stage written here
 
 ## Things to do before our next class
 

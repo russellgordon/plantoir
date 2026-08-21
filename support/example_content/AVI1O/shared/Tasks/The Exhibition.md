@@ -6,9 +6,9 @@ tags:
   - tasks
   - unit-4
 ---
-**The culminating task. The last eight periods of Unit 4, ending with a
-public opening.** The show is the whole class's; the mark is yours
-alone.
+**The culminating task. Eight periods near the end of Unit 4 — numbered
+1 to 8 below — ending with a public opening.** The show is the whole
+class's; the mark is yours alone.
 
 You select, prepare, install, and label your own work, and stand beside
 it while people look.
@@ -30,11 +30,11 @@ rather than waiting for the show to speak for you.
 | --- | --- |
 | 1 | Selection: which of your works, and why those |
 | 2 | Preparation: mounting, edges, backing, and the permissions and credit note written |
-| 3 | Photographing everything for the portfolio and the record |
+| 3 | Photographing everything for the portfolio and the record, and your labels drafted from it |
 | 4 | Artist statements drafted and workshopped |
-| 5 | Curating: how the show is grouped, sequenced, and lit |
-| 6 | Installation: hanging, spacing, labels, sight lines |
-| 7 | Final checks, and the environmental audit of what we used |
+| 5 | Curating: how the show is grouped, sequenced, and lit — and a conference with me at your own wall, on the plan and on your statement |
+| 6 | Installation: hanging, spacing, labels, sight lines, acting on what the conference said |
+| 7 | Final checks, statements up beside the work, and the environmental audit of what we used |
 | 8 | The opening: you stand with your work and answer questions |
 
 ## What you deliver
@@ -60,8 +60,10 @@ rather than waiting for the show to speak for you.
 
 | Criterion | What it looks like |
 | --- | --- |
+| The selection | You can say why these works and not your other ones, and the wall bears the reason out |
 | Preparation | The work is genuinely ready for an audience |
-| Presentation | Your own section reads as a considered wall — height, spacing and sight lines serving the work |
+| The statement | A visitor who reads it looks back at the work rather than asking you what you meant |
+| Presentation | Your own section reads as a considered wall — height, spacing and sight lines serving the work, and a correct label beside every piece |
 | Audience | You can say who this show is for, and what would have to change to reach a different one |
 | Ethics | Sources credited; nothing shown that you do not have the right to show, and your note says what you changed or left out because of it |
 | Environment | Materials and waste handled responsibly, and you can say what you changed |
@@ -121,7 +123,9 @@ selections item — that one is chaired and the room is listening
   describe the visitor who does not stop, and say what about the hanging
   loses them, has understood something a defended selection does not
   show.
-  Record: one line per student on the class list, in the period.
+  Record: on the class list, the neighbouring work they ruled out — and
+  a star beside anyone who could also describe the visitor who walks
+  past.
 
 Do NOT try to gather either of these at the opening on Day 19. You will
 be hosting, and a student standing beside their work with a visitor in

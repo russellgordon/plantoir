@@ -12,7 +12,7 @@ tags:
 
 1. Retrieval: elements, principles, terminology
 2. Unit 1 consolidation, on the wall
-3. Looking ahead: four media in eight weeks
+3. Looking ahead: four media in a fortnight
 
 ## Things to do before our next class
 

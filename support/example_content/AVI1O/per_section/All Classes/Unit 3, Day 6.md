@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Draft the interpretation section.
+- [ ] Draft the interpretation, and what the context changes about it.

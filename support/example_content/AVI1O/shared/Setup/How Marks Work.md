@@ -22,7 +22,7 @@ The other **thirty per cent** comes from a single final evaluation at
 the end of the course, which is deliberately built to reach back across
 the whole of it rather than test the last unit.
 
-**The seventy** is the eight tasks you hand in during the semester, in
+**The seventy** is the eight tasks you do during the semester, in
 roughly the order you meet them: [[The Elements Study]],
 [[The Sketchbook Habit]], [[The Media Trials]],
 [[The Information Piece]], [[The Interpretation]],
@@ -101,14 +101,14 @@ consolation prize. It is how the mark is meant to work.
 
 ## Feedback arrives while you can still use it
 
-On every task you hand in during the semester there is a critique or a
-conference that looks at the work while it is still unfinished, and at
-least one working period after it and before the due date whose job is
-acting on what you heard. The final evaluation is the exception, and it
-is why the portfolio is built across the whole course rather than
-assembled at the end of it.
-It is on the class page as studio time, and it is the cheapest mark
-improvement available in this course.
+On every one of those eight tasks there is a critique or a conference
+that looks at the work while it is still unfinished, and at least one
+working period after it and before the due date whose job is acting on
+what you heard. That period is on the class page as studio time, and it
+is the cheapest mark improvement available in this course. The final
+evaluation is the one piece of work with no such period, and it is why
+the portfolio is built across the whole course rather than assembled at
+the end of it.
 
 Be careful about which one you count. There is often a second
 conference the day before something is due, and that one is for
@@ -128,7 +128,7 @@ is about the work; that column is about the worker, and mixing the two
 tells you less about both. So there is no mark here for turning up, for
 how tidy your bench is, or for how hard a piece of work looked to make.
 What you do with a blade, a solvent and a sink IS marked, and the next
-paragraph says why that is not an exception to this.
+paragraph says why.
 
 There is one exception, and it is narrow. Where a habit is written into
 the curriculum itself, it is marked like anything else in the

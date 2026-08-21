@@ -14,8 +14,9 @@ tags:
 2. Thumbnails — ten in ten minutes, and why small and fast
 3. [[The Sketchbook Habit]] launched
 4. What we are aiming at by June: [[Learning Goals]]; how it is all
-   marked: [[How Marks Work]]; and when the room is open outside class:
-   [[Help Sessions]]
+   marked: [[How Marks Work]]; what June itself asks for, and why you
+   keep everything: [[The Portfolio and Reflection]]; and when the room
+   is open outside class: [[Help Sessions]]
 
 ## Things to do before our next class
 

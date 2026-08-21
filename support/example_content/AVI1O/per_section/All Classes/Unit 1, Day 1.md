@@ -18,4 +18,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Bring a sketchbook and a pencil. Draw one thing you can see from where you eat.
+- [ ] Bring a sketchbook and a pencil. Draw one thing you can see from
+      where you eat.

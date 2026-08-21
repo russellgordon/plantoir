@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Period 5 of 8: curating, and each of you takes a wall or a bay
+1. Period 5 of 8: curating, and each of you takes a wall or a bay —
+   conferences on your plan and your statement as I come round
 2. Grouping, sequence, sight lines, and light
 3. The show planned on paper, and your three lines on who it is for
 

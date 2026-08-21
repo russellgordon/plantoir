@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Period 7 of 8: final checks
+1. Period 7 of 8: final checks, and statements up beside the work
 2. [[Art and the Environment]] — the audit of what we used, and your own
    share of it written here
 3. A last look at your wall from where a visitor will stand

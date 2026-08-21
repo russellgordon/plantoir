@@ -30,12 +30,19 @@ Everything, organised, from September — see [[The Portfolio]]:
 ## Written in the examination period
 
 **Part one — an unseen work** (about 90 minutes). You are given a work
-you have not studied, and you run the critical analysis process on it in
-writing: reaction, description, analysis and interpretation, judgement.
+you have not studied, together with its label and a short piece of wall
+text — artist, title, date, place, medium, who it was made for and what
+for — and you run the critical analysis process on it in writing, all
+four stages under their own names: initial reaction, analysis and
+interpretation, cultural context, aesthetic judgement. Those few lines
+are there because the third stage asks who and what a work was for, and
+you cannot research it in an examination room.
 
 **Part two — your own year** (about 60 minutes):
 
-1. What changed between your September sketchbook and your June one?
+1. What changed between your September sketchbook and your June one,
+   and where in it can you see the creative process working better than
+   it did in September?
 2. What has making and analysing art done to how you see things outside
    this room?
 3. What skills has this course built that are not about art, and where
@@ -53,8 +60,9 @@ writing: reaction, description, analysis and interpretation, judgement.
 | Criterion | What it looks like |
 | --- | --- |
 | Completeness | The record is there, organised and dated |
-| Analysis | The unseen work is read carefully, with evidence |
-| Self-assessment | Your written judgement of your own work is specific, and points at evidence anyone could go and look at |
+| Analysis | The unseen work is read carefully, with evidence, and all four stages are there and named |
+| Self-assessment | Your written judgement of your own work is specific, points at evidence anyone could go and look at, and says where the portfolio shows the creative process serving you better than it did in September |
+| Transfer | You name skills this course built that are not about art, and say where each of them would be worth having |
 | Insight | You notice something not obvious about your own year |
 | Routes | Four real ones — a course, a program or job, and two things in this community — named accurately enough that somebody could act on them |
 | Communication | Clear writing, correct terminology |
@@ -67,6 +75,8 @@ writing: reaction, description, analysis and interpretation, judgement.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A1.3]]
 
 ![[B1.4]]
 

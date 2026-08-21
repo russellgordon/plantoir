@@ -6,7 +6,7 @@ tags:
   - tasks
   - unit-2
 ---
-**Due: mid-Unit 2.** One finished piece each.
+**Due: late in Unit 2.** One finished piece each.
 
 You may work alongside a partner: share the message, the research into
 who needs it, and the testing. The piece you hand in is your own, and
@@ -92,7 +92,8 @@ TALK — Unit 2, Day 16, the conferences already on that agenda
   carry. Do NOT ask what a stranger reads: they tested that on somebody
   as homework the night before and the answer is printed on the task
   page.
-  Record: one line per student on the day plan, in the period.
+  Record: a phrase per student on the day plan — the objection they
+  predicted, and who would raise it.
 
 The product evidence is the piece itself, handed in and posted on Unit
 2, Day 17, and what came back from the wild.

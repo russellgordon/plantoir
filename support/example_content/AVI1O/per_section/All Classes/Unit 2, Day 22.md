@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. What we can do now that we could not in September
+1. What we can do now that we could not in September, and what
+   [[The Portfolio and Reflection]] will ask you to prove in June
 2. Looking ahead: work that means something
 3. Studio time
 

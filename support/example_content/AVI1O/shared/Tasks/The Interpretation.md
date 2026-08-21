@@ -18,15 +18,23 @@ in a book, or online — that you can look at repeatedly and at reasonable
 size. Not a thumbnail, and not something you already know the answer
 about.
 
-## The four moves, labelled
+## The four stages, labelled
+
+The same four as [[The Critical Analysis Process]], with the same names —
+label each section of your writing with the stage it is, because naming
+the stages correctly is part of what is marked.
 
 1. **Initial reaction.** What you felt or noticed first, before
    analysing. Honest, including boredom or confusion.
-2. **Description.** What is actually there — subject, elements,
-   principles, materials, scale. No judgement yet.
-3. **Analysis and interpretation.** How the parts work together, what
-   the work seems to be about, and what in the work supports that.
-4. **Judgement.** Is it effective, and by what standard?
+2. **Analysis and interpretation.** Description first: what is actually
+   there — subject, elements, principles, materials, scale — and no
+   judgement yet. Then how the parts work together, what the work seems
+   to be about, and what in the work supports that.
+3. **Cultural context.** Who made this, when, for whom, and under what
+   conditions — and what that changes about the reading you just made.
+4. **Aesthetic judgement.** Does it succeed — first on its own terms,
+   then on yours? "It did what it was after and I still dislike it" is a
+   conclusion; "I liked it" is not.
 
 ## What is marked
 
@@ -35,7 +43,9 @@ about.
 | Description first | Evidence before opinion; the commonest failure is the reverse |
 | The elements | Identified accurately and connected to their effect |
 | Interpretation | An argument supported by what is visibly there |
-| Terminology | Correct, and used because it is precise |
+| Context | You find out when, where and for whom the work was made, and say what knowing it changed |
+| Judgement | You say whether the work succeeds on its own terms before you say whether you like it |
+| Terminology | Correct, and used because it is precise — including the names of the four stages |
 | Change | You say how your reading shifted between first and second look |
 
 > [!tip] Write down your first reaction before you know anything
@@ -71,8 +81,9 @@ drafts
   Going well: the student goes back to the image between sentences, and
   points at it rather than describing it when you stop by.
   Stuck: the reproduction is closed, or shrunk into a corner of the
-  screen, and the paragraph being written is about the artist's life
-  rather than about the picture.
+  screen. The context stage is drafted this week too, so a paragraph
+  about who the work was made for is on task; a biography of the artist
+  that never comes back to the picture is not.
   Record: one column on the class list — looking, or not — on a single
   circuit of the room.
 
