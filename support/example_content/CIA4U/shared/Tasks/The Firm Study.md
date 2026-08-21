@@ -6,7 +6,7 @@ tags:
   - tasks
   - unit-2
 ---
-**Launched at the start of Unit 2; due in the fourth week of the unit.**
+**Launched at the start of Unit 2; due in the second week of the unit.**
 Individual.
 
 One Canadian firm, taken apart: what kind of thing it is, what kind of

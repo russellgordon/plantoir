@@ -59,8 +59,6 @@ Build from [[Measuring an Economy]], [[Aggregate Supply and Demand]],
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B3.3]]
-
 ![[D1.1]]
 
 ![[D1.2]]

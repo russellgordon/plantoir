@@ -69,21 +69,35 @@ you early.
 - **Two pages, and the cutting shows.** What stayed is what changes the
   decision.
 - **Your own answer at the delivery.** One question from the floor, taken
-  without help, on your own sections — judged against the five above,
-  exactly as the writing is.
+  without help, and it can come from anywhere in the brief — judged
+  against the five above, exactly as the writing is.
+- **Your own paragraphs, initialled.** Every paragraph carries the
+  initials of whoever wrote it, and all four parts carry paragraphs from
+  both of you. I mark you on the paragraphs with your initials.
 
 ## Working in pairs, marked individually
 
-Two authors, two marks. Divide the brief so that each of you writes and
-signs named sections — the fiscal side and the politics, say, against
-the monetary side and the risks — and put on the page who wrote what.
-The recommendation at the top is agreed between the two of you, and it is
-not marked as a thing on its own. What I mark on each of your papers is
-whether YOUR sections actually carry that recommendation, and your own
-answer when a question comes from the floor at the delivery.
+Two authors, two marks. Both of you write across the whole brief — the
+fiscal side, the monetary side, the politics and the risks all carry
+paragraphs from each of you — and the mark is made yours by attribution
+rather than by division: **initial every paragraph you wrote**. The
+recommendation at the top is agreed between the two of you and is not
+marked as a thing on its own.
 
-Neither the sections nor the answer is shared, and nothing your partner
-or anyone on the floor says about your work is part of your mark.
+What I mark on each of your papers is whether the paragraphs with YOUR
+initials on them — in all four parts, not two of them — actually carry
+that recommendation, and your own answer when a question comes from the
+floor at the delivery. That question can come from anywhere in the
+brief, so neither of you can hand a section over and stop reading it.
+
+Cutting to two pages will sometimes take out the only paragraph one of
+you wrote in one of the four parts. When it does, rewrite until it does
+not — deciding which sentence has to survive is the cutting, and both of
+you doing it in all four parts is the point.
+
+Neither the paragraphs nor the answer is shared, and nothing your
+partner or anyone on the floor says about your work is part of your
+mark.
 
 Build from [[Reading a Budget]], [[Circular Flow]],
 [[The Money Multiplier and Monetary Policy]] and
@@ -104,7 +118,8 @@ Build from [[Reading a Budget]], [[Circular Flow]],
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 3, Day 18, the policy brief work period
+OBSERVE — Unit 3, Day 18, the policy brief work period, whose first
+item drafts the brief long and then cuts it in the room
   Watch for: what comes OUT. Two pages is a hard limit and the cutting
   is the assignment, but the finished brief shows only what stayed —
   never what was removed, and never which partner wanted to keep it.
@@ -117,17 +132,17 @@ OBSERVE — Unit 3, Day 18, the policy brief work period
 
 TALK — Unit 3, Day 19, the conferences already on that agenda, after
 the peer challenge
-  Ask each partner separately: "Your partner wrote the monetary half. If
-  the Bank moved the other way next month, which sentence of YOUR half
-  would you have to rewrite?"
+  Ask each partner separately: "If the Bank moved the other way next
+  month, which sentence in this brief would have to be rewritten first,
+  and whose initials are on it?"
   Then: "Which of your two named risks would you spot first in the data,
   and how many months late would you be?"
-  The first is D3.2 — how monetary policy actually reaches the economy —
-  asked of the partner who did not write that section, which is the one
-  question a co-written brief cannot answer for you. The second turns
-  D3.1's transmission lags onto the pair's own recommendation; a strong
-  answer names an indicator and a publication delay rather than a
-  feeling.
+  The first is D3.2 — how monetary policy actually reaches the economy.
+  Asked of each partner out of the other's hearing, it is also the one
+  question that shows whether the monetary paragraphs were written by
+  two people or handed over by one. The second turns D3.1's transmission
+  lags onto the pair's own recommendation; a strong answer names an
+  indicator and a publication delay rather than a feeling.
   Record: one line per pair, with the indicator named, on the conference
   sheet.
 

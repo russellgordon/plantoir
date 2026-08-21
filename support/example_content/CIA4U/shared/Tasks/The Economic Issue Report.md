@@ -34,6 +34,7 @@ questions taken.**
 | The recommendation | Specific, costed, and beginning somewhere real |
 | The trade-offs | What your recommendation gives up, and who bears that |
 | The check | The indicator that would tell you in a year whether it worked |
+| The international response | Which intergovernmental bodies have addressed the disparity your issue produces or reflects, what they recommended or funded, and how well that worked |
 
 ## How it is marked
 
@@ -49,8 +50,15 @@ questions taken.**
 - **The international dimension.** E2.2 and E3.1 mean your issue has to be
   placed in a world context: what international events or policies bear on
   it, and what the comparable disparities look like elsewhere.
-- **Institutions assessed.** E3.2 — where an intergovernmental body has
-  responded to your issue, say how well, against criteria you set.
+- **Institutions assessed.** E3.2 asks about **various** intergovernmental
+  organizations, so name at least two that have addressed the disparity
+  your issue produces or reflects, and say how well each did, against
+  criteria you set before you look. Start with the expectation's own list
+  — UNESCO, UNIFEM, the UN Development Programme, the World Health
+  Organization, the International Monetary Fund, the World Bank — and add
+  the OECD or the International Labour Organization where the question is
+  a Canadian one. If nothing comes back, you are searching for your issue
+  rather than for the disparity underneath it.
 
 > [!warning] Choose in week one, and choose something with published data
 > The strongest reports come from students who spent the first two periods

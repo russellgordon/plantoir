@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. [[The Intervention Argument]] papers handed in
-2. Milestone entry, written here from a table you have not seen — [[The Notebook and Portfolio]]
-3. [[A Model of Your Own]] conferences run while you write
+2. [[A Model of Your Own]] conferences, one at a time
+3. While the conferences run: retrieval across Unit 2 — the firm, the structure, the failure, the remedy
+4. Then, at your own pace: one market from Units 1 and 2 analysed end to end
 
 ## Things to do before our next class
 

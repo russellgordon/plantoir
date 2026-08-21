@@ -47,8 +47,7 @@ exactly the habit this course is trying to break.
 
 Built from *The Ontario Curriculum, Grades 11 and 12: Canadian and World
 Studies, 2015*, unrevised. Five strands, fifteen overall and sixty-four
-specific expectations — the largest expectation count of any course in
-this collection.
+specific expectations.
 
 Note for the citation-minded: **"110 hours" is not printed in the
 curriculum document.** What is printed is that each course has a credit

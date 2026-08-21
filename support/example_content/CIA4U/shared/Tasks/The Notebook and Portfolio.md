@@ -7,10 +7,10 @@ tags:
 ---
 **Runs from the first week of the course to the last.** Individual.
 
-The notebook you keep all term, and the two portfolio pieces written at
-the two ends of the course. This page exists so that you know from the
-first week which parts of that work carry a mark and which are
-practice, and what each of the marked parts is judged on.
+The notebook you keep all term, one portfolio piece built across Units 1
+and 2, and one written at the end of the course. This page exists so
+that you know from the first week which parts of that work carry a mark
+and which are practice, and what each of the marked parts is judged on.
 
 ## What is practice, and what is marked
 
@@ -25,18 +25,19 @@ Three things carry a mark, and all three are written in class time.
 
 **Three milestone entries**, one at the end of each of the first three
 units. I put a table in front of you that day — one you have not worked
-with — and you write a complete entry from it inside the period: the
+with — and you write a complete entry from it in the twenty-five minutes
+set aside for it, in class, never at home: the
 value, the reference period, the table number, the release date, the
 date you retrieved it, one sentence on what the figure means in the
 vocabulary of this course, and one sentence on what it does not tell
 you. Your own notebook is open beside you. That is the point of having
 kept one.
 
-**[[A Model of Your Own]]**, launched in the last week of Unit 1,
-conferenced and then revised in the last two periods of Unit 2, and
-handed in on the first day of Unit 3. One decision you actually face,
-modelled, with every assumption written down and the first one to fail
-named.
+**[[A Model of Your Own]]**, launched in the fourth week of Unit 1,
+drafted in the last twenty minutes of Unit 2 Day 15, conferenced on Unit
+2 Day 21 and revised in the period after it, and handed in on the first
+day of Unit 3. One decision you actually face, modelled, with every
+assumption written down and the first one to fail named.
 
 **[[Where Economics Leads]]**, written in class in the period after the
 culminating report is delivered. Where the reasoning in this course
@@ -106,16 +107,19 @@ OBSERVE — Unit 1, Day 22, the first milestone entry written in class
   the checklist cannot supply is the last line — what the figure does
   not tell you — and the students who write a good one are almost always
   the ones who first go back and read how they phrased it in September.
-  The finished entry looks the same either way.
+  The finished entry shows you whether that last line is real; only the
+  room shows you whether it came out of the notebook.
   Going well: an old entry found and read before the last line is
   written.
   Stuck: the last line is written first, in ten seconds, and it is a
   restatement of the figure.
-  Record: one sweep at the ten-minute mark and one at the twenty-five —
-  a tick per name for "went back to an old entry". Thirty seconds each.
+  Record: one sweep about eight minutes into the writing and one about
+  eight minutes before the end — a tick per name for "went back to an
+  old entry". Thirty seconds each.
 
 TALK — Unit 2, Day 21, the A Model of Your Own conferences already on
-that agenda, which run while the rest of the class writes
+that agenda, which run while the rest of the class works through the
+unit's retrieval
   Ask: "Give the same decision to somebody with half the free hours you
   have. Does your conclusion flip — and at what point does it?"
   Then: "Where else this month have you caught yourself doing what this

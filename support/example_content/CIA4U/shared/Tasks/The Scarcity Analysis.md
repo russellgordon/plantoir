@@ -6,7 +6,7 @@ tags:
   - tasks
   - unit-1
 ---
-**Launched early in Unit 1; due in the third week.** Individual.
+**Launched early in Unit 1; due in the second week.** Individual.
 
 One allocation decision, analysed properly — which means saying what was
 given up, not only what was chosen.
@@ -21,16 +21,17 @@ need to know what the alternatives on the table actually were.
 
 ## What to produce
 
-**A written analysis of about 1,000 words.**
+**A written analysis of about 1,200 words.**
 
 | Section | What it must do |
 | --- | --- |
-| The scarcity | Name the scarce resource precisely — money, land, hours, trained people |
+| The scarcity | Name the scarce resource precisely — money, land, hours, trained people — and say which of the four factors of production it is |
 | The three questions | What is produced, how, and for whom — B1.1's frame, applied to your case |
-| The system | Where this decision sits between market and command allocation, and why that matters here |
+| The system | Which of the four systems — market, mixed, traditional, command — is actually allocating here, and how a named country running a different one would have answered the same three questions |
 | Positive and normative | Separate the factual claims from the value claims, explicitly |
 | The curve | A production possibilities argument showing the trade-off, with the axes labelled in real units |
 | What was given up | The next-best alternative, named and costed |
+| The longer run | Which factor of production this decision commits, and whether committing it uses that factor up, holds it steady, or builds it — and what that does to where your curve can go in five years |
 
 ## How it is marked
 
@@ -39,8 +40,17 @@ need to know what the alternatives on the table actually were.
   earns everything.
 - **The two kinds of claim, kept apart.** Most weak papers slide from "this
   reduces class size" to "this is the right decision" without noticing.
+- **A second system, named.** One specific country whose economy answers
+  what, how and for whom differently from Canada's, and what it would have
+  done with this decision. "A command economy would decide centrally" is
+  not a comparison; naming the country and the mechanism is.
 - **A curve that means something.** The production possibilities argument
   has to be about your case, in your units, not a generic diagram.
+- **The longer run, argued rather than asserted.** A decision that consumes
+  a scarce factor and one that renews it are not the same decision, whatever
+  they cost this year. Say which yours is, and what it does to the choices
+  available afterwards — the sustainable-development half of the scarcity
+  question.
 - **Sources.** Every figure carries a table number or a document and a
   date, per [[Where Canadian Economic Data Lives]].
 
@@ -57,8 +67,6 @@ Build from [[Scarcity and Choice]], [[Opportunity Cost]] and
 ## Curriculum connection
 
 ![[B3.1]]
-
-![[B3.2]]
 
 ![[B1.1]]
 

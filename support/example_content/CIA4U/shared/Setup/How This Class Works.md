@@ -26,8 +26,8 @@ studies, English, or social sciences and humanities.
 weight to match. The final evaluation is [[The Data Examination]], three
 hours, with tables in front of you rather than in your memory.
 [[The Notebook and Portfolio]] runs underneath all four units: the
-notebook you keep every week, and the two portfolio pieces written at
-either end of the term.
+notebook you keep every week, one portfolio piece built across Units 1
+and 2, and one written at the end of the term.
 
 ## Economics dates, and this course is built around that
 

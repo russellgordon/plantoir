@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Policy brief work period
+1. Policy brief work period: drafted long first, then cut in the room — the two-page limit applied where I can see it
 2. [[Judging an Economic Claim]] turned on your own recommendation
 3. The trade-off named: who bears the cost of what you propose
 
 ## Things to do before our next class
 
-- [ ] Draft the brief to two pages, not three.
+- [ ] Finish cutting the brief to two pages, not three.

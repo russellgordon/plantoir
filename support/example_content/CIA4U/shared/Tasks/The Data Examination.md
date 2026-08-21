@@ -24,14 +24,14 @@ not agree with each other.
 
 You answer in three parts.
 
-## Part one — the sources, about 45 minutes
+## Part one — the sources, about 40 minutes
 
 Assess the dossier. For each document: what is measured, by whom, over what
 period, and what would make it unreliable here. The submission from an
 interested party is not disqualified by being interested — say what in it
 you can use and what you cannot, and why.
 
-## Part two — the analysis, about 75 minutes
+## Part two — the analysis, about 70 minutes
 
 Interpret the evidence. Read the tables properly — level or rate,
 seasonally adjusted or not, real or nominal, and compared with what.
@@ -43,11 +43,12 @@ argument rather than as vocabulary sprinkled through it.
 
 ## Part three — the judgement, about 45 minutes
 
-Two shorter pieces of writing. First, take one economic theorist we
-studied and say how they would read this dossier, and what in it they
-would find difficult. Second, say how social movements or social justice
-organisations have addressed an inequality of this kind, and how
-effectively — criteria first, then the assessment.
+Two shorter pieces of writing. First, take two of the economic theorists
+we studied, say how each would read this dossier and what in it each
+would find difficult, and say how far either way of thinking still shapes
+the way this issue is argued today. Second, say how social movements
+or social justice organisations have addressed an inequality of this
+kind, and how effectively — criteria first, then the assessment.
 
 The remaining time is for reading and planning, and you should use it. The
 strongest papers spend twenty-five minutes on the dossier before writing a
@@ -62,6 +63,7 @@ sentence.
 | Selection | You choose the right tool and justify the choice |
 | Conceptual structure | The four concepts organise the argument |
 | Judgement | The conclusion follows from the evidence, including the evidence against |
+| Theory put to work | Two theorists' key ideas set against each other on the dossier rather than described, with a defensible claim about how far either still carries |
 | Communication | Structured, plain, and readable under pressure |
 
 ## Preparing for it

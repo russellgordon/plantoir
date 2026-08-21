@@ -12,7 +12,7 @@ tags:
 
 1. [[The Policy Brief]] delivered, first half
 2. Fifteen minutes, one recommendation, its cost named aloud
-3. Questions from the floor, one to each partner in turn
+3. Questions from the floor, one to each partner in turn, and it can come from anywhere in the brief
 
 ## Things to do before our next class
 

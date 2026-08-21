@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Draft the model half of the market model.
+- [ ] Draft the model and the shifters.

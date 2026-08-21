@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval, then a diagnostic: name a firm you buy from weekly and say who owns it. Two minutes, on paper — where the class starts on ownership decides how much of item 3 we need today
+1. Retrieval across Unit 1 — scarcity, cost, the curve, the market, elasticity — then a diagnostic: name a firm you buy from weekly and say who owns it. Two minutes, on paper — where the class starts on ownership decides how much of item 3 we need today
 2. The firm as a decision-making unit: [[Costs and the Firm]]
 3. Legal forms — who bears the loss, and who has a claim on the surplus
 4. Launch: [[The Firm Study]]

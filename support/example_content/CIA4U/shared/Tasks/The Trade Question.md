@@ -95,18 +95,20 @@ the hand-in
   is the whole point of noticing today.
 
 TALK — Unit 4, Day 5, the conferences on the research period
-  Ask: "Your theory says these two economies should trade this good in
-  this direction. Read me the year in your data where that shows most
-  clearly, and the year where it shows least."
+  Ask: "Which of the other two theories would somebody use to argue
+  against you, and what in your own data would they point at?"
   Then: "Who in Canada would most like this trade to stop, and what is
   their strongest argument?"
-  The first is E1.1 — the theories as claims that are reflected in actual
-  trading practice, tested against the student's own series rather than
-  restated. The second is E2.1, how globalisation shapes what individuals,
+  The first is E1.1 — a variety of theories, held against actual trading
+  practice. The page and the agenda both tell the student to find where
+  their own theory fails, so that question is rehearsed; being made to
+  run somebody else's theory over their own series is not, and it is the
+  one that shows whether the choice of theory was made or merely landed
+  on. The second is E2.1, how globalisation shapes what individuals,
   firms and governments decide; a strong answer gives the opposition its
   strongest form rather than its easiest one, and often turns into the
   "decision that went the other way" the task requires.
-  Record: on the research-period list, the year they pointed at, and
+  Record: on the research-period list, the rival theory they named, and
   three words for who wants it stopped.
 
 The product evidence is the analysis handed in on Day 8.

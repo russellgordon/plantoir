@@ -4,8 +4,8 @@ publish: true
 created: __CREATED__
 ---
 Work you keep rather than hand in once. The notebook runs all term and
-the self-check is used in every unit; the other two pieces are written
-at the two ends of the course.
+the self-check is used in every unit; of the other two, one is built
+across Units 1 and 2 and one is written at the end of the course.
 
 **All four units**
 
