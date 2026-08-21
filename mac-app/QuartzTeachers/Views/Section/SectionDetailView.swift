@@ -275,10 +275,16 @@ struct SectionDetailView: View {
                     TaskProgressView(
                         runner: deployRunner.activeRunner,
                         title: deployProgressTitle,
+                        hidesSiteLink: deployRunner.legs.count > 1,
                         onCancel: {
                             cancelDeploy()
                         }
                     )
+                    // Every succeeded destination's own link, once the
+                    // whole run has finished — see DeployDestinationLinks.
+                    if deployRunner.legs.count > 1, !deployRunner.isRunning {
+                        DeployDestinationLinks(legs: deployRunner.legs)
+                    }
                 }
             } else {
                 TaskProgressView(
@@ -298,10 +304,14 @@ struct SectionDetailView: View {
     /// a course with a single destination keeps the plain title it has
     /// always had.
     var deployProgressTitle: String {
-        if deployRunner.legs.count > 1, let currentLeg = deployRunner.currentLeg {
-            return "Deploying \(titleText) — \(DeployCommand.destinationDescription(for: currentLeg.destination))"
-        }
-        return "Deploying \(titleText)"
+        return SectionDetailView.deployProgressTitle(
+            sectionName: titleText,
+            isRunning: deployRunner.isRunning,
+            legCount: deployRunner.legs.count,
+            currentDestinationDescription: deployRunner.currentLeg.map { leg in
+                DeployCommand.destinationDescription(for: leg.destination)
+            }
+        )
     }
 
     /// What the preview panel is called. While the preview is being made
@@ -331,6 +341,26 @@ struct SectionDetailView: View {
             return "Preparing the preview of \(sectionName)"
         }
         return "Preview of \(sectionName)"
+    }
+
+    /// Names the destination CURRENTLY running only while the deploy is
+    /// still going — once it has finished, naming just one destination in
+    /// the title is misleading when every configured destination actually
+    /// ran (a teacher who deployed to Netlify AND Cloudflare should not see
+    /// a title that only mentions whichever one happened to run last). The
+    /// checklist above already names each destination with its own
+    /// checkmark, and `DeployDestinationLinks` below lists every live link,
+    /// so the finished title reverts to the plain single-destination form.
+    static func deployProgressTitle(
+        sectionName: String,
+        isRunning: Bool,
+        legCount: Int,
+        currentDestinationDescription: String?
+    ) -> String {
+        if isRunning, legCount > 1, let currentDestinationDescription {
+            return "Deploying \(sectionName) — \(currentDestinationDescription)"
+        }
+        return "Deploying \(sectionName)"
     }
 
     /// Whichever task is running now, or — once both have finished — the

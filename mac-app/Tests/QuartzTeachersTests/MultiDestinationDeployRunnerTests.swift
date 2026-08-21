@@ -211,6 +211,70 @@ final class MultiDestinationDeployRunnerTests: XCTestCase {
         _ = runner.activeRunner
         XCTAssertFalse(runner.hasAnyOutput)
     }
+
+    // MARK: - DeployDestinationLinks.succeeded(from:) — the fix for
+    // "only Cloudflare, the second deploy target, is visible" once a
+    // multi-destination deploy finishes.
+
+    @MainActor
+    func testSucceededKeepsOnlyFinishedAndSucceededLegs() {
+        var netlifyLeg: MultiDestinationDeployRunner.Leg = MultiDestinationDeployRunner.Leg(
+            destination: CourseConfiguration.DeployDestination(type: "netlify", path: "")
+        )
+        netlifyLeg.isFinished = true
+        netlifyLeg.succeeded = true
+
+        var cloudflareLeg: MultiDestinationDeployRunner.Leg = MultiDestinationDeployRunner.Leg(
+            destination: CourseConfiguration.DeployDestination(type: "cloudflare_pages", path: "")
+        )
+        cloudflareLeg.isFinished = true
+        cloudflareLeg.succeeded = false
+
+        // Never reached — a cancel or an earlier build failure stopped the
+        // run before this leg's turn came.
+        let folderLeg: MultiDestinationDeployRunner.Leg = MultiDestinationDeployRunner.Leg(
+            destination: CourseConfiguration.DeployDestination(type: "local_folder", path: NSTemporaryDirectory())
+        )
+
+        let succeeded: [MultiDestinationDeployRunner.Leg] = DeployDestinationLinks.succeeded(
+            from: [netlifyLeg, cloudflareLeg, folderLeg]
+        )
+        XCTAssertEqual(destinationTypes(of: succeeded), ["netlify"])
+    }
+
+    @MainActor
+    func testSucceededListsEveryDestinationThatActuallyPublished() {
+        // The exact bug reported: after a successful deploy to BOTH
+        // Netlify and Cloudflare, only the last one to run was visible —
+        // this is the property that must hold once both have finished.
+        var netlifyLeg: MultiDestinationDeployRunner.Leg = MultiDestinationDeployRunner.Leg(
+            destination: CourseConfiguration.DeployDestination(type: "netlify", path: "")
+        )
+        netlifyLeg.isFinished = true
+        netlifyLeg.succeeded = true
+
+        var cloudflareLeg: MultiDestinationDeployRunner.Leg = MultiDestinationDeployRunner.Leg(
+            destination: CourseConfiguration.DeployDestination(type: "cloudflare_pages", path: "")
+        )
+        cloudflareLeg.isFinished = true
+        cloudflareLeg.succeeded = true
+
+        let succeeded: [MultiDestinationDeployRunner.Leg] = DeployDestinationLinks.succeeded(
+            from: [netlifyLeg, cloudflareLeg]
+        )
+        XCTAssertEqual(destinationTypes(of: succeeded), ["netlify", "cloudflare_pages"])
+    }
+}
+
+/// Named after what it produces, not how — used only to keep the
+/// assertions above readable without reaching for `.map`.
+@MainActor
+private func destinationTypes(of legs: [MultiDestinationDeployRunner.Leg]) -> [String] {
+    var types: [String] = []
+    for leg in legs {
+        types.append(leg.destination.type)
+    }
+    return types
 }
 
 private typealias Outcome = MultiDestinationDeployRunner.Outcome

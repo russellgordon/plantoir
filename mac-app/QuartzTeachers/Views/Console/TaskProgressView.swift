@@ -16,6 +16,13 @@ struct TaskProgressView: View {
     let runner: ScriptRunner
     let title: String
     let canCancel: Bool
+    /// True only for a multi-destination deploy, where this view is bound
+    /// to whichever leg ran LAST — showing that one leg's own "Your website
+    /// is live" link would read as though it were the whole story.
+    /// `DeployDestinationLinks` shows every succeeded destination's own
+    /// link instead; a single-destination deploy (the overwhelming
+    /// majority) never sets this and looks exactly as it always has.
+    let hidesSiteLink: Bool
     let onCancel: (() -> Void)?
 
     @State var isShowingDetails: Bool = false
@@ -28,11 +35,13 @@ struct TaskProgressView: View {
         title: String,
         showingDetailsForTesting: Bool = false,
         canCancel: Bool = true,
+        hidesSiteLink: Bool = false,
         onCancel: (() -> Void)? = nil
     ) {
         self.runner = runner
         self.title = title
         self.canCancel = canCancel
+        self.hidesSiteLink = hidesSiteLink
         self.onCancel = onCancel
         _isShowingDetails = State(initialValue: showingDetailsForTesting)
     }
@@ -194,7 +203,13 @@ struct TaskProgressView: View {
 
                         // Finish with something to click: the live site,
                         // or — for folder deploys — the published folder.
-                        if !runner.wasCancelled, exitCode == 0, let siteURL = runner.publishedSiteURL {
+                        // Skipped for a multi-destination deploy, where
+                        // `hidesSiteLink` is set and `DeployDestinationLinks`
+                        // shows every succeeded destination's own link
+                        // instead of just this one (the last) leg's.
+                        if hidesSiteLink {
+                            // Nothing here — see DeployDestinationLinks.
+                        } else if !runner.wasCancelled, exitCode == 0, let siteURL = runner.publishedSiteURL {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Your website is live.")
                                 Link(siteURL.absoluteString, destination: siteURL)

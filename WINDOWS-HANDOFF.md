@@ -4092,14 +4092,72 @@ than the build.
 `DeployDestinationChecklist` — a small new view, one row per configured
 destination with a symbol (pending / spinning / done / failed) and its
 name — appears above the existing `TaskProgressView` ONLY when
-`deployRunner.legs.count > 1`. `TaskProgressView` itself is unmodified: it
-is shared with the course-creation wizard and the preview panel, so
-reshaping it for multi-destination deploy would have affected both of
-those unrelated callers. Instead it is bound to
+`deployRunner.legs.count > 1`. **Update (entry 302): the paragraph below
+originally claimed `TaskProgressView` was unmodified — it needed one
+addition, `hidesSiteLink`, once the finished-state gap this same section
+describes ("bound to `activeRunner`... the same as it always was") turned
+out to hide the FIRST destination's own live link, not just risk it.**
+`TaskProgressView` is shared with the course-creation wizard and the
+preview panel, so reshaping it broadly for multi-destination deploy would
+have affected both of those unrelated callers — the actual change is a
+single `Bool` flag, defaulting `false`, that only ever changes behaviour
+for the one deploy-panel call site that passes `true`. It is bound to
 `deployRunner.activeRunner` — whichever leg is current, or the first leg
 before anything starts — which for a single-destination course is
 indistinguishable from binding directly to a plain `ScriptRunner`, the
 same as it always was.
+
+## The finished multi-destination deploy panel only showed the LAST destination's link (entry 302)
+
+Row 301 (above) gave every destination its own `ScriptRunner` specifically
+so one leg's "Live URL:" line could never overwrite another's — but the
+DISPLAY never used that. `TaskProgressView` is bound to
+`deployRunner.activeRunner`, and after a run finishes that is whichever leg
+ran LAST; its own "Your website is live." section only ever names and
+links that one leg. Reported directly, after a real deploy to both Netlify
+and Cloudflare: "only Cloudflare, the second deploy target, is visible" —
+the checklist above it correctly showed both destinations checked off, but
+the body below told a story where only the second one had happened.
+
+**The fix has two parts, matching the two places the same "last leg only"
+assumption was baked in:**
+
+1. **The link itself.** A new view, `DeployDestinationLinks`, lists every
+   SUCCEEDED leg's own site link (or, for a `local_folder` destination, its
+   own "Show in Finder" button) — shown only once
+   `deployRunner.legs.count > 1 && !deployRunner.isRunning`, right below the
+   existing `TaskProgressView`. To avoid showing the LAST destination's
+   link twice (once from `TaskProgressView`'s own section, once from the
+   new list), `TaskProgressView` gained `hidesSiteLink: Bool = false` — set
+   `true` only from the multi-destination deploy call site, so every other
+   caller (the wizard's preview, a single-destination deploy) is
+   byte-identical to before.
+2. **The title.** `deployProgressTitle` had the identical bug one layer
+   up: it kept appending "— Cloudflare Pages" even once the WHOLE run had
+   finished, which reads as though only that one destination had
+   published. Refactored into a testable static function
+   (`SectionDetailView.deployProgressTitle(sectionName:isRunning:legCount:
+   currentDestinationDescription:)`, matching the existing
+   `previewTaskTitle`/`showsDeployProgress` pattern) so naming the CURRENT
+   destination only happens `if isRunning` — once the run is done, the
+   title reverts to the plain single-destination form, and the checklist
+   plus the new links list carry the per-destination detail instead.
+
+Both gaps were found the same way row 301 found its own defect worth
+guarding against: not by reading the code, but by actually deploying to
+two destinations and looking at what a teacher would see. The unit suite
+(`MultiDestinationDeployRunnerTests`, `ConsoleFocusTests`) stayed green
+through both the broken and the fixed version, because nothing in it
+renders the finished-state SwiftUI view — the same shape as row 300's
+folder-adoption bug and row 297's screenshot fallback, and the reason rule
+9 keeps insisting on driving the real app before calling a change done.
+
+**What Windows needs from this**: check whether its own multi-destination
+deploy panel (once row 301's behavioural piece is implemented there) is
+similarly bound to whichever runner ran last. The fix is the same SHAPE —
+list every succeeded destination's own link once the whole run is done,
+and stop a title from naming one destination after the fact — not this
+Swift.
 
 ## Testing
 

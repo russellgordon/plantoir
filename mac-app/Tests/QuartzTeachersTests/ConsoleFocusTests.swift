@@ -77,4 +77,53 @@ final class ConsoleFocusTests: XCTestCase {
         )
         XCTAssertFalse(showsDeploy)
     }
+
+    // MARK: - deployProgressTitle — the destination-name suffix must not
+    // outlive the run it describes, once more than one destination exists.
+
+    @MainActor
+    func testASingleDestinationDeployNeverNamesADestination() {
+        XCTAssertEqual(
+            SectionDetailView.deployProgressTitle(
+                sectionName: "MCV4U-S1",
+                isRunning: true,
+                legCount: 1,
+                currentDestinationDescription: "Netlify"
+            ),
+            "Deploying MCV4U-S1"
+        )
+    }
+
+    @MainActor
+    func testARunningMultiDestinationDeployNamesTheCurrentOne() {
+        XCTAssertEqual(
+            SectionDetailView.deployProgressTitle(
+                sectionName: "MCV4U-S1",
+                isRunning: true,
+                legCount: 2,
+                currentDestinationDescription: "Cloudflare Pages"
+            ),
+            "Deploying MCV4U-S1 — Cloudflare Pages"
+        )
+    }
+
+    @MainActor
+    func testAFinishedMultiDestinationDeployDropsTheLastDestinationsName() {
+        // The actual bug reported: the title kept naming Cloudflare (the
+        // destination that happened to run last) even after Netlify had
+        // ALSO deployed successfully — reading as though only one
+        // destination had been published to. The checklist above already
+        // names each destination with its own checkmark, and
+        // DeployDestinationLinks below lists every live link, so the
+        // finished title should not single one out.
+        XCTAssertEqual(
+            SectionDetailView.deployProgressTitle(
+                sectionName: "MCV4U-S1",
+                isRunning: false,
+                legCount: 2,
+                currentDestinationDescription: "Cloudflare Pages"
+            ),
+            "Deploying MCV4U-S1"
+        )
+    }
 }
