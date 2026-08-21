@@ -282,4 +282,8 @@ Where you sorted these families yourself, before anyone named them:
 ![[C2.1]]
 
 ![[C2.2]]
+
+![[C2.7]]
+
+![[C3.2]]
 %%curriculum-end%%

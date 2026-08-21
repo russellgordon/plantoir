@@ -240,9 +240,15 @@ without them, the number is not wrong — it is not a number.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.9]]
+
+![[A1.12]]
+
 ![[F2.2]]
 
 ![[F2.5]]
 
-![[A1.12]]
+![[F3.2]]
+
+![[F3.6]]
 %%curriculum-end%%

@@ -231,6 +231,8 @@ atmosphere.
 
 ![[E1.2]]
 
+![[E2.7]]
+
 ![[E2.8]]
 %%curriculum-end%%
 

@@ -229,6 +229,10 @@ The arithmetic: [[Limiting Reagent and Yield]] and
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.7]]
+
+![[A1.10]]
+
 ![[D1.1]]
 
 ![[D1.2]]

@@ -174,9 +174,13 @@ runs short of oxygen.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C2.1]]
+
 ![[C2.4]]
 
 ![[C2.5]]
 
 ![[C2.6]]
+
+![[C2.10]]
 %%curriculum-end%%

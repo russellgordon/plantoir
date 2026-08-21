@@ -95,6 +95,10 @@ turned out to be happening, at scale, over the place you chose?
 
 ![[F1.2]]
 
+![[F2.4]]
+
+![[F2.5]]
+
 ![[F3.1]]
 %%curriculum-end%%
 

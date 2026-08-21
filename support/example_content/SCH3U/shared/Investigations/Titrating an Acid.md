@@ -261,9 +261,13 @@ becomes a dishonest result.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[E2.7]]
+![[A1.13]]
 
 ![[E2.6]]
 
-![[A1.13]]
+![[E2.7]]
+
+![[E3.5]]
+
+![[E3.6]]
 %%curriculum-end%%

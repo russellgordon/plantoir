@@ -139,6 +139,8 @@ your [[Chemistry Journal]]. It is the entry I read first.
 ![[A2.1]]
 
 ![[A2.2]]
+
+![[B1.1]]
 %%curriculum-end%%
 
 %%

@@ -82,6 +82,8 @@ against your draft with [[Judging Your Own Work]] before the period ends.
 
 ![[A1.2]]
 
+![[A1.10]]
+
 ![[A1.13]]
 
 ![[B3.5]]

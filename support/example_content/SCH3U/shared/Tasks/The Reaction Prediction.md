@@ -200,7 +200,13 @@ Wider context and the discussion this connects to:
 
 ![[C1.2]]
 
+![[C2.3]]
+
 ![[C2.4]]
+
+![[C2.6]]
+
+![[C2.10]]
 %%curriculum-end%%
 
 %%

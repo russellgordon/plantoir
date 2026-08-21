@@ -193,15 +193,17 @@ deal. See [[What Counts as Evidence]] and [[Reading a Data Table]].
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B1.2]]
-
-![[B2.5]]
-
 ![[A1.3]]
 
 ![[A1.5]]
 
 ![[A1.7]]
+
+![[B1.2]]
+
+![[B2.5]]
+
+![[B2.6]]
 %%curriculum-end%%
 
 %%
