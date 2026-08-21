@@ -2,6 +2,8 @@
 title: The Independent Study
 publish: true
 created: __CREATED__
+tags:
+  - tasks
 enableToc: true
 ---
 > [!abstract] At a glance

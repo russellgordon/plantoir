@@ -2,7 +2,8 @@
 title: Choosing Your Independent Study Text
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - reading
 ---
 [[The Independent Study]] runs from early November to early January. This
 page is how to choose the text you will live with.

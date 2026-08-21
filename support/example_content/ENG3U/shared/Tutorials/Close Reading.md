@@ -2,6 +2,8 @@
 title: Close Reading
 publish: true
 created: __CREATED__
+tags:
+  - tutorials
 enableToc: true
 ---
 Close reading is reading slowly enough to notice the choices. At this

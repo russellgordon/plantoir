@@ -2,7 +2,8 @@
 title: Media Texts We Study
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - reading
 ---
 Four media texts, read with the same care as the print ones.
 

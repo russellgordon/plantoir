@@ -2,6 +2,8 @@
 title: Reading
 publish: true
 created: __CREATED__
+tags:
+  - reading
 enableToc: true
 ---
 ## The play

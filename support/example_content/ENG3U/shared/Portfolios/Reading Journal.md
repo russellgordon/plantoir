@@ -2,7 +2,8 @@
 title: Reading Journal
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - portfolios
 ---
 One notebook, all semester, for annotation notes, drafting, and the
 record of what you can now do.

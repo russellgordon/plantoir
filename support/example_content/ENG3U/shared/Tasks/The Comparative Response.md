@@ -2,6 +2,8 @@
 title: The Comparative Response
 publish: true
 created: __CREATED__
+tags:
+  - tasks
 enableToc: true
 ---
 > [!abstract] At a glance

@@ -2,6 +2,8 @@
 title: Getting Help
 publish: true
 created: __CREATED__
+tags:
+  - setup
 ---
 1. **Ask the person beside you.** Half of English is talking about a text
    with somebody who read it differently.

@@ -2,6 +2,8 @@
 title: _DUPLICATE ME
 publish: false
 created: __CREATED__
+tags:
+  - reading
 ---
 %%
 How to use this template:

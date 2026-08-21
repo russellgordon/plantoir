@@ -2,6 +2,8 @@
 title: Judging Your Own Work
 publish: true
 created: __CREATED__
+tags:
+  - portfolios
 ---
 Every task page publishes its criteria before you start. Most people read
 them once, on launch day, and then hand in an essay that misses two rows

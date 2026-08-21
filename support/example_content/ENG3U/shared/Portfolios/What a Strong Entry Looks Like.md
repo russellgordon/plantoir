@@ -2,7 +2,8 @@
 title: What a Strong Entry Looks Like
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - portfolios
 ---
 Two entries about the same class.
 

@@ -2,6 +2,8 @@
 title: How Marks Work
 publish: true
 created: __CREATED__
+tags:
+  - setup
 enableToc: true
 ---
 Nothing here is marked on how much you like reading, or on how confident

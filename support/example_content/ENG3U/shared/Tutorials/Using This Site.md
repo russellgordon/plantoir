@@ -2,6 +2,8 @@
 title: Using This Site
 publish: true
 created: __CREATED__
+tags:
+  - tutorials
 ---
 Four things to know, and then you are fluent.
 

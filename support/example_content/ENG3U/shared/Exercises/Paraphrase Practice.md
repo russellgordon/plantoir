@@ -2,6 +2,8 @@
 title: Paraphrase Practice
 publish: true
 created: __CREATED__
+tags:
+  - exercises
 ---
 Method on [[Reading Shakespeare]]. Paraphrase first, then unfold.
 

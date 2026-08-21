@@ -2,6 +2,8 @@
 title: Portfolio Checklist
 publish: true
 created: __CREATED__
+tags:
+  - portfolios
 ---
 Copy this into your notebook — the boxes here are printed, not clickable.
 

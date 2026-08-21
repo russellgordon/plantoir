@@ -2,6 +2,8 @@
 title: Evidence and Analysis Practice
 publish: true
 created: __CREATED__
+tags:
+  - exercises
 ---
 Conventions on [[Writing About Literature]].
 

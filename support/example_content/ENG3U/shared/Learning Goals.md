@@ -3,6 +3,8 @@ title: Learning Goals
 publish: true
 created: __CREATED__
 transcludeTitleSize: h2
+tags:
+  - reference
 excludeBacklinks: true
 ---
 Grade 11 university English is where reading becomes an argument you can

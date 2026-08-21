@@ -2,6 +2,8 @@
 title: Tasks
 publish: true
 created: __CREATED__
+tags:
+  - tasks
 ---
 - [[The Close Reading Essay]] — Unit 1. One argument about one story, in
   700 words.

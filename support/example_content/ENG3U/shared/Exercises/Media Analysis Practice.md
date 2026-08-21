@@ -2,6 +2,8 @@
 title: Media Analysis Practice
 publish: true
 created: __CREATED__
+tags:
+  - exercises
 ---
 Method on [[Media Texts and Their Arguments]].
 

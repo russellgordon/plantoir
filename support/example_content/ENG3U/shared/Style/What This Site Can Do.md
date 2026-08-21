@@ -2,6 +2,8 @@
 title: What This Site Can Do
 publish: true
 created: __CREATED__
+tags:
+  - style
 enableToc: true
 ---
 This page has two audiences. Students: it shows why the notes look the

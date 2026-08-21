@@ -2,6 +2,8 @@
 title: How This Class Works
 publish: true
 created: __CREATED__
+tags:
+  - setup
 enableToc: true
 ---
 This course is mostly reading, arguing, and writing — in that order,

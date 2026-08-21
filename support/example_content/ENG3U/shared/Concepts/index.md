@@ -2,6 +2,8 @@
 title: Concepts
 publish: true
 created: __CREATED__
+tags:
+  - concepts
 ---
 **Reading**
 

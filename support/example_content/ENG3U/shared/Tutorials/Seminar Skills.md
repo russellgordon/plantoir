@@ -2,6 +2,8 @@
 title: Seminar Skills
 publish: true
 created: __CREATED__
+tags:
+  - tutorials
 enableToc: true
 ---
 A seminar is a discussion where the participants have all read the thing

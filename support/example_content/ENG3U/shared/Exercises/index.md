@@ -2,6 +2,8 @@
 title: Exercises
 publish: true
 created: __CREATED__
+tags:
+  - exercises
 ---
 > [!tip] How to use these pages
 > Answer on paper first. Every answer is folded away, and reading a

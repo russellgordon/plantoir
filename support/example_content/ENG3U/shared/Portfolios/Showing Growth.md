@@ -2,6 +2,8 @@
 title: Showing Growth
 publish: true
 created: __CREATED__
+tags:
+  - portfolios
 ---
 ## The method
 

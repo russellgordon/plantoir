@@ -3,6 +3,8 @@ title: Help Sessions
 publish: true
 created: __CREATED__
 transcludeTitleSize: h2
+tags:
+  - reference
 excludeBacklinks: true
 ---
 **Tuesdays and Thursdays at lunch, in this room.**

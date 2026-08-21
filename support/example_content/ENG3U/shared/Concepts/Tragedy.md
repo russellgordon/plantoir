@@ -2,7 +2,8 @@
 title: Tragedy
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - concepts
 ---
 Tragedy is a form with a shape and a set of expectations, and *Macbeth*
 both uses and strains them.

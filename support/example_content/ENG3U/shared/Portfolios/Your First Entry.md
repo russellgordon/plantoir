@@ -2,6 +2,8 @@
 title: Your First Entry
 publish: true
 created: __CREATED__
+tags:
+  - portfolios
 ---
 Written in the first week, kept, and read again at the end.
 

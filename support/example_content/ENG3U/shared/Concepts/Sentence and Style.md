@@ -2,6 +2,8 @@
 title: Sentence and Style
 publish: true
 created: __CREATED__
+tags:
+  - concepts
 ---
 Style is not ornament. At this level it is the difference between an
 essay a reader has to decode and one they can follow at speed.

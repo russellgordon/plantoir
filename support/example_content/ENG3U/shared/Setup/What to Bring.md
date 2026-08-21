@@ -2,6 +2,8 @@
 title: What to Bring
 publish: true
 created: __CREATED__
+tags:
+  - setup
 ---
 - [ ] A notebook for annotation notes and drafting.
 - [ ] The current text, annotatable — your own copy if possible.

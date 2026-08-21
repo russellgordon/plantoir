@@ -2,6 +2,8 @@
 title: Portfolios
 publish: true
 created: __CREATED__
+tags:
+  - portfolios
 ---
 - [[Reading Journal]] — what goes in it and why.
 - [[Your First Entry]] — written in the first week, read again in January.

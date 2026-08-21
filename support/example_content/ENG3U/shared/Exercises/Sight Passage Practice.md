@@ -2,6 +2,8 @@
 title: Sight Passage Practice
 publish: true
 created: __CREATED__
+tags:
+  - exercises
 ---
 Unseen passages, answered under time. This is the examination's largest
 single section and the one that improves fastest with practice.

@@ -2,6 +2,8 @@
 title: Macbeth
 publish: true
 created: __CREATED__
+tags:
+  - reading
 enableToc: true
 ---
 > [!abstract] At a glance

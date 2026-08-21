@@ -2,6 +2,8 @@
 title: Tutorials
 publish: true
 created: __CREATED__
+tags:
+  - tutorials
 ---
 These are not ideas and not assignments — they are ways of working. Each
 one is taught here once, so every other page can point at it instead of
