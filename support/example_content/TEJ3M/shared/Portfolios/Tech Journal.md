@@ -82,3 +82,11 @@ run before you hand the journal in.
 | Precision | Values with units and conditions; faults named and located |
 | Evidence | A sketch or a photo of your own work in most entries |
 | Growth | "Try next" items reappear later as things actually tried |
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D3.4]]
+
+![[D3.6]]
+%%curriculum-end%%

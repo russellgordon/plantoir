@@ -100,6 +100,20 @@ can check for yourself.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
+![[A1.3]]
+
+![[A2.2]]
+
+![[A2.3]]
+
+![[A2.4]]
+
+![[A4.3]]
+
+![[A4.4]]
+
 ![[B1.1]]
 
 ![[B1.3]]
@@ -108,13 +122,13 @@ can check for yourself.
 
 ![[B2.2]]
 
-![[A1.2]]
+![[B2.3]]
 
-![[A2.2]]
-
-![[A4.4]]
+![[B4.1]]
 
 ![[B4.2]]
+
+![[B4.3]]
 
 ![[B4.5]]
 

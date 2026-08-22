@@ -69,6 +69,8 @@ semester carries a known-issues list, because
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.3]]
+
 ![[C1.1]]
 
 ![[C1.2]]

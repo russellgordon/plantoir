@@ -64,3 +64,11 @@ None of that photographs well and none of it looks like an
 achievement from the outside. It is growth all the same, and your
 early entries are the proof that it was not always there — which is
 the entire reason we bother writing them down.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D3.4]]
+
+![[D3.6]]
+%%curriculum-end%%

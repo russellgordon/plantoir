@@ -83,3 +83,11 @@ and the fix into your [[Tech Journal]] as you go: it is the same loop
 [[Showing Growth]] will ask you to point at in January, and by the
 capstone it is something you run without being told, which is the
 actual point of it.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D3.4]]
+
+![[D3.6]]
+%%curriculum-end%%

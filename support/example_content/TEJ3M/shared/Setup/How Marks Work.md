@@ -96,7 +96,7 @@ and practice is not marked.
 There is a second column on your report card, and it is not a smaller
 version of the first. It carries a letter — **E, G, S or N** — for each
 of the six learning skills and work habits every Ontario course reports
-on, and it is where responsibility, organization, independent work,
+on, and it is where responsibility, organisation, independent work,
 collaboration, initiative and self-regulation are judged. We will talk
 about that column, sometimes at length. It never moves your percentage.
 The two describe different things — one the build, one the builder —
@@ -105,7 +105,7 @@ and averaging them together would tell you less about either.
 This course has exactly one genuine exception, and it comes out of the
 curriculum rather than out of my preferences. Expectation D3.5 asks you
 to understand and *apply* the work habits the computer technology
-industry runs on — working safely, teamwork, reliability, organization,
+industry runs on — working safely, teamwork, reliability, organisation,
 initiative — as the Ontario Skills Passport sets them out. The verb is
 *apply* and the object is the habits, so a habit the curriculum itself
 names is judged the way every other expectation in it is judged. D3.5

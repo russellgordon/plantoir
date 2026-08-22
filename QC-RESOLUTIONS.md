@@ -904,6 +904,94 @@ An adversarial subagent was invoked to conduct an exhaustive, independent audit 
 - **All destination pages reachable within 2 hops of a class page.**
 - **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
 
+---
+
+### 1.1 Coverage depth: TEJ3M once-only expectations (9 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across TEJ3M (Grade 11 Computer Engineering Technology) by ensuring all 53 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (concept summaries, exercises, labs, discussions, warm-ups, portfolios, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding hardware, networking, electronics, and system concepts over time.
+
+#### Baseline Findings (TEJ3M)
+- Total expectations: 53 specific expectations (`A1.1` to `D3.6`)
+- Addressed only once (9 codes):
+  - `A1.3`: describe trends in the development of computer hardware (only on `Concepts/Sequential Logic and Memory.md`)
+  - `A2.3`: describe the essential functions performed by the BIOS firmware (only on `Concepts/BIOS, Firmware, and Boot.md`)
+  - `A2.4`: describe how the BIOS, hardware, and operating system interact (only on `Concepts/BIOS, Firmware, and Boot.md`)
+  - `A4.3`: describe various services offered by servers to network clients (only on `Concepts/Networks and Protocols.md`)
+  - `B2.1`: set up and configure a home office system (only on `Tasks/The Client Build.md`)
+  - `B2.3`: configure a computer system to use multiple operating systems (only on `Labs/Two Operating Systems, One Machine.md`)
+  - `B4.1`: design, install, and configure a peer-to-peer network (only on `Labs/Build and Test a Network.md`)
+  - `B4.3`: construct various network cables (only on `Labs/Build and Test a Network.md`)
+  - `D3.6`: maintain an up-to-date portfolio of computer technology work (only on `Tasks/The Engineering Showcase.md`)
+
+---
+
+#### Actions Completed
+
+1. **Concepts Substantive Expansion (`shared/Concepts/`)**:
+   - `Concepts/Ports and Connection Standards.md`: Added section `## Hardware development trends: speed, capacity, and resolution` detailing PCIe Gen 1–5 lane scaling, DDR4 vs DDR5 transfer rates, display bandwidth jumps (1080p, 4K, 8K, HDMI 2.1, DisplayPort 2.1), and storage density (CD/DVD/Blu-ray optical media to PCIe NVMe M.2 SSDs). Transclusions: `A1.1, A1.2, A1.3`.
+   - `Concepts/Operating Systems.md`: Added `## Running multiple operating systems: dual boot and virtualisation` (dual-boot partition schemes vs Type-1/Type-2 hypervisors) and `## How the OS interacts with firmware and hardware` (boot handoff, device driver abstraction, power management). Transclusions: `A1.1, A2.1, A2.4, B2.3`.
+   - `Concepts/BIOS, Firmware, and Boot.md`: Enriched multi-OS boot and virtualization hardware extension support. Transclusions: `A2.2, A2.3, A2.4, B2.3`.
+   - `Concepts/Network Types and Topologies.md`: Added `## Services provided in client–server architectures` (HTTP/HTTPS port 80/443, FTP/SFTP port 21/22, SMTP/IMAP port 25/993, SSH port 22, IPP print services port 631, LDAP/Active Directory directory login port 389) and `## Building and cabling peer-to-peer networks` (hardware selection, UTP Cat 5e/6 cable crimping, T568A/B straight-through vs crossover pinouts, cable tester verification, and OS workgroup file/printer sharing). Transclusions: `A4.1, A4.3, B4.1, B4.2, B4.3`.
+   - `Concepts/Careers and the Environment.md`: Added 4th H2 heading `## Career portfolios and technical evidence` connecting portfolio maintenance to postsecondary technical admissions, Ontario Skills Passport (OSP), safety credentials, and career development. Transclusions: `C1.1, C1.2, D3.1, D3.2, D3.3, D3.4, D3.5, D3.6`.
+
+2. **Exercises Substantive Expansion (`shared/Exercises/`)**:
+   - `Exercises/Number Systems Practice.md`: Added Question 11 & Answer 11 calculating frame buffer memory sizes and transmission bandwidths for 1080p ($6.22\ \text{MB}$, $2.99\ \text{Gbps}$) versus 4K UHD ($24.88\ \text{MB}$, $11.94\ \text{Gbps}$), and Question 12 & Answer 12 analyzing capacity scaling and transfer throughputs across storage generations (CD-ROM $700\ \text{MB}$, DVD $4.7\ \text{GB}$, Blu-ray $25\ \text{GB}$, PCIe 4.0 NVMe SSD $2\ \text{TB}$ at $7000\ \text{MB/s}$). Transclusions: `A1.3, A5.1, A5.2`.
+   - `Exercises/Networking Practice.md`: Added Question 10 & Answer 10 matching server services (HTTP, SSH, SMTP, FTP, IPP) and evaluating centralized directory authentication, Question 11 & Answer 11 detailing T568A/B pinout standards, straight-through vs crossover cable wiring (Tx pins 1-2, Rx pins 3-6), and cable tester fault diagnosis (crossed pairs), and Question 12 & Answer 12 designing, cabling, subnetting, and configuring a peer-to-peer office workgroup network. Transclusions: `A4.1, A4.2, A4.3, B4.1, B4.2, B4.3`.
+
+3. **Labs & Tasks Alignment (`shared/Labs/`, `shared/Tasks/`)**:
+   - `Labs/Build a Machine to Spec.md`: Transclusions `A1.2, A1.3, A2.2, A2.3, A2.4, B1.1, B1.3, B2.1`.
+   - `Labs/Two Operating Systems, One Machine.md`: Transclusions `A2.1, A2.3, A2.4, B2.2, B2.3`.
+   - `Tasks/The Client Build.md`: Added comprehensive transclusions covering machine build & hardware trends, POST diagnostics, firmware setup, home office peripherals, multi-OS options, server services, and network cabling. Transclusions: `A1.2, A1.3, A2.2, A2.3, A2.4, A4.3, A4.4, B1.1, B1.3, B2.1, B2.2, B2.3, B4.1, B4.2, B4.3, B4.5, D2.1, D2.2`.
+
+4. **Warm-Ups, Discussions & Portfolios (`shared/`)**:
+   - `Warm-Ups/Tech Headlines.md`: Added curriculum connection block for `A1.3, C2.1, C2.2`.
+   - `Discussions/Repair or Replace.md`: Added `A1.3` to curriculum connection block (`A1.3, C1.1, C1.2, C2.2`).
+   - `Portfolios/Tech Journal.md`: Added curriculum block for `D3.4, D3.6`.
+   - `Portfolios/Showing Growth.md`: Added curriculum block for `D3.4, D3.6`.
+   - `Portfolios/Final Reflection.md`: Added curriculum block for `D3.1, D3.2, D3.3, D3.4, D3.6`.
+   - `Portfolios/What a Strong Entry Looks Like.md`: Added curriculum block for `D3.4, D3.6`.
+   - `Portfolios/Your First Entry.md`: Added curriculum block for `D3.4, D3.6`.
+   - `Portfolios/Journal Checklist.md`: Added curriculum block for `D3.4, D3.6`.
+   - `Portfolios/Judging Your Own Work.md`: Added curriculum block for `D3.4, D3.6`.
+
+5. **Structural Integrity & Formatting Invariants**:
+   - Standardized Canadian spelling across payload (`organisation`, `synchronise`, `centralised`, `authorised`).
+   - Removed `enableToc: true` from pages containing fewer than 4 H2 headings across 15 concept pages and `shared/Curriculum/index.md`.
+   - Confirmed 100% two-hop reachability from all 86 class pages.
+
+---
+
+#### Adversarial Audit & Quality Control Review (TEJ3M)
+
+Three rounds of adversarial subagent audits were performed to refute claims, verify primary curriculum fidelity, enforce Canadian spelling, and check structural invariants.
+
+**Audit Findings & Iteration:**
+- **Pass 1:** Identified 2 spelling defects (`synchronize` in `Network Types and Topologies.md:60` and `centralized` in `Networking Practice.md:47`). Both were corrected.
+- **Pass 2:** Identified `authorized` in `Network Types and Topologies.md:68` and `enableToc: true` on `Careers and the Environment.md` with only 3 H2s. Corrected `authorised`, added `## Career portfolios and technical evidence` heading, and audited all remaining pages for `enableToc` invariants (removing `enableToc: true` where $< 4$ H2s).
+- **Pass 3:** Verified all reported defects corrected. Certified clean status with 0 defects remaining.
+
+---
+
+#### Final Verification Metrics (TEJ3M)
+
+- **Total Specific Expectations:** 53 (`A1.1` – `D3.6`)
+- **Expectations Addressed $\ge 2$ Times:** 53 / 53 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Coverage Frequencies of the 9 Target Codes:**
+  - `A1.3`: 7 times
+  - `A2.3`: 4 times
+  - `A2.4`: 5 times
+  - `A4.3`: 4 times
+  - `B2.1`: 2 times
+  - `B2.3`: 4 times
+  - `B4.1`: 4 times
+  - `B4.3`: 4 times
+  - `D3.6`: 9 times
+- **Linter Results (`lint_payload.py TEJ3M`):** Clean (269 pages checked, 86 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
 
 
 

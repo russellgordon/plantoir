@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 Someone's board in [[Solder a Board]] came back with a resistor that had
 gone brown and smelled wrong. Nothing was miswired. The circuit did

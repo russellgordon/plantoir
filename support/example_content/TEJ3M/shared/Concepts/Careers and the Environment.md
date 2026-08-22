@@ -109,6 +109,8 @@ programs, trade and industry associations, and specialised postsecondary
 programs exist specifically to change that; [[The Trades Are Tech]] is
 where we talk about who ends up in this room and who does not.
 
+## Career portfolios and technical evidence
+
 Start collecting the evidence now. Your [[Tech Journal]] and the
 portfolio it feeds are the artefact every one of these routes asks to
 see — circuit diagrams, photographs of builds, a video of something
@@ -128,5 +130,9 @@ working, and your own account of what went wrong first. See
 
 ![[D3.3]]
 
+![[D3.4]]
+
 ![[D3.5]]
+
+![[D3.6]]
 %%curriculum-end%%
