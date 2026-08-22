@@ -18,6 +18,17 @@ struct SectionDetailView: View {
     /// single `ScriptRunner` always did.
     @State var deployRunner = MultiDestinationDeployRunner()
 
+    /// True from the moment Deploy is pressed until `deployRunner` actually
+    /// starts running — the span spent stopping any preview and doing the
+    /// pre-flight checks below, before there is any real progress to show.
+    /// `consoleArea` shows a plain "Preparing to deploy…" placeholder while
+    /// this is true, instead of `TaskProgressView` bound to a `deployRunner`
+    /// that has nothing to say yet — a fresh, idle runner renders as
+    /// nothing at all (see `deployAndWait()`), and the PREVIOUS deploy's
+    /// runner still holding last time's finished outcome is no better,
+    /// since neither is what is actually happening right now.
+    @State var isPreparingDeploy: Bool = false
+
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
     @State var isWaitingForServer: Bool = false
@@ -188,7 +199,14 @@ struct SectionDetailView: View {
                     startDeploy()
                 }
                 .labelStyle(.titleAndIcon)
-                .disabled(deployRunner.isRunning)
+                // `isPreparingDeploy` closes a real window, not just a
+                // display one: `deployRunner.isRunning` alone stays false
+                // through `deployAndWait()`'s whole prep phase (stopping any
+                // preview, waiting for containers to clear), and the button
+                // was clickable again the instant that phase started — a
+                // second click there raced its own stop-preview-then-deploy
+                // sequence against the first's.
+                .disabled(deployRunner.isRunning || isPreparingDeploy)
                 .help("Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
 
@@ -320,27 +338,31 @@ struct SectionDetailView: View {
                 // the left margin — two different leading edges for what
                 // reads as one panel. Explicit .leading lines them up.
                 VStack(alignment: .leading, spacing: 0) {
-                    // Only appears once a course has more than one
-                    // destination — the overwhelming majority never see
-                    // this at all, and the progress panel beneath it
-                    // looks exactly as it always has.
-                    if deployRunner.legs.count > 1 {
-                        DeployDestinationChecklist(legs: deployRunner.legs)
-                    }
-                    // DeployDestinationLinks renders INSIDE TaskProgressView
-                    // itself, in the same spot a single destination's own
-                    // "Your website is live" link would sit — above "Show
-                    // details", never pushed down past the (variable-height)
-                    // console.
-                    TaskProgressView(
-                        runner: deployRunner.activeRunner,
-                        title: deployProgressTitle,
-                        hidesSiteLink: deployRunner.legs.count > 1,
-                        allLegs: deployRunner.legs.count > 1 ? deployRunner.legs : nil,
-                        onCancel: {
-                            cancelDeploy()
+                    if isPreparingDeploy {
+                        preparingToDeployPlaceholder
+                    } else {
+                        // Only appears once a course has more than one
+                        // destination — the overwhelming majority never see
+                        // this at all, and the progress panel beneath it
+                        // looks exactly as it always has.
+                        if deployRunner.legs.count > 1 {
+                            DeployDestinationChecklist(legs: deployRunner.legs)
                         }
-                    )
+                        // DeployDestinationLinks renders INSIDE TaskProgressView
+                        // itself, in the same spot a single destination's own
+                        // "Your website is live" link would sit — above "Show
+                        // details", never pushed down past the (variable-height)
+                        // console.
+                        TaskProgressView(
+                            runner: deployRunner.activeRunner,
+                            title: deployProgressTitle,
+                            hidesSiteLink: deployRunner.legs.count > 1,
+                            allLegs: deployRunner.legs.count > 1 ? deployRunner.legs : nil,
+                            onCancel: {
+                                cancelDeploy()
+                            }
+                        )
+                    }
                 }
             } else {
                 TaskProgressView(
@@ -353,6 +375,26 @@ struct SectionDetailView: View {
             }
             Spacer(minLength: 0)
         }
+    }
+
+    /// Stands in for the real deploy progress panel during `deployAndWait()`'s
+    /// prep work — stopping any preview, waiting for containers to clear —
+    /// before there is a real, running `deployRunner` to show. No "Show
+    /// details" or Cancel here: there is genuinely nothing yet to look at
+    /// or to stop, unlike once the real panel takes over a moment later.
+    var preparingToDeployPlaceholder: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("Deploying \(sectionName)")
+                    .font(.headline)
+                Spacer()
+                Text("Preparing to deploy…")
+                    .foregroundStyle(.secondary)
+            }
+            ProgressView()
+                .progressViewStyle(.linear)
+        }
+        .padding(12)
     }
 
     /// What the deploy panel is called. Names the destination currently
@@ -644,6 +686,20 @@ struct SectionDetailView: View {
             )
         }
 
+        // The toolbar button disables itself on `isPreparingDeploy`, but the
+        // assistant reaches this function directly, with no button to have
+        // disabled — guard here too, or two overlapping deploys can run at
+        // once and stomp on `deployRunner`'s shared state (legs, startedAt)
+        // as each writes over the other's.
+        if isPreparingDeploy || deployRunner.isRunning {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.sectionIsBusy(
+                    course: course.code, section: String(sectionNumber)
+                )
+            )
+        }
+
         let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
 
         // Whatever is wrong with ANY configured destination is said here,
@@ -663,20 +719,17 @@ struct SectionDetailView: View {
         // comparing stale timestamps and picking the just-stopped preview
         // panel, flashing "Stopped" for a beat before the deploy panel took
         // over. Marking the deploy as started immediately keeps the console
-        // on the deploy panel through that whole window. The legs are reset
-        // to fresh, empty ones too — `run()` will do the same a little
-        // further down, but not resetting them here left the panel showing
-        // the PREVIOUS deploy's finished outcome (its own stale success or
-        // failure) for that same beat, which is no more honest than
-        // "Stopped" was.
+        // on the deploy panel through that whole window.
+        //
+        // `isPreparingDeploy` covers what that timestamp alone does not:
+        // `deployRunner.legs` still holds the PREVIOUS deploy's runners
+        // (finished, one way or another) until `run()` replaces them with
+        // fresh ones a little further down, and `consoleArea` must not show
+        // either that stale outcome or the flat-out blank a fresh, unstarted
+        // runner renders as — neither is what is actually happening right
+        // now, which is: getting ready to deploy.
         deployRunner.startedAt = Date()
-        deployRunner.legs = []
-        for destination in destinations {
-            deployRunner.legs.append(MultiDestinationDeployRunner.Leg(destination: destination))
-        }
-        deployRunner.currentLegIndex = 0
-        deployRunner.wasCancelled = false
-        deployRunner.wasStoppedByUser = false
+        isPreparingDeploy = true
 
         // Stop any running or building preview before deploying, and wait for
         // container processes to exit so they cannot kill or race the deploy build.
@@ -692,6 +745,7 @@ struct SectionDetailView: View {
         // assistant reaches this by pressing the button while a deploy is
         // already running in this window.
         if deployRunner.isRunning {
+            isPreparingDeploy = false
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.sectionIsBusy(
@@ -719,6 +773,11 @@ struct SectionDetailView: View {
                 sectionNumber: sectionNumber
             )
         }
+
+        // The real progress panel takes over from here — `deployRunner.run()`
+        // is about to give `deployRunner.legs` fresh runners of its own and
+        // start reporting real progress on them.
+        isPreparingDeploy = false
 
         // What the launcher is asked to do, for each destination, is
         // decided in one place — shared with the scheduled deploy and the

@@ -119,7 +119,13 @@ struct TaskProgressView: View {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let _ = noteRefresh(at: context.date)
                 VStack(alignment: .leading, spacing: 10) {
-                    if runner.isRunning {
+                    // `isBetweenPhases`: this runner has already finished
+                    // one script and is about to start a second on the
+                    // same leg (a build, then its deploy) — treated as
+                    // still running so the console keeps showing progress
+                    // rather than flashing "Done" for a leg with a script
+                    // still queued up on it. See `ScriptRunner.isBetweenPhases`.
+                    if runner.isRunning || runner.isBetweenPhases {
                         HStack(spacing: 8) {
                             Text(title)
                                 .font(.headline)
