@@ -54,9 +54,20 @@ struct SectionDetailView: View {
 
     // MARK: - Computed properties
 
+    /// What this section is CALLED — used wherever a sentence names it
+    /// ("Deploying ICS3U-S1"). Deliberately without the " — Edited"
+    /// marker: the marker is a statement about the window's contents, not
+    /// part of the section's name, and "Deploying ICS3U-S1 — Edited" reads
+    /// as though "Edited" were something being deployed.
+    var sectionName: String {
+        return "\(course.code)-S\(sectionNumber)"
+    }
+
+    /// What the window's title bar says — the name, plus the marker when
+    /// there is something unpublished.
     var titleText: String {
         return SectionPublishState.windowTitle(
-            base: "\(course.code)-S\(sectionNumber)",
+            base: sectionName,
             hasUnpublishedEdits: hasUnpublishedEdits
         )
     }
@@ -350,7 +361,7 @@ struct SectionDetailView: View {
     /// always had.
     var deployProgressTitle: String {
         return SectionDetailView.deployProgressTitle(
-            sectionName: titleText,
+            sectionName: sectionName,
             isRunning: deployRunner.isRunning,
             legCount: deployRunner.legs.count,
             currentDestinationDescription: deployRunner.currentLeg.map { leg in
@@ -364,7 +375,7 @@ struct SectionDetailView: View {
     /// is simply about the preview, so it must stop claiming to be
     /// preparing one.
     var previewTaskTitle: String {
-        return SectionDetailView.previewTaskTitle(isPreparing: previewRunner.isRunning, sectionName: titleText)
+        return SectionDetailView.previewTaskTitle(isPreparing: previewRunner.isRunning, sectionName: sectionName)
     }
 
     /// True when the console should be about publishing rather than

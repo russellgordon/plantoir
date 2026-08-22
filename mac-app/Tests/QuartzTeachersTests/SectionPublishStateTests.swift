@@ -42,12 +42,39 @@ final class SectionPublishStateTests: XCTestCase {
         for testCase in try XCTUnwrap(marker["cases"] as? [[String: Any]]) {
             let base: String = try XCTUnwrap(testCase["base"] as? String)
             let edited: Bool = try XCTUnwrap(testCase["hasUnpublishedEdits"] as? Bool)
+            let expected: String = try XCTUnwrap(testCase["expectTitle"] as? String)
+
+            // A sentence NAMING the section carries the bare name — the
+            // marker belongs to the title bar and nowhere else.
+            if testCase["inASentenceNamingTheSection"] as? Bool == true {
+                XCTAssertEqual(base, expected)
+                continue
+            }
             XCTAssertEqual(
                 SectionPublishState.windowTitle(base: base, hasUnpublishedEdits: edited),
-                try XCTUnwrap(testCase["expectTitle"] as? String),
+                expected,
                 "The title bar must say exactly what the contract says it says"
             )
         }
+    }
+
+    /// Reported from a real deploy: the progress panel said "Deploying
+    /// ICS3U-S1 — Edited", which reads as though "Edited" were something
+    /// being published. Every sentence that names the section is passed
+    /// the name, never the title.
+    func testASentenceNamingTheSectionNeverCarriesTheMarker() {
+        let deploying: String = SectionDetailView.deployProgressTitle(
+            sectionName: "ICS3U-S1", isRunning: true, legCount: 2,
+            currentDestinationDescription: "Netlify"
+        )
+        XCTAssertFalse(deploying.contains("Edited"))
+        XCTAssertTrue(deploying.contains("ICS3U-S1"))
+
+        let previewing: String = SectionDetailView.previewTaskTitle(
+            isPreparing: true, sectionName: "ICS3U-S1"
+        )
+        XCTAssertFalse(previewing.contains("Edited"))
+        XCTAssertTrue(previewing.contains("ICS3U-S1"))
     }
 
     // MARK: - Which files count
