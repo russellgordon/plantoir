@@ -878,5 +878,159 @@
     "note" : "Several previews run at once, one per working folder, and they must not collide. These numbers are the toolchain's, not either app's: the container publishes fixed ports and the host side probes a block.",
     "websocketOffset" : 1000,
     "why" : "Quartz's live-reload websocket needs its own port (--wsPort = port + 1000). Without it, two previews collide on the websocket even when their site ports differ — which looks like one preview randomly failing to refresh rather than like a port clash."
+  },
+  "publishedFreshness" : {
+    "filesCounted" : {
+      "cases" : [
+        {
+          "counts" : true,
+          "path" : "course_config.json"
+        },
+        {
+          "counts" : true,
+          "path" : "Unit 1/Lesson.md",
+          "why" : "A shared, course-level folder."
+        },
+        {
+          "counts" : true,
+          "path" : "section1/Classes/Unit 1, Day 1.md"
+        },
+        {
+          "counts" : false,
+          "path" : "section2/Classes/Unit 1, Day 1.md",
+          "why" : "Another section's folder is another section's site."
+        },
+        {
+          "counts" : true,
+          "path" : "Media/diagram.png",
+          "why" : "Media is symlinked into the build, so its contents do reach the site."
+        },
+        {
+          "counts" : true,
+          "path" : "hidden_explorer_components.txt",
+          "why" : "Not a page, but it decides what the sidebar shows."
+        },
+        {
+          "counts" : false,
+          "path" : ".merged_output/section1/public/index.html",
+          "why" : "Output, not content — and hidden."
+        },
+        {
+          "counts" : false,
+          "path" : ".netlify_sites/section1.json"
+        },
+        {
+          "counts" : false,
+          "path" : ".publish_state/section1.json",
+          "why" : "LOAD-BEARING. The stamp lives in a hidden folder precisely so it is not itself content; counted, every publish would end by declaring the section edited."
+        },
+        {
+          "counts" : false,
+          "path" : ".obsidian/workspace.json"
+        },
+        {
+          "counts" : false,
+          "path" : ".DS_Store"
+        },
+        {
+          "counts" : false,
+          "path" : "Unit 1/.DS_Store"
+        },
+        {
+          "counts" : false,
+          "path" : "course_config.backup.json",
+          "why" : "Written by build_site.py's own preflight, at publish time. Counted, a publish that discovered a new folder would immediately mark the section edited."
+        },
+        {
+          "counts" : false,
+          "path" : "course_config.json.tmp"
+        },
+        {
+          "counts" : false,
+          "path" : "merged_output/index.html",
+          "why" : "The legacy, non-hidden spelling of the output folder."
+        },
+        {
+          "counts" : false,
+          "path" : "node_modules/thing/index.js"
+        }
+      ],
+      "note" : "Which files a section's fingerprint is taken over, as relative paths inside `courses/<CODE>/`, for section 1. Derived from what is on disk rather than from `shared_folders` / `per_section_folders`: `build_site.py` DISCOVERS new folders at publish time and appends them to those lists AFTERWARDS, so a folder made this morning is a real input the configuration does not know about yet."
+    },
+    "marker" : {
+      "cases" : [
+        {
+          "base" : "ICS3U-S1",
+          "expectTitle" : "ICS3U-S1",
+          "hasUnpublishedEdits" : false
+        },
+        {
+          "base" : "ICS3U-S1",
+          "expectTitle" : "ICS3U-S1 — Edited",
+          "hasUnpublishedEdits" : true
+        }
+      ],
+      "suffix" : " — Edited",
+      "why" : "The em dash and the capital E are Pages', deliberately — a teacher who has seen one save indicator has seen this one."
+    },
+    "note" : "Whether a section's window says \" — Edited\" — the Pages-style marker meaning the pages this section uses have changed since it was last published. Authored, not a readout: it must fail when the rule drifts.",
+    "whenRecorded" : [
+      {
+        "expectRecorded" : true,
+        "when" : "every configured destination succeeded"
+      },
+      {
+        "expectRecorded" : false,
+        "when" : "one of two destinations failed",
+        "why" : "A course publishing to two hosts, one of which failed, has not published. Its marker must stay up."
+      },
+      {
+        "expectRecorded" : false,
+        "when" : "the publish was cancelled or stopped"
+      },
+      {
+        "expectRecorded" : false,
+        "when" : "the shared build failed"
+      },
+      {
+        "moment" : "when the FIRST upload begins, not when the last one ends",
+        "why" : "A publish can take minutes. A page edited WHILE it uploads did not go out, and stamping the finishing state would mark that edit published — the one direction this feature must never fail in."
+      }
+    ],
+    "whenShown" : [
+      {
+        "expectEdited" : false,
+        "when" : "the section has never been published",
+        "why" : "THE ONE THAT IS NOT OBVIOUS. There is nothing to have been edited since, and a marker that is always on for every new course is a marker nobody reads. A section earns the marker only after a first successful publish."
+      },
+      {
+        "expectEdited" : false,
+        "when" : "nothing has changed since the last publish"
+      },
+      {
+        "expectEdited" : true,
+        "when" : "a page this section alone uses has changed"
+      },
+      {
+        "expectEdited" : true,
+        "when" : "a page this section SHARES with other sections has changed",
+        "why" : "Shared pages are course-level and are copied into every section, so every section is marked. Editing only `publishForSection3` in fact changes only section 3's site, and the other sections are marked early rather than wrongly — being exact would mean parsing the frontmatter of every shared page on every check."
+      },
+      {
+        "expectEdited" : true,
+        "when" : "a page has been DELETED since the last publish",
+        "why" : "Why the check is a fingerprint of the file inventory rather than 'is anything newer than the publish date'. Modification dates cannot see a removal, and an unpublished deletion is the one a teacher would most want to know about."
+      },
+      {
+        "expectEdited" : true,
+        "when" : "course_config.json has changed",
+        "why" : "The configuration is an input to the built site — fonts, the sidebar, the coverage map. Changing it changes what students see as surely as editing a page does."
+      },
+      {
+        "expectEdited" : false,
+        "when" : "the stamp file cannot be read",
+        "why" : "Treated as never published. An unreadable stamp must not be able to CLAIM a section is up to date, and it must not shout at a teacher whose course predates the feature."
+      }
+    ]
   }
 }

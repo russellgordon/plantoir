@@ -4649,6 +4649,157 @@ equivalent question is whatever Windows' own native networking stack has
 to say for itself, not whether some container has gone stale — there is
 no container to check.
 
+## The " — Edited" marker: knowing a section has changed since it published (entry 310)
+
+Russell asked for the thing Pages does — `Untitled 3 — Edited` in the title
+bar — for a section window: if any page the section uses, or shares with
+other sections, has changed since the last publish, say so. And explicitly:
+without impacting performance.
+
+**The first finding was that nothing recorded when a section last
+published.** Not in `course_config.json`, not in the trail, nowhere on
+either platform. The `.netlify_sites` / `.cloudflare_sites` markers record
+that a section has EVER published, not when or with what. So the feature is
+half "compare two things" and half "start recording one of them".
+
+### The shared file — match this exactly
+
+`courses/<CODE>/.publish_state/section<N>.json`:
+
+```json
+{
+  "destinations" : [ "netlify" ],
+  "fingerprint" : "9f2c…",
+  "publishedAt" : "2026-08-22T13:46:32Z"
+}
+```
+
+Written by whichever app publishes, read by both. A teacher who publishes
+section 1 on the mac and opens the same working folder on Windows must not
+see " — Edited" there. That makes the fingerprint algorithm a wire format
+rather than an implementation detail, so it has to match to the character:
+
+1. Walk `courses/<CODE>/`, skipping hidden entries.
+2. Keep each regular file whose relative path passes the filter below.
+3. For each, one line: `relativePath|sizeInBytes|microsecondsSinceEpoch`,
+   where the path uses `/` separators and the microseconds are the
+   modification date times 1,000,000, TRUNCATED to an integer.
+4. Sort the lines as plain strings, join with `\n`, SHA-256, lowercase hex.
+
+`SectionPublishState.fingerprint` is the reference. Note step 3's separator
+and step 4's sort — a `List<string>` sorted with a culture-aware comparer
+will not agree with Swift's, so sort ordinally.
+
+### What counts, and why it is NOT read from the configuration
+
+The obvious implementation reads `shared_folders`, `shared_files`,
+`per_section_folders` and `per_section_files` out of `course_config.json`
+and fingerprints those. It is wrong, and the reason is easy to miss:
+`build_site.py` DISCOVERS new top-level folders during its preflight and
+appends them to those lists AFTERWARDS. A folder the teacher made this
+morning is a genuine input to the site and is not in the configuration
+yet — so a configuration-driven fingerprint would be blind to it until the
+next publish, which is the exact publish the marker exists to prompt.
+
+So the rule is derived from what is on disk: everything non-hidden under
+the course folder, minus
+
+- another section's `section<M>/` folder (`section3` yes, `sections` and
+  `section3b` no — those are folders a teacher is free to make),
+- `node_modules` and the legacy non-hidden `merged_output`,
+- `.DS_Store` / `Thumbs.db`,
+- `course_config.backup.json` and any `*.tmp`.
+
+`course_config.json` itself COUNTS — fonts, the sidebar and the coverage map
+are inputs to the built site as surely as a page is. `Media/` counts, because
+it is symlinked into the build. `hidden_explorer_components*` counts, because
+it decides what the sidebar shows.
+
+Two of those exclusions are load-bearing rather than tidy, and both were
+found by reading `build_site.py` rather than by testing:
+
+- **`.publish_state` is hidden on purpose.** The stamp is written into the
+  course folder at the end of a publish. Counted, every publish would end by
+  declaring the section edited — an indicator permanently stuck on.
+- **`course_config.backup.json` and `course_config.json.tmp`** are written
+  by `_atomic_write_json_with_backup` during the build's own preflight,
+  whenever discovery finds something new. Same failure, less often, and
+  therefore harder to diagnose.
+
+`contracts/app-rules.json` → `publishedFreshness.filesCounted` runs all
+sixteen of these as data. Wire that up before anything else here; it is the
+half most likely to drift.
+
+### When the stamp is written
+
+In `MultiDestinationDeployRunner.run()`, and only when
+`outcome.allSucceeded`. A course publishing to two hosts, one of which
+failed, has NOT published, and its marker must stay up — that is the whole
+point of having redundant destinations mean something.
+
+**The fingerprint is taken when the FIRST upload begins, not when the last
+one ends.** A publish takes minutes; a page the teacher edits while it
+uploads did not go out, and stamping the finishing state would mark that
+edit as published. That is the one direction this feature must never fail
+in: an early marker costs a needless publish, a late one costs a class that
+never saw the page.
+
+Taking it at the start of `run()` instead — before the build leg — was
+considered and rejected: the build's preflight can rewrite
+`course_config.json`, so that reading would show a spurious edit on every
+publish that discovered a new folder.
+
+### What is shown
+
+`base` is the existing title (`ICS3U-S1`); the marker appends `" — Edited"`
+— em dash, spaces either side, capital E, all of it Pages'. Contract cases
+in `publishedFreshness.marker`.
+
+**A section that has never published shows NO marker.** Pages does the
+opposite (`Untitled 3 — Edited` on a document never saved), and it was
+rejected here on purpose: a marker that is on for every new course from the
+moment it is created is a marker teachers learn to ignore, which costs the
+one it is for. An unreadable or corrupt stamp is treated identically to no
+stamp, so a course predating this feature is quiet rather than shouting.
+
+### One accepted imprecision, so nobody "fixes" it
+
+A course-level page shared by every section marks EVERY section edited —
+even though editing only `publishForSection3` in fact changes only section
+3's site. Being exact means parsing the frontmatter of every shared page on
+every check, which is reading files, which is the cost the whole design
+avoids. The wording was chosen to stay true either way: a page this section
+uses, or shares, has changed. It is early, not wrong.
+
+### The refresh triggers, and the watcher NOT built
+
+The mac recomputes on four events only: the window appearing, the app
+becoming active, this window becoming key, and a run finishing. Never on a
+timer, and never from `body` — a view that recomputed it while rendering
+would walk the course folder every time a console line arrived during a
+publish. The walk runs off the main thread, so a course on a slow network
+volume cannot stutter a window coming to the front.
+
+An FSEvents stream over the course folder was considered and deliberately
+NOT built, on either platform. Neither app runs one today, the marker only
+matters at the instant somebody looks at the title bar, and a watcher is a
+cost paid continuously for an answer wanted occasionally. If the
+on-activate refresh ever feels stale in practice, that is the moment to add
+one — for the frontmost course only, coalesced — and not before.
+
+Windows owes its own equivalents of the two mac-specific pieces: setting
+the window title (WinUI does it on the window, not through a
+`navigationTitle` modifier) and the activation events.
+
+### The trail
+
+New event `section content marked published`, in `ActivityTrail.Event` and
+in `shared-rules.json` → `activityTrail.mustRecord`. It matters more than a
+routine line because the marker is DERIVED: its presence and its absence
+look identical on disk, so "it still says Edited after I published" has
+nothing to look at without it. The line also records that the publish
+succeeded at EVERY destination rather than merely at one.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have

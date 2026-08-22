@@ -190,6 +190,13 @@ class MultiDestinationDeployRunner {
         wasStoppedByUser = false
         defer { isRunning = false }
 
+        /// The content as it stood when the first upload began — recorded
+        /// only if every destination then succeeded. Taken at that moment
+        /// rather than at the end because a publish can take minutes, and
+        /// a page the teacher edits WHILE it uploads did not go out;
+        /// stamping the finishing state would mark that edit published.
+        var publishedFingerprint: String?
+
         for index in legs.indices {
             currentLegIndex = index
             let destination: CourseConfiguration.DeployDestination = legs[index].destination
@@ -231,6 +238,13 @@ class MultiDestinationDeployRunner {
                 runner.milestones = MultiDestinationDeployRunner.deployOnlyMilestones(forDestinationType: destination.type)
             }
 
+            if publishedFingerprint == nil {
+                publishedFingerprint = SectionPublishState.fingerprint(
+                    courseDirectory: course.directoryURL,
+                    sectionNumber: sectionNumber
+                )
+            }
+
             let arguments: [String] = DeployCommand.arguments(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
@@ -255,6 +269,38 @@ class MultiDestinationDeployRunner {
                 wasStoppedByUser = wasStoppedByUser || runner.wasStoppedByUser
                 break
             }
+        }
+
+        recordWhatWentOut(course: course, sectionNumber: sectionNumber, fingerprint: publishedFingerprint)
+    }
+
+    /// Marks the section up to date, so its window stops saying
+    /// " — Edited". Only when EVERY destination succeeded: a course
+    /// publishing to two hosts, one of which failed, has not published.
+    private func recordWhatWentOut(course: Course, sectionNumber: Int, fingerprint: String?) {
+        guard let fingerprint, outcome.allSucceeded else {
+            return
+        }
+        var destinations: [String] = []
+        var names: [String] = []
+        for leg in legs where leg.succeeded {
+            destinations.append(leg.destination.type)
+            names.append(DeployCommand.destinationDescription(for: leg.destination))
+        }
+        let recorded: Bool = SectionPublishState.recordPublish(
+            courseDirectory: course.directoryURL,
+            sectionNumber: sectionNumber,
+            fingerprint: fingerprint,
+            destinations: destinations
+        )
+        if recorded {
+            ActivityTrail.note(
+                .sectionContentMarkedPublished,
+                "marked this section\u{2019}s pages as published to "
+                + MultiDestinationDeployRunner.joinedWithAnd(names),
+                course: course.code,
+                section: sectionNumber
+            )
         }
     }
 
