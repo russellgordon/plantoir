@@ -377,6 +377,16 @@ wait for it, or ask. Relaunching afterwards is HIS, the same way it is on the
 mac (rule 10): a rebuild that reopens the app steals focus from whatever he has
 moved on to.
 
+**Standing order, added 2026-08-22: when a round of changes looks done, rebuild
+for `x64` so his "PT - Dev" Desktop shortcut runs it.** The Windows mirror of
+mac rule 10 below — "when you think the work is done, rebuild the app before
+you say so." His shortcut points at
+`Plantoir\bin\x64\Debug\net9.0-windows10.0.19041.0\win-x64\Plantoir.exe`,
+which a plain `dotnet build` does not write to (see `WINDOWS-BOOTSTRAP.md` §6
+for why and the exact command). Build with `-p:Platform=x64` before reporting
+back, and say the build is ready at "PT - Dev" — still without launching it
+yourself; that part stays his.
+
 ### Clean up after yourself, because a force-kill skips the app's own tidying
 
 `Stop-Process` is not Quit. The app never runs its shutdown path, so anything
