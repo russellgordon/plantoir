@@ -276,6 +276,7 @@ struct SectionDetailView: View {
                         runner: deployRunner.activeRunner,
                         title: deployProgressTitle,
                         hidesSiteLink: deployRunner.legs.count > 1,
+                        allLegs: deployRunner.legs.count > 1 ? deployRunner.legs : nil,
                         onCancel: {
                             cancelDeploy()
                         }

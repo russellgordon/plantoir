@@ -4250,7 +4250,7 @@ fixing that silently for free.
 `build_site.py`'s `resolve_section_domain()` decides the baseUrl baked
 into a build's sitemap, RSS feed, and social-card absolute URLs. A single
 build's `public/` folder is uploaded to EVERY configured destination (see
-row 303's "a build runs exactly once, fused into the first destination's
+row 302's "a build runs exactly once, fused into the first destination's
 own progress") — so unlike the Swift GUI's per-destination LINK DISPLAY,
 there is no way for the baseUrl itself to be different per destination; it
 is one value baked into the actual files. The fix there reads the new
@@ -4294,6 +4294,54 @@ custom domain are in play. There is no urgency purely from "Windows has no
 `MultiDestinationDeployRunner` yet" (true, and fine on its own), but the
 read/write asymmetry above is a real risk today, for any course a teacher
 happens to open on both platforms.
+
+## The multi-destination console dropped the first destination's output (entry 304)
+
+Reported directly, right alongside row 303: "output to the faux terminal
+should show details from both deploys, not replace the deploy details
+from the first deploy with the second." `TaskConsoleView` — the "Show
+details" panel beneath the progress header — is bound to one
+`ScriptRunner`, and the caller was always `deployRunner.activeRunner`:
+whichever leg is CURRENT. The moment a second destination started, the
+first destination's own console output was simply gone — not scrolled
+past, gone — replaced by the second leg's own, mostly-empty transcript.
+
+The fix threads an optional `allLegs: [MultiDestinationDeployRunner.Leg]?`
+through `TaskProgressView` into `TaskConsoleView`. When set (and there is
+more than one leg), the console shows every leg that has produced ANY
+output so far, each under a `"── <Service> ──"` heading, joined in deploy
+order:
+
+```swift
+static func combinedTranscriptText(runner: ScriptRunner, allLegs: [MultiDestinationDeployRunner.Leg]?) -> String {
+    guard let allLegs, allLegs.count > 1 else {
+        let text = runner.transcript.displayText
+        return text.isEmpty ? "Starting…" : text
+    }
+    var sections: [String] = []
+    for leg in allLegs where !leg.runner.transcript.lines.isEmpty {
+        sections.append("── \(DeployCommand.destinationDescription(for: leg.destination)) ──\n" + leg.runner.transcript.displayText)
+    }
+    return sections.isEmpty ? "Starting…" : sections.joined(separator: "\n\n")
+}
+```
+
+`runner` itself is untouched and still drives the status header (Finished
+/ Failed / spinner), the input field, and the auto-scroll trigger —
+exactly one leg is ever actually RUNNING at a time, so there is only ever
+one place a teacher's answer to a prompt needs to go. A leg the run never
+reached (stopped by a cancel, or an earlier failed shared build) is
+filtered out by the "has produced any output" check rather than shown as
+an empty, confusing section. `allLegs` defaults to `nil` everywhere else
+— a single-destination deploy, and the wizard's own preview — so those
+callers are byte-for-byte unchanged.
+
+**What Windows needs from this**: the same shape, once row 302's
+behavioural piece exists there — concatenate every destination's own
+output that exists so far, under its own heading, rather than showing only
+whichever one is current. Not this Swift; the decision that travels is
+"a multi-destination console must never let an earlier destination's
+output simply disappear."
 
 ## Testing
 

@@ -23,6 +23,12 @@ struct TaskProgressView: View {
     /// link instead; a single-destination deploy (the overwhelming
     /// majority) never sets this and looks exactly as it always has.
     let hidesSiteLink: Bool
+    /// Every leg of a multi-destination deploy, in order — passed through
+    /// unchanged to `TaskConsoleView` so "Show details" can show EVERY
+    /// destination's own output so far, not just whichever leg happens to
+    /// be `runner` right now. `nil` for everything else (a single
+    /// destination, a preview), which looks exactly as it always has.
+    let allLegs: [MultiDestinationDeployRunner.Leg]?
     let onCancel: (() -> Void)?
 
     @State var isShowingDetails: Bool = false
@@ -36,12 +42,14 @@ struct TaskProgressView: View {
         showingDetailsForTesting: Bool = false,
         canCancel: Bool = true,
         hidesSiteLink: Bool = false,
+        allLegs: [MultiDestinationDeployRunner.Leg]? = nil,
         onCancel: (() -> Void)? = nil
     ) {
         self.runner = runner
         self.title = title
         self.canCancel = canCancel
         self.hidesSiteLink = hidesSiteLink
+        self.allLegs = allLegs
         self.onCancel = onCancel
         _isShowingDetails = State(initialValue: showingDetailsForTesting)
     }
@@ -279,7 +287,7 @@ struct TaskProgressView: View {
                 // transcript then demanded tens of thousands of points,
                 // growing the window's content past the window itself
                 // and sliding the interface out of sight.
-                TaskConsoleView(runner: runner)
+                TaskConsoleView(runner: runner, allLegs: allLegs)
                     .frame(minHeight: 200, idealHeight: 260, maxHeight: .infinity)
                     .clipped()
             }
