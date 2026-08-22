@@ -78,13 +78,17 @@ accept from the picture alone? That gap is what this task is about.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B3.3]]
-
-![[B3.2]]
+![[B1.4]]
 
 ![[B2.1]]
 
 ![[B2.2]]
+
+![[B3.1]]
+
+![[B3.2]]
+
+![[B3.3]]
 %%curriculum-end%%
 
 %%

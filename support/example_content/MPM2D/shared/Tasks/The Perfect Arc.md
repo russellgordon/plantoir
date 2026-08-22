@@ -77,13 +77,15 @@ the world teaches you what a model is — and what it is not.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[A2.4]]
-
-![[A4.2]]
+![[A1.1]]
 
 ![[A1.3]]
 
-![[A1.1]]
+![[A2.4]]
+
+![[A3.3]]
+
+![[A4.2]]
 %%curriculum-end%%
 
 %%

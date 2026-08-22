@@ -83,6 +83,8 @@ the conversations — they have a way of showing you what you know.
 
 ![[Mathematical Process Expectations]]
 
+![[A3.7]]
+
 ![[A3.8]]
 %%curriculum-end%%
 
@@ -118,8 +120,8 @@ class
   A strong answer names one specific thing — the axis sits halfway
   between the zeros, so the vertex was never a guess — and then says it
   again with the vocabulary stripped out. The two answers together are
-  Reflecting and Communicating from the process expectations, and the
-  second is the harder of the two to fake.
+  A3.8 and the Reflecting and Communicating process expectations heard
+  in conversation, and the second is the harder of the two to fake.
   Record: two words per student beside the class list. You are noting
   whether the reason is SPECIFIC, not whether it is right.
 

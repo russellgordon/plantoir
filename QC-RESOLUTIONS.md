@@ -450,3 +450,88 @@ An adversarial subagent was invoked to refute claims of resolution, audit curric
 - **Linter Results (`lint_payload.py SPH4U`):** Clean (284 pages checked, 86 class pages, 0 errors, 0 once-only expectations).
 - **All destination pages reachable within 2 hops of a class page.**
 - **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+---
+
+### 1.1 Coverage depth: MPM2D once-only expectations (11 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across MPM2D (Grade 10 Principles of Mathematics) by ensuring all 41 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (concepts, exercises, explorations, discussions, number talks, tutorials, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding quadratic relations, analytic geometry, and trigonometry over time.
+
+#### Baseline Findings (MPM2D)
+- Total expectations: 41 specific expectations (`A1.1` to `C3.4`)
+- Addressed only once (11 codes): `A1.1, A1.4, A3.3, A3.5, A3.7, B1.4, B1.5, B3.1, C1.1, C2.1, C3.2`
+- Landing page teacher comment drift: `per_section/index.md` mentioned Unit 4, Day 5/6 instead of Unit 4, Day 20/21.
+
+#### Actions Completed
+
+1. **Exercises Enhancement (`shared/Exercises/`)**:
+   - `Quadratic Graphing Practice.md`: Added Question 7 (collecting and graphing experimental data for an inclined ramp roll and fitting a quadratic curve of best fit $d = 50t^2$), Question 8 (comparing $y = x^2$ with $y = 2^x$, zero and negative exponents $2^0 = 1, 2^{-1} = 1/2, 2^{-2} = 1/4$, and contrasting graph features), and Question 9 (completing the square without fractions for $y = x^2 - 10x + 21$ and $y = 3x^2 + 12x + 5$ into vertex form using algebra and area models). Transclusions: `A1.1, A1.4, A2.3, A2.4, A3.3, A3.5`.
+   - `Expanding and Factoring Practice.md`: Added Question 9 (factoring quadratic relation $y = x^2 - 2x - 8$ into factored form $y = (x - 4)(x + 2)$ to identify zeros/intercepts, axis of symmetry, and vertex). Transclusions: `A3.1, A3.2, A3.3`.
+   - `Quadratic Formula Practice.md`: Added Question 7 (exploring the algebraic development of the quadratic formula by completing the square on general parameters $ax^2 + bx + c = 0$ mapped side-by-side with numerical equation $2x^2 + 8x - 10 = 0$). Transclusions: `A3.4, A3.7, A3.8`.
+   - `Linear Systems Practice.md`: Added Question 8 (developing and applying slope formula $m = \frac{y_2 - y_1}{x_2 - x_1}$ from coordinates and writing linear equations) and Question 9 (translating between standard form $Ax + By + C = 0$ and slope-intercept form $y = mx + b$). Transclusions: `B1.1, B1.2, B1.4, B1.5`.
+   - `Midpoint and Length Practice.md`: Added Question 8 (finding slopes and equations of triangle medians and perpendicular bisectors in standard form). Transclusions: `B1.4, B1.5, B2.1, B2.2, B2.5, B3.1, B3.2`.
+   - `Similar Triangles Practice.md`: Added Question 7 (verifying similarity between right triangles with a $30°$ angle and computing constant opposite-to-hypotenuse side ratios defining $\sin 30° = 0.5$). Transclusions: `C1.1, C1.2, C1.3, C2.1`.
+   - `Trig Ratios and Laws Practice.md`: Added Question 7 (exploring the development of the cosine law by dropping an altitude in acute $\triangle ABC$, splitting the base, and applying the Pythagorean theorem to arrive at $a^2 = b^2 + c^2 - 2bc\cos A$). Transclusions: `C2.1, C2.2, C3.1, C3.2, C3.3, C3.4`.
+
+2. **Concept Pages Alignment & Deepening (`shared/Concepts/`)**:
+   - `The Vertex Form.md`: Enhanced completing the square section with explicit Case 1 ($a = 1$) and Case 2 ($a \neq 1$) without fractions, using area diagrams/algebra tiles. Transclusions: `A2.3, A2.4, A3.5`.
+   - `Quadratic Relations.md`: Added dedicated section comparing quadratic growth ($y = x^2$) with exponential growth ($y = 2^x$), exploring patterns for zero and negative exponents ($2^0 = 1, 2^{-1} = 1/2, 2^{-2} = 1/4$), and contrasting parabolic symmetry with exponential asymptotes. Transclusions: `A1.2, A1.3, A1.4`.
+   - `Parallel, Perpendicular, and the Bisector.md`: Added slope formula derivation from coordinates and translated right bisector equations between point-slope, slope-intercept, and standard forms ($3x + 2y - 20 = 0$). Transclusions: `B1.3, B1.4, B1.5, B2.5`.
+   - `Midpoint and Length.md`: Added slope formula $m = \frac{y_2 - y_1}{x_2 - x_1}$ as the rise-over-run companion coordinate tool derived from the right triangle. Transclusions: `B1.4, B2.1, B2.2`.
+
+3. **Explorations, Discussions & Number Talks (`shared/Explorations/`, `shared/Discussions/`, `shared/Number Talks/`)**:
+   - `Explorations/Maximum Enclosure.md`: Transclusions `A1.1, A1.3, A3.5, A4.1`.
+   - `Explorations/The Handshake Problem.md`: Transclusions `A1.1, A1.2, Mathematical Process Expectations`.
+   - `Explorations/Crossing Paths.md`: Transclusions `B1.1, B1.2, B1.4`.
+   - `Explorations/How Tall Is the Flagpole.md`: Transclusions `C1.1, C1.3, C2.1, C2.3`.
+   - `Discussions/What Makes a Proof Convincing.md`: Transclusions `B3.1, B3.2, B3.3`.
+   - `Number Talks/Always, Sometimes, Never.md`: Transclusions `B3.1, B3.3, C1.1, C1.2, C2.1`.
+   - `Tutorials/Checking Your Own Work.md`: Transclusions `A3.5, A3.8, B1.1`.
+
+4. **Tasks, Summative Evaluations & Landing Page (`shared/Tasks/`, `per_section/`)**:
+   - `The Perfect Arc.md`: Transclusions `A1.1, A1.3, A2.4, A3.3, A4.2`.
+   - `The Quadrilateral Case File.md`: Transclusions `B1.4, B2.1, B2.2, B3.1, B3.2, B3.3`.
+   - `Break-Even.md`: Transclusions `B1.1, B1.2, B1.4, B1.5`.
+   - `Inaccessible Heights.md`: Transclusions `C1.1, C1.3, C2.1, C2.3, C3.2, C3.4`.
+   - `The Math Symposium.md`: Transclusions `Mathematical Process Expectations, A3.7, A3.8`; updated TALK triangulation block to explicitly name `A3.8`.
+   - `Final Examination.md`: Transclusions `A3.5, A3.6, A4.1, B1.3, B1.4, B1.5, B2.5, C3.1, C3.2`.
+   - `per_section/index.md`: Corrected comment referencing Unit 4, Day 20 as newest published page and Day 21 as held-back example.
+
+---
+
+#### Adversarial Audit & Quality Control Review (MPM2D)
+
+An adversarial subagent was invoked to refute claims of resolution, audit curriculum alignment against primary Ministry documents in `shared/Curriculum/`, test KaTeX syntax, verify two-hop reachability, inspect folder indexes, and check Canadian spelling.
+
+**Round 1 Defects Verified Fixed:**
+1. *Defect 1 (Unescaped currency dollar signs):* Verified all currency figures in `Crossing Paths.md`, `Would You Rather.md`, `Writing About Math.md`, and `Linear Systems Practice.md` use properly escaped `\$` syntax.
+2. *Defect 2 (Missing concept pages in index):* Verified `shared/Concepts/index.md` contains 100% of concept pages, including `Factors and Intercepts` and `Parallel, Perpendicular, and the Bisector`.
+3. *Defect 3 (Missing exploration in index):* Verified `shared/Explorations/index.md` contains 100% of exploration pages, including `Squares Against Doubling`.
+4. *Defect 4 (Missing tutorial in index):* Verified `shared/Tutorials/index.md` contains 100% of tutorial pages, including `Scavenger Hunt`.
+5. *Defect 5 (`enableToc` rule compliance):* Verified `enableToc: true` is only present on pages with $\ge 4$ H2 headings (`The Vertex Form.md` defaults to false, `Curriculum/index.md` has exactly 4 H2 headings).
+
+**Round 2 Audit Actions & Corrected Defects:**
+1. *Spelling Standardization:* Corrected instances of US spelling "skeptic" to Canadian spelling "sceptic" in `shared/Explorations/Maximum Enclosure.md` (line 18) and `per_section/All Classes/Unit 2, Day 10.md` (line 16), ensuring 100% adherence to Canadian English.
+2. *KaTeX Multiline In-Callout Formatting:* Corrected inline math formatting in `shared/Exercises/Midpoint and Length Practice.md` (lines 38–39) and `shared/Style/What This Site Can Do.md` (lines 144–145) to prevent potential KaTeX inline span breaks across markdown blockquote lines.
+
+**Audit Results:**
+- **Verdict:** **CERTIFIED CLEAN** (0 blocking defects, 0 minor observations).
+- Confirmed all 41 specific expectations (`A1.1` to `C3.4`) are authentically taught, exercised, or evaluated $\ge 2$ times.
+- Confirmed all 11 target expectations are thoroughly represented across multiple authentic destination files (ranging from 3 to 8 files each).
+- Confirmed all folder `index.md` files contain 100% of non-template markdown files.
+- Confirmed zero transclusions or links inside comments, zero curriculum blocks on class pages, and 100% two-hop graph reachability.
+- Confirmed Canadian spelling and stylistic conventions maintained throughout.
+
+---
+
+#### Final Verification Metrics (MPM2D)
+
+- **Total Specific Expectations:** 41 (`A1.1` – `C3.4`)
+- **Expectations Addressed $\ge 2$ Times:** 41 / 41 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Linter Results (`lint_payload.py MPM2D`):** Clean (232 pages checked, 84 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+

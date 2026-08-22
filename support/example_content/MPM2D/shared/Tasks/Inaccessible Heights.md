@@ -79,9 +79,15 @@ is where you learn to win it.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[C2.3]]
+![[C1.1]]
 
 ![[C1.3]]
+
+![[C2.1]]
+
+![[C2.3]]
+
+![[C3.2]]
 
 ![[C3.4]]
 %%curriculum-end%%

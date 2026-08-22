@@ -23,6 +23,9 @@ directions, and the model is not training wheels: it is the reason.
 8. **Explain with the area model.** Draw a rectangle with sides
    $x + 3$ and $x + 5$, split into four regions. Explain where each
    term of the expansion lives — and why factoring runs it backwards.
+9. **From factors to intercepts.** Factor the quadratic relation
+   $y = x^2 - 2x - 8$ into the form $y = a(x - r)(x - s)$ to state its
+   zeros ($x$-intercepts), determine the axis of symmetry, and sketch.
 
 ## Answers
 
@@ -61,10 +64,20 @@ directions, and the model is not training wheels: it is the reason.
 > corner. Factoring hands you the area and asks for the sides: the
 > same rectangle, rebuilt — the move [[The Border Problem]] made visible.
 
+> [!success]- Answer 9
+> Factoring gives $y = (x - 4)(x + 2)$, so $r = 4$ and $s = -2$: the
+> zeros ($x$-intercepts) sit at $x = 4$ and $x = -2$. The axis of
+> symmetry runs halfway between them at $x = \frac{4 + (-2)}{2} = 1$,
+> giving vertex $(1, -9)$ and $y$-intercept $-8$. Factored form
+> $y = a(x - r)(x - s)$ displays the zeros directly — the connection
+> [[Factors and Intercepts]] explores.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A3.1]]
 
 ![[A3.2]]
+
+![[A3.3]]
 %%curriculum-end%%

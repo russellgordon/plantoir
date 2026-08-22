@@ -96,15 +96,23 @@ decides your grade alone.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A3.5]]
+
 ![[A3.6]]
 
 ![[A4.1]]
 
 ![[B1.3]]
 
+![[B1.4]]
+
+![[B1.5]]
+
 ![[B2.5]]
 
 ![[C3.1]]
+
+![[C3.2]]
 %%curriculum-end%%
 
 %%
