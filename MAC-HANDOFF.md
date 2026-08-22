@@ -1158,6 +1158,98 @@ Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
 
+- ✅ DONE (Windows, 2026-08-22). **A "Publish" that followed a running
+  preview could spew the whole build log into the assistant's chat reply —
+  fixed by making `AssistWorkspace.Apply` actually honor the `preview: false`
+  the chat window was already sending and being ignored.**
+
+  **The report.** Russell described a cycle of "preview", "Unpublish Unit 4,
+  Day 20", "Publish Unit 4, Day 20" — and on that final Publish, the assistant's
+  reply carried every line of a fresh build, instead of a short "Working…" /
+  "Published".
+
+  **Root cause: the `preview` flag was set on the way in and read nowhere on
+  the way through.** `AssistAgent.RunTool` (`Plantoir.Core/Assist/AssistAgent.
+  cs`, `EditsPages`/`TakesPreviewFlag`) already forces
+  `arguments["preview"] = false` for `publish_pages`/`unpublish_pages`/
+  `publish_class_on`, with a doc comment stating the intent plainly: "They run
+  on the server as pure file edits — `preview: false`, so the server builds
+  nothing — and then the app's own preview is put on screen." That promise was
+  not kept. `PlantoirTools.Act` (`Plantoir.Mcp/PlantoirTools.cs`) received
+  `preview` and used it for exactly one thing — skipping an early "nothing to
+  do" return — then called `workspace.Apply(plan, progress, cancellation)`,
+  a method with **no `preview` parameter at all**. So every publish/unpublish
+  of a single page (the common case — a single day, like "Unit 4, Day 20")
+  triggered a second, hidden `preview.ps1 --build-only` inside `Apply`,
+  unconditionally, on the server — racing the app's own visible rebuild
+  (`ShowPreviewInApp.Invoke()`, fired moments later back in `RunTool`) for the
+  same `.merged_output/section<N>/` folder, with no build-lease protection
+  guarding that inner call the way `RebuildPreview` and `RefuseIfPlantoirIs
+  Building` already guard every OTHER build path. On failure, the hidden
+  build's raw output (`LauncherRunner.Explain` — up to 12 tail lines of the
+  launcher's own stdout/stderr, spliced onto the failure message) became the
+  tool's `Detail`, fed straight into `_messages` for the local model, which —
+  per the pattern already noted elsewhere in this file (a small model restates
+  what it is given) — parroted the raw block back into the chat instead of a
+  clean sentence. `ApplyWholeUnit`, the sibling code path for a whole-unit
+  publish, already did this correctly (skips the build entirely when
+  `preview: false`); `Apply`, the single-page path, simply never got the same
+  treatment.
+
+  **Why "Publish" leaked but the preceding "Unpublish" in the same cycle did
+  not.** `PublishPlan.Publishes` is `!draft`; `Apply`'s build branch only runs
+  `if (plan.Publishes)`. `unpublish_pages` (`draft: true`) returns before ever
+  reaching the launcher, so only a publish can hit the unfenced hidden build —
+  matching the reported asymmetry exactly.
+
+  **What was built.** `Apply(PublishPlan plan, bool preview = true, …)` now
+  takes and honors the same flag `ApplyWholeUnit` already did: when `preview`
+  is false, it returns the plain summary and builds nothing, leaving the one
+  visible rebuild to the app, exactly as the `EditsPages` doc comment always
+  claimed. When `preview` is true (a caller with no window on screen, or the
+  `publish_class_on` sequencing path), the build now goes through
+  `RefuseIfPlantoirIsBuilding` + `ClaimTheBuild` immediately beforehand — the
+  same lease discipline `RebuildPreview` already had — so it cannot race a
+  concurrent build either. And on failure, both `Apply` and `ApplyWholeUnit`
+  now say a short, contract-backed sentence
+  (`AssistWording.WhereTheOutputIs` — "The output is in that section's window
+  in Plantoir.") instead of splicing the launcher's raw transcript into the
+  model's context. `PlantoirTools.Act`'s two call sites (`publish_pages`/
+  `unpublish_pages` and `publish_class_on`) now pass the `preview` argument
+  they already had through to `Apply`.
+
+  **Why not just filter/summarize the raw output client-side instead.** That
+  would have treated the symptom (raw text reaching the model) without fixing
+  the cause (a hidden build the app's own doc comment said would never
+  happen), and would have left the race between the hidden and visible builds
+  in place — a race that can corrupt a half-written preview even when nothing
+  fails outright. Honoring the flag that was already being sent removes both
+  the leak and the race in one change, and needed no new plumbing: `preview`
+  was already threaded as far as `Act`, just dropped at the last hop.
+
+  **Nothing for the mac to port.** The mac's equivalent code was checked and
+  does not have this bug, structurally rather than by luck:
+  `AssistToolRunner.bringThePreviewUpToDate`
+  (`mac-app/QuartzTeachers/Models/Assist/AssistToolRunner.swift`) is the ONE
+  place a rebuild is ever triggered after a page edit, and it chooses
+  visible-vs-headless dynamically, at the moment it runs, by asking whether a
+  section window exists — never via a boolean threaded across the MCP-tool
+  boundary and then silently ignored. The publishing write itself (`carryOut`)
+  never calls a builder at all; it always defers to that one dispatcher. And
+  its headless fallback (`AssistSiteWork.rebuildPreview`) already returns only
+  the canned `AssistWording.previewDidNotBuild` sentence on failure, never raw
+  output. Recorded here for awareness only, per rule 4 in `CLAUDE.md`: no
+  contract case is proposed, because the fix is Windows-only plumbing with no
+  teacher-visible wording change to assert cross-platform (the wording used,
+  `WhereTheOutputIs`/`previewDidNotBuild`, already existed in both apps'
+  `AssistWording` before this fix).
+
+  **Reference:** `Plantoir.Core/Assist/AssistWorkspace.cs` (`Apply`,
+  `ApplyWholeUnit`), `Plantoir.Mcp/PlantoirTools.cs` (`Act`). Tests:
+  `Plantoir.Tests/AssistTests.cs` —
+  `PublishingWithPreviewFalseBuildsNothing`,
+  `APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog`.
+
 - ✅ DONE (mac, salvaging stranded Windows work, 2026-08-22). **A branch that
   never got merged, `issue/mac-site-shots-unmerged`: mostly superseded, three
   real fixes rescued into a fresh branch.**
