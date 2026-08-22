@@ -534,4 +534,64 @@ An adversarial subagent was invoked to refute claims of resolution, audit curric
 - **All destination pages reachable within 2 hops of a class page.**
 - **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
 
+---
+
+### 1.1 Coverage depth: CHA3U once-only expectations (13 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across CHA3U (Grade 11 American History, University Preparation) by ensuring all 67 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (concepts, investigations, sources, writing guides, tutorials, discussions, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding historical thinking, primary source analysis, and historical inquiry over time.
+
+#### Baseline Findings (CHA3U)
+- Total expectations: 67 specific expectations (`A1.1` to `E3.5`)
+- Addressed only once (13 codes): `A1.9, B2.4, C2.4, C3.5, D1.3, D2.3, D3.1, D3.2, D3.3, D3.5, E1.2, E1.3, E3.5`
+- Unlinked shared files in class schedule:
+  - `shared/Style/What This Site Can Do.md`
+  - `shared/Tutorials/Scavenger Hunt.md`
+- Missing from folder index: `shared/Tutorials/Scavenger Hunt.md` was omitted from `shared/Tutorials/index.md`.
+
+#### Actions Completed
+
+1. **Writing Guides & Inquiry Method (`shared/Writing/`)**:
+   - `Building an Argument.md`: Added curriculum transclusion `A1.9` for communicating inquiry findings using appropriate historical terminology and criteria.
+   - `Using Evidence.md`: Added curriculum transclusion `A1.9` for interpreting and analyzing evidence with precise historical vocabulary (provenance, standpoint, corroboration).
+
+2. **Concept Pages Alignment & Deepening (`shared/Concepts/`)**:
+   - `Before 1492.md`: Added curriculum transclusion `B2.4` for indigenous environmental adaptations, regional geography, and natural resources across North American ecosystems.
+   - `Colonies and the People In Them.md`: Added curriculum transclusion `B2.4` for regional environmental and economic differences (New England, Middle Colonies, Chesapeake/Southern plantations).
+   - `Politics of a Growing Republic.md`: Added new section "Foreign relations, territory, and domestic power" discussing the War of 1812, Treaty of Ghent, Monroe Doctrine, Texas annexation, Mexican-American War, and Civil War diplomacy; updated frontmatter with `enableToc: true`; added curriculum transclusion `C2.4`.
+   - `Reform Movements.md`: Added curriculum transclusion `C3.5` for assessing the individual contributions of Elizabeth Cady Stanton, Sojourner Truth, Frederick Douglass, Dorothea Dix, and William Lloyd Garrison.
+   - `Removal and Resistance.md`: Added curriculum transclusion `C3.5` for assessing the individual contributions and leadership of Tecumseh, John Ross, Major Ridge, Andrew Jackson, Chief Joseph, and Lakota leaders.
+   - `Jim Crow and Resistance.md`: Added curriculum transclusions `D1.3, D2.3, D3.5` for statutory disenfranchisement, Progressive and civil rights reform organizing (Ida B. Wells, W.E.B. Du Bois, NAACP), and cultural contributions (Harlem Renaissance, blues, jazz, Negro Leagues baseball).
+   - `Industry, Labour, and the Cities.md`: Added curriculum transclusions `D1.3, D2.3, D3.2, D3.3` for domestic labour legislation, AFL/IWW reform movements, metropolises (New York, Chicago, Detroit), and industrial technology/assembly lines.
+   - `Migration and a Changing Population.md`: Added curriculum transclusion `D3.1` for 19th/20th-century immigration trends, ethnic enclaves, nativism, and immigration restrictions.
+   - `Arts, Culture, and Consumer Society.md`: Added curriculum transclusions `D3.2, D3.3, E1.3` for regional culture/heritage, science and technology (broadcasting, motion pictures, recordings, appliances), and postwar consumer economy/globalization.
+   - `The Postwar United States.md`: Added curriculum transclusions `E1.2, E3.5` for postwar science and technology (television, digital technologies, medical breakthroughs, space exploration) and arts/popular culture.
+   - `Movements and Backlash.md`: Added curriculum transclusions `E1.2, E1.3` for television and environmental science (*Silent Spring*) and economic trends (Rust Belt transition, UFW farmworker boycotts).
+
+3. **Discussions & Seminars (`shared/Discussions/`)**:
+   - `Is the United States an Empire.md`: Added curriculum transclusions `C2.4, E1.2, E1.3, E3.5` connecting continental and overseas foreign relations, Cold War defense technologies, transnational economic power, and global cultural soft power.
+   - `Who Counts as American.md`: Added curriculum transclusions `D3.1, E3.5` for historical immigration quota acts, national origins exclusions, and cultural assertions of citizenship in literature and popular arts.
+
+4. **Sources & Research Guides (`shared/Sources/`)**:
+   - `Newspapers and Print Culture.md`: Added curriculum transclusion `D3.5` for mass-circulation journalism, Pulitzer, Hearst, magazines, muckraking, and comic strips.
+   - `Photographs.md`: Added curriculum transclusion `D3.5` for documentary photography, Jacob Riis, Lewis Hine, FSA photography, and popular visual culture.
+
+5. **Investigations & Inquiry Case Studies (`shared/Investigations/`)**:
+   - `Whose Story Gets Taught.md`: Added curriculum transclusions `D3.2, D3.5, E3.5` for regional historical narratives, artistic representations in popular film and media, and public monuments/memorials (Maya Lin).
+
+6. **Tasks & Summative Evaluations (`shared/Tasks/`)**:
+   - `The Source Study.md`: Added curriculum transclusion `A1.9` for assessing student communication of historical inquiry vocabulary.
+   - `The Colonies Compared.md`: Added curriculum transclusion `B2.4` for evaluating environmental, geographic, and natural resource factors in colonial settlement and labour structures.
+   - `Slavery and the Nation.md`: Added curriculum transclusion `C3.5` for evaluating individual contributions to anti-slavery organizing, testimony, and resistance.
+   - `The Union Divided.md`: Added curriculum transclusion `C2.4` for analyzing how territorial conquest (Mexican-American War) and foreign diplomacy affected domestic sectional crisis.
+   - `The Industrial Republic.md`: Added curriculum transclusions `D2.3, D3.1, D3.2, D3.3` for evaluating plant technology/assembly lines (`D3.3`), immigrant workforce and exclusion (`D3.1`), worker organizing and unions (`D2.3`), and regional/metropolitan impact (`D3.2`).
+   - `Rights and Movements.md`: Added curriculum transclusions `D1.3, D2.3` for tracing domestic civil rights policy, voting statutes, and reform movements before and after 1945.
+   - `The Long Argument.md`: Added curriculum transclusion `E1.3` for synthesizing economic trends, federal power, corporate regulation, and inequality across modern American history.
+   - `The Document Examination.md`: Added curriculum transclusion `A1.9` for assessing historical thinking terminology and source criticism on the final evaluation.
+
+7. **Class Schedule & Tutorials Index Alignment**:
+   - `per_section/All Classes/Unit 1, Day 1.md`: Linked `[[What This Site Can Do]]` in agenda item 4 and `[[Scavenger Hunt]]` in the homework checklist.
+   - `shared/Tutorials/index.md`: Added `[[Scavenger Hunt]]` under Unit 1.
+
+
 

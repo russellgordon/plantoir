@@ -77,6 +77,8 @@ and the investigation [[Whose Story Gets Taught|Whose Story Gets Taught?]] for t
 ![[C3.1]]
 
 ![[C3.2]]
+
+![[C3.5]]
 %%curriculum-end%%
 
 %%

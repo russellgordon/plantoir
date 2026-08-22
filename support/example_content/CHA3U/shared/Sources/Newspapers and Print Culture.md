@@ -70,4 +70,6 @@ you assumed. Record the paper, place, date, page and column every time, as
 ![[A1.3]]
 
 ![[C3.6]]
+
+![[D3.5]]
 %%curriculum-end%%

@@ -77,9 +77,15 @@ survives in [[Whose Story Gets Taught|Whose Story Gets Taught?]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D1.3]]
+
 ![[D2.1]]
+
+![[D2.3]]
 
 ![[D2.4]]
 
 ![[D3.4]]
+
+![[D3.5]]
 %%curriculum-end%%

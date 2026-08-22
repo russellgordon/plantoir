@@ -74,6 +74,8 @@ sit, see [[Government Records]].
 
 ![[B2.3]]
 
+![[B2.4]]
+
 ![[B3.2]]
 %%curriculum-end%%
 

@@ -76,6 +76,10 @@ right tool and [[Rights and Movements]] the right place to argue it out.
 
 ![[E1.1]]
 
+![[E1.2]]
+
+![[E1.3]]
+
 ![[E2.1]]
 
 ![[E2.2]]

@@ -82,6 +82,10 @@ being marked on. For first-person accounts, see
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D1.3]]
+
+![[D2.3]]
+
 ![[D2.4]]
 
 ![[D3.4]]

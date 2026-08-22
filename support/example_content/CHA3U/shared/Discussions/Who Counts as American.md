@@ -61,7 +61,11 @@ with Canada is welcome and must be evidenced, not flattering — see
 %%curriculum-start%%
 ## Curriculum connection
 
-![[E3.1]]
+![[D3.1]]
 
 ![[E2.4]]
+
+![[E3.1]]
+
+![[E3.5]]
 %%curriculum-end%%

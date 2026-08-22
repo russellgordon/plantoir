@@ -93,6 +93,14 @@ warnings on both pages before you rely on them.
 ![[D1.2]]
 
 ![[D2.2]]
+
+![[D2.3]]
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[D3.3]]
 %%curriculum-end%%
 
 %%

@@ -78,6 +78,8 @@ reach from here.
 
 ![[A1.8]]
 
+![[A1.9]]
+
 ![[B1.1]]
 %%curriculum-end%%
 

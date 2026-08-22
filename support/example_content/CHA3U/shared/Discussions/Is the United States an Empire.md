@@ -58,7 +58,15 @@ into [[Rights and Movements]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C2.4]]
+
 ![[D1.4]]
 
+![[E1.2]]
+
+![[E1.3]]
+
 ![[E2.3]]
+
+![[E3.5]]
 %%curriculum-end%%

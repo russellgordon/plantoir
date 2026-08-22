@@ -75,6 +75,8 @@ will and will not tell you, see [[Newspapers and Print Culture]].
 ![[C2.1]]
 
 ![[C2.3]]
+
+![[C2.4]]
 %%curriculum-end%%
 
 %%
