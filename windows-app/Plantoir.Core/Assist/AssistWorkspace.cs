@@ -1191,7 +1191,7 @@ public sealed class AssistWorkspace
     /// be encouraged to use an LLM for bulk edits, and an LLM can make a mess
     /// that is hard to undo" — so undo is a real button here, not advice.
     /// </summary>
-    public async Task<AssistResult> Apply(PublishPlan plan, IProgress<string>? progress = null,
+    public async Task<AssistResult> Apply(PublishPlan plan, bool preview = true, IProgress<string>? progress = null,
                                           CancellationToken cancellation = default)
     {
         var course = Course(plan.CourseCode);
@@ -1274,12 +1274,27 @@ public sealed class AssistWorkspace
         // the site-name prompt, the Cloudflare account, the first publish, the
         // multi-minute upload — so the safety valve and the simplification are
         // the same decision.
+        //
+        // `preview` is false when the caller (the assistant chat window) is
+        // about to put its OWN visible rebuild on screen — see
+        // AssistAgent.RunTool's `arguments["preview"] = false` for
+        // publish_pages/unpublish_pages. Building here too would race that
+        // rebuild for the same output folder, and a failure from this hidden
+        // build would hand the model a message to restate in the chat, which
+        // is exactly the "every line of the build spews into the reply" bug.
+        // So when told not to build, this returns the plain summary and
+        // leaves the one visible build to the app.
+        if (!preview)
+            return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding), backup);
+
+        RefuseIfPlantoirIsBuilding(course);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
+        using var claim = ClaimTheBuild(course);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
             return new AssistResult(false,
-                $"{WhatSurvived(changed)}, but the preview couldn’t be built. {build.Message}", backup);
+                $"{WhatSurvived(changed)}, but the preview couldn’t be built. {AssistWording.WhereTheOutputIs}", backup);
 
         return new AssistResult(true, Summary(changed, previewed: true, course.Code, section, plan.Hiding), backup);
     }
@@ -1472,12 +1487,14 @@ public sealed class AssistWorkspace
         if (!preview)
             return new AssistResult(true, summary, backup);
 
+        RefuseIfPlantoirIsBuilding(course);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
+        using var claim = ClaimTheBuild(course);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
                                         _folder, progress, cancellation);
         return build.Succeeded
             ? new AssistResult(true, summary, backup)
-            : new AssistResult(false, build.Message, backup);
+            : new AssistResult(false, $"{summary} But the preview couldn’t be built. {AssistWording.WhereTheOutputIs}", backup);
     }
 
     /// <summary>

@@ -1269,7 +1269,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var plan = PlanForDay(course, section, date, preview);
             if (plan.NothingToDoSentence is { } already) return Answering(already);
 
-            var result = await workspace.Apply(plan, Relay(progress), cancellation);
+            var result = await workspace.Apply(plan, preview, Relay(progress), cancellation);
 
             var text = new StringBuilder(result.Message);
             if (plan.Index is { WillChange: true } index)
@@ -1404,7 +1404,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             string verb = plan.Hiding ? "Unpublished" : "Published";
             string word = changing == 1 ? "page" : "pages";
 
-            var result = await workspace.Apply(plan, Relay(progress), cancellation);
+            var result = await workspace.Apply(plan, preview, Relay(progress), cancellation);
             return result.Succeeded
                 ? Answering($"{verb} {changing} {word}.", result.Message)
                 : Answering(result.Message);

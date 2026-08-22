@@ -1399,6 +1399,48 @@ public class AssistWorkspaceTests : IDisposable
     }
 
     [Fact]
+    public async Task PublishingWithPreviewFalseBuildsNothing()
+    {
+        // AssistAgent sets preview=false for publish_pages/unpublish_pages
+        // whenever the chat window is about to put its OWN visible rebuild on
+        // screen — see EditsPages/TakesPreviewFlag there. If Apply() built a
+        // preview anyway, that hidden build would race the app's visible one
+        // for the same output folder, and a failure from it would hand the
+        // model raw launcher output to restate in the chat — the bug where
+        // every line of the build spewed into the assistant's reply on a
+        // "Publish" that followed a preview.
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
+        var workspace = Open();
+
+        var result = await workspace.Apply(
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false), preview: false);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(_launcher.Runs);
+        Assert.Contains("published", result.Message.ToLowerInvariant());
+    }
+
+    [Fact]
+    public async Task APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog()
+    {
+        // The other half of the same bug: even when Apply() is told to
+        // build (preview: true, the default a caller with no window on
+        // screen would use), a failed build must not glue the launcher's
+        // raw stdout/stderr onto the message the model reads back to the
+        // teacher.
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
+        _launcher.FailOn = "preview";
+        var workspace = Open();
+
+        var result = await workspace.Apply(
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(AssistWording.WhereTheOutputIs, result.Message);
+        Assert.DoesNotContain("Last output:", result.Message);
+    }
+
+    [Fact]
     public void TheTermsAreExplainedOncePerSectionAndThenRemembered()
     {
         // A teacher told "I've published tomorrow's class" will reasonably
