@@ -156,6 +156,27 @@ Get-Process -Name Plantoir -ErrorAction SilentlyContinue | Stop-Process -Force
 Say that you closed it, do not close it out from under a build or deploy he can
 watch happening, and leave relaunching to him.
 
+**Standing order, added 2026-08-22: build for `x64`, not AnyCPU, so the
+Desktop shortcut picks it up.** The plain `dotnet build` above lands in
+`Plantoir\bin\Debug\net9.0-windows10.0.19041.0\win-x64\` — but the **"PT -
+Dev" shortcut on Russell's Desktop** points at
+`Plantoir\bin\x64\Debug\net9.0-windows10.0.19041.0\win-x64\Plantoir.exe`, a
+sibling folder MSBuild only writes to when the `x64` platform is explicit.
+Building the plain way leaves that shortcut pointing at a stale binary — he
+launches "PT - Dev" expecting today's fix and gets yesterday's. Build:
+
+```powershell
+dotnet build Plantoir/Plantoir.csproj -c Debug -p:Platform=x64
+```
+
+**When you believe a round of changes is done and are about to report back —
+not after every edit — rebuild this way**, the same moment macOS rule 10 in
+`CLAUDE.md` names for that side. This makes the fresh build available at the
+shortcut; it does **not** mean launching it — relaunching is still his call
+(see above, and mac rule 10). Say plainly that the build is ready at "PT -
+Dev" when you report back; a "done" that leaves that shortcut stale is not
+done, the same way a stale Dock icon is not done on the mac.
+
 **And clean up after the kill.** `Stop-Process` is not Quit, so the app's own
 tidying never runs. Two things it would have done:
 
