@@ -162,8 +162,41 @@ public sealed class AssistantSettingsDialog : ContentDialog
         _rbSmaller.Checked += (_, _) => SetChoice(AssistModelChoice.Smaller);
         _rbLarger.Checked += (_, _) => SetChoice(AssistModelChoice.Larger);
 
+        // One store per rung, shared with every assistant window through
+        // AssistModelStores — not one made here — so a download started in
+        // Settings is still visible (and still the SAME download) if a
+        // teacher opens the assistant while it runs, and vice versa.
+        foreach (var tier in new[] { AssistModelTier.Small, AssistModelTier.Large })
+            AssistModelStores.Store(tier).Changed += OnStoreChanged;
+        Closed += (_, _) => DetachFromStores();
+
         UpdateUI();
     }
+
+    private bool _detached;
+
+    /// <summary>
+    /// Undo the store subscriptions above. Idempotent, and public, so the
+    /// caller can detach in a try/finally around ShowAsync too — a
+    /// ContentDialog that never actually got shown (WinUI allows only one
+    /// on screen at a time; a second Settings… invocation before the first
+    /// closes throws) would otherwise never fire Closed, leaving this
+    /// instance subscribed to the app-lifetime AssistModelStores forever.
+    /// </summary>
+    public void DetachFromStores()
+    {
+        if (_detached) return;
+        _detached = true;
+        foreach (var tier in new[] { AssistModelTier.Small, AssistModelTier.Large })
+            AssistModelStores.Store(tier).Changed -= OnStoreChanged;
+    }
+
+    /// <summary>
+    /// A store's progress arrives on whatever thread the download is running
+    /// on; every WinUI element this dialog owns must only be touched from
+    /// the UI thread that created them.
+    /// </summary>
+    private void OnStoreChanged() => DispatcherQueue?.TryEnqueue(UpdateUI);
 
     private void SetChoice(string choice)
     {
@@ -198,7 +231,7 @@ public sealed class AssistantSettingsDialog : ContentDialog
         }
 
         // What happens next
-        bool chosenDownloaded = IsTierDownloaded(chosenTier);
+        bool chosenDownloaded = AssistModelStores.Store(chosenTier).IsReady;
         if (chosenDownloaded)
         {
             _whatHappensNext.Text = $"{chosenTier.ChoiceLabel()} is ready. Opening the assistant will use it.";
@@ -217,7 +250,7 @@ public sealed class AssistantSettingsDialog : ContentDialog
 
         foreach (var tier in new[] { AssistModelTier.Small, AssistModelTier.Large })
         {
-            long? sizeOnDisk = GetBytesOnDisk(tier);
+            long? sizeOnDisk = AssistModelStore.BytesOnDisk(tier);
             if (sizeOnDisk.HasValue)
             {
                 totalBytes += sizeOnDisk.Value;
@@ -244,6 +277,7 @@ public sealed class AssistantSettingsDialog : ContentDialog
 
     private UIElement CreateHousekeepingRow(AssistModelTier tier, long? sizeOnDisk)
     {
+        var store = AssistModelStores.Store(tier);
         var rowPanel = new StackPanel { Spacing = 4 };
         var topRow = new Grid();
         topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -271,28 +305,60 @@ public sealed class AssistantSettingsDialog : ContentDialog
         var button = new Button();
         Grid.SetColumn(button, 1);
 
-        if (sizeOnDisk.HasValue)
+        if (store.State == AssistModelStoreState.Downloading)
+        {
+            button.Content = "Stop";
+            AutomationProperties.SetAutomationId(button, $"assistantStopDownload{tier}");
+            button.Click += (_, _) => store.Cancel();
+        }
+        else if (store.IsReady)
         {
             button.Content = "Remove";
             AutomationProperties.SetAutomationId(button, $"assistantRemove{tier}");
-            button.Click += (_, _) =>
-            {
-                RemoveTier(tier);
-                UpdateUI();
-            };
+            button.Click += (_, _) => store.Remove();
         }
         else
         {
             button.Content = "Download";
             AutomationProperties.SetAutomationId(button, $"assistantDownload{tier}");
-            button.Click += (_, _) =>
-            {
-                // Trigger download or inform
-            };
+            button.Click += (_, _) => store.Download();
         }
 
         topRow.Children.Add(button);
         rowPanel.Children.Add(topRow);
+
+        if (store.State == AssistModelStoreState.Downloading)
+        {
+            var bar = new ProgressBar
+            {
+                IsIndeterminate = store.TotalBytes <= 0,
+                Value = store.FractionComplete * 100,
+            };
+            AutomationProperties.SetAutomationId(bar, $"assistantDownloadProgress{tier}");
+            rowPanel.Children.Add(bar);
+
+            var progressText = new TextBlock
+            {
+                Text = store.TotalBytes > 0
+                    ? $"{FormatBytes(store.ReceivedBytes)} of {FormatBytes(store.TotalBytes)} ({store.FractionComplete * 100:0}%)"
+                    : $"{FormatBytes(store.ReceivedBytes)} so far",
+                FontSize = 12,
+                Opacity = 0.7,
+            };
+            rowPanel.Children.Add(progressText);
+        }
+
+        if (store.State == AssistModelStoreState.Failed && store.FailureReason is { } reason)
+        {
+            rowPanel.Children.Add(new TextBlock
+            {
+                Text = reason,
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"],
+            });
+        }
+
         return rowPanel;
     }
 
@@ -332,41 +398,4 @@ public sealed class AssistantSettingsDialog : ContentDialog
         return $"{bytes / 1024.0:0.0} KB";
     }
 
-    public static string ModelPath(AssistModelTier tier)
-    {
-        string dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Plantoir", "models");
-        return Path.Combine(dir, tier.FileName());
-    }
-
-    public static bool IsTierDownloaded(AssistModelTier tier)
-    {
-        string path = ModelPath(tier);
-        if (!File.Exists(path)) return false;
-        var info = new FileInfo(path);
-        return info.Length >= tier.DownloadBytes();
-    }
-
-    public static long? GetBytesOnDisk(AssistModelTier tier)
-    {
-        string path = ModelPath(tier);
-        if (!File.Exists(path)) return null;
-        var info = new FileInfo(path);
-        return info.Length;
-    }
-
-    public static void RemoveTier(AssistModelTier tier)
-    {
-        string path = ModelPath(tier);
-        if (File.Exists(path))
-        {
-            try
-            {
-                File.Delete(path);
-                ActivityTrail.Note(ActivityTrail.Event.AssistantModelRemoved, $"removed {tier.DisplayName()}");
-            }
-            catch { }
-        }
-    }
 }
