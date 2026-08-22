@@ -6,13 +6,25 @@ enableToc: false
 tags:
   - tasks
 ---
-Five pieces of work that are marked, one per unit and one at the end.
-They are not decoration on top of the tests — they are the places where
-you have to put everything together at once, which is the only place I
-can see whether you can.
+Almost everything in this course that carries a mark is on one of these
+pages: four unit tasks, the four lab write-ups that run alongside them,
+and two final pieces at the end. The one exception lives in another
+folder — the three milestone entries in your [[Science Journal]], set out
+on [[Journal Checklist]]. Where each piece sits in the seventy or the
+thirty is on [[How Marks Work]].
 
-Every task page has the same four parts, and they are in this order for
-a reason.
+| Task | Unit | The short version |
+| --- | --- | --- |
+| [[The Systems Case Study]] | Tissues, organs, and systems | Research a condition, explain the biology, weigh an ethical question |
+| [[The Reaction Investigation]] | Chemical reactions | Design and run your own investigation into a reaction that matters |
+| [[The Climate Brief]] | Climate change | Advise a real audience, using real data, and name the costs |
+| [[The Optics Design]] | Light and geometric optics | Design a device, predict what it will do, then test the prediction |
+| [[Lab Reports]] | All four | Four write-ups, written in class, the same eight criteria every time |
+| [[The Science Showcase]] | Finale | Present your work and defend it under questioning |
+| [[Final Examination]] | Finale | Two and a half hours on paper, across the whole course |
+
+The four unit tasks all have the same four parts, and they are in this
+order for a reason.
 
 | Part | What it does |
 | --- | --- |
@@ -21,13 +33,9 @@ a reason.
 | **What to hand in** | The deliverable, and the parts it must contain |
 | **How it will be judged** | The criteria, in plain language, before you start |
 
-| Task | Unit | The short version |
-| --- | --- | --- |
-| [[The Systems Case Study]] | Tissues, organs, and systems | Research a condition, explain the biology, weigh an ethical question |
-| [[The Reaction Investigation]] | Chemical reactions | Design and run your own investigation into a reaction that matters |
-| [[The Climate Brief]] | Climate change | Advise a real audience, using real data, and name the costs |
-| [[The Optics Design]] | Light and geometric optics | Design a device, predict what it will do, then test the prediction |
-| [[The Science Showcase]] | Finale | Present your work and defend it under questioning |
+They are not decoration on top of the write-ups — they are the places
+where you have to put everything together at once, which is the only
+place I can see whether you can.
 
 > [!important] Read the criteria table before you start
 > Not after. It tells you what separates a level 3 from a level 4, and
@@ -35,7 +43,7 @@ a reason.
 > end. The pattern is always the same one described in
 > [[How Marks Work]]: level 4 is not more work, it is **judgement**.
 
-Two rules apply to all five, and neither is negotiable.
+Two rules apply to every page in this folder, and neither is negotiable.
 
 **Every number and every claim must be traceable.** You will never be
 penalised for saying "I could not find a reliable figure for this". You

@@ -57,11 +57,15 @@ each day says which scenes are read in full and which in summary.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.3]]
+
+![[A1.4]]
+
+![[A1.7]]
+
 ![[B1.1]]
 
 ![[B2.1]]
 
 ![[B2.3]]
-
-![[A1.4]]
 %%curriculum-end%%

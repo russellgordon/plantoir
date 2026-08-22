@@ -39,7 +39,9 @@ is a system out of control.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[E3.1]]
-
 ![[E2.1]]
+
+![[E2.3]]
+
+![[E3.1]]
 %%curriculum-end%%

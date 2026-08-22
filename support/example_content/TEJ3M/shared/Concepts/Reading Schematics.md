@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 The first time a schematic went up in [[Read the Schematic]] somebody
 said it looked nothing like the breadboard in front of them. Correct. A

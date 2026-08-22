@@ -23,16 +23,18 @@ only. When a full one is asked for, this is its shape.
 ## The two sections people get wrong
 
 **Observations** contain no interpretation. A table, a graph, a note that
-the string slipped on trial 3. Nothing about what it means.
+the third cylinder was already soft before it went in. Nothing about what
+it means.
 
-**Analysis** is where the physics happens: calculations shown once in
-full, graphs read for slope or area, comparison with the accepted value,
-and a real account of uncertainty — see [[Uncertainty and Error]].
+**Analysis** is where the biology happens: calculations shown once in
+full, graphs read for slope, intercept or shape, the result set against
+what the biology predicted, and a real account of uncertainty — see
+[[Uncertainty and Error]].
 
 ## Past tense, no "I"
 
-"The cart was released from the 40 cm mark" rather than "I let the cart
-go". This convention is not about formality; it is about the result
+"Each cylinder was blotted for a count of five" rather than "I dried them
+off". This convention is not about formality; it is about the result
 belonging to the procedure rather than to you.
 
 The sentence-level habits — precise terms, structure before function — are

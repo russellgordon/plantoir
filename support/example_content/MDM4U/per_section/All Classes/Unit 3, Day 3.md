@@ -17,7 +17,9 @@ tags:
 3. Name it: [[Bias]] — response, non-response, measurement, sampling,
    and the cultural bias nobody adds on purpose
 4. Launch: [[The Survey Autopsy]] — take a real survey apart: who was
-   asked, who was missed, and what the wording pushed people toward
+   asked, who was missed, and what the wording pushed people toward.
+   Its criteria table is on the page today, before you choose a
+   survey, and it is what I will read the autopsy against
 5. Journal check: [[Journal Checklist]] — entries collected midway
 
 ## Things to do before our next class

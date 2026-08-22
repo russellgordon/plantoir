@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[How You Actually Decide]] — you already have a method
-2. Naming the strategies, and what each one is good for
-3. Trying one on a low-stakes decision, out loud
+1. [[Judging Your Own Work]] on your own draft, first thing — you run the routine this time, with me at your shoulder
+2. The rest of the period: act on what the checkpoint found, and on what you have just found yourself
+3. [[The Skills Inventory Task]] handed in at the end of the period
 
 ## Things to do before our next class
 
-- [ ] Read [[How You Actually Decide]]. Bring one decision that is genuinely still open.
+- [ ] File the inventory and its rough version in [[Your Career Portfolio]].

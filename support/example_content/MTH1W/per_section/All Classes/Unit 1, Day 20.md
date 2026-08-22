@@ -10,10 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Number talk: [[Would You Rather]]
-2. Discussion: [[Why Struggle Is the Point]] — six weeks in, with
+1. First twenty minutes: work your revision list from the checkpoint,
+   with me circulating — this is what the checkpoint was for
+2. Number talk: [[Would You Rather]]
+3. Discussion: [[Why Struggle Is the Point]] — six weeks in, with
    evidence from your own journals
-3. Study skills: [[How to Study for Math]] — what actually works, and
+4. Study skills: [[How to Study for Math]] — what actually works, and
    what only feels like working
 
 ## Things to do before our next class

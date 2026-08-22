@@ -203,9 +203,13 @@ genuine 4.6 from a rounding artefact — see
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
+![[A1.13]]
+
+![[D2.1]]
+
 ![[D2.2]]
 
 ![[D2.4]]
-
-![[A1.13]]
 %%curriculum-end%%

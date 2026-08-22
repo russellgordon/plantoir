@@ -74,4 +74,8 @@ belongs in [[Where You Stand Now]].
 ![[B1.4]]
 
 ![[C2.2]]
+
+![[B1.5]]
+
+![[A2.2]]
 %%curriculum-end%%

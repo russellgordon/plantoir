@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Bench: write up [[A Monohybrid Cross]] in class, including the
-   chi-square
+   chi-square — the third of the five [[Investigation Reports]], marked
+   against the same six rows as the first two
 2. Skill: [[Uncertainty and Error]] — what a deviation from the expected
    ratio does and does not prove
 

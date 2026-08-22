@@ -6,8 +6,7 @@ tags:
   - warm-ups
   - unit-1
 ---
-Most days start the same way, with the same twelve or fifteen minutes. By
-October you will be able to run it without being led, which is the point —
+Most days start the same way, with the same twelve or fifteen minutes. Within a few weeks you will be able to run it without being led, which is the point —
 a dancer who can warm themselves up properly can train anywhere, in any
 studio, for the rest of their life.
 

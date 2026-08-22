@@ -18,4 +18,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Finish the practice set.
-- [ ] [[Newton's Second Law]] report due next class.
+- [ ] [[Newton's Second Law]] report due in two classes.

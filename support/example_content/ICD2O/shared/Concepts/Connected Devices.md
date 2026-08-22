@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: false
+enableToc: true
 ---
 After [[Inside the Box]], you start seeing computers everywhere —
 because they are everywhere. Your phone is one, obviously. But so is
@@ -42,6 +42,21 @@ often worth making, but it should be a trade you notice.
 [[Networks and Connectivity]] follows how it travels, and
 [[Staying Secure Online]] is about keeping the flow on your terms.
 
+## Assessing requirements for connected devices
+
+Recommending or deploying connected hardware (as in
+[[The Device Recommendation]]) requires matching device specifications to
+user contexts:
+
+- **Range and wireless protocols** — low-power Bluetooth (BLE) for
+  wearables and short-range peripherals; local Wi-Fi for high-bandwidth
+  smart-home hubs and cameras; cellular/LPWAN for remote sensors.
+- **Power constraints** — battery-operated sensors require efficient
+  sleep cycles and minimal transmission frequency.
+- **Privacy and data controls** — evaluating whether voice and video data
+  are processed on-device (edge computing) or streamed to cloud servers,
+  and whether strong encryption and security updates are supported.
+
 [^1]: "Smart" is a marketing word, not a technical one. A smart
     speaker cannot think — it can hear, connect, and follow
     instructions that programmers wrote. "Connected" is the honest
@@ -51,6 +66,8 @@ often worth making, but it should be a trade you notice.
 ## Curriculum connection
 
 ![[B1.2]]
+
+![[B2.3]]
 
 ![[B4.2]]
 %%curriculum-end%%

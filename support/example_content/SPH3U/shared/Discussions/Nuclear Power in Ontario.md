@@ -34,7 +34,19 @@ the position is not about physics.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D1.1]]
+
 ![[D1.2]]
+
+![[D2.8]]
+
+![[D3.6]]
+
+![[D3.9]]
+
+![[D3.10]]
+
+![[D3.11]]
 
 ![[D3.12]]
 %%curriculum-end%%

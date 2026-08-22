@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Checkpoint, on your own: selection, adaptation, speciation, evidence
-2. Mark your own; revision list written
+1. Checkpoint, on your own: selection, adaptation, speciation, evidence — [[Natural Selection]] and [[Speciation]]
+2. Mark your own; revision list written: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 
-- [ ] Journal: what you would tell September-you about evolution.
+- [ ] Journal: what you would tell the you who started this course about evolution.

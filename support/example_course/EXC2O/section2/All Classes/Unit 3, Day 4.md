@@ -17,6 +17,7 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Flame test analysis due next class.
+- [ ] Flame test analysis finished in your lab notebook.
 - [ ] Exercise: [[Bohr-Rutherford Diagrams]], questions 1–3.
-- [ ] Second [[Science in the News]] submission due Friday.
+- [ ] Start looking for your second [[Science in the News]] article — a
+      claim made about a material or a product.

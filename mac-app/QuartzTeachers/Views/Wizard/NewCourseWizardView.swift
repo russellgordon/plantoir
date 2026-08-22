@@ -55,6 +55,10 @@ struct NewCourseWizardView: View {
     @State var deployTarget: String = "netlify"
     @State var deployFolderPath: String = ""
 
+    /// Extra destinations this course ALSO publishes to, beyond
+    /// `deployTarget` — see `CourseConfiguration.additionalDeployTargets`.
+    @State var additionalDeployTargets: [CourseConfiguration.AdditionalDeployTarget] = []
+
     @State var expandOnFolderClick: Bool = false
     @State var showReadingTime: Bool = false
     @State var footerHTML: String = ""
@@ -360,7 +364,7 @@ struct NewCourseWizardView: View {
                     }
                     if ExampleContentCatalog.includesCurriculum(forCode: courseCode) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Toggle("Include Ontario curriculum pages", isOn: $includesCurriculumPages)
+                            Toggle("Include \(ExampleContentCatalog.jurisdictionName(forCode: courseCode)) curriculum pages", isOn: $includesCurriculumPages)
                                 .disabled(!prepopulatesExampleContent)
                                 .accessibilityIdentifier("curriculumToggle")
                             ExampleCaption("Every expectation as its own page, so lessons and tasks can link to exactly what they address")
@@ -458,7 +462,8 @@ struct NewCourseWizardView: View {
                 PublishingChoiceView(
                     deployTarget: $deployTarget,
                     deployFolderPath: $deployFolderPath,
-                    cloudflareAccountID: cloudflareAccountIDBinding
+                    cloudflareAccountID: cloudflareAccountIDBinding,
+                    additionalDeployTargets: $additionalDeployTargets
                 )
             } header: {
                 FormSectionHeader("Deploying", caption: "Netlify is the usual choice — change any time in Settings")
@@ -625,6 +630,25 @@ struct NewCourseWizardView: View {
                 return
             }
         }
+        // Every ADDITIONAL destination gets the same check its primary
+        // counterpart would — a redundancy target with no valid folder or
+        // credential would just fail silently the first time a deploy
+        // actually reaches it, which is exactly the surprise redundancy
+        // is supposed to prevent.
+        for target in additionalDeployTargets {
+            if target.type == "local_folder" {
+                if let problem = CourseConfiguration.deployFolderProblem(forPath: target.path) {
+                    validationProblem = problem
+                    return
+                }
+            }
+            if target.type == "cloudflare_pages" {
+                if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
+                    validationProblem = problem
+                    return
+                }
+            }
+        }
 
         var name: String = courseName.trimmingCharacters(in: .whitespaces)
         if name.isEmpty {
@@ -710,7 +734,7 @@ struct NewCourseWizardView: View {
             }
         }
 
-        return [
+        var config: [String: Any] = [
             "course_code": code,
             "course_name": name,
             "custom_short_name": isClubCode ? customShortName.trimmingCharacters(in: .whitespaces) : "",
@@ -770,5 +794,30 @@ struct NewCourseWizardView: View {
             "show_section_marker": ["sections": markerMap],
             "color_schemes": schemeMap,
         ]
+
+        // Omitted entirely rather than written as `[]` when nobody has
+        // opted in — a course that never touches this feature writes the
+        // exact same file the wizard has always written. See
+        // `CourseConfiguration.additionalDeployTargets`, whose setter
+        // does the identical thing on every later save.
+        // Pruned against the primary one more time here, defensively —
+        // the picker's own onChange keeps this consistent live on screen,
+        // but the file written to disk must be correct even if some future
+        // change to this view ever let the two disagree.
+        let prunedAdditionalTargets: [CourseConfiguration.AdditionalDeployTarget] =
+            CourseConfiguration.pruningAdditionalTargets(additionalDeployTargets, ofType: deployTarget)
+        if !prunedAdditionalTargets.isEmpty {
+            var encoded: [[String: Any]] = []
+            for target in prunedAdditionalTargets {
+                var entry: [String: Any] = ["type": target.type]
+                if !target.path.isEmpty {
+                    entry["path"] = target.path
+                }
+                encoded.append(entry)
+            }
+            config["additional_deploy_targets"] = encoded
+        }
+
+        return config
     }
 }

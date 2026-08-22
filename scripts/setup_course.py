@@ -83,7 +83,15 @@ DEFAULT_PER_SECTION_FILES = [
 # are never published, and stay that way unless the teacher flips them.
 UNPUBLISHED_PER_SECTION_FILES = {"Private Notes.md", "Scratch Page.md"}
 
-COURSE_LOOKUP_PATH = toolchain_paths.SUPPORT_DIR / "ontario_secondary_courses.json"
+# Two jurisdictions, both resolved through toolchain_paths rather than by
+# hard-coded prefix: a native Windows run has no /opt, and SUPPORT_DIR is
+# what already knows where the bundled support/ tree landed. Order matters
+# only in that the first file holding the code wins, and no code appears in
+# both.
+COURSE_LOOKUP_PATHS = [
+    toolchain_paths.SUPPORT_DIR / "ontario_secondary_courses.json",
+    toolchain_paths.SUPPORT_DIR / "british_columbia_secondary_courses.json",
+]
 
 # ---------- NEW: Backup exclusion set ---------------------------------------
 BACKUP_DEFAULT_EXCLUDES = {
@@ -379,15 +387,24 @@ def prompt_type_list(prompt_text, default_list=None, add_md_extension=False, for
     return cleaned
 
 def get_course_name_from_json(course_code):
-    if not COURSE_LOOKUP_PATH.exists():
-        return None
-    try:
-        with open(COURSE_LOOKUP_PATH, "r", encoding="utf-8") as f:
-            course_data = json.load(f)
-        course_info = course_data.get(course_code.upper())
-        if not course_info:
-            return None
+    course_info = None
+    for path in COURSE_LOOKUP_PATHS:
+        if not path.exists():
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                course_data = json.load(f)
+            info = course_data.get(course_code.upper())
+            if info:
+                course_info = info
+                break
+        except Exception:
+            continue
 
+    if not course_info:
+        return None
+
+    try:
         print(f"\n🔎 Found course info for {course_code}:")
         formal = course_info["formal_name"]
         short = course_info["short_name"]

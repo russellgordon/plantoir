@@ -902,6 +902,28 @@ probe_container_write() {
     rm -f /teaching/courses/.write_probe'
 }
 
+# A long-lived container's own network namespace can wedge independently
+# of everything else — Colima, the Docker daemon, and every OTHER
+# container on the same machine (including a brand-new one built from
+# the identical image) can be perfectly healthy while this one specific
+# container can no longer resolve DNS at all. Found 2026-08-22: an
+# existing working folder's Cloudflare deploy failed with wrangler's own
+# "fetch failed" — a genuine connectivity error, not a bug in wrangler or
+# in this script — while a brand-new working folder deployed without a
+# problem seconds later. A teacher would have seen a bare Python
+# traceback and no way to know their internet was never actually the
+# problem. Skipped for local_folder, which needs no network at all.
+probe_container_network() {
+  if [[ "$TARGET" == "local_folder" ]]; then
+    return 0
+  fi
+  local PROBE_HOST="api.cloudflare.com"
+  if [[ "$TARGET" == "netlify" ]]; then
+    PROBE_HOST="app.netlify.com"
+  fi
+  docker exec "$CONTAINER_NAME" sh -lc "getent hosts $PROBE_HOST" >/dev/null 2>&1
+}
+
 echo " Ensuring container is running with the correct, writable mount..."
 if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   CURRENT_MOUNT_SRC=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
@@ -924,6 +946,10 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
         echo " 🛑 Mounted 'courses/' is not writable from the container — recreating it…"
         docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
         run_container_with_mount
+      elif ! probe_container_network; then
+        echo " 🔌 This container's connection has gone stale — recreating it…"
+        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+        run_container_with_mount
       else
         echo "✅ Container $CONTAINER_NAME is already running with correct, writable mount."
       fi
@@ -932,6 +958,10 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
       docker start "$CONTAINER_NAME" >/dev/null
       if ! probe_container_write; then
         echo " 🛑 Mounted 'courses/' is not writable from the container after start — recreating it…"
+        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+        run_container_with_mount
+      elif ! probe_container_network; then
+        echo " 🔌 This container's connection has gone stale after starting it — recreating it…"
         docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
         run_container_with_mount
       fi

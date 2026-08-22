@@ -7,9 +7,9 @@ tags:
 ---
 By mid-course, your [[Dev Journal]] stops being only a diary and
 becomes something rarer: **evidence**. The person who wrote your
-September entries no longer quite exists — and because that person
+your earliest entries no longer quite exists — and because that person
 wrote honestly, you can prove it. Showing growth means putting your
-September self and your now-self side by side and letting the
+starting self and your now-self side by side and letting the
 difference speak.
 
 ## Growth is a claim plus evidence — like a bug report
@@ -20,7 +20,7 @@ somehow" — it says exactly what happened, where, and how to reproduce
 it. Growth writing meets the same standard: every claim reproduced by
 two dated entries from your own record.
 
-> In September I wrote: "The computer doesn't guess. Kind of
+> At the start of the course I wrote: "The computer doesn't guess. Kind of
 > unsettling." Last week a `TypeError` told me which line and which
 > two types disagreed, and I had it fixed in two minutes without
 > asking anyone. The strictness that unsettled me is now the thing I
@@ -36,7 +36,7 @@ what can you point to?
 
 Treat your earlier entries the way an essay treats sources:
 
-- **Date it** — "In my September 24 entry…" — the distance matters.
+- **Date it** — "In my entry from the third week…" — the distance matters.
 - **Quote a phrase, not a page.** Your words from the time carry more
   truth than your summary of them now. "Mine still worked though. I
   keep thinking about that", from [[Your First Entry]], says more
@@ -54,4 +54,6 @@ Treat your earlier entries the way an essay treats sources:
 ## Curriculum connection
 
 ![[A1.1]]
+
+![[A3.3]]
 %%curriculum-end%%

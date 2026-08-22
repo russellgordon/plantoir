@@ -49,9 +49,9 @@ another's. Compare your work to your own work three weeks ago. That comparison
 is fair, and it is the one being assessed.
 
 Your progress is measured by control, clarity, and understanding, not
-appearance. Set goals you can reach — exactly what [[The Safe Dancer]] asks
-for — and hold to [[Our Studio Agreement]], which covers how we speak about
-each other's bodies and our own.
+appearance. Set goals you can reach — the fifth thing [[The Safe Dancer]] asks
+you to write — and hold to [[Our Studio Agreement]], which covers how we speak
+about each other's bodies and our own.
 
 %%curriculum-start%%
 ## Curriculum connection

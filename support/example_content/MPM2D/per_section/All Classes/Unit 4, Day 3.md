@@ -15,7 +15,8 @@ tags:
 2. Random groups — same angle, any size: what never changes?
 3. Consolidate + notes to your future self —
    [[The Primary Trigonometric Ratios]]
-4. Launch: [[Inaccessible Heights]] — choose something unmeasurable
+4. Launch: [[Inaccessible Heights]] — choose something unmeasurable, and
+   read the criteria table today, while the choice is still open
 5. Check your understanding: [[Trig Ratios and Laws Practice]], block one
 
 ## Things to do before our next class

@@ -49,7 +49,7 @@ worship and another calls performance is not settled in a Grade 9 studio.
 And a fourth: the boundary may not be worth defending. Nothing about your
 practice changes on either side of it — so is this a real argument, or a
 question about words? Say so if you think so, but then say why it kept coming
-up all year.
+up all semester.
 
 This is [[Content and Interpretation]] from the other side: content alone
 rarely settles what something is. Whatever you decide should still hold when

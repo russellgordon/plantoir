@@ -87,3 +87,21 @@ to one decimal place where rounding is needed.
 > right triangle under $T$ gives height
 > $h = QT \sin 40° \approx 72.6$ m. Two triangles sharing an edge —
 > solve one, carry the edge to the other.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D1.1]]
+
+![[D1.2]]
+
+![[D1.3]]
+
+![[D1.4]]
+
+![[D1.5]]
+
+![[D1.6]]
+
+![[D1.7]]
+%%curriculum-end%%

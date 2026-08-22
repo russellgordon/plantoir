@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: false
+enableToc: true
 ---
 By the time you finished [[Setting Up Python]], you had already met
 the two layers this page names: the app you installed, and the
@@ -31,6 +31,30 @@ does the touching. That is also why the "same" app on your phone and
 your laptop is really two apps: each was written to ask a different
 OS.
 
+## File systems and storage organisation
+
+The operating system manages how data is saved to physical and cloud
+storage. It structures files into hierarchical folders (directories),
+tracks file paths, and enforces access permissions. Good file management
+habits — structuring directories by project, maintaining backups, and
+knowing whether a file lives locally or in cloud sync — are covered in
+[[Files and the Cloud]].
+
+## Researching software and assessing requirements
+
+Before adopting new software tools or recommending programs to a client
+(as in [[The Device Recommendation]]), systematic research is required:
+
+- **System and hardware compatibility** — verify whether the software
+  supports the user's OS version, processor architecture, and available
+  RAM.
+- **Consulting authoritative documentation** — review official release
+  notes, developer guides, and help documentation (as taught in
+  [[Finding Answers Online]]) rather than relying on unverified forum
+  opinions.
+- **Licensing, privacy, and support** — evaluate whether open-source or
+  commercial tools best suit the user's budget and security needs.
+
 ## Updates are maintenance, not nagging
 
 All software ships with mistakes in it — all of it, always, which is
@@ -48,4 +72,10 @@ rather you not leave open.
 ## Curriculum connection
 
 ![[B1.3]]
+
+![[B2.1]]
+
+![[B2.2]]
+
+![[B2.3]]
 %%curriculum-end%%

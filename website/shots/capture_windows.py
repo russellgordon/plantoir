@@ -46,11 +46,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from images import prepare, WIDEST_PHONE_PIXELS, WIDEST_WINDOW_PIXELS  # noqa: E402
 from composite import fan, side_by_side  # noqa: E402
 
-# Per-section naming, matching the sites redeployed on 2026-08-20 — see the
-# note beside the same table in capture.py. ENG2D moved to its section 2 site;
-# MCV4U and SCH3U are still on section 1.
+# Per-section naming, matching the sites redeployed on 2026-08-19 — see the
+# note beside the same table in capture.py.
 DEMO_COURSES = [
-    {"code": "ENG2D", "site": "eng2d-s2-2026-gordon"},
+    {"code": "ENG2D", "site": "eng2d-s1-2026-gordon"},
     {"code": "MCV4U", "site": "mcv4u-s1-2026-gordon"},
     {"code": "SCH3U", "site": "sch3u-s1-2026-gordon"},
 ]
@@ -85,20 +84,42 @@ def find_or_build_plantoir_exe() -> Path:
 
 
 def capture_app_windows(plantoir_exe: Path) -> None:
+    """One run per appearance, with Windows switched into it first.
+
+    Not one run photographing both: a WinUI brush read from
+    Application.Current.Resources resolves against the theme the app LAUNCHED
+    in, whatever RequestedTheme the window's content carries. Photographing
+    dark from a light-launched process produced a white dialog card with white
+    text on it, and assistant bubbles in light grey on a dark window.
+    """
     announce("Photographing Plantoir App Windows on Windows")
-    # -PassThru + exit $p.ExitCode, not just -Wait: Start-Process alone does not
-    # forward the child's exit code to powershell.exe's own, so a crash inside
-    # Plantoir.exe (mid-capture, after some images were already saved) came back
-    # as a clean check=True pass here every time -- discovered 2026-08-20 when
-    # MarketingShotCapturer.RunAsync's own exit-0-on-catch bug hid a crash for two
-    # runs in a row, and this would have hidden it a third time even after that
-    # side was fixed. Errors are still on screen (Plantoir.exe's own stderr, and
-    # %TEMP%\marketing_capture.log), just no longer swallowed by the exit code.
-    subprocess.run([
-        "powershell", "-Command",
-        f"$p = Start-Process '{plantoir_exe}' -ArgumentList '--capture-marketing-shots', "
-        f"'{IMAGE_DIR.resolve()}' -Wait -NoNewWindow -PassThru; exit $p.ExitCode"
-    ], cwd=REPO, check=True)
+    from hero_windows import read_theme, write_theme
+
+    was_apps, was_system = read_theme()
+    try:
+        for theme in ("light", "dark"):
+            print(f"   --- Plantoir {theme} appearance ---", flush=True)
+            write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
+            # -PassThru + exit $p.ExitCode, not just -Wait: Start-Process alone
+            # does not forward the child's exit code to powershell.exe's own,
+            # so a crash inside Plantoir.exe (mid-capture, after some images
+            # were already saved) came back as a clean check=True pass here
+            # every time -- discovered 2026-08-20 when
+            # MarketingShotCapturer.RunAsync's own exit-0-on-catch bug hid a
+            # crash for two runs in a row, and this would have hidden it a
+            # third time even after that side was fixed. Errors are still on
+            # screen (Plantoir.exe's own stderr, and
+            # %TEMP%\marketing_capture.log), just no longer swallowed by the
+            # exit code.
+            subprocess.run([
+                "powershell", "-Command",
+                f"$p = Start-Process '{plantoir_exe}' -ArgumentList "
+                f"'--capture-marketing-shots', '{IMAGE_DIR.resolve()}', "
+                f"'--theme', '{theme}' -Wait -NoNewWindow -PassThru; exit $p.ExitCode"
+            ], cwd=REPO, check=True)
+    finally:
+        write_theme(was_apps, was_system)
+        print("   Windows colour mode put back")
 
 
 def capture_browser_sites() -> None:

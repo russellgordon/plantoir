@@ -14,7 +14,8 @@ tags:
 2. Warm-up: [[Caption This]] — the platform round: same story, three
    platforms
 3. Studio: the distribution plan — what goes where, when, and who posts
-   it
+   it — then revise the [[Publication Day]] schedule in writing against
+   it, and date what you changed
 4. Consolidate: [[Audiences and Platforms]]
 
 ## Things to do before our next class

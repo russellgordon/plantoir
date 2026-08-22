@@ -15,6 +15,7 @@ tags:
    order: axis, amplitude, period, phase
 3. Consolidate: two correct equations for one curve, and why both are
    right
+4. Practise: [[Sinusoid Practice]], reading and building sinusoids
 
 ## Things to do before our next class
 

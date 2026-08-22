@@ -13,7 +13,9 @@ tags:
 1. Warm-up: [[Predict the Circuit]] — three resistors, one prediction
 2. Bench time: [[Breadboard a Circuit]] — a second circuit, built from a
    schematic you have not seen before
-3. What a schematic assumes you already know
+3. What a schematic assumes you already know — hands up for every
+   symbol that stopped you; the count decides tomorrow's opening
+4. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

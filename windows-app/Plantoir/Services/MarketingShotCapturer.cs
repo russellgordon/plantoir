@@ -42,7 +42,25 @@ public static class MarketingShotCapturer
         catch { }
     }
 
-    public static async Task RunAsync(string outputDir)
+    /// <summary>
+    /// Photograph the app windows, optionally for one appearance only.
+    ///
+    /// One appearance per PROCESS, with the OS switched to it first, is the
+    /// only way these come out right. Setting RequestedTheme on the window's
+    /// content changes what the controls draw, but every brush fetched as
+    /// Application.Current.Resources["..."] still resolves against the theme
+    /// the APP launched in — so a dark capture came back with a white dialog
+    /// card carrying white text, and assistant bubbles in light grey on a
+    /// dark window. Chasing those brush by brush (tried first: hardcoding
+    /// approximate literals in ThemedBrush) works but keeps drifting from the
+    /// real design tokens and needs re-chasing for every new brush anyone
+    /// adds; one process per appearance makes every themed resource resolve
+    /// exactly the way a teacher's copy resolves it, because the situation is
+    /// the same one. capture_windows.py switches Windows into each appearance
+    /// before launching this with --theme, and puts the colour mode back in a
+    /// finally.
+    /// </summary>
+    public static async Task RunAsync(string outputDir, string? onlyTheme = null)
     {
         try
         {
@@ -65,7 +83,12 @@ public static class MarketingShotCapturer
             ProvisionDemoWorkspace(workspacePath);
             Log($"Workspace provisioned at {workspacePath}");
 
-            foreach (var theme in new[] { ElementTheme.Light, ElementTheme.Dark })
+            ElementTheme[] wanted = onlyTheme is null
+                ? new[] { ElementTheme.Light, ElementTheme.Dark }
+                : new[] { onlyTheme.Equals("dark", StringComparison.OrdinalIgnoreCase)
+                              ? ElementTheme.Dark : ElementTheme.Light };
+
+            foreach (var theme in wanted)
             {
                 string themeName = theme == ElementTheme.Dark ? "dark" : "light";
                 Log($"--- Capturing theme: {themeName} ---");
@@ -336,7 +359,7 @@ public static class MarketingShotCapturer
         window.Workspace.Selection = new SidebarSelection.CourseItem("ENG2D");
         await Task.Delay(400);
 
-        var dialog = new NewCourseDialog(window, theme);
+        var dialog = new NewCourseDialog(window);
         dialog.RequestedTheme = theme;
         dialog.StageForCapture("SBI3U", "1, 2");
 
@@ -353,9 +376,12 @@ public static class MarketingShotCapturer
         var dialogCard = new Border
         {
             Width = 540,
-            MaxHeight = 680,
-            Background = ThemedBrush("SolidBackgroundFillColorBaseBrush", theme),
-            BorderBrush = ThemedBrush("SurfaceStrokeColorDefaultBrush", theme),
+            // 680 cut the Language / region row through the middle of its
+            // control, with no scrollbar to explain why -- it read as a
+            // rendering fault rather than as a panel that continues.
+            MaxHeight = 720,
+            Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
+            BorderBrush = (Brush)Application.Current.Resources["SurfaceStrokeColorDefaultBrush"],
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(24, 20, 24, 20),
@@ -370,7 +396,9 @@ public static class MarketingShotCapturer
 
         var titleBlock = new TextBlock
         {
-            Text = "New Course",
+            // The dialog's own title, not a second copy of it that can
+            // drift: the real one says "New Course or Club".
+            Text = dialog.Title?.ToString() ?? "New Course",
             FontSize = 20,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 16)
@@ -383,6 +411,7 @@ public static class MarketingShotCapturer
             dialog.Content = null;
             Grid.SetRow(formContent, 1);
             dialogLayout.Children.Add(formContent);
+            GiveTheFormRoomForCapture(formContent);
         }
 
         var buttonRow = new StackPanel
@@ -442,6 +471,32 @@ public static class MarketingShotCapturer
         "Setting up this PC\nBuilding your website builder\nEnsuring container is running\n"
         + "Deploying from local build\n";
 
+    /// <summary>
+    /// Give the form enough room that the photograph cuts where the mac's
+    /// twin cuts -- at a section boundary, not through a control.
+    ///
+    /// The form lives in a ScrollViewer capped at 520, which put the card's
+    /// bottom edge straight through the "Language / region" row: a label with
+    /// its dropdown sliced off reads as a rendering fault rather than as a
+    /// panel that continues. Asking for the scrollbar instead was tried first
+    /// and does nothing -- Windows' "automatically hide scroll bars" setting
+    /// wins over VerticalScrollBarVisibility.Visible, so a still frame never
+    /// shows one. 600 completes that row and brings the next heading into
+    /// view, which is what the mac shot shows.
+    /// </summary>
+    private static void GiveTheFormRoomForCapture(FrameworkElement content)
+    {
+        if (content is ScrollViewer viewer)
+        {
+            viewer.MaxHeight = 600;
+            return;
+        }
+        if (content is Panel panel)
+            foreach (var child in panel.Children)
+                if (child is FrameworkElement element)
+                    GiveTheFormRoomForCapture(element);
+    }
+
     private static async Task CaptureProgressWindow(string workspacePath, ElementTheme theme, string outputPath)
     {
         var window = new MainWindow(workspacePath, null);
@@ -476,12 +531,7 @@ public static class MarketingShotCapturer
         window.Activate();
 
         await Task.Delay(500);
-        // Section 2, not 1 -- the embedded image at siteImagePath is
-        // site-eng2d-windows-*.png, which capture_windows.py now takes from
-        // the eng2d-s2-2026-gordon site (Russell's 2026-08-20 redeploy). The
-        // toolbar has to agree with what is actually pictured underneath it,
-        // or the shot reads "ENG2D-S1" over a page that says "Section 2".
-        window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 2);
+        window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 1);
         await Task.Delay(400);
 
         if (window.DetailPresenter.Content is SectionDetailView detail)
@@ -517,6 +567,8 @@ public static class MarketingShotCapturer
         window.Activate();
 
         await Task.Delay(500);
+
+        window.ShowPromptShelfForCapture();
 
         // Stage teacher message bubble matching macOS assistant test
         var teacherMsg = new TextBlock
@@ -566,55 +618,6 @@ public static class MarketingShotCapturer
         await Task.Delay(600);
         await SaveWindowContentToPngAsync(window, outputPath);
         window.Close();
-    }
-
-    /// <summary>
-    /// A HARDCODED literal for one theme, not a live resource lookup. Two
-    /// live approaches were tried and measured to fail, both logged in
-    /// %TEMP%\marketing_capture.log:
-    ///   1. Application.Current.RequestedTheme = theme -- throws
-    ///      COMException 0x80131515 at the WinRT boundary. WinUI does not
-    ///      support changing the app-wide theme after launch.
-    ///   2. Indexing Application.Current.Resources.ThemeDictionaries, and
-    ///      then (once App.xaml turned out to merge XamlControlsResources
-    ///      rather than declare ThemeDictionaries itself) recursively
-    ///      searching MergedDictionaries for it -- both resolved "Light"
-    ///      (the app's ambient theme at that point) but threw "No 'Dark'
-    ///      theme dictionary found" for the other one. WinUI appears to
-    ///      only materialize the ACTIVE theme's dictionary regardless of how
-    ///      it's reached, so asking for the theme the app isn't currently in
-    ///      fails no matter the path to it.
-    /// These are approximate Fluent 2 values, not pulled from the resource
-    /// system at all -- fine here, since this only feeds a screenshot, where
-    /// "reads clearly against its background" is the bar, not a pixel-exact
-    /// design token.
-    /// </summary>
-    public static Brush ThemedBrush(string key, ElementTheme theme)
-    {
-        bool dark = theme == ElementTheme.Dark;
-        Windows.UI.Color color = key switch
-        {
-            "SolidBackgroundFillColorBaseBrush" => dark
-                ? Windows.UI.Color.FromArgb(255, 32, 32, 32)
-                : Windows.UI.Color.FromArgb(255, 243, 243, 243),
-            "CardBackgroundFillColorDefaultBrush" => dark
-                ? Windows.UI.Color.FromArgb(255, 56, 56, 56)
-                : Windows.UI.Color.FromArgb(255, 255, 255, 255),
-            "SurfaceStrokeColorDefaultBrush" => dark
-                ? Windows.UI.Color.FromArgb(255, 61, 61, 61)
-                : Windows.UI.Color.FromArgb(255, 224, 224, 224),
-            "SystemFillColorCriticalBrush" => dark
-                ? Windows.UI.Color.FromArgb(255, 255, 153, 164)
-                : Windows.UI.Color.FromArgb(255, 196, 43, 28),
-            "SystemFillColorCautionBrush" => dark
-                ? Windows.UI.Color.FromArgb(255, 255, 200, 61)
-                : Windows.UI.Color.FromArgb(255, 157, 93, 0),
-            "TextFillColorSecondaryBrush" => dark
-                ? Windows.UI.Color.FromArgb(255, 197, 197, 197)
-                : Windows.UI.Color.FromArgb(255, 118, 118, 118),
-            _ => throw new ArgumentException($"ThemedBrush has no hardcoded value for '{key}'.", nameof(key)),
-        };
-        return new SolidColorBrush(color);
     }
 
     private static void ConfigureWindow(Window window, int width, int height, ElementTheme theme)

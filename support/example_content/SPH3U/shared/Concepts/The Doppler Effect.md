@@ -36,7 +36,7 @@ The same physics, from a siren to the edge of the observable universe.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[E2.7]]
+![[E2.1]]
 
 ![[E3.6]]
 %%curriculum-end%%

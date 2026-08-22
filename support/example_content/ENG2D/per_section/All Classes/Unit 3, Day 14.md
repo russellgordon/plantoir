@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Follow-ups finished and handed in — [[The Seminar]], day 5
-2. Reading period with your own book
+1. [[The Seminar]], day 5 — the first half of the period is for the note I
+   left on your draft and your own weakest row; follow-ups handed in
+   before the bell
+2. Reading period with your own book once yours is in
 
 ## Things to do before our next class
 

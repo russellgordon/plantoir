@@ -35,6 +35,21 @@ Do them by hand; the point is to stop needing a tool for a byte.
 10. A 10-bit analog-to-digital converter with a 3.3 V reference reports a
     reading of 683. What voltage is at its input, and what is the
     smallest voltage difference it could possibly detect?
+11. A display runs at $1080\text{p}$ ($1920 \times 1080$ pixels) with 24-bit
+    true colour ($3\ \text{bytes}$ per pixel) at $60\ \text{Hz}$. How much
+    uncompressed memory does a single frame buffer require in megabytes, and
+    what raw data transfer rate in gigabits per second is needed to refresh
+    the screen at $60\ \text{Hz}$? How do these figures change for a $4\text{K}$
+    UHD ($3840 \times 2160$) display?
+12. Trace the capacity and throughput scaling of storage media across
+    generations: A CD-ROM stores $700\ \text{MB}$ with an $8\times$ transfer rate
+    of $1.2\ \text{MB/s}$. A DVD stores $4.7\ \text{GB}$ with an $8\times$ rate
+    of $11.08\ \text{MB/s}$. A Blu-ray disc stores $25\ \text{GB}$ at an $8\times$
+    rate of $36\ \text{MB/s}$. A modern $2\ \text{TB}$ PCIe 4.0 NVMe SSD transfers
+    data at $7000\ \text{MB/s}$.
+    (a) How many CD-ROMs of data fit onto a single $2\ \text{TB}$ SSD?
+    (b) How long does it take to read $25\ \text{GB}$ of data from a Blu-ray
+    disc versus from the NVMe SSD?
 
 ## Answers
 
@@ -130,11 +145,38 @@ Do them by hand; the point is to stop needing a tool for a byte.
 >
 > The smallest detectable difference is one code step, $\frac{3.3\ \text{V}}{1024} \approx 0.0032\ \text{V}$, about 3.2 mV. No amount of decimal places in your `print` statement improves on that — the resolution is set by the hardware, and reporting a reading as 2.2032 V claims a precision the converter does not have.
 
+> [!success]- Answer 11
+> **$1080\text{p}$ Frame buffer size:**
+> $1920 \times 1080 = 2\,073\,600\ \text{pixels}$.
+> $2\,073\,600 \times 3\ \text{bytes} = 6\,220\,800\ \text{bytes} \approx 6.22\ \text{MB}$ per uncompressed frame.
+>
+> **$1080\text{p}$ Data transfer rate at $60\ \text{Hz}$:**
+> $6\,220\,800\ \text{bytes/frame} \times 60\ \text{frames/s} \times 8\ \text{bits/byte} = 2\,985\,984\,000\ \text{bits/s} \approx 2.99\ \text{Gbps}$.
+>
+> **$4\text{K}$ UHD comparison:**
+> $3840 \times 2160 = 8\,294\,400\ \text{pixels}$ — exactly $4\times$ the pixels of $1080\text{p}$.
+> Frame buffer: $8\,294\,400 \times 3\ \text{bytes} = 24\,883\,200\ \text{bytes} \approx 24.88\ \text{MB}$ per frame.
+> Bandwidth: $2.986\ \text{Gbps} \times 4 \approx 11.94\ \text{Gbps}$.
+> This quadrupling in data rate explains why high-resolution displays forced interfaces to advance from HDMI 1.4 ($10.2\ \text{Gbps}$) to HDMI 2.0 ($18\ \text{Gbps}$) and DisplayPort 1.4/2.0 ($32.4\text{--}80\ \text{Gbps}$).
+
+> [!success]- Answer 12
+> **(a) Capacity comparison:**
+> $2\ \text{TB} = 2\,000\,000\ \text{MB}$.
+> $\frac{2\,000\,000\ \text{MB}}{700\ \text{MB/CD}} \approx 2857\ \text{CDs}$.
+> A single M.2 drive smaller than a finger stores the equivalent of nearly three thousand CD-ROMs.
+>
+> **(b) Read time for $25\ \text{GB}$ ($25\,000\ \text{MB}$):**
+> Optical Blu-ray disc: $t = \frac{25\,000\ \text{MB}}{36\ \text{MB/s}} \approx 694.4\ \text{s} \approx 11.6\ \text{minutes}$.
+> NVMe M.2 SSD: $t = \frac{25\,000\ \text{MB}}{7000\ \text{MB/s}} \approx 3.57\ \text{seconds}$.
+> The NVMe drive reads the same payload nearly $200\times$ faster, illustrating why solid-state storage displaced optical media as the primary storage and software distribution standard.
+
 Take these to where they bite: [[Logic Gates Practice]] treats the bits
 as decisions, and [[Networking Practice]] treats them as addresses.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A1.3]]
 
 ![[A5.1]]
 

@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval; then [[Sharing a Watershed]] — one physical system, several jurisdictions
-2. Effects travel downstream automatically; obligations travel upstream only if somebody agreed to them
-3. Launch: [[The Local Hazard Assessment]] — groups, one hazard, one audience who could act on it
+1. Diagnostic: name every party with a say over the water leaving this schoolyard, and rank them by how much say they have. Unmarked, and we put your ranking back on the table tomorrow
+2. [[Sharing a Watershed]] — one physical system, several jurisdictions
+3. Effects travel downstream automatically; obligations travel upstream only if somebody agreed to them
+4. Launch: [[The Local Hazard Assessment]] — groups, one hazard, one audience who could act on it
 
 ## Things to do before our next class
 

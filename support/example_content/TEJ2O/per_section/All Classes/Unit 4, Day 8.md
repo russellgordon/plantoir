@@ -13,7 +13,10 @@ tags:
 1. Warm-up: [[Which One Doesn't Belong]] — four upgrade options
 2. Bench time: [[The Refurb Report]], day 5 — the upgrade performed, and
    measured before and after
-3. The honest verdict: repair, upgrade, or recycle, with the numbers
+3. Checkpoint: while you work I read each report draft against the
+   criteria table and leave one written note
+4. The honest verdict: repair, upgrade, or recycle, with the numbers
+5. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

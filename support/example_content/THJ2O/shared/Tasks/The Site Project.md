@@ -7,10 +7,18 @@ tags:
   - unit-4
 ---
 **The culminating task. Eight periods in Unit 4, ending with a
-handover.** Groups of three or four.
+handover.** Groups of three or four, with an individual mark.
 
 A real green-industry job on one of our sites, carried from survey to
 handover.
+
+One job, three or four marks, and no shared mark anywhere in it. **You
+take a named part of the survey and a named part of the plan, you keep
+your own site log with dated photographs of the work you did, you write
+one section of the maintenance schedule under your own name, and you
+present that section at the handover.** Rotate the tape, the clipboard,
+and the tools deliberately: a period spent fetching material leaves you
+with nothing to be marked on.
 
 ## The jobs on offer
 
@@ -31,7 +39,7 @@ handover.
 | 4 | Preparation: materials, tools, and the site itself |
 | 5 | Build or plant, day one |
 | 6 | Build or plant, day two |
-| 7 | Finish, clean up, and photograph |
+| 7 | Finish, clean up, photograph, and write your section of the schedule |
 | 8 | Handover: the maintenance schedule, presented |
 
 ## What you deliver
@@ -54,6 +62,13 @@ handover.
 | Community effect | You can say what this does for the people who use this place |
 | Handover | The schedule is usable by a stranger |
 
+Every row here describes one job that three or four of you did, so
+every row is judged on your named part of it — your section of the
+survey and the plan, the work your dated site log shows you doing, your
+section of the maintenance schedule, and what you say at the conference
+on the design day. Nobody is marked on somebody else's corner of the
+site.
+
 > [!warning] It stays after you leave
 > This is on a real site that other people use, and it will be there in
 > five years — or it will have failed there in five years. That is the
@@ -72,3 +87,53 @@ handover.
 
 ![[C3.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Not the handover on Day 12: there are visitors in the room, you are
+running it, and whoever inherits the work is asking the questions. What
+you see there is the product. Everything else has to come from earlier.
+
+OBSERVE — Unit 4, Day 5, the survey period
+  Watch for a datum. A group that measures from a fixed thing they can
+  find again — a post, a building corner, a tagged tree — can set the
+  plan out on Day 9. A group that takes distances from wherever they
+  happen to be standing fills in an identical survey sheet and discovers
+  the problem with the materials already on site. B1.1 is exactly this:
+  a site inventory and a two-dimensional survey.
+  Second thing: who holds the tape and who writes. The survey is one
+  period, so the student who spends all of it on the clipboard has no
+  measurement evidence of their own. Their site log will say what they
+  did; what you see here is whether the group let the roles move, which
+  a log written by the person who kept the pen will not.
+  Going well: a baseline established and marked before any dimension is
+  taken; the tape and the clipboard change hands.
+  Stuck: a sketch covered in numbers with nothing to measure them from.
+  Record: on your copy of the site sketch, mark each group's datum — or
+  its absence. Add initials as the clipboard moves.
+
+TALK — Unit 4, Day 6, at the conferences on feasibility already on that
+agenda
+  Feasibility is what the agenda promises, so ask that and then keep
+  going.
+  Ask: "Point at the thing on this plan that moves water. Where does it
+  go in a hard rain, and where was it going before you touched it?"
+  Then: "Whose day changes when this is finished — and how would you
+  find out if you were wrong about that?"
+  The first is A3.4 and C1.1 together, on their own site rather than in
+  general — so make them point at an actual system: a drain, a culvert,
+  a downspout, an irrigation line, the bed itself now holding water that
+  used to run off. A3.4 is structural and mechanical SYSTEMS, so a slope
+  on its own does not answer it. The second is the C3.3 question turned
+  on their own job — what this kind of work does to the people around it
+  — and a maintenance schedule never has to answer it. A strong answer
+  follows the water to somewhere real and names people: the staff who
+  will mow around it, next year's class, the people who walk the shore.
+  Record: two boxes ruled on each group's plan, water and people, ticked
+  as they answer. Day 7 is the costing, so anything they cannot answer
+  today has one period to become an answer.
+
+The product evidence is the finished work, the plan and costing, and the
+maintenance schedule presented on Day 12.
+%%

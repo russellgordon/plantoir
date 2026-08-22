@@ -27,6 +27,10 @@ leadership unit and revisited at the end of the course.
 - What did the situation explain that the label did not? Think about
   where you were the newest person, the only person of your kind in the
   room, or under real time pressure.
+- **Where did it come from?** Name one thing about how you work that was
+  normal where you grew up — in your family, in your community, in a job
+  you have had — and is not normal everywhere. An instrument reports a
+  result; it cannot see what shaped the person taking it.
 - What would you want a manager to know about how you work, and what
   would you want them to ignore?
 
@@ -41,6 +45,10 @@ leadership unit and revisited at the end of the course.
 You will re-read this before writing
 [[Your Leadership Statement]], and say what changed. Keep it somewhere
 you will find it.
+
+The analysis is written in class, and it is marked against the four rows
+on [[The Management Portfolio]] — the same four rows as every other
+entry.
 
 %%curriculum-start%%
 ## Curriculum connection

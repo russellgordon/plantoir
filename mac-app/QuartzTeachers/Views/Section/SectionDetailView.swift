@@ -11,7 +11,23 @@ struct SectionDetailView: View {
     let sectionNumber: Int
 
     @State var previewRunner = ScriptRunner()
-    @State var deployRunner = ScriptRunner()
+
+    /// Runs every configured destination in sequence — see
+    /// `MultiDestinationDeployRunner`. For the overwhelming majority of
+    /// courses (exactly one destination) this behaves exactly like a
+    /// single `ScriptRunner` always did.
+    @State var deployRunner = MultiDestinationDeployRunner()
+
+    /// True from the moment Deploy is pressed until `deployRunner` actually
+    /// starts running — the span spent stopping any preview and doing the
+    /// pre-flight checks below, before there is any real progress to show.
+    /// `consoleArea` shows a plain "Preparing to deploy…" placeholder while
+    /// this is true, instead of `TaskProgressView` bound to a `deployRunner`
+    /// that has nothing to say yet — a fresh, idle runner renders as
+    /// nothing at all (see `deployAndWait()`), and the PREVIOUS deploy's
+    /// runner still holding last time's finished outcome is no better,
+    /// since neither is what is actually happening right now.
+    @State var isPreparingDeploy: Bool = false
 
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
@@ -26,12 +42,45 @@ struct SectionDetailView: View {
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
 
+    /// Whether this section's pages have changed since it last published
+    /// — the " — Edited" marker in the title bar.
+    ///
+    /// Held rather than computed on every redraw, and refreshed only at
+    /// the moments a teacher could be LOOKING at the title bar: the window
+    /// arriving, the app coming to the front, this window becoming the key
+    /// one, and a publish or preview finishing. A body that recomputed it
+    /// would walk the course folder every time a console line arrived.
+    @State var hasUnpublishedEdits: Bool = false
+
+    /// Which refresh is the current one. `NSWindow.didBecomeKeyNotification`
+    /// fires for EVERY window and panel in the app — the assistant, a
+    /// settings sheet, an alert — and app activation fires alongside it, so
+    /// several walks can be in flight at once. Without this counter their
+    /// results land in whatever order they finish, and a walk begun before
+    /// a publish can overwrite the answer from one begun after it: the
+    /// window says " — Edited" about a section that has just gone out.
+    @State var refreshGeneration: Int = 0
+
     @Environment(WorkspaceModel.self) var workspace
 
     // MARK: - Computed properties
 
-    var titleText: String {
+    /// What this section is CALLED — used wherever a sentence names it
+    /// ("Deploying ICS3U-S1"). Deliberately without the " — Edited"
+    /// marker: the marker is a statement about the window's contents, not
+    /// part of the section's name, and "Deploying ICS3U-S1 — Edited" reads
+    /// as though "Edited" were something being deployed.
+    var sectionName: String {
         return "\(course.code)-S\(sectionNumber)"
+    }
+
+    /// What the window's title bar says — the name, plus the marker when
+    /// there is something unpublished.
+    var titleText: String {
+        return SectionPublishState.windowTitle(
+            base: sectionName,
+            hasUnpublishedEdits: hasUnpublishedEdits
+        )
     }
 
     var isBusy: Bool {
@@ -48,7 +97,7 @@ struct SectionDetailView: View {
             // which is what dragged the progress header under the
             // window's toolbar when a preview was restarted.
             VStack(spacing: 0) {
-                if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || !deployRunner.transcript.lines.isEmpty {
+                if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
                     consoleArea
                 } else {
                     ContentUnavailableView(
@@ -69,6 +118,22 @@ struct SectionDetailView: View {
             }
         }
         .navigationTitle(titleText)
+        .task {
+            refreshEditedMarker()
+        }
+        .onChange(of: isBusy) { _, nowBusy in
+            // A publish clears the marker; a preview leaves the content
+            // alone but is the other moment the folder has just been read.
+            if !nowBusy {
+                refreshEditedMarker()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshEditedMarker()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            refreshEditedMarker()
+        }
         .toolbar {
             // Every item is ALWAYS present (disabled when inapplicable):
             // conditionally inserting toolbar items makes macOS rebuild
@@ -134,7 +199,14 @@ struct SectionDetailView: View {
                     startDeploy()
                 }
                 .labelStyle(.titleAndIcon)
-                .disabled(deployRunner.isRunning)
+                // `isPreparingDeploy` closes a real window, not just a
+                // display one: `deployRunner.isRunning` alone stays false
+                // through `deployAndWait()`'s whole prep phase (stopping any
+                // preview, waiting for containers to clear), and the button
+                // was clickable again the instant that phase started — a
+                // second click there raced its own stop-preview-then-deploy
+                // sequence against the first's.
+                .disabled(deployRunner.isRunning || isPreparingDeploy)
                 .help("Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
 
@@ -215,8 +287,10 @@ struct SectionDetailView: View {
     }
 
     /// Why this section's deploy would not get anywhere, or nil when it
-    /// would. Both destinations that need something from the teacher are
-    /// checked: the folder, and the Cloudflare Account ID.
+    /// would. EVERY configured destination is checked — the primary and
+    /// every additional one — so a redundancy target with no valid folder
+    /// or credential is caught here rather than discovered halfway
+    /// through a run that already published to the others.
     var deployRefusalReason: String? {
         return SectionDetailView.deployRefusalReason(
             configuration: course.configuration,
@@ -226,17 +300,10 @@ struct SectionDetailView: View {
 
     /// The same check, free of the view, so it can be tested.
     static func deployRefusalReason(configuration: CourseConfiguration, cloudflareAccountID: String) -> String? {
-        if configuration.deployTarget == "local_folder" {
-            if let folderProblem = CourseConfiguration.deployFolderProblem(forPath: configuration.deployFolderPath) {
-                return "\(folderProblem) Fix it in this course’s settings, under Deploying, then deploy again."
-            }
-        }
-        if configuration.deploysToCloudflare {
-            if let accountProblem = CourseConfiguration.cloudflareAccountProblem(forID: cloudflareAccountID) {
-                return "\(accountProblem) Add it in this course’s settings, under Deploying, then deploy again."
-            }
-        }
-        return nil
+        return MultiDestinationDeployRunner.refusalReason(
+            destinations: configuration.allDeployDestinations,
+            cloudflareAccountID: cloudflareAccountID
+        )
     }
 
     var deployRefusalBinding: Binding<Bool> {
@@ -264,13 +331,39 @@ struct SectionDetailView: View {
     var consoleArea: some View {
         VStack(spacing: 0) {
             if showsDeployProgress {
-                TaskProgressView(
-                    runner: deployRunner,
-                    title: "Deploying \(titleText)",
-                    onCancel: {
-                        cancelDeploy()
+                // .leading: DeployDestinationChecklist is a compact HStack
+                // with no content of its own that forces full width, so
+                // under this VStack's default (.center) alignment it would
+                // float centred while TaskProgressView's own text starts at
+                // the left margin — two different leading edges for what
+                // reads as one panel. Explicit .leading lines them up.
+                VStack(alignment: .leading, spacing: 0) {
+                    if isPreparingDeploy {
+                        preparingToDeployPlaceholder
+                    } else {
+                        // Only appears once a course has more than one
+                        // destination — the overwhelming majority never see
+                        // this at all, and the progress panel beneath it
+                        // looks exactly as it always has.
+                        if deployRunner.legs.count > 1 {
+                            DeployDestinationChecklist(legs: deployRunner.legs)
+                        }
+                        // DeployDestinationLinks renders INSIDE TaskProgressView
+                        // itself, in the same spot a single destination's own
+                        // "Your website is live" link would sit — above "Show
+                        // details", never pushed down past the (variable-height)
+                        // console.
+                        TaskProgressView(
+                            runner: deployRunner.activeRunner,
+                            title: deployProgressTitle,
+                            hidesSiteLink: deployRunner.legs.count > 1,
+                            allLegs: deployRunner.legs.count > 1 ? deployRunner.legs : nil,
+                            onCancel: {
+                                cancelDeploy()
+                            }
+                        )
                     }
-                )
+                }
             } else {
                 TaskProgressView(
                     runner: previewRunner,
@@ -284,12 +377,47 @@ struct SectionDetailView: View {
         }
     }
 
+    /// Stands in for the real deploy progress panel during `deployAndWait()`'s
+    /// prep work — stopping any preview, waiting for containers to clear —
+    /// before there is a real, running `deployRunner` to show. No "Show
+    /// details" or Cancel here: there is genuinely nothing yet to look at
+    /// or to stop, unlike once the real panel takes over a moment later.
+    var preparingToDeployPlaceholder: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("Deploying \(sectionName)")
+                    .font(.headline)
+                Spacer()
+                Text("Preparing to deploy…")
+                    .foregroundStyle(.secondary)
+            }
+            ProgressView()
+                .progressViewStyle(.linear)
+        }
+        .padding(12)
+    }
+
+    /// What the deploy panel is called. Names the destination currently
+    /// running only once there is more than one to distinguish between —
+    /// a course with a single destination keeps the plain title it has
+    /// always had.
+    var deployProgressTitle: String {
+        return SectionDetailView.deployProgressTitle(
+            sectionName: sectionName,
+            isRunning: deployRunner.isRunning,
+            legCount: deployRunner.legs.count,
+            currentDestinationDescription: deployRunner.currentLeg.map { leg in
+                DeployCommand.destinationDescription(for: leg.destination)
+            }
+        )
+    }
+
     /// What the preview panel is called. While the preview is being made
     /// the title says so; once it has finished or been stopped, the panel
     /// is simply about the preview, so it must stop claiming to be
     /// preparing one.
     var previewTaskTitle: String {
-        return SectionDetailView.previewTaskTitle(isPreparing: previewRunner.isRunning, sectionName: titleText)
+        return SectionDetailView.previewTaskTitle(isPreparing: previewRunner.isRunning, sectionName: sectionName)
     }
 
     /// True when the console should be about publishing rather than
@@ -305,12 +433,64 @@ struct SectionDetailView: View {
 
     // MARK: - Functions
 
+    /// Works out whether the title bar should say " — Edited", off the
+    /// main thread: the check is a directory walk, and however brief, a
+    /// course on a slow network volume must not be able to stutter a
+    /// window that is being brought to the front.
+    func refreshEditedMarker() {
+        let courseDirectory: URL = course.directoryURL
+        let sectionNumber: Int = self.sectionNumber
+        // A course that publishes into a folder inside itself would
+        // otherwise feed its own marker: `deploy.py` writes the whole
+        // built site there, so every check after a publish would differ
+        // from the one before it and the window would say " — Edited"
+        // permanently.
+        let excluded: [String] = SectionPublishState.selfPublishingSubpaths(
+            courseDirectory: courseDirectory,
+            destinations: course.configuration.allDeployDestinations
+        )
+        refreshGeneration += 1
+        let generation: Int = refreshGeneration
+        Task.detached(priority: .utility) {
+            let edited: Bool = SectionPublishState.hasUnpublishedEdits(
+                courseDirectory: courseDirectory,
+                sectionNumber: sectionNumber,
+                excludingRelativePaths: excluded
+            )
+            await MainActor.run {
+                if generation == refreshGeneration {
+                    hasUnpublishedEdits = edited
+                }
+            }
+        }
+    }
+
     /// Names the preview panel for what it is at the moment.
     static func previewTaskTitle(isPreparing: Bool, sectionName: String) -> String {
         if isPreparing {
             return "Preparing the preview of \(sectionName)"
         }
         return "Preview of \(sectionName)"
+    }
+
+    /// Names the destination CURRENTLY running only while the deploy is
+    /// still going — once it has finished, naming just one destination in
+    /// the title is misleading when every configured destination actually
+    /// ran (a teacher who deployed to Netlify AND Cloudflare should not see
+    /// a title that only mentions whichever one happened to run last). The
+    /// checklist above already names each destination with its own
+    /// checkmark, and `DeployDestinationLinks` below lists every live link,
+    /// so the finished title reverts to the plain single-destination form.
+    static func deployProgressTitle(
+        sectionName: String,
+        isRunning: Bool,
+        legCount: Int,
+        currentDestinationDescription: String?
+    ) -> String {
+        if isRunning, legCount > 1, let currentDestinationDescription {
+            return "Deploying \(sectionName) — \(currentDestinationDescription)"
+        }
+        return "Deploying \(sectionName)"
     }
 
     /// Whichever task is running now, or — once both have finished — the
@@ -462,7 +642,7 @@ struct SectionDetailView: View {
                 workspaceURL: workspaceURL
             )
         }
-        deployRunner.cancelByUser()
+        deployRunner.cancel()
     }
 
     /// Hands the port back, whatever ended the preview.
@@ -506,14 +686,50 @@ struct SectionDetailView: View {
             )
         }
 
-        // Whatever is wrong with the destination is said here, before a
-        // build starts: discovering it after several minutes of work would
-        // waste the teacher's time and read as a failure of the deploy.
+        // The toolbar button disables itself on `isPreparingDeploy`, but the
+        // assistant reaches this function directly, with no button to have
+        // disabled — guard here too, or two overlapping deploys can run at
+        // once and stomp on `deployRunner`'s shared state (legs, startedAt)
+        // as each writes over the other's.
+        if isPreparingDeploy || deployRunner.isRunning {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.sectionIsBusy(
+                    course: course.code, section: String(sectionNumber)
+                )
+            )
+        }
+
+        let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
+
+        // Whatever is wrong with ANY configured destination is said here,
+        // before a build starts: discovering it partway through a
+        // redundancy run would waste the teacher's time and let some
+        // destinations quietly go out while others never got the chance.
         if let problem = deployRefusalReason {
             return AssistSiteWorkResult(
                 succeeded: false, message: problem, isAboutTheDestination: true
             )
         }
+
+        // Claim the console for the deploy panel before touching the preview
+        // runner below. Stopping a running preview here sets its own
+        // `wasStoppedByUser`, which — until `deployRunner.run()` gives this a
+        // real timestamp a little further down — left `showsDeployProgress`
+        // comparing stale timestamps and picking the just-stopped preview
+        // panel, flashing "Stopped" for a beat before the deploy panel took
+        // over. Marking the deploy as started immediately keeps the console
+        // on the deploy panel through that whole window.
+        //
+        // `isPreparingDeploy` covers what that timestamp alone does not:
+        // `deployRunner.legs` still holds the PREVIOUS deploy's runners
+        // (finished, one way or another) until `run()` replaces them with
+        // fresh ones a little further down, and `consoleArea` must not show
+        // either that stale outcome or the flat-out blank a fresh, unstarted
+        // runner renders as — neither is what is actually happening right
+        // now, which is: getting ready to deploy.
+        deployRunner.startedAt = Date()
+        isPreparingDeploy = true
 
         // Stop any running or building preview before deploying, and wait for
         // container processes to exit so they cannot kill or race the deploy build.
@@ -529,6 +745,7 @@ struct SectionDetailView: View {
         // assistant reaches this by pressing the button while a deploy is
         // already running in this window.
         if deployRunner.isRunning {
+            isPreparingDeploy = false
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.sectionIsBusy(
@@ -538,25 +755,12 @@ struct SectionDetailView: View {
         }
 
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
-        // A folder or Cloudflare deploy never touches Netlify, so their
-        // progress must not talk about it either.
-        if course.configuration.deploysToLocalFolder {
-            deployRunner.milestones = needsBuild ? TaskMilestones.buildAndDeployToFolder : TaskMilestones.deployToFolder
-        } else if course.configuration.deploysToCloudflare {
-            deployRunner.milestones = needsBuild ? TaskMilestones.buildAndDeployToCloudflare : TaskMilestones.deployToCloudflare
-        } else {
-            deployRunner.milestones = needsBuild ? TaskMilestones.buildAndDeploy : TaskMilestones.deploy
-        }
-
-        // When this section has a custom domain, the live-site link shown
-        // after publishing wears it instead of the Netlify address.
-        let customDomain: String = CourseConfiguration.normalizedCustomDomain(
-            course.configuration.customDomain(forSection: sectionNumber)
-        )
-        deployRunner.customDomainForLinks = customDomain.isEmpty ? nil : customDomain
 
         // Let the rest of the app know this course is mid-publish (so,
-        // for example, Add Section… declines until it finishes).
+        // for example, Add Section… declines until it finishes) — ONE
+        // bracket around the whole sequence of destinations, not one per
+        // destination: from outside this window, the course is "busy
+        // publishing" for the whole span.
         CourseActivity.beginPublish(
             folderPath: workspaceURL.path,
             courseCode: course.code,
@@ -570,57 +774,42 @@ struct SectionDetailView: View {
             )
         }
 
-        if needsBuild {
-            deployRunner.run(
-                scriptNamed: "preview.sh",
-                arguments: [course.code, String(sectionNumber), "--build-only"],
-                workingDirectory: workspaceURL
-            )
-            if let problem = deployRunner.launchProblem {
-                return AssistSiteWorkResult(succeeded: false, message: problem)
-            }
-            let built: Bool = await deployRunner.waitUntilFinished()
-            if !built {
-                // The failure and its output are already on screen.
-                return AssistSiteWorkResult(
-                    succeeded: false,
-                    message: AssistWording.couldNotBuildBeforeDeploying(
-                        course: course.code, section: String(sectionNumber)
-                    )
-                )
-            }
-        }
+        // The real progress panel takes over from here — `deployRunner.run()`
+        // is about to give `deployRunner.legs` fresh runners of its own and
+        // start reporting real progress on them.
+        isPreparingDeploy = false
 
-        // What the launcher is asked to do is decided in one place —
-        // shared with the scheduled deploy, so an alarm set for half
-        // six sends the site to the same destination this button does.
-        let deployArguments: [String] = DeployCommand.arguments(
-            courseCode: course.code,
+        // What the launcher is asked to do, for each destination, is
+        // decided in one place — shared with the scheduled deploy and the
+        // assistant's headless path, so an alarm set for half six sends
+        // the site to the same destinations this button does.
+        await deployRunner.run(
+            course: course,
             sectionNumber: sectionNumber,
-            configuration: course.configuration,
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
-        )
-        deployRunner.run(
-            scriptNamed: DeployCommand.scriptName,
-            arguments: deployArguments,
+            destinations: destinations,
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
             workingDirectory: workspaceURL,
-            keepingTranscript: needsBuild
+            needsBuild: needsBuild
         )
-        if let problem = deployRunner.launchProblem {
-            return AssistSiteWorkResult(succeeded: false, message: problem)
-        }
-        let deployed: Bool = await deployRunner.waitUntilFinished()
-        if !deployed {
+
+        // A failed shared build is reported the same way regardless of
+        // how many destinations were configured — none of them were ever
+        // reached, so the wording says "could not be built", not "did
+        // not finish", which would wrongly suggest the upload failed.
+        if deployRunner.legs.first?.buildFailed == true {
             return AssistSiteWorkResult(
                 succeeded: false,
-                message: AssistWording.deployDidNotFinish(
+                message: AssistWording.couldNotBuildBeforeDeploying(
                     course: course.code, section: String(sectionNumber)
                 )
             )
         }
-        return AssistSiteWorkResult(
-            succeeded: true,
-            message: AssistWording.deployed(course: course.code, section: String(sectionNumber))
+
+        return MultiDestinationDeployRunner.result(
+            course: course.code,
+            section: String(sectionNumber),
+            destinationCount: destinations.count,
+            outcome: deployRunner.outcome
         )
     }
 

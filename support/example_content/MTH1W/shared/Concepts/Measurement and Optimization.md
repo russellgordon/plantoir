@@ -22,6 +22,49 @@ visible in your work and they check the work for you: if the answer
 comes out in cm² when you wanted cm³, the units caught the error
 before you did.
 
+## Where a unit comes from
+
+The sentence above passes over something worth stopping on. Every
+measurement system in that list was *invented*, by particular people
+solving a particular problem, and the choices they made are still
+sitting inside the numbers you write down.
+
+The older units are almost all bodies and work. A **cubit** is a
+forearm; a **foot** is a foot; a **hand**, still the unit horses are
+measured in, is a hand. A **fathom** is the span of two outstretched
+arms, because that is how you haul a rope in and count it as it comes.
+An **acre** was the area one person with one ox could plough in a day,
+which is why an acre is a strange number of square metres — it was never
+a length at all, it was a day's work. These units are wonderfully
+convenient, because the measuring instrument is attached to you, and
+hopeless for trade, because your forearm is not mine.
+
+**That is the problem the metric system was built to solve**, in
+revolutionary France in the 1790s, and the design goal was explicitly
+political as much as scientific: a unit belonging to nobody, so that no
+landowner's forearm and no region's custom could be the standard. The
+metre was defined from the size of the Earth, the other units were
+derived from it by tens, and the awkward local units that different
+towns used for the same goods were legislated away. It took decades and
+was widely resented — but the reason the conversions on this page are
+easy is that somebody decided they should be.
+
+Two things follow that are still live. **The definitions kept moving.**
+A metre was a fraction of a meridian, then a metal bar in a vault near
+Paris, and is now defined by the speed of light, because each definition
+was replaced when somebody needed to measure more finely than it could
+be reproduced. And **the old systems did not go away.** Canada buys
+lumber in feet and milk in litres; aviation measures altitude in feet
+worldwide; a recipe hands you cups. So the conversion skill above is not
+a historical curiosity — it is what a Canadian trades worker, nurse, or
+pilot does several times a day, and it is where real mistakes with real
+costs happen when it is done carelessly.
+
+When [[The Math Fair]] asks you to research a measurement system or a
+geometric idea, this is the shape of a good story: who needed it, what
+their instrument was, what broke when the community got bigger than the
+instrument, and where the idea earns a living now.
+
 ## What doubling a dimension really does
 
 Stretch, and the measurements do *not* all stretch together:
@@ -49,6 +92,8 @@ effects and these thirds, most volume problems in
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[E1.1]]
 
 ![[E1.3]]
 

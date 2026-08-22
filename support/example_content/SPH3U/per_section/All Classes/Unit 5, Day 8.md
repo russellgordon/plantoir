@@ -11,11 +11,14 @@ tags:
 ## Agenda
 
 1. Spin the motor by hand and watch the meter move
-2. [[Electromagnetic Induction]], transformers, and the grid
-3. Presentations: [[Motor and Generator Report]]
-4. Course wrap: the five strands, one argument
+2. [[Electromagnetic Induction]], and the transformers between here and
+   the generating station
+3. Launch: [[Motor and Generator Report]] — day 1 of the culminating
+   task, with the seven rows it is marked against read together. Then,
+   before the benches go away: your motor's speed, and one timed run with
+   the potential difference and the current read off while it turns
 
 ## Things to do before our next class
 
-- [ ] Hand in [[Motor and Generator Report]].
-- [ ] Final journal entry: what you can do now that you could not in September.
+- [ ] Decide with your partner which variable you will change. The
+      prediction gets written down in class, before it is tested.

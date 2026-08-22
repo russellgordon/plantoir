@@ -14,8 +14,10 @@ evidence?
 
 Photon energy is $E = hf$. Ionizing radiation — the kind that breaks
 chemical bonds — starts in the ultraviolet, around $10\ \text{eV}$. A
-phone's photons carry about $10^{-5}\ \text{eV}$: a million times too
-little, no matter how many arrive.
+cellular antenna or wireless router uses oscillating electric dipoles to
+generate non-ionizing radiofrequency electromagnetic waves whose photons carry
+about $10^{-5}\ \text{eV}$: a million times too little to ionize matter, no
+matter how many photons arrive. See [[Electromagnetic Radiation]].
 
 That does not make every question closed. Heating is a real effect at
 sufficient power, and "no known mechanism" is a weaker claim than "no
@@ -35,9 +37,12 @@ it. "I read that…" is where this discussion starts, not where it ends.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.9]]
+
 ![[D1.2]]
 
 ![[E1.2]]
 
-![[A1.9]]
+![[E3.4]]
 %%curriculum-end%%
+

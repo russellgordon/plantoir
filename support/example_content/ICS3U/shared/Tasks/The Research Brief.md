@@ -89,3 +89,31 @@ at this border, and what would you have to learn first?
 
 ![[D2.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Do NOT try to gather this on Days 20 and 21. The talks are the
+performance and you are running the room; the evidence from those days
+is product evidence, and it arrives on its own.
+
+OBSERVE — Unit 3, Day 15, the search period
+  Watch for: whether they narrow to one named project with named
+  researchers, or accumulate general articles about a field. Every
+  finished brief names one project, so the brief cannot tell you which
+  student did which.
+  Going well: a named lab, a paper, a date, inside twenty minutes.
+  Stuck: a fourth article about "the future of" something.
+  Record: a tick when the specific project is found, and the time.
+
+TALK — Unit 3, Day 19, during the writing period
+  Ask: "What does this project claim it can do, and what does it
+  carefully not claim?"
+  Then: "Who disagrees with them?"
+  A strong answer separates the finding from the press release. That is
+  D2.1, and it is the difference between understanding an emerging area
+  and being able to summarise a page about one.
+  Record: one line per student.
+
+The product evidence is the brief and the talk, on Days 20 and 21.
+%%

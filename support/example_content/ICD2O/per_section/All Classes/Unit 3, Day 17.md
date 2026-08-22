@@ -12,8 +12,9 @@ tags:
 
 1. Warm-up: [[Tech Headlines]] — who gets written about, and who does
    not
-2. Discussion: [[Whose Innovations Count]]
-3. Launch, day 1 of 9: [[The Innovation Brief]] — including who built
+2. Discussion: [[Whose Innovations Count]], starting from the positions
+   you wrote yesterday
+3. Launch, day 1 of 8: [[The Innovation Brief]] — including who built
    it, named
 
 ## Things to do before our next class

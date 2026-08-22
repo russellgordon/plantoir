@@ -92,10 +92,26 @@ def resolve_section_domain(course_dir: Path, config: dict, section_number: int) 
     """
     section_key = f"section{section_number}"
 
-    # 1. Custom domain from course_config.json
+    # 1. Custom domain from course_config.json — keyed by destination type
+    # since a course may publish to more than one place at once, but the
+    # baseUrl baked into THIS build (sitemap, RSS, social-card absolute
+    # URLs) can only ever be one value. Reads the PRIMARY destination's own
+    # domain, matching what the "Live URL" link on a finished deploy has
+    # always pointed at — the mac/Windows apps' "Advanced" custom-domain
+    # fields are per-destination for exactly this reason (a Netlify-only
+    # domain must never leak into a Cloudflare Pages leg's own link), and
+    # the primary is the one destination this single build is canonically
+    # published as. An older, single-string shape is read as-is: it was
+    # written back when a course could only ever have one destination, so
+    # there was only ever one destination it could have meant.
     custom_domains = config.get("custom_domains", {})
     if isinstance(custom_domains, dict):
-        section_custom_domain = (custom_domains.get("sections") or {}).get(section_key)
+        section_domains = (custom_domains.get("sections") or {}).get(section_key)
+        if isinstance(section_domains, dict):
+            primary_destination_type = config.get("deploy_target") or "netlify"
+            section_custom_domain = section_domains.get(primary_destination_type)
+        else:
+            section_custom_domain = section_domains
         if section_custom_domain:
             cleaned = clean_base_url(section_custom_domain)
             if cleaned:
@@ -783,8 +799,8 @@ def resolve_header_label(config: dict, course_code: str) -> str:
     "Ap Calc". A teacher who wants prose in that spot has "custom_short_name",
     which is their own text and is used as typed.
     """
-    grade_char = course_code[3] if len(course_code) >= 4 else ""
-    if grade_char.isdigit():
+    grade_label = get_grade_label(course_code)
+    if grade_label:
         return course_code.upper()
     # Club or otherwise non-standard code: the teacher's own short name if
     # they set one, and otherwise the code itself — in capitals.
@@ -843,6 +859,27 @@ def resolve_show_section_marker(config: dict, section_number: int) -> bool:
 GRADE_LABELS = {"1": "Grade 9", "2": "Grade 10", "3": "Grade 11", "4": "Grade 12"}
 
 
+def get_grade_label(course_code: str) -> str:
+    """
+    Derive the grade label from a course code across jurisdictions.
+    Supports Ontario (4th char 1-4) and BC (trailing 09, 10, 11, 12).
+    """
+    trimmed = (course_code or "").strip()
+    if not trimmed:
+        return ""
+    if trimmed.endswith("09") or trimmed.endswith("-09"):
+        return "Grade 9"
+    if trimmed.endswith("10") or trimmed.endswith("-10"):
+        return "Grade 10"
+    if trimmed.endswith("11") or trimmed.endswith("-11"):
+        return "Grade 11"
+    if trimmed.endswith("12") or trimmed.endswith("-12"):
+        return "Grade 12"
+    if len(trimmed) >= 4 and trimmed[3].isdigit():
+        return GRADE_LABELS.get(trimmed[3], "Grade ?")
+    return ""
+
+
 def resolve_show_grade_in_title(cfg, section_number):
     """Per-section, like the section marker; defaults on. An older config
     that stored one course-wide boolean is honoured."""
@@ -866,8 +903,9 @@ def computed_landing_title(cfg, section_number, show_marker):
     # the name already carries the grade; what to do about it — edit the
     # name or turn the switch off — is the teacher's call, never guessed.
     prefix = ""
-    if resolve_show_grade_in_title(cfg, section_number) and len(code) >= 4 and code[3].isdigit():
-        prefix = GRADE_LABELS.get(code[3], "Grade ?") + " "
+    grade_label = get_grade_label(code)
+    if resolve_show_grade_in_title(cfg, section_number) and grade_label:
+        prefix = f"{grade_label} "
     title = f"{prefix}{name}"
     if show_marker:
         title = f"{title}, Section {section_number}"
@@ -1268,6 +1306,82 @@ LOCALES_SRC_CANDIDATES = [
     Path(__file__).resolve().parent.parent / "support" / "locales",
     Path(__file__).resolve().parent / "support" / "locales",
 ]
+
+FAVICON_SRC_CANDIDATES = [
+    Path("support/favicon"),
+    # Not a hard-coded /opt: Windows now runs these scripts NATIVELY, with no
+    # container at all, and points this at the app's bundled runtime through
+    # PLANTOIR_SUPPORT_DIR. Inside the container the default is still /opt/support.
+    toolchain_paths.SUPPORT_DIR / "favicon",
+    Path(__file__).resolve().parent.parent / "support" / "favicon",
+    Path(__file__).resolve().parent / "support" / "favicon",
+]
+
+# What goes into quartz/static, and what Head.tsx links from every page.
+# Overwriting Quartz's own icon.png is deliberate even though nothing links it
+# any more: leaving it behind would ship somebody else's logo inside a
+# teacher's site, findable by anything that goes looking.
+FAVICON_FILES = ["favicon.ico", "icon.svg", "apple-touch-icon.png", "icon.png"]
+
+
+def _find_favicon_source() -> Path | None:
+    for candidate in FAVICON_SRC_CANDIDATES:
+        if candidate.is_dir() and (candidate / "favicon.ico").is_file():
+            return candidate
+    return None
+
+
+def install_favicon(output_dir: Path, content_root: Path | None = None):
+    """
+    Give the built site Plantoir's icon instead of Quartz's.
+
+    Quartz ships `quartz/static/icon.png` — its own logo — and its Head links
+    that as the favicon, so every site a teacher published wore the Quartz mark
+    in the browser tab. The replacement set is drawn from the app icon by
+    scripts/brand_images.py and baked into the image at /opt/support/favicon.
+
+    Two destinations, and the second one is not redundant:
+
+      * `quartz/static/` is what the Static emitter copies to `public/static/`,
+        and what the <link> tags in Head.tsx point at. That covers every
+        browser that reads the page.
+      * `content/favicon.ico` is how the site gets a favicon at its ROOT.
+        Quartz's Assets emitter copies non-Markdown files out of content/
+        into public/ unchanged, and it is the only route there — the Static
+        emitter can write nothing above public/static/. The root copy is what
+        answers the implicit GET /favicon.ico that feed readers, link
+        unfurlers and older browsers make without reading the page at all.
+
+    Runs on every build rather than only on a full rebuild, so a course folder
+    built before this existed picks the icon up next time it is previewed.
+    """
+    src = _find_favicon_source()
+    if src is None:
+        print("ℹ️ Favicon set not found — leaving Quartz's own icon in place.")
+        return
+
+    static_dir = output_dir / "quartz" / "static"
+    copied = 0
+    try:
+        static_dir.mkdir(parents=True, exist_ok=True)
+        for name in FAVICON_FILES:
+            source_file = src / name
+            if not source_file.is_file():
+                continue
+            shutil.copy2(source_file, static_dir / name)
+            copied += 1
+    except Exception as e:
+        print(f"⚠️ Could not install the site icon: {e}")
+        return
+
+    if content_root is not None:
+        try:
+            shutil.copy2(src / "favicon.ico", content_root / "favicon.ico")
+        except Exception as e:
+            print(f"⚠️ Could not place favicon.ico at the site root: {e}")
+
+    print(f"🌱 Installed the Plantoir site icon ({copied} file(s) → quartz/static).")
+
 
 def install_locales(output_dir: Path):
     target = output_dir / "quartz" / "i18n" / "locales"
@@ -3401,8 +3515,8 @@ cited by code. If that is the case here, it is worth citing a few of them
 where they genuinely apply rather than leaving the record silent.
 """
 
-SPECIFIC_CODE = re.compile(r"^([A-F])(\d+)\.(\d+)$")
-OVERALL_FILE = re.compile(r"^([A-F]\d+)\.\s")
+SPECIFIC_CODE = re.compile(r"^([A-Z])(\d+)\.(\d+)$")
+OVERALL_FILE = re.compile(r"^([A-Z]\d+)\.\s")
 CURRICULUM_BLOCK = re.compile(r"%%curriculum-start%%(.*?)%%curriculum-end%%", re.S)
 BLOCK_LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
 TRANSCLUSION = re.compile(r"!\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
@@ -4009,6 +4123,11 @@ def build_section_site(
 
     # Ensure Media symlink is present inside content/
     _ensure_media_symlink(content_root, course_dir)
+
+    # The site's own icon, into quartz/static AND the content root. Placed
+    # here because the content root is rebuilt from scratch just above, so a
+    # copy made any earlier would have been thrown away.
+    install_favicon(output_dir, content_root)
 
     section_index = section_dir / "index.md"
     if section_index.exists():

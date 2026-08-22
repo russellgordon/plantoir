@@ -170,6 +170,14 @@ becomes quantitative.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E1.1]]
+
+![[E1.2]]
+
+![[E2.1]]
+
+![[E2.8]]
+
 ![[E3.1]]
 
 ![[E3.2]]

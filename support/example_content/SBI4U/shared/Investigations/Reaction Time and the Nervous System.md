@@ -34,7 +34,11 @@ reflex arc: retina to brain to muscle.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
 ![[E2.2]]
+
+![[E2.4]]
 
 ![[E3.2]]
 %%curriculum-end%%

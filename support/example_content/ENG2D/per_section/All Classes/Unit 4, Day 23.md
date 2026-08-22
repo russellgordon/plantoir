@@ -12,7 +12,8 @@ tags:
 ## Agenda
 
 1. Review, part three: the essay, planned and opened in fifteen minutes
-2. Then the habit that ran through the year: claim, evidence, analysis
+2. Then the habit that ran through the semester: claim, evidence,
+   analysis
 3. Format walk-through: [[Final Examination]], section by section
 
 ## Things to do before our next class

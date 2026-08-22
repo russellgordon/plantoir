@@ -89,3 +89,13 @@ in radian mode.
 > $\frac{3\pi}{2} \approx 4.7$ radians per second. Radians make the
 > arithmetic honest: multiply by the radius and you would have the
 > rim speed, straight from $s = r\theta$.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B1.1]]
+
+![[B1.2]]
+
+![[B1.4]]
+%%curriculum-end%%

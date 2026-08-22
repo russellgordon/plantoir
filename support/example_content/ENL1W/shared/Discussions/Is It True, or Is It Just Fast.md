@@ -57,4 +57,6 @@ realistic and both of us know it.
 ![[C3.3]]
 
 ![[B1.1]]
+
+![[A2.6]]
 %%curriculum-end%%

@@ -16,7 +16,10 @@ tags:
    recovery. Consent first, and anyone may decline
 3. Record with the proper terminology: systolic, diastolic, recovery
    rate. Graph the recovery curve
+4. Keep this table. It is step 7 of [[Body Systems Report]], and today is
+   the period in which that part of the report is done — including any
+   reading you took twice, and why
 
 ## Things to do before our next class
 
-- [ ] Data table and recovery graph finished.
+- [ ] Data table and recovery graph finished, retakes and all.

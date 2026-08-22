@@ -139,4 +139,56 @@ your [[Chemistry Journal]]. It is the entry I read first.
 ![[A2.1]]
 
 ![[A2.2]]
+
+![[B1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Day 13 is the assessment itself, with the room running and everybody
+presenting at once. You cannot circulate and confer on that day; budget
+your attention for judging what is in front of you and gather everything
+else at the two preparation periods before it.
+
+OBSERVE — Unit 5, Day 12, while another group interrogates their numbers
+  Watch for: the three seconds after a question they cannot answer. The
+  task page asks for "I don't know" finished properly — what the data
+  cannot settle, why, and what would — and on Day 13 that answer will be
+  rehearsed, because they will have met the question here first. This is
+  the only period where you see it unrehearsed.
+  Watch also for which answer they choose to repair afterwards: the
+  weakest one, or the easiest one.
+  Going well: a straight admission followed by a mechanism; the weakest
+  answer chosen for repair.
+  Stuck: an improvised answer delivered confidently; twenty minutes
+  spent polishing the part that was already strong.
+  Record: your class list, two columns — named the limit, improvised.
+  That is A1.11 in its oral form, and it is the row that separates a
+  level 3 from a level 4 on the day.
+
+TALK — Unit 5, Day 11, while they rehearse on one other group
+  This is not a dress run you are running: the groups rehearse on each
+  other, which leaves you free to sit down with one at a time.
+  Ask: "The person in your career panel — which part of your own work
+  this semester would they have done better than you, and which part
+  would they not have bothered with at all?"
+  Then: "Who told you what your scientist did, and how would you check
+  that they were right?"
+  A strong answer places the job against work they have actually done,
+  rather than reciting a description, and can name where the information
+  about the scientist came from. That is A2.1 and A2.2 heard while it is still a
+  draft; two days later it is two polished minutes and a name, and you
+  will not be able to tell the two apart.
+  Record: one line each, the career and the scientist they named. Keep
+  the list — anyone whose scientist is a label rather than a person has
+  two days to fix it, and telling them now is worth more than marking it
+  later.
+
+The product evidence is the showcase itself on Day 13, plus the
+reflection written in the last twenty minutes. Half the marks are on the
+asking side of the room, so carry the class list on Day 13 and put a
+tick against a name each time somebody asks a question that made a
+presenter stop — a tally is the only way that evidence survives a room
+with twenty conversations in it.
+%%

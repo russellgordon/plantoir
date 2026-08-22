@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 The community centre's booking sheet came to us as three parallel
 lists: rooms in one, purposes in another, group sizes in a third. It

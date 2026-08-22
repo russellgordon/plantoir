@@ -36,9 +36,7 @@ thinking appear in every unit rather than in a block at the start. The
 four content strands build in order: the tools, then a market, then a
 whole economy, then that economy opened to the world.
 
-## Overall and specific expectations
-
-### Strand A. Economic Inquiry and Skill Development
+## Strand A. Economic Inquiry and Skill Development
 *Throughout this course, students will:*
 
 ![[A1. Economic Inquiry]]
@@ -57,7 +55,7 @@ whole economy, then that economy opened to the world.
 ![[A2.3]]
 ![[A2.4]]
 
-### Strand B. Fundamentals of Economics
+## Strand B. Fundamentals of Economics
 *By the end of this course, students will:*
 
 ![[B1. Scarcity and Choice]]
@@ -80,7 +78,7 @@ whole economy, then that economy opened to the world.
 ![[B4.2]]
 ![[B4.3]]
 
-### Strand C. Firms, Markets, and Economic Stakeholders
+## Strand C. Firms, Markets, and Economic Stakeholders
 *By the end of this course, students will:*
 
 ![[C1. The Firm and Market Structures]]
@@ -100,7 +98,7 @@ whole economy, then that economy opened to the world.
 ![[C3.2]]
 ![[C3.3]]
 
-### Strand D. Macroeconomics
+## Strand D. Macroeconomics
 *By the end of this course, students will:*
 
 ![[D1. Macroeconomic Models and Measures]]
@@ -119,7 +117,7 @@ whole economy, then that economy opened to the world.
 ![[D3.2]]
 ![[D3.3]]
 
-### Strand E. Global Interdependence and Inequalities
+## Strand E. Global Interdependence and Inequalities
 *By the end of this course, students will:*
 
 ![[E1. Theories and Models of International Trade]]

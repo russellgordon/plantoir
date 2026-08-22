@@ -83,3 +83,9 @@ functions later in a file that is entirely innocent.
 
 The full method is [[Reading a Traceback in Someone Else's Code]];
 this warm-up is the drill that makes it fast.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A4.1]]
+%%curriculum-end%%

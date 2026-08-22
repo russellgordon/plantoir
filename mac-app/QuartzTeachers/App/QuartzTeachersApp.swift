@@ -38,7 +38,10 @@ struct QuartzTeachersApp: App {
         // failed with "Operation not permitted" on every path while the same
         // deploy from the app minutes earlier took 144 seconds and worked.
         if let script = ScheduledDeploy.requestedScript(from: CommandLine.arguments) {
-            ScheduledDeploy.runScheduled(script: script)
+            ScheduledDeploy.runScheduled(
+                script: script,
+                section: ScheduledDeploy.requestedSection(from: CommandLine.arguments)
+            )
         }
 
         // Writing the contracts in `contracts/` is the other thing this binary
@@ -64,7 +67,17 @@ struct QuartzTeachersApp: App {
         // group's windows, and presented values restored the same way —
         // last writer wins, both windows on one folder. The folder comes
         // from the app's own frame-keyed list instead.
-        WindowGroup("Plantoir") {
+        //
+        // `id: "main"` exists only so code (the local assistant, when no
+        // section window is open — see AssistToolRunner.revealSectionOnScreen)
+        // can call `openWindow(id: "main")` to open a fresh one; there is
+        // no bare, id-less `openWindow()` overload that opens "the app's
+        // one WindowGroup" the way an earlier draft of this assumed. Giving
+        // the group an id changes nothing about restoration (handled
+        // entirely outside SwiftUI's own id-keyed mechanism, per the
+        // comment above) or Cmd+N (SwiftUI's automatic New Window menu
+        // item is generated per-scene regardless of id).
+        WindowGroup("Plantoir", id: "main") {
             WindowRootView()
                 // A bounded IDEAL size matters as much as the minimum:
                 // without it the window's content is sized by whatever

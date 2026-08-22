@@ -12,7 +12,8 @@ tags:
 
 1. Retrieval; then [[Industry, Labour, and the Cities]] — steel, rail, and the corporation
 2. Trusts, the men who built them, and the Sherman Act
-3. [[Statistics and the Census]] — reading the numbers of an industrialising country
+3. A page of 1900 census tables read cold, before anyone explains them — unmarked, and it tells me who can already do this
+4. [[Statistics and the Census]] — what to do with the numbers of an industrialising country
 
 ## Things to do before our next class
 

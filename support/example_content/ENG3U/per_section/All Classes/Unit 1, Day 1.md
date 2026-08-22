@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Welcome — what Grade 11 university assumes, and what it does not
-2. A story read cold, and six minutes of writing
+2. A story read cold, and six minutes of writing — not marked, and not a
+   test: it is how I find out what this class already does with a text
 3. Read together: [[How This Class Works]] and [[How Marks Work]]
 4. Tour: [[Using This Site]], [[How This Site Is Organised]],
    [[What This Site Can Do]]

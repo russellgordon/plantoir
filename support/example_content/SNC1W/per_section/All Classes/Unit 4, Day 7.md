@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: predict the brightness in four circuits, in writing
-2. In groups: build all four and compare with the predictions
+1. Warm-up: predict the brightness in four circuits, in writing: [[Series and Parallel Circuits]]
+2. In groups: build all four and compare with the predictions: [[Circuit Diagram Practice]]
 3. Consolidate: the rule you can state, and the one you had to see
 
 ## Things to do before our next class

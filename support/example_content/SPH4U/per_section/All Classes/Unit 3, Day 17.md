@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: one charge, three questions — force, field, potential
-2. Consolidation: the unit on one page, built by the room
-3. Look ahead: light, which the last two units disagree about
+1. Warm-up: one charge, three questions — force, field, potential: [[Electric Fields and Potential]]
+2. Half the period is yours: the revision list from last class, worked
+   through, with me between the benches: [[Fields Practice]]
+3. Consolidation: the unit on one page, built by the room
+4. Look ahead: light, which the last two units disagree about
 
 ## Things to do before our next class
 

@@ -11,7 +11,7 @@ your first week and come back whenever the routines feel fuzzy.
 - [[Our Classroom Norms]] — broken programs welcome, honesty about
   help, accounts and screens respected. The most important page here.
 - [[What to Bring]] — a notebook, your login, and the phone rule.
-- [[How Marks Work]] — process, growth, and communication. Not being a
-  "computer person", because those don't exist.
+- [[How Marks Work]] — the seventy and the thirty, and what is
+  deliberately kept out of both.
 - [[Getting Help]] — the order to try things in, starting with the
   error message.

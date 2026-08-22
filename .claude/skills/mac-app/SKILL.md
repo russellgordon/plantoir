@@ -92,6 +92,39 @@ The one-line summary is the part that saves him time. It is one of:
 > Rebuilt and quit — you will need a NEW WORKING FOLDER to see this.
 > Rebuilt and quit — note the open conversation's undo history went with it.
 
+## Leave no zombie containers behind
+
+**Check this at the end of every session that previewed, deployed or ran
+`verify.sh`.** Each working folder gets its own container, named
+`teaching-quartz-<hash of the folder path>`, and they are STOPPED rather than
+removed when the app quits. They accumulate silently: a count of **75** had
+built up by 2026-08-20, one per working folder ever previewed, going back
+months. Nothing breaks — a stopped container costs only disk — but it hides
+the one container that matters when you are debugging, and `docker ps -a`
+becomes unreadable.
+
+```bash
+docker ps -a --filter status=exited --filter status=created \
+  --format '{{.Names}}' | grep '^teaching-quartz-' | xargs -r docker rm -f
+```
+
+Three conditions, and they matter more than the cleanup does:
+
+- **Only STOPPED ones.** A running `teaching-quartz-*` is a live preview —
+  possibly Russell's, possibly another agent's in a second window. The
+  filters above are what keep it safe; do not simplify them to a bare
+  `docker ps -aq`.
+- **Only `teaching-quartz-*`.** Colima is shared with his other projects
+  (Supabase local dev, among others) — `docker system prune` is the wrong
+  tool here and would take those with it.
+- **Never `colima stop`**, which is rule 7 in [`CLAUDE.md`](../../../CLAUDE.md)
+  and unchanged by any of this.
+
+The next `setup.sh` or `preview.sh` in a folder recreates its container
+automatically, so removing one costs a teacher nothing and costs you a few
+seconds of container start on the next preview. Say how many you removed —
+if the number is large, that is worth him knowing.
+
 ## When a clean build is required
 
 A plain rebuild misses some things, and the symptom is always the same:

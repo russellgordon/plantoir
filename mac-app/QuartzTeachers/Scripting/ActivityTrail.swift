@@ -57,6 +57,11 @@ nonisolated enum ActivityTrail {
         case assistantModelDownloadStopped = "assistant model download stopped"
         case assistantModelRemoved = "assistant model removed"
         case assistantConfirmationChanged = "assistant confirmation changed"
+        /// Why a section stopped saying " — Edited". Without it, a
+        /// teacher reporting "it still says Edited after I published"
+        /// leaves nothing to look at: the marker is derived, so its
+        /// absence and its presence look identical on disk.
+        case sectionContentMarkedPublished = "section content marked published"
     }
 
     // MARK: - Stored properties

@@ -14,8 +14,10 @@ tags:
    the diagonals of a parallelogram are equal
 2. Random groups — case-file workday: gather evidence at the boards
    with [[Midpoint and Length]] and slopes
-3. Mid-task check: hold your argument against
-   [[What Makes a Proof Convincing]]
+3. Mid-task check: judge your file against its own criteria table —
+   [[Judging Your Own Work]] — and against
+   [[What Makes a Proof Convincing]]. Next class is for the row you
+   name weakest
 4. Verify as you go — [[Checking Your Own Work]]
 
 ## Things to do before our next class

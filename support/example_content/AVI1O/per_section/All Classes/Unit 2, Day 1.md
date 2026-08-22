@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval; then paint: what acrylic actually does
+1. Retrieval, then paint before anything is explained — what you can
+   already do with a brush tells me where this unit starts
 2. [[Painting]] — mixing, layering, and brush behaviour
 3. Studio time: a colour mixing chart
 

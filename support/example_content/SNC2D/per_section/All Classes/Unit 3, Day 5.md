@@ -18,3 +18,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Journal: the driver you moved between piles, and why.
+- [ ] Bring the climate graph you found. Next class is the one that reads
+      them.

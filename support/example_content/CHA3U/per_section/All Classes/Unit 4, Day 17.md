@@ -12,7 +12,7 @@ tags:
 
 1. Period 7 of 8: rehearsal
 2. A hostile question from another pair, and the revision that follows it
-3. Peer reading against the criteria
+3. [[Judging Your Own Work]] on your own periods of the brief, then peer reading against the criteria
 
 ## Things to do before our next class
 

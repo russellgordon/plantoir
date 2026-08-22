@@ -10,10 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. How you are marked, and what is not marked: [[How Marks Work]]
-2. Getting unstuck early: [[Getting Help]] and [[Help Sessions]]
-3. [[Your Career Portfolio]] started — where every piece of this course ends up
+1. Skills you already have and did not learn at a job: [[Skills That Transfer]], read in both directions — your evidence, then an employer's need
+2. Where 'resilience' is the right word, and where it is not
+3. Getting unstuck early: [[Getting Help]] and [[Help Sessions]]
+4. [[Your Career Portfolio]] started — where every piece of this course ends up
 
 ## Things to do before our next class
 
+- [ ] Read [[Skills That Transfer]] to the end, including the last section.
 - [ ] Choose where your portfolio will live, and make the first entry today rather than tomorrow.

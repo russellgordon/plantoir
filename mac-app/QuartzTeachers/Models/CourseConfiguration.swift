@@ -43,7 +43,14 @@ class CourseConfiguration {
             let stored: String = stringValue(forKey: "deploy_target")
             return stored.isEmpty ? "netlify" : stored
         }
-        set { values["deploy_target"] = newValue }
+        set {
+            values["deploy_target"] = newValue
+            // A destination can never be both primary and additional at
+            // once — deploying to the same place twice makes no sense.
+            additionalDeployTargets = CourseConfiguration.pruningAdditionalTargets(
+                additionalDeployTargets, ofType: newValue
+            )
+        }
     }
 
     /// The folder local-folder deploys publish into; each section lands
@@ -61,6 +68,166 @@ class CourseConfiguration {
     /// True when this course deploys to Cloudflare Pages.
     var deploysToCloudflare: Bool {
         return deployTarget == "cloudflare_pages"
+    }
+
+    /// One additional (non-primary) destination this course also
+    /// publishes to, for redundancy — `deployTarget` remains the primary.
+    /// `type` uses the same spellings as `deployTarget`; `path` is only
+    /// meaningful when `type` is "local_folder".
+    struct AdditionalDeployTarget: Equatable {
+        var type: String
+        var path: String
+    }
+
+    /// The three destinations Plantoir knows how to publish to, in the
+    /// order they are offered — shared by the primary picker and the
+    /// additional-targets list, so "one of each type" has a single place
+    /// that defines what a "type" even is.
+    static let knownDeployTargetTypes: [String] = ["netlify", "cloudflare_pages", "local_folder"]
+
+    /// Extra places this course ALSO publishes to, beyond `deployTarget` —
+    /// for redundancy against one host having a bad day, never a
+    /// replacement for the primary choice: `deployTarget` still decides
+    /// where the "Live URL" link on a finished deploy points.
+    ///
+    /// Empty for every course that has not opted in, which is the
+    /// overwhelming majority: the key is OMITTED from `course_config.json`
+    /// entirely rather than written as `[]`, so a course nobody has
+    /// touched writes the exact same file this app has always written.
+    /// At most one entry per known type, and never a type that already
+    /// IS the primary — `deployTarget` already covers that one.
+    var additionalDeployTargets: [AdditionalDeployTarget] {
+        get {
+            guard let rawList = values["additional_deploy_targets"] as? [[String: Any]] else {
+                return []
+            }
+            var result: [AdditionalDeployTarget] = []
+            for entry in rawList {
+                guard let type = entry["type"] as? String, !type.isEmpty else {
+                    continue
+                }
+                let path = entry["path"] as? String ?? ""
+                result.append(AdditionalDeployTarget(type: type, path: path))
+            }
+            return result
+        }
+        set {
+            if newValue.isEmpty {
+                values.removeValue(forKey: "additional_deploy_targets")
+                return
+            }
+            var encoded: [[String: Any]] = []
+            for target in newValue {
+                var entry: [String: Any] = ["type": target.type]
+                if !target.path.isEmpty {
+                    entry["path"] = target.path
+                }
+                encoded.append(entry)
+            }
+            values["additional_deploy_targets"] = encoded
+        }
+    }
+
+    /// One place this course publishes to — either the primary
+    /// (`deployTarget`) or one of `additionalDeployTargets`, both reduced
+    /// to the same shape so a deploy can walk one plain list instead of
+    /// treating the primary as a special case.
+    struct DeployDestination: Equatable {
+        var type: String
+        var path: String
+    }
+
+    /// Every destination this course publishes to, in deploy order — the
+    /// primary first, then each additional target in the order it was
+    /// added. This is the one list a multi-destination deploy walks; the
+    /// primary is not special beyond going first, which is only how the
+    /// "Live URL" link on a finished deploy is chosen.
+    var allDeployDestinations: [DeployDestination] {
+        var result: [DeployDestination] = [
+            DeployDestination(type: deployTarget, path: deployFolderPath),
+        ]
+        for target in additionalDeployTargets {
+            result.append(DeployDestination(type: target.type, path: target.path))
+        }
+        return result
+    }
+
+    /// Removes `type` from `targets` if present — the one place that knows
+    /// how to keep a primary choice and an additional-targets list from
+    /// ever agreeing on the same destination twice. Used by this class's
+    /// own `deployTarget` setter (so Course Settings, which binds straight
+    /// to this model, can never reach the inconsistent state) and by
+    /// `PublishingChoiceView`'s picker (so the wizard's plain `@State`,
+    /// which is not backed by a `CourseConfiguration` until course
+    /// creation, keeps the same guarantee live on screen). A plain
+    /// function rather than a method on an instance, so it is testable
+    /// without standing up either a model or a rendered view.
+    static func pruningAdditionalTargets(
+        _ targets: [AdditionalDeployTarget], ofType type: String
+    ) -> [AdditionalDeployTarget] {
+        var result: [AdditionalDeployTarget] = []
+        for target in targets where target.type != type {
+            result.append(target)
+        }
+        return result
+    }
+
+    /// Types available to add as an ADDITIONAL target: every known type
+    /// except whichever one is already primary — a course cannot list the
+    /// same destination twice.
+    func availableAdditionalDeployTargetTypes() -> [String] {
+        var result: [String] = []
+        for type in CourseConfiguration.knownDeployTargetTypes where type != deployTarget {
+            result.append(type)
+        }
+        return result
+    }
+
+    /// Whether `type` is currently configured as an additional target.
+    func hasAdditionalDeployTarget(ofType type: String) -> Bool {
+        for target in additionalDeployTargets where target.type == type {
+            return true
+        }
+        return false
+    }
+
+    /// The stored path for an additional local-folder target, or "" when
+    /// that type is not configured (or is not "local_folder", which never
+    /// has one).
+    func additionalDeployTargetPath(ofType type: String) -> String {
+        for target in additionalDeployTargets where target.type == type {
+            return target.path
+        }
+        return ""
+    }
+
+    /// Turns an additional target on or off. Turning one off drops it
+    /// entirely, including any path it carried — re-enabling it later
+    /// starts from a blank path rather than resurrecting the old one, so
+    /// a stale folder from months ago can never come back silently.
+    func setAdditionalDeployTarget(_ enabled: Bool, ofType type: String) {
+        var targets: [AdditionalDeployTarget] = []
+        for target in additionalDeployTargets where target.type != type {
+            targets.append(target)
+        }
+        if enabled {
+            targets.append(AdditionalDeployTarget(type: type, path: ""))
+        }
+        additionalDeployTargets = targets
+    }
+
+    /// Updates the folder path for an additional local-folder target. A
+    /// no-op if that type is not currently enabled as an additional target.
+    func setAdditionalDeployTargetPath(_ path: String, ofType type: String) {
+        var targets: [AdditionalDeployTarget] = []
+        for target in additionalDeployTargets {
+            if target.type == type {
+                targets.append(AdditionalDeployTarget(type: type, path: path))
+            } else {
+                targets.append(target)
+            }
+        }
+        additionalDeployTargets = targets
     }
 
     /// What is wrong with the Cloudflare Account ID, or nil when it is
@@ -374,19 +541,59 @@ class CourseConfiguration {
         setNestedValue(emoji, forKey: "emojis", childKey: "sections", entryKey: "section\(sectionNumber)")
     }
 
-    /// The teacher's own domain for a section's published site — shown in
-    /// links to the live site in place of the address Netlify assigns.
-    /// Empty when the Netlify address is used as-is.
-    func customDomain(forSection sectionNumber: Int) -> String {
+    /// The teacher's own domain for ONE DESTINATION of a section's
+    /// published site — shown in links to that destination's live site in
+    /// place of the address it would otherwise be assigned (a
+    /// `.netlify.app` or `.pages.dev` subdomain). Empty when that
+    /// destination's own address is used as-is.
+    ///
+    /// Keyed by destination TYPE, not just by section: a course publishing
+    /// to both Netlify and Cloudflare Pages for redundancy may want a
+    /// domain on one and not the other. A single section-wide domain (the
+    /// shape this replaces) had to guess which destination it was for and
+    /// got applied to every destination regardless — the reported bug this
+    /// shape exists to fix ("only Cloudflare, the second deploy target, is
+    /// visible" had a sibling: a Netlify-only domain silently overriding
+    /// the Cloudflare link too).
+    ///
+    /// Reads an OLDER shape too: `custom_domains.sections.sectionN` used
+    /// to be a bare string, written before a course could have more than
+    /// one destination. That value is treated as belonging to the
+    /// section's PRIMARY destination (`deployTarget`) — the only
+    /// destination that existed when it could have been set — and is
+    /// invisible to every other destination type, which is exactly
+    /// correct for a course that has never touched additional
+    /// destinations at all.
+    func customDomain(forSection sectionNumber: Int, destinationType: String) -> String {
         let sectionsMap: [String: Any] = nestedDictionary(forKey: "custom_domains", childKey: "sections")
-        if let stored = sectionsMap["section\(sectionNumber)"] as? String {
-            return stored
+        guard let stored = sectionsMap["section\(sectionNumber)"] else {
+            return ""
+        }
+        if let perDestination = stored as? [String: Any] {
+            return perDestination[destinationType] as? String ?? ""
+        }
+        // Old shape: a bare string, meant for whichever destination was
+        // primary when it was set — never for any other type.
+        if let legacyDomain = stored as? String, destinationType == deployTarget {
+            return legacyDomain
         }
         return ""
     }
 
-    func setCustomDomain(_ domain: String, forSection sectionNumber: Int) {
-        setNestedValue(domain, forKey: "custom_domains", childKey: "sections", entryKey: "section\(sectionNumber)")
+    func setCustomDomain(_ domain: String, forSection sectionNumber: Int, destinationType: String) {
+        let sectionsMap: [String: Any] = nestedDictionary(forKey: "custom_domains", childKey: "sections")
+        let sectionKey: String = "section\(sectionNumber)"
+        var perDestination: [String: Any] = [:]
+        if let existing = sectionsMap[sectionKey] as? [String: Any] {
+            perDestination = existing
+        } else if let legacyDomain = sectionsMap[sectionKey] as? String, !legacyDomain.isEmpty {
+            // A stray old-shape string, meant for the primary destination,
+            // is carried forward into the new shape rather than silently
+            // dropped the first time ANY destination's domain is set here.
+            perDestination[deployTarget] = legacyDomain
+        }
+        perDestination[destinationType] = domain
+        setNestedValue(perDestination, forKey: "custom_domains", childKey: "sections", entryKey: sectionKey)
     }
 
     /// A typed or pasted domain, reduced to just the domain: whitespace

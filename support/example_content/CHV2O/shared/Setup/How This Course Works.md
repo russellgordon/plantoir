@@ -9,7 +9,7 @@ Civics is not a course about being a good citizen. It is a course about
 how public decisions are actually made in Canada, who has the power to
 make them, and what you can do when you think one of them is wrong.
 
-It is short — a half credit, running from early November to mid-January —
+It is short — a half credit, running across the second half of the semester —
 so almost every period does something.
 
 ## A normal period
@@ -37,7 +37,7 @@ Naming the concept comes afterwards. That is why the pages in
   have seen; arriving without it means catching up on what everyone else
   is already arguing about.
 - **Keep the notebook.** [[Your Civic Notebook]] is where the culminating
-  project comes from, and it cannot be reconstructed in December.
+  project comes from, and it cannot be reconstructed at the end of the course.
 
 ## The shape of the term
 
@@ -57,9 +57,34 @@ in the world outside this building, and then a two-and-a-half-hour
 > genuinely disagree. [[Our Working Agreement]] sets out how we argue
 > about those — read it in the first week, not the week you need it.
 
+## Connecting to your community: youth service and leadership
+
+Civic participation extends beyond classroom analysis into active service. In
+Ontario, all secondary students complete forty hours of community involvement to
+graduate. This course helps you identify meaningful service and leadership
+opportunities in your community:
+
+- Serving on municipal youth advisory committees or school board student
+  senates.
+- Volunteering with local food banks, newcomer settlement agencies, and youth
+  advocacy groups.
+- Participating in environmental conservation projects and community cleanups.
+- Working as trained poll workers during municipal, provincial, or federal
+  elections.
+
+Connecting your coursework to real community service builds practical leadership
+and civic commitment that lasts well beyond Grade 10. See
+[[Service and Contribution]].
+
 ## If you fall behind
 
 Say so early. In a ten-week course there is no quiet stretch to catch up
-in, and a missed week in November is a real problem by December.
+in, and a missed week early on is a real problem by the end of the course.
 [[Getting Help]] lists the ways to reach me, and [[Help Sessions]] has
 the times I am in the room.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C1.6]]
+%%curriculum-end%%

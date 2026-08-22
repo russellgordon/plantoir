@@ -12,7 +12,7 @@ tags:
 
 1. Seminar: [[What Do We Owe the Next Community|What Do We Owe the Next Community?]]
 2. [[Global Population Questions]]
-3. Working period
+3. Working period: the changes yesterday's conference named
 
 ## Things to do before our next class
 

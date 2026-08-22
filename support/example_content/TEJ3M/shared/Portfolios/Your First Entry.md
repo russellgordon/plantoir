@@ -56,3 +56,11 @@ in four months.
 > explicit okay. The honesty you risk in week one becomes your best
 > evidence of growth by the end of the semester — and only you decide
 > who ever hears it.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D3.4]]
+
+![[D3.6]]
+%%curriculum-end%%

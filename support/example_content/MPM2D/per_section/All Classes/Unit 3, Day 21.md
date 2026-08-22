@@ -14,7 +14,9 @@ tags:
    well the model hugs the curve
 2. Two questions per visitor — where does your vertex sit, and how do
    you know?
-3. Journal collection — run [[Journal Checklist]] before handing it in
+3. Last ten minutes, here in class: this unit's milestone entry in your
+   [[Math Journal]] — the entry that is evaluated. Run
+   [[Journal Checklist]] before handing the journal in
 4. Look ahead: last unit — we measure what we cannot reach
 
 ## Things to do before our next class

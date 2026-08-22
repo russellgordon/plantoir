@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 2 — five forelimbs, one pattern
+1. Start of Unit 2 — five forelimbs, one pattern. Before we name
+   anything, write your own explanation for the resemblance. A
+   diagnostic, not marked, and I keep them until Day 15
 2. [[Comparative Anatomy]] — colour the same bone in all five
 3. Name it: [[Evidence for Evolution]]
 4. Hand in [[Biodiversity Field Study]]

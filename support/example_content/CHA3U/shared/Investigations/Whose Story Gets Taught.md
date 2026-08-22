@@ -67,7 +67,13 @@ rank anything.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D3.2]]
+
+![[D3.5]]
+
 ![[E3.1]]
 
 ![[E3.2]]
+
+![[E3.5]]
 %%curriculum-end%%

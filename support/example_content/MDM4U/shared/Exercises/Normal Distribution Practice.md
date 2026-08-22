@@ -125,6 +125,14 @@ to four decimal places for $z$ rounded to two.
    Household incomes in a city. (c) Repeated careful measurements of
    one fixed length. (d) Time customers spend waiting on hold.
 
+10. A continuous random variable $X$ models the battery life of a laptop
+    (in hours) as normal with $\mu = 8.0$ and $\sigma = 1.2$.
+    (a) What is the theoretical probability that a randomly tested
+    laptop runs for *exactly* 8.000000 hours, $P(X = 8.0)$? Explain why.
+    (b) Find the probability that a laptop runs between 7.0 and 9.0
+    hours. (c) Explain why probabilities for continuous random variables
+    must be defined over intervals rather than single points.
+
 > [!success]- Answer 8
 > The count of heads is binomial with $n = 100$ and $p = 0.5$, so
 > $\mu = np = 50$ and $\sigma = \sqrt{np(1-p)} = \sqrt{25} = 5$.
@@ -156,3 +164,35 @@ to four decimal places for $z$ rounded to two.
 > reach for the curve. "Keeps appearing" is not "always appears",
 > and confidently applying a normal model to skewed data is one of
 > the tidiest ways to be wrong in [[The Culminating Investigation]].
+
+> [!success]- Answer 10
+> (a) $P(X = 8.0) = 0$. For any continuous random variable, the sample
+> space contains infinitely many outcomes. The area of a vertical line
+> segment with width 0 under a continuous density curve is 0.
+> (b) Standardize both bounds:
+> $$z_1 = \frac{7.0 - 8.0}{1.2} \approx -0.83 \qquad z_2 = \frac{9.0 - 8.0}{1.2} \approx 0.83$$
+> Areas to the left: $0.2033$ and $0.7967$. Subtract:
+> $0.7967 - 0.2033 = 0.5934$, so about $59.3\%$.
+> (c) Because probability corresponds to the area under the continuous
+> probability density curve. An interval $[a, b]$ has non-zero width
+> $\Delta x > 0$ and thus positive area, whereas a single point has zero
+> width. Continuous probability distributions assign probabilities to
+> ranges of values, forming a continuous model.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B2.1]]
+
+![[B2.3]]
+
+![[B2.5]]
+
+![[B2.6]]
+
+![[B2.7]]
+
+![[B2.8]]
+
+![[D1.4]]
+%%curriculum-end%%

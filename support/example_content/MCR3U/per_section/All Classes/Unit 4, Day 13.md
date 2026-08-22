@@ -16,12 +16,12 @@ tags:
    the end?
 3. Consolidate: annuities — geometric series with a payday, for saving
    and for borrowing alike
-4. Work period: [[Your Financial Future]]
+4. [[Your Financial Future]], day 2 — work period
 5. Read: [[Showing Growth]] — start flagging the entries that show how
    far you have come
 
 ## Things to do before our next class
 
 - [ ] Finish the interest half of [[Sequences, Series, and Interest Practice]].
-- [ ] Symposium is next class — one last check against
-      [[The Functions Symposium]] criteria.
+- [ ] Symposium scouting: your group's two candidate families, named,
+      and which unit each one comes from.

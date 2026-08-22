@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Efficiency of a Light Bulb]] in class
+1. Bench: write up [[Efficiency of a Light Bulb]] in class —
+   [[Lab Reports]], number six
 2. Practise: [[Efficiency Calculations]] — where the rest of the energy
    went
 

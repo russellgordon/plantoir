@@ -23,8 +23,8 @@ Ontario Ministry of Education and **effective September 2022**.
 ## What this course is, and how long it runs
 
 Civics and Citizenship is a **half credit — 55 hours**. In this example
-course it runs from early November to mid-January, picking up the period
-that Career Studies used from September.
+course it runs across the second half of the semester, picking up the period
+that Career Studies used from the first week.
 
 The 0.5 value is stated in the 2018 parent document, which the 2022
 policy expressly leaves in force for that purpose.

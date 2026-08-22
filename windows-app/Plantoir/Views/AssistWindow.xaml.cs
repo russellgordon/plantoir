@@ -112,54 +112,105 @@ public sealed partial class AssistWindow : Window
 
         if (!_model.IsInstalled())
         {
-            // The one download, and the one place a teacher gets to refuse it.
-            var offer = new ContentDialog
+            // Shared with Settings' own housekeeping list through
+            // AssistModelStores, rather than downloaded straight into
+            // _model here — a teacher who pressed Download in Settings and
+            // then opened the assistant while it ran used to get a SECOND
+            // download racing the first onto the same file, each undoing
+            // the other. Joining the same store means this window sees
+            // (and can show progress for) a download started anywhere.
+            var store = AssistModelStores.Store(_model.Tier);
+
+            // Whether the download in flight was started from THIS window —
+            // decides what closing the window does. A teacher who shuts
+            // this window has finished with IT, but since the stores are
+            // shared (AssistModelStores), the download this window can see
+            // may have been started in Settings, where the whole point was
+            // to fetch it ahead of time and get on with something else.
+            // Closing a window that merely WATCHED must not cancel that —
+            // mac parity, AssistSession.startedTheDownload; see
+            // GUI-IMPROVEMENTS.md row 219 for the bug this exists to avoid
+            // repeating.
+            bool startedByThisWindow = false;
+
+            // The one place a teacher gets to refuse it — but only when
+            // nothing is already running. A download already in flight
+            // (started from Settings, or from another assistant window on
+            // this tier) was already agreed to once; asking again here
+            // would be asking a question the teacher already answered.
+            if (store.State != AssistModelStoreState.Downloading && !store.IsReady)
             {
-                Title = "Download the assistant?",
-                Content = "The assistant runs on this computer — nothing you write is sent anywhere. " +
-                          "It needs a one-time download of about 1.1 GB, and then it works offline.",
-                PrimaryButtonText = "Download",
-                CloseButtonText = "Not now",
-                DefaultButton = ContentDialogButton.Primary,
-                XamlRoot = Root.XamlRoot,
-            };
-            if (await offer.ShowAsync() != ContentDialogResult.Primary)
-            {
-                Say("Assistant", "No assistant, then — close this window whenever you like.");
-                return;
+                var offer = new ContentDialog
+                {
+                    Title = "Download the assistant?",
+                    Content = "The assistant runs on this computer — nothing you write is sent anywhere. " +
+                              "It needs a one-time download of about 1.1 GB, and then it works offline.",
+                    PrimaryButtonText = "Download",
+                    CloseButtonText = "Not now",
+                    DefaultButton = ContentDialogButton.Primary,
+                    XamlRoot = Root.XamlRoot,
+                };
+                if (await offer.ShowAsync() != ContentDialogResult.Primary)
+                {
+                    Say("Assistant", "No assistant, then — close this window whenever you like.");
+                    return;
+                }
+                store.Download();
+                startedByThisWindow = true;
             }
 
-            ActivityTrail.Note(ActivityTrail.Event.AssistantModelDownloadStarted,
-                "assistant download started", _course.Code, _section);
             var note = SayWithBar("Assistant", "Downloading the assistant…");
 
-            // Reports are POSTED to this thread, so one can still be in the
+            // Reports arrive on the store's own thread; this handler is
+            // POSTED to this window's thread, so one can still be in the
             // queue when the download finishes — and it would land after the
             // closing message and overwrite it with a stale byte count. The
             // flag makes anything arriving after the end a no-op.
             bool finished = false;
-            var progress = new Progress<LocalModel.Fetching>(state =>
+            var completion = new TaskCompletionSource();
+            void OnStoreChanged()
             {
-                if (finished) return;
-                note.Text.Text = state.Describe();
-                // An unknown total leaves the bar sweeping rather than sitting
-                // at zero, which reads as stuck.
-                note.Bar.IsIndeterminate = !state.Known;
-                if (state.Known) note.Bar.Value = state.Percent;
-            });
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (finished) return;
+                    if (store.State == AssistModelStoreState.Downloading)
+                    {
+                        var fetching = new LocalModel.Fetching(store.ReceivedBytes, store.TotalBytes);
+                        note.Text.Text = fetching.Describe();
+                        note.Bar.IsIndeterminate = !fetching.Known;
+                        if (fetching.Known) note.Bar.Value = fetching.Percent;
+                    }
+                    else
+                    {
+                        completion.TrySetResult();
+                    }
+                });
+            }
+            store.Changed += OnStoreChanged;
+            using (_closing.Token.Register(() =>
+            {
+                // Cancel the SHARED download only when this window is the
+                // one that started it. A window that merely joined an
+                // in-flight download (started from Settings, or another
+                // assistant window) just stops watching on close — the
+                // download itself keeps running for whoever else is
+                // looking at it.
+                if (startedByThisWindow) store.Cancel();
+                completion.TrySetResult();
+            }))
+            {
+                if (store.IsReady) completion.TrySetResult();   // already finished before we subscribed
+                await completion.Task;
+            }
+            store.Changed -= OnStoreChanged;
 
-            bool installed = await _model.Install(progress, _closing.Token);
             finished = true;
             note.Bar.Visibility = Visibility.Collapsed;
-            if (!installed)
+            if (!store.IsReady)
             {
-                ActivityTrail.Note(ActivityTrail.Event.AssistantModelDownloadFailed,
-                    "assistant download did not finish", _course.Code, _section);
                 note.Text.Text = "The download didn’t finish. Check the network and try opening this window again.";
                 return;
             }
-            ActivityTrail.Note(ActivityTrail.Event.AssistantModelDownloaded,
-                "assistant downloaded", _course.Code, _section);
             note.Text.Text = "The assistant is downloaded.";
         }
 
@@ -466,6 +517,22 @@ public sealed partial class AssistWindow : Window
                 });
             }
         }
+    }
+
+    /// <summary>
+    /// Mount the prompt shelf for a marketing capture, as though a teacher had
+    /// typed it.
+    ///
+    /// The shelf is normally mounted on the path that runs once the local
+    /// assistant is ready, and a capture never starts one -- so the window
+    /// photographed with the top third of it blank, and the Windows shot
+    /// omitted a feature the mac's twin leads with. The cards do nothing
+    /// here: tapping one is what a teacher does, and nothing is tapped.
+    /// </summary>
+    public void ShowPromptShelfForCapture()
+    {
+        PromptShelfHost.Content = new AssistPromptShelfView(_ => { });
+        PromptShelfArea.Visibility = Visibility.Visible;
     }
 
     public void AddStagedBubbleForCapture(string speaker, bool fromTeacher, params UIElement[] contents)

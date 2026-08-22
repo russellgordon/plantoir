@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Number talk: [[Visual Patterns]] — how many squares in step 43?
-2. Random groups — [[Patterns That Count]] at the boards
+2. Random groups — [[Patterns That Count]] at the boards. Unmarked: I am
+   finding out what you already reach for when a pattern grows, and which
+   of you will only trust a formula somebody handed you
 3. Consolidate: [[Sequences and Their Rules]] — arithmetic, geometric,
    recursive: three ways to say what comes next
 4. Check your understanding — one sequence, written three ways

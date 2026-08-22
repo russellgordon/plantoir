@@ -6,6 +6,7 @@ created: __CREATED__
 | Tutorial | The skill |
 | --- | --- |
 | [[Using This Site]] | Finding your way around |
+| [[Scavenger Hunt]] | A hands-on tour of the tools behind this site |
 | [[Close Reading]] | Annotating so the second reading is faster than the first |
 | [[Reading Shakespeare]] | Getting through verse without drowning |
 | [[Seminar Skills]] | Talking about a text with people who disagree |

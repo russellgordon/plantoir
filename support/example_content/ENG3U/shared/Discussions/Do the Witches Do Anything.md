@@ -2,6 +2,8 @@
 title: Do the Witches Do Anything
 publish: true
 created: __CREATED__
+tags:
+  - discussions
 enableToc: true
 ---
 ## The question

@@ -10,10 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. [[An Evolution Case Study]], day 4 — working period: the mechanism, written
-   as selection acting on variation that already existed
-2. Trade drafts and challenge one claim each
+1. [[An Evolution Case Study]], day 4 — working period, and it opens with
+   yesterday's feedback, acted on before anything new is written
+2. Then the mechanism, written as selection acting on variation that
+   already existed
+3. [[Judging Your Own Work]], on your own this time, against the success
+   criteria on the task page — one row named, one thing fixed
+4. Trade drafts and challenge one claim each
 
 ## Things to do before our next class
 
-- [ ] Case drafted.
+- [ ] Case drafted, with the row you named as weakest already fixed.

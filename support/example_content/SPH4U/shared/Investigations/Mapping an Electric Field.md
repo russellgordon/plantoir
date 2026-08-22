@@ -8,7 +8,9 @@ tags:
   - unit-3
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Pairs.** You will draw a field you cannot see,
+> **Time:** one class, written up in the next period and handed in at the
+> bell — the fourth of the marked [[Investigation Write-Ups]]. **Pairs at
+> the bench, write-up yours alone.** You will draw a field you cannot see,
 > from measurements you can.
 
 Conductive paper, two electrodes, a low-voltage supply, and a voltmeter

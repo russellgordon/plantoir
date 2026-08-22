@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Downstream and downwind: where a modification's effects actually arrive, and how long they take
+1. Downstream and downwind: where a modification's effects actually arrive, how long they take, and which of them leave the watershed altogether
 2. [[Water Moves Through a System]] returned to for a site that changed the behaviour of its own basin
-3. [[The Land Use Question]] research period
+3. [[The Land Use Question]] research period, with a five-minute check-in per pair — feedback only
 
 ## Things to do before our next class
 

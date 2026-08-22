@@ -10,12 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. [[The Optics Design]] presented, one table at a time
-2. [[The Science Showcase]] — defend your strongest investigation
-3. Questions from the floor; name your limitations before someone else does
-4. [[Final Reflection]] written in the last twenty minutes
+1. Career and scientist panels handed in, on one page, at the start
+2. [[The Science Showcase]] in rounds: one presenter per bench at a time,
+   five minutes on [[The Optics Design]], everybody else circulating
+3. Second pass, two minutes each: your strongest earlier investigation.
+   Questions at every bench, and your question sheet filled in as you go
+4. [[Final Reflection]] written here, in the last twenty minutes
 
 ## Things to do before you leave
 
-- [ ] Submit [[Final Reflection]] before the bell.
+- [ ] Hand in your question sheet and [[Final Reflection]] before the bell.
 - [ ] Nothing else. Thank you for a good semester.

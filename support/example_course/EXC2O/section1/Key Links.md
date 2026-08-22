@@ -1,7 +1,7 @@
 ---
 title: Key Links
 publish: true
-created: 2026-08-14T12:24:26.000-0400
+created: 2026-09-08T07:00:00.000-0400
 transcludeTitleSize: h2
 excludeBacklinks: true
 ---
@@ -17,3 +17,4 @@ excludeBacklinks: true
 - [[How This Site Is Organised]]
 - [[What This Site Can Do]]
 - [[Curriculum/index|Curriculum Expectations]]
+- [[Scavenger Hunt]]

@@ -12,7 +12,9 @@ tags:
 
 1. Welcome — what this course is for, and what it is not
 2. The first read: a page put in front of you cold, and four minutes of
-   writing about it
+   writing about it. Not marked, and not meant to be — it tells me where
+   this class is starting from, which is what decides what the first weeks
+   looks like
 3. Read together: [[How This Class Works]] — the shape of a period
 4. Tour of the site: [[Using This Site]], [[How This Site Is Organised]],
    and [[What This Site Can Do]]

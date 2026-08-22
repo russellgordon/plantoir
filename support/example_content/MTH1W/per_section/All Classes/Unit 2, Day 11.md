@@ -16,6 +16,8 @@ tags:
    you make the 2 a 5. Predict BEFORE pressing enter
 3. Consolidate: slide, reflect, rotate — named only now.
    [[Moving a Line]]
+4. Discussion: [[When Will I Use This]] — the phone-plan crossing point
+   is Exhibit A, and you brought the rest
 
 ## Things to do before our next class
 

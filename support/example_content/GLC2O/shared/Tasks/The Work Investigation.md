@@ -6,8 +6,8 @@ tags:
   - tasks
   - unit-2
 ---
-**Unit 2. Individual, with a short presentation to a small group. Due in
-week seven.** Three to four pages plus five minutes of talking.
+**Unit 2. Individual, with a short report to a small group. Handed in on
+Day 7 of the unit.** Three to four pages plus five minutes of talking.
 
 You pick one field of work, find out what is actually happening in it,
 and connect it to what you can already do.
@@ -50,7 +50,8 @@ you. No slides required.
   but which task changed and what happened to the people doing it.
 - **Honest self-assessment.** Gaps named as clearly as strengths.
 - **A usable profile.** Something you would genuinely show someone.
-- **A clear five minutes.** One finding your group remembers afterwards.
+- **A clear five minutes.** One finding stated plainly enough that
+  somebody hearing it once could repeat it.
 
 > [!warning] A field with no bad news is a field you have not researched
 > Every occupation has a part people leave over — hours, physical
@@ -67,3 +68,43 @@ you. No slides required.
 
 ![[B2.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 4, the research period
+  Watch for: which comes first, the trend or the source. Both routes end
+  in a paragraph with a citation under it, and the handed-in page cannot
+  tell them apart. B1.1 asks them to IDENTIFY trends from the world, not
+  to decorate an opinion they arrived with.
+  Going well: two sources open at once; a figure copied with its date; a
+  trend abandoned because nothing supported it.
+  Stuck: the claim is written and the source is hunted afterwards to
+  agree with it. The tell is a student who can name the trend but not
+  where they were reading.
+  Record: three columns on your day plan — source first, claim first,
+  not started.
+
+TALK — Unit 2, Day 5, during the work period on the skills section
+  Ask: "Take the trend that worries you most. What does it change about
+  what you should be doing in Grade 11?"
+  Then: "Which skill on your list could nobody get from a classroom, and
+  where would they get it instead?"
+  B1.1 ends by asking students to analyse the possible impact of those
+  trends on their own choices now and in the future, and the trends
+  section they hand in is not asked for that — it is asked what each
+  trend did to the work. So the last clause of the expectation has
+  nowhere to appear except here. B1.2 asks how transferable skills are
+  developed through school, extracurricular AND community experiences,
+  and the second question is the only place that "and" gets tested: a
+  skills section lists what the work demands, never where a person would
+  go to get it.
+  Record: the field and the skill, paired, on your class list. When you
+  mark the skills section, that pairing is what you read the page
+  against.
+
+Do not try to gather either from the five-minute reports on Day 7 — you
+are running that room, and they are rehearsed.
+
+The product evidence is the three to four pages, handed in on Day 7.
+%%

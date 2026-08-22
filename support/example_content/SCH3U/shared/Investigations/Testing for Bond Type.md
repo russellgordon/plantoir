@@ -196,9 +196,17 @@ asked about.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B3.5]]
+![[A1.4]]
+
+![[A1.5]]
+
+![[B2.4]]
 
 ![[B2.5]]
 
-![[A1.5]]
+![[B2.6]]
+
+![[B3.4]]
+
+![[B3.5]]
 %%curriculum-end%%

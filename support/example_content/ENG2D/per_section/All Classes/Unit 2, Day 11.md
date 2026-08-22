@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. 3.1: Mercutio dies and the play changes
-2. What exactly changes? Pace, genre, and Romeo's verbs
+1. 3.1: Mercutio dies and the play changes: [[Romeo and Juliet]]
+2. What exactly changes? Pace, genre, and Romeo's verbs: [[Dramatic Form]]
 3. Reading period with your own book
 
 ## Things to do before our next class

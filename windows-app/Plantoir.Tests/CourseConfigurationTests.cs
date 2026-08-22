@@ -203,6 +203,97 @@ public class CourseConfigurationTests
     public void CustomDomainsAreNormalized(string raw, string expected) =>
         Assert.Equal(expected, CourseConfiguration.NormalizedCustomDomain(raw));
 
+    // WINDOWS-HANDOFF.md entry 307: custom_domains.sections.sectionN moved
+    // from a bare string to a map keyed by destination TYPE, since the mac
+    // side can now deploy one section to more than one destination. Windows
+    // has no multi-destination deploy UI yet, but must never read this map
+    // as empty (a silent domain loss) or overwrite it with a bare string (an
+    // actual clobber of a mac teacher's other-destination domains) just
+    // because a Windows teacher opened and saved the course's settings.
+
+    [Fact]
+    public void ReadingAnOlderBareStringDomainAttributesItToThePrimaryDestinationOnly()
+    {
+        var config = FromJson("""
+            {"course_code":"ICS3U","deploy_target":"netlify",
+             "custom_domains":{"sections":{"section1":"ics3u.school.ca"}}}
+            """);
+        Assert.Equal("ics3u.school.ca", config.CustomDomain(1));
+        Assert.Equal("ics3u.school.ca", config.CustomDomain(1, "netlify"));
+        Assert.Equal("", config.CustomDomain(1, "cloudflare_pages"));
+    }
+
+    [Fact]
+    public void ReadingTheNewPerDestinationMapNeverDegradesToEmpty()
+    {
+        var config = FromJson("""
+            {"course_code":"ICS3U","deploy_target":"netlify",
+             "custom_domains":{"sections":{"section1":
+               {"netlify":"ics3u.school.ca","cloudflare_pages":"ics3u-mirror.school.ca"}}}}
+            """);
+        Assert.Equal("ics3u.school.ca", config.CustomDomain(1, "netlify"));
+        Assert.Equal("ics3u-mirror.school.ca", config.CustomDomain(1, "cloudflare_pages"));
+    }
+
+    [Fact]
+    public void SavingThePrimaryDestinationsDomainNeverClobbersOtherDestinationsAlreadyOnDisk()
+    {
+        // Simulates a mac-configured multi-destination course, opened and
+        // saved on Windows without touching anything about the additional
+        // destination — the exact scenario entry 307 flags as real data loss
+        // if SetCustomDomain still wrote a bare string.
+        var config = FromJson("""
+            {"course_code":"ICS3U","deploy_target":"netlify",
+             "custom_domains":{"sections":{"section1":
+               {"netlify":"ics3u.school.ca","cloudflare_pages":"ics3u-mirror.school.ca"}}}}
+            """);
+
+        config.SetCustomDomain(1, "ics3u-new.school.ca");
+
+        Assert.Equal("ics3u-new.school.ca", config.CustomDomain(1, "netlify"));
+        Assert.Equal("ics3u-mirror.school.ca", config.CustomDomain(1, "cloudflare_pages"));
+    }
+
+    [Fact]
+    public void SavingAnOlderBareStringDomainMigratesItIntoTheMapAttributedToThePrimary()
+    {
+        var config = FromJson("""
+            {"course_code":"ICS3U","deploy_target":"netlify",
+             "custom_domains":{"sections":{"section1":"ics3u.school.ca"}}}
+            """);
+
+        // Some future Windows UI setting the Cloudflare leg's own domain
+        // must not discard the pre-existing bare-string Netlify domain.
+        config.SetCustomDomain(1, "cloudflare_pages", "ics3u-mirror.school.ca");
+
+        Assert.Equal("ics3u.school.ca", config.CustomDomain(1, "netlify"));
+        Assert.Equal("ics3u-mirror.school.ca", config.CustomDomain(1, "cloudflare_pages"));
+    }
+
+    [Fact]
+    public void ClearingADestinationsDomainRemovesOnlyThatEntry()
+    {
+        var config = FromJson("""
+            {"course_code":"ICS3U","deploy_target":"netlify",
+             "custom_domains":{"sections":{"section1":
+               {"netlify":"ics3u.school.ca","cloudflare_pages":"ics3u-mirror.school.ca"}}}}
+            """);
+
+        config.SetCustomDomain(1, "");
+
+        Assert.Equal("", config.CustomDomain(1, "netlify"));
+        Assert.Equal("ics3u-mirror.school.ca", config.CustomDomain(1, "cloudflare_pages"));
+    }
+
+    [Fact]
+    public void SavingWithNoExistingDomainStillOnlyTouchesThePrimaryDestination()
+    {
+        var config = FromJson("""{"course_code":"ICS3U","deploy_target":"netlify"}""");
+        config.SetCustomDomain(1, "ics3u.school.ca");
+        Assert.Equal("ics3u.school.ca", config.CustomDomain(1));
+        Assert.Equal("", config.CustomDomain(1, "cloudflare_pages"));
+    }
+
     [Fact]
     public void GradeWarningFiresOnlyWhenNameCarriesTheLabel()
     {

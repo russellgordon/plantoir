@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Delivery day: the batch handed over
-2. Review: time, materials, losses, and what you would change
+1. Delivery day: the batch handed over: [[The Production Run]]
+2. Review: time, materials, losses, and what you would change: [[Harvest and What Happens Next]]
 3. The innovation question introduced
 
 ## Things to do before our next class

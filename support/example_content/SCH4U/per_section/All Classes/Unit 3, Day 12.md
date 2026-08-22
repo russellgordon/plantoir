@@ -14,7 +14,8 @@ tags:
 2. Propose what a catalyst has to be doing to the molecules themselves
 3. Name it: [[Collision Theory and Catalysts]] — then say out loud where
    the model stops being true
-4. Task launch: [[The Rate Investigation]] — your variable, your design
+4. Task launch: [[The Rate Investigation]] — your variable, your design;
+   read the criteria table before you draft the question
 5. Discuss: [[Energy Choices]] — rate and energy argued at industrial scale
 
 ## Things to do before our next class

@@ -10,11 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. Analysis period: [[Double Slit with a Laser]] — 600 nanometres,
-   measured with a metre stick
+1. Write-up period: [[Double Slit with a Laser]] — 600 nanometres
+   measured with a metre stick, analysed and concluded. The last of the
+   five marked write-ups, in at the bell
 2. The small-angle approximation: when it is safe, and when it is not
 3. Uncertainty in a wavelength, propagated properly
 
 ## Things to do before our next class
 
-- [ ] Double-slit analysis finished.
+- [ ] Nothing on the double slit — it went in today.
+- [ ] Bring a CD and, if you can, a bubble wand.

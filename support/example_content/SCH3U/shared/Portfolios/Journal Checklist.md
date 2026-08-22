@@ -17,11 +17,19 @@ first.
 - [ ] Raw readings written down, not only the calculated answers
 - [ ] At least one entry where a number came out wrong and you chased it
 - [ ] Notes from at least two discussions, saying what moved
-- [ ] A [[Showing Growth]] comparison from mid-semester
+- [ ] Both [[Showing Growth]] comparisons, written in class
 - [ ] [[Final Reflection]] completed
 - [ ] Dates on everything, in order, readable by a stranger
 
 ## How it is assessed
+
+The entries that carry a mark are the ones written **in class, at a
+milestone** — the end-of-unit entries, the two [[Showing Growth]]
+comparisons, and [[Final Reflection]]. Everything else in here is yours,
+and it is what makes those entries possible; see [[How Marks Work]]. The
+criteria below are what I read the milestone entries against, and what
+you should read them against first — [[Judging Your Own Work]] is the
+routine for doing that.
 
 | Criterion | What I am looking for |
 | --- | --- |

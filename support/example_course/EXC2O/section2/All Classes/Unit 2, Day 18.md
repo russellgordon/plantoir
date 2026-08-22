@@ -12,7 +12,9 @@ tags:
 
 1. Retrieval warm-up — no notes: a food web, a cycle, and a climate graph
    read honestly
-2. Checkpoint, on your own: ecosystems, cycles, and climate evidence
+2. Checkpoint, on your own: ecosystems, cycles, and climate evidence — the
+   same four parts and the same criteria as [[Unit 2 Test]], which is two
+   classes from now
 3. Mark your own; revision list written
 
 ## Things to do before our next class

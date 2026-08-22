@@ -14,6 +14,7 @@ tags:
 2. Back to [[Collision Theory and Catalysts]]: explain your own result
    in terms of collisions, not in terms of 'faster'
 3. Discussion: [[Energy Choices]]
+4. Journal in class: the unit's milestone entry
 
 ## Things to do before our next class
 

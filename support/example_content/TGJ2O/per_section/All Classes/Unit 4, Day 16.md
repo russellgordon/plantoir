@@ -12,7 +12,7 @@ tags:
 
 1. Standup
 2. Portfolio: [[Newsroom Journal]] against [[Journal Checklist]], and
-   [[Showing Growth]] — September beside January
+   [[Showing Growth]] — your first entry beside your last
 3. [[Final Reflection]] begun in class
 
 ## Things to do before our next class

@@ -40,21 +40,36 @@ struct SectionSettingsView: View {
         )
     }
 
-    var customDomainBinding: Binding<String> {
+    /// Every destination this section's custom-domain fields cover —
+    /// every configured destination EXCEPT a local folder, which has no
+    /// domain concept at all (a domain is something a browser visits, and
+    /// a folder is not). The overwhelming majority of courses have
+    /// exactly one destination, and see exactly the field they always
+    /// have — see `customDomainFieldLabel(destination:destinationCount:)`.
+    var customDomainDestinations: [CourseConfiguration.DeployDestination] {
+        var result: [CourseConfiguration.DeployDestination] = []
+        for destination in configuration.allDeployDestinations where destination.type != "local_folder" {
+            result.append(destination)
+        }
+        return result
+    }
+
+    func customDomainBinding(forDestinationType destinationType: String) -> Binding<String> {
         return Binding(
-            get: { configuration.customDomain(forSection: sectionNumber) },
+            get: { configuration.customDomain(forSection: sectionNumber, destinationType: destinationType) },
             set: { newDomain in
                 configuration.setCustomDomain(
                     CourseConfiguration.normalizedCustomDomain(newDomain),
-                    forSection: sectionNumber
+                    forSection: sectionNumber,
+                    destinationType: destinationType
                 )
             }
         )
     }
 
     /// A gentle warning when the entry does not read as a domain.
-    var customDomainProblem: String? {
-        let domain: String = configuration.customDomain(forSection: sectionNumber)
+    func customDomainProblem(forDestinationType destinationType: String) -> String? {
+        let domain: String = configuration.customDomain(forSection: sectionNumber, destinationType: destinationType)
         if domain.isEmpty {
             return nil
         }
@@ -118,17 +133,32 @@ struct SectionSettingsView: View {
             )
 
             DisclosureGroup("Advanced") {
-                VStack(alignment: .leading, spacing: 4) {
-                    TextField("Custom domain", text: customDomainBinding)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .accessibilityIdentifier("customDomainField-section\(sectionNumber)")
-                    if let customDomainProblem {
-                        Text(customDomainProblem)
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    } else {
-                        ExampleCaption("e.g. ics3u.yourschool.ca — links to your live site will use this domain instead of the Netlify address. Your site must already answer there (set the domain up in Netlify first). Leave empty to use the Netlify address.")
+                VStack(alignment: .leading, spacing: 16) {
+                    // One field per destination that can even HAVE a
+                    // domain (never a local folder) — labelled by service
+                    // name only once there is more than one to tell apart,
+                    // so the overwhelming majority of courses (one
+                    // destination) see exactly the field they always have.
+                    ForEach(customDomainDestinations, id: \.type) { destination in
+                        VStack(alignment: .leading, spacing: 4) {
+                            TextField(
+                                SectionSettingsView.customDomainFieldLabel(
+                                    destination: destination,
+                                    destinationCount: customDomainDestinations.count
+                                ),
+                                text: customDomainBinding(forDestinationType: destination.type)
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .autocorrectionDisabled()
+                            .accessibilityIdentifier("customDomainField-section\(sectionNumber)-\(destination.type)")
+                            if let problem = customDomainProblem(forDestinationType: destination.type) {
+                                Text(problem)
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            } else {
+                                ExampleCaption(SectionSettingsView.customDomainCaption(forDestinationType: destination.type))
+                            }
+                        }
                     }
                 }
                 .padding(.top, 4)
@@ -138,4 +168,31 @@ struct SectionSettingsView: View {
         }
     }
 
+    // MARK: - Functions
+
+    /// "Custom domain" for the overwhelming majority — exactly one
+    /// destination, exactly the field a course has always had. Once more
+    /// than one destination is configured, names WHICH service this
+    /// particular field is for — a domain meant for Netlify would
+    /// otherwise read as though it applied to Cloudflare Pages too, which
+    /// was the actual bug this per-destination shape replaces.
+    static func customDomainFieldLabel(
+        destination: CourseConfiguration.DeployDestination,
+        destinationCount: Int
+    ) -> String {
+        if destinationCount <= 1 {
+            return "Custom domain"
+        }
+        return "\(DeployCommand.destinationDescription(for: destination)) custom domain"
+    }
+
+    /// Names the actual service this field's default address comes from —
+    /// correct even in the single-destination case, where the field used
+    /// to say "Netlify" unconditionally regardless of what a course's one
+    /// destination actually was (a Cloudflare-only course saw a caption
+    /// naming the wrong host).
+    static func customDomainCaption(forDestinationType destinationType: String) -> String {
+        let serviceName: String = destinationType == "cloudflare_pages" ? "Cloudflare Pages" : "Netlify"
+        return "e.g. ics3u.yourschool.ca — links to your live site will use this domain instead of the \(serviceName) address. Your site must already answer there (set the domain up in \(serviceName) first). Leave empty to use the \(serviceName) address."
+    }
 }

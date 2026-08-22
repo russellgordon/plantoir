@@ -19,4 +19,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Re-read your September journal entries.
+- [ ] Re-read your earliest journal entries.

@@ -8,7 +8,9 @@ tags:
   - unit-5
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Pairs.** Graphs due next class.
+> **Time:** one class plus an analysis period. **Pairs.** Graphs due
+> next class; the analysis section is one of the five that are marked —
+> see [[Investigation Reports]].
 
 Ohm's law is a claim about a graph being straight. So build the graph.
 

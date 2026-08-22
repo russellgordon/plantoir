@@ -27,9 +27,8 @@ graph TD
 
 ![[Mathematical Process Expectations]]
 
-## Overall and specific expectations
+## Strand A. Quadratic Relations of the Form y = ax² + bx + c
 
-### Strand A. Quadratic Relations of the Form y = ax² + bx + c
 *By the end of this course, students will:*
 
 ![[A1. Investigating the Basic Properties of Quadratic Relations]]
@@ -58,7 +57,8 @@ graph TD
 ![[A4.1]]
 ![[A4.2]]
 
-### Strand B. Analytic Geometry
+## Strand B. Analytic Geometry
+
 *By the end of this course, students will:*
 
 ![[B1. Using Linear Systems to Solve Problems]]
@@ -80,7 +80,8 @@ graph TD
 ![[B3.2]]
 ![[B3.3]]
 
-### Strand C. Trigonometry
+## Strand C. Trigonometry
+
 *By the end of this course, students will:*
 
 ![[C1. Investigating Similarity and Solving Problems Involving Similar Triangles]]

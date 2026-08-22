@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: the same four questions asked of a mass and of a charge
-2. In groups: build the comparison table before you are shown one
+1. Warm-up: the same four questions asked of a mass and of a charge: [[Coulomb's Law]]
+2. In groups: build the comparison table before you are shown one: [[Comparing the Three Fields]]
 3. Consolidate: one inverse-square law, two constants, one sign
    difference that changes everything
 

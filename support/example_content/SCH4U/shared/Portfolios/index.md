@@ -20,3 +20,8 @@ Start with [[Chemistry Journal]] for what this is and why we bother,
 then write [[Your First Entry]] in the first week.
 [[What a Strong Entry Looks Like]] shows you the standard, and
 [[Journal Checklist]] is what I check against at the end.
+
+[[Judging Your Own Work]] is the other habit this folder is for, and it
+points outward rather than inward: a routine for reading a draft against
+the criteria that will be used on it, while there is still time to
+change something. We run it together the first time, in Unit 1.

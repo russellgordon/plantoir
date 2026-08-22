@@ -57,6 +57,10 @@ float** is a measure of photosynthetic rate.
    convince you either way.
 3. What would happen with no bicarbonate in the water? Predict, then explain
    using the equation on [[Photosynthesis]].
+4. Leave a floating disc in the dark and it sinks again. Using
+   [[Cellular Respiration]], say what happened to the oxygen — and then
+   compare the two processes: what does each one take in, what does each give
+   out, and why does a pond need both of them running at once?
 
 ## Hand in
 

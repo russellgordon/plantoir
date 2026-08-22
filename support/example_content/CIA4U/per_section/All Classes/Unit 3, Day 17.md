@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. The policy interest rate: what the Bank of Canada actually sets
-2. Transmission — rate to borrowing to spending to prices, and the lag at each step
+1. The policy interest rate: what the Bank of Canada actually sets: [[The Money Multiplier and Monetary Policy]]
+2. Transmission — rate to borrowing to spending to prices, and the lag at each step: [[Inflation]]
 3. The most recent rate announcement read as a document
 
 ## Things to do before our next class

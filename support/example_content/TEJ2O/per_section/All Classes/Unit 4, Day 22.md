@@ -17,11 +17,13 @@ comment when you reuse the page; comments never appear on the site either. %%
 
 1. Celebrate: the semester's best saves — the re-crimps, revivals, and
    rescues, chosen by you
-2. Launch: [[Final Reflection]] — begin it in class
+2. [[Final Reflection]] — finished here, in class, journal open, and
+   handed in with it
 3. Journal collection: [[Journal Checklist]] and [[Showing Growth]] are
    your last look before handing it in
 4. Circle up — tools away, shop closed, one final log
 
 ## Things to do before our next class
 
-- [ ] Finish [[Final Reflection]] and hand in your [[Tech Journal]].
+- [ ] Nothing. Come back in a year and tell me what you have opened
+      since.

@@ -129,6 +129,11 @@
         "carries": "whether the assistant now asks before changing anything",
         "event": "assistant confirmation changed",
         "why": "Turning off the confirmation step changes what every later request DOES - it goes straight through instead of stopping for a button. A report that says 'it just did it without asking' is explained entirely by this line, and without it the behaviour looks like a bug in the gate rather than a setting somebody chose."
+      },
+      {
+        "carries": "which section, and which destinations it was published to",
+        "event": "section content marked published",
+        "why": "Why a section stopped saying \" \u2014 Edited\". The marker is DERIVED - its presence and its absence look identical on disk - so a teacher reporting 'it still says Edited after I published' leaves nothing to look at without this line. It is also the only record that a publish succeeded at EVERY destination rather than merely at one."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -305,6 +310,16 @@
           "code": "b2.3",
           "expect": true,
           "why": "Either case."
+        },
+        {
+          "code": "D1.1",
+          "expect": true,
+          "why": "BC Applied Design competency code."
+        },
+        {
+          "code": "K2.3",
+          "expect": true,
+          "why": "BC Content knowledge standard code."
         },
         {
           "code": "B2",
@@ -559,12 +574,43 @@
         "why": "A deliberate divergence, and the reason is worth keeping. The mac's plist carries --account, so the question is asked here and answered once. On Windows the scheduled task could not be handed one, which would make Cloudflare unschedulable - if that is still true, refuse it with a sentence that says so rather than scheduling something that will fail at 06:30."
       },
       {
+        "expectRefusal": "additionalDeployFolderNeedsAttention",
+        "given": {
+          "additionalFolderProblem": true,
+          "additionalTarget": "local_folder",
+          "hasDeployedBefore": true
+        },
+        "name": "an ADDITIONAL folder destination whose folder is not usable",
+        "why": "Checked after the primary's own two checks, in the same order additional destinations are deployed to (primary first, then each additional one) - a redundancy target with no valid folder would otherwise sit silently broken until the scheduled moment, exactly what asking everything up front exists to prevent. hasDeployedBefore is true here so the PRIMARY's own checks pass first and this is genuinely the additional check firing."
+      },
+      {
+        "expectRefusal": "additionalCloudflareAccountMissing",
+        "given": {
+          "additionalTarget": "cloudflare_pages",
+          "cloudflareAccountID": "",
+          "hasDeployedBefore": true
+        },
+        "name": "an ADDITIONAL Cloudflare destination with no Account ID",
+        "why": "cloudflareAccountID is the SAME key the primary's own Cloudflare check uses - it is one credential per teacher, not one per destination, so a missing Account ID refuses whichever destination (primary or additional) actually needs it."
+      },
+      {
         "expectRefusal": "neverDeployed",
         "given": {
           "hasDeployedBefore": false
         },
         "name": "a section that has never been deployed",
         "why": "The FIRST deploy of a section asks what to call the website. Nobody is there to answer at the scheduled time and it would simply wait. Deploy once by hand, then it can be scheduled - which is what the refusal says."
+      },
+      {
+        "expectRefusal": "additionalDestinationNeverDeployed",
+        "given": {
+          "additionalTarget": "cloudflare_pages",
+          "additionalTargetHasDeployedBefore": false,
+          "cloudflareAccountID": "0123456789abcdef0123456789abcdef",
+          "hasDeployedBefore": true
+        },
+        "name": "the PRIMARY has deployed before, but an additional destination has not",
+        "why": "The same reasoning as the primary's own check, for whichever additional destination is new - a brand-new Netlify or Cloudflare destination also asks what to call the site; local_folder never does, so it can never trigger this one. A valid cloudflareAccountID is given so THAT check passes first and this is genuinely the never-deployed check firing."
       },
       {
         "expectRefusal": null,

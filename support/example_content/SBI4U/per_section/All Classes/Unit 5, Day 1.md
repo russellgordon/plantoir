@@ -10,8 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 5 — bacteria in a flask, and a curve that cannot continue
-2. [[Population Growth]]: exponential and logistic
+1. Start of Unit 5 — the population you watched change, and what you
+   think stopped it. Unmarked: it tells me which of the two models you
+   already believe
+2. [[Population Growth]]: exponential and logistic — and the flask of
+   bacteria whose curve cannot continue
 3. [[Modelling Population Growth]] in a spreadsheet
 4. What r and K actually mean
 

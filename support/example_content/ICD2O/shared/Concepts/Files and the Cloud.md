@@ -6,9 +6,9 @@ tags:
   - concepts
 enableToc: false
 ---
-Your [[Dev Journal]] needs a home, and this term will pile programs,
-plans, and half-finished drafts beside it. Where that work lives —
-and whether future-you can find any of it in June — comes down to
+Your [[Dev Journal]] needs a home, and this term will pile programs, plans,
+and half-finished drafts beside it. Where that work lives — and whether
+future-you can find any of it at the end of the course — comes down to
 habits that take about a week to build.
 
 ## Local, cloud, or both
@@ -31,8 +31,8 @@ five copies, four of them out of date within the hour.
 
 ## Naming things for future-you
 
-The person who benefits from good file habits is you in June, hunting
-for the quiz project at 11 p.m. Give that person a gift:
+The person who benefits from good file habits is you at the end of the
+course, hunting for the quiz project at 11 p.m. Give that person a gift:
 
 - [ ] One folder per course, one subfolder per project
 - [ ] Names that say what the file *is* — `quiz-plan.md`, not `stuff`

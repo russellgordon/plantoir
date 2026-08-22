@@ -10,10 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Routines that run without deciding: [[Habits That Actually Help]]
-2. Choosing the three you will actually keep for ten weeks
-3. Work period and conferences
+1. Launched: [[The Skills Inventory Task]] — we read what earns the marks today, not the night before it is due
+2. What counts as evidence, and who could confirm it, with your Day 1 page handed back to compare against
+3. Part two explained: adapting, and persevering
+4. Last fifteen minutes: [[Judging Your Own Work]], modelled on last year's inventory with the criteria beside it
 
 ## Things to do before our next class
 
-- [ ] Draft part three of the task, using [[Habits That Actually Help]].
+- [ ] Nothing to hand in. Bring the finished inventory list — the next two periods are for writing the task.

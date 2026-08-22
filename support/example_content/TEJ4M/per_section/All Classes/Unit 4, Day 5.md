@@ -11,9 +11,11 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Read the Schematic]] — a network drawing with an error
-2. Bench: [[Design and Test a Network]] finished — addressed, documented,
-   and handed to another bench to test
-3. NAT is not a firewall: demonstrate why
+2. Bench: [[Design and Test a Network]] finished — addressed,
+   documented, and handed to another bench to test. Their findings come
+   back to you in writing, and they carry no mark either way
+3. NAT is not a firewall: demonstrate why. Bench record for
+   [[Design and Test a Network]] in at tools-away
 
 ## Things to do before our next class
 

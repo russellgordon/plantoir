@@ -12,7 +12,7 @@ tags:
 
 1. Shape, form, space, and colour
 2. [[The Elements of Design]] completed
-3. Studio time
+3. Studio time: line, shape, and tonal value studies in charcoal and graphite
 
 ## Things to do before our next class
 

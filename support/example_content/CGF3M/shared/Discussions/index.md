@@ -15,5 +15,6 @@ prepare.
 
 Come with a position, evidence for it, and the strongest version of the
 case against you. You will be asked to state the opposing argument before
-you are allowed to answer it, and you will be marked on how fairly you do
-that.
+you are allowed to answer it. None of these three seminars carries a
+mark — they are where that habit gets built, and the place it is
+eventually marked is the hearing in [[The Land Use Question]].

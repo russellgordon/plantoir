@@ -45,11 +45,13 @@ rungs of several of them.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D3.1]]
+![[C2.2]]
 
-![[D3.4]]
+![[D3.1]]
 
 ![[D3.2]]
 
 ![[D3.3]]
+
+![[D3.4]]
 %%curriculum-end%%

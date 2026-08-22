@@ -34,6 +34,48 @@ $1.5 \times 10^6\ \text{m/s}$.
 > — comparable to atomic spacing, which is why crystals diffract
 > electrons.
 
+**5.** In a photoelectric effect inquiry simulating a potassium photocathode,
+a student measures the stopping potential $V_{\text{stop}}$ required to halt
+photoelectrons across four incident frequencies:
+
+| Frequency $f$ ($10^{14}\ \text{Hz}$) | $6.0$ | $7.0$ | $8.0$ | $9.0$ |
+| --- | --- | --- | --- | --- |
+| Stopping potential $V_{\text{stop}}$ ($\text{V}$) | $0.22$ | $0.63$ | $1.04$ | $1.46$ |
+
+(a) Using Einstein's photoelectric equation $e V_{\text{stop}} = hf - W$,
+determine the experimental value of Planck's constant $h$ from the slope of
+the $V_{\text{stop}}$ vs $f$ graph. (b) Determine the work function $W$ in
+$\text{eV}$ and the threshold frequency $f_0$.
+
+> [!success]- Answer 5
+> (a) Slope $m = \frac{\Delta V_{\text{stop}}}{\Delta f} = \frac{1.46 - 0.22}{(9.0 - 6.0)\times 10^{14}} = \frac{1.24}{3.0 \times 10^{14}} = 4.13 \times 10^{-15}\ \text{V}\cdot\text{s}$.
+> Since $e V_{\text{stop}} = hf - W \implies V_{\text{stop}} = \frac{h}{e}f - \frac{W}{e}$,
+> $h = e \times m = (1.602 \times 10^{-19}\ \text{C})(4.13 \times 10^{-15}\ \text{V}\cdot\text{s}) = 6.62 \times 10^{-34}\ \text{J}\cdot\text{s}$.
+> (b) Threshold frequency $f_0$ occurs where $V_{\text{stop}} = 0$:
+> $0 = (4.13 \times 10^{-15})f_0 - \frac{W}{e} \implies f_0 = 6.0 \times 10^{14} - \frac{0.22}{4.13 \times 10^{-15}} = 5.47 \times 10^{14}\ \text{Hz}$.
+> Work function $W = h f_0 = (4.13 \times 10^{-15}\ \text{eV}\cdot\text{s})(5.47 \times 10^{14}\ \text{Hz}) = 2.26\ \text{eV}$
+> ($3.62 \times 10^{-19}\ \text{J}$).
+
+**6.** At the TRIUMF cyclotron facility in Vancouver, protons ($m_0 = 1.67 \times 10^{-27}\ \text{kg}$)
+are accelerated to a relativistic speed of $v = 0.75c$. (a) Calculate the
+classical momentum $p_{\text{classical}} = m_0 v$ and the relativistic
+momentum $p_{\text{rel}} = \gamma m_0 v$. (b) Explain how the measured
+deflection curvature of the proton beam in the facility's dipole steering
+magnets ($r = p / (qB)$) proves the validity of relativistic dynamics and
+refutes classical Newtonian mechanics at high velocities.
+
+> [!success]- Answer 6
+> (a) Lorentz factor $\gamma = 1/\sqrt{1 - (0.75)^2} = 1/\sqrt{0.4375} = 1.512$.
+> Classical: $p_{\text{classical}} = (1.67 \times 10^{-27})(0.75 \times 3.00 \times 10^8) = 3.76 \times 10^{-19}\ \text{kg}\cdot\text{m/s}$.
+> Relativistic: $p_{\text{rel}} = \gamma p_{\text{classical}} = (1.512)(3.76 \times 10^{-19}) = 5.68 \times 10^{-19}\ \text{kg}\cdot\text{m/s}$.
+> (b) In a uniform magnetic field $B$, a charged particle follows a circular
+> arc of radius $r = p / (qB)$. If Newtonian mechanics were valid, the beam
+> would bend along a radius corresponding to $p_{\text{classical}}$, requiring
+> a smaller magnetic field to steer. In actual accelerator experiments, the
+> observed beam radius requires the magnetic force to bend the $51\%$ larger
+> relativistic momentum $p_{\text{rel}}$, conclusively proving relativistic
+> momentum conservation.
+
 %%curriculum-start%%
 ## Curriculum connection
 
@@ -41,9 +83,12 @@ $1.5 \times 10^6\ \text{m/s}$.
 
 ![[F2.3]]
 
+![[F2.4]]
+
 ![[F3.1]]
 
 ![[F3.2]]
 
 ![[F3.3]]
 %%curriculum-end%%
+

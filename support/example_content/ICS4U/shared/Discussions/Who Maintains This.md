@@ -70,3 +70,13 @@ attached. Whether that is a gift or a burden is decided by choices
 you make weeks earlier, in [[Writing Code Others Can Read]] and in
 [[Software Project Management]]. The related argument, about the
 moment you personally walk away, is [[What Happens When You Leave]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B1.6]]
+
+![[D2.2]]
+
+![[D4.3]]
+%%curriculum-end%%

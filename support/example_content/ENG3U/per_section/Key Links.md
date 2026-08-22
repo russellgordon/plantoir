@@ -5,6 +5,7 @@ created: __CREATED__
 transcludeTitleSize: h2
 excludeBacklinks: true
 ---
+
 - [[How This Class Works]]
 - [[Our Agreements]]
 - [[How Marks Work]]

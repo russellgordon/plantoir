@@ -13,7 +13,9 @@ tags:
 1. Number talk: [[Graph Talks]] — three binomial shapes
 2. Random groups — vary $n$ and $p$ and predict the shape before
    plotting. Where does it become symmetric?
-3. Clinic: [[Distributions Practice]] to the end
+3. Clinic: [[Distributions Practice]] to the end. Formative: the
+   sentence I listen for as I pass is why the trials are independent —
+   or why they are not
 
 ## Things to do before our next class
 

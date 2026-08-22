@@ -21,6 +21,14 @@ otherwise from the macOS login Keychain item ``containerized-quartz-netlify``
 — the same item the course launchers use, so there is exactly one Netlify
 token on the machine. The site id lives in ``website/site.json`` under
 ``netlify_site_id``.
+
+plantoir.app is itself a free-tier Netlify project, so it is exposed to the
+same "Powered by Netlify" ad badge as every class site — see
+``scripts/netlify_badge.py`` (shared with ``scripts/deploy.py``, which
+suppresses the identical badge for class sites) for the mechanism.
+``write_netlify_headers_file(SITE_DIR)`` runs here, before the manifest is
+built, so the ``_headers`` file it writes rides along in the same delta
+upload as every other file.
 """
 
 from __future__ import annotations
@@ -41,6 +49,13 @@ WEBSITE = Path(__file__).resolve().parent
 REPO = WEBSITE.parent
 SITE_DIR = REPO / "site"
 KEYCHAIN_SERVICE = "containerized-quartz-netlify"
+
+# scripts/ is a sibling of website/, not a package either lives inside, so it
+# has to be added to sys.path by hand before the shared badge-suppression
+# module can be imported — the same trick scripts/deploy.py itself uses for
+# its own sibling imports (toolchain_paths).
+sys.path.insert(0, str(REPO / "scripts"))
+from netlify_badge import write_netlify_headers_file  # noqa: E402
 
 
 def read_site_id() -> str:
@@ -148,6 +163,14 @@ def deploy() -> int:
     branch = subprocess.run(["git", "-C", str(REPO), "branch", "--show-current"],
                             capture_output=True, text=True).stdout.strip()
     print(f"🌍 Deploying site/ to plantoir.app (from branch '{branch or 'unknown'}')…")
+
+    # Netlify can add its own advertisement badge to free-plan sites, same as
+    # any class site published by scripts/deploy.py. Must run before the
+    # manifest below, so the _headers file it writes is part of what gets
+    # uploaded.
+    protected_scripts = write_netlify_headers_file(SITE_DIR)
+    print(f"   Wrote a website rule keeping Netlify's own ad badge off "
+          f"plantoir.app (checked {protected_scripts} script(s) already on the site).")
 
     digests_by_remote_path, local_file_by_digest = build_manifest()
     print(f"   {len(digests_by_remote_path)} file(s) in the manifest.")

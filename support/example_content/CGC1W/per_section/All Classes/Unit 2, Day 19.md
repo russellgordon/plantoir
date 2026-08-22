@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Working period: the product's journey
-2. Mapping clinic: showing movement on a map
-3. Conferences
+1. Working period: [[The Product's Journey]]
+2. Mapping clinic: showing movement on a map: [[Moving People and Goods]]
+3. Conferences on supply chain mapping and lifecycle tracing for [[The Product's Journey]]
 
 ## Things to do before our next class
 

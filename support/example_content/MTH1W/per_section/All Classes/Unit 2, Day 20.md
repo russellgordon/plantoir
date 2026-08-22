@@ -11,9 +11,13 @@ tags:
 ## Agenda
 
 1. Checkpoint, on your own: patterns, expressions, equations, and lines
-2. Mark your own; revision list written
+2. Mark your own; revision list written. I do not mark this one —
+   [[How Marks Work]] says why
 3. Method: [[Showing Your Thinking]] — what a marker needs to see
+4. Last fifteen minutes: your milestone journal entry, written here —
+   what the checkpoint found, and your next move
 
 ## Things to do before our next class
 
-- [ ] Journal: what you would tell September-you about algebra.
+- [ ] Bring your revision list — next class opens with twenty minutes
+      on it.

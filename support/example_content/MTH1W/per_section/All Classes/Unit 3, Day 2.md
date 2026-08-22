@@ -15,7 +15,7 @@ tags:
    argue about the middle
 3. Consolidate from the bottom: quartiles as a fair way to slice
 4. Notes to your future self — naming [[Box Plots and Quartiles]]
-5. [[A Data Story]] check-in: questions locked in
+5. [[A Data Story]], day 2 of 9 — check-in: questions locked in
 
 ## Things to do before our next class
 

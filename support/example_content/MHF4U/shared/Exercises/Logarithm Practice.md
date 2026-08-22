@@ -90,3 +90,54 @@ the algebra.
 > years. The 300 divided away — doubling time does not care how
 > much you started with, which is the signature of exponential
 > growth.
+
+## From a graph
+
+10. The acidity of a solution is given by $\text{pH} = -\log C$, where
+    $C$ is the concentration of $\ce{H+}$ ions in mol/L. Graph the
+    relationship with technology, and read from the graph: what happens
+    to the pH when a solution is diluted from $0.1$ mol/L to
+    $0.01$ mol/L? From $0.001$ to $0.0001$? Then pose one question of
+    your own that the same graph can answer, and answer it.
+
+> [!success]- Answer 10
+> Both dilutions raise the pH by exactly $1$, and the graph shows why
+> more convincingly than the algebra does: a factor of ten in $C$ is a
+> fixed *step* along the pH axis wherever you take it, which is the
+> defining property of a logarithmic scale and the reason the curve
+> flattens so dramatically to the right. Rearranged,
+> $C = 10^{-\text{pH}}$, which is the same statement read the other
+> way — [[Logarithmic Scales]] does this with decibels and magnitudes
+> too.
+>
+> Reasonable questions of your own: *which concentration gives a
+> neutral pH of 7?* (read across at $y = 7$: $C = 10^{-7}$ mol/L)
+> *how much stronger is lemon juice at pH $2$ than black coffee at pH
+> $5$?* (three steps, so $10^3 = 1000$ times the concentration) *what
+> pH would you get if you could keep diluting forever?* (the curve
+> climbs without limit, so the honest answer is that the model stops
+> describing real water long before the graph does). A question worth
+> posing is one whose answer you could not have written down before
+> you drew the graph.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.1]]
+
+![[A1.2]]
+
+![[A1.3]]
+
+![[A1.4]]
+
+![[A3.1]]
+
+![[A3.2]]
+
+![[A3.3]]
+
+![[A2.4]]
+
+![[A3.4]]
+%%curriculum-end%%

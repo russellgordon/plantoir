@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. The lyrics you brought, on the board. Is it a poem? First argument
+1. The lyrics you brought, on the board. Is it a poem? First argument —
+   and my first look at what this room already believes poetry is, which
+   decides which arguments this unit has to have. Nothing here is marked
 2. Introduce [[Poems We Will Argue About]] — the five, and why these
 3. Read aloud: "The Bull Moose"
 

@@ -10,8 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Practise: [[Paraphrase Practice]], first two
-2. 1.4–1.5: Lady Macbeth's letter scene, and who has already decided
+1. Practise: [[Paraphrase Practice]], first two — no marks, and no need
+   for a clean copy; it tells me whether the six moves have landed or
+   want another period
+2. 1.4–1.6: Lady Macbeth's letter scene, who has already decided, and
+   thirty lines of Duncan admiring the house he will die in
 3. Concept: [[Character as Argument]] — Banquo as the control
 
 ## Things to do before our next class

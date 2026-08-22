@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Bench work and maintenance of the trial plants
-2. Tool inspection and sharpening
-3. Evidence file check-in
+1. Bench work and maintenance of the trial plants: [[Watering Properly]]
+2. Tool inspection and sharpening: [[Maintaining Your Tools]]
+3. Evidence file check-in — feedback, not a mark: [[The Evidence File]]
 
 ## Things to do before our next class
 

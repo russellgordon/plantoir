@@ -55,12 +55,32 @@ of media, one of them somewhere else.** A single external drive sitting
 beside the machine survives a disk failure but not a theft, a fire, or
 a spilled coffee that reaches both.
 
+## Naming and filing, so the backup is worth having
+
+A backup of a folder called `stuff` full of `IMG_4471.jpg` restores
+exactly as fast and tells you exactly as little. File management is the
+other half of the same job, and it is three habits:
+
+1. **Name a file for what it is, not for when you made it.** Job
+   number, machine, and what the file shows —
+   `refurb-03-drive-smart-before.png` — so a name found in six months
+   still says something. Dates go in the name only where the order
+   matters, and then front to back: `2026-01-14`, never `14-1-26`.
+2. **Move files into folders as you make them**, not in a rename pass
+   at the end. One folder per job, the same handful of subfolder names
+   every time, and nothing important living on a desktop.
+3. **Put the folder where the backup can see it.** On a serviced
+   machine that means a network drive or the shared folder the client
+   actually backs up — a file the backup software was never pointed at
+   is not backed up, however carefully it was named.
+
 ## Before you hand any machine back
 
 - [ ] Free space checked and reported
 - [ ] Disk check run, result recorded
 - [ ] Updates applied, or their state noted
 - [ ] Backup taken, and one file restored from it as a test
+- [ ] Files named and filed where the backup will actually find them
 - [ ] Everything above written in the service record, not remembered
 
 Copy that list into your [[Tech Journal]] — it is the pre-flight check
@@ -71,6 +91,8 @@ course.
 ## Curriculum connection
 
 ![[B4.4]]
+
+![[B1.3]]
 
 ![[B4.2]]
 

@@ -10,12 +10,13 @@ sustained look **across** your whole [[Dev Journal]], written in the
 final week. Every other entry looked at a single day. This one reads
 the entire record and answers the only question a course can really
 be measured by: *what do you leave with that you did not arrive
-with?*
+with?* Nothing in it is marked — see [[How Marks Work]] — which is the
+whole reason it is worth writing straight.
 
 ## Before you write
 
 Reread your journal front to back in one sitting — expect the
-September entries to feel written by someone else. As you read, flag:
+your earliest entries to feel written by someone else. As you read, flag:
 
 - one entry that embarrasses you a little — that is usually where the
   growth is buried
@@ -29,7 +30,7 @@ Three sections, roughly a page, built the way [[Showing Growth]]
 taught — date it, quote your own words, then show the now:
 
 1. **How my building changed.** The biggest difference between what
-   September-you and now-you can *make*, proven with two cited
+   the you who started this course and now-you can *make*, proven with two cited
    entries — from a first program that crashed on a capital letter to
    whatever you stood behind on [[Launch Day]].
 2. **How my thinking about technology changed.** The other axis, just

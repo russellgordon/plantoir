@@ -10,7 +10,7 @@ students. %%
 
 ## Section __SECTION_NUMBER__ — notes to myself
 
-- Book the culminating audience in October. The conservation authority
+- Book the culminating audience early in the course. The conservation authority
   and the municipal emergency coordinator both need about six weeks;
   facilities staff can usually come at shorter notice.
 - Confirm the farm date with the farmer early. Their week is set by the
@@ -22,7 +22,7 @@ students. %%
 ## Before the first field day, every time
 
 Read this list before the shoreline day, and again before the woodlot
-and the farm. It is not a September formality — the sites differ and so
+and the farm. It is not a first-week formality — the sites differ and so
 do the risks.
 
 **Water.** Nobody enters the water, for any reason, on any day. Stay
@@ -47,7 +47,7 @@ bacterium generally needs the tick attached for roughly 24 to 36 hours,
 which is exactly why prompt checking is the whole defence. Say that
 sentence to them, because it is the one that makes them do it.
 
-**Heat and sun.** September fieldwork is often the hottest weather of
+**Heat and sun.** Early-term fieldwork is often the hottest weather of
 the term and the shoreline has no shade. Water, hats, sunscreen, and
 tell them plainly to report dizziness, a headache or stopping sweating
 *early* — heat illness gets worse quickly and is easy to treat at the
@@ -77,7 +77,7 @@ The slow-onset case is **the Great Lakes water level cycle**, chosen
 partly because it is the shore the class walks to. A metre and a half of
 range over a century, no single event and no moment it begins, is a much
 harder and more useful thing for students to argue about than a distant
-example, and their own September and January profiles are evidence in it.
+example, and their own first-visit and final profiles are evidence in it.
 
 ## The conflicting figures are deliberate — do not tidy them
 
@@ -119,7 +119,7 @@ The four field days are Unit 1 Day 8 (shoreline), Unit 1 Day 16
 (woodlot), Unit 3 Day 8 (farm) and Unit 4 Day 5 (shoreline again, with
 the hazard question). Each has a preparation period immediately before it
 and a debrief period immediately after, and the safety and kit pages are
-linked from every preparation period rather than only from September.
+linked from every preparation period rather than only from the first week.
 
 If the timetable takes a day off you, take it from a work period rather
 than from a debrief. The debriefs are where the field data becomes

@@ -10,7 +10,7 @@ students. %%
 
 ## Section __SECTION_NUMBER__ — notes to myself
 
-- Book the culminating audience in October. `The Long Argument` needs
+- Book the culminating audience early in the course. `The Long Argument` needs
   somebody who will push back, and the good ones are booked early.
 - `Slavery and the Nation` requires a real statute clause in part one.
   Prepare a shortlist unless the class has archive access — students

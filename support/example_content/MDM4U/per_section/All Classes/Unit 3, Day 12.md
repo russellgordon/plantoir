@@ -15,7 +15,9 @@ tags:
    number: linear or not, strong or weak, positive or negative
 3. Consolidate: back to [[Two-Variable Statistics]] — the description
    comes first, the correlation coefficient second
-4. Clinic: [[One- and Two-Variable Data Practice]] to the end
+4. Clinic: [[One- and Two-Variable Data Practice]] to the end. Exit
+   ticket, not marked: one relationship described in a sentence with no
+   number in it
 
 ## Things to do before our next class
 

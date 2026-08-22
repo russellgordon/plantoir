@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Studio time: finishing
-2. What 'finished' means, and how to tell
-3. Conferences
+1. Studio time: finishing, and acting on the critique: [[The Body of Work]]
+2. What 'finished' means, and how to tell: [[Judging Your Own Work]]
+3. Conferences on final series adjustments and exhibition readiness for [[The Body of Work]]
 
 ## Things to do before our next class
 

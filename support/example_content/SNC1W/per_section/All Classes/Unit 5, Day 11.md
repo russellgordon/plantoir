@@ -17,3 +17,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Journal: the proposal that changed your mind.
+- [ ] Bring your final [[Science in the News]] article; the submission is
+      written in class next period.

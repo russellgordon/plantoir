@@ -143,8 +143,8 @@ Bench notes, sketches, and the reasons behind decisions go into your
 [[Tech Journal]] as they happen — that is what the decision prompt is
 for, and writing this document is much faster when the reasons are
 already recorded. The tidy version is the deliverable attached to each
-task, and it is what earns most of the marks described in
-[[How Marks Work]].
+task, and it is where a large share of the criteria on every task page
+are actually won — see [[How Marks Work]].
 
 Write it in the language [[Writing About Technology]] describes:
 specific, quantified, imperative in procedures, and addressed to the

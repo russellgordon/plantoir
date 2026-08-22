@@ -43,10 +43,13 @@
       { "code": "ICS3U", "expect": "Intro to Comp Sci" },
       { "code": "  ics3u  ", "expect": "Intro to Comp Sci", "why": "Trimmed and upper-cased before the lookup, exactly as the code field itself is." },
       { "code": "SPH4U", "expect": "Physics" },
+      { "code": "MCMPR11", "expect": "Computer Programming", "why": "British Columbia course code lookup." },
+      { "code": "MFMP-10", "expect": "Foundations & Pre-Calculus", "why": "British Columbia course code lookup." },
+      { "code": "MMA--09", "expect": "Mathematics", "why": "British Columbia course code lookup." },
       { "code": "CODING", "expect": null, "why": "A club code is in no lookup, so nothing is filled in and the teacher types their own name." },
       { "code": "", "expect": null }
     ],
-    "note": "The course name a NEW course starts with, filled in from the code. It is the SHORT name from support/ontario_secondary_courses.json, not the formal one. The formal name is the ministry's string — \"Introduction to Computer Science, Grade 11, U\" — which is correct and which almost nobody wants as a website title: defaulting to it only means the teacher deletes it before typing what they actually call the course. Both names stay one button away in the wizard, and the command-line wizard offers them in the same order (short first, then formal, then a custom name). The fill only ever replaces an empty field or a previous fill of its own, so a teacher's own typing is never overwritten."
+    "note": "The course name a NEW course starts with, filled in from the code. It is the SHORT name from the regional course registries (support/*_secondary_courses.json), not the formal one. The formal name is the ministry's string — \"Introduction to Computer Science, Grade 11, U\" — which is correct and which almost nobody wants as a website title: defaulting to it only means the teacher deletes it before typing what they actually call the course. Both names stay one button away in the wizard, and the command-line wizard offers them in the same order (short first, then formal, then a custom name). The fill only ever replaces an empty field or a previous fill of its own, so a teacher's own typing is never overwritten."
   },
   "gradeLabels": {
     "cases": [
@@ -67,9 +70,24 @@
         "expect": "Grade 10"
       },
       {
+        "code": "MCMPR11",
+        "expect": "Grade 11",
+        "why": "BC trailing 2-digit grade 11."
+      },
+      {
+        "code": "MFMP-10",
+        "expect": "Grade 10",
+        "why": "BC trailing 2-digit grade 10."
+      },
+      {
+        "code": "MMA--09",
+        "expect": "Grade 9",
+        "why": "BC trailing 2-digit grade 09."
+      },
+      {
         "code": "CODING",
         "expect": "",
-        "why": "No digit in the fourth place, so no grade is claimed."
+        "why": "No digit in the fourth place or recognized trailing grade, so no grade is claimed."
       },
       {
         "code": "ABC",
@@ -82,7 +100,7 @@
         "why": "A digit that is not 1–4 is honest about not knowing rather than silently dropping it."
       }
     ],
-    "note": "The grade named by an Ontario course code's FOURTH character, matching the wizard. A club code with no digit there gets no grade label at all rather than a wrong one."
+    "note": "The grade named by a course code across supported jurisdictions (Ontario 4th character digit, BC trailing 2-digit grade), matching the wizard. A club code with no recognized grade gets no grade label at all rather than a wrong one."
   },
   "note": "Names on disk and the rules for adding a section. All of it is string handling over files both apps read, so all of it ports — and the naming grammar in particular MUST, because the two apps list each other's files. A course backed up on a Mac and opened on Windows has to appear in the Backups list, not vanish because the parser was rewritten from memory.",
   "sectionNumbers": {

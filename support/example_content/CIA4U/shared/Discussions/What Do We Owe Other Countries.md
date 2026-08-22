@@ -32,16 +32,26 @@ Note that the first three are not exclusive, and the fourth is the only one
 that is genuinely a values claim rather than an empirical one — which is
 worth saying out loud during the seminar.
 
-## The institutions, judged rather than listed
+## The institutions and trade bodies, judged rather than listed
 
 E3.2 asks you to assess intergovernmental responses — the United Nations
 Development Programme, the World Health Organization, the International
 Monetary Fund, the World Bank. E3.3 asks the same of social movements and
 social justice organisations, from the International Labour Organization to
-fair-trade and anti–child-labour campaigns. Judge them by criteria you set
-first: reach, durability, whether the recipients had any say, and what
-happened after the programme ended. "Effective" with no criterion attached
-is not an assessment.
+fair-trade, feminist, and anti–child-labour campaigns. E2.4 asks how
+individuals and consumer groups attempt to address sweatshops, resource
+exploitation, and hazardous working conditions. E1.4 asks how multilateral
+trade agreements (WTO, regional trade pacts) and economic forums (G20)
+shape trading opportunities and global rules.
+
+E3.1 asks you to analyse the structural causes of global economic
+disparities — colonial legacies, resource ownership, illiteracy, gender
+inequality, and unequal market access.
+
+Judge these institutions and responses by criteria you set first: reach,
+durability, whether the recipients had any say, and what happened after the
+programme ended. "Effective" with no criterion attached is not an
+assessment.
 
 ## The discussion
 
@@ -57,16 +67,23 @@ is not an assessment.
    not, and give the reason in each case.
 
 Bring what [[Inequality]] established about measuring disparity, and what
-[[Comparative Advantage]] said about who captures the gains from trade.
+[[Comparative Advantage]] said about trade theories and who captures the
+gains from trade.
 
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E1.1]]
+
 ![[E1.3]]
+
+![[E1.4]]
 
 ![[E2.3]]
 
 ![[E2.4]]
+
+![[E3.1]]
 
 ![[E3.2]]
 

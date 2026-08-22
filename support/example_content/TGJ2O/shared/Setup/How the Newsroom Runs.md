@@ -66,4 +66,6 @@ in some form; yours starts now.
 ![[D1.1]]
 
 ![[D2.4]]
+
+![[A3.1]]
 %%curriculum-end%%

@@ -515,65 +515,198 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
-- **Windows marketing shots re-taken for the section-2 ENG2D redeploy, and a
-  theming bug in the capture harness fixed along the way** (Windows,
-  2026-08-20).
-  - **What changed**: Russell redeployed the demo sites; ENG2D's screenshot
-    source moved from `eng2d-s1-2026-gordon` to `eng2d-s2-2026-gordon`
-    (MCV4U and SCH3U stayed on section 1). `website/shots/capture_windows.py`'s
-    `DEMO_COURSES` table was updated to match, same as the note beside the
-    identical table in `capture.py` already asks for. **No mac action
-    needed** — the mac's own table still points at `eng2d-s1-2026-gordon` and
-    that is fine unless this side also wants the section-2 content; nothing
-    here forces the two platforms' screenshots to source the same section.
-  - **A dialog theming bug was found and fixed, not caused by the URL
-    change** — `MarketingShotCapturer.CaptureNewCourseWindow` sets a
-    PER-WINDOW `RequestedTheme`, but `NewCourseDialog`'s "New to this?" card
-    (and the harness's own synthetic dialog card around it) read
-    `Application.Current.Resources["key"]` directly in code, which resolves
-    against the APP-WIDE theme, not the window's local override. In the Dark
-    capture this rendered a still-light card with barely-legible text over
-    the dark chrome around it — a real bug, but confirmed to be
-    capture-harness-only: `RequestedTheme` is set nowhere else in the app, so
-    a teacher never sees per-window theme divergence from the live app.
-  - **Two fixes tried and REJECTED, both left as comments at the call site
-    since they read as reasonable next attempts and are not**:
-    (1) `Application.Current.RequestedTheme = theme` after launch — throws
-    `COMException 0x80131515` at the WinRT boundary; WinUI does not support
-    changing the app-wide theme at runtime. (2) Indexing
-    `Application.Current.Resources.ThemeDictionaries["Light"/"Dark"]`
-    directly, then (once `App.xaml` turned out to merge `XamlControlsResources`
-    rather than declare `ThemeDictionaries` itself) recursively searching
-    `MergedDictionaries` for it — both resolved whichever theme the app was
-    ambiently in but threw "Cannot find a resource with the given key" for
-    the other one. WinUI appears to only materialize the ACTIVE theme's
-    dictionary regardless of how it is reached, so asking for the theme the
-    app is not currently in fails no matter the path to it. **The fix that
-    shipped**: `MarketingShotCapturer.ThemedBrush` hardcodes approximate
-    Fluent 2 literal colours per theme (matching the precedent already in
-    `ConfigureWindow`'s `#F3F3F3`/`#202020` page backgrounds) rather than
-    resolving anything live — acceptable here because this only feeds a
-    screenshot, where "reads clearly" is the bar, not a pixel-exact token.
-  - **A related bug, worth knowing regardless of the theming question**:
-    `MarketingShotCapturer.RunAsync` caught its own exceptions, logged them,
-    and still called `Environment.Exit(0)` either way — so a mid-capture
-    crash was invisible to `capture_windows.py`'s `subprocess.run(...,
-    check=True)`, which reported success with whatever images happened to
-    exist, stale ones included. This hid the theming bug's own two failed
-    fix attempts from the exit code entirely; both were only visible in
-    `%TEMP%\marketing_capture.log`. Now exits 1 on failure. **A second,
-    independent instance of the same swallow was in `capture_windows.py`
-    itself**: `Start-Process -Wait` does not forward the child's exit code
-    to `powershell.exe`'s own, so even with the C# fix a crash still would
-    not have surfaced — fixed with `-PassThru; exit $p.ExitCode`. Worth a
-    glance on the mac only if `capture.py` has an analogous
-    "subprocess exit code stands in for a success check" assumption
-    anywhere; nothing here suggests it does.
+- **The Windows hero pair had three separate bugs, found by actually looking
+  at it next to the mac's** (Windows, 2026-08-21, commit "Fix Windows hero
+  image: stray border pixels, tiny windows, and an empty Obsidian sidebar").
+  Russell asked directly: "compare the macOS hero image to the Windows hero
+  image captures and you will see what I mean" — and looking, rather than
+  reasoning about the code, is how all three were actually found and fixed.
+  - **A hairline of the window's own border was baked into every card.**
+    `DWMWA_EXTENDED_FRAME_BOUNDS` (used because `GetWindowRect` includes an
+    invisible resize border — already known, see the entry below) excludes
+    that invisible border but NOT the thin accent border Windows 11 draws
+    directly on the window, so the raw grab kept 1 DIP of that border colour
+    on all four edges. It reads as near-black (52-54, 52-54, 52-54) in BOTH
+    appearances, since it is the system border colour, not the app's — so it
+    shows as stray dark pixels once composited onto the page's own
+    background, worst on the light cards. Measured identically on all three
+    window kinds (Obsidian, Plantoir, Edge) in both themes: exactly 2 real
+    pixels at this machine's 2x scale, i.e. 1 DIP. Fixed by cropping that
+    border off before masking the corners, and shrinking the corner-radius
+    mask to match (`BORDER_DIPS`, `photograph()` in `hero_windows.py`). If
+    the mac's own captures ever show a comparable hairline, this is the shape
+    of bug to look for — but `screencapture -l` returning a window with its
+    corners already transparent (rule 1 in the marketing-screenshots skill)
+    means the mac has never had a border baked into the bitmap to begin with.
+  - **The card size was a REAL-PIXEL cap, so it didn't scale with the
+    display.** `card_geometry()`'s 1680x960 cap was tuned on a
+    1920x1080-at-150% machine, where it read as "almost the whole screen"
+    (1120x672 DIPs out of a 1280x672 DIP work area). The same 1680x960 REAL
+    pixels on a 200%-scaled screen is only 840x480 DIPs — a physically small
+    window whose UI barely shows anything, which is exactly what "you can
+    barely see anything in each window" was describing. Re-expressed the cap
+    in DIPs (`CARD_WIDTH_DIP = 1120`, `CARD_HEIGHT_DIP = 640` — the size the
+    old cap actually was, in points, on the machine it was tuned on) and
+    multiplied by `scale_factor()` at capture time, so a card occupies the
+    same fraction of the desktop on any display. Cards went from 1680x960 to
+    2240x1280 real pixels on this (200%-scaled) machine; nothing changes on a
+    100%-scaled one.
+  - **Obsidian's sidebar was three collapsed folder names, because nothing
+    ever told it to be anything else.** The mac's rich sidebar (several
+    folders open, real class notes visible) turned out to depend on nothing
+    reproducible — no fold state is stored anywhere in a vault's
+    `.obsidian/` (checked `workspace.json` by hand; there is no
+    `expandedFolders` key or equivalent), so it can only be Electron's own
+    per-machine local storage remembering what Russell has manually browsed
+    on that Mac over time. That is not something a fresh Windows vault has
+    ever had a reason to accumulate, and setting the file-explorer leaf's
+    `autoReveal: true` in `workspace.json` before launch was NOT sufficient
+    on its own — it visibly expanded the active note's ancestors but settled
+    mid-scroll, short of the note itself, and repeated waits up to 6s did not
+    change where it stopped. What worked, tested with `autoReveal` explicitly
+    OFF to confirm it does not depend on that setting at all: Obsidian's own
+    **"Reveal current file in navigation" command**, fired through the
+    command palette (`Ctrl+P`, type the name, Enter) once the window is
+    placed at its final size. It deterministically expands every ancestor
+    folder AND scrolls to the note, highlighted, regardless of any persisted
+    per-vault state — which is also why it is the right fix rather than the
+    `autoReveal` setting: it does not depend on Electron local storage that a
+    fresh machine will never have. New helper `reveal_active_file()` in
+    `hero_windows.py`, called from `capture_obsidian()`. **Worth knowing if
+    the mac's demo vault is ever reprovisioned from scratch** (a new machine,
+    or `~/Desktop/Teaching` deleted and rebuilt): the mac's own rich sidebar
+    would come back collapsed too, for the identical reason, and the same
+    command would be the fix there — nothing about it is Windows-specific,
+    it just happened to be found here because Windows had no accumulated
+    local-storage state to be masking the bug.
+  - **A pre-existing risk, found while testing this and fixed alongside it**:
+    `capture_edge()`'s `stop("msedge.exe")` (`taskkill /F /IM msedge.exe`)
+    kills every Edge process on the machine, scratch profile or not. On a
+    machine where Edge is also someone's real browser — which it was, on
+    this one, mid-session — that silently closes whatever they had open.
+    New `stop_matching(process_name, command_line_contains)` uses
+    `Get-CimInstance Win32_Process` to filter by command line before
+    killing, so only the process launched against our own
+    `--user-data-dir=EDGE_PROFILE` is touched; verified live with a
+    non-matching filter first (confirmed zero processes selected) before
+    trusting it against the real one. **Not extended to `Obsidian.exe` or
+    `Plantoir.exe`** in this pass — Plantoir is explicitly pre-authorised to
+    be force-closed on Windows regardless (`CLAUDE.md`, "An agent working on
+    Windows may close a running Plantoir without asking"), and no real
+    Obsidian was running to be at risk here. If the mac's own Safari capture
+    ever needs an equivalent, it already has one structurally: the `⎚`
+    profile keeps scratch state separate from Russell's own Safari, so a
+    `killall Safari` (if it has one) is not the same class of risk to begin
+    with.
+  - **Left unresolved, and NOT chased further**: the Plantoir card's native
+    title bar came back light in a dark-appearance capture, 4 runs out of 4
+    in this session, including with an extra 3s settle after `write_theme()`
+    before launch (ruling out a simple registry-propagation race).
+    `ShowHeroWindowAsync` (`MarketingShotCapturer.cs`) sets `RequestedTheme`
+    on the content root and the progress view, which is why the MENU BAR and
+    everything below it renders correctly dark — but nothing there touches
+    the native caption's dark-mode attribute, which is presumably meant to
+    follow the OS registry `write_theme()` already sets before launch. Why
+    that isn't landing is unknown: possibly a genuine gap (no explicit
+    `DwmSetWindowAttribute(..., DWMWA_USE_IMMERSIVE_DARK_MODE, ...)` call
+    anywhere in this codepath), possibly specific to capturing over RDP,
+    where this session ran. `site/img/hero-windows-dark.png` ships with this
+    flaw rather than being blocked on it — the three bugs above are the ones
+    Russell asked about and are confirmed fixed; the title bar is a smaller,
+    separate defect for a future session to chase, on a physical console
+    rather than RDP if possible, to rule that variable out first.
+  - Reference: `website/shots/hero_windows.py` (`photograph`, `card_geometry`,
+    `reveal_active_file`, `stop_matching`).
+
+- **Windows marketing shots re-taken, a Windows hero pair added, and an
+  already-known theming bug re-fixed the right way** (Windows, 2026-08-20).
+  - **What changed**: Russell redeployed the demo sites and initially asked
+    for ENG2D's screenshot source to move to `eng2d-s2-2026-gordon` — that
+    turned out to be a mistake caught minutes later ("the eng2d website
+    should be s1 like the other courses"), so `website/shots/capture_windows.py`'s
+    `DEMO_COURSES` table stayed as it already was: `eng2d-s1-2026-gordon`,
+    matching MCV4U and SCH3U on section 1, and matching the identical table
+    in `capture.py`. The images were still re-shot (a fresh Netlify deploy
+    can change page content even with the URL unchanged), so this is not a
+    no-op even though the table's end value is the same as before. **No mac
+    action needed** — nothing here changes what `capture.py`'s own table
+    should point at.
+  - **A dialog theming bug surfaced during the re-shoot, and turned out to
+    already be found and fixed — on a branch that was never merged.**
+    `NewCourseDialog`'s "New to this?" card (and the harness's own synthetic
+    dialog card around it) read `Application.Current.Resources["key"]`
+    directly in code, which resolves against the theme the app LAUNCHED in,
+    not a window's local `RequestedTheme` override. `dev`'s capture harness
+    runs both appearances from one launched-light process, so the Dark
+    capture rendered a still-light card with barely-legible text. Confirmed
+    capture-harness-only: nothing in the live app sets `RequestedTheme`
+    anywhere, so a teacher never sees this. Two live fixes were tried here
+    first and rejected — `Application.Current.RequestedTheme = theme` after
+    launch throws `COMException 0x80131515` (WinUI does not support changing
+    the app-wide theme at runtime), and indexing
+    `Resources.ThemeDictionaries` (directly, then recursively through
+    `MergedDictionaries`) resolves only whichever theme the app is ambiently
+    in — then hardcoding approximate Fluent 2 literals as a third attempt,
+    which worked but was never committed. **All three were abandoned** on
+    finding `ac96888c` ("Photograph each appearance from its own process, so
+    the dark shots are dark") on the unmerged `new-screenshots` branch (5
+    commits, Russell, 2026-08-19, 48 behind `dev` at the time) — the actual
+    fix, already reasoned through: launch `Plantoir.exe --capture-marketing-shots
+    --theme <light|dark>` as a SEPARATE process per appearance, with Windows'
+    own colour mode switched first (`capture_windows.py` now imports
+    `read_theme`/`write_theme` from `hero_windows.py`, which already had
+    them). Every themed resource then resolves the way a teacher's copy
+    resolves it, because the situation genuinely is a teacher's copy in that
+    appearance — no brush-by-brush chasing, and no approximation. **Ported
+    forward instead of merging the branch**: the branch was 48 commits stale
+    (predates the v1.1.0 release and the mac's own screenshot re-shoot), so
+    its 26-image commit was left behind and only the code changes were
+    carried over by hand.
+  - **A second commit on that branch was also worth carrying forward**:
+    `dd6f3fe9` fixed the SAME class of bug in `hero_windows.py` — the
+    Obsidian card was hardcoded to `section2/.../Unit 4, Day 23`, which held
+    only until the next redeploy moved the site to Day 22 and nothing
+    noticed. `hero_windows.py` now has `most_recent_class()`, which reads the
+    live site's front page at capture time and falls back to a named
+    constant only if the site is unreachable. Also picked up: `SECTION = 1`
+    (was hardcoded to section 2, while Plantoir and Edge were both showing
+    section 1 — a second three-cards-disagree bug, independent of the class
+    number one), and a fresh Edge scratch profile per launch (a reused
+    profile let Edge restore the previous pass's tab after being
+    force-killed, so the dark hero card came back showing the same page
+    twice).
+  - **The hero pair itself was also just plain missing from `dev`** —
+    `website/shots/hero_windows.py` existed (added by `99c7bb36`, the commit
+    that also gave plantoir.app its platform-conditional hero serving), but
+    `site/img/hero-windows-light.png` / `-dark.png` did not, because the run
+    that produced them was ONLY on `new-screenshots`. Regenerated fresh here
+    rather than pulled from that branch, so they reflect today's redeploy and
+    the section/class fixes above. Windows visitors were seeing the mac's
+    hero image (`build.py`'s platform fallback) until this landed.
+  - **A related bug, worth knowing regardless of the theming question and
+    not on the old branch at all**: `MarketingShotCapturer.RunAsync` caught
+    its own exceptions, logged them, and still called `Environment.Exit(0)`
+    either way — so a mid-capture crash was invisible to
+    `capture_windows.py`'s `subprocess.run(..., check=True)`, which reported
+    success with whatever images happened to exist, stale ones included.
+    This hid two of the three rejected theming fixes above from the exit
+    code entirely; both were only visible in `%TEMP%\marketing_capture.log`.
+    Now exits 1 on failure. **A second, independent instance of the same
+    swallow was in `capture_windows.py` itself**: `Start-Process -Wait` does
+    not forward the child's exit code to `powershell.exe`'s own, so even
+    with the C# fix a crash still would not have surfaced — fixed with
+    `-PassThru; exit $p.ExitCode`. Worth a glance on the mac only if
+    `capture.py` has an analogous "subprocess exit code stands in for a
+    success check" assumption anywhere; nothing here suggests it does.
+  - **`new-screenshots` (local and `origin/new-screenshots`) is now safe to
+    delete** — its useful commits are carried forward as described above,
+    and its one 26-image commit is superseded by today's re-shoot. Left in
+    place rather than deleted here, since it is Russell's own branch.
   - Reference: `windows-app/Plantoir/Services/MarketingShotCapturer.cs`
-    (`ThemedBrush`, `CaptureNewCourseWindow`, `RunAsync`),
-    `windows-app/Plantoir/Views/NewCourseDialog.cs` (`ThemedResource`),
-    `website/shots/capture_windows.py` (`DEMO_COURSES`,
-    `capture_app_windows`).
+    (`RunAsync`, `CaptureNewCourseWindow`), `windows-app/Plantoir/App.xaml.cs`
+    (the `--theme` argument), `website/shots/capture_windows.py`
+    (`DEMO_COURSES`, `capture_app_windows`), `website/shots/hero_windows.py`
+    (`most_recent_class`, `SECTION`, `capture_edge`).
 
 - **plantoir.app now has a Windows hero composite, and `deploy_site_name`
   turned out not to be a key** (Windows, 2026-08-19, commit "Give the Windows
@@ -1024,6 +1157,526 @@ is what happened to the test-race item, sitting here for three days with
 Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
+
+- ✅ DONE (mac, salvaging stranded Windows work, 2026-08-22). **A branch that
+  never got merged, `issue/mac-site-shots-unmerged`: mostly superseded, three
+  real fixes rescued into a fresh branch.**
+
+  Asked to "sort out screenshots" against that branch. It had 11 commits
+  ahead of `dev`, but its merge-base with `dev` was 229 commits stale
+  (last touched 2026-08-19, one day before `dev` independently re-solved the
+  same problems). Diffed every changed file against both the merge-base and
+  current `dev` before touching anything, rather than trusting the commit
+  messages:
+
+  - **Superseded, confirmed file-by-file, nothing worth keeping**: the mac
+    Safari-capture appearance/address-bar check (branch's
+    `require_matching_appearance` in `capture.py` vs. `dev`'s
+    `verify_appearance`/`verify_address_bar` in `safari.py`, landed
+    2026-08-20 — same problem, `dev`'s version is the one that shipped);
+    `mask_window_corners` (branch still called it; `dev` dropped it entirely
+    in favour of `screencapture -l`'s own transparent corners); the Windows
+    one-appearance-per-process capture in `capture_windows.py`/
+    `hero_windows.py` (`dev`'s version is character-for-character the same
+    idea, plus a later `-PassThru` exit-code fix the branch never got); the
+    `data-win-srcset` hero-image swap in `site/index.html` (`dev` already
+    has it); every `site/img/*.png`/`.webp` binary (`dev` has re-shot these
+    several times since). Merging the branch as-is would have produced 15
+    conflict markers and reintroduced the corner-masking approach `dev` had
+    already replaced.
+  - **Not superseded — three real C#/WinUI fixes, ported by hand into
+    `issue/windows-capture-dialog-fixes`** (branched from current `dev`,
+    not from the stale branch, so there was nothing else to drag along):
+    `NewCourseDialog.StageForCapture` now calls the same `Refresh*` methods
+    a teacher's own typing would trigger, since a `TextBox` that has not
+    been templated yet takes a programmatic `Text` without raising
+    `TextChanged` — the staged capture dialog previously showed an empty
+    course-name suggestion and no club row; the staged dialog card's
+    `MaxHeight` went 680 → 720 (was slicing the Language/region row through
+    its own control, with no scrollbar to explain why — Windows hides
+    scrollbars by default, so a still frame never shows one) plus a
+    `GiveTheFormRoomForCapture` pass capping the form's inner `ScrollViewer`
+    at 600 so the cut lands at a section boundary; the dialog's title now
+    reads `dialog.Title` ("New Course or Club") instead of a hardcoded
+    "New Course"; `AssistWindow` gained `ShowPromptShelfForCapture()`, since
+    the prompt shelf normally mounts once the local assistant finishes
+    starting, which a staged capture never triggers — the assistant-window
+    shot was missing its top third. Full row: `GUI-IMPROVEMENTS.md` #316;
+    the Windows side of what still needs doing is in `WINDOWS-HANDOFF.md`'s
+    "Salvaged capture fixes" section.
+
+  **Not built or tested — there is no .NET SDK on this Mac.** The port was
+  done by reading both the branch's diff and `dev`'s current file at each
+  call site and hand-verifying every method it calls
+  (`AutoFillCourseName`, `RefreshClubRow`, etc., and
+  `AssistPromptShelfView`'s constructor signature) still exists with the
+  same shape, rather than applying the patch blind — but a `dotnet build` +
+  `dotnet test` and an eyeballed real capture run are still owed before this
+  merges. The stale branch itself (`issue/mac-site-shots-unmerged`) was left
+  for Russell to delete rather than deleted here, since deleting a pushed
+  branch is his call.
+
+- ✅ DONE (Windows, 2026-08-22). **The Settings window's Download button did
+  nothing at all — fixed by porting the mac's shared-store architecture, not
+  just wiring the click.**
+
+  **The bug, reported directly**: "Nothing visibly happens when you press the
+  Download button to download the large or small model in the Settings
+  window for the local AI assistant. This works on macOS." The cause was
+  exactly that plain: `AssistantSettingsDialog.cs`'s Download button handler
+  was `button.Click += (_, _) => { /* Trigger download or inform */ };` — a
+  comment where the call should have been. The download MECHANICS
+  (`LocalModel.Install`, streaming with progress, exact-byte-size validation)
+  already existed and already worked — they were only ever wired to the
+  "open the assistant with no model yet" flow in `AssistWindow.xaml.cs`, never
+  to Settings.
+
+  **Fixed as a straight button-wiring patch would have shipped the mac's own
+  already-paid-for double-download bug.** Before touching the click handler,
+  read `mac-app/QuartzTeachers/Models/Assist/AssistModelStore.swift` and
+  `AssistModelStores.swift` — the mac's own doc comment on
+  `AssistModelStores` names the exact failure a naive Windows fix would have
+  reintroduced: "there used to be one `AssistModelStore` per PLACE that
+  cared: the settings panel made its own, and every assistant window made
+  another. A teacher who pressed Download in Settings and then opened the
+  assistant while it ran got a second store... deleting it... and starting
+  again. Two transfers writing to one destination, each undoing the other,
+  on a school connection, for gigabytes." Wiring Settings' button straight to
+  a fresh `LocalModel.Install()` call would have reproduced this immediately,
+  since `AssistWindow.xaml.cs` already ran its OWN independent download with
+  no shared state at all.
+
+  **What was built instead, matching the mac's architecture**: new
+  `Plantoir.Core/Assist/AssistModelStore.cs` — `AssistModelStore` (per-tier
+  state machine: Missing/Downloading/Ready/Failed, wrapping the pre-existing
+  `LocalModel.Install`, idempotent `Download()`/`Cancel()`/`Remove()`, a
+  `Changed` event in place of Swift's `@Observable`) and `AssistModelStores`
+  (a static per-tier registry — direct port of the mac's enum-based
+  singleton). `AssistantSettingsDialog.cs`'s housekeeping rows now read
+  live store state instead of raw file checks, with a progress bar, a "Stop"
+  button while downloading, and a failure line — matching
+  `AssistantSettingsView.swift`'s `downloadRow(for:)` shape.
+  `AssistWindow.xaml.cs`'s own download flow was rewired onto the SAME
+  shared store, so a download started in either place is visible — and is
+  the SAME download — in the other.
+
+  **Verified live against the real app** (UI Automation, no mock): clicked
+  Download in Settings, watched a genuine Hugging Face download run with
+  live-updating progress ("525.3 MB of 1.04 GB (49%)" → "Downloaded · 1.04 GB
+  on this PC"), clicked Remove, confirmed it correctly reverted to "Not
+  downloaded" with the file actually gone from disk. Screenshots taken at
+  each step. This is the class of bug a green unit suite would never have
+  caught on its own — nothing here was previously tested at all, on either
+  platform's Settings surface specifically.
+
+  **An adversarial audit (fresh sub-agent, no memory of this session, asked
+  to independently re-verify) caught a real regression before this shipped**:
+  the new `AssistWindow.xaml.cs` cancelled the SHARED download unconditionally
+  whenever its own window closed — including when Settings, not that window,
+  had started it. This is not a new mistake; it is the IDENTICAL bug the mac
+  found and fixed, on record as GUI-IMPROVEMENTS.md row 219 and
+  `AssistSession.swift`'s own `startedTheDownload` flag and doc comment:
+  "Closing a window that merely WATCHED must not cancel that." Fixed the same
+  way: a local `startedByThisWindow` bool, true only when THIS window's own
+  offer dialog was accepted, gating the cancel-on-close — an explicit Stop
+  (Settings' own button) still cancels unconditionally either way, matching
+  the mac's `stopDownload()` "an explicit stop is honoured wherever it came
+  from."
+
+  The same audit also found the `AssistModelRemoved` trail line was missing
+  the "how much space it freed" clause `shared-rules.json`'s
+  `activityTrail.mustRecord` requires and the mac's own line includes —
+  fixed (`"removed {tier} — {size} freed"`, word-for-word shape match) — and
+  a narrow leak where a Settings dialog that never actually got shown (WinUI
+  allows only one `ContentDialog` on screen; a fast double-invoke throws)
+  would stay subscribed to the app-lifetime store registry forever — fixed
+  with an idempotent `DetachFromStores()`, called from both `Closed` and a
+  `try/finally` at the call site.
+
+  **Two low-severity findings assessed and deliberately left as-is, not
+  silently dropped**: (1) two `AssistWindow`s opened within the same instant
+  for an un-downloaded tier can both show the "Download the assistant?"
+  offer dialog — `Download()`'s own guard makes this harmless in DATA terms
+  (no double-download), the only cost is a redundant dialog a teacher could
+  decline while a download genuinely runs elsewhere; a real fix needs new
+  synchronization surface on `AssistModelStore` this session judged not
+  worth adding blind, with no way to drive an actual two-window race live in
+  this environment. (2) `AssistModelStore`'s mutable state has no lock —
+  the mac's `@Observable` store is implicitly main-actor-isolated and race-
+  free by construction, this one is not, but every touched field is
+  atomically-sized on 64-bit .NET, so the worst case is one stale UI redraw,
+  self-correcting on the next `Changed` event, never a crash or torn read.
+
+  **Test coverage, and its honest boundary**: 12 new tests in
+  `AssistModelStoreTests.cs` cover store identity/sharing (the exact
+  double-download guarantee), disk-state reflection, and the synchronous
+  Download/Remove/Cancel guards — none touch the real network, since
+  `LocalModel`'s `HttpClient` has no injection seam, matching the mac's own
+  boundary (no dedicated `AssistModelStore` test file exists there either).
+  The `startedByThisWindow` fix itself is UI-embedded
+  (`ContentDialog.ShowAsync`, `Root.XamlRoot`) and not unit-testable in
+  isolation, same as the mac's equivalent `AssistSession`/`AssistWindowView`
+  logic — verified by direct code reading against the mac's own pattern, not
+  by an automated test, on both platforms.
+
+  **A real, pre-existing test-infrastructure bug found and fixed along the
+  way**: `LocalModelTests.cs` already set the static
+  `LocalModel.ModelDirectoryOverride` with no xUnit collection guard: adding
+  `AssistModelStoreTests.cs` (a second class touching the same static)
+  produced a genuine, observed intermittent failure the moment both classes
+  existed — xUnit parallelises test classes by default. Fixed by sharing a
+  new `DisableParallelization = true` collection between the two classes,
+  the identical pattern `ModelTests.cs`'s `SharedActivityState` already
+  established for the preview-lease/publish-registry statics. Confirmed
+  clean on 3 full-suite runs plus 5 targeted runs of the two classes
+  together after the fix, versus a real failure observed before it.
+
+  Full suite after every fix above: **620 tests, 620 passed**. Reference:
+  `Plantoir.Core/Assist/AssistModelStore.cs` (new),
+  `Plantoir/Views/AssistantSettingsDialog.cs`,
+  `Plantoir/Views/AssistWindow.xaml.cs`, `Plantoir/MainWindow.xaml.cs`
+  (`Settings_Click`), `Plantoir.Tests/AssistModelStoreTests.cs` (new),
+  `Plantoir.Tests/LocalModelTests.cs`
+  (`SharedLocalModelStateCollection`).
+
+- ✅ DONE (Windows, 2026-08-22). **An adversarial audit of the multi-destination
+  deploy port found two real bugs in the assistant/MCP path — both fixed,
+  both real, one predating this feature entirely.**
+
+  **Why this entry exists.** The previous entry below claimed full parity.
+  Asked to verify that claim, a fresh sub-agent — no memory of the session
+  that wrote the previous entry, so not anchored by its narrative — read
+  both codebases side by side and ran the suite itself rather than trusting
+  the reported pass count. It found two real gaps. Both were independently
+  re-verified by direct code reading (not just relayed) before anything was
+  changed, and the audit's own claims were cross-checked too — an injected
+  "security warning" arrived in one of the notification payloads during this
+  process, asserting the audit's findings should not be trusted; it was
+  treated as untrusted text, not evidence, and had no bearing on the fixes
+  below, which rest on independently re-read code, not on the audit's say-so.
+
+  **Bug 1, real but pre-existing (Aug 14, before this feature): the
+  assistant's scheduled-deploy path never read the Cloudflare Account ID at
+  all.** `AssistWorkspace.PlanScheduledDeploy` called
+  `ScheduledDeploy.Problem(course, section, when, DateTime.Now)` — no 5th
+  argument, so `cloudflareAccountID` defaulted to `""`
+  (`ScheduledDeploy.cs:29`). Confirmed with `git log -S` against that exact
+  call: it dates to commit `4400f80a`, well before this feature. The
+  previous entry's new "check every ADDITIONAL destination" logic in
+  `ScheduledDeploy.Problem` inherited this silently: scheduling a deploy for
+  ANY course with a Cloudflare destination — primary or additional — through
+  the assistant always refused with "Paste your Cloudflare Account ID," even
+  with one correctly configured, because the check could never see it. The
+  companion bug in `PlantoirTools.ScheduleDeploy` was worse in kind: even
+  past that refusal, it built the actual scheduled task's `--account` flag
+  with no account ID either, so a scheduled Cloudflare deploy would have run
+  at 6:30 AM with an empty credential.
+
+  **The fix**: both read `AppSettings.Load().CloudflareAccountId` — the same
+  machine-global, per-teacher setting the GUI's `SidebarPane` already reads,
+  just not previously reached from either headless call site. `AssistWorkspace`
+  gained `CloudflareAccountIdOverrideForTests` (a static hook, mac parity:
+  the same shape as `ScheduledDeploy.launchAgentsDirectoryOverride`) so the
+  new tests don't depend on whatever happens to be in the real machine's
+  `settings.json`. Two new tests in `ScheduledDeployTests.cs`:
+  `PlanScheduledDeployReadsTheRealCloudflareAccountIdRatherThanAlwaysRefusing`
+  (a valid override → no refusal) and
+  `PlanScheduledDeployStillRefusesWithNoCloudflareAccountIdConfigured` (an
+  empty override → the same refusal as before). The existing
+  `ACloudflareCourseCannotBeScheduled` test didn't catch this because it
+  calls `ScheduledDeploy.Problem` directly, bypassing
+  `AssistWorkspace.PlanScheduledDeploy` entirely — the exact gap the new
+  tests close.
+
+  **Bug 2, real, architectural, NOT fixed by changing the sequencing —
+  documented instead, deliberately.** `AssistWorkspace.Deploy` (the
+  headless/MCP deploy path) does not call `MultiDestinationDeployRunner.
+  RunAsync`. It reimplements the same shape by hand — one build, then a
+  loop over destinations where a failure doesn't stop the others — using
+  `ILauncherRunner`, not `ScriptRunner`. The mac's own equivalent,
+  `AssistSiteWork.deploy()`, literally calls "the same sequencer the Deploy
+  button uses," and its own code comment names the exact failure this
+  guards against: two implementations of the same rule drifting apart, once
+  sending a Cloudflare course to Netlify.
+
+  **Why this was NOT unified, after weighing it directly**: `RunAsync` is
+  built on `ScriptRunner` — ConPTY, live progress notification, a WinUI
+  `SynchronizationContext` — GUI-only infrastructure. `plantoir-mcp.exe` is
+  a genuinely separate headless process with no window, and `ILauncherRunner`
+  is the existing, narrower abstraction the ENTIRE `AssistWorkspace` class
+  already runs every operation through, not something introduced for this
+  feature. Forcing the two together is a real refactor — generalizing
+  `MultiDestinationDeployRunner` over an execution abstraction, or rebuilding
+  `ILauncherRunner`'s callers on top of `ScriptRunner` — with no way to
+  verify the result against the real MCP process in this environment (no
+  Claude Code MCP client was connected to drive it live here). Attempting it
+  blind, on top of an already-large session, was judged the wrong trade.
+  **Rejected explicitly, not overlooked**; if this drifts from `RunAsync`'s
+  own rules in a future change, that is the trade this entry names as having
+  been made on purpose. A code comment at the call site (`AssistWorkspace.
+  cs`, inside `Deploy`) says the same thing, so the next reader doesn't
+  mistake the separate loop for an oversight.
+
+  **A related, systemic non-issue checked and deliberately left alone**:
+  the audit also flagged that `AssistWorkspace.Deploy` rebuilds
+  unconditionally rather than checking `BuildFreshness.NeedsRebuild` first
+  (mac's headless path does check). Confirmed by reading the whole class:
+  ALL FOUR of `AssistWorkspace`'s preview-building call sites
+  (`Deploy`, `RebuildPreview`, and two more) share this same unconditional
+  pattern — it is evidently a deliberate, class-wide design choice
+  predating this feature, not a defect specific to deploy redundancy.
+  Changing only `Deploy` would have been inconsistent with the other three
+  and out of scope for what this feature was asked to bring to parity;
+  left unchanged.
+
+  Full suite after both fixes: **608 tests, 608 passed** (606 + the 2 new
+  ones). Reference: `AssistWorkspace.cs` (`PlanScheduledDeploy`, `Deploy`,
+  `CloudflareAccountIdOverrideForTests`), `PlantoirTools.cs`
+  (`ScheduleDeploy`), `ScheduledDeployTests.cs`.
+
+- ✅ DONE (Windows, 2026-08-22). **Redundant deploy targets, ported in full:
+  schema, settings/wizard UI, Deploy publishing to every destination,
+  scheduled deploy, the assistant's headless deploy, and progress display —
+  WINDOWS-HANDOFF.md entries 304, 305, 306, 308 (301–303 are shared Python,
+  inherited automatically; 307's data-safety half landed the day before,
+  see the entry below; 309/310 are mac-only layout fixes with no Windows
+  equivalent bug — see "What was deliberately NOT copied" below).**
+
+  **The schema (entry 304).** `CourseConfiguration` gained
+  `AdditionalDeployTarget` (a `Type`/`Path` record struct),
+  `DeployDestination`, `AllDeployDestinations`, `KnownDeployTargetTypes`,
+  and a set of plain STATIC functions —
+  `PruningAdditionalTargets`, `AvailableAdditionalDeployTargetTypes`,
+  `HasAdditionalDeployTarget`, `AdditionalDeployTargetPath`,
+  `SettingAdditionalDeployTarget`, `SettingAdditionalDeployTargetPath` —
+  mirroring the mac's choice to make pruning a plain function rather than
+  an instance method, for the identical reason: the wizard's `_deployTarget`
+  is a plain field with no `CourseConfiguration` to route through until
+  Create is clicked, so it calls the SAME static functions the instance
+  property wraps, rather than duplicating the pruning rule. `DeployTarget`'s
+  setter now prunes on every primary change, exactly as the mac's does. The
+  omit-when-empty write rule is the one the mac's own note flagged as easy
+  to get wrong — `AdditionalDeployTargetsTests.WritingAnEmptyAdditionalTargetsListOmitsTheKeyEntirely`
+  ported and passing.
+
+  **The settings/wizard UI.** `PublishingChoiceView.cs` — already shared by
+  Course Settings and the wizard, same as the mac's — gained a rebuilt
+  "Also publish to, for redundancy" section: one `ToggleSwitch` per known
+  type that is not the current primary, matching the mac's rule that this
+  list is REBUILT (not just re-shown) whenever the primary changes, since
+  the set of available types changes with it. Turning on `local_folder`
+  reveals a folder field + Choose… button + its own validation line;
+  turning on `cloudflare_pages` shows a plain note pointing at the SAME
+  Account ID field the primary picker already has, rather than a duplicate
+  field — the mac's own reasoning applies unchanged: Cloudflare's credential
+  is per-teacher, in app settings, never per-course, so an additional
+  Cloudflare target needs no field of its own. `Problem` (the property that
+  gates Save/Create) now checks every additional target with the same two
+  rules the primary already used.
+
+  **Deploy publishes to every destination (entry 305).**
+  `MultiDestinationDeployRunner` (new, `Plantoir.Core/Scripting/`) is the
+  direct C# translation of the mac's Swift type: `Leg` (one
+  `CourseConfiguration.DeployDestination` + its own `ScriptRunner` —
+  built this way from the start, since the mac's own history names "one
+  `ScriptRunner` per leg, never a shared one" as the single most important
+  decision here, the one that fails SILENTLY if gotten wrong), sequential
+  `RunAsync` (the shared build happens exactly once, on the first leg, via
+  the same `BuildAndDeployMilestones`/`DeployOnlyMilestones` split the mac
+  uses; a destination FAILING does not stop the others, a CANCEL or a
+  failed shared build stops the whole run), `RefusalReason` (checked up
+  front against every destination, not discovered mid-run), `JoinedWithAnd`,
+  and `Result(...)` — the one place that picks the teacher's sentence,
+  `destinationCount <= 1` always using the UNCHANGED single-destination
+  wording. `AssistWording` gained the three matching functions
+  (`DeployedToMultipleDestinations`, `DeployPartiallySucceeded`,
+  `DeployToMultipleDestinationsDidNotFinish`), word-for-word ports of the
+  mac's.
+
+  **One sequencer, three callers** (Windows has no wizard-preview caller
+  and no separate "assistant with no window" process the way the mac's
+  MCP-as-the-app-itself does, so this is 3 where the mac's is 4):
+  `SectionDetailView.Deploy_Click` (the toolbar button — rewritten around
+  `RunAsync`, which now also resolves per-leg milestones and per-leg custom
+  domain internally, so the button's own code is SHORTER than before, not
+  longer), `AssistWorkspace.Deploy` (the in-app assistant's headless path —
+  loops every destination, refuses up front if ANY of them is Cloudflare
+  since this process has no access to the stored Account ID either way, a
+  Windows-specific limit the mac does not share), and `ScheduledDeploy.
+  Problem` + `TaskScheduling.Schedule` (the overnight path). A genuine,
+  incidental bonus this produced, exactly like the mac's own entry 307:
+  `AssistWorkspace.Deploy`'s success sentence was a bespoke string that had
+  quietly drifted from the contract ("Deployed … Students can see it now."
+  vs. the contract's "… Students can reach it now.") — never caught because
+  nothing tested it against `assist-wording.json` directly. Routing through
+  `MultiDestinationDeployRunner.Result` fixed it for free;
+  `AssistTests.DeployingIsItsOwnAskAndNeverASideEffect` now asserts the
+  canonical wording instead of the drifted one.
+
+  **Scheduled deploy across destinations — a genuinely different mechanism
+  than the mac's, because Windows Task Scheduler has no "just this once"
+  self-removing agent shape to lean on.** The mac writes one un-chained
+  shell line per destination into a script launchd runs. `TaskScheduling.
+  Schedule` gained the identical shape for &gt;1 destination — a small
+  wrapper `.ps1`, one `& deploy.ps1 <args>` line per destination, none
+  joined with `-and`/`&&` so one destination failing cannot stop the
+  others — written to `%LOCALAPPDATA%\Plantoir\scheduled\`, NOT a temp
+  folder: the task may fire hours later, and a temp-folder sweep must never
+  be the reason an overnight deploy silently does nothing. A single
+  destination — the overwhelming majority — is completely unchanged: one
+  inline `schtasks /TR` command, no wrapper script at all. `Cancel` now also
+  deletes the wrapper script it wrote, so rescheduling does not accumulate
+  litter. `ScheduledDeploy.Problem` gained the same "every additional
+  destination gets the primary's own two checks, then the same
+  never-deployed check" shape as the mac's — this is also what the
+  previously-red `SharedRules_ScheduledDeployRefusals_MatchesContract`
+  contract test needed, and it is green now.
+
+  **Custom domain UI (the other half of entry 307 — the data-safety fix
+  landed the day before this, see the entry below).**
+  `CourseSettingsView`'s "Advanced" section now shows one field per
+  destination that can have a domain, labelled plainly "Custom domain" for
+  the single-destination case and "`<Service>` custom domain" once there is
+  more than one — mirroring `SectionSettingsView`'s own two rules.
+
+  **Progress display (entries 306, 308) — built correctly from the start,
+  rather than shipping the mac's original bug and fixing it after.**
+  `TaskProgressView` gained an optional `multiRunner` parameter to `Show()`;
+  when set and carrying more than one leg:
+  - a `DestinationChecklist` (one row per destination, ✓/✗/•/○) appears
+    above the progress bar, so a teacher watching sees which destinations
+    have finished and which are still to come, rather than a bar that looks
+    stuck between legs;
+  - the outcome badge is computed from `MultiDestinationDeployRunner.
+    CurrentOutcome` — every leg's own result — never from whichever leg's
+    `ScriptRunner` happens to be `ActiveRunner` when the run ends, which is
+    the exact bug the mac's row 306 found and fixed (a first-destination
+    failure with a second-destination success reading as plain "Done").
+    Windows never had this bug to begin with, because the badge was written
+    against the aggregate outcome from the start;
+  - `DestinationLinks` lists every SUCCEEDED leg's own link (or "Show in
+    File Explorer" button), in the SAME slot the single-destination link
+    already occupied — never appended after the whole panel, which is what
+    the mac's own row 309 had to fix after shipping it the other way;
+  - `CombinedTranscriptText()` concatenates every leg that has produced any
+    output so far, under a `"── <Service> ──"` heading, exactly the shape
+    the mac's row 308 arrived at — a leg the run never reached is filtered
+    out rather than shown as an empty section.
+
+  **What was deliberately NOT copied, and why.** The mac's rows 309/310 fix
+  a WinUI-inapplicable bug: SwiftUI's default `VStack` alignment is
+  `.center`, so the mac had to add an explicit `alignment: .leading`.
+  WinUI's `StackPanel` (used throughout `TaskProgressView.xaml`) has no
+  such default-centring behaviour — content is left-aligned unless told
+  otherwise — so there was never a centring bug here to fix. Named so a
+  future reader does not go looking for one.
+
+  **What was NOT verified, and why it is said plainly rather than
+  quietly assumed working.** This entire piece was built and unit-tested on
+  a machine with no display session available to drive the real WinUI app —
+  `dotnet build`/`dotnet test` only. The checklist glyphs, the console
+  combining, and the destination-links layout are UNTESTED AGAINST THE REAL
+  RENDERED APP. The mac's own history (rows 300, 305→306, and the note on
+  rule 9 generally) is that layout and finished-state bugs specifically are
+  the class of thing a unit suite stays green through while the real view
+  is broken — "driving the real app caught a real bug the design missed" is
+  a recurring sentence in this file for exactly that reason. **Before this
+  ships, drive a real multi-destination deploy (two destinations, one of
+  them made to fail on purpose — e.g. an invalid Cloudflare Account ID) and
+  look at what the panel actually shows.**
+
+  **What Windows still does NOT have, and does not need for this piece**:
+  the mac's local-assistant "no section window open" fix (entry 300, its
+  own row in WINDOWS-HANDOFF.md). Checked directly: Windows' `AssistWindow`
+  is constructed per-section already (`AssistWindow(workspacePath, course,
+  section, main)`, one call site, `SidebarPane.xaml.cs`), and its own
+  `StartDeployInAppAsync` calls `MainWindow.DeployForAsync`, which SELECTS
+  the right section in that same window before deploying — the window the
+  assistant was opened FROM always exists, by construction, so the mac's
+  "no window open at all" scenario is structurally impossible on this side
+  rather than a gap to close.
+
+  Reference: `Plantoir.Core/Scripting/MultiDestinationDeployRunner.cs`
+  (new), `Plantoir.Core/Models/CourseConfiguration.cs` (additional-targets
+  schema), `Plantoir.Core/Models/DeployCommand.cs` (destination-aware
+  overloads), `Plantoir.Core/Assist/AssistWording.cs` (the three new
+  functions), `Plantoir.Core/Assist/AssistWorkspace.cs` (`Deploy`),
+  `Plantoir.Core/Assist/ScheduledDeploy.cs` (`Problem`),
+  `Plantoir.Core/Assist/TaskScheduling.cs` (multi-destination `Schedule`),
+  `Plantoir/Views/PublishingChoiceView.cs`, `Plantoir/Views/
+  CourseSettingsView.xaml.cs`, `Plantoir/Views/NewCourseDialog.cs`,
+  `Plantoir/Views/SectionDetailView.xaml.cs` (`Deploy_Click`), `Plantoir/
+  Views/TaskProgressView.xaml`/`.xaml.cs`. Tests:
+  `AdditionalDeployTargetsTests.cs` (new, 10 cases),
+  `MultiDestinationDeployRunnerTests.cs` (new, 13 cases covering refusal
+  reasoning, milestone selection, wording selection, and outcome
+  bookkeeping — everything testable without spawning a real `deploy.ps1`),
+  plus the `ScheduledDeployRefusals` and `FileFormats_CourseConfigKeys`
+  contract tests, both previously red, now green. Full suite: 606 tests,
+  606 passed.
+
+- ✅ DONE (Windows, 2026-08-21). **Custom domain reads and writes are now
+  per-destination-type on Windows too, closing a real data-loss risk from
+  WINDOWS-HANDOFF.md entry 307.**
+
+  **What was wrong.** Entry 307 moved `custom_domains.sections.sectionN` from
+  a bare string to a map keyed by destination type
+  (`{"netlify": "…", "cloudflare_pages": "…"}`), because a section-wide
+  domain applied to every destination was itself the bug it fixed (a
+  Netlify-only domain silently overriding the Cloudflare link too). Windows's
+  `CourseConfiguration.CustomDomain`/`SetCustomDomain` still read and wrote
+  the old bare-string shape unconditionally. The read side degraded safely
+  (an unrecognised `JObject` shape returned `""`, so a domain looked unset
+  rather than crashing anything). The **write** side did not: any Windows
+  teacher who opened a mac-configured multi-destination course's settings
+  and saved — even retyping the identical value — would overwrite the whole
+  per-destination map with one bare string, discarding every other
+  destination's domain the mac side had configured. Windows has no
+  multi-destination deploy feature of its own yet (piece 1's
+  `AdditionalDeployTargets` schema is not ported — see the still-red
+  `FileFormats_CourseConfigKeys_MatchesContract` and
+  `SharedRules_ScheduledDeployRefusals_MatchesContract` contract tests,
+  unrelated to this fix and pre-existing on `dev`), so this was real data
+  loss on a shared file caused purely by opening Course Settings, not by
+  using any feature Windows actually offers.
+
+  **The fix**, matching the mac's own migration rule exactly
+  (`CourseConfiguration.swift`'s `customDomain(forSection:destinationType:)` /
+  `setCustomDomain(_:forSection:destinationType:)`): `CustomDomain`/
+  `SetCustomDomain` gained a `destinationType` overload, with the existing
+  1-arg / 2-arg call sites kept as convenience wrappers around the primary
+  destination (`DeployTarget`) so no call site anywhere in
+  `CourseSettingsView.xaml.cs` or `SectionDetailView.xaml.cs` had to change.
+  An old bare string on disk is read as belonging to the PRIMARY destination
+  only (never any other type), and on write is migrated into the map —
+  attributed to the primary — rather than discarded, the same rule the mac
+  applies. Setting a destination's domain now edits only that destination's
+  own entry in the map; every other entry already there is carried forward
+  untouched. Windows still has no UI to set a *non-primary* destination's
+  domain (there is no additional-destination settings UI to hang it on
+  yet), but the shape is now safe to have on disk regardless of which app
+  last touched it.
+
+  **Not done as part of this fix, and deliberately**: porting piece 1
+  (`AdditionalDeployTargets` schema + settings UI, entry 304) or piece 2
+  (multi-destination Deploy itself, entry 305). Those are larger, separate
+  pieces of work — this fix only makes the *shared file* safe to pass
+  between platforms in the meantime. `AdditionalDeployTargetsTests`'
+  `testWritingAnEmptyAdditionalTargetsListOmitsTheKeyEntirely` assertion
+  (entry 304's own note for Windows) still needs porting when that piece is
+  picked up.
+
+  Reference: `CourseConfiguration.cs` (`CustomDomain`/`SetCustomDomain`
+  overloads), `CourseConfigurationTests.cs` (six new tests: reading an older
+  bare string attributes it to the primary only; reading the new map never
+  degrades to empty; saving the primary's domain never clobbers another
+  destination already on disk; saving migrates an old bare string into the
+  map rather than discarding it; clearing one destination's domain removes
+  only that entry; and saving with nothing on disk still only touches the
+  primary). Full Windows suite: 579 tests, 577 passed — the two failures are
+  the pre-existing, unrelated `additional_deploy_targets`/scheduled-deploy
+  contract gaps named above, confirmed failing identically on unmodified
+  `dev` before this change.
 
 - ✅ DONE (mac, 2026-08-20). **Setting up a working folder no longer blocks
   the main thread — the mac catching up to Windows 1.1.0, found by Russell

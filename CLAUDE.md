@@ -143,22 +143,53 @@ Neither app contains toolchain logic of its own: they write the same
      the Netlify site is not connected to GitHub. `python3 website/build.py
      --deploy` is the only way it updates, run from `main` so the live site
      matches what shipped.)
-   - **`dev` is where work integrates.** Start sessions from `dev`, branch
-     off it, merge back to it. A piece merges only with its tests green and
-     its write-ups done (rules 2–5).
+   - **`dev` is where work integrates — and NOTHING reaches it without
+     Russell saying so.** Start sessions from `dev` and branch off it. The
+     merge back is HIS call, every time: see "Autonomy moves with the
+     model" below, which was narrowed on 2026-08-22 for exactly this.
+     A piece is ready to merge only with its tests green and its write-ups
+     done (rules 2–5) — say it is ready and stop there.
+
+     **The push rule now applies to the ISSUE BRANCH: work is not finished
+     until `git push -u origin issue/<slug>` — push in the same session, as
+     you go.** The reason is unchanged and was learned the hard way on
+     2026-08-21, when a Windows session merged a hero-image fix into its
+     local `dev`, reported it done, and a mac clone made from `origin/dev`
+     minutes later had none of it, because the commits had never left the
+     Windows machine. Work that stays on one machine is invisible to every
+     other machine and every other session, and that is just as true of an
+     unpushed issue branch as it was of an unpushed `dev`. If `git push` is
+     rejected because the remote moved, `git fetch` and read what changed
+     before merging or force-pushing anything — never push over work you
+     have not looked at.
    - **One issue branch per coherent piece**, branched off `dev`: named
      `issue/<number>-<slug>` when a GitHub issue exists, `issue/<slug>` when
      not. "A coherent piece" keeps its old meaning — one thing a teacher
      could notice, with its tests and its write-up; not one file, and not a
-     whole afternoon. Merge with `--no-ff` so the piece stays one readable
-     unit in history, and delete the branch after it merges.
-   - **Autonomy moves with the model.** Committing as you go on the issue
-     branch and merging a finished piece into `dev` are the standing order —
-     no per-session permission, exactly as commit-to-main used to be. Merging
-     `dev` into `main` is PUBLISHING: do it during a requested release cut,
-     or when Russell asks, never on your own initiative. Outside an iterative
-     run — a one-off question, an experiment, something half-finished — the
-     older rule still holds: ask first.
+     whole afternoon. When Russell approves the merge, merge with `--no-ff`
+     so the piece stays one readable unit in history, and delete the branch
+     after it merges.
+   - **Autonomy moves with the model, and it stops at the issue branch.**
+     Committing as you go on the issue branch, and pushing that branch to
+     `origin`, are the standing order — no per-session permission.
+     **Merging into `dev` is NOT**, and asking is not a formality to be
+     inferred past: wait for Russell to say so in this session, about this
+     piece. Narrowed 2026-08-22, superseding the order that had merging and
+     pushing `dev` in the standing set — which is why a session can find
+     merge commits on `dev` dated before this rule and should not read them
+     as precedent.
+
+     The reason is what `dev` is FOR. It is the branch every other machine
+     and every other session starts from, so a merge is not "saving work",
+     it is handing work to everybody — including a Windows session that
+     will build on it before anyone has looked at it. Work pushed to an
+     issue branch is just as safe from being lost and costs nobody anything
+     if it turns out to be wrong. So: finish the piece, push the branch,
+     say it is ready and what it contains, and let him decide.
+
+     Merging `dev` into `main` is PUBLISHING and was already his: do it
+     during a requested release cut, or when he asks, never on your own
+     initiative.
 
    End every commit message with the `Co-Authored-By` trailer naming the
    agent that did the work. Claude sessions use the trailer their harness

@@ -64,4 +64,6 @@ and nation, and the peoples affected are still here.
 ## Curriculum connection
 
 ![[B2.1]]
+
+![[B3.4]]
 %%curriculum-end%%

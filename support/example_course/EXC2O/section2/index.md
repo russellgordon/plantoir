@@ -1,12 +1,12 @@
 ---
-title: Grade 9 Science, Section 2
-created: 2026-08-14T12:24:26.000-0400
+title: Section 2
+created: 2027-01-19T07:00:00.000-0500
 enableToc: false
 excludeBacklinks: true
 publish: true
 ---
 # Most Recent Class
-![[Unit 5, Day 14]]
+![[Unit 5, Day 17]]
 
 %% Teacher: this is what students meet first, so it should show the newest
 class you have published. You do not have to keep it up to date by hand:

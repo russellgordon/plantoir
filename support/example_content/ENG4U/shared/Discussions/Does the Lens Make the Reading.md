@@ -39,7 +39,11 @@ that would break it.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
 ![[A1.5]]
+
+![[A1.8]]
 
 ![[B1.6]]
 

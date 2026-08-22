@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Working period: the proposal's map
+1. Working period: the proposal's map, and the changes yesterday's
+   constraints conference named
 2. Mapping clinic — a site map that carries an argument, not a screenshot: [[Making a Thematic Map]]
 3. Conferences on the alternative you have to answer
 

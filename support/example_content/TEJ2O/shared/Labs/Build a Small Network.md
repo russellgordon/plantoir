@@ -71,6 +71,10 @@ is the first artefact [[The Network Job]] will ask you for.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A2.1]]
+
+![[A2.2]]
+
 ![[B3.1]]
 
 ![[B3.2]]

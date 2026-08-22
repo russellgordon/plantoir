@@ -29,8 +29,8 @@ table or series it came from, and when that figure was released.** Not
 "unemployment 6.4%" but "unemployment rate, 6.4%, July 2026, Statistics
 Canada Table 14-10-0287-01, released 7 August 2026".
 
-This looks fussy in September. By November it is the reason your work can
-be checked, updated and defended, and everyone else's cannot.
+This looks fussy at the start of the course. By the end it is the reason
+your work can be checked, updated and defended, and everyone else's cannot.
 [[Your Economics Notebook]] shows what a page of that looks like when it is
 being kept properly.
 

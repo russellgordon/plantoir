@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Shop and site clean-down, properly
-2. Waste, recycling, and what does not go in the bin
+1. Shop and site clean-down, properly: [[Safe Shop and Site Practice]]
+2. Waste, recycling, and what does not go in the bin: [[What We Do to the Environment]]
 3. Retrieval across Unit 2
 
 ## Things to do before our next class

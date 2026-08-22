@@ -8,9 +8,9 @@ tags:
 ---
 The portfolio is the one thing in this course that outlasts it. It is
 where the inventory, the interview notes, the applications, the research,
-and the plan all end up, and it is half of your final evaluation. Start
-it in the first week, because a portfolio assembled in the last week is
-obviously a portfolio assembled in the last week.
+and the plan all end up, and it is what your final evaluation is argued
+from. Start it in the first week, because a portfolio assembled in the
+last week is obviously a portfolio assembled in the last week.
 
 ## What goes in it
 
@@ -29,7 +29,7 @@ Three kinds of thing:
 Somewhere you will still have access in Grade 12 — a school drive
 folder, a document, a physical folder, or your Individual Pathways Plan.
 Whichever you choose, choose one, and put everything in it the same day
-you make it. Assembling a portfolio from six locations in November is a
+you make it. Assembling a portfolio from six locations at the end is a
 task nobody completes.
 
 ## The entries that matter most

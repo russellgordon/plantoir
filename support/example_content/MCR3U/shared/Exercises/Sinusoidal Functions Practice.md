@@ -87,3 +87,33 @@ throughout.
 > change size. Raising the platform 1 m lifts everything: $c$ goes
 > from 27 to 28. Each physical change edits exactly one letter; that
 > one-to-one mapping is the whole point of the form.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D2.1]]
+
+![[D2.2]]
+
+![[D2.3]]
+
+![[D2.4]]
+
+![[D2.5]]
+
+![[D2.6]]
+
+![[D2.7]]
+
+![[D2.8]]
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[D3.3]]
+
+![[D3.4]]
+
+![[D3.5]]
+%%curriculum-end%%

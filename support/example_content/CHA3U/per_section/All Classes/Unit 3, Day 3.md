@@ -12,7 +12,7 @@ tags:
 
 1. [[Photographs]] — Riis, Hine, and what a reforming camera argues
 2. A photograph's caption read against its frame
-3. Research period
+3. Research period: gathering and analyzing reforming photographs and labour records for [[The Industrial Republic]]
 
 ## Things to do before our next class
 

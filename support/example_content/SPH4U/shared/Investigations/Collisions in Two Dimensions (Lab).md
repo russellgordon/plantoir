@@ -8,8 +8,10 @@ tags:
   - unit-2
 ---
 > [!abstract] At a glance
-> **Time:** one class plus analysis. **Groups of three.** Video required —
-> see [[Analysing Video of Motion]].
+> **Time:** one class, written up in the next period and handed in at the
+> bell — the third of the marked [[Investigation Write-Ups]]. **Groups of
+> three at the table, write-up yours alone.** Video required — see
+> [[Analysing Video of Motion]].
 
 An air table, two pucks, one glancing collision, and vector arithmetic
 that either balances or tells you something.

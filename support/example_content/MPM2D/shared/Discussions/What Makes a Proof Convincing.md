@@ -41,6 +41,8 @@ just observed, but inevitable.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B3.1]]
+
 ![[B3.2]]
 
 ![[B3.3]]

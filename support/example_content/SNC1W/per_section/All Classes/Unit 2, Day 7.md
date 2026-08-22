@@ -10,11 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Investigating Photosynthesis]] in class
+1. Bench: write up [[Investigating Photosynthesis]] in class —
+   [[Lab Reports]], number two
 2. Respiration and photosynthesis on one diagram, arrows in both
    directions
 3. Portfolio: [[Reflecting on an Investigation]]
 
 ## Things to do before our next class
 
-- [ ] Report finished; reflection written.
+- [ ] Skim [[The Carbon Cycle]]. Next class is three cycles in one period.

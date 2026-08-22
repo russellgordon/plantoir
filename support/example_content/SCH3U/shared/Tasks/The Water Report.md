@@ -179,6 +179,11 @@ preference with a paragraph around it.
 5. **Limitations.** What your measurements cannot establish, and why.
    This is the section I read most carefully.
 
+You sample and titrate with a partner, and the data table is shared.
+**Your limitations section is written by you alone**, and so is your
+recommendation — those are the parts your individual mark rests on,
+together with what I see and hear at your bench.
+
 **A sources page**, in the format in [[Writing About Chemistry]], with at
 least three sources of the right kinds: the municipal water quality
 report, Ontario's Drinking Water Quality Standards, Health Canada's
@@ -226,5 +231,48 @@ atmosphere.
 
 ![[E1.2]]
 
+![[E2.7]]
+
 ![[E2.8]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 4, Day 11, the triplicate titration at the bench
+  Watch for: what happens to the trial that disagrees. The task makes
+  them write down their own tolerance — what agreement between
+  replicates they will accept — before they start, and there are two
+  ways to end up meeting it: run a fourth trial, or quietly drop the odd
+  one. The report shows three numbers agreeing to whatever tolerance
+  they wrote down, either way, and only one of those pairs measured
+  them. Watch too for the buret rinsed with the solution it
+  will hold rather than with water, and the meniscus read at eye level
+  rather than from standing height.
+  Going well: a fourth trial started without being told; a titre crossed
+  out with a reason written beside it.
+  Stuck: three numbers that agree suspiciously well and no rough run
+  before them; a buret filled above eye level on a stool.
+  Record: your class list, two columns — repeated the odd trial, dropped
+  it. Add a tick for a rinse done properly, since that one is over in a
+  second and you will not see it twice.
+
+TALK — Unit 4, Day 12, the working period comparing your numbers with
+the published record
+  Ask, of each partner on their own, about whichever quantity they
+  actually measured — chloride for most of them: "Would you expect this
+  figure to be higher a year from now or in November here, and what is doing
+  that?"
+  Then: "Suppose this school put refill stations in tomorrow. What would
+  you want measured six months later to know whether it had been worth
+  it?"
+  A strong answer reaches road salt, or the building's own plumbing, and
+  distinguishes something that accumulates from something that washes
+  through — that is E1.1 heard about their OWN number rather than
+  recited from a list, and it is where you find out which partner did
+  the reasoning. The second question is E1.2, and an answer that names
+  only money has answered half of it.
+  Record: one line per student, and the origin they reached first.
+
+The product evidence is the report, handed in on Day 14.
+%%

@@ -11,9 +11,9 @@ tags:
 ---
 ## Agenda
 
-1. Review: an unseen dossier, worked against the clock
-2. Six sources on one issue, and the first twenty minutes practised
-3. Where sources disagree, and what to do about it
+1. Review: an unseen dossier, worked against the clock — six sources, and the first twenty minutes practised rather than skipped
+2. In pairs: two sources set against each other, and what to do where they disagree. No marks — it is the last thing I can still put right before the examination
+3. Anything you still want to ask about [[The Issue Examination]]
 
 ## Things to do before our next class
 

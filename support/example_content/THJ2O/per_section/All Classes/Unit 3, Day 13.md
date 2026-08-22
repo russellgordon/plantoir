@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Production run day 3: quality against the specification
+1. Production run day 3: quality against the specification: [[The Production Run]]
 2. Consistency across the batch, measured
-3. Conferences
+3. Conferences and judging quality against criteria: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 
-- [ ] Update the log.
+- [ ] Check the batch measurements are in the log.

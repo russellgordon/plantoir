@@ -2,6 +2,11 @@
   "courseConfigKeys": {
     "keys": [
       {
+        "key": "additional_deploy_targets",
+        "type": "array of objects ({type, path})",
+        "why": "Extra destinations a course ALSO publishes to, beyond `deploy_target` (the primary) — for redundancy against one host having a bad day. `type` uses the same spellings as `deploy_target`; `path` is only present for `local_folder` entries. ABSENT (not `[]`) for every course that has not opted in, so a course nobody has touched writes the exact same file it always has."
+      },
+      {
         "example": "ICS3U",
         "key": "course_code",
         "type": "string"
@@ -13,7 +18,8 @@
       },
       {
         "key": "custom_domains",
-        "type": "per-section map of strings"
+        "type": "per-section map of (per-destination-type map of strings), e.g. custom_domains.sections.section1.netlify",
+        "why": "Keyed by destination TYPE (`netlify`, `cloudflare_pages` — never `local_folder`, which has no domain concept), not just by section, because a course can publish to more than one destination at once and a domain meant for one must never be applied to another's own link. An OLDER shape — `custom_domains.sections.sectionN` as a bare string, written before a course could have more than one destination — is still read: as the domain for whichever destination is currently `deploy_target` (the primary), and invisible to every other type. Setting a domain for a second destination migrates a bare string it finds into the new shape rather than discarding it."
       },
       {
         "key": "custom_short_name",

@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. [[The Roller Coaster Loop, Properly]], day 3 — working period: build,
+1. First ten minutes: the derivation goes back on the board with
+   whatever yesterday's conference said was missing from it
+2. [[The Roller Coaster Loop, Properly]], day 3 — working period: build,
    run, and measure
-2. The rolling correction, and where the missing energy went
+3. The rolling correction, and where the missing energy went
 
 ## Things to do before our next class
 

@@ -12,7 +12,8 @@ tags:
 
 1. Welcome — why this room runs on thinking, not copying
 2. First number talk: [[Graph Talks]] — two lines, no scale: what could
-   this graph be saying?
+   this graph be saying? Nothing today is marked; this is how I find out
+   what this class already brings to graphs before I teach anything
 3. Read together: [[Our Classroom Norms]]
 4. Tour of the site: [[Using This Site]] and [[How This Site Is Organised]]
 5. The daily rhythm we will live by: [[How Math Class Works]]

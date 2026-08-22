@@ -12,7 +12,7 @@ tags:
 
 1. What sustainable development claims to do: [[What Sustainable Development Means]]
 2. Three models compared
-3. Working period
+3. Working period: the changes yesterday's conference named
 
 ## Things to do before our next class
 

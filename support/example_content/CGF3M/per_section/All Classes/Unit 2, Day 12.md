@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. [[The 2023 Canadian Wildfire Season]] — about seven times the average area, with fewer fires than usual
-2. Two official area figures reconciled: NRCan's 14.6 Mha of forest against CIFFC's 17,203,625 ha
+2. Two official area figures reconciled in pairs and argued out, nothing recorded: NRCan's 14.6 Mha of forest against CIFFC's 17,203,625 ha
 3. Evacuation as a preparedness success and a disaster impact at once — roughly 232,000 people
 
 ## Things to do before our next class

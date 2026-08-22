@@ -141,8 +141,7 @@ Add a `-` to start a callout collapsed. Every practice set in
 before you peek, but the peek is always there:
 
 > [!success]- Worked answer (click to expand)
-> $\frac{3}{4} + \frac{5}{6} = \frac{9}{12} + \frac{10}{12} =
-> \frac{19}{12} = 1\frac{7}{12}$
+> $\frac{3}{4} + \frac{5}{6} = \frac{9}{12} + \frac{10}{12} = \frac{19}{12} = 1\frac{7}{12}$
 
 ```markdown
 > [!success]- Worked answer (click to expand)

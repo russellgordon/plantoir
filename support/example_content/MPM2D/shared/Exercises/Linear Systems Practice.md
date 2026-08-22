@@ -26,6 +26,16 @@ a point that satisfies only one line is just a resident.
    fix it, and check the corrected point in both equations.
 7. **Challenge.** Create a system whose solution is $(-1, 4)$, where
    neither equation starts with $y$ isolated. Prove it works.
+8. **Slope formula and line equation.** A line passes through $A(-2, 7)$
+   and $B(4, -5)$. (a) Develop and apply the slope formula
+   $m = \frac{y_2 - y_1}{x_2 - x_1}$ to find its slope. (b) Use the slope
+   and one point to determine the equation of the line in slope-intercept
+   form $y = mx + b$.
+9. **Translating between linear forms.** (a) Convert the equation
+   $y = \frac{3}{4}x - 5$ to standard form $Ax + By + C = 0$, where
+   $A, B, C$ are integers and $A \ge 0$. (b) Convert $2x - 5y = 15$ to
+   slope-intercept form $y = mx + b$ and identify its slope and
+   $y$-intercept.
 
 ## Answers
 
@@ -61,10 +71,28 @@ a point that satisfies only one line is just a resident.
 > $2(-1) - 4 = -6$, one system is $x + y = 3$ with $2x - y = -6$ —
 > checks pass by construction. Creating a system is solving, reversed.
 
+> [!success]- Answer 8
+> (a) The slope formula measures vertical rise over horizontal run:
+> $m = \frac{-5 - 7}{4 - (-2)} = \frac{-12}{6} = -2$.
+> (b) Substitute $m = -2$ and $(4, -5)$ into $y = mx + b$:
+> $-5 = -2(4) + b \implies b = 3$. Equation: $y = -2x + 3$. Verify with
+> $A(-2, 7)$: $-2(-2) + 3 = 7$ ✓.
+
+> [!success]- Answer 9
+> (a) Multiply all terms by 4 to clear fractions: $4y = 3x - 20$.
+> Rearrange to $3x - 4y - 20 = 0$. (Check at $x = 0$: $y = -5$ gives
+> $-4(-5) - 20 = 0$ ✓).
+> (b) Isolate $y$: $-5y = -2x + 15 \implies y = \frac{2}{5}x - 3$.
+> Slope $m = \frac{2}{5}$, $y$-intercept $(0, -3)$.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[B1.1]]
 
 ![[B1.2]]
+
+![[B1.4]]
+
+![[B1.5]]
 %%curriculum-end%%

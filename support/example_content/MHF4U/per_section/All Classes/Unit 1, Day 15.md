@@ -11,8 +11,10 @@ tags:
 ## Agenda
 
 1. Number talk: [[Estimation Duels]]
-2. [[The Rollercoaster]], day 5 — working period: the profile finished and the
-   ride tested for the constraints a passenger would notice
+2. [[The Rollercoaster]], day 5 — working period: ten minutes alone
+   with [[Judging Your Own Work]] first, naming your weakest row, then
+   the rest of the period to mend it and finish the profile — tested
+   for the constraints a passenger would notice
 3. Gallery: three profiles compared for smoothness
 
 ## Things to do before our next class

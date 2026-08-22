@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: one interaction, analysed both ways
-2. Consolidation: the unit on one page, built by the room
-3. Look ahead: forces that act with nothing in between
+1. Warm-up: one interaction, analysed both ways: [[Collisions in Two Dimensions]]
+2. Half the period is yours: the revision list from last class, worked
+   through, with me moving between you: [[Momentum and Collisions Practice]]
+3. Consolidation: the unit on one page, built by the room
+4. Look ahead: forces that act with nothing in between
 
 ## Things to do before our next class
 

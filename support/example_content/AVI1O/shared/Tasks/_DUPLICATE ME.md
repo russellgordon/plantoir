@@ -35,13 +35,39 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 Organize further concepts, practice questions, or reflection prompts under additional headings.
 
-%%curriculum-start%%
-## Curriculum connection
-
 %%
 Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
 %%
 
+%%curriculum-start%%
+## Curriculum connection
+
 ![[A1.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+This block is a note to yourself. It is never published: everything
+between the %% markers is stripped before the site is built. Keep it
+OUTSIDE the curriculum markers above, or it disappears for any teacher
+who installs the course without curriculum pages. Plain text only: no
+wikilinks and no transclusions, because both are read straight off the
+file and would count as coverage for work no student page does. Write
+bare codes and page names as words.
+
+OBSERVE — Unit _, Day _, the period this is actually available in
+  Watch for: something visible only while they work, and gone from the
+  finished thing.
+  Going well:
+  Stuck:
+  Record: how you note it for a whole class in seconds.
+
+TALK — Unit _, Day _, a conference or check-in the schedule already has
+  Ask: "
+  Then: "
+  A strong answer sounds like: and the expectation it evidences.
+  Record:
+
+The product evidence is: the thing that arrives on its own.
+%%

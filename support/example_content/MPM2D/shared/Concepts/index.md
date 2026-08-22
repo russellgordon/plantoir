@@ -15,6 +15,7 @@ after the exploration, not instead of it.
 - [[Linear Systems]]
 - [[Solving Systems Algebraically]]
 - [[Midpoint and Length]]
+- [[Parallel, Perpendicular, and the Bisector]]
 - [[The Equation of a Circle]]
 - [[Properties on the Grid]]
 
@@ -24,6 +25,7 @@ after the exploration, not instead of it.
 - [[Quadratic Relations]]
 - [[Transformations of Parabolas]]
 - [[The Vertex Form]]
+- [[Factors and Intercepts]]
 - [[Zeros and the Quadratic Formula]]
 
 ## Triangles

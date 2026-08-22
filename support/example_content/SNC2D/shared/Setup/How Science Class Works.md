@@ -51,13 +51,16 @@ something your evidence either supports or does not.
 - **Practice** happens in the Exercises pages, after the sense-making,
   never instead of it.
 - **Journal entries** are written the day of the work, not the week
-  before they are read. See [[Science Journal]].
+  before they are read. Three of them are written in class, and those are
+  the three that carry a mark. See [[Science Journal]].
 
 ## What I expect
 
 Turn up, bring your data, argue with each other, and say when you do
-not follow something. The last one is the only one people find hard,
-and it is the one that changes your mark most.
+not follow something. The last one is the only one people find hard, and
+it is the one that changes the work most. None of the four is marked —
+how you work is reported separately from your percentage, and
+[[How Marks Work]] sets out where that line falls.
 
 > [!note] Missing a class
 > Read the class page — the agenda links everything we used, so you can

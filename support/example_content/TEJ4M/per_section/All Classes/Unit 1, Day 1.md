@@ -14,7 +14,9 @@ tags:
    fifth answer counts, the one that needs a datasheet
 2. On the bench, a device that used to work: [[The Failure Autopsy]].
    Before a screwdriver moves, every bench writes down what it thinks
-   killed the thing and what evidence would prove it
+   killed the thing and what evidence would prove it. Nothing here is
+   marked — those verdicts are how I find out what three years have
+   taught this room about failure, and they set what Unit 1 dwells on
 3. Open it and find out. Nothing gets repaired today and nothing gets
    thrown out — we are pathologists, not technicians
 4. The agreement and the destination, read rather than skimmed:

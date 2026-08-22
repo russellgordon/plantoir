@@ -45,7 +45,7 @@ graph LR
 > [!tip] Why winter is sparky
 > Charge leaks away through moisture in the air. Cold air holds little water
 > vapour, so charge accumulates instead of draining — which is why doorknobs
-> start biting in January and not in September.
+> start biting at the end of the course and not at the start of the course.
 
 %%curriculum-start%%
 ## Curriculum connection

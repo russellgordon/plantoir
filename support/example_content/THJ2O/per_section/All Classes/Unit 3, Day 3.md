@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Bench care: watering, light, and air movement
+1. Bench care: watering, light, and air movement: [[Watering Properly]]
 2. First inspection — what to look for at day three
-3. Trial and bench measurements
+3. Trial and bench measurements: [[The Propagation Bench]]
 
 ## Things to do before our next class
 
-- [ ] Update the log.
+- [ ] Check today's inspection is written down.

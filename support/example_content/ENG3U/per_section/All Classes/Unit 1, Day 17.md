@@ -12,7 +12,8 @@ tags:
 
 1. Consolidation: what the short story makes possible
 2. Look ahead: a play in which nobody says what they mean
-3. First look at [[Macbeth]] and at [[The Macbeth Seminar]]
+3. First look at [[Macbeth]] and at [[The Macbeth Seminar]] — day 1 of 6:
+   what a seminar is for, and what you will be asked to lead
 
 ## Things to do before our next class
 

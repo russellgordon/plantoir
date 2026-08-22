@@ -10,8 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Launch: [[The Body of Work]] — three related works
-2. What 'related by idea' means, with examples
+1. Your three ideas up on the wall and read cold — not marked; it tells
+   me who has a question and who has a subject
+2. Launch: [[The Body of Work]] — three related works, and what
+   'related by idea' means
 3. Idea conferences: yours narrowed to one
 
 ## Things to do before our next class

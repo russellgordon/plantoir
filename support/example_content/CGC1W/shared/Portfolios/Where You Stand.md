@@ -7,26 +7,26 @@ tags:
   - unit-4
 ---
 The last entry, written in the final week. One Canadian geographic issue,
-and an honest account of how your view of it moved between September and
-now — with the evidence that moved it.
+and an honest account of how your view of it moved between the start of the
+course and now — with the evidence that moved it.
 
 ## Choosing the issue
 
 It has to be one you held a position on early: land and treaty rights,
 where and whether to build, who pays for climate damage, what a community
 owes people arriving from elsewhere, where food should come from. If you
-cannot recall a September view, take what you argued about hardest.
+cannot recall an early view, take what you argued about hardest.
 
 ## Before you write
 
-Re-read your September notes, your [[The Field Notebook\|field notebook]]
+Re-read your earliest notes, your [[The Field Notebook\|field notebook]]
 entries from the shoreline and the woodlot, all three versions of
 [[A Map of Your Own]], and your seminar contributions. Look for the
 moment the position shifted, not for a summary of what you now believe.
 
 ## The entry (about 700 words)
 
-**What you thought in September, stated plainly.** Not the polished
+**What you thought at the start of the course, stated plainly.** Not the polished
 version — the actual one, including the part you would now argue against.
 
 **What changed it.** Name the specific thing: a number you looked up

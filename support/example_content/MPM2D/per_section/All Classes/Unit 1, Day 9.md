@@ -12,7 +12,7 @@ tags:
 
 1. Number talk: [[Would You Rather]] — two plans
 2. Random groups — three word problems: define the variables, build the
-   system, THEN solve. The defining is the marked step
+   system, THEN solve. The defining is the step everything else rests on
 3. Clinic: [[Linear Systems Practice]] to the end
 
 ## Things to do before our next class

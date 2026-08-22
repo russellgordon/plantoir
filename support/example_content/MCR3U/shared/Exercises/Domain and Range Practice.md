@@ -75,3 +75,9 @@ exists. A stated reason is worth more than a memorised answer.
 > but forbids nothing new). Domain: $x \ne 1$; range: $y \ne 2$.
 > The excluded values are exactly the new asymptotes — sketch it or
 > confirm in [[Using Desmos]], and the two gaps stare back at you.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.3]]
+%%curriculum-end%%

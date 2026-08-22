@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Standup
+1. Standup: [[Record a Standup]]
 2. Consolidation: how you know what you know, on one page, built by the
-   room
+   room: [[The Investigation]]
 3. Look ahead: the last unit puts it all on a page readers will hold
 
 ## Things to do before our next class

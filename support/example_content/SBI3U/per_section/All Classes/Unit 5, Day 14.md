@@ -18,4 +18,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Hand in [[Plant Growth Investigation]].
-- [ ] Final journal entry: what you can do now that you could not in September.
+- [ ] Final journal entry: what you can do now that you could not at the start of the course.

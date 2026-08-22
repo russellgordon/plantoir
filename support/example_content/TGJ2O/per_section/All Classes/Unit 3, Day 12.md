@@ -14,6 +14,8 @@ tags:
 2. Warm-up: [[One-Minute Pitch]] — the structure round: your story in
    three sentences
 3. Desk time: drafting, with the strongest fact in the first sentence
+4. Last fifteen minutes: [[Judging Your Own Work]] against
+   [[The Investigation]]'s criteria — name your weakest row for tomorrow
 
 ## Things to do before our next class
 

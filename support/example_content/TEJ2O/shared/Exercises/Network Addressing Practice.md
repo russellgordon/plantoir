@@ -29,6 +29,12 @@ yourself in [[Crimp and Test a Cable]].
 6. You have just cabled two machines together and want proof they
    can talk. Which utility do you reach for, and what does a good
    result look like?
+7. **Compare network scopes.** State two key differences between a
+   Local Area Network (LAN) and a Wide Area Network (WAN) in terms of
+   geographic coverage, transmission media, and ownership.
+8. **Network roles and hardware.** Contrast a peer-to-peer (P2P) network
+   with a client–server network, and describe the specific job of a
+   network interface card (NIC), a switch, and a router.
 
 ## Answers
 
@@ -65,8 +71,33 @@ yourself in [[Crimp and Test a Cable]].
 > A good result is a string of responses timed in milliseconds;
 > silence sends you back to check cables and addresses.
 
+> [!success]- Answer 7
+> A LAN covers a limited local space (a room, home, or office building)
+> using privately owned copper cables or Wi-Fi, with high bandwidth
+> and low latency. A WAN spans wide geographical distances (across
+> cities, countries, or globally like the Internet), relying on
+> leased telecommunications infrastructure, fibre-optic trunks, and
+> public routing systems.
+
+> [!success]- Answer 8
+> In a P2P network, every connected workstation acts as both client and
+> server with equal authority, sharing files directly without central
+> management. In a client–server network, dedicated servers provide
+> centralised services (authentication, file storage, printing) to
+> client workstations. Hardware roles:
+> - **NIC:** Connects a device to the network medium and handles
+>   physical/logical signalling.
+> - **Switch:** Connects devices within a LAN and directs data frames
+>   to specific ports using MAC addresses.
+> - **Router:** Forwards data packets between different networks using
+>   IP addresses to determine the optimal route.
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A2.1]]
+
+![[A2.2]]
 
 ![[A2.4]]
 

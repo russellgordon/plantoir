@@ -13,6 +13,16 @@
 > Whichever is chosen, the thing published is the same built
 > `public/` folder; only the transport differs. The two newer
 > destinations are described at the end of this page.
+>
+> **A course can publish to more than one destination now, for
+> redundancy** — see `additional_deploy_targets` in
+> [the config reference](08-course-config-reference.md). `deploy.py`
+> itself is unaware of this: it still does exactly one destination per
+> invocation, exactly as below. Redundancy is entirely an APP-layer
+> concern — the app (or the scheduled-deploy shell script it writes)
+> simply invokes `deploy.py` once per configured destination, in
+> sequence, and one destination failing does not stop the others. See
+> `mac-app/QuartzTeachers/Scripting/MultiDestinationDeployRunner.swift`.
 
 [◀ Previous: Quartz Customizations](06-quartz-customizations.md) · [Back to index](README.md) · [Next: course_config.json Reference ▶](08-course-config-reference.md)
 
@@ -115,6 +125,60 @@ fonts / …) of what Netlify requested and writes the full ordered list to
 `public/_required_last_deploy.txt`. This exists to answer the question "why
 did that deploy upload 400 files?" — the usual culprit being some
 nondeterminism reintroduced into the build.
+
+### Suppressing Netlify's own ad badge
+
+Netlify can inject a "Powered by Netlify" badge — and a matching pre-launch
+toolbar — into any public site on a free-tier project (rollout confirmed
+2026-08-21). There is no API field to turn it off: its published OpenAPI
+spec has nothing named `badge`, `powered_by`, or `premium` anywhere on the
+`Site` object, so the only documented control is a per-project dashboard
+toggle — not something that scales to hundreds of teachers' class sites.
+
+Netlify's own docs name the one lever that *is* automatic: the badge only
+renders through an inline `<script>` injected at their edge, and a
+Content-Security-Policy whose `script-src` omits `'unsafe-inline'` makes the
+browser refuse to run it
+(<https://docs.netlify.com/manage/projects/powered-by-netlify-badge/>):
+"Neither the badge nor the pre-launch toolbar appears, and no other project
+functionality is affected."
+
+A fixed CSP would be fragile — Quartz's own build does emit a few inline
+`<script>` blocks (a search-index prefetch trigger, a callout-collapse
+handler, a Mermaid pan/zoom script), and a hardcoded allow-list would go
+stale on a Quartz upgrade or silently break a teacher's own embedded
+`<script>`. So `write_netlify_headers_file()` scans the actual built
+`public/` folder at deploy time — every `.html` file, every unique inline
+`<script>` body, SHA-256-hashed — and writes `public/_headers` with a policy
+built from what is really there:
+
+```
+/*
+  Content-Security-Policy: script-src 'self' 'sha256-…' 'sha256-…' … https://cdn.jsdelivr.net;
+```
+
+Only `script-src` is set, never `default-src` — nothing else about a page
+(images, fonts, styles, network requests) is restricted. This runs on the
+Netlify path only, right after any production rebuild above and right
+before the delta-deploy manifest is built, so `_headers` rides along in the
+same SHA-1 manifest as every other file. It is deterministic build to build
+(same content ⇒ same hashes ⇒ same file), which matters for the same reason
+covered under "Why determinism matters" above. Tested in
+`scripts/test_deploy_netlify_headers.py` (no Docker needed — `verify.sh`
+runs it before the image build).
+
+**Cloudflare Pages and `local_folder` pay nothing for this.** It is a
+problem Netlify created, so only a Netlify deploy should carry the cost —
+Cloudflare's `publish_to_cloudflare()` returns from `main()` before this
+code is even reachable, and `local_folder` never invokes `deploy.py` at
+all. No extra file, no extra console line, no extra time on either path.
+This also keeps them a clean control group: deploying identical content to
+both Netlify and Cloudflare is a direct way to check whether a suspected
+breakage on a site is caused by this feature specifically, rather than by
+the build itself. Pinned structurally in
+`CloudflareIsNeverTouchedTests` in `scripts/test_deploy_netlify_headers.py`,
+so a future refactor that moves the badge-suppression call earlier fails
+that test rather than shipping a silent regression.
 
 ### Rate limiting
 

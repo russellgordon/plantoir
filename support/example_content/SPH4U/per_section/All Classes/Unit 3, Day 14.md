@@ -12,7 +12,9 @@ tags:
 
 1. Discussion: [[The Fields We Live In]] — with your own research on the
    table
-2. [[Fields Technology Report]], day 5 — working period: the report finished
+2. [[Fields Technology Report]], day 5 — working period: first the
+   source or the section yesterday's conference put a question against,
+   then the report finished
 
 ## Things to do before our next class
 

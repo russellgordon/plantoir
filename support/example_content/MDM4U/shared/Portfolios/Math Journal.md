@@ -7,7 +7,8 @@ tags:
 ---
 > [!abstract] At a glance
 > Individual · ongoing all course · one entry after every class ·
-> collected at the end of each unit
+> read at the end of each unit · the entry that carries a mark is the
+> milestone one, written in class
 
 ## What you are making
 
@@ -50,8 +51,9 @@ today" is a perfect journal sentence — dated, testable, and yours.
 
 ## Success criteria and collection
 
-The journal comes in each unit, read against these criteria —
-[[Journal Checklist]] turns them into a self-check before handing in.
+The journal comes in at the end of each unit, read against these
+criteria — [[Journal Checklist]] turns them into a self-check before
+you hand it over.
 
 | Quality | What it looks like |
 | --- | --- |
@@ -60,3 +62,14 @@ The journal comes in each unit, read against these criteria —
 | Precision | Foggy things located, not just felt |
 | Growth | "What I would try" items reappear as things actually tried |
 | Traceability | The investigation's decisions are dated and explained |
+
+> [!important] Which entries carry a mark, and which do not
+> The nightly entries are practice, and practice is not marked in
+> this course — see [[How Marks Work]]. What I evaluate is the
+> **milestone entry**: the last fifteen minutes of the final class of
+> Units 1, 2 and 3, written here, in the room, looking back across the
+> unit against the five qualities above. The nightly entries are what
+> make that fifteen minutes possible, which is the honest reason to
+> keep them. Unit 4 ends differently: [[Final Reflection]] is its
+> milestone entry, written in class on the last day before the review
+> classes begin.

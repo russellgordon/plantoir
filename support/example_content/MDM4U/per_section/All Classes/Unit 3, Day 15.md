@@ -25,5 +25,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Investigation milestone: data set assembled, cleaned, and fully
-      cited. Bring it — the analysis begins in Unit 4.
+- [ ] Investigation milestone: data set assembled and fully cited, in
+      hand by next class. Cleaning is the working period on Day 17 and
+      the first analysis is Day 18.

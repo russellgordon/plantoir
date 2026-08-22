@@ -179,6 +179,10 @@ of air pressing on you at this moment.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[F2.1]]
+
+![[F2.2]]
+
 ![[F3.4]]
 
 ![[F3.5]]

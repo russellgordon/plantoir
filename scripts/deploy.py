@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import base64
 import datetime as dt
 import io
 import json
@@ -721,6 +720,37 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
     print(f" Live URL: https://{host}")
     print("\n✅ Deploy complete.")
 
+# ---------- Netlify ad-badge suppression ----------
+# Netlify can inject its own "Powered by Netlify" badge (and a matching
+# pre-launch toolbar) into any public site on a free-tier project — see
+# https://docs.netlify.com/manage/projects/powered-by-netlify-badge/. There
+# is no API field to turn it off (its own OpenAPI spec has nothing named
+# "badge" anywhere on the Site object), and asking every teacher to find the
+# toggle in their own Netlify dashboard, per section, forever, is not a real
+# fix. Netlify's docs name the one lever that IS automatic: the badge only
+# renders through an inline <script> injected at their edge, and a
+# Content-Security-Policy whose script-src omits 'unsafe-inline' makes the
+# browser refuse to run it — "Neither the badge nor the pre-launch toolbar
+# appears, and no other project functionality is affected."
+#
+# The risk with a blanket policy like that is breaking a site's OWN inline
+# scripts. Rather than hand-maintain a fixed allow-list (which would go
+# stale the moment Quartz changes its bundling, or miss a teacher who embeds
+# a <script> of their own), this scans the actual built HTML at deploy time
+# and allows exactly what is really there, by content hash. That is a
+# behaviour, not a fixed list — it holds even if Quartz's own scripts change
+# on a version bump, and it does not depend on knowing in advance what a
+# teacher chose to embed.
+#
+# The scanning logic itself lives in netlify_badge.py (sibling module) — the
+# marketing site's own Netlify deploy (website/netlify_deploy.py) is exposed
+# to the identical badge and shares this implementation rather than carrying
+# a second copy. Re-exported here so this module's own callers, and
+# test_deploy_netlify_headers.py's `deploy._collect_inline_script_policy` /
+# `deploy.write_netlify_headers_file`, keep resolving unchanged.
+from netlify_badge import _collect_inline_script_policy, write_netlify_headers_file  # noqa: E402
+
+
 # ---------- Delta deploy helpers ----------
 def _sha1_bytes(data: bytes) -> str:
     h = hashlib.sha1()
@@ -1093,6 +1123,16 @@ def main():
     target_domain = clean_base_url(site_url)
     if target_domain:
         ensure_base_url_and_rebuild(section_dir, target_domain, args.course, str(args.section), _HOST_OS)
+
+    # Netlify can add its own "Powered by Netlify" badge to a free-tier
+    # site — this rule keeps it off without touching anything students see.
+    # Must run after any rebuild above and before the manifest below, so the
+    # file it writes is part of what gets uploaded.
+    print("\n Netlify can add its own advertisement badge to free-plan sites.")
+    print(" Writing a website rule that keeps it off your students' pages…")
+    protected_scripts = write_netlify_headers_file(public_dir)
+    print(f" (That rule also checked the {protected_scripts} script(s) already on this")
+    print(" site, so nothing on the page stops working.)")
 
     # Always delta deploy to PRODUCTION (as requested)
     print(" Preparing delta deploy manifest…")

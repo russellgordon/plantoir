@@ -111,3 +111,9 @@ small thing is also a question, and a better one than most emails.
 The reason none of this should embarrass you: everybody in the room
 is stuck on something right now, and the ones who look like they are
 not are simply further into the twenty minutes.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A4.1]]
+%%curriculum-end%%

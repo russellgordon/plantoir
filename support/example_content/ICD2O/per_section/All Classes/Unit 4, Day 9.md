@@ -11,10 +11,16 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Predict the Output]]
-2. [[Launch Day]], day 2 — working period: choose what you will show, and
-   write the two sentences you will open with
-3. Test the opening on a partner who was not in your group
+2. Two minutes each with me, while the room plans: program, or
+   plan-plus-prototype — the path check the task asks you to make with
+   me before you commit
+3. [[Launch Day]], day 2 — working period: the plan on paper first —
+   what the core is, and the pieces it breaks into — then start
+   building it
+4. Last fifteen minutes: read your plan to somebody who has not heard
+   it. If they cannot say what the core does, the plan is not finished
 
 ## Things to do before our next class
 
-- [ ] Demo chosen. Opening written.
+- [ ] Nothing to finish at home. If reading the plan aloud changed it,
+      note what changed.

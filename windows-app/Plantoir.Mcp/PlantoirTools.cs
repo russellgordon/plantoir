@@ -340,9 +340,19 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
 
             var plan = workspace.PlanScheduledDeploy(course, section, moment);
-            var deployArgs = DeployCommand.Arguments(plan.CourseCode, plan.SectionNumber, workspace.Course(plan.CourseCode).Configuration);
+            // The Cloudflare Account ID is a per-teacher, machine-global
+            // setting, read the same way PlanScheduledDeploy's own refusal
+            // check does — omitting it here would schedule a Cloudflare
+            // deploy with an empty --account, even once the refusal check
+            // above had already confirmed a real one was configured.
+            string cloudflareAccountId = AppSettings.Load().CloudflareAccountId;
+            // One argument list per configured destination — same order
+            // AllDeployDestinations deploys in.
+            var deployArgumentsList = workspace.Course(plan.CourseCode).Configuration.AllDeployDestinations
+                .Select(destination => DeployCommand.Arguments(plan.CourseCode, plan.SectionNumber, destination, cloudflareAccountId))
+                .ToList();
             if (TaskScheduling.Schedule(plan.TaskName, workspace.FolderPath,
-                                        plan.CourseCode, plan.SectionNumber, moment, deployArgs) is { } problem)
+                                        plan.CourseCode, plan.SectionNumber, moment, deployArgumentsList) is { } problem)
                 throw new AssistRefusal($"Nothing was scheduled. {problem}");
 
             // The caution about the computer being awake is on the card the

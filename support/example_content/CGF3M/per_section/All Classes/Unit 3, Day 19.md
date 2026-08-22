@@ -12,7 +12,7 @@ tags:
 
 1. [[The Land Use Question]] hearing, first half
 2. Each speaker states the opposing case first, and is marked on how fairly it is put
-3. One question from the floor per pair: what evidence would change your mind?
+3. One question from the floor to each speaker, not to each pair: what evidence would change your mind?
 
 ## Things to do before our next class
 

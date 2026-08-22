@@ -17,8 +17,8 @@ mirrors them exactly.
   question, the safety notes, the procedure, and what to record.
 - **[[Exercises/index|Exercises]]** — practice sets with the answers
   folded away.
-- **[[Discussions/index|Discussions]]** — questions physics cannot settle
-  on its own, where the physics is still the reason the conversation is
+- **[[Discussions/index|Discussions]]** — questions biology cannot settle
+  on its own, where the biology is still the reason the conversation is
   worth having.
 - **[[Portfolios/index|Portfolios]]** — your own record of the course.
 - **[[Reference/index|Reference]]** — the things you look up: units,

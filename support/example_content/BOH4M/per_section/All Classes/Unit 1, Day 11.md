@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. What a room actually does when you present: [[Presenting to a Room]]
-2. Building the deck: [[Building a Deck That Works]]
-3. Draft your one sentence and your three points; swap with another pair
+1. First fifteen minutes: the one change yesterday's conference named for your study, made now — bring the note you left with
+2. What a room actually does when you present: [[Presenting to a Room]]
+3. Building the deck: [[Building a Deck That Works]]
+4. Draft your one sentence and your three points; swap with another pair
 
 ## Things to do before our next class
 

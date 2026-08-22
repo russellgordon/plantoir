@@ -148,3 +148,13 @@ write the words themselves.
 > the middle of something else, and your program is one of eleven
 > things they touched today. Code that requires a good mood to
 > understand will be rewritten by somebody who does not have one.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.2]]
+
+![[A4.3]]
+
+![[A4.4]]
+%%curriculum-end%%

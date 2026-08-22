@@ -217,5 +217,9 @@ ray conventions. Your own measurements of this law:
 
 ![[E2.1]]
 
+![[E2.2]]
+
+![[E2.3]]
+
 ![[E3.3]]
 %%curriculum-end%%

@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 Your code runs somewhere. At Grade 11 that was a laptop; by the time
 anything you write is used by strangers, it is a rack in a building that

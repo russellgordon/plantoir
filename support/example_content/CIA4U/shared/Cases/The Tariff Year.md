@@ -41,17 +41,26 @@ hides the industries that were hit hardest.
 
 ## The reasoning to do
 
-Use [[Comparative Advantage]] to say what the model predicts a tariff
-does — and then say what it leaves out, because the model has no
-geopolitics in it and no adjustment costs for the worker whose plant
-closed. Use [[Elasticity]] to work out who actually pays a tariff: the
-answer depends on how easily buyers can switch, not on who writes the
-cheque at the border.
+Use [[Comparative Advantage]] to compare trade theories (E1.1) — absolute
+advantage, comparative advantage, and new trade theory — and explain what
+each predicts a tariff does. Then say what the models leave out: geopolitics,
+supply chain vulnerability, and adjustment costs for displaced workers. Use
+[[Elasticity]] to work out who actually pays a tariff: the incidence depends
+on relative price elasticities of supply and demand, not on who writes the
+cheque at the border. Traced exchange rate movements (E1.2) further show how
+currency fluctuations offset or magnify tariff barriers.
+
+Apply the concepts of economic thinking (A2.3) — economic significance,
+cause and effect, stability and variability, and economic perspective — to
+trace how this trade conflict alters investment and consumer costs across
+different Canadian regions.
 
 Then the harder question, which is E2.3's: what should Canada do? Retaliate
-in kind, diversify markets, subsidise affected industries, or absorb it and
-keep negotiating — each has a constituency, a cost, and a record. Judge
-them by criteria you state in advance, as [[The Trade Question]] requires.
+in kind, diversify export markets through agreements like CETA or CPTPP
+(E1.4), subsidise affected domestic industries, or absorb the duties and
+keep negotiating. Each policy response carries a constituency, a fiscal
+cost, and an economic consequence. Judge them by criteria you state in
+advance, as [[The Trade Question]] requires.
 
 **Retrieve before you write.** Statistics Canada's merchandise trade
 release and the federal government's own tariff notices are the two
@@ -61,11 +70,17 @@ date within weeks.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A2.3]]
+
+![[D2.3]]
+
+![[E1.1]]
+
+![[E1.2]]
+
 ![[E1.4]]
 
 ![[E2.2]]
 
 ![[E2.3]]
-
-![[D2.3]]
 %%curriculum-end%%

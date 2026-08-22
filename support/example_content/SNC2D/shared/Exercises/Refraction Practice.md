@@ -192,7 +192,9 @@ refraction: [[Finding the Focal Length]].
 %%curriculum-start%%
 ## Curriculum connection
 
-![[E3.7]]
-
 ![[E2.6]]
+
+![[E3.4]]
+
+![[E3.7]]
 %%curriculum-end%%

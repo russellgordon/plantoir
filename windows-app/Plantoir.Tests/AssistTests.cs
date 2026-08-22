@@ -1353,7 +1353,10 @@ public class AssistWorkspaceTests : IDisposable
         var result = await workspace.Deploy("ICS3U", 1);
 
         Assert.True(result.Succeeded);
-        Assert.Contains("Students can see it now.", result.Message);
+        // Contract wording (assist-wording.json → "deployed"), not the
+        // bespoke sentence this used to say — found to have drifted from
+        // the contract while porting multi-destination deploy (entry 305).
+        Assert.Equal(AssistWording.Deployed("ICS3U", "1"), result.Message);
         Assert.Equal(new[] { "preview", "preview", "deploy" }, _launcher.Runs.Select(r => r.Launcher));
     }
 

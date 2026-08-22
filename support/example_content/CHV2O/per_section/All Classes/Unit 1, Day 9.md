@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Judging Civic Information]] — everything reaches you through somebody who wanted it to
-2. Who paid, who benefits, and what has been left out
-3. Four sources on one issue, ranked and defended
+1. [[Values That Pull Against Each Other]] — the list everyone agrees on, and the trade-offs nobody does
+2. Launched: [[The Issue Brief]] — the criteria table read together before anybody chooses
+3. Choosing an issue live now, specific enough to have sides
 
 ## Things to do before our next class
 
-- [ ] Read [[Judging Civic Information]].
+- [ ] Choose your issue and find three sources of different kinds.

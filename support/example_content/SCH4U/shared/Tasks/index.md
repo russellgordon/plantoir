@@ -7,13 +7,16 @@ tags:
   - chemistry
   - tasks
 ---
-Five pieces of work that are marked, one per unit and one at the end.
-They are not decoration on top of the tests — they are the places where
-you have to put everything together at once, which is the only place I
-can see whether you can.
+Everything in this course that carries a mark is on one of these pages.
+Five term tasks, one per unit; the four write-ups gathered on
+[[The Lab Reports]]; and the two pieces at the end that make up the
+final thirty per cent. They are not decoration on top of the practice —
+they are the places where you have to put everything together at once,
+which is the only place I can see whether you can. What is **not** here
+is not marked, and [[How Marks Work]] lists what that leaves out.
 
-Every task page has the same four parts, and they are in this order for
-a reason.
+Each of the five term tasks has the same four parts, and they are in
+this order for a reason.
 
 | Part | What it does |
 | --- | --- |
@@ -28,7 +31,15 @@ a reason.
 | [[The Molecule Dossier]] | Organic chemistry | Take one everyday organic compound apart, all the way from its IUPAC name to who it affects |
 | [[The Rate Investigation]] | Energy and rates | Design a rate experiment, measure it properly, and connect it to a process that runs at scale |
 | [[The Buffer Design]] | Equilibrium | Choose a target pH, design a buffer to hold it, predict its behaviour, then test it |
-| [[The Chemistry Showcase]] | Finale | Present your work and defend it under questioning |
+| [[The Cell Report]] | Electrochemistry | Judge one electrochemical technology against a job somebody actually wants it to do |
+
+Running underneath all five, and at the end:
+
+| Also marked | When | The short version |
+| --- | --- | --- |
+| [[The Lab Reports]] | One per unit, Units 1 to 4 | Four investigations written up in class, on the same seven criteria every time |
+| [[The Chemistry Showcase]] | The last class | Present your work and defend it under questioning |
+| [[Final Examination]] | The examination period | The whole course, on paper, in three hours |
 
 > [!important] Read the criteria table before you start
 > Not after. It tells you what separates a level 3 from a level 4, and
@@ -36,7 +47,7 @@ a reason.
 > end. The pattern is always the same one described in
 > [[How Marks Work]]: level 4 is not more work, it is **judgement**.
 
-## Five rules that apply to all five tasks
+## Five rules that apply to all five term tasks
 
 **Every number carries a unit and a defensible number of significant
 figures.** A pH quoted to four decimal places from a probe reading to

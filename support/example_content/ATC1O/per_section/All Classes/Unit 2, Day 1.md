@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Warm-Up as Choreography]]
-2. Retrieval: name that element
+2. Retrieval: name that element — so I can see which of the four stuck
+   and which one I have to teach again
 3. From warm-up to material: [[Warm-Up as Choreography]]
 4. Phrase work begins: [[Phrase Building]]
 5. Cool-down

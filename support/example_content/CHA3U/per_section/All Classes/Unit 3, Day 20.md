@@ -12,7 +12,7 @@ tags:
 
 1. 1945: the bomb, and the arguments made for it and against it, then and since
 2. [[Interpretation and Historiography]] revisited — how the Hiroshima debate has moved
-3. Retrieval across Unit 3
+3. Second half of the period: [[Skills You Are Building]] written here, from your notebook
 
 ## Things to do before our next class
 

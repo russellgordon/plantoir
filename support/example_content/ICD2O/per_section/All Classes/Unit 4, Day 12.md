@@ -11,10 +11,14 @@ tags:
 ## Agenda
 
 1. Warm-up: your choice
-2. [[Launch Day]], day 5 — working period: the room. Where guests stand,
-   where machines go, who greets people at the door
-3. Full technical run: every machine, every cable, in place
+2. [[Launch Day]], day 5 — working period: the reuse documentation and
+   the known-limits list — what it does, how to run it, how to change
+   it, who else it touches, and what it stores — with
+   [[Writing Good Comments|comments]] inside the code itself
+3. Last fifteen minutes: swap documentation with somebody and try to
+   run their artifact from their instructions alone, asking them
+   nothing. Every place you get stuck is a line they have not written
 
 ## Things to do before our next class
 
-- [ ] Everything in the room, not at home.
+- [ ] Nothing to finish at home.

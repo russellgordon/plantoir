@@ -16,8 +16,9 @@ tags:
    logic analyzer
 3. Code that survives a bring-up: [[Talking to a Peripheral]], kept in
    a repository from the first line — [[Version Control for Firmware]]
-4. Launch: [[The Interface]]. Scope evidence is part of what you hand
-   in, not a bonus
+4. Launch: [[The Interface]], criteria table read at the bench before
+   you start. Scope evidence is part of what you hand in, not a bonus,
+   and pairs divide the evidence today rather than at the end
 5. Log the first transaction that worked and the thing you changed to
    get it
 

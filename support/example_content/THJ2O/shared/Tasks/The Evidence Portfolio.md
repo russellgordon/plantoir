@@ -16,7 +16,8 @@ apprenticeship sponsor — evidence that you can do this work.
 
 ## The portfolio
 
-Assembled all year, not in June — see [[The Evidence File]]:
+Assembled all semester, not at the end of the course — see
+[[The Evidence File]] :
 
 - Photographs of every build, bed, and planting, before and after
 - Your propagation log and growing trial data
@@ -24,6 +25,8 @@ Assembled all year, not in June — see [[The Evidence File]]:
 - The safety ticket record, and any additional tickets earned
 - Your skills record: Essential Skills and work habits with real
   examples — see [[Your Skills Record]]
+- Your self-checks against the task criteria, dated — see
+  [[Judging Your Own Work]]
 - Drawings, costings, and the site project handover
 - A one-page summary of what you can do, written for someone hiring
 
@@ -44,8 +47,12 @@ you are doing and why as you go.
    entering an occupation where they would be in a minority — women in
    the trades, Indigenous apprenticeship supports, newcomer bridging
    programs — and say what it actually offers.
-3. **Your Essential Skills and work habits**, assessed honestly against
-   evidence in the portfolio.
+3. **The Essential Skills and work habits the green industries run
+   on** — which ones, why each matters in this work, and a piece of
+   evidence from your own year that shows what one of them looks like
+   in practice. What is marked is whether you understand which skills
+   this trade needs and why; how highly you rate yourself at them is
+   not part of it.
 
 ## What is marked
 
@@ -54,7 +61,7 @@ you are doing and why as you go.
 | Evidence | Real, dated, and yours |
 | Practical | The three tasks done correctly and safely, with reasoning |
 | Career knowledge | Specific routes, requirements, and next steps |
-| Self-assessment | Honest, with evidence rather than adjectives |
+| Skills and habits | The Essential Skills and work habits this trade runs on, each tied to real evidence |
 | Presentation | Something you would actually hand to an employer |
 
 > [!tip] Build it as you go
@@ -77,3 +84,49 @@ you are doing and why as you go.
 
 ![[D2.6]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+The practical demonstration in the examination period is product
+evidence and nothing else — you are running three stations and timing
+them, and you should not try to do anything else there. The two prompts
+below are in the last fortnight, while the portfolio can still change.
+
+OBSERVE — Unit 4, Day 13, the portfolio work period
+  Watch what comes OUT. D2.6 offers develop OR select, and selecting is
+  the half nobody does: a folder with everything in it, in the order it
+  was found, has been assembled rather than chosen, and the difference
+  is invisible once the cover is on.
+  Then watch what happens when somebody finds a gap. Photographing what
+  still stands on site and captioning it honestly, and quietly taking a
+  groupmate's photograph of work they were both part of, produce pages
+  that read alike; the caption is what separates them, and you will
+  believe the caption more having watched it being written.
+  Going well: a pile of rejects beside the folder, and a caption being
+  rewritten.
+  Stuck: page after page added without a caption; a photograph nobody
+  can say who took.
+  Record: two columns beside each name — put in, took out. A student
+  with nothing in the second column is the conference to have first.
+
+TALK — Unit 4, Day 17, at the portfolio conferences already on that
+agenda
+  The written section asks for three careers and how to get into them,
+  so those answers are prepared. Go around them.
+  Ask: "If you had one page of this to show somebody, which piece — and
+  which one would you be sorry to leave out?"
+  Then: "Name the ticket or certificate you do not have yet that would
+  change what somebody could hire you for. What does getting it actually
+  take?"
+  A strong second answer is specific about the route — a course, a fee,
+  a number of supervised hours, an age you have to be. That is D2.1
+  heard as a plan rather than as research, and a written page can list
+  requirements without the student ever working out which one applies to
+  them.
+  Record: one line each — the piece they would keep, and the ticket they
+  named. The second column is worth reading again at parents' night.
+
+The product evidence is the portfolio handed in on Day 20 and the
+practical demonstration in the examination period.
+%%

@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 enableToc: true
 ---
-Ten poems across the year, each read beside something it argues with.
+Ten poems across the semester, each read beside something it argues with.
 
 | Poem | Poet | Read beside |
 | --- | --- | --- |
@@ -41,9 +41,11 @@ because a reading aloud is an interpretation with a body.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.4]]
+
+![[A1.7]]
+
 ![[B1.5]]
 
 ![[B2.3]]
-
-![[A1.4]]
 %%curriculum-end%%

@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Day 3 of 8: structuring the whole piece
+2. Day 3 of 9: structuring the whole piece
 3. [[Structures for Making]] applied at length
-4. Coaching
+4. Coaching: spacing, group dynamics, and spatial focus for [[The Showing]]
 5. Cool-down
 
 ## Things to do before our next class

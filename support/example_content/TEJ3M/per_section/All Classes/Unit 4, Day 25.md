@@ -11,7 +11,12 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Predict the Circuit]] — your own project's front end
-2. [[The Engineering Project]], day 3 — circuits built and measured
+2. Proposals back, with my comments on them: [[The Engineering Project]],
+   day 3 — whatever the review sent you back to, settled first; then
+   circuits built and measured
+3. Build log open on the bench from the first minute, per
+   [[Documenting Your Build]] — it is written as it happens or it is
+   not written
 
 ## Things to do before our next class
 

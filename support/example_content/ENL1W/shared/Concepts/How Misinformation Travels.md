@@ -69,4 +69,8 @@ first, and does a source with something to lose stand behind it?
 ![[C3.3]]
 
 ![[A2.2]]
+
+![[A2.5]]
+
+![[A2.7]]
 %%curriculum-end%%

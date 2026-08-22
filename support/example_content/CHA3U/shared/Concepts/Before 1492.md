@@ -59,4 +59,6 @@ it is the habit that makes [[What Did the Frontier Mean|What Did the Frontier Me
 ## Curriculum connection
 
 ![[B1.1]]
+
+![[B2.4]]
 %%curriculum-end%%

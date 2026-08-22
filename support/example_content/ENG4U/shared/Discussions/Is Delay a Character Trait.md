@@ -37,7 +37,11 @@ that is your counter-reading section.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
 ![[A1.5]]
+
+![[A1.7]]
 
 ![[B1.6]]
 

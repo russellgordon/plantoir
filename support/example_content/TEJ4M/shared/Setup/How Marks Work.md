@@ -4,56 +4,143 @@ publish: true
 created: __CREATED__
 tags:
   - setup
+enableToc: true
 ---
 Marks in this course worry people for one wrong reason: a belief that
 some people are "good with their hands" and everyone else should stay
 back from the bench. No such division exists, and after two years in
 this room you have the evidence in your own journal. Measuring,
 calculating, specifying, and diagnosing are learned skills, every one
-of them, and you are marked on **process, evidence, and
-communication** — all three of which are inside your control.
+of them, and what is marked is the work they produce.
 
-## Where evidence comes from
+## The seventy and the thirty
+
+Every Grade 12 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it — which matters in a course
+where almost everybody is visibly better at the end of the course than they
+were at the start of the course. The other thirty per cent comes from one
+final evaluation at the end.
 
 ```mermaid
-pie title Where evidence comes from
-    "The capstone: design project and review" : 35
-    "Unit tasks" : 25
-    "Labs and design reviews" : 15
-    "Tech Journal and reflection" : 15
-    "Daily practice, safety, and collaboration" : 10
+pie title Where the mark comes from
+    "The semester's work" : 70
+    "The Engineering Review" : 30
 ```
 
-**The capstone is the largest single piece of this course**, and that
-is deliberate. [[The Engineering Design Project]] and
-[[The Engineering Review]] together are where everything else lands:
-you specify something, choose parts and defend the choices, build it,
-measure it, document it so somebody else could build it, and then
-stand in front of the room and answer hard questions about it. Nothing
-in Grade 10 or Grade 11 asked for all of that at once. It is worth what
-it is worth because it is the closest thing in this building to the
-actual job.
+**The seventy** is everything you hand in between the first class and the
+last build day. In the order you meet them: your ten
+[[The Bench Record|bench records]], one for each lab;
+[[The Specification]] in Unit 1; [[The Interface]] in Unit 2;
+[[The Control System]] in Unit 3; [[The Deployment]] and then
+[[The Engineering Design Project]] in Unit 4; and your [[Tech Journal]],
+collected at the end of Units 1, 2 and 3.
 
-**Unit tasks** — [[The Specification]], [[The Interface]], and
-[[The Control System]] — are the rehearsals. Each one takes a piece of
-the capstone and makes it the whole assignment, with its success
-criteria published before you start.
+They are not equally weighted. The capstone is worth several of the
+smaller pieces on its own, because it runs longest and asks for
+everything at once, and the four unit tasks are the rehearsals that
+make it possible. The exact split is not a secret — ask me for it
+whenever you like. It is simply not the useful thing to memorise, and
+printing it to the nearest per cent would present my professional
+judgement as arithmetic.
 
-**Labs and design reviews** cover bench work and the reviews attached
-to it. Presenting a design and being questioned about it is assessed,
-and so is the quality of the questions you ask about somebody else's.
-A review comment that names a requirement is worth more than three
-that name a preference.
+**The thirty** is [[The Engineering Review]], the last class of the
+course. You demonstrate the device you built, answer three published
+questions about it — two about the design and one about what the thing
+costs the world it goes into — critique three other projects in
+writing, and hand in your journal with [[Final Reflection]] attached,
+and your handover package with its career and work-habit note at the
+front. It is deliberately not a fifth unit
+test: the questions reach back across the whole semester, which is why
+you have had them since Unit 4 began.
 
-**Reflection** is your [[Tech Journal]]. It is where a destroyed
-component, a prediction that missed by a factor of ten, or a decision
-you later overturned turns into evidence of learning — and it is often
-the strongest evidence you have.
+Each of the five tasks that runs across several periods — the four unit
+tasks and the capstone — has a point before hand-in where you get
+feedback rather than a mark, and a named slot afterwards for acting on
+what it found. On four of them that slot is the first job of the next
+period; on [[The Specification]] it is a whole revision period. Either
+way it is written on the class page, so you can see it coming.
 
-**Daily practice** is the small stuff done consistently: warm-ups,
-roles rotated fairly, safety habits kept without reminders, the
-question that unstuck the bench beside you, the supply turned off and
-wound down before you walked away.
+## Four kinds of thinking, not one
+
+Every task asks for more than one of these, and the balance shifts with
+the task.
+
+| What is judged | What it means at this bench |
+| --- | --- |
+| What you know | The parts, the laws, the protocols, the standards, and what a datasheet figure actually promises |
+| How you think | Choosing between two designs, finding the fault nobody else located, deciding what to cut and when |
+| How you communicate | A schematic that matches the board, a log somebody can follow, an answer to a hard question |
+| Where you apply it | Making it work in conditions nobody rehearsed with you |
+
+The balance in *this* course leans towards the last two, because the
+curriculum it is built from mostly asks you to design, build, test and
+hand over rather than to recite. That is also why the capstone is a
+problem you found rather than one I set: applying what you know in a
+situation nobody walked you through is the hardest of the four, and the
+only place it can be seen is somewhere unrehearsed.
+
+## Three kinds of evidence, and two of them are not paper
+
+**What you make** is the obvious one: records, traces, logs, code,
+documentation. **What I watch you do** is the second — whether the
+predicted column is written before the supply comes on, whether a fault
+is halved or guessed at, whether the current limit is set before the
+leads go on. **What you tell me** is the third: the bench-side
+questions while you work, the feedback checkpoint before each of those
+five tasks is collected, the design review, and the defence at the end.
+
+The last two are not a softer substitute for the first. Some of what
+you understand will only ever appear there — and if your build is
+unfinished on the day, the conversation is often the strongest evidence
+in the room. That is not a consolation. It is how the mark is meant to
+work.
+
+## What is not in your mark
+
+**How you work** is reported separately, on the same report card, as
+**E, G, S or N** — responsibility, organization, independent work,
+collaboration, initiative, and self-regulation. They matter, we will
+talk about them, and they do not move your percentage. The mark is
+about the work; that column is about the worker, and mixing the two
+tells you less about both.
+
+There is one exception, and it is written into the curriculum rather
+than invented here. Two expectations in this course are themselves
+about habits: [[D3.4|the work habits this industry runs on]] and
+[[D3.3|the essential skills it expects]], both as the Ontario Skills
+Passport names them. Where [[The Engineering Review]] marks those, it
+marks what they produced — a handover package that was complete when
+the period began, a critique specific enough to act on, the career and
+work-habit note at the front of your package — never how hard somebody
+appeared to be trying.
+
+**Your own judgement, and your bench partner's, are not part of your
+mark either.** You will judge your own work often, because
+[[Judging Your Own Work]] is the cheapest way there is to raise a mark
+before it is given. The determination is still mine, from evidence.
+The same goes for the bench checks you mark yourself in Units 1, 2 and
+3: they exist so you know what to practise, and I never see a score
+from one.
+
+**Practice between classes is practice.** Nothing on a "things to do
+before our next class" list carries a mark of its own. It is
+preparation — the marks live in each task's own criteria, and a journal
+prompt in that list is a question to bring to your next entry rather
+than something I read. The [[Tech Journal]] entries I do read for a
+mark are the ones written in class: at tools-away on a bench day, and
+at the unit collections. Every task in the seventy is given real
+periods to be built in, because work that carries a mark belongs where
+I can watch it happen and where nobody's mark turns on what they have
+at home.
+
+**Shared benches, individual marks.** [[The Interface]] and
+[[The Control System]] are done in pairs, [[The Deployment]] at a bench
+of two or three, and a capstone may be built in a pair. Each of those
+pages names exactly which piece of the evidence is yours and marked as
+yours. Nobody in this course receives a mark for work somebody else
+did, in either direction.
 
 > [!important] Broken circuits are never penalised as broken
 > Version one of everything smokes, blinks wrongly, or does nothing at

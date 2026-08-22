@@ -6,8 +6,8 @@ tags:
   - setup
 ---
 This course hands you tools, components, and machines — and asks you
-to be confused in public while holding them. That takes norms — and they bind everyone, including
-your teacher.
+to be confused in public while holding them. That takes norms — and
+they bind everyone, including your teacher.
 
 > [!danger] The core agreement
 > Nobody's dead bench gets laughed at. Every technician you would
@@ -52,4 +52,6 @@ early.
 ## Curriculum connection
 
 ![[D2.1]]
+
+![[D2.2]]
 %%curriculum-end%%

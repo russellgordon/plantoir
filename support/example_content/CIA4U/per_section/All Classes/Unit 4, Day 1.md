@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval; then [[Comparative Advantage]] built from a two-country table
-2. Absolute against comparative advantage, and the gain from trade computed
-3. Where the model's assumptions stop describing Canada
+1. Retrieval across Unit 3, then a diagnostic in two sentences: why does Canada import anything it could make itself? Answer before we build anything
+2. [[Comparative Advantage]] built from a two-country table, against what you just wrote
+3. Absolute against comparative advantage, and the gain from trade computed
+4. Where the model's assumptions stop describing Canada
 
 ## Things to do before our next class
 

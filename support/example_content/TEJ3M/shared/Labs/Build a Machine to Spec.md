@@ -74,11 +74,19 @@ driver version, and a photograph of the finished cable routing.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
+![[A1.3]]
+
+![[A2.2]]
+
+![[A2.3]]
+
+![[A2.4]]
+
 ![[B1.1]]
 
 ![[B1.3]]
 
-![[A1.2]]
-
-![[A2.2]]
+![[B2.1]]
 %%curriculum-end%%

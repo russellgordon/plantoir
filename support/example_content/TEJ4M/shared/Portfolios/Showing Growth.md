@@ -81,7 +81,7 @@ parts. Reading a datasheet's derating curve and feeling the small
 flinch that stops you designing at the fence. Catching, in
 [[Spot the Hazard]], the hazard that consists of something being
 *absent*. Being asked "why that part?" and having an answer that was
-written down in November.
+written down weeks earlier.
 
 None of that photographs well and none of it looks like an achievement
 from the outside. It is growth all the same, and your early entries

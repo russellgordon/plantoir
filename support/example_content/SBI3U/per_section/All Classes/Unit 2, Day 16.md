@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Checkpoint continued: the case studies, presented in threes
+1. Checkpoint continued: the case studies, presented in threes — [[Evolution Practice]]
 2. Every presenter answers one question: what would change your mind?
-3. Consolidate: the strand in one page of your journal
+3. Consolidate: the strand in one page of your [[Biology Journal]]
 
 ## Things to do before our next class
 

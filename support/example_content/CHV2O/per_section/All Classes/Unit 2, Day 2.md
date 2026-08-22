@@ -12,7 +12,7 @@ tags:
 
 1. [[Court Decisions]] — the one civic document whose author is required to explain the reasoning
 2. Facts, issue, reasons, disposition
-3. One short passage worked together, slowly
+3. One short passage worked together, slowly — then four lines on the way out: facts, issue, reasons, disposition. No mark; it tells me who is ready for a decision of their own
 
 ## Things to do before our next class
 

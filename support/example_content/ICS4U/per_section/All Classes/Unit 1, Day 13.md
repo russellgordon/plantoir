@@ -16,7 +16,9 @@ tags:
 3. Read and change: [[A Program with Two Classes]]
 4. Discussion: [[Who Maintains This]] — the program from Day 1 is
    somebody's Tuesday afternoon, every year, forever
-5. Hand in [[The Model]]
+5. [[The Model]], day 4 — working period: judge your own against the
+   criteria table, name your weakest row, and book the fix into
+   tomorrow
 
 ## Things to do before our next class
 

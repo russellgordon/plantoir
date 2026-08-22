@@ -52,12 +52,15 @@ tools:
 For the segment from $A(1, 2)$ to $B(7, 6)$:
 
 - Midpoint: $\left(\frac{1+7}{2}, \frac{2+6}{2}\right) = (4, 4)$
-- Slope of $AB$: $\frac{6-2}{7-1} = \frac{4}{6} = \frac{2}{3}$
+- Slope of $AB$: $m = \frac{y_2 - y_1}{x_2 - x_1} = \frac{6-2}{7-1} = \frac{4}{6} = \frac{2}{3}$
 - Perpendicular slope: $-\frac{3}{2}$
-- Equation through $(4,4)$: $y - 4 = -\frac{3}{2}(x - 4)$
+- Equation in point-slope form through $(4,4)$: $y - 4 = -\frac{3}{2}(x - 4)$
+- In slope-intercept form: $y = -\frac{3}{2}x + 10$
+- In standard form: $3x + 2y - 20 = 0$
 
-Every right-bisector question is those four lines in that order. Write
-them as a checklist once and the questions stop being puzzles.
+Every right-bisector question is those steps in that order. Translating
+between forms — $y = mx + b$ for graphing, $Ax + By + C = 0$ for
+general alignment — lets you match the form to the job.
 
 ## What the bisector is for
 
@@ -90,6 +93,10 @@ it is exactly what [[The Quadrilateral Case File]] asks you to produce.
 ## Curriculum connection
 
 ![[B1.3]]
+
+![[B1.4]]
+
+![[B1.5]]
 
 ![[B2.5]]
 %%curriculum-end%%

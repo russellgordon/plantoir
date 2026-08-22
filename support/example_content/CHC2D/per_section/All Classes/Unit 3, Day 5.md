@@ -12,7 +12,7 @@ tags:
 
 1. Cold War Canada: alliances, Suez, and peacekeeping
 2. [[Canada and the World]]
-3. Work period
+3. Work period: acting on the conference notes from last class
 
 ## Things to do before our next class
 

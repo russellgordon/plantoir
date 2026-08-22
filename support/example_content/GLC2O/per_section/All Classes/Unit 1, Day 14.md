@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval across Unit 1: skills, habits, decisions, goals
-2. What you can now evidence about yourself, and to whom
-3. Looking ahead: the work that is out there, and how it moves
+1. First half of the period: act on what the checkpoint found, then [[The Decision]] handed in
+2. Portfolio entry, written here: what these three weeks changed about what you thought you were good at
+3. Retrieval across Unit 1 in the last twenty minutes: skills, habits, decisions, goals — and what is coming
 
 ## Things to do before our next class
 

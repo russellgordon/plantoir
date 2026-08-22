@@ -15,6 +15,12 @@ struct AssistWindowView: View {
     /// Everything this window needs, assembled when it opens.
     @State private var session: AssistSession
 
+    /// Opens a new "Plantoir" window — handed down into the session so a
+    /// deploy or preview the assistant starts can put the section on
+    /// screen itself, the one capability only the local in-app assistant
+    /// has (see `AssistToolRunner.revealSectionOnScreen`).
+    @Environment(\.openWindow) private var openWindow
+
     /// What the teacher is typing.
     @State private var typing: String = ""
 
@@ -175,7 +181,7 @@ struct AssistWindowView: View {
         }
         .task {
             history = AssistPromptHistory.read(fromStored: storedHistory)
-            await session.prepare()
+            await session.prepare(openMainWindow: { openWindow(id: "main") })
         }
         .onDisappear {
             AssistWindowPlacement.save(

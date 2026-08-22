@@ -42,8 +42,8 @@ point.
 ## Phones
 
 In the tray at the door unless the class page says otherwise. Some
-periods the phone is the tool — filming a scene, researching a claim,
-recording a seminar — and the page will say so.
+periods the phone is the tool — researching what a text left out,
+screenshotting a feed to take apart — and the page for that day says so.
 
 %%curriculum-start%%
 ## Curriculum connection

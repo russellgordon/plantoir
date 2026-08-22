@@ -3736,6 +3736,1170 @@ qualification, and adding a sentence would have made the mac's build a
 behaviour change. If that explanation is worth having, propose the case and
 let both suites go red; that is the mechanism working.
 
+## Every built site wears the Plantoir icon, not Quartz's
+
+Added 2026-08-20, merged to `dev` 2026-08-21 — after the Windows container was
+retired, so the delivery half of this is written against the runtime that
+actually exists on that side now.
+
+**Shared Python and shared assets: nothing to port.** Both halves already
+reach Windows by routes that were built before this feature existed —
+`Vendor/fetch-runtime.ps1` copies `patches/Head.tsx` into the bundled Quartz
+scaffold exactly as the Dockerfile does for the container, and
+`Plantoir.csproj`'s `..\..\support\**` glob carries `support/favicon/`
+unfiltered. Two parts are still worth knowing, because one is a trap and one
+is an asymmetry you cannot fix from your side.
+
+Until this, every class site a teacher published showed **Quartz's logo** in the
+browser tab. Quartz ships `quartz/static/icon.png` and its `Head` links that as
+the favicon; nobody had replaced it. A teacher who publishes four sections had
+four tabs wearing somebody else's mark.
+
+### What is in the site now
+
+`support/favicon/` holds four generated files, baked into the image by the
+existing `COPY support/ /opt/support/`, and `build_site.py`'s
+`install_favicon()` copies them on **every** build (not only a full rebuild, so
+folders built before this heal themselves):
+
+| File | Where it goes | Who reads it |
+|---|---|---|
+| `icon.svg` | `public/static/` | Every current browser. Sharp at any size. |
+| `favicon.ico` | `public/static/` **and `public/`** | Older Safari; Windows shortcuts. 16/32/48, BMP entries. |
+| `apple-touch-icon.png` | `public/static/` | iOS "Add to Home Screen". 180x180, square, opaque. |
+| `icon.png` | `public/static/` | Nothing links it. It overwrites Quartz's, so the site carries no Quartz logo even unlinked. |
+
+`patches/Head.tsx` links the first three, in that order, with paths relative to
+the page (`baseDir`) so a site served from a subfolder still finds them. Order
+is load-bearing: a browser takes the LAST icon it understands, so the `.ico`
+goes first and the SVG wins wherever it is supported.
+
+### The trap: there are two emitters, and only one can write to the root
+
+`favicon.ico` is installed **twice**, and the second copy is not redundant.
+
+- Quartz's **Static** emitter copies `quartz/static/` to `public/static/`. That
+  is where the `<link>` tags point, and it covers every browser that reads the
+  page.
+- Nothing that emitter can do puts a file at `public/favicon.ico`. The only
+  route to the site ROOT is the **Assets** emitter, which copies every
+  non-Markdown file out of `content/` into `public/` unchanged. So
+  `install_favicon()` also drops `favicon.ico` into the content root — which is
+  why the call sits AFTER the content folder is rebuilt from scratch, not in
+  the ALWAYS block above it. A copy made any earlier is deleted a few lines
+  later and the failure is invisible: the page still looks right, and only the
+  implicit `GET /favicon.ico` that feed readers, link unfurlers and older
+  browsers make (without reading the page at all) comes back 404.
+
+**The source folder is resolved through `toolchain_paths.SUPPORT_DIR`**, not a
+hard-coded `/opt/support`. That was corrected when this merged: it was written
+while Windows still ran in a container, and a literal `/opt` would have found
+nothing natively — the site would have built cleanly, said nothing, and worn
+the Quartz logo. Anything else that reaches for a bundled file belongs on the
+same shim.
+
+`verify.sh` now asserts both halves separately — the four files exist, the root
+`favicon.ico` and `static/icon.png` are byte-identical to `support/favicon/`,
+and `index.html` links all three. It is a mac-only gate (bash, and it expects
+`docker`), so on Windows the equivalent is to publish a section and look at the
+tab. A site can have every file and still show the
+Quartz logo if `patches/Head.tsx` did not make it into the image, so
+`check_baked patches/Head.tsx` was added at the same time (it had never been
+checked).
+
+### The asymmetry: the favicon can only be regenerated on the mac
+
+The artwork's source of truth is `mac-app/Plantoir.icon` — the Icon Composer
+bundle, mac-only. `scripts/brand_images.py` reads the plant's SVG path straight
+out of it and draws every image that carries the mark, the favicon included, so
+the mark cannot drift between the social card, the profile avatars and the
+browser tab. It needs only Pillow, but it needs that `.icon` folder, so
+**a Windows session cannot regenerate the set** — the same direction as
+`--write-contracts`. Treat `support/favicon/*` as data you receive. If the app
+icon changes, that is a mac task, and the Windows `.ico`
+(`windows-app/Plantoir/Assets/make-icon.ps1`) is a separate regeneration from a
+1024 export, exactly as it is today.
+
+### The favicon IS the app icon, and that was a decision
+
+Not a reinterpretation of it. The raster sizes are literally `icon_tile()` —
+the same function that draws the tile on plantoir.app's social card — so the
+favicon cannot come to disagree with the icon in the Dock: same ramp, same
+0.703 glyph scale, same viewBox centring, same drop shadow, same
+regular-weight outline with the leaf counters open. `favicon_svg()` is that
+tile written out as vector, reading the same constants rather than typing the
+numbers again.
+
+**This was tried the other way first, and reverted on Russell's call.** The
+first version used the **fill** weight of the same glyph — `plant.svg` is three
+subpaths (the silhouette, then the two leaf counters), so dropping the last two
+gives a solid plant for free. The argument was legibility: at 16 physical
+pixels the outline's leaf midribs land on the outline and the mark goes muddy,
+which is measured rather than assumed. The argument that beat it is simpler —
+**looking like the app icon is the point of the app icon.** Record that
+direction, because the legibility case is genuinely tempting and will be made
+again.
+
+If it ever does need revisiting, two dials exist and one trap:
+
+- `render_glyph`'s **`bold_units`** thickens the outline in viewBox units
+  without changing the drawing. The Instagram avatar already uses it (3.0) for
+  exactly this reason — it is stored at 320 and shown at 32.
+- The **`.ico` can carry a different drawing per size**, since each entry is a
+  separate bitmap, and `write_favicons` already renders each size natively.
+- The trap: **`icon.svg` cannot.** Browsers that support it render THAT at
+  whatever size they choose, so a per-size tactic that only touches the `.ico`
+  leaves Chrome and Firefox unaffected. And 16 physical pixels is a Windows tab
+  at 100% scaling — any Retina Mac asks for 32.
+
+One thing rejected outright: **darkening the green for contrast.** The brand
+green on the cream tile is about 3:1. The answer to a thin stroke is a thicker
+stroke, not a different colour, and the colour is not ours to change here.
+
+There is deliberately **no web manifest and no 192/512 PWA icon set**. That is
+Android home-screen and installable-app territory, not a favicon, and the
+teacher's site is neither.
+
+## Suppressing Netlify's own ad badge (entry 301)
+
+Netlify can inject a "Powered by Netlify" badge — and a matching pre-launch
+toolbar — into any public site on a free-tier project. Confirmed live
+2026-08-21: their own rollout table has free-plan projects created
+2026-08-19 or later default it **ON**. Every class site this project
+publishes to Netlify was about to start wearing an ad in front of students,
+with no code involved and nothing here to notice it happening.
+
+**There is no API lever.** Netlify's published OpenAPI spec
+(`https://raw.githubusercontent.com/netlify/open-api/master/swagger.yml`,
+6,074 lines, read in full) has nothing named `badge`, `powered_by`, or
+`premium` anywhere on the `Site` object. The only documented control is a
+per-project dashboard toggle — Project configuration → General → Powered by
+Netlify badge — which does not scale to hundreds of teachers' class sites
+and cannot be driven by `deploy.py`'s existing REST calls.
+
+**The one automatic lever Netlify itself documents**: the badge only
+executes through an inline `<script>` their edge injects into the response
+HTML, and a Content-Security-Policy whose `script-src` omits
+`'unsafe-inline'` makes the browser refuse to run it —
+<https://docs.netlify.com/manage/projects/powered-by-netlify-badge/> states
+plainly that "Neither the badge nor the pre-launch toolbar appears, and no
+other project functionality is affected."
+
+### The risk that had to be ruled out first
+
+A blanket `script-src` restriction is only safe if the site's OWN inline
+scripts still work. Before writing a line of the fix, a real built site
+(`courses/EXC2O/.merged_output/section1/public/`, 294 pages) was checked
+directly:
+
+- The dark-mode-before-paint script — the one that matters most, since
+  getting it wrong means every page flashes the wrong theme — is already
+  **external** (`prescript.js`). Safe.
+- Search, graph view, the SPA router — all external (`postscript.js`). Safe.
+- Quartz DOES emit 3 inline `<script>` blocks per page: a search-index
+  prefetch trigger (content varies only by folder depth — a handful of
+  variants), a callout-collapse handler, and a Mermaid pan/zoom script (the
+  latter two byte-identical on every page). None embed secret or
+  teacher-specific data.
+
+### The design, and what was rejected
+
+`write_netlify_headers_file()` (in `scripts/deploy.py`) scans the ACTUAL
+built `public/` folder at deploy time — every `.html` file, every unique
+inline `<script>` body, SHA-256-hashed, plus any cross-origin
+`<script src="https://…">` host — and writes `public/_headers` with a policy
+built from what is really there:
+
+```
+/*
+  Content-Security-Policy: script-src 'self' 'sha256-…' 'sha256-…' … https://cdn.jsdelivr.net;
+```
+
+Only `script-src` is set, never `default-src` — nothing else about a page
+(images, fonts, styles, network requests) is touched. It runs on the
+Netlify path only (Cloudflare Pages and `local_folder` don't have this
+badge), right after any production rebuild and right before the
+delta-deploy manifest is built, so `_headers` rides along in the same SHA-1
+manifest as every other file — no separate upload step.
+
+Two designs were considered and rejected:
+
+1. **A hardcoded hash allow-list for Quartz's own known scripts.** Rejected
+   because it goes stale the moment Quartz's bundling changes on a version
+   bump — a silent breakage discovered only when a teacher reports a dead
+   page — and it does nothing for a teacher who pastes their own
+   `<script>` into a note for some embed. Scanning the real build handles
+   both automatically, at the cost of nothing more than a directory walk on
+   an already-built site.
+2. **Patching Quartz's TSX components so every inline script becomes an
+   external file**, matching what already happens for `prescript.js`
+   (`patches/Head.tsx` filters resources by `loadTime` and only THAT
+   resource gets rendered `src=`). Rejected because Quartz's source isn't
+   vendored here — it's cloned fresh at Docker build time
+   (`Dockerfile:27`) — so this would mean chasing down, in upstream
+   TypeScript this repo doesn't keep a copy of, whichever components emit
+   the callout-collapse and Mermaid scripts, and re-verifying the patch on
+   every future Quartz version bump. The scanning approach needs none of
+   that: it observes output, not implementation.
+
+Deterministic build to build (same content ⇒ same hashes ⇒ same file),
+which is the same property `documentation/07-deployment.md`'s "Why
+determinism matters" section already requires of everything else in
+`public/`, for the same delta-deploy reason. Verified against the real
+Example Course build: 5 unique inline-script hashes (2 static, 3 folder-depth
+variants of the search-prefetch trigger), 1 cross-origin host
+(`cdn.jsdelivr.net`, KaTeX's autorender script).
+
+Tested in `scripts/test_deploy_netlify_headers.py` — pure stdlib, no Docker,
+no network — and wired into `verify.sh` as a fast pre-check that runs before
+the (slow) image build, so a broken change here fails in milliseconds.
+
+A teacher who clicks "Show details" during a deploy sees plain-language
+lines explaining what this step is doing and that it checked the site's own
+scripts first, so it reads as something deliberate rather than as
+unexplained new console noise.
+
+**Cloudflare Pages pays nothing for a problem that's Netlify's alone**
+(confirmed 2026-08-21, in response to exactly this question). It was
+already true by construction — `main()`'s `if args.target == "cloudflare":`
+branch calls `publish_to_cloudflare()` and returns before reaching the
+Netlify site lookup, the token check, or the badge-suppression call, and
+`local_folder` never invokes `deploy.py` at all — but that guarantee rested
+only on code ORDER, silently, so `CloudflareIsNeverTouchedTests` in
+`scripts/test_deploy_netlify_headers.py` now pins it structurally: one test
+asserts the cloudflare branch's `return` appears before the
+`write_netlify_headers_file()` call site in `main()`'s source, a second
+asserts `publish_to_cloudflare()`'s own source never mentions that
+function at all. A future refactor that moves badge suppression earlier
+fails these tests instead of shipping a silent regression. This also keeps
+Cloudflare a clean control group on purpose: deploying identical content to
+both destinations is a direct way to check whether a suspected site
+breakage is caused by this feature rather than by the build itself.
+
+**Shared Python — nothing to mirror.** Windows inherits this the moment
+`deploy.py` is next synced; there is no C# equivalent to write.
+
+**Update 2026-08-21: this now also covers plantoir.app.** The marketing
+site (`website/`) is a second free-tier Netlify project exposed to the
+identical badge, with its own deploy path (`website/netlify_deploy.py`, run
+via `python3 website/build.py --deploy`) that has nothing to do with either
+app. Rather than duplicate the ~90 lines of scanning logic a second time,
+`_collect_inline_script_policy()` and `write_netlify_headers_file()` moved
+out of `deploy.py` into a new sibling module, `scripts/netlify_badge.py`,
+with `deploy.py` re-exporting both names so its own call site and
+`scripts/test_deploy_netlify_headers.py` (which does `import deploy` and
+calls `deploy.write_netlify_headers_file`) are unchanged. `netlify_deploy.py`
+imports the same module by adding `scripts/` to `sys.path` — the identical
+trick `deploy.py` already uses for `toolchain_paths` — and calls it on
+`site/` right before its own delta-deploy manifest is built, mirroring
+where `deploy.py` calls it on `public/`. Covered by
+`scripts/test_netlify_badge.py` (the module in isolation, plus an identity
+check that `deploy.py`'s re-export is the same function object) and
+`website/test_netlify_deploy_headers.py` (the wiring, against a temp folder
+standing in for `site/`).
+
+This is host/CI-side Python only — not part of either app — so it is an
+**awareness note, not something to port**: there is no C# equivalent to
+write here either, on either side of this update.
+
+## The Dockerfile never picked up netlify_badge.py (entry 302)
+
+Row 301's badge-suppression CSP scans the built site and hash-allows every
+inline `<script>` it finds, but the scanning logic itself lives in a
+sibling module, `scripts/netlify_badge.py`, that `deploy.py` imports by
+bare name. The Dockerfile's `COPY` list for `/opt/scripts` is explicit,
+one line per file — `toolchain_paths.py`, `setup_course.py`,
+`build_site.py`, `deploy.py`, `social_card.py` — and never gained a line
+for the new module. Every real deploy through the container (Netlify or
+the marketing site) failed outright with `ModuleNotFoundError: No module
+named 'netlify_badge'`.
+
+**Why the unit test never caught it**: `scripts/test_deploy_netlify_headers.py`
+and `scripts/test_netlify_badge.py` both import `deploy`/`netlify_badge`
+directly from the working tree, where the sibling file is right there on
+disk regardless of what the Dockerfile does — they exercise the SCANNING
+LOGIC, never the actual built image. Only a deploy through the real
+container hits the gap, which is exactly the class of bug `verify.sh`'s
+slow, Docker-dependent checks exist to catch and the fast host-side
+pre-checks structurally cannot.
+
+**The fix**: one `COPY scripts/netlify_badge.py /opt/scripts/netlify_badge.py`
+line in the Dockerfile, plus the matching `check_baked` line in
+`verify.sh` — which had the identical gap itself: it compares every other
+baked script against the working tree, but had never been taught about
+this one, so the image could go stale here again with the gate staying
+green throughout.
+
+**What Windows needs from this**: nothing to port directly (shared
+Dockerfile, shared `verify.sh`), but the LESSON is worth keeping in mind
+if Windows ever adds its own per-file bundling list for the native
+runtime's scripts (`Vendor/fetch-runtime.ps1` or similar) — an explicit
+per-file list is exactly the shape that silently misses a new file added
+elsewhere; a folder-reference or manifest-driven copy does not have this
+failure mode.
+
+## unsafe-eval had to join the Netlify CSP, or every sidebar goes empty (entry 303)
+
+Row 301's badge-suppression CSP — `script-src` with hash-only sources, no
+`'unsafe-inline'` — silently broke Quartz's own Explorer SIDEBAR on every
+page of every site deployed to Netlify. `patches/explorer.inline.ts`
+builds its sort/filter/map functions from `data-data-fns` JSON via
+`new Function("return " + source)()` — a capability `'unsafe-eval'`
+governs, not a script identity, so hash-allowing every actual inline
+script (which row 301 already did correctly) never touched it.
+
+**Found by A/B testing a real deploy** to both Netlify and Cloudflare
+Pages side by side: Netlify's sidebar rendered "Navigate this site" with
+an empty list underneath; Cloudflare (no CSP at all) showed the full
+tree. Reproduced in a fresh PRIVATE Safari window first, to rule out
+leftover `localStorage` from earlier testing on the same site name — the
+bug survived that, so it was real. Confirmed definitively via the
+browser's own console, reached with Safari's `do JavaScript`: "Refused to
+evaluate a string as JavaScript because 'unsafe-eval' ... is not an
+allowed source of script."
+
+**The fix**: add `'unsafe-eval'` to the policy in `netlify_badge.py`.
+`'unsafe-eval'` and `'unsafe-inline'` are INDEPENDENT CSP keywords —
+Netlify's own docs confirm the badge needs `'unsafe-inline'` specifically
+("the script runs in an inline frame"), so this does not let the badge
+back in. A new test pins both facts at once: `'unsafe-eval'` present,
+`'unsafe-inline'` still absent.
+
+**What Windows needs from this**: nothing to port (shared Python, inherited
+the moment `netlify_badge.py` is next synced), but the same TRAP is worth
+naming for whoever next writes a restrictive CSP anywhere in this project:
+hash-allowing every inline `<script>` proves the SCRIPTS are allowed to
+run, not that everything THOSE scripts try to do is still permitted —
+`eval`/`new Function`/`setTimeout(string)` are a separate capability
+(`'unsafe-eval'`) that a hash-only policy blocks by default, and nothing
+about "I scanned every inline script" catches that on its own.
+## Redundant deploy targets — piece 1: schema and configuration (entry 304)
+
+Motivated directly by the Netlify ad-badge fix (its own entry 301, on the
+`issue/netlify-badge-suppression` branch): if a host has a bad day, real
+redundancy needs a second copy of the site ALREADY live, not a scramble to
+reconfigure a new destination after the fact. Russell pushed back on the
+first design sketched for this (a chevron on the Deploy button to pick a
+*different* single destination) — that is a faster manual redeploy, not
+redundancy, since nothing keeps a second destination current until someone
+notices a problem and switches. The corrected design: **a course can
+configure more than one deploy destination, and deploying publishes to
+every configured one.**
+
+This is piece 1 of 2, done: **the config schema and the wizard/settings UI
+to configure additional destinations.** The Deploy button itself is
+UNCHANGED — it still publishes to `deployTarget` (the primary) only. Piece
+2 (not started) teaches it to publish to every configured destination.
+
+### The schema
+
+```json
+{
+  "deploy_target": "netlify",
+  "additional_deploy_targets": [
+    { "type": "cloudflare_pages" },
+    { "type": "local_folder", "path": "/Users/teacher/Sites" }
+  ]
+}
+```
+
+`deploy_target` is unchanged — same key, same meaning, same default. The new
+`additional_deploy_targets` key is an array of `{type, path}` objects,
+`type` using the identical spellings as `deploy_target`; `path` is present
+only for a `local_folder` entry (Netlify's and Cloudflare's credentials
+live in per-teacher app settings already, not per-course, so neither needs
+one). **Omitted entirely — never written as `[]` — for every course that
+has not opted in**, which is the overwhelming majority: the file an
+untouched course writes is byte-identical to what it always wrote. This
+was the whole point of "the default remains pick one."
+
+**One of each of the three known types, maximum, never two of the same
+type.** A destination can never be listed as both primary AND additional at
+once. That invariant lives in exactly one place —
+`CourseConfiguration.pruningAdditionalTargets(_:ofType:)`, a plain static
+function, not a method on an instance — called from two call sites that
+need it for different reasons:
+
+- `CourseConfiguration.deployTarget`'s own setter, so Course Settings
+  (which binds its picker straight to the live model) can never reach the
+  inconsistent state.
+- `PublishingChoiceView`'s picker `onChange`, so the WIZARD's plain
+  `@State` — which has no `CourseConfiguration` to route through until the
+  course is actually created — gets the identical guarantee live on
+  screen. `NewCourseWizardView.buildConfigurationDictionary()` also prunes
+  once more, defensively, at the point it actually writes the file, so the
+  file on disk is correct even in a hypothetical future case where the
+  view's own `onChange` did not fire before Create was clicked.
+
+A plain function was chosen deliberately over an instance method so it is
+testable without standing up either a live model or a rendered view — see
+`AdditionalDeployTargetsTests.testPruningAdditionalTargetsDropsOnlyTheMatchingType`.
+The first version of that test tried to exercise this by mutating a plain
+property on the `HeldPublishingChoice` test harness and expecting the
+pruning to have happened — it silently could not, because
+`HeldPublishingChoice` is a plain class with no logic of its own, and
+`.onChange` only fires on an actually-rendered SwiftUI view. The test would
+have passed for the wrong reason if the assertion direction had been
+different; testing the plain function directly is the fix, not a
+workaround.
+
+### The UI
+
+`PublishingChoiceView` — already shared by the wizard and Course
+Settings — gained a new section below the existing primary picker: "Also
+publish to, for redundancy", with one `Toggle` per known type that is not
+the current primary. Each toggle, switched on, reveals the SAME detail
+fields (Cloudflare Account ID + help + 25 MB caption, or the folder field +
+Choose… button) that the primary picker's own conditional block shows for
+that type — factored out into two `private` subviews
+(`CloudflareDetailFields`, `LocalFolderDetailFields`) so the primary and
+additional cases read from one definition each and cannot drift apart.
+They are never on screen at the same time for the same type, by
+construction — `availableAdditionalDeployTargetTypes` already excludes
+whichever type is primary.
+
+**A toggle that is already on does not disappear from the list.** The
+first test written for "all three slots filled" assumed the additional
+list would show only types NOT yet added, and asserted it went empty once
+all three were configured — that is wrong for a toggle list: every other
+toggle in this app stays visible and shows its own state, and a
+redundancy toggle that vanished the moment you turned it on would be the
+one control that did not. Fixed the test, not the view.
+
+**Validation matches the primary's, for the same reason the primary's
+exists**: an additional Cloudflare target with no Account ID, or an
+additional local-folder target with no valid path, blocks Save/Create —
+exactly like the primary case already does — rather than failing silently
+the first time piece 2 actually tries to deploy to it. Both the wizard's
+`validate()` and Settings' `savingProblem` gate loop over
+`additionalDeployTargets` with the identical two checks the primary
+already ran.
+
+### What Windows needs from this
+
+`windows-app/Plantoir.Core/Models/CourseConfiguration.cs` needs the
+equivalent `AdditionalDeployTargets` property, with the identical
+omit-when-empty write rule (checked by
+`AdditionalDeployTargetsTests.testWritingAnEmptyAdditionalTargetsListOmitsTheKeyEntirely`
+on the mac side — port that assertion, it is the one easy to get wrong).
+`windows-app/Plantoir/Views/PublishingChoiceView.cs` needs the equivalent
+toggle section. **Piece 2 (below) has now shipped on the mac** — Deploy
+really does publish to every configured destination there now, so a
+`course_config.json` written by a Windows teacher with `additional_deploy_
+targets` set, opened on the mac, would now actually redundantly deploy —
+which makes this genuinely urgent rather than a someday item: a Windows
+teacher who cannot configure a second destination is simply missing the
+feature, and a Mac teacher's config edited on Windows (schema written, but
+never acted on there) is a real cross-platform inconsistency, not a
+hypothetical one.
+
+**Update (2026-08-22, Windows): implemented.** `CourseConfiguration.
+AdditionalDeployTargets` (plus `DeployDestination`, `AllDeployDestinations`,
+`PruningAdditionalTargets`, and the rest of the static helpers the mac's own
+instance methods delegate to) carries the identical omit-when-empty rule,
+and `PublishingChoiceView.cs` gained the "Also publish to, for redundancy"
+toggle section, shared by both Course Settings and the wizard exactly as on
+the mac. Full write-up: `MAC-HANDOFF.md`, "Done" ledger.
+
+## Redundant deploy targets — piece 2: Deploy publishes to every
+configured destination (entry 305)
+
+Piece 1 (above) built the schema and the settings UI; this is where Deploy
+itself changed. A course with no additional destinations configured — the
+overwhelming majority — behaves **exactly** as it always has: same single
+console, same progress bar, same "Live URL" link, same wording, byte for
+byte. A course with 2–3 configured destinations now gets an actual
+redundant deploy: each destination gets its own `deploy.sh` run, in
+sequence, and one failing does not stop the others.
+
+### Why sequential, and why one `ScriptRunner` per destination
+
+Both were open questions when this was designed (see the earlier
+conversation in this repo's history) and both were decided explicitly,
+not defaulted into:
+
+- **Sequential, not parallel**, for this first version. Netlify already
+  rate-limits aggressively on CONCURRENT uploads within a single
+  destination's own file transfers (measured and documented in
+  `documentation/07-deployment.md`'s "Rate limiting" section) — running
+  two or three destinations' uploads at once, each already juggling its
+  own concurrency, was judged too much unknown interaction for a first
+  version. Nothing about the design prevents parallelizing later if it
+  proves worth the complexity.
+- **One `ScriptRunner` per destination, never one shared runner reused
+  across legs.** This was the single most important implementation
+  decision, because the wrong choice fails SILENTLY. `ScriptRunner`'s
+  `publishedSiteURL(in:)` / `publishedFolderURL(in:)` only ever scan
+  THAT runner's own transcript tail. Route two destinations through one
+  reused `ScriptRunner` (even with `keepingTranscript: true`, which is
+  what makes a build-then-deploy pair read as one console today) and the
+  SECOND destination's "Live URL:" or "PUBLISHED_FOLDER=" line silently
+  overwrites the first's — the teacher would see only the last
+  destination's link, with the first one's simply gone, no error anywhere.
+  `MultiDestinationDeployRunner.Leg` gives each destination its own
+  runner specifically to avoid this.
+
+### The build happens exactly once
+
+`BuildFreshness.needsRebuild` is checked ONCE, before the destination
+loop starts — never per destination. If the site is stale, the FIRST
+destination's own run gets the combined build-and-deploy milestone list
+(`TaskMilestones.buildAndDeploy` / `.buildAndDeployToCloudflare` /
+`.buildAndDeployToFolder`, exactly the lists that already existed for the
+single-destination case) via `keepingTranscript: true`, so the build and
+that leg's deploy still read as one console, exactly as today. Every
+SUBSEQUENT destination always uses the deploy-only milestone list — by
+the time leg 2 runs, the site is already current. A failed shared build
+stops the WHOLE run (`Leg.buildFailed`) rather than letting every
+remaining destination deploy the same stale content, which would not be
+redundancy, it would be the same mistake published twice.
+
+### One sequencer, four callers
+
+`MultiDestinationDeployRunner.run(...)` is called from all four places a
+deploy can start, so none of them can drift the way `DeployCommand.
+arguments` itself once warned against (built separately in two places, one
+silently sent a Cloudflare course to Netlify):
+
+1. `SectionDetailView.deployAndWait()` — the toolbar button, and the
+   assistant when a section window is open (same choke-point as before).
+2. `AssistToolchainWork.deploy()` — the assistant with no window on
+   screen (Claude Code over MCP, or a scheduled deploy invoking the app
+   headlessly).
+3. `ScheduledDeploy.oneShotCommand(...)` — NOT a Swift caller of the
+   sequencer at all, since this path runs unattended with the app closed.
+   Instead, `scheduleDeploy(...)` now builds one `deployArgumentsList`
+   entry per destination (`CourseConfiguration.allDeployDestinations`,
+   same order as the other three callers) and `oneShotCommand` bakes ONE
+   shell line per destination into the generated script, none chained
+   with `&&` — a destination failing must not stop the others' shell
+   lines from running, the shell-script equivalent of the Swift
+   sequencer's own "one leg failing doesn't stop the loop" rule. Only a
+   failed BUILD (`$READY`) still skips every deploy line, matching the
+   Swift side's `Leg.buildFailed` early-exit.
+4. `ScheduledDeploy.problem(...)` — the pre-flight refusal check, run
+   when the teacher SCHEDULES the deploy, not when it fires. Generalized
+   to check every configured destination, not only the primary — an
+   additional Cloudflare target with no Account ID, or an additional
+   folder with no valid path, now refuses scheduling up front, with new
+   wording ("also deploys to a folder…") kept deliberately separate from
+   the PRIMARY destination's existing, contract-referenced wording, which
+   is untouched, so no existing check against this function needed to
+   change.
+
+### Wording: unchanged for the overwhelming majority, three new sentences
+for the rest
+
+`MultiDestinationDeployRunner.result(...)` is the one place that decides
+which sentence a teacher (or the assistant, relaying it) hears.
+`destinationCount <= 1` — true for every course that has not opted into
+redundancy — ALWAYS uses the original `AssistWording.deployed` /
+`.deployDidNotFinish`, unchanged, word for word: a teacher who never
+touched this feature must never see a different sentence. For 2+
+destinations, three new `AssistWording` functions cover the three real
+outcomes: all succeeded (`deployedToMultipleDestinations`), some
+succeeded and some did not (`deployPartiallySucceeded`, naming which
+failed — the failed-destination list is joined into words by
+`MultiDestinationDeployRunner.joinedWithAnd`, OUTSIDE `AssistWording`,
+since that table holds only whole sentences and never list-joining logic
+— see its own doc comment), and none succeeded
+(`deployToMultipleDestinationsDidNotFinish`). A build failure is reported
+identically regardless of destination count — "could not be built", never
+"did not finish", which would wrongly suggest the upload failed rather
+than the build.
+
+### The checklist UI
+
+`DeployDestinationChecklist` — a small new view, one row per configured
+destination with a symbol (pending / spinning / done / failed) and its
+name — appears above the existing `TaskProgressView` ONLY when
+`deployRunner.legs.count > 1`. **Update (entry 306): the paragraph below
+originally claimed `TaskProgressView` was unmodified — it needed one
+addition, `hidesSiteLink`, once the finished-state gap this same section
+describes ("bound to `activeRunner`... the same as it always was") turned
+out to hide the FIRST destination's own live link, not just risk it.**
+`TaskProgressView` is shared with the course-creation wizard and the
+preview panel, so reshaping it broadly for multi-destination deploy would
+have affected both of those unrelated callers — the actual change is a
+single `Bool` flag, defaulting `false`, that only ever changes behaviour
+for the one deploy-panel call site that passes `true`. It is bound to
+`deployRunner.activeRunner` — whichever leg is current, or the first leg
+before anything starts — which for a single-destination course is
+indistinguishable from binding directly to a plain `ScriptRunner`, the
+same as it always was.
+
+## The finished multi-destination deploy panel only showed the LAST destination's link (entry 306)
+
+Row 305 (above) gave every destination its own `ScriptRunner` specifically
+so one leg's "Live URL:" line could never overwrite another's — but the
+DISPLAY never used that. `TaskProgressView` is bound to
+`deployRunner.activeRunner`, and after a run finishes that is whichever leg
+ran LAST; its own "Your website is live." section only ever names and
+links that one leg. Reported directly, after a real deploy to both Netlify
+and Cloudflare: "only Cloudflare, the second deploy target, is visible" —
+the checklist above it correctly showed both destinations checked off, but
+the body below told a story where only the second one had happened.
+
+**The fix has two parts, matching the two places the same "last leg only"
+assumption was baked in:**
+
+1. **The link itself.** A new view, `DeployDestinationLinks`, lists every
+   SUCCEEDED leg's own site link (or, for a `local_folder` destination, its
+   own "Show in Finder" button) — shown only once
+   `deployRunner.legs.count > 1 && !deployRunner.isRunning`, right below the
+   existing `TaskProgressView`. To avoid showing the LAST destination's
+   link twice (once from `TaskProgressView`'s own section, once from the
+   new list), `TaskProgressView` gained `hidesSiteLink: Bool = false` — set
+   `true` only from the multi-destination deploy call site, so every other
+   caller (the wizard's preview, a single-destination deploy) is
+   byte-identical to before.
+2. **The title.** `deployProgressTitle` had the identical bug one layer
+   up: it kept appending "— Cloudflare Pages" even once the WHOLE run had
+   finished, which reads as though only that one destination had
+   published. Refactored into a testable static function
+   (`SectionDetailView.deployProgressTitle(sectionName:isRunning:legCount:
+   currentDestinationDescription:)`, matching the existing
+   `previewTaskTitle`/`showsDeployProgress` pattern) so naming the CURRENT
+   destination only happens `if isRunning` — once the run is done, the
+   title reverts to the plain single-destination form, and the checklist
+   plus the new links list carry the per-destination detail instead.
+
+Both gaps were found the same way row 305 found its own defect worth
+guarding against: not by reading the code, but by actually deploying to
+two destinations and looking at what a teacher would see. The unit suite
+(`MultiDestinationDeployRunnerTests`, `ConsoleFocusTests`) stayed green
+through both the broken and the fixed version, because nothing in it
+renders the finished-state SwiftUI view — the same shape as row 300's
+folder-adoption bug and row 297's screenshot fallback, and the reason rule
+9 keeps insisting on driving the real app before calling a change done.
+
+**What Windows needs from this**: check whether its own multi-destination
+deploy panel (once row 305's behavioural piece is implemented there) is
+similarly bound to whichever runner ran last. The fix is the same SHAPE —
+list every succeeded destination's own link once the whole run is done,
+and stop a title from naming one destination after the fact — not this
+Swift.
+
+**Update (2026-08-22, Windows): built correctly from the start, avoiding
+this bug rather than fixing it after the fact.** `TaskProgressView`'s outcome
+badge is computed from `MultiDestinationDeployRunner.CurrentOutcome` — every
+leg's own result — not from whichever leg's `ScriptRunner` happens to be
+`ActiveRunner` when the run ends, so a first-destination failure with a
+second-destination success can never read as plain "Done". `DestinationLinks`
+lists every succeeded leg's own link (or folder button), occupying the same
+slot the single-destination link already used. Full write-up: `MAC-HANDOFF.md`.
+
+## Custom domain: per-destination, not per-section, or one host's domain leaks onto another's (entry 307)
+
+Row 306 (above) fixed the multi-destination deploy PANEL showing only the
+last destination's live link. "Advanced → Custom domain" in Course
+Settings had the identical bug one layer up, and worse: it was applied
+SILENTLY at deploy time rather than merely misdisplayed. One section-wide
+domain (`custom_domains.sections.sectionN`, a bare string) was substituted
+onto EVERY destination's link — a domain meant only for Netlify was also
+swapped onto the Cloudflare Pages leg's own address, a Cloudflare project
+that in the overwhelming majority of real cases does not answer to that
+DNS record at all.
+
+Reported directly, asking for exactly the shape row 306 already
+established for the same underlying problem: "ask the user which deploy
+target this applies to. Whatever target exists that is not using a custom
+domain should still show the default assigned to that service."
+
+### The new shape
+
+`custom_domains.sections.sectionN` is now a map keyed by destination TYPE:
+
+```json
+{
+  "custom_domains": {
+    "sections": {
+      "section1": {
+        "netlify": "ics3u.school.ca",
+        "cloudflare_pages": "ics3u-mirror.school.ca"
+      }
+    }
+  }
+}
+```
+
+Never a `local_folder` key — a domain is something a browser visits, and a
+folder is not, so `CourseConfiguration.customDomain(forSection:
+destinationType:)` is simply never called with that type from the UI (the
+settings view filters `allDeployDestinations` to exclude it before
+building any field at all).
+
+**An OLDER shape is still read**: `custom_domains.sections.sectionN` used
+to be a bare string, written before a course could have more than one
+destination. That value is treated as belonging to the section's PRIMARY
+destination (`deployTarget`) — the only destination that existed when it
+could have been set — and is invisible to every other type. Setting a
+SECOND destination's domain migrates a bare string it finds into the new
+per-type shape rather than silently discarding it (`CourseConfiguration.
+setCustomDomain`, `mac-app/QuartzTeachers/Models/CourseConfiguration.swift`).
+
+### The settings UI
+
+`SectionSettingsView`'s "Advanced" disclosure now shows one field per
+destination that can have a domain (never `local_folder`), via
+`ForEach(customDomainDestinations, id: \.type)`. The LABEL stays plain
+"Custom domain" — byte-identical to what a course has always shown — for
+the overwhelming majority (exactly one destination); only once there is
+more than one does it become "`<Service>` custom domain"
+(`SectionSettingsView.customDomainFieldLabel(destination:destinationCount:)`).
+The CAPTION is a smaller, separate fix that applies even in the
+single-destination case: it used to hardcode "the Netlify address"
+unconditionally, so a course whose one destination was Cloudflare Pages
+was told to "leave empty to use the Netlify address" — simply wrong.
+`customDomainCaption(forDestinationType:)` always names the real service.
+
+### The deploy-time fix — resolved per LEG, not passed in once
+
+`MultiDestinationDeployRunner.run()` no longer takes a
+`customDomainForLinks: String?` parameter at all. It used to be resolved
+ONCE by the caller and applied to every leg's `ScriptRunner` identically —
+which is the actual mechanism of the bug. Now `run()` resolves the domain
+itself, per leg, inside its own loop:
+
+```swift
+let domainForThisDestination: String = CourseConfiguration.normalizedCustomDomain(
+    course.configuration.customDomain(forSection: sectionNumber, destinationType: destination.type)
+)
+runner.customDomainForLinks = domainForThisDestination.isEmpty ? nil : domainForThisDestination
+```
+
+A genuine, incidental bonus this produced: `AssistSiteWork.swift` (the
+assistant's headless deploy path, no section window on screen) was passing
+`customDomainForLinks: nil` UNCONDITIONALLY — the assistant never wore a
+teacher's custom domain, even for an ordinary single-destination course.
+Removing the parameter meant every caller now resolves it the same way,
+fixing that silently for free.
+
+### The Python side — one baseUrl per build, so it follows the PRIMARY only
+
+`build_site.py`'s `resolve_section_domain()` decides the baseUrl baked
+into a build's sitemap, RSS feed, and social-card absolute URLs. A single
+build's `public/` folder is uploaded to EVERY configured destination (see
+row 305's "a build runs exactly once, fused into the first destination's
+own progress") — so unlike the Swift GUI's per-destination LINK DISPLAY,
+there is no way for the baseUrl itself to be different per destination; it
+is one value baked into the actual files. The fix there reads the new
+dict shape through the PRIMARY destination's own entry (`config.get
+("deploy_target")`), matching what the "Live URL" link on a finished
+deploy has always pointed at — an old bare string is read as-is,
+unchanged. This needed its own test file
+(`scripts/test_build_site_domain_resolution.py`) run against the real
+built image rather than the host-side fast pre-checks the other Python
+tests here use, because `build_site.py` imports `frontmatter`, which lives
+only inside the container.
+
+### What Windows needs from this — a real cross-platform risk, not just a schema gap
+
+This is NOT merely "Windows hasn't caught up to a new key yet." Windows's
+`CourseConfiguration.CustomDomain`/`SetCustomDomain`
+(`windows-app/Plantoir.Core/Models/CourseConfiguration.cs:279-283`) still
+read and write the bare-string shape unconditionally, via `NestedString`/
+`SetNestedValue`. Two distinct failure modes follow from the SAME course
+file being opened on both platforms:
+
+- **Read side (degrades, does not crash)**: `NestedString` type-checks for
+  a `JValue` of `JTokenType.String` and returns `""` for anything else,
+  including the new shape's `JObject` — so a Windows teacher opening a
+  course a mac teacher has multi-destination-enabled sees their custom
+  domain silently VANISH (read as never set), not an error.
+- **Write side (genuine data loss)**: `SetNestedValue` always writes a
+  plain string. A Windows teacher who edits and saves ANY custom-domain
+  field on such a course — even just retyping the same value — CLOBBERS
+  the whole per-destination map back down to one bare string, discarding
+  every other destination's domain the mac side had configured. This is
+  not a display glitch; it is data a Windows session would actually
+  destroy on write.
+
+Windows needs the equivalent per-destination-type shape — reading the new
+dict form (falling back to the primary destination's own key, mirroring
+`build_site.py`'s own migration logic) and writing per-destination-type
+rather than one flat string — before it is safe for a course to move
+between the two apps once BOTH multi-destination deploy and more than one
+custom domain are in play. There is no urgency purely from "Windows has no
+`MultiDestinationDeployRunner` yet" (true, and fine on its own), but the
+read/write asymmetry above is a real risk today, for any course a teacher
+happens to open on both platforms.
+
+**Update (2026-08-21, Windows): the read/write fix landed first, on its
+own** (`CustomDomain`/`SetCustomDomain` gained the `destinationType`
+overload, migrating an old bare string on write rather than clobbering the
+map), closing the data-loss risk before Windows had any multi-destination
+UI at all. **Update (2026-08-22, Windows): `MultiDestinationDeployRunner`
+now exists, and `CourseSettingsView`'s "Advanced" section shows one custom
+domain field per destination that can have one** (never `local_folder`),
+labelled plainly "Custom domain" for the overwhelming single-destination
+case and "`<Service>` custom domain" once there is more than one — mirroring
+`SectionSettingsView`. Full write-up: `MAC-HANDOFF.md`.
+
+## The multi-destination console dropped the first destination's output (entry 308)
+
+Reported directly, right alongside row 307: "output to the faux terminal
+should show details from both deploys, not replace the deploy details
+from the first deploy with the second." `TaskConsoleView` — the "Show
+details" panel beneath the progress header — is bound to one
+`ScriptRunner`, and the caller was always `deployRunner.activeRunner`:
+whichever leg is CURRENT. The moment a second destination started, the
+first destination's own console output was simply gone — not scrolled
+past, gone — replaced by the second leg's own, mostly-empty transcript.
+
+The fix threads an optional `allLegs: [MultiDestinationDeployRunner.Leg]?`
+through `TaskProgressView` into `TaskConsoleView`. When set (and there is
+more than one leg), the console shows every leg that has produced ANY
+output so far, each under a `"── <Service> ──"` heading, joined in deploy
+order:
+
+```swift
+static func combinedTranscriptText(runner: ScriptRunner, allLegs: [MultiDestinationDeployRunner.Leg]?) -> String {
+    guard let allLegs, allLegs.count > 1 else {
+        let text = runner.transcript.displayText
+        return text.isEmpty ? "Starting…" : text
+    }
+    var sections: [String] = []
+    for leg in allLegs where !leg.runner.transcript.lines.isEmpty {
+        sections.append("── \(DeployCommand.destinationDescription(for: leg.destination)) ──\n" + leg.runner.transcript.displayText)
+    }
+    return sections.isEmpty ? "Starting…" : sections.joined(separator: "\n\n")
+}
+```
+
+`runner` itself is untouched and still drives the status header (Finished
+/ Failed / spinner), the input field, and the auto-scroll trigger —
+exactly one leg is ever actually RUNNING at a time, so there is only ever
+one place a teacher's answer to a prompt needs to go. A leg the run never
+reached (stopped by a cancel, or an earlier failed shared build) is
+filtered out by the "has produced any output" check rather than shown as
+an empty, confusing section. `allLegs` defaults to `nil` everywhere else
+— a single-destination deploy, and the wizard's own preview — so those
+callers are byte-for-byte unchanged.
+
+**What Windows needs from this**: the same shape, once row 306's
+behavioural piece exists there — concatenate every destination's own
+output that exists so far, under its own heading, rather than showing only
+whichever one is current. Not this Swift; the decision that travels is
+"a multi-destination console must never let an earlier destination's
+output simply disappear."
+
+**Update (2026-08-22, Windows): implemented from the start, same shape.**
+`TaskProgressView.CombinedTranscriptText()` joins every leg that has
+produced any output — filtered the same way, a leg the run never reached is
+simply not shown — under a `"── <Service> ──"` heading, in deploy order.
+Full write-up: `MAC-HANDOFF.md`.
+
+## A container's own network can wedge independently of everything else (entry 311)
+
+A real Cloudflare deploy failed with wrangler's own `fetch failed` ("Please
+check your network connection and try again") and a bare Python
+traceback — in a working folder that had deployed successfully many times
+before. A BRAND-NEW working folder deployed without a problem seconds
+later, using the identical image. Traced directly: the existing folder's
+long-lived container had a wedged network namespace — `docker exec
+<container> getent hosts google.com` failed outright — while every OTHER
+container on the same Colima VM, Colima itself, and a fresh THROWAWAY
+container built from that exact same image all resolved DNS instantly.
+This is a known Docker failure mode for containers that have been running
+a long time; it is not caused by anything in this project's code, and it
+is not something Colima's own health check would catch, because Colima
+and the Docker daemon are both genuinely fine — only this one container's
+own network state is not.
+
+**The risk this poses to a real teacher**: a course that deploys
+successfully for weeks, then fails once with a network-shaped error and a
+stack trace, for no reason visible from the teacher's side at all — no
+wifi change, no VPN, nothing they did. Exactly the kind of failure this
+project's own error-explaining machinery (`FailureExplainer` et al.) exists
+to prevent from ever reaching a teacher as raw Python.
+
+**The fix**, in `deploy.sh`, mirrors the shape of the existing
+`probe_container_write()` check (which already recreates a container whose
+mount has gone stale or wrong) rather than inventing a new pattern:
+
+```bash
+probe_container_network() {
+  if [[ "$TARGET" == "local_folder" ]]; then
+    return 0
+  fi
+  local PROBE_HOST="api.cloudflare.com"
+  if [[ "$TARGET" == "netlify" ]]; then
+    PROBE_HOST="app.netlify.com"
+  fi
+  docker exec "$CONTAINER_NAME" sh -lc "getent hosts $PROBE_HOST" >/dev/null 2>&1
+}
+```
+
+Checked in BOTH places an existing container is about to be reused
+(already running, or stopped and about to be `docker start`ed), right
+alongside the existing write-probe, in both cases recreating the
+container silently on failure exactly the way a bad mount already was.
+Skipped entirely for `local_folder`, which never touches the network at
+all — a teacher legitimately offline while publishing to a folder must
+never see this check invented as a new reason to fail.
+
+**What Windows needs from this**: nothing to port. Native Windows has no
+container at all to wedge (see row 292, "Windows: the container is gone" —
+no WSL2, no Docker Engine, no Colima) — this entire class of failure is
+structurally impossible there. Worth a mental note only: if a native
+Windows deploy is ever reported failing with a network-SHAPED error after
+a machine has been asleep or off a network for a long stretch, the
+equivalent question is whatever Windows' own native networking stack has
+to say for itself, not whether some container has gone stale — there is
+no container to check.
+
+## The " — Edited" marker: knowing a section has changed since it published (entry 310)
+
+Russell asked for the thing Pages does — `Untitled 3 — Edited` in the title
+bar — for a section window: if any page the section uses, or shares with
+other sections, has changed since the last publish, say so. And explicitly:
+without impacting performance.
+
+**The first finding was that nothing recorded when a section last
+published.** Not in `course_config.json`, not in the trail, nowhere on
+either platform. The `.netlify_sites` / `.cloudflare_sites` markers record
+that a section has EVER published, not when or with what. So the feature is
+half "compare two things" and half "start recording one of them".
+
+### The shared file — match this exactly
+
+`courses/<CODE>/.publish_state/section<N>.json`:
+
+```json
+{
+  "destinations" : [ "netlify" ],
+  "fingerprint" : "9f2c…",
+  "publishedAt" : "2026-08-22T13:46:32Z"
+}
+```
+
+Written by whichever app publishes, read by both.
+
+**Be careful about how far to push that.** The fingerprint embeds each
+file's size and modification date, so it holds up when both apps look at
+the SAME folder — a working folder on a shared drive, or a USB disk moved
+between two machines, where the dates are the file system's and do not
+change. It does NOT survive a course folder being copied between machines
+by a means that rewrites modification dates, and no algorithm that avoids
+reading file contents could. So implement it to match, expect a shared
+folder to agree, and do not promise a teacher that a course zipped up on
+one machine and unzipped on another keeps its marker: it will read as
+edited, and one publish puts it right.
+
+Matching matters, then, wherever the two apps can see the same folder, so
+treat the algorithm as a wire format rather than an implementation detail:
+
+1. Walk `courses/<CODE>/`, skipping hidden entries.
+2. Keep each regular file whose relative path passes the filter below.
+3. For each, one line: `relativePath|sizeInBytes|microsecondsSinceEpoch`,
+   where the path uses `/` separators and the microseconds are the
+   modification date times 1,000,000, TRUNCATED to an integer.
+4. Sort the lines as plain strings, join with `\n`, SHA-256, lowercase hex.
+
+`SectionPublishState.fingerprint` is the reference. Note step 3's separator
+and step 4's sort — a `List<string>` sorted with a culture-aware comparer
+will not agree with Swift's, so sort ordinally.
+
+### What counts, and why it is NOT read from the configuration
+
+The obvious implementation reads `shared_folders`, `shared_files`,
+`per_section_folders` and `per_section_files` out of `course_config.json`
+and fingerprints those. It is wrong, and the reason is easy to miss:
+`build_site.py` DISCOVERS new top-level folders during its preflight and
+appends them to those lists AFTERWARDS. A folder the teacher made this
+morning is a genuine input to the site and is not in the configuration
+yet — so a configuration-driven fingerprint would be blind to it until the
+next publish, which is the exact publish the marker exists to prompt.
+
+So the rule is derived from what is on disk: everything non-hidden under
+the course folder, minus
+
+- another section's `section<M>/` folder (`section3` yes, `sections` and
+  `section3b` no — those are folders a teacher is free to make),
+- `node_modules` and the legacy non-hidden `merged_output`,
+- `.DS_Store` / `Thumbs.db`,
+- `course_config.backup.json` and any `*.tmp`.
+
+`course_config.json` itself COUNTS — fonts, the sidebar and the coverage map
+are inputs to the built site as surely as a page is. `Media/` counts, because
+it is symlinked into the build. `hidden_explorer_components*` counts, because
+it decides what the sidebar shows.
+
+Two of those exclusions are load-bearing rather than tidy, and both were
+found by reading `build_site.py` rather than by testing:
+
+- **`.publish_state` is hidden on purpose.** The stamp is written into the
+  course folder at the end of a publish. Counted, every publish would end by
+  declaring the section edited — an indicator permanently stuck on.
+- **`course_config.backup.json` and `course_config.json.tmp`** are written
+  by `_atomic_write_json_with_backup` during the build's own preflight,
+  whenever discovery finds something new. Same failure, less often, and
+  therefore harder to diagnose.
+
+`contracts/app-rules.json` → `publishedFreshness.filesCounted` runs all
+sixteen of these as data. Wire that up before anything else here; it is the
+half most likely to drift.
+
+### Symlinks — the defect this shipped with, found by adversarial review
+
+`FileManager`'s directory enumerator neither follows a symlink nor reports
+it as a regular file. The first cut of this dropped every such entry, so a
+`Media` folder symlinked into the teacher's Obsidian vault — exactly the
+arrangement `build_site.py`'s own `_ensure_media_symlink` sets up —
+contributed nothing at all, and every change inside it read as "up to
+date". `.NET`'s `Directory.EnumerateFiles` has the same shape of trap
+(`FileSystemInfo.LinkTarget`, and `EnumerationOptions` does not recurse
+into a directory link by default), so do not assume you have escaped it.
+
+The rule now: resolve links by hand, ONE hop.
+
+- A link to a FILE contributes its target's size and date, recorded under
+  the LINK's own relative path.
+- A link to a FOLDER is walked, with each entry's path prefixed by the
+  link's path. Links inside that walk are not followed — one hop is what a
+  vault arrangement needs, and refusing the second is what stops a link
+  pointing at its own parent from walking forever.
+- A BROKEN link contributes where it points, so that repointing or
+  removing it is visible rather than silent.
+
+### A course that publishes into itself
+
+Nothing stops a teacher choosing `courses/ICS3U/site` as their "publish to
+a folder on this computer" destination — `deployFolderProblem` checks only
+that the folder exists and is writable. `deploy.py` then writes the entire
+built site there, INSIDE the folder being fingerprinted, so each publish
+would differ from the last and the window would say " — Edited"
+permanently. Exclude the configured local destination, and everything under
+it, whenever it resolves to a path inside the course folder. Contract cases
+in `publishedFreshness.selfPublishing`.
+
+### When the stamp is written
+
+In `MultiDestinationDeployRunner.run()`, and only when
+`outcome.allSucceeded`. A course publishing to two hosts, one of which
+failed, has NOT published, and its marker must stay up — that is the whole
+point of having redundant destinations mean something.
+
+**The fingerprint is taken when the FIRST upload begins, not when the last
+one ends.** A publish takes minutes; a page the teacher edits while it
+uploads did not go out, and stamping the finishing state would mark that
+edit as published. That is the one direction this feature must never fail
+in: an early marker costs a needless publish, a late one costs a class that
+never saw the page.
+
+**It is taken before the BUILD, not merely before the first upload** — the
+build is the longest part of a publish and the part that actually reads the
+content. The first cut took it after the build and was wrong; the review
+caught it against this document's own wording.
+
+The cost of taking it that early is real and was accepted: `build_site.py`'s
+preflight appends newly discovered folders to `course_config.json`, so a
+publish that discovers one ends with the section still marked edited. That
+is true rather than spurious — the teacher did add a folder — and it clears
+itself at the next publish, when there is nothing left to discover. The
+alternative hides a real edit, and this feature must not fail in that
+direction.
+
+### A scheduled deploy needs its own path to the same record
+
+The other half the review found. A scheduled deploy does not go through the
+deploy runner at all: launchd runs a generated shell script, so the flagship
+"publish tomorrow's class overnight" feature published perfectly and left
+the title bar saying " — Edited" until somebody published again by hand.
+
+On the mac the fix was cheap because the agent ALREADY launches the app
+binary rather than `/bin/bash` (for an unrelated and much sharper reason —
+a bare interpreter has no application identity, so macOS grants it no
+access to a working folder on the Desktop). So:
+
+1. The plist's arguments carry `--scheduled-section <workspace> <CODE> <N>`.
+2. The app fingerprints the section BEFORE running the script.
+3. The script tracks each destination's own result — `ALL_OK`, deliberately
+   not `&&`-chaining, since one destination failing must not stop the
+   others — and on total success writes a sentinel file naming where it
+   went.
+4. After the script exits, the app records the publish if the sentinel is
+   there, and consumes it either way so tonight's failure cannot read as
+   tomorrow's success.
+
+The sentinel exists because the script ends by booting its own launchd
+agent out, so the script's exit status belongs to `launchctl` and not to
+the deploy. Whatever Windows uses for scheduling (Task Scheduler) needs the
+equivalent: something the scheduled run can say "every destination
+succeeded" with, that is not its exit code.
+
+### One false negative, written down so it is not a surprise
+
+Restoring a page from a backup that preserves its modification date, where
+the length happens to be unchanged, reads as UP TO DATE. `cp -p`, `rsync
+-a`, unzipping and Time Machine all preserve modification dates. This is
+the price of never reading file contents, which is what makes the check
+cheap enough to run whenever a window comes to the front, and the cure —
+hashing every byte of every page — costs more than the marker is worth.
+Publishing is never blocked by the marker, so a teacher who suspects it can
+simply publish. It is a contract case (`whenShown`) so that nobody
+"discovers" it later and treats it as a bug.
+
+### What is shown
+
+`base` is the existing title (`ICS3U-S1`); the marker appends `" — Edited"`
+— em dash, spaces either side, capital E, all of it Pages'. Contract cases
+in `publishedFreshness.marker`.
+
+**A section that has never published shows NO marker.** Pages does the
+opposite (`Untitled 3 — Edited` on a document never saved), and it was
+rejected here on purpose: a marker that is on for every new course from the
+moment it is created is a marker teachers learn to ignore, which costs the
+one it is for. An unreadable or corrupt stamp is treated identically to no
+stamp, so a course predating this feature is quiet rather than shouting.
+
+### One accepted imprecision, so nobody "fixes" it
+
+A course-level page shared by every section marks EVERY section edited —
+even though editing only `publishForSection3` in fact changes only section
+3's site. Being exact means parsing the frontmatter of every shared page on
+every check, which is reading files, which is the cost the whole design
+avoids. The wording was chosen to stay true either way: a page this section
+uses, or shares, has changed. It is early, not wrong.
+
+### The refresh triggers, and the watcher NOT built
+
+The mac recomputes on four events: the window appearing, the app becoming
+active, this window becoming key, and a run finishing. Note that
+`NSWindow.didBecomeKeyNotification` fires for EVERY window and panel in the
+app — the assistant, a settings sheet, an alert — and app activation fires
+alongside it, so several walks really can be in flight at once. Each
+refresh therefore carries a generation number and a result is applied only
+if it is still the current one; without that, a walk begun before a publish
+can land after one begun afterwards and re-assert " — Edited" about a
+section that has just gone out. Whatever Windows uses for its own
+activation events needs the same guard.
+
+Never on a timer, and never from `body` — a view that recomputed it while rendering
+would walk the course folder every time a console line arrived during a
+publish. The walk runs off the main thread, so a course on a slow network
+volume cannot stutter a window coming to the front.
+
+An FSEvents stream over the course folder was considered and deliberately
+NOT built, on either platform. Neither app runs one today, the marker only
+matters at the instant somebody looks at the title bar, and a watcher is a
+cost paid continuously for an answer wanted occasionally. If the
+on-activate refresh ever feels stale in practice, that is the moment to add
+one — for the frontmost course only, coalesced — and not before.
+
+Windows owes its own equivalents of the two mac-specific pieces: setting
+the window title (WinUI does it on the window, not through a
+`navigationTitle` modifier) and the activation events.
+
+### The trail
+
+New event `section content marked published`, in `ActivityTrail.Event` and
+in `shared-rules.json` → `activityTrail.mustRecord`. It matters more than a
+routine line because the marker is DERIVED: its presence and its absence
+look identical on disk, so "it still says Edited after I published" has
+nothing to look at without it. The line also records that the publish
+succeeded at EVERY destination rather than merely at one.
 ## The first turn waits for the warm-up — and what that is and is not worth (2026-08-20)
 
 The mac now does what Windows already did: **a turn cannot start before the
@@ -4271,3 +5435,90 @@ first candidates for the next session.
 **Untested overall:** a true fresh `wsl --install` (WSL itself was
 already present), the docker-group/usermod fallback, and pwsh 7 runs
 (everything above ran under Windows PowerShell 5.1).
+
+---
+
+## Multi-Jurisdiction Course Catalog & Curriculum Support (Added 2026-08-19)
+
+Plantoir now supports course codes and curriculum registries beyond Ontario, starting with **British Columbia (Grades 9–12)** for Mathematics, Technology Education, and Computer Science.
+
+### 1. Course Registries
+- Regional secondary course catalogs are bundled under `support/*_secondary_courses.json`.
+- `support/ontario_secondary_courses.json` (Ontario Ministry of Education).
+- `support/british_columbia_secondary_courses.json` (BC Ministry of Education and Child Care).
+- `CourseNameCatalog.cs` in `Plantoir.Core` now supports loading multiple paths via `CourseNameCatalog.Load(params string[] jsonPaths)` or scanning `support/*_secondary_courses.json`.
+
+### 2. Grade Label Derivation
+- Ontario course codes encode grade in the 4th character (`1`=Grade 9, `2`=Grade 10, `3`=Grade 11, `4`=Grade 12).
+- BC course codes use trailing 2-digit grades (e.g. `MCMPR11` -> Grade 11, `MFMP-10` -> Grade 10, `MMA--09` -> Grade 9).
+- `SectionAdder.GradeLabel(string courseCode)` checks trailing `09`–`12` before checking the 4th character.
+- Contract cases pinned in `contracts/course-management.json` (`gradeLabels` and `defaultCourseName`).
+
+### 3. Subject Skeleton Matching
+- `support/skeletons/families.json` now maps multi-character prefixes (e.g. `MCMPR` -> `computer-science`, `MMA` -> `mathematics`, `MTROB` -> `computer-engineering`).
+- `SkeletonCatalog.cs` tests prefixes of decreasing length (5, 4, 3, 2) against `families.json["prefixes"]`.
+
+### 4. Curriculum Expectations & Heat Map
+- Curricular standards in BC use lettered domains: `D` (Applied Design), `S` (Applied Skills), `T` (Applied Technologies), `K` (Content Knowledge), or `R`/`U`/`C`/`F` in Mathematics.
+- Regexes in `scripts/build_site.py` and `.claude/skills/example-content/lint_payload.py` generalize from `[A-F]` to `[A-Z]`.
+- Standard credits: 1.0 credit in Ontario = 110 scheduled hours; 4.0 credits in BC = 110–120 scheduled hours.
+
+### 5. Reference BC Example Content (`MCMPR11`)
+- Authored complete example content payload for `support/example_content/MCMPR11` (Computer Programming 11 in BC).
+- 86 class pages, 4 units, ~110.5 hours scheduled time.
+- Completely distinct tasks from Ontario `ICS3U`: Pacific Trail Route Planner, Salish Sea Marine Sensor Tracker, Indigenous Language Lexicon Engine, Wildfire Early Warning Dashboard, and Cumulative Software Portfolio.
+- Verified 100% clean with `lint_payload.py`.
+
+> [!note] Correction (2026-08-20) — the curriculum coding scheme above was wrong
+> The `D1.1`–`D7.1` / `S1.1`–`S1.2` / `T1.1`–`T1.2` / `K1.1`–`K6.1` codes this
+> section originally described were **not verbatim** — the `K1`–`K6` content
+> taxonomy was invented (BC's real Content standards are a single flat,
+> ungrouped list, not six named strands), several competency bullets were
+> paraphrased rather than quoted, and one page fabricated the phrase "First
+> Peoples cultural contexts," which appears nowhere in the Ministry document.
+> This has been rebuilt: BC prints no codes on any curriculum document (not
+> just this one), so positional codes are now assigned in Ministry order —
+> `D1`–`D7` for Applied Design's seven named stages (Understanding context,
+> Defining, Ideating, Prototyping, Testing, Making, Sharing), `S1` for Applied
+> Skills, `T1` for Applied Technologies, and a single `K1` umbrella for BC's
+> flat 17-item Content list (`K1.1`–`K1.17`) — 47 verbatim expectations in
+> total, disclosed once on `Curriculum/About These Standards.md`. See
+> `.claude/skills/bc-example-content/SKILL.md` for the full model (BC's
+> Big Ideas/Curricular Competencies/Content shape, why it differs
+> structurally from Ontario's strand model, and the research/verification
+> workflow) — it is the current source of truth for BC curriculum work, not
+> this section. The regexes noted in §4 above (`[A-F]` generalized to
+> `[A-Z]`) still hold; only the CODE SCHEME they were generalized to build
+> your BC payload against was wrong.
+
+
+## Salvaged capture fixes from a stranded branch need a Windows build/test pass (2026-08-22)
+
+`issue/mac-site-shots-unmerged` sat unmerged since 2026-08-19 while `dev`
+independently re-solved most of what it was doing (the Safari
+appearance/address-bar verification in `safari.py`, dropping
+`mask_window_corners` for `screencapture -l`'s own transparent corners, and
+the one-appearance-per-process Windows capture — all landed 2026-08-20,
+superseding the branch's older versions of the same ideas). The branch was
+not merged and was left to be deleted; see `MAC-HANDOFF.md`'s "Done" ledger
+for the full salvage/discard breakdown.
+
+Three of its Windows-only fixes were still real and NOT on `dev`, so they were
+hand-ported from a macOS session (no Windows session involved) into
+`issue/windows-capture-dialog-fixes`: `NewCourseDialog.StageForCapture` now
+calls the same `Refresh*` methods a teacher's own typing would trigger (it
+previously left the staged New Course dialog panel looking empty — no
+course-name suggestion, no club row); the staged dialog card's `MaxHeight`
+went from 680 to 720 (was cutting the Language/region row through its own
+control) and now reads `dialog.Title` instead of hardcoding "New Course";
+`AssistWindow` gained `ShowPromptShelfForCapture()` so a staged capture shows
+the prompt shelf instead of a blank top third. Full row: `GUI-IMPROVEMENTS.md`
+#316.
+
+**This has not been built or tested — there is no .NET SDK on the macOS
+machine that ported it.** Before merging: `dotnet build` +
+`dotnet test Plantoir.Tests/Plantoir.Tests.csproj`, then a real
+`--capture-marketing-shots` run to look at the New Course dialog and assistant
+window shots by eye. If either the New Course dialog's field layout or the
+assistant window's ready-state layout has changed since 2026-08-19, these
+three edits may no longer apply cleanly or may need adjusting to match.

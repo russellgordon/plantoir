@@ -77,4 +77,6 @@ and build a case about it in [[The Recent Past]].
 ![[E1.1]]
 
 ![[E1.3]]
+
+![[E2.2]]
 %%curriculum-end%%

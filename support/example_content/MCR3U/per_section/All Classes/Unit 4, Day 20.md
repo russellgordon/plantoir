@@ -10,10 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. [[The Functions Symposium]], day 4 — working period: the questions you
-   expect, and the ones you would rather not be asked
-2. Practise being questioned by another group
+1. [[The Functions Symposium]], day 3 — working period: the failure
+   boundary found, and one question answered with your model that the raw
+   data cannot answer — beginning with whatever yesterday's conference
+   asked for
+2. Each of you writes the panel that carries your own name
+3. Practise being questioned by another group: the questions you expect,
+   and the ones you would rather not be asked
 
 ## Things to do before our next class
 
-- [ ] Ready. Nothing new made — selection and explanation only.
+- [ ] Exhibit assembled; both symposium questions rehearsed out loud.

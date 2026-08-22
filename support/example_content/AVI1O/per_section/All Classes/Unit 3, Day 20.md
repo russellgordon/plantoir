@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval across Unit 3
-2. Choosing the idea for your body of work
+1. Retrieval across Unit 3: [[The Critical Analysis Process]]
+2. Choosing the idea for your body of work: [[The Body of Work]]
 3. Studio time: first thumbnails
 
 ## Things to do before our next class

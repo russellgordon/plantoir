@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Period 2 of 8: the design
-2. A scaled plan and a plant or materials list
+1. Period 2 of 8: the design: [[The Site Project]]
+2. A scaled plan and a plant or materials list: [[Design and Problem Solving in the Green Industries]]
 3. Conferences on feasibility
 
 ## Things to do before our next class
