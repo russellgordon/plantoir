@@ -376,7 +376,10 @@ public static class MarketingShotCapturer
         var dialogCard = new Border
         {
             Width = 540,
-            MaxHeight = 680,
+            // 680 cut the Language / region row through the middle of its
+            // control, with no scrollbar to explain why -- it read as a
+            // rendering fault rather than as a panel that continues.
+            MaxHeight = 720,
             Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
             BorderBrush = (Brush)Application.Current.Resources["SurfaceStrokeColorDefaultBrush"],
             BorderThickness = new Thickness(1),
@@ -393,7 +396,9 @@ public static class MarketingShotCapturer
 
         var titleBlock = new TextBlock
         {
-            Text = "New Course",
+            // The dialog's own title, not a second copy of it that can
+            // drift: the real one says "New Course or Club".
+            Text = dialog.Title?.ToString() ?? "New Course",
             FontSize = 20,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 16)
@@ -406,6 +411,7 @@ public static class MarketingShotCapturer
             dialog.Content = null;
             Grid.SetRow(formContent, 1);
             dialogLayout.Children.Add(formContent);
+            GiveTheFormRoomForCapture(formContent);
         }
 
         var buttonRow = new StackPanel
@@ -464,6 +470,32 @@ public static class MarketingShotCapturer
     private const string DeployTranscript =
         "Setting up this PC\nBuilding your website builder\nEnsuring container is running\n"
         + "Deploying from local build\n";
+
+    /// <summary>
+    /// Give the form enough room that the photograph cuts where the mac's
+    /// twin cuts -- at a section boundary, not through a control.
+    ///
+    /// The form lives in a ScrollViewer capped at 520, which put the card's
+    /// bottom edge straight through the "Language / region" row: a label with
+    /// its dropdown sliced off reads as a rendering fault rather than as a
+    /// panel that continues. Asking for the scrollbar instead was tried first
+    /// and does nothing -- Windows' "automatically hide scroll bars" setting
+    /// wins over VerticalScrollBarVisibility.Visible, so a still frame never
+    /// shows one. 600 completes that row and brings the next heading into
+    /// view, which is what the mac shot shows.
+    /// </summary>
+    private static void GiveTheFormRoomForCapture(FrameworkElement content)
+    {
+        if (content is ScrollViewer viewer)
+        {
+            viewer.MaxHeight = 600;
+            return;
+        }
+        if (content is Panel panel)
+            foreach (var child in panel.Children)
+                if (child is FrameworkElement element)
+                    GiveTheFormRoomForCapture(element);
+    }
 
     private static async Task CaptureProgressWindow(string workspacePath, ElementTheme theme, string outputPath)
     {
@@ -535,6 +567,8 @@ public static class MarketingShotCapturer
         window.Activate();
 
         await Task.Delay(500);
+
+        window.ShowPromptShelfForCapture();
 
         // Stage teacher message bubble matching macOS assistant test
         var teacherMsg = new TextBlock

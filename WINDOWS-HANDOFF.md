@@ -5295,3 +5295,34 @@ Plantoir now supports course codes and curriculum registries beyond Ontario, sta
 > `[A-Z]`) still hold; only the CODE SCHEME they were generalized to build
 > your BC payload against was wrong.
 
+
+## Salvaged capture fixes from a stranded branch need a Windows build/test pass (2026-08-22)
+
+`issue/mac-site-shots-unmerged` sat unmerged since 2026-08-19 while `dev`
+independently re-solved most of what it was doing (the Safari
+appearance/address-bar verification in `safari.py`, dropping
+`mask_window_corners` for `screencapture -l`'s own transparent corners, and
+the one-appearance-per-process Windows capture — all landed 2026-08-20,
+superseding the branch's older versions of the same ideas). The branch was
+not merged and was left to be deleted; see `MAC-HANDOFF.md`'s "Done" ledger
+for the full salvage/discard breakdown.
+
+Three of its Windows-only fixes were still real and NOT on `dev`, so they were
+hand-ported from a macOS session (no Windows session involved) into
+`issue/windows-capture-dialog-fixes`: `NewCourseDialog.StageForCapture` now
+calls the same `Refresh*` methods a teacher's own typing would trigger (it
+previously left the staged New Course dialog panel looking empty — no
+course-name suggestion, no club row); the staged dialog card's `MaxHeight`
+went from 680 to 720 (was cutting the Language/region row through its own
+control) and now reads `dialog.Title` instead of hardcoding "New Course";
+`AssistWindow` gained `ShowPromptShelfForCapture()` so a staged capture shows
+the prompt shelf instead of a blank top third. Full row: `GUI-IMPROVEMENTS.md`
+#316.
+
+**This has not been built or tested — there is no .NET SDK on the macOS
+machine that ported it.** Before merging: `dotnet build` +
+`dotnet test Plantoir.Tests/Plantoir.Tests.csproj`, then a real
+`--capture-marketing-shots` run to look at the New Course dialog and assistant
+window shots by eye. If either the New Course dialog's field layout or the
+assistant window's ready-state layout has changed since 2026-08-19, these
+three edits may no longer apply cleanly or may need adjusting to match.

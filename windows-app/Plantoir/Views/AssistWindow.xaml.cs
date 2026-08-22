@@ -519,6 +519,22 @@ public sealed partial class AssistWindow : Window
         }
     }
 
+    /// <summary>
+    /// Mount the prompt shelf for a marketing capture, as though a teacher had
+    /// typed it.
+    ///
+    /// The shelf is normally mounted on the path that runs once the local
+    /// assistant is ready, and a capture never starts one -- so the window
+    /// photographed with the top third of it blank, and the Windows shot
+    /// omitted a feature the mac's twin leads with. The cards do nothing
+    /// here: tapping one is what a teacher does, and nothing is tapped.
+    /// </summary>
+    public void ShowPromptShelfForCapture()
+    {
+        PromptShelfHost.Content = new AssistPromptShelfView(_ => { });
+        PromptShelfArea.Visibility = Visibility.Visible;
+    }
+
     public void AddStagedBubbleForCapture(string speaker, bool fromTeacher, params UIElement[] contents)
     {
         AddCard(speaker, contents);
