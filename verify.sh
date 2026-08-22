@@ -11,6 +11,8 @@ set -euo pipefail
 # folder builds from locally.
 #
 # What it does, in order:
+#   0. Runs deploy.py's pure-Python unit tests (no Docker needed) so a broken
+#      script fails in milliseconds rather than after a full image build.
 #   1. Ensures the container runtime is up (shares an already-running Colima;
 #      never stops it — safe to run alongside other Colima-based toolchains).
 #   2. docker build -t quartz-teacher:dev-test .
@@ -77,6 +79,24 @@ if [[ ! -t 0 ]]; then
   echo "   To run it from a script or CI, give it one:"
   echo "     script -q /dev/null ./verify.sh"
   exit 1
+fi
+
+# -------------------- 0.5. Pure-Python unit tests (no Docker needed) --------------------
+# Fast, dependency-free checks that don't need the image — run first so a
+# broken script.py change fails in milliseconds instead of after a full
+# Docker build.
+if (cd scripts && python3 test_deploy_netlify_headers.py) >/tmp/verify_deploy_headers_test.log 2>&1; then
+  pass "deploy.py: Netlify ad-badge suppression (scripts/test_deploy_netlify_headers.py)"
+else
+  fail "deploy.py: Netlify ad-badge suppression (scripts/test_deploy_netlify_headers.py)"
+  cat /tmp/verify_deploy_headers_test.log
+fi
+
+if (cd scripts && python3 test_netlify_badge.py) >/tmp/verify_netlify_badge_test.log 2>&1; then
+  pass "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
+else
+  fail "netlify_badge.py: shared ad-badge suppression module (scripts/test_netlify_badge.py)"
+  cat /tmp/verify_netlify_badge_test.log
 fi
 
 # -------------------- 1. Container runtime (shared Colima) --------------------
@@ -204,6 +224,7 @@ check_baked() {
 check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py
+check_baked scripts/netlify_badge.py      /opt/scripts/netlify_badge.py
 check_baked patches/Explorer.tsx          /opt/quartz/quartz/components/Explorer.tsx
 check_baked patches/FolderContent.tsx     /opt/quartz/quartz/components/pages/FolderContent.tsx
 check_baked patches/explorer.inline.ts    /opt/quartz/quartz/components/scripts/explorer.inline.ts

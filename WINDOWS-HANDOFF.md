@@ -3860,164 +3860,219 @@ There is deliberately **no web manifest and no 192/512 PWA icon set**. That is
 Android home-screen and installable-app territory, not a favicon, and the
 teacher's site is neither.
 
-## The local assistant opens a window rather than deploying silently (entry 300)
+## Suppressing Netlify's own ad badge (entry 301)
 
-Reported directly, after driving the real app: "Deploying from the
-assistant does not show anything in the GUI... Using that command in the
-local assistant should simply do the same thing as pressing the Deploy
-button in the GUI." Traced before touching anything — this turned out to
-be a **pre-existing, deliberately documented design decision**
-(`documentation/10-local-ai-assistant.md`), not a regression from any
-recent change: `AssistToolRunner.deploySection`/`bringThePreviewUpToDate`
-have always forked on whether `SectionWindowControllers` has a registered
-controller for the section — window found, press its own Deploy/Preview
-(visible); no window, run the launcher headlessly (invisible) — and that
-fork groups THREE genuinely different callers as if they were the same
-case: the local in-app assistant, Claude Code over MCP
-(`Plantoir --mcp-stdio`), and a 6:30 a.m. scheduled deploy.
+Netlify can inject a "Powered by Netlify" badge — and a matching pre-launch
+toolbar — into any public site on a free-tier project. Confirmed live
+2026-08-21: their own rollout table has free-plan projects created
+2026-08-19 or later default it **ON**. Every class site this project
+publishes to Netlify was about to start wearing an ad in front of students,
+with no code involved and nothing here to notice it happening.
 
-**Only one of those three can actually do anything about it.** MCP is a
-separate process that never constructs a Scene graph at all — confirmed by
-reading `QuartzTeachersApp.init()`: `AssistMCPServer.serve(workingFolder:)`
-returns `Never` and blocks on `dispatchMain()` before `body` (and therefore
-every `WindowGroup`) is ever touched. A scheduled deploy runs with the app
-closed. Both must keep the silent fallback — there is no window for either
-to open, structurally, not as a design choice. The **local** assistant is
-different: it runs inside the same real, on-screen app session pressing
-the Deploy button would, with a live SwiftUI Scene graph and a genuine
-`@Environment(\.openWindow)` available — it was simply never given the
-capability to use it.
+**There is no API lever.** Netlify's published OpenAPI spec
+(`https://raw.githubusercontent.com/netlify/open-api/master/swagger.yml`,
+6,074 lines, read in full) has nothing named `badge`, `powered_by`, or
+`premium` anywhere on the `Site` object. The only documented control is a
+per-project dashboard toggle — Project configuration → General → Powered by
+Netlify badge — which does not scale to hundreds of teachers' class sites
+and cannot be driven by `deploy.py`'s existing REST calls.
 
-### The fix: `openMainWindow`, threaded down from the one place that has it
+**The one automatic lever Netlify itself documents**: the badge only
+executes through an inline `<script>` their edge injects into the response
+HTML, and a Content-Security-Policy whose `script-src` omits
+`'unsafe-inline'` makes the browser refuse to run it —
+<https://docs.netlify.com/manage/projects/powered-by-netlify-badge/> states
+plainly that "Neither the badge nor the pre-launch toolbar appears, and no
+other project functionality is affected."
 
-`AssistToolRunner` gained an optional stored closure,
-`openMainWindow: (@MainActor () -> Void)?`, defaulting to `nil` (so every
-existing caller — MCP, every test — needs zero changes). It is populated
-on exactly one path: `AssistWindowView` (a real SwiftUI `View`, therefore
-the only place `@Environment(\.openWindow)` is legally readable) declares
-`@Environment(\.openWindow) private var openWindow`, wraps it in a closure,
-and passes it through `AssistSession.prepare(openMainWindow:)` →
-`.startEngine(openMainWindow:)` → `AssistToolRunner.init(...,
-openMainWindow:)`.
+### The risk that had to be ruled out first
 
-`AssistToolRunner.revealSectionOnScreen(course:sectionNumber:)` is the new
-function both `deploySection` and `bringThePreviewUpToDate` call when
-`sectionWindow(for:)` finds nothing, right before falling back to the old
-headless path:
+A blanket `script-src` restriction is only safe if the site's OWN inline
+scripts still work. Before writing a line of the fix, a real built site
+(`courses/EXC2O/.merged_output/section1/public/`, 294 pages) was checked
+directly:
 
-1. **Reuse an already-open window on the same working folder if one
-   exists** (`WorkspaceModel.windowModels`, a static registry every
-   on-screen window's model already adds itself to). This is the COMMON
-   case, not the exception — the assistant is almost always opened FROM an
-   already-open window's sidebar (`SidebarView.swift`'s
-   `openWindow(value: AssistWindowRequest(...))`), so most of the time a
-   window already exists, just not necessarily showing this section.
-2. **Only if none exists, open a fresh one** via the injected
-   `openMainWindow()`, then poll `WorkspaceModel.windowModels` briefly for
-   it to appear — its own `WindowRootView.onAppear` adopts the right
-   folder automatically via the pre-existing `adoptFolderForNewWindow()` /
-   `mostRecentKeyFolderPath` mechanism (a mid-session window opens where
-   the teacher most recently had a window key), so nothing new had to be
-   built for folder discovery.
-3. **Set that window's `.selection` to the target section**, activate the
-   app, and bring the window's own `NSWindow` forward
-   (`makeKeyAndOrderFront`) — `WorkspaceModel.window` already tracks this
-   per-window reference; no new AppKit plumbing beyond calling a method
-   that already existed.
-4. **Wait for `SectionWindowControllers` to actually register a
-   controller** before proceeding — moving `.selection` is not the section
-   appearing; `SectionDetailView` still has to mount on a real SwiftUI
-   render pass and run its own `.onAppear` first. Polled, the same shape
-   `ScriptRunner.waitUntilFinished()` already uses for a different kind of
-   "wait for something async to become true."
+- The dark-mode-before-paint script — the one that matters most, since
+  getting it wrong means every page flashes the wrong theme — is already
+  **external** (`prescript.js`). Safe.
+- Search, graph view, the SPA router — all external (`postscript.js`). Safe.
+- Quartz DOES emit 3 inline `<script>` blocks per page: a search-index
+  prefetch trigger (content varies only by folder depth — a handful of
+  variants), a callout-collapse handler, and a Mermaid pan/zoom script (the
+  latter two byte-identical on every page). None embed secret or
+  teacher-specific data.
 
-If none of that produces a controller in time (should be rare — a few
-render passes, polled at 50ms), it falls through to the pre-existing
-headless path exactly as before. Nothing about the fallback itself
-changed; only the fork's THIRD branch (local assistant, no window YET)
-gained a real chance to become the first branch (window found) before
-falling all the way through.
+### The design, and what was rejected
 
-### Two things that did not work the way a first draft assumed — write them down so nobody re-tries them
+`write_netlify_headers_file()` (in `scripts/deploy.py`) scans the ACTUAL
+built `public/` folder at deploy time — every `.html` file, every unique
+inline `<script>` body, SHA-256-hashed, plus any cross-origin
+`<script src="https://…">` host — and writes `public/_headers` with a policy
+built from what is really there:
 
-- **There is no bare, id-less `openWindow()` that opens "the app's one
-  plain WindowGroup."** A first pass assumed `WindowGroup("Plantoir") {
-  ... }` (no `id:`) could be opened in code with plain `openWindow()`,
-  mirroring how the Cmd+N default works automatically. It does not compile
-  — `error: missing argument for parameter 'id' in call`. Fixed by giving
-  the group an explicit `id: "main"` and calling `openWindow(id: "main")`,
-  the same pattern this codebase already uses successfully for `"about"`
-  and (with a data payload) `"assistant"`.
-- **Giving the main WindowGroup an id needed checking, not assuming, was
-  safe** — SwiftUI's own scene-keyed window restoration could plausibly
-  have started behaving differently. It doesn't, here: `WindowRootView`'s
-  own comment says outright that "per-window SwiftUI persistence is not
-  used for the folder at all" — restoration is handled entirely by the
-  app's own frame-keyed `WindowFolderMemory`, independent of any SwiftUI
-  scene id. Cmd+N is similarly unaffected, since SwiftUI generates the
-  standard New Window menu item per-scene regardless of whether that scene
-  has an id.
+```
+/*
+  Content-Security-Policy: script-src 'self' 'sha256-…' 'sha256-…' … https://cdn.jsdelivr.net;
+```
 
-### What is NOT covered by an automated test, and why
+Only `script-src` is set, never `default-src` — nothing else about a page
+(images, fonts, styles, network requests) is touched. It runs on the
+Netlify path only (Cloudflare Pages and `local_folder` don't have this
+badge), right after any production rebuild and right before the
+delta-deploy manifest is built, so `_headers` rides along in the same SHA-1
+manifest as every other file — no separate upload step.
 
-The actual "a brand-new window appears with the right section on screen"
-flow needs a real SwiftUI render pass and a real `NSWindow` — no unit test
-can produce either. `AssistRevealsSectionOnScreenTests.swift` covers every
-piece of the DECISION logic that does not require one: an already-open
-window is found and reused (never re-opened); `openMainWindow` is
-never invoked when a matching window is already open, at both the
-`revealSectionOnScreen` layer and through the real `deploy_section` tool
-call; the nil-capability (MCP/scheduled) path returns immediately without
-touching any window state.
+Two designs were considered and rejected:
 
-**The full flow was verified by hand, driving the real app — and it
-caught a real bug the design above did not anticipate.** First pass: quit
-the main window, leave only the assistant chat open, ask it to preview.
-A brand-new window DID open — but it landed on "Choose Your Working
-Folder" instead of the section, because `revealSectionOnScreen` was
-relying on the new window's own `WindowRootView.onAppear` to guess the
-right folder (`adoptFolderForNewWindow`, keyed off whichever window was
-most recently KEY in AppKit's own terms) — a heuristic built for Cmd+N,
-where the app genuinely has no better answer. It has one here: the
-assistant's own `workspace.workspaceURL` already IS the answer. The
-fallback handled the miss safely (no crash, the pre-existing headless
-message), but the reveal itself failed — so `revealSectionOnScreen` was
-changed to identify the new window by IDENTITY (a before/after snapshot of
-`WorkspaceModel.windowModels`, not by folder path, since the new one has
-none yet) and call `adoptRestoredPath` on it directly, unconditionally,
-rather than trust the heuristic. Rebuilt, retested the identical way: the
-new window opened straight to "MCV4U-S1" with the correct working folder
-in its own breadcrumb, "Stop Preview" showing a build genuinely in
-progress, and the assistant's reply reading
-`AssistWording.previewIsRebuilding` — the SUCCESS path, not the fallback.
-This is exactly what rule 9 in `CLAUDE.md` promises and exactly why it is
-not optional for a change like this one: the unit suite was green through
-both the broken and the fixed version, because nothing in it constructs a
-real second window.
+1. **A hardcoded hash allow-list for Quartz's own known scripts.** Rejected
+   because it goes stale the moment Quartz's bundling changes on a version
+   bump — a silent breakage discovered only when a teacher reports a dead
+   page — and it does nothing for a teacher who pastes their own
+   `<script>` into a note for some embed. Scanning the real build handles
+   both automatically, at the cost of nothing more than a directory walk on
+   an already-built site.
+2. **Patching Quartz's TSX components so every inline script becomes an
+   external file**, matching what already happens for `prescript.js`
+   (`patches/Head.tsx` filters resources by `loadTime` and only THAT
+   resource gets rendered `src=`). Rejected because Quartz's source isn't
+   vendored here — it's cloned fresh at Docker build time
+   (`Dockerfile:27`) — so this would mean chasing down, in upstream
+   TypeScript this repo doesn't keep a copy of, whichever components emit
+   the callout-collapse and Mermaid scripts, and re-verifying the patch on
+   every future Quartz version bump. The scanning approach needs none of
+   that: it observes output, not implementation.
 
-### What Windows needs from this
+Deterministic build to build (same content ⇒ same hashes ⇒ same file),
+which is the same property `documentation/07-deployment.md`'s "Why
+determinism matters" section already requires of everything else in
+`public/`, for the same delta-deploy reason. Verified against the real
+Example Course build: 5 unique inline-script hashes (2 static, 3 folder-depth
+variants of the search-prefetch trigger), 1 cross-origin host
+(`cdn.jsdelivr.net`, KaTeX's autorender script).
 
-If the Windows local assistant has the same fork (window found → visible;
-no window → silent launcher run), it likely has the identical gap, since
-the underlying mistake — grouping "the in-app assistant with no window
-open yet" together with genuinely headless callers — is a reasoning error
-independent of platform. The fix is the same SHAPE, not this Swift: find
-whether a capability exists on that platform to open/focus a window from
-outside a View's own scope (WinUI's equivalent of `@Environment
-(\.openWindow)`), thread it down ONLY on the local-assistant path, and
-reuse an already-open window before opening a new one. Nothing here is
-shared code to port — it is the decision that travels.
+Tested in `scripts/test_deploy_netlify_headers.py` — pure stdlib, no Docker,
+no network — and wired into `verify.sh` as a fast pre-check that runs before
+the (slow) image build, so a broken change here fails in milliseconds.
 
-**One specific trap worth naming, since it cost a round trip here too:**
-if WinUI's new-window creation has any equivalent of "guess which folder
-to open based on whichever window was last active," do not lean on it for
-this feature. The caller (the local assistant) already knows the exact
-answer — set it directly on the freshly created window rather than trusting
-a heuristic built for a different situation (a teacher pressing New Window
-themselves, with no better source of truth available). Identify the new
-window by IDENTITY (whatever WinUI's equivalent of "not in the list of
-windows that existed a moment ago" is), not by the folder it's supposed to
-end up with — it has none yet.
+A teacher who clicks "Show details" during a deploy sees plain-language
+lines explaining what this step is doing and that it checked the site's own
+scripts first, so it reads as something deliberate rather than as
+unexplained new console noise.
+
+**Cloudflare Pages pays nothing for a problem that's Netlify's alone**
+(confirmed 2026-08-21, in response to exactly this question). It was
+already true by construction — `main()`'s `if args.target == "cloudflare":`
+branch calls `publish_to_cloudflare()` and returns before reaching the
+Netlify site lookup, the token check, or the badge-suppression call, and
+`local_folder` never invokes `deploy.py` at all — but that guarantee rested
+only on code ORDER, silently, so `CloudflareIsNeverTouchedTests` in
+`scripts/test_deploy_netlify_headers.py` now pins it structurally: one test
+asserts the cloudflare branch's `return` appears before the
+`write_netlify_headers_file()` call site in `main()`'s source, a second
+asserts `publish_to_cloudflare()`'s own source never mentions that
+function at all. A future refactor that moves badge suppression earlier
+fails these tests instead of shipping a silent regression. This also keeps
+Cloudflare a clean control group on purpose: deploying identical content to
+both destinations is a direct way to check whether a suspected site
+breakage is caused by this feature rather than by the build itself.
+
+**Shared Python — nothing to mirror.** Windows inherits this the moment
+`deploy.py` is next synced; there is no C# equivalent to write.
+
+**Update 2026-08-21: this now also covers plantoir.app.** The marketing
+site (`website/`) is a second free-tier Netlify project exposed to the
+identical badge, with its own deploy path (`website/netlify_deploy.py`, run
+via `python3 website/build.py --deploy`) that has nothing to do with either
+app. Rather than duplicate the ~90 lines of scanning logic a second time,
+`_collect_inline_script_policy()` and `write_netlify_headers_file()` moved
+out of `deploy.py` into a new sibling module, `scripts/netlify_badge.py`,
+with `deploy.py` re-exporting both names so its own call site and
+`scripts/test_deploy_netlify_headers.py` (which does `import deploy` and
+calls `deploy.write_netlify_headers_file`) are unchanged. `netlify_deploy.py`
+imports the same module by adding `scripts/` to `sys.path` — the identical
+trick `deploy.py` already uses for `toolchain_paths` — and calls it on
+`site/` right before its own delta-deploy manifest is built, mirroring
+where `deploy.py` calls it on `public/`. Covered by
+`scripts/test_netlify_badge.py` (the module in isolation, plus an identity
+check that `deploy.py`'s re-export is the same function object) and
+`website/test_netlify_deploy_headers.py` (the wiring, against a temp folder
+standing in for `site/`).
+
+This is host/CI-side Python only — not part of either app — so it is an
+**awareness note, not something to port**: there is no C# equivalent to
+write here either, on either side of this update.
+
+## The Dockerfile never picked up netlify_badge.py (entry 302)
+
+Row 301's badge-suppression CSP scans the built site and hash-allows every
+inline `<script>` it finds, but the scanning logic itself lives in a
+sibling module, `scripts/netlify_badge.py`, that `deploy.py` imports by
+bare name. The Dockerfile's `COPY` list for `/opt/scripts` is explicit,
+one line per file — `toolchain_paths.py`, `setup_course.py`,
+`build_site.py`, `deploy.py`, `social_card.py` — and never gained a line
+for the new module. Every real deploy through the container (Netlify or
+the marketing site) failed outright with `ModuleNotFoundError: No module
+named 'netlify_badge'`.
+
+**Why the unit test never caught it**: `scripts/test_deploy_netlify_headers.py`
+and `scripts/test_netlify_badge.py` both import `deploy`/`netlify_badge`
+directly from the working tree, where the sibling file is right there on
+disk regardless of what the Dockerfile does — they exercise the SCANNING
+LOGIC, never the actual built image. Only a deploy through the real
+container hits the gap, which is exactly the class of bug `verify.sh`'s
+slow, Docker-dependent checks exist to catch and the fast host-side
+pre-checks structurally cannot.
+
+**The fix**: one `COPY scripts/netlify_badge.py /opt/scripts/netlify_badge.py`
+line in the Dockerfile, plus the matching `check_baked` line in
+`verify.sh` — which had the identical gap itself: it compares every other
+baked script against the working tree, but had never been taught about
+this one, so the image could go stale here again with the gate staying
+green throughout.
+
+**What Windows needs from this**: nothing to port directly (shared
+Dockerfile, shared `verify.sh`), but the LESSON is worth keeping in mind
+if Windows ever adds its own per-file bundling list for the native
+runtime's scripts (`Vendor/fetch-runtime.ps1` or similar) — an explicit
+per-file list is exactly the shape that silently misses a new file added
+elsewhere; a folder-reference or manifest-driven copy does not have this
+failure mode.
+
+## unsafe-eval had to join the Netlify CSP, or every sidebar goes empty (entry 303)
+
+Row 301's badge-suppression CSP — `script-src` with hash-only sources, no
+`'unsafe-inline'` — silently broke Quartz's own Explorer SIDEBAR on every
+page of every site deployed to Netlify. `patches/explorer.inline.ts`
+builds its sort/filter/map functions from `data-data-fns` JSON via
+`new Function("return " + source)()` — a capability `'unsafe-eval'`
+governs, not a script identity, so hash-allowing every actual inline
+script (which row 301 already did correctly) never touched it.
+
+**Found by A/B testing a real deploy** to both Netlify and Cloudflare
+Pages side by side: Netlify's sidebar rendered "Navigate this site" with
+an empty list underneath; Cloudflare (no CSP at all) showed the full
+tree. Reproduced in a fresh PRIVATE Safari window first, to rule out
+leftover `localStorage` from earlier testing on the same site name — the
+bug survived that, so it was real. Confirmed definitively via the
+browser's own console, reached with Safari's `do JavaScript`: "Refused to
+evaluate a string as JavaScript because 'unsafe-eval' ... is not an
+allowed source of script."
+
+**The fix**: add `'unsafe-eval'` to the policy in `netlify_badge.py`.
+`'unsafe-eval'` and `'unsafe-inline'` are INDEPENDENT CSP keywords —
+Netlify's own docs confirm the badge needs `'unsafe-inline'` specifically
+("the script runs in an inline frame"), so this does not let the badge
+back in. A new test pins both facts at once: `'unsafe-eval'` present,
+`'unsafe-inline'` still absent.
+
+**What Windows needs from this**: nothing to port (shared Python, inherited
+the moment `netlify_badge.py` is next synced), but the same TRAP is worth
+naming for whoever next writes a restrictive CSP anywhere in this project:
+hash-allowing every inline `<script>` proves the SCRIPTS are allowed to
+run, not that everything THOSE scripts try to do is still permitted —
+`eval`/`new Function`/`setTimeout(string)` are a separate capability
+(`'unsafe-eval'`) that a hash-only policy blocks by default, and nothing
+about "I scanned every inline script" catches that on its own.
 
 ## Testing
 
