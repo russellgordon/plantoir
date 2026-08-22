@@ -248,18 +248,30 @@ class MultiDestinationDeployRunner {
                     legs[index].buildFailed = true
                     break
                 }
+                // The build's own exit code is not the leg's outcome — the
+                // deploy script starts on this same runner the moment the
+                // build succeeds, a few lines down. Without this, the gap
+                // between the build actually finishing and this run() loop
+                // noticing reads to the console as the whole leg being
+                // "Done", because that IS what a finished runner with a
+                // clean exit code normally means.
+                runner.isBetweenPhases = true
                 let built: Bool = await runner.waitUntilFinished()
                 if runner.wasCancelled || runner.wasStoppedByUser {
+                    runner.isBetweenPhases = false
                     wasCancelled = runner.wasCancelled
                     wasStoppedByUser = runner.wasStoppedByUser
                     legs[index].isFinished = true
                     break
                 }
                 if !built {
+                    runner.isBetweenPhases = false
                     legs[index].isFinished = true
                     legs[index].buildFailed = true
                     break
                 }
+                // Still true here on the success path — cleared by the
+                // deploy `run()` call below, as part of its normal reset.
             } else {
                 runner.milestones = MultiDestinationDeployRunner.deployOnlyMilestones(forDestinationType: destination.type)
             }

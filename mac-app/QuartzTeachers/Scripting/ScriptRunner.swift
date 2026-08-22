@@ -57,6 +57,19 @@ class ScriptRunner {
     /// must not be reported as one.
     var wasStoppedByUser: Bool = false
 
+    /// True for the moment a caller has this runner finish one script and
+    /// immediately start another on it — a multi-destination deploy that
+    /// needs a fresh build runs "preview.sh --build-only" then `deploy.sh`
+    /// back to back on the SAME runner, so the build's own real exit code
+    /// briefly leaves `isRunning == false` with `lastExitCode == 0` before
+    /// the deploy script starts. Read literally, that is indistinguishable
+    /// from the whole leg being done — `TaskProgressView` treats this flag
+    /// as "still running" so the console keeps showing progress instead of
+    /// flashing "Done" for a leg that has a second script still to run.
+    /// Set by the caller before it waits on the first script's exit; reset
+    /// by `run()` itself, so starting anything new always clears it.
+    var isBetweenPhases: Bool = false
+
     /// Set when the pending question is a launcher asking for a
     /// publishing credential, so the interface can explain how to get one
     /// rather than repeating the launcher's one-line prompt. Nil for every
@@ -91,6 +104,10 @@ class ScriptRunner {
 
     private var process: Process?
     private var terminal: PseudoTerminal?
+
+    /// Callers of `waitUntilFinished()` parked here until the script
+    /// actually exits — see that function for why this replaced polling.
+    private var finishedContinuations: [CheckedContinuation<Bool, Never>] = []
 
     /// Output that has arrived but not yet been shown. Chunks land on a
     /// background queue and reach the interface at a fixed, modest rate.
@@ -132,6 +149,7 @@ class ScriptRunner {
         launchProblem = nil
         wasCancelled = false
         wasStoppedByUser = false
+        isBetweenPhases = false
         stepDetail = ""
 
         let scriptURL: URL = workingDirectory.appendingPathComponent(scriptName)
@@ -225,12 +243,26 @@ class ScriptRunner {
     /// Waits for the script to end. The result says whether it succeeded;
     /// callers that only need to sequence work after the script (whatever
     /// its outcome) are free to ignore it.
+    ///
+    /// Event-driven rather than polled: `finishRun()` resumes every parked
+    /// caller the instant it sets `isRunning = false`, instead of a caller
+    /// noticing only on its next poll. That gap used to be visible — a
+    /// multi-destination deploy that builds before its first leg runs this
+    /// TWICE on the same runner (build, then deploy), back to back with no
+    /// suspension point between them; with polling at 300ms, the runner's
+    /// freshly-"finished" state (a real exit code, nothing left running)
+    /// could sit on screen for up to 300ms and render as "Done" before the
+    /// very next line put it back to work — indistinguishable from the
+    /// whole leg finishing early. Resuming immediately collapses that gap
+    /// to effectively nothing.
     @discardableResult
     func waitUntilFinished() async -> Bool {
-        while isRunning {
-            try? await Task.sleep(for: .milliseconds(300))
+        if !isRunning {
+            return lastExitCode == 0
         }
-        return lastExitCode == 0
+        return await withCheckedContinuation { continuation in
+            finishedContinuations.append(continuation)
+        }
     }
 
     /// Sends one line of input to the script, as if typed in Terminal.
@@ -988,6 +1020,16 @@ class ScriptRunner {
             ).lowercased()
             + String(format: " after %.1fs", Date().timeIntervalSince(startedAt ?? Date()))
         )
+
+        // Wake every `waitUntilFinished()` caller now, on this same
+        // synchronous step — not on their next poll. See that function's
+        // comment for why the gap mattered.
+        let outcome: Bool = exitCode == 0
+        let waitingCallers: [CheckedContinuation<Bool, Never>] = finishedContinuations
+        finishedContinuations = []
+        for continuation in waitingCallers {
+            continuation.resume(returning: outcome)
+        }
     }
 
     /// Rewrites this run's record if enough time has passed.
