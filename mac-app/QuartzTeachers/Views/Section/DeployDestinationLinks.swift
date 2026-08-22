@@ -29,12 +29,12 @@ struct DeployDestinationLinks: View {
     var body: some View {
         let succeededLegs: [MultiDestinationDeployRunner.Leg] = DeployDestinationLinks.succeeded(from: legs)
         if !succeededLegs.isEmpty {
-            // Centred as a GROUP within the window — each leg's own caption
-            // and link stay left-aligned to each other, but the block of
-            // destinations as a whole sits centred, which is what reads
-            // right sitting directly above "Show details" rather than
-            // pinned to one side of a wide window.
-            VStack(spacing: 10) {
+            // Leading-aligned, matching every other line in this panel
+            // (the title, the Done/Failed status, DeployDestinationChecklist
+            // above it) — a teacher's eye already knows where that edge is;
+            // centring only this one block read as visually disconnected
+            // from everything around it.
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(succeededLegs) { leg in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(DeployCommand.destinationDescription(for: leg.destination))
@@ -52,7 +52,6 @@ struct DeployDestinationLinks: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 

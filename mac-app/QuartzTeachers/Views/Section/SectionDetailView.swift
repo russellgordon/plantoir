@@ -264,7 +264,13 @@ struct SectionDetailView: View {
     var consoleArea: some View {
         VStack(spacing: 0) {
             if showsDeployProgress {
-                VStack(spacing: 0) {
+                // .leading: DeployDestinationChecklist is a compact HStack
+                // with no content of its own that forces full width, so
+                // under this VStack's default (.center) alignment it would
+                // float centred while TaskProgressView's own text starts at
+                // the left margin — two different leading edges for what
+                // reads as one panel. Explicit .leading lines them up.
+                VStack(alignment: .leading, spacing: 0) {
                     // Only appears once a course has more than one
                     // destination — the overwhelming majority never see
                     // this at all, and the progress panel beneath it
