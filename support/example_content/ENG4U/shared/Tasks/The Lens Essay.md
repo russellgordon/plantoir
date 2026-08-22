@@ -57,15 +57,19 @@ argument, in which the second lens complicates the first.
 
 ![[B1.7]]
 
+![[B3.1]]
+
 ![[C1.2]]
+
+![[C2.2]]
 
 ![[C2.4]]
 
 ![[C2.6]]
 
-![[C3.6]]
+![[C3.4]]
 
-![[B3.1]]
+![[C3.6]]
 %%curriculum-end%%
 
 %%

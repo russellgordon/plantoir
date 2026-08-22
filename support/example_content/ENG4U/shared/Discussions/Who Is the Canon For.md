@@ -41,7 +41,15 @@ one sentence each. Bring it; we will read three aloud and test them.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
+![[A1.2]]
+
+![[A1.3]]
+
 ![[A1.6]]
+
+![[A1.8]]
 
 ![[A1.9]]
 

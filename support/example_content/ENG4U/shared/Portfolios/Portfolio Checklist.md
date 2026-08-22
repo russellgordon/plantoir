@@ -39,9 +39,13 @@ Copy this into your notebook — the boxes here are printed, not clickable.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A3.2]]
+
+![[B4.2]]
+
+![[C3.1]]
+
 ![[C4.3]]
 
 ![[D4.2]]
-
-![[B4.2]]
 %%curriculum-end%%

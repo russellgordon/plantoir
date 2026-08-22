@@ -32,6 +32,25 @@ it can show what Offred cannot see. Ask what that does to a novel whose
 whole method is a restricted, compromised testimony — see
 [[Narration and Testimony]].
 
+## Audience, perspective, and form
+
+When evaluating these media texts, examine:
+
+- **Audience reception**: How different audiences (e.g., theatrical vs
+  television viewers, fans of the original text vs newcomers) respond to
+  changes in tone and characterisation.
+- **Perspectives and power**: How casting decisions, camera angles, and
+  score choices construct beliefs about authority, gender, and agency.
+- **Production models**: How industry constraints — from commercial broadcast
+  standards to festival distribution — dictate narrative pacing.
+
+## Models for what you make
+
+The trailers, director's concepts, and video essays on this list serve as
+mentor texts for your own creative production in [[The Adaptation Study]].
+Deconstruct their topic, purpose, and audience, and note how their chosen
+form and technical conventions communicate an interpretive claim.
+
 ## What it feeds
 
 [[The Adaptation Study]], which asks you to analyse and then to make.
@@ -41,7 +60,21 @@ whole method is a restricted, compromised testimony — see
 
 ![[D1.3]]
 
+![[D1.4]]
+
+![[D1.5]]
+
 ![[D1.6]]
 
+![[D2.1]]
+
 ![[D2.2]]
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[D3.3]]
+
+![[D3.4]]
 %%curriculum-end%%

@@ -41,9 +41,11 @@ because a reading aloud is an interpretation with a body.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.4]]
+
+![[A1.7]]
+
 ![[B1.5]]
 
 ![[B2.3]]
-
-![[A1.4]]
 %%curriculum-end%%

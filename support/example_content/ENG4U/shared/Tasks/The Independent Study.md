@@ -69,25 +69,31 @@ that follows exists for whatever that turns up.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[C1.3]]
-
-![[C1.5]]
-
 ![[A2.1]]
 
 ![[A2.4]]
 
+![[A2.5]]
+
 ![[B4.2]]
+
+![[C1.3]]
+
+![[C1.5]]
+
+![[C2.2]]
 
 ![[C2.5]]
 
 ![[C2.7]]
 
+![[C3.1]]
+
+![[C3.4]]
+
 ![[C3.5]]
 
 ![[C4.2]]
-
-![[A2.5]]
 %%curriculum-end%%
 
 %%

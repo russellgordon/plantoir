@@ -102,19 +102,33 @@ The follow-up is marked against its own three points, above.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
+![[A1.2]]
+
+![[A1.3]]
+
 ![[A1.5]]
+
+![[A1.7]]
+
+![[A1.8]]
+
+![[A1.9]]
 
 ![[A2.1]]
 
 ![[A2.3]]
-
-![[A3.1]]
 
 ![[A2.4]]
 
 ![[A2.6]]
 
 ![[A2.7]]
+
+![[A3.1]]
+
+![[A3.2]]
 
 ![[B3.3]]
 %%curriculum-end%%

@@ -255,3 +255,78 @@ An adversarial subagent was invoked to refute claims of resolution, audit curric
 
 ---
 
+### 1.1 Coverage depth: ENG4U once-only expectations (17 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across ENG4U (Grade 12 University English) by ensuring all 70 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (concepts, exercises, discussions, portfolios, reading guides, style rules, tutorials, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding literature, writing, oral communication, and media studies over time.
+
+#### Baseline Findings (ENG4U)
+- Total expectations: 70 specific expectations (`A1.1` to `D4.2`)
+- Addressed only once (17 codes): `A1.1, A1.2, A1.3, A1.7, A1.8, A1.9, A3.2, C2.2, C3.1, C3.4, D1.4, D1.5, D1.6, D3.1, D3.2, D3.3, D3.4`
+- Unlinked shared file: `shared/Style/Writing About Literature.md` (carried no class schedule link).
+- Empty curriculum block: `shared/Portfolios/Judging Your Own Work.md`.
+
+#### Actions Completed
+
+1. **Concepts & Style Alignment (`shared/Concepts/`, `shared/Style/`)**:
+   - `Adaptation and Media.md`: Added comprehensive sections on divergent audience reception across eras/demographics (`D1.4`), ideological representation and power structures in casting/framing (`D1.5`), media industry production/financing/distribution economics and content regulations (`D1.6`), and a 4-step media creation guide (`D3.1, D3.2, D3.3, D3.4`). Transclusions: `D1.1, D1.2, D1.4, D1.5, D1.6, D2.1, D2.2, D3.1, D3.2, D3.3, D3.4`.
+   - `Writing About Literature.md`: Added rules 8 and 9 on developing an authoritative critical voice (`C2.2`) and maintaining grammatical cohesion/parallelism (`C3.4`). Transclusions: `B1.3, C2.2, C2.3, C3.1, C3.4`. Linked from `per_section/All Classes/Unit 1, Day 13.md` during essay drafting.
+   - `Research Writing.md`: Added academic voice, spelling of critical terms and secondary sources, and complex sentence grammar. Transclusions: `C1.3, C1.5, C2.2, C3.1, C3.2, C3.4, C3.6, C3.7`.
+   - `The Extended Essay.md`: Added voice, spelling verification, and grammatical cohesion for long-form essays. Transclusions: `C1.1, C1.4, C2.1, C2.2, C2.7, C3.1, C3.4, C3.5, C3.6`.
+   - `Comparative Argument.md`: Added grammatical balance, parallelism, and transitions in comparative claims. Transclusions: `B1.6, C1.2, C1.4, C2.4, C3.4`.
+   - `Thesis and Argument.md`: Added syntactic precision in non-run-on analytical thesis statements. Transclusions: `C1.2, C1.4, C3.4`.
+
+2. **Exercises Enhancement (`shared/Exercises/`)**:
+   - `Evidence and Analysis Practice.md`: Corrected character attribution (Lady Macbeth); added Questions 6–8 explicitly drilling assertive critical voice revision (`C2.2`), diagnosis and correction of literary homonyms/spelling patterns (*canon* vs *cannon*, *illusory*, *soliloquy*, *elicit* vs *illicit*) (`C3.1`), and parallelism in comparative analysis (`C3.4`). Transclusions: `C2.2, C2.4, C3.1, C3.4, C3.5`.
+   - `Paraphrase Practice.md`: Added `C3.1` for using reference resources to verify spelling and archaic vocabulary.
+
+3. **Tutorials, Discussions & Portfolios (`shared/Tutorials/`, `shared/Discussions/`, `shared/Portfolios/`)**:
+   - `Seminar Skills.md`: Added explicit guidelines for setting listening purposes/goals (`A1.1`), active listening moves (probing questions, steelmanning, acknowledging dissent) (`A1.2`), and presentation delivery evaluation (vocal pacing, tone, non-verbal cues) (`A1.9`). Transclusions: `A1.1, A1.2, A1.3, A1.5, A1.6, A1.7, A1.8, A1.9, A2.2, A2.3, A2.5, A2.6, A2.7, A3.1`.
+   - `Research and Sources.md`: Added `D1.6` for commercial advertising, sponsored media, and corporate ownership factors. Transclusions: `B1.6, C1.3, D1.4, D1.5, D1.6`.
+   - `Discussions/Who Is the Canon For.md`: Added listening goals, active listening to opposing viewpoints, listening comprehension, and ideological power analysis. Transclusions: `A1.1, A1.2, A1.3, A1.6, A1.8, A1.9, B1.6`.
+   - `Discussions/Does the Lens Make the Reading.md`: Added active listening and perspective evaluation. Transclusions: `A1.2, A1.5, A1.8, B1.6, B1.7`.
+   - `Discussions/Is Delay a Character Trait.md`: Added active listening and oral argument analysis. Transclusions: `A1.2, A1.5, A1.7, B1.6, B2.1`.
+   - `Discussions/What Does a Warning Owe Us.md`: Added active listening, oral ideological analysis, and dystopian media perspectives. Transclusions: `A1.2, A1.5, A1.8, B1.6, B1.8, D1.5`.
+   - `Portfolios/Judging Your Own Work.md`: Created curriculum block connecting self-assessment to oral reflection and reading/writing/media growth. Transclusions: `A3.2, B4.1, C4.1, D4.1`.
+   - `Portfolios/What a Strong Entry Looks Like.md`: Added transclusions `A3.2, B4.2, C4.2`.
+   - `Portfolios/Portfolio Checklist.md`: Added transclusions `A3.2, C3.1`.
+
+4. **Reading Guides (`shared/Reading/`)**:
+   - `Reading/Adaptations and Media Texts.md`: Added sections on audience reception, ideological framing, and mentor models for media text creation. Transclusions: `D1.3, D1.4, D1.5, D1.6, D2.1, D2.2, D3.1, D3.2, D3.3, D3.4`.
+   - `Reading/Hamlet.md`: Added listening comprehension and oral soliloquy performance analysis. Transclusions: `A1.3, A1.4, A1.7, B1.1, B2.1, B2.3`.
+   - `Reading/Poetry Unit.md`: Added spoken poetry and oral verse delivery analysis. Transclusions: `A1.4, A1.7, B1.5, B2.3`.
+
+5. **Tasks & Summative Evaluations (`shared/Tasks/`)**:
+   - `The Hamlet Seminar.md`: Added transclusions `A1.1, A1.2, A1.3, A1.7, A1.8, A1.9, A3.2` reflecting listening purpose, active listening, presentation analysis, and post-seminar oral reflection.
+   - `The Adaptation Study.md`: Added transclusions `D1.4, D1.5, D1.6` reflecting audience reception, ideological perspective, and industry constraints.
+   - `The Lens Essay.md`: Added transclusions `C2.2, C3.4`.
+   - `The Critical Essay.md`: Added transclusions `C2.2, C3.1, C3.4`.
+   - `The Comparative Essay.md`: Added transclusions `C2.2, C3.4`.
+   - `The Independent Study.md`: Added transclusions `C2.2, C3.1, C3.4`.
+
+---
+
+#### Adversarial Audit & Quality Control Review (ENG4U)
+
+An adversarial subagent was invoked to refute claims of resolution, verify curriculum fidelity against primary source definitions in `shared/Curriculum/`, inspect pedagogical scaffolding, and check structural constraints in `SKILL.md`.
+
+**Audit Verdict:** PASS (0 defects found).
+- Confirmed all 70 expectations are authentic, robustly grounded, and covered $\ge 2$ times.
+- Confirmed all 13 overall expectations (A1–D4) are evaluated in `shared/Tasks/`.
+- Confirmed zero transclusions inside comments, zero curriculum blocks on class pages, and 100% two-hop graph reachability.
+- Confirmed Canadian spelling and stylistic conventions maintained throughout.
+
+---
+
+#### Final Verification Metrics (ENG4U)
+
+- **Total Specific Expectations:** 70 (`A1.1` – `D4.2`)
+- **Expectations Addressed $\ge 2$ Times:** 70 / 70 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Linter Results (`lint_payload.py ENG4U`):** Clean (255 pages checked, 86 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+---
+
+

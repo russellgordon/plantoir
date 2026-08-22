@@ -12,7 +12,8 @@ tags:
 
 1. [[The Lens Essay]], day 3 — drafting period. Start with whatever
    yesterday's conference sent you back to
-2. Reference: [[The Extended Essay]] — signposting without announcing
+2. Reference: [[Writing About Literature]] and [[The Extended Essay]] —
+   signposting without announcing
 
 ## Things to do before our next class
 

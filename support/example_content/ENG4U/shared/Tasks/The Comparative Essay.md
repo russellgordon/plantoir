@@ -53,19 +53,23 @@ the hand-in is deliberate: it is where the rewriting goes.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B1.6]]
+
+![[B3.2]]
+
 ![[C1.2]]
 
 ![[C1.4]]
 
-![[B1.6]]
+![[C2.2]]
 
 ![[C2.4]]
 
 ![[C2.7]]
 
-![[C3.5]]
+![[C3.4]]
 
-![[B3.2]]
+![[C3.5]]
 %%curriculum-end%%
 
 %%

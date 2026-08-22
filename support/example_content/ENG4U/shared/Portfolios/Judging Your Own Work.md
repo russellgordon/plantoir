@@ -73,3 +73,15 @@ is something you do unasked, which is the actual point. Keep the checks
 in your [[Reading Journal]]; read them side by side when you build the
 pair for [[Showing Growth]], because the row you keep marking *not yet*
 is the story of your term.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A3.2]]
+
+![[B4.1]]
+
+![[C4.1]]
+
+![[D4.1]]
+%%curriculum-end%%
