@@ -23,7 +23,9 @@ struct TaskProgressView: View {
     /// link instead; a single-destination deploy (the overwhelming
     /// majority) never sets this and looks exactly as it always has.
     let hidesSiteLink: Bool
-    /// Every leg of a multi-destination deploy, in order — passed through
+    /// Every leg of a multi-destination deploy, in order — used TWICE:
+    /// rendered as `DeployDestinationLinks` in place of the single-leg link
+    /// section (right where `hidesSiteLink` skips it), and passed through
     /// unchanged to `TaskConsoleView` so "Show details" can show EVERY
     /// destination's own output so far, not just whichever leg happens to
     /// be `runner` right now. `nil` for everything else (a single
@@ -211,12 +213,16 @@ struct TaskProgressView: View {
 
                         // Finish with something to click: the live site,
                         // or — for folder deploys — the published folder.
-                        // Skipped for a multi-destination deploy, where
-                        // `hidesSiteLink` is set and `DeployDestinationLinks`
-                        // shows every succeeded destination's own link
-                        // instead of just this one (the last) leg's.
+                        // A multi-destination deploy (`hidesSiteLink` set)
+                        // shows `DeployDestinationLinks` here instead —
+                        // every succeeded destination's own link, not just
+                        // this one (the last) leg's — in the SAME spot a
+                        // single destination's own link would sit, above
+                        // "Show details", never down past the console.
                         if hidesSiteLink {
-                            // Nothing here — see DeployDestinationLinks.
+                            if let allLegs {
+                                DeployDestinationLinks(legs: allLegs)
+                            }
                         } else if !runner.wasCancelled, exitCode == 0, let siteURL = runner.publishedSiteURL {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Your website is live.")

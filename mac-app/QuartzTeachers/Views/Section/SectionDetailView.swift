@@ -272,6 +272,11 @@ struct SectionDetailView: View {
                     if deployRunner.legs.count > 1 {
                         DeployDestinationChecklist(legs: deployRunner.legs)
                     }
+                    // DeployDestinationLinks renders INSIDE TaskProgressView
+                    // itself, in the same spot a single destination's own
+                    // "Your website is live" link would sit — above "Show
+                    // details", never pushed down past the (variable-height)
+                    // console.
                     TaskProgressView(
                         runner: deployRunner.activeRunner,
                         title: deployProgressTitle,
@@ -281,11 +286,6 @@ struct SectionDetailView: View {
                             cancelDeploy()
                         }
                     )
-                    // Every succeeded destination's own link, once the
-                    // whole run has finished — see DeployDestinationLinks.
-                    if deployRunner.legs.count > 1, !deployRunner.isRunning {
-                        DeployDestinationLinks(legs: deployRunner.legs)
-                    }
                 }
             } else {
                 TaskProgressView(

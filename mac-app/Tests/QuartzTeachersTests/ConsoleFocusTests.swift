@@ -114,8 +114,8 @@ final class ConsoleFocusTests: XCTestCase {
         // ALSO deployed successfully — reading as though only one
         // destination had been published to. The checklist above already
         // names each destination with its own checkmark, and
-        // DeployDestinationLinks below lists every live link, so the
-        // finished title should not single one out.
+        // DeployDestinationLinks lists every live link, so the finished
+        // title should not single one out.
         XCTAssertEqual(
             SectionDetailView.deployProgressTitle(
                 sectionName: "MCV4U-S1",
