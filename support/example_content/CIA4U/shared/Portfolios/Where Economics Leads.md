@@ -28,7 +28,7 @@ asks you to find where it lands for you.
 
 Read that list against what you have already done in this course. If you
 can take a statistical table, extract the figure that bears on a
-question, and write a paragraph a skeptical reader cannot knock down,
+question, and write a paragraph a sceptical reader cannot knock down,
 you have the transferable core of every row above. Those are the Ontario
 Skills Passport essential skills — document use, numeracy, writing,
 computer use, oral communication — in their working form.

@@ -79,7 +79,11 @@ third-party cost that was priced and then was not.
 
 ![[B3.4]]
 
+![[C1.4]]
+
 ![[C2.1]]
+
+![[C2.4]]
 
 ![[C3.1]]
 

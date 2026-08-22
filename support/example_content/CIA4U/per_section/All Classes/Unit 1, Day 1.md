@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
+- [ ] Complete the [[Scavenger Hunt]] to practise navigating the site and editing notes in Obsidian.
 - [ ] Read [[Our Working Agreement]] properly. This course argues about taxes and immigration, so it matters.

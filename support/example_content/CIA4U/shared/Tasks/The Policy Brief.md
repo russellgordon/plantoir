@@ -119,13 +119,21 @@ Build from [[Reading a Budget]], [[Circular Flow]],
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D1.2]]
+
 ![[D2.1]]
 
 ![[D2.2]]
 
+![[D2.3]]
+
+![[D2.4]]
+
 ![[D3.1]]
 
 ![[D3.2]]
+
+![[E2.3]]
 %%curriculum-end%%
 
 %%

@@ -45,11 +45,15 @@ argue an instrument in [[The Intervention Argument]].
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B4.2]]
+
 ![[C1.4]]
+
+![[C1.5]]
 
 ![[C1.6]]
 
 ![[C3.1]]
 
-![[B4.2]]
+![[C3.3]]
 %%curriculum-end%%

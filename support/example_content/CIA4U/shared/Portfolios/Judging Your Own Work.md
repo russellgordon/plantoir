@@ -71,3 +71,11 @@ people run it without being told to.
 One last thing worth doing: read your verdicts out loud to the person
 beside you before you act on them. You will hear the rows where you
 were being generous to yourself, usually before they say a word.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.1]]
+
+![[A2.2]]
+%%curriculum-end%%

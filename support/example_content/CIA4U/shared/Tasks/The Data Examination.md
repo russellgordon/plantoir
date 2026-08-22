@@ -46,9 +46,12 @@ argument rather than as vocabulary sprinkled through it.
 Two shorter pieces of writing. First, take two of the economic theorists
 we studied, say how each would read this dossier and what in it each
 would find difficult, and say how far either way of thinking still shapes
-the way this issue is argued today. Second, say how social movements
-or social justice organisations have addressed an inequality of this
-kind, and how effectively — criteria first, then the assessment.
+the way this issue is argued today. Second, assess how individuals,
+social movements, or social justice organisations have attempted to address
+problems related to international economic activities or global disparities
+(e.g., child labour, supply chain working conditions, environmental
+degradation, human rights violations, fair trade certification) — criteria
+first, then the assessment of their effectiveness.
 
 The remaining time is for reading and planning, and you should use it. The
 strongest papers spend twenty-five minutes on the dossier before writing a
@@ -64,6 +67,7 @@ sentence.
 | Conceptual structure | The four concepts organise the argument |
 | Judgement | The conclusion follows from the evidence, including the evidence against |
 | Theory put to work | Two theorists' key ideas set against each other on the dossier rather than described, with a defensible claim about how far either still carries |
+| Global action and disparity | Critical assessment of how movements or groups address international economic harms against explicit criteria |
 | Communication | Structured, plain, and readable under pressure |
 
 ## Preparing for it
@@ -91,6 +95,8 @@ tests. [[Judging an Economic Claim]] and
 ![[A1.5]]
 
 ![[B4.1]]
+
+![[E2.4]]
 
 ![[E3.3]]
 %%curriculum-end%%

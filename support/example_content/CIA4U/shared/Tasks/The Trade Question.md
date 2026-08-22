@@ -36,6 +36,21 @@ rate retrieved from Bank of Canada series `FXUSDCAD`, what a movement in
 the exchange rate does to your exporters and your importers, and note that
 these pull in opposite directions.
 
+**The trade agreement and institutional framework.** E1.4 asks you to
+analyse the objectives and influence of trade agreements and political or
+economic organizations. Identify which treaty framework or multilateral
+organization governs your chosen trade (e.g., CUSMA/NAFTA, WTO rules, CETA,
+CPTPP, or G20 commitments). Explain its rules of origin, tariff structures,
+and dispute settlement mechanisms, and assess how international events
+(E2.2) or Canadian government trade interventions (E2.3) have altered the
+agreement's operation.
+
+**Economic and ethical trade-offs.** E1.3 asks you to evaluate trade models
+against both economic and ethical criteria. Examine whether the trading
+practices in your case protect worker rights, support environmental
+standards, or create market distortions (such as marketing boards, supply
+management, or export subsidies).
+
 **Globalisation's effect on decisions.** E2.1's question: how did the
 availability of this trade change what firms, workers and governments
 decided to do? Include at least one decision that went the other way — a
@@ -56,6 +71,12 @@ Name the winners and the losers by industry and region, with evidence.
 
 - **The theory chosen, and where it fails.** Both halves. A case that
   fits its theory perfectly usually means the case was picked to fit.
+- **The institutional and trade agreement framework.** E1.4: the treaty,
+  rules of origin, and dispute mechanisms named and evaluated, with the
+  impact of international events (E2.2) and Canadian government responses
+  (E2.3) accounted for.
+- **Economic and ethical criteria weighed.** E1.3: market efficiency
+  balanced against labour standards, environmental rules, or trade barriers.
 - **A dated rate, used.** The exchange-rate movement is retrieved,
   dated, and traced through to a consequence on each side of the trade.
 - **Both directions named.** Exporters and importers move opposite ways.
@@ -74,7 +95,15 @@ Build from [[Comparative Advantage]] and [[The Tariff Year]].
 
 ![[E1.2]]
 
+![[E1.3]]
+
+![[E1.4]]
+
 ![[E2.1]]
+
+![[E2.2]]
+
+![[E2.3]]
 %%curriculum-end%%
 
 %%

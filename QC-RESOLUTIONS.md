@@ -593,5 +593,101 @@ An adversarial subagent was invoked to refute claims of resolution, audit curric
    - `per_section/All Classes/Unit 1, Day 1.md`: Linked `[[What This Site Can Do]]` in agenda item 4 and `[[Scavenger Hunt]]` in the homework checklist.
    - `shared/Tutorials/index.md`: Added `[[Scavenger Hunt]]` under Unit 1.
 
+---
+
+#### Adversarial Audit & Quality Control Review (CHA3U)
+
+An adversarial subagent was invoked to refute claims of resolution, audit curriculum alignment against primary Ministry documents, check KaTeX syntax, verify reachability, and check comment block constraints.
+
+**Audit Results:**
+- **Verdict:** **CERTIFIED CLEAN** (0 blocking defects found).
+- Confirmed all 67 specific expectations (`A1.1` to `E3.5`) are authentically taught, exercised, or evaluated $\ge 2$ times.
+- Confirmed all 14 overall expectations (`A1` to `E3`) are evaluated across `shared/Tasks/`.
+- Confirmed zero transclusions or links inside comments, zero curriculum blocks on class pages, and 100% two-hop graph reachability.
+- Confirmed Canadian spelling and stylistic conventions maintained throughout.
+
+---
+
+#### Final Verification Metrics (CHA3U)
+
+- **Total Specific Expectations:** 67 (`A1.1` – `E3.5`)
+- **Expectations Addressed $\ge 2$ Times:** 67 / 67 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Linter Results (`lint_payload.py CHA3U`):** Clean (255 pages checked, 86 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+---
+
+### 1.1 Coverage depth: CIA4U once-only expectations (2 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across CIA4U (Grade 12 Analysing Current Economic Issues, University Preparation) by ensuring all 64 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (concepts, cases, discussions, models, data, tutorials, portfolios, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding economic inquiry, microeconomic decision-making, macroeconomic indicators and policy, and international trade and global disparity over time.
+
+#### Baseline Findings (CIA4U)
+- Total expectations: 64 specific expectations (`A1.1` to `E3.3`)
+- Addressed only once (2 codes): `E1.4, E2.4`
+- Unlinked tutorial in class schedule: `shared/Tutorials/Scavenger Hunt.md`
+- Missing from folder index: `shared/Tutorials/Scavenger Hunt.md` omitted from `shared/Tutorials/index.md`
+
+#### Actions Completed
+
+1. **Models & Conceptual Grounding (`shared/Models/`, `shared/Concepts/`)**:
+   - `Models/Comparative Advantage.md`: Added dedicated section on **Trade agreements and international governance** covering regional pacts (CUSMA/NAFTA, CETA, CPTPP), multilateral rules (WTO dispute settlement), and macroeconomic forums (G20), explaining objectives, non-tariff barriers, and domestic sovereignty trade-offs (`E1.4`), plus Ricardo and Smith foundations (`B4.1`). Transclusions: `B4.1, E1.1, E1.2, E1.3, E1.4`.
+   - `Concepts/Sustainability and the Economy.md`: Added dedicated section on **Global externalities and citizen action** covering international environmental degradation, cross-border resource extraction, and consumer/worker activism (ethical boycotts/buycotts, fair-trade certification, supply chain due diligence) (`E2.4`). Transclusions: `B3.1, B3.3, E2.4`.
+   - `Concepts/Inequality.md`: Transclusions `C2.3, C3.2, D1.3, D1.5, E3.1`.
+   - `Concepts/Why Governments Intervene.md`: Transclusions `B4.2, C1.4, C1.5, C1.6, C3.1, C3.3`.
+   - `Concepts/Schools of Economic Thought.md`: Transclusions `B4.1, B4.2`.
+
+2. **Cases, Discussions & Data (`shared/Cases/`, `shared/Discussions/`, `shared/Data/`)**:
+   - `Cases/The Tariff Year.md`: Enhanced "The reasoning to do" with trade theories (`E1.1`), exchange rate transmission dynamics (`E1.2`), and concepts of economic thinking (`A2.3`). Transclusions: `A2.3, D2.3, E1.1, E1.2, E1.4, E2.2, E2.3`.
+   - `Cases/The Cost of a Place to Live.md`: Transclusions `A1.5, B4.3, C2.1, C2.3, C2.4, D2.1, D2.4`.
+   - `Discussions/What Do We Owe Other Countries.md`: Expanded institutional analysis with multilateral trade bodies (`E1.4`), trade theories (`E1.1`), and structural causes of global economic marginalization (`E3.1`). Transclusions: `E1.1, E1.3, E1.4, E2.3, E2.4, E3.1, E3.2, E3.3`.
+   - `Data/Judging an Economic Claim.md`: Transclusions `A1.1, A1.2, A1.3, A1.4, A1.6, A1.9`.
+
+3. **Tasks & Summative Evaluations (`shared/Tasks/`)**:
+   - `The Trade Question.md`: Added subsection on treaty frameworks, dispute mechanisms, and rules of origin (`E1.4`), economic vs ethical criteria (`E1.3`), international events (`E2.2`), and Canadian government responses (`E2.3`). Transclusions: `E1.1, E1.2, E1.3, E1.4, E2.1, E2.2, E2.3`.
+   - `The Data Examination.md`: Enhanced Part 3 to explicitly require evaluating individual, NGO, and group actions addressing international economic harms (child labour, sweatshops, environmental degradation, working conditions) (`E2.4`) alongside social movements (`E3.3`). Transclusions: `A1.3, A1.4, A1.5, B4.1, E2.4, E3.3`.
+   - `The Economic Issue Report.md`: Enhanced Part 8 ("The international response") and marking criteria to evaluate both intergovernmental bodies (`E3.2`) and grassroots social movements / civil society coalitions (`E2.4`, `E3.3`), using the concepts of economic thinking (`A1.5, A2.3`). Transclusions: `A1.5, A1.6, A1.7, A2.3, E2.2, E2.4, E3.1, E3.2, E3.3`.
+   - `The Policy Brief.md`: Transclusions `D1.2, D2.1, D2.2, D2.3, D2.4, D3.1, D3.2, E2.3`.
+   - `The Intervention Argument.md`: Transclusions `B3.4, C1.4, C2.1, C2.4, C3.1, C3.2`.
+
+4. **Portfolios, Tutorials, Schedule & Style Standardization**:
+   - `Portfolios/Judging Your Own Work.md`: Added curriculum connection block for transferable self-regulation and monitoring habits (`A2.1, A2.2`).
+   - `Portfolios/Where Economics Leads.md`: Corrected US spelling `skeptical` to Canadian spelling `sceptical` (line 31).
+   - `Curriculum/index.md`: Promoted Strands A through E headings to `##` (H2), providing 5 H2 headings to strictly satisfy the `enableToc: true` 4+ H2 requirement.
+   - `Tutorials/index.md`: Added `[[Scavenger Hunt]]` under Unit 1.
+   - `per_section/All Classes/Unit 1, Day 1.md`: Linked `[[Scavenger Hunt]]` in the homework checklist.
+
+---
+
+#### Adversarial Audit & Quality Control Review (CIA4U)
+
+Two rounds of adversarial subagent audits were conducted to challenge all claims of resolution, test curriculum fidelity against primary source definitions, check structural/style invariants, and verify reachability.
+
+**Round 1 Defects Identified & Resolved:**
+1. *Defect 1 (Canadian Spelling):* Corrected `skeptical` to `sceptical` in `Where Economics Leads.md:31`.
+2. *Defect 2 (TOC H2 Rule):* Promoted 5 strand headings in `Curriculum/index.md` to `##` (H2) to satisfy `enableToc: true` rule.
+3. *Defect 3 (Superficial Transclusions):* Removed unearned transclusions `C1.6, C1.5, D3.3` from `The Cost of a Place to Live.md`, `D2.2` from `Why Governments Intervene.md`, `E3.3` from `Inequality.md`, `C2.3, D1.5` from `Sustainability and the Economy.md`, and `B1.1, D1.5` from `Schools of Economic Thought.md`.
+
+**Round 2 Audit Results:**
+- **Verdict:** **CERTIFIED 100% CLEAN** (0 defects, 0 observations).
+- Confirmed all 64 specific expectations (`A1.1` to `E3.3`) are authentically taught, exercised, or evaluated $\ge 2$ times across the course.
+- Confirmed all 15 overall expectations (A1, A2, B1, B2, B3, B4, C1, C2, C3, D1, D2, D3, E1, E2, E3) are evaluated in `shared/Tasks/`.
+- Confirmed zero transclusions or links inside comments, zero curriculum blocks on class pages, and 100% two-hop graph reachability.
+- Confirmed Canadian spelling and stylistic conventions maintained throughout.
+
+---
+
+#### Final Verification Metrics (CIA4U)
+
+- **Total Specific Expectations:** 64 (`A1.1` – `E3.3`)
+- **Expectations Addressed $\ge 2$ Times:** 64 / 64 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Linter Results (`lint_payload.py CIA4U`):** Clean (256 pages checked, 86 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+
 
 

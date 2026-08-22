@@ -33,7 +33,7 @@ recommend.
 | The recommendation | Specific, costed, and beginning somewhere real |
 | The trade-offs | What your recommendation gives up, and who bears that |
 | The check | The indicator that would tell you in a year whether it worked |
-| The international response | Which intergovernmental bodies have addressed the disparity your issue produces or reflects, what they recommended or funded, and how well that worked |
+| The international response | Which intergovernmental bodies and grassroots social movements or advocacy groups have addressed the problems or disparities your issue produces or reflects, what they attempted, and how well that worked |
 
 ## How it is marked
 
@@ -43,21 +43,21 @@ recommend.
 - **Communication for the audience.** A1.7 asks for a form fit to purpose:
   a report reads differently from a presentation to a policy panel, and
   both are being assessed.
-- **The concepts of economic thinking, used.** A2.3 — economic
+- **The concepts of economic thinking, used.** A1.5 and A2.3 — economic
   significance, cause and effect, stability and variability, economic
   perspective. Not listed in a paragraph; used to structure the analysis.
 - **The international dimension.** E2.2 and E3.1 mean your issue has to be
   placed in a world context: what international events or policies bear on
   it, and what the comparable disparities look like elsewhere.
-- **Institutions assessed.** E3.2 asks about **various** intergovernmental
-  organizations, so name at least two that have addressed the disparity
-  your issue produces or reflects, and say how well each did, against
-  criteria you set before you look. Start with the expectation's own list
-  — UNESCO, UNIFEM, the UN Development Programme, the World Health
-  Organization, the International Monetary Fund, the World Bank — and add
-  the OECD or the International Labour Organization where the question is
-  a Canadian one. If nothing comes back, you are searching for your issue
-  rather than for the disparity underneath it.
+- **Institutions and citizen groups assessed.** E3.2, E2.4, and E3.3 ask
+  about various intergovernmental organizations as well as individual, NGO,
+  and social movement actions. Name at least two entities —
+  intergovernmental bodies (e.g., UNESCO, UN Development Programme, WHO,
+  IMF, World Bank, OECD, ILO) or social justice movements and civil
+  society coalitions (e.g., fair trade alliances, environmental movements,
+  anti-sweatshop networks) — that have addressed the disparity or
+  international economic problem your issue reflects. Evaluate their
+  effectiveness against criteria you set before you look.
 
 > [!warning] Choose in week one, and choose something with published data
 > The strongest reports come from students who spent the first two periods
@@ -72,6 +72,8 @@ Everything in the course feeds this. [[The Tariff Year]],
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.5]]
+
 ![[A1.6]]
 
 ![[A1.7]]
@@ -80,9 +82,13 @@ Everything in the course feeds this. [[The Tariff Year]],
 
 ![[E2.2]]
 
+![[E2.4]]
+
 ![[E3.1]]
 
 ![[E3.2]]
+
+![[E3.3]]
 %%curriculum-end%%
 
 %%
