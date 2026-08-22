@@ -1126,6 +1126,69 @@ Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
 
+- ✅ DONE (Windows, 2026-08-21). **Custom domain reads and writes are now
+  per-destination-type on Windows too, closing a real data-loss risk from
+  WINDOWS-HANDOFF.md entry 307.**
+
+  **What was wrong.** Entry 307 moved `custom_domains.sections.sectionN` from
+  a bare string to a map keyed by destination type
+  (`{"netlify": "…", "cloudflare_pages": "…"}`), because a section-wide
+  domain applied to every destination was itself the bug it fixed (a
+  Netlify-only domain silently overriding the Cloudflare link too). Windows's
+  `CourseConfiguration.CustomDomain`/`SetCustomDomain` still read and wrote
+  the old bare-string shape unconditionally. The read side degraded safely
+  (an unrecognised `JObject` shape returned `""`, so a domain looked unset
+  rather than crashing anything). The **write** side did not: any Windows
+  teacher who opened a mac-configured multi-destination course's settings
+  and saved — even retyping the identical value — would overwrite the whole
+  per-destination map with one bare string, discarding every other
+  destination's domain the mac side had configured. Windows has no
+  multi-destination deploy feature of its own yet (piece 1's
+  `AdditionalDeployTargets` schema is not ported — see the still-red
+  `FileFormats_CourseConfigKeys_MatchesContract` and
+  `SharedRules_ScheduledDeployRefusals_MatchesContract` contract tests,
+  unrelated to this fix and pre-existing on `dev`), so this was real data
+  loss on a shared file caused purely by opening Course Settings, not by
+  using any feature Windows actually offers.
+
+  **The fix**, matching the mac's own migration rule exactly
+  (`CourseConfiguration.swift`'s `customDomain(forSection:destinationType:)` /
+  `setCustomDomain(_:forSection:destinationType:)`): `CustomDomain`/
+  `SetCustomDomain` gained a `destinationType` overload, with the existing
+  1-arg / 2-arg call sites kept as convenience wrappers around the primary
+  destination (`DeployTarget`) so no call site anywhere in
+  `CourseSettingsView.xaml.cs` or `SectionDetailView.xaml.cs` had to change.
+  An old bare string on disk is read as belonging to the PRIMARY destination
+  only (never any other type), and on write is migrated into the map —
+  attributed to the primary — rather than discarded, the same rule the mac
+  applies. Setting a destination's domain now edits only that destination's
+  own entry in the map; every other entry already there is carried forward
+  untouched. Windows still has no UI to set a *non-primary* destination's
+  domain (there is no additional-destination settings UI to hang it on
+  yet), but the shape is now safe to have on disk regardless of which app
+  last touched it.
+
+  **Not done as part of this fix, and deliberately**: porting piece 1
+  (`AdditionalDeployTargets` schema + settings UI, entry 304) or piece 2
+  (multi-destination Deploy itself, entry 305). Those are larger, separate
+  pieces of work — this fix only makes the *shared file* safe to pass
+  between platforms in the meantime. `AdditionalDeployTargetsTests`'
+  `testWritingAnEmptyAdditionalTargetsListOmitsTheKeyEntirely` assertion
+  (entry 304's own note for Windows) still needs porting when that piece is
+  picked up.
+
+  Reference: `CourseConfiguration.cs` (`CustomDomain`/`SetCustomDomain`
+  overloads), `CourseConfigurationTests.cs` (six new tests: reading an older
+  bare string attributes it to the primary only; reading the new map never
+  degrades to empty; saving the primary's domain never clobbers another
+  destination already on disk; saving migrates an old bare string into the
+  map rather than discarding it; clearing one destination's domain removes
+  only that entry; and saving with nothing on disk still only touches the
+  primary). Full Windows suite: 579 tests, 577 passed — the two failures are
+  the pre-existing, unrelated `additional_deploy_targets`/scheduled-deploy
+  contract gaps named above, confirmed failing identically on unmodified
+  `dev` before this change.
+
 - ✅ DONE (mac, 2026-08-20). **Setting up a working folder no longer blocks
   the main thread — the mac catching up to Windows 1.1.0, found by Russell
   while testing the v1.1.0 candidate.**
