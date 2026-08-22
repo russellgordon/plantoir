@@ -276,11 +276,75 @@ public sealed class CourseConfiguration
     public void SetEmoji(int section, string emoji) =>
         SetNestedValue("emojis", "sections", SectionKey(section), emoji);
 
-    public string CustomDomain(int section) =>
-        NestedString("custom_domains", "sections", SectionKey(section));
+    /// <summary>
+    /// The teacher's own domain for ONE DESTINATION of a section's published
+    /// site. Keyed by destination TYPE, not just by section, because a course
+    /// publishing to more than one destination for redundancy may want a
+    /// domain on one and not another — mirrors
+    /// `CourseConfiguration.customDomain(forSection:destinationType:)` on the
+    /// mac side; see WINDOWS-HANDOFF.md entry 307.
+    ///
+    /// Reads an OLDER shape too: `custom_domains.sections.sectionN` used to
+    /// be a bare string, written before a course could have more than one
+    /// destination. That value is treated as belonging to the section's
+    /// PRIMARY destination (<see cref="DeployTarget"/>) — the only
+    /// destination that existed when it could have been set — and is
+    /// invisible to every other destination type.
+    /// </summary>
+    public string CustomDomain(int section, string destinationType)
+    {
+        if (_values["custom_domains"] is not JObject outer) return "";
+        if (outer["sections"] is not JObject sections) return "";
+        var entry = sections[SectionKey(section)];
+        if (entry is JObject perDestination)
+            return perDestination[destinationType] is JValue { Type: JTokenType.String } v ? (string)v! : "";
+        // Old shape: a bare string, meant for whichever destination was
+        // primary when it was set — never for any other type.
+        if (entry is JValue { Type: JTokenType.String } legacy && destinationType == DeployTarget)
+            return (string)legacy!;
+        return "";
+    }
 
-    public void SetCustomDomain(int section, string domain) =>
-        SetNestedValue("custom_domains", "sections", SectionKey(section), NormalizedCustomDomain(domain));
+    /// <summary>Convenience for the primary destination — what a course with a single destination always means.</summary>
+    public string CustomDomain(int section) => CustomDomain(section, DeployTarget);
+
+    /// <summary>
+    /// Writes ONE destination's domain, never clobbering another
+    /// destination's entry. A stray old-shape bare string already on disk
+    /// (set before this course had more than one destination) is carried
+    /// forward into the new per-destination map, attributed to the PRIMARY
+    /// destination, rather than silently discarded the first time any
+    /// destination's domain is set here — see WINDOWS-HANDOFF.md entry 307,
+    /// which found the mac side losing exactly this data before the map
+    /// shape existed. Setting an empty domain removes that destination's own
+    /// entry rather than storing an empty string.
+    /// </summary>
+    public void SetCustomDomain(int section, string destinationType, string domain)
+    {
+        if (_values["custom_domains"] is not JObject outer) { outer = new JObject(); _values["custom_domains"] = outer; }
+        if (outer["sections"] is not JObject sections) { sections = new JObject(); outer["sections"] = sections; }
+        string sectionKey = SectionKey(section);
+
+        JObject perDestination;
+        if (sections[sectionKey] is JObject existing)
+        {
+            perDestination = existing;
+        }
+        else
+        {
+            perDestination = new JObject();
+            if (sections[sectionKey] is JValue { Type: JTokenType.String } legacy && ((string)legacy!).Length > 0)
+                perDestination[DeployTarget] = (string)legacy!;
+            sections[sectionKey] = perDestination;
+        }
+
+        string normalized = NormalizedCustomDomain(domain);
+        if (normalized.Length == 0) perDestination.Remove(destinationType);
+        else perDestination[destinationType] = normalized;
+    }
+
+    /// <summary>Convenience for the primary destination — what a course with a single destination always means.</summary>
+    public void SetCustomDomain(int section, string domain) => SetCustomDomain(section, DeployTarget, domain);
 
     public bool ShowsSectionMarker(int section) =>
         NestedBool("show_section_marker", "sections", SectionKey(section), true);
