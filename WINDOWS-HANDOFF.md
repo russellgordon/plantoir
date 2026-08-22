@@ -4674,10 +4674,21 @@ half "compare two things" and half "start recording one of them".
 }
 ```
 
-Written by whichever app publishes, read by both. A teacher who publishes
-section 1 on the mac and opens the same working folder on Windows must not
-see " — Edited" there. That makes the fingerprint algorithm a wire format
-rather than an implementation detail, so it has to match to the character:
+Written by whichever app publishes, read by both.
+
+**Be careful about how far to push that.** The fingerprint embeds each
+file's size and modification date, so it holds up when both apps look at
+the SAME folder — a working folder on a shared drive, or a USB disk moved
+between two machines, where the dates are the file system's and do not
+change. It does NOT survive a course folder being copied between machines
+by a means that rewrites modification dates, and no algorithm that avoids
+reading file contents could. So implement it to match, expect a shared
+folder to agree, and do not promise a teacher that a course zipped up on
+one machine and unzipped on another keeps its marker: it will read as
+edited, and one publish puts it right.
+
+Matching matters, then, wherever the two apps can see the same folder, so
+treat the algorithm as a wire format rather than an implementation detail:
 
 1. Walk `courses/<CODE>/`, skipping hidden entries.
 2. Keep each regular file whose relative path passes the filter below.
@@ -4730,6 +4741,39 @@ found by reading `build_site.py` rather than by testing:
 sixteen of these as data. Wire that up before anything else here; it is the
 half most likely to drift.
 
+### Symlinks — the defect this shipped with, found by adversarial review
+
+`FileManager`'s directory enumerator neither follows a symlink nor reports
+it as a regular file. The first cut of this dropped every such entry, so a
+`Media` folder symlinked into the teacher's Obsidian vault — exactly the
+arrangement `build_site.py`'s own `_ensure_media_symlink` sets up —
+contributed nothing at all, and every change inside it read as "up to
+date". `.NET`'s `Directory.EnumerateFiles` has the same shape of trap
+(`FileSystemInfo.LinkTarget`, and `EnumerationOptions` does not recurse
+into a directory link by default), so do not assume you have escaped it.
+
+The rule now: resolve links by hand, ONE hop.
+
+- A link to a FILE contributes its target's size and date, recorded under
+  the LINK's own relative path.
+- A link to a FOLDER is walked, with each entry's path prefixed by the
+  link's path. Links inside that walk are not followed — one hop is what a
+  vault arrangement needs, and refusing the second is what stops a link
+  pointing at its own parent from walking forever.
+- A BROKEN link contributes where it points, so that repointing or
+  removing it is visible rather than silent.
+
+### A course that publishes into itself
+
+Nothing stops a teacher choosing `courses/ICS3U/site` as their "publish to
+a folder on this computer" destination — `deployFolderProblem` checks only
+that the folder exists and is writable. `deploy.py` then writes the entire
+built site there, INSIDE the folder being fingerprinted, so each publish
+would differ from the last and the window would say " — Edited"
+permanently. Exclude the configured local destination, and everything under
+it, whenever it resolves to a path inside the course folder. Contract cases
+in `publishedFreshness.selfPublishing`.
+
 ### When the stamp is written
 
 In `MultiDestinationDeployRunner.run()`, and only when
@@ -4744,10 +4788,58 @@ edit as published. That is the one direction this feature must never fail
 in: an early marker costs a needless publish, a late one costs a class that
 never saw the page.
 
-Taking it at the start of `run()` instead — before the build leg — was
-considered and rejected: the build's preflight can rewrite
-`course_config.json`, so that reading would show a spurious edit on every
-publish that discovered a new folder.
+**It is taken before the BUILD, not merely before the first upload** — the
+build is the longest part of a publish and the part that actually reads the
+content. The first cut took it after the build and was wrong; the review
+caught it against this document's own wording.
+
+The cost of taking it that early is real and was accepted: `build_site.py`'s
+preflight appends newly discovered folders to `course_config.json`, so a
+publish that discovers one ends with the section still marked edited. That
+is true rather than spurious — the teacher did add a folder — and it clears
+itself at the next publish, when there is nothing left to discover. The
+alternative hides a real edit, and this feature must not fail in that
+direction.
+
+### A scheduled deploy needs its own path to the same record
+
+The other half the review found. A scheduled deploy does not go through the
+deploy runner at all: launchd runs a generated shell script, so the flagship
+"publish tomorrow's class overnight" feature published perfectly and left
+the title bar saying " — Edited" until somebody published again by hand.
+
+On the mac the fix was cheap because the agent ALREADY launches the app
+binary rather than `/bin/bash` (for an unrelated and much sharper reason —
+a bare interpreter has no application identity, so macOS grants it no
+access to a working folder on the Desktop). So:
+
+1. The plist's arguments carry `--scheduled-section <workspace> <CODE> <N>`.
+2. The app fingerprints the section BEFORE running the script.
+3. The script tracks each destination's own result — `ALL_OK`, deliberately
+   not `&&`-chaining, since one destination failing must not stop the
+   others — and on total success writes a sentinel file naming where it
+   went.
+4. After the script exits, the app records the publish if the sentinel is
+   there, and consumes it either way so tonight's failure cannot read as
+   tomorrow's success.
+
+The sentinel exists because the script ends by booting its own launchd
+agent out, so the script's exit status belongs to `launchctl` and not to
+the deploy. Whatever Windows uses for scheduling (Task Scheduler) needs the
+equivalent: something the scheduled run can say "every destination
+succeeded" with, that is not its exit code.
+
+### One false negative, written down so it is not a surprise
+
+Restoring a page from a backup that preserves its modification date, where
+the length happens to be unchanged, reads as UP TO DATE. `cp -p`, `rsync
+-a`, unzipping and Time Machine all preserve modification dates. This is
+the price of never reading file contents, which is what makes the check
+cheap enough to run whenever a window comes to the front, and the cure —
+hashing every byte of every page — costs more than the marker is worth.
+Publishing is never blocked by the marker, so a teacher who suspects it can
+simply publish. It is a contract case (`whenShown`) so that nobody
+"discovers" it later and treats it as a bug.
 
 ### What is shown
 
@@ -4773,9 +4865,18 @@ uses, or shares, has changed. It is early, not wrong.
 
 ### The refresh triggers, and the watcher NOT built
 
-The mac recomputes on four events only: the window appearing, the app
-becoming active, this window becoming key, and a run finishing. Never on a
-timer, and never from `body` — a view that recomputed it while rendering
+The mac recomputes on four events: the window appearing, the app becoming
+active, this window becoming key, and a run finishing. Note that
+`NSWindow.didBecomeKeyNotification` fires for EVERY window and panel in the
+app — the assistant, a settings sheet, an alert — and app activation fires
+alongside it, so several walks really can be in flight at once. Each
+refresh therefore carries a generation number and a result is applied only
+if it is still the current one; without that, a walk begun before a publish
+can land after one begun afterwards and re-assert " — Edited" about a
+section that has just gone out. Whatever Windows uses for its own
+activation events needs the same guard.
+
+Never on a timer, and never from `body` — a view that recomputed it while rendering
 would walk the course folder every time a console line arrived during a
 publish. The walk runs off the main thread, so a course on a slow network
 volume cannot stutter a window coming to the front.

@@ -38,7 +38,10 @@ struct QuartzTeachersApp: App {
         // failed with "Operation not permitted" on every path while the same
         // deploy from the app minutes earlier took 144 seconds and worked.
         if let script = ScheduledDeploy.requestedScript(from: CommandLine.arguments) {
-            ScheduledDeploy.runScheduled(script: script)
+            ScheduledDeploy.runScheduled(
+                script: script,
+                section: ScheduledDeploy.requestedSection(from: CommandLine.arguments)
+            )
         }
 
         // Writing the contracts in `contracts/` is the other thing this binary

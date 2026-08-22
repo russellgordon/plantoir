@@ -190,11 +190,26 @@ class MultiDestinationDeployRunner {
         wasStoppedByUser = false
         defer { isRunning = false }
 
-        /// The content as it stood when the first upload began — recorded
-        /// only if every destination then succeeded. Taken at that moment
-        /// rather than at the end because a publish can take minutes, and
-        /// a page the teacher edits WHILE it uploads did not go out;
-        /// stamping the finishing state would mark that edit published.
+        /// The content as it stood when the run BEGAN — recorded only if
+        /// every destination then succeeded.
+        ///
+        /// Taken before anything runs, rather than at the end, because a
+        /// publish takes minutes and the build is the longest part of it:
+        /// a page the teacher edits while it runs may or may not have been
+        /// read, and stamping the finishing state would mark that edit
+        /// published. An early fingerprint costs a needless publish; a
+        /// late one costs a class that never saw the page, so this errs
+        /// early on purpose.
+        ///
+        /// It is taken before the BUILD too, which has one visible
+        /// consequence worth knowing: `build_site.py`'s preflight appends
+        /// newly discovered folders to `course_config.json`, so a publish
+        /// that discovers one ends with the section still marked edited.
+        /// That is correct — the teacher did add a folder — and it clears
+        /// itself at the next publish, when there is nothing left to
+        /// discover. The alternative, fingerprinting after the build,
+        /// hides a real edit, and this feature must not fail in that
+        /// direction.
         var publishedFingerprint: String?
 
         for index in legs.indices {
@@ -208,6 +223,17 @@ class MultiDestinationDeployRunner {
                 course.configuration.customDomain(forSection: sectionNumber, destinationType: destination.type)
             )
             runner.customDomainForLinks = domainForThisDestination.isEmpty ? nil : domainForThisDestination
+
+            if publishedFingerprint == nil {
+                publishedFingerprint = SectionPublishState.fingerprint(
+                    courseDirectory: course.directoryURL,
+                    sectionNumber: sectionNumber,
+                    excludingRelativePaths: SectionPublishState.selfPublishingSubpaths(
+                        courseDirectory: course.directoryURL,
+                        destinations: destinations
+                    )
+                )
+            }
 
             let buildsFirst: Bool = index == 0 && needsBuild
             if buildsFirst {
@@ -236,13 +262,6 @@ class MultiDestinationDeployRunner {
                 }
             } else {
                 runner.milestones = MultiDestinationDeployRunner.deployOnlyMilestones(forDestinationType: destination.type)
-            }
-
-            if publishedFingerprint == nil {
-                publishedFingerprint = SectionPublishState.fingerprint(
-                    courseDirectory: course.directoryURL,
-                    sectionNumber: sectionNumber
-                )
             }
 
             let arguments: [String] = DeployCommand.arguments(
@@ -277,7 +296,7 @@ class MultiDestinationDeployRunner {
     /// Marks the section up to date, so its window stops saying
     /// " — Edited". Only when EVERY destination succeeded: a course
     /// publishing to two hosts, one of which failed, has not published.
-    private func recordWhatWentOut(course: Course, sectionNumber: Int, fingerprint: String?) {
+    func recordWhatWentOut(course: Course, sectionNumber: Int, fingerprint: String?) {
         guard let fingerprint, outcome.allSucceeded else {
             return
         }
@@ -293,15 +312,23 @@ class MultiDestinationDeployRunner {
             fingerprint: fingerprint,
             destinations: destinations
         )
-        if recorded {
-            ActivityTrail.note(
-                .sectionContentMarkedPublished,
-                "marked this section\u{2019}s pages as published to "
-                + MultiDestinationDeployRunner.joinedWithAnd(names),
-                course: course.code,
-                section: sectionNumber
-            )
+        // The failure branch is recorded too, and matters MORE than the
+        // success: the marker is derived, so a section that stayed
+        // "Edited" because the stamp could not be written looks exactly
+        // like one that was never published. Without this line the report
+        // "it still says Edited after I published" has nothing to read.
+        let destinationNames: String = MultiDestinationDeployRunner.joinedWithAnd(names)
+        var sentence: String = "marked this section\u{2019}s pages as published to " + destinationNames
+        if !recorded {
+            sentence = "published to " + destinationNames
+                + ", but could not note it down — the window will still say Edited"
         }
+        ActivityTrail.note(
+            .sectionContentMarkedPublished,
+            sentence,
+            course: course.code,
+            section: sectionNumber
+        )
     }
 
     // MARK: - Turning an outcome into words

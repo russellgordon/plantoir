@@ -170,7 +170,7 @@ final class ScheduledDeployTests: XCTestCase {
         // notice said `"bash" can run in the background`, which names none of
         // the teacher's applications.
         let programArguments: [String] = try XCTUnwrap(reread["ProgramArguments"] as? [String])
-        XCTAssertEqual(programArguments.count, 3)
+        XCTAssertEqual(programArguments.count, 7)
         XCTAssertFalse(programArguments[0].hasSuffix("/bash"),
                        "A bare interpreter cannot read the teacher's files: \(programArguments[0])")
         XCTAssertTrue(programArguments[0].contains("Plantoir"),
@@ -180,6 +180,14 @@ final class ScheduledDeployTests: XCTestCase {
             programArguments[2],
             ScheduledDeploy.scriptURL(courseCode: "ICS3U", sectionNumber: 1).path
         )
+        // …and which section it is publishing, so the app can mark that
+        // section's pages as published once the script has finished. A
+        // scheduled deploy does not go through the deploy runner, so
+        // without this it publishes and leaves the window saying
+        // " — Edited" until somebody publishes again by hand.
+        XCTAssertEqual(programArguments[3], ScheduledDeploy.sectionFlag)
+        XCTAssertEqual(programArguments[5], "ICS3U")
+        XCTAssertEqual(programArguments[6], "1")
 
         // The work itself is unchanged; it moved into a file the app runs.
         let command: String = ScheduledDeploy.oneShotCommand(

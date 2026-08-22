@@ -24,7 +24,7 @@ enum ScheduledDeploy {
     /// The prefix every one of our agents' labels carries, so an agent of
     /// ours is never mistaken for anything else in the teacher's
     /// `LaunchAgents` folder.
-    static let labelPrefix: String = "ca.russellgordon.Plantoir.deploy"
+    nonisolated static let labelPrefix: String = "ca.russellgordon.Plantoir.deploy"
 
     /// The environment key carrying the moment the agent was set for.
     ///
@@ -39,7 +39,7 @@ enum ScheduledDeploy {
 
     /// This section's agent label — the course code AND the section number,
     /// so two sections of one course can never collide, nor two courses.
-    static func agentLabel(courseCode: String, sectionNumber: Int) -> String {
+    nonisolated static func agentLabel(courseCode: String, sectionNumber: Int) -> String {
         let code: String = sanitizedCode(courseCode)
         return "\(labelPrefix).\(code).section\(sectionNumber)"
     }
@@ -48,7 +48,7 @@ enum ScheduledDeploy {
     /// already letters and digits, so in practice this changes nothing —
     /// it is here so that a club named with a space cannot produce a label
     /// launchd refuses.
-    static func sanitizedCode(_ courseCode: String) -> String {
+    nonisolated static func sanitizedCode(_ courseCode: String) -> String {
         var result: String = ""
         for character in courseCode.uppercased() {
             if character.isLetter || character.isNumber {
@@ -76,6 +76,46 @@ enum ScheduledDeploy {
 
     /// The flag the agent launches the app with.
     nonisolated static let runFlag: String = "--run-scheduled-deploy"
+
+    /// The flag carrying which section the run belongs to, so the app can
+    /// mark that section's pages as published once the script has
+    /// finished. Without it a scheduled deploy publishes perfectly and
+    /// leaves the window saying " — Edited" until somebody publishes again
+    /// by hand — the flagship "publish tomorrow's class overnight" feature
+    /// quietly disagreeing with the title bar.
+    nonisolated static let sectionFlag: String = "--scheduled-section"
+
+    /// Where the script says every destination succeeded. A file rather
+    /// than an exit code because the script ends by booting its own agent
+    /// out of launchd, so its status is `launchctl`'s and not the
+    /// deploy's.
+    nonisolated static func successSentinelURL(courseCode: String, sectionNumber: Int) -> URL {
+        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Application Support")
+            .appendingPathComponent("Plantoir")
+            .appendingPathComponent("scheduled")
+            .appendingPathComponent("\(label).succeeded")
+    }
+
+    /// The course folder and section a `--scheduled-section` invocation
+    /// names, or nil when it names none.
+    nonisolated static func requestedSection(
+        from arguments: [String]
+    ) -> (courseDirectory: URL, courseCode: String, sectionNumber: Int)? {
+        guard let index = arguments.firstIndex(of: sectionFlag), index + 3 < arguments.count,
+              let sectionNumber = Int(arguments[index + 3]) else {
+            return nil
+        }
+        let workspace: URL = URL(fileURLWithPath: arguments[index + 1])
+        let courseCode: String = arguments[index + 2]
+        return (
+            workspace.appendingPathComponent("courses").appendingPathComponent(courseCode),
+            courseCode,
+            sectionNumber
+        )
+    }
 
     /// The script a `--run-scheduled-deploy` invocation should run, or nil
     /// when this is an ordinary launch.
@@ -332,6 +372,10 @@ enum ScheduledDeploy {
             Bundle.main.executableURL?.path ?? "/bin/bash",
             runFlag,
             scriptURL(courseCode: courseCode, sectionNumber: sectionNumber).path,
+            sectionFlag,
+            workspaceURL.path,
+            courseCode,
+            String(sectionNumber),
         ]
         plist["StartCalendarInterval"] = schedule
         plist["WorkingDirectory"] = workspaceURL.path
@@ -357,7 +401,8 @@ enum ScheduledDeploy {
         courseCode: String,
         sectionNumber: Int,
         workspaceURL: URL,
-        deployArgumentsList: [[String]]
+        deployArgumentsList: [[String]],
+        destinationTypes: [String] = []
     ) -> String {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
         let plistPath: String = plistURL(courseCode: courseCode, sectionNumber: sectionNumber).path
@@ -439,11 +484,28 @@ enum ScheduledDeploy {
         // Deploy only if there is something good to deploy — the button
         // returns early on a failed build rather than sending the previous
         // one, and an unattended run must not be less careful.
+        // Every destination's own result is tracked, because the section
+        // is only marked as published when EVERY one of them worked — a
+        // course publishing to two hosts, one of which failed, has not
+        // published. The sentinel is what tells the app that, since this
+        // script's own exit status belongs to `launchctl bootout` below.
+        let sentinelPath: String = successSentinelURL(
+            courseCode: courseCode, sectionNumber: sectionNumber
+        ).path
+        lines.append("/bin/rm -f \(shellQuoted(sentinelPath))")
+        lines.append("ALL_OK=\"$READY\"")
         lines.append("if [ \"$READY\" = \"1\" ]; then")
         for deployLine in deployLines {
-            lines.append("  \(deployLine)")
+            lines.append("  if ! \(deployLine); then ALL_OK=0; fi")
         }
         lines.append("fi")
+        // The sentinel carries WHERE it went, so the record a scheduled
+        // publish leaves is the same shape as the button's.
+        lines.append(
+            "if [ \"$ALL_OK\" = \"1\" ]; then /bin/echo "
+            + shellQuoted(destinationTypes.joined(separator: " "))
+            + " > \(shellQuoted(sentinelPath)); fi"
+        )
         // Cleanup runs either way: a failed build must still leave nothing
         // pending, or the agent fires again at the same time tomorrow.
         lines.append("/bin/launchctl bootout gui/$(/usr/bin/id -u)/\(shellQuoted(label))")
@@ -518,7 +580,8 @@ enum ScheduledDeploy {
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
                 workspaceURL: workspaceURL,
-                deployArgumentsList: deployArgumentsList
+                deployArgumentsList: deployArgumentsList,
+                destinationTypes: scheduledDestinationTypes(course: course)
             ) + "\n"
             try command.write(to: commandURL, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes(
@@ -555,13 +618,29 @@ enum ScheduledDeploy {
     /// Output is not captured here — launchd already points the agent's
     /// stdout and stderr at the section's log, and this process inherits
     /// them, so the script's own output lands where it always did.
-    nonisolated static func runScheduled(script: String) -> Never {
+    nonisolated static func runScheduled(
+        script: String,
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)? = nil
+    ) -> Never {
+        // Taken BEFORE anything runs, for the same reason the Deploy
+        // button takes it before its own build: a page edited while an
+        // overnight publish is running did not go out, and stamping the
+        // finishing state would mark it published.
+        var fingerprintBeforeRunning: String?
+        if let section {
+            fingerprintBeforeRunning = SectionPublishState.fingerprint(
+                courseDirectory: section.courseDirectory,
+                sectionNumber: section.sectionNumber
+            )
+        }
+
         let process: Process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = [script]
         do {
             try process.run()
             process.waitUntilExit()
+            recordScheduledPublish(section: section, fingerprint: fingerprintBeforeRunning)
             exit(process.terminationStatus)
         } catch {
             FileHandle.standardError.write(Data(
@@ -569,6 +648,44 @@ enum ScheduledDeploy {
             ))
             exit(1)
         }
+    }
+
+    /// Which destination types this course publishes to, in deploy order.
+    static func scheduledDestinationTypes(course: Course) -> [String] {
+        var result: [String] = []
+        for destination in course.configuration.allDeployDestinations {
+            result.append(destination.type)
+        }
+        return result
+    }
+
+    /// Marks the section's pages as published, if the script said every
+    /// destination worked. The sentinel is consumed either way, so a run
+    /// that failed cannot be read as a success by the next one.
+    nonisolated static func recordScheduledPublish(
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
+        fingerprint: String?
+    ) {
+        guard let section, let fingerprint else {
+            return
+        }
+        let sentinel: URL = successSentinelURL(
+            courseCode: section.courseCode, sectionNumber: section.sectionNumber
+        )
+        guard let written = try? String(contentsOf: sentinel, encoding: .utf8) else {
+            return
+        }
+        try? FileManager.default.removeItem(at: sentinel)
+        var destinations: [String] = []
+        for name in written.split(separator: " ") {
+            destinations.append(String(name).trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        SectionPublishState.recordPublish(
+            courseDirectory: section.courseDirectory,
+            sectionNumber: section.sectionNumber,
+            fingerprint: fingerprint,
+            destinations: destinations
+        )
     }
 
     /// Takes the alarm off. Returns nil on success.

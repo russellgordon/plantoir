@@ -19,8 +19,17 @@ import Foundation
 /// milliseconds on a course of a few hundred pages, and it can run every
 /// time a window comes to the front. Hashing contents would mean reading
 /// every byte of every page for a marker nobody asked to be exact. The
-/// price is that touching a page without changing it reads as an edit,
-/// which is the same bargain every save-indicator makes.
+/// price is paid in both directions, and the second is the one to know
+/// about. Touching a page without changing it reads as an EDIT, which is
+/// the same bargain every save indicator makes. And a page restored from a
+/// backup that preserved its modification date, whose length happens to be
+/// unchanged, reads as UP TO DATE — `cp -p`, `rsync -a`, unzipping and
+/// Time Machine all preserve dates. That is a genuine false negative,
+/// accepted rather than overlooked: the cure is hashing every byte of
+/// every page on every check, and publishing is never blocked by the
+/// marker, so a teacher who suspects it can simply publish. It is a
+/// contract case (`publishedFreshness.whenShown`) so it is not
+/// rediscovered later as a bug.
 ///
 /// A plain "is anything newer than the publish date" check would have been
 /// cheaper still, and was rejected: modification dates cannot see a
@@ -164,13 +173,17 @@ nonisolated enum SectionPublishState {
     /// configuration yet. Reading the lists would leave that folder
     /// invisible to the marker until the next publish — which is exactly
     /// the publish the marker exists to prompt.
-    static func fingerprint(courseDirectory: URL, sectionNumber: Int) -> String {
+    static func fingerprint(
+        courseDirectory: URL,
+        sectionNumber: Int,
+        excludingRelativePaths: [String] = []
+    ) -> String {
         var lines: [String] = []
         let fileManager: FileManager = FileManager.default
         let root: URL = courseDirectory
         guard let enumerator = fileManager.enumerator(
             at: root,
-            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey],
+            includingPropertiesForKeys: Array(SectionPublishState.wantedKeys),
             options: [.skipsHiddenFiles]
         ) else {
             return digest(of: "")
@@ -181,11 +194,33 @@ nonisolated enum SectionPublishState {
             if relativePath.isEmpty {
                 continue
             }
-            let values = try? fileURL.resourceValues(
-                forKeys: [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey]
-            )
-            let isRegularFile: Bool = values?.isRegularFile ?? false
-            if !isRegularFile {
+            if isExcluded(relativePath: relativePath, by: excludingRelativePaths) {
+                enumerator.skipDescendants()
+                continue
+            }
+            let values = try? fileURL.resourceValues(forKeys: SectionPublishState.wantedKeys)
+
+            // A symlink is content the teacher can see and Quartz can
+            // read, and `FileManager`'s enumerator neither follows one nor
+            // reports it as a regular file. Left as-is, a `Media` folder
+            // symlinked into an Obsidian vault — the arrangement
+            // `build_site.py`'s own `_ensure_media_symlink` exists for —
+            // would contribute NOTHING, and every change inside it would
+            // read as "up to date". So links are resolved by hand, once:
+            // a link to a file contributes the target's own size and date
+            // under the LINK's path, and a link to a folder is walked.
+            if values?.isSymbolicLink == true {
+                appendLines(
+                    &lines,
+                    forSymbolicLinkAt: fileURL,
+                    relativePath: relativePath,
+                    sectionNumber: sectionNumber,
+                    excluding: excludingRelativePaths
+                )
+                continue
+            }
+
+            if values?.isRegularFile != true {
                 // A folder that cannot contribute is not descended into —
                 // this is what keeps the walk off `.merged_output`-sized
                 // trees and off eleven other sections' pages.
@@ -197,9 +232,7 @@ nonisolated enum SectionPublishState {
             if !countsTowardFingerprint(relativePath: relativePath, sectionNumber: sectionNumber) {
                 continue
             }
-            let size: Int = values?.fileSize ?? 0
-            let modified: Double = values?.contentModificationDate?.timeIntervalSince1970 ?? 0
-            lines.append("\(relativePath)|\(size)|\(Int(modified * 1_000_000))")
+            lines.append(line(forRelativePath: relativePath, values: values))
         }
 
         lines.sort()
@@ -265,11 +298,20 @@ nonisolated enum SectionPublishState {
     /// there is nothing to compare it against, and "Edited" on a brand new
     /// course would be a marker that is always on, which is a marker
     /// nobody reads.
-    static func hasUnpublishedEdits(courseDirectory: URL, sectionNumber: Int) -> Bool {
+    static func hasUnpublishedEdits(
+        courseDirectory: URL,
+        sectionNumber: Int,
+        excludingRelativePaths: [String] = []
+    ) -> Bool {
         guard let stamp = stamp(courseDirectory: courseDirectory, sectionNumber: sectionNumber) else {
             return false
         }
-        return stamp.fingerprint != fingerprint(courseDirectory: courseDirectory, sectionNumber: sectionNumber)
+        let current: String = fingerprint(
+            courseDirectory: courseDirectory,
+            sectionNumber: sectionNumber,
+            excludingRelativePaths: excludingRelativePaths
+        )
+        return stamp.fingerprint != current
     }
 
     /// What a section window's title bar says.
@@ -283,7 +325,105 @@ nonisolated enum SectionPublishState {
         return base + " — Edited"
     }
 
+
+    /// Whether a path sits inside somewhere the caller has ruled out —
+    /// used for a "publish into a folder on this computer" destination the
+    /// teacher has pointed INSIDE their own course folder. `deploy.py`
+    /// writes the whole built site there, so counting it would leave the
+    /// marker on permanently, one publish feeding the next.
+    static func isExcluded(relativePath: String, by excluded: [String]) -> Bool {
+        for candidate in excluded where !candidate.isEmpty {
+            if relativePath == candidate || relativePath.hasPrefix(candidate + "/") {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Where a course publishes to that is inside the course folder
+    /// itself, as a relative path — nothing, for the overwhelming majority
+    /// of courses, which publish to a host or to a folder somewhere else.
+    static func selfPublishingSubpaths(
+        courseDirectory: URL,
+        destinations: [CourseConfiguration.DeployDestination]
+    ) -> [String] {
+        var result: [String] = []
+        for destination in destinations where !destination.path.isEmpty {
+            let target: URL = URL(fileURLWithPath: (destination.path as NSString).expandingTildeInPath)
+            let relative: String = relativePathOf(target, under: courseDirectory)
+            if !relative.isEmpty {
+                result.append(relative)
+            }
+        }
+        return result
+    }
+
     // MARK: - Private helpers
+
+    private static let wantedKeys: Set<URLResourceKey> = [
+        .contentModificationDateKey, .fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey
+    ]
+
+    private static func line(forRelativePath relativePath: String, values: URLResourceValues?) -> String {
+        let size: Int = values?.fileSize ?? 0
+        let modified: Double = values?.contentModificationDate?.timeIntervalSince1970 ?? 0
+        return "\(relativePath)|\(size)|\(Int(modified * 1_000_000))"
+    }
+
+    /// Everything a symlink brings in, under the link's own path.
+    ///
+    /// The target is walked WITHOUT following any further links: one hop
+    /// is what a teacher's vault arrangement needs, and refusing the
+    /// second is what stops a link pointing at its own parent from
+    /// walking forever.
+    private static func appendLines(
+        _ lines: inout [String],
+        forSymbolicLinkAt linkURL: URL,
+        relativePath: String,
+        sectionNumber: Int,
+        excluding: [String]
+    ) {
+        let resolved: URL = linkURL.resolvingSymlinksInPath()
+        let values = try? resolved.resourceValues(forKeys: wantedKeys)
+        if values?.isRegularFile == true {
+            if countsTowardFingerprint(relativePath: relativePath, sectionNumber: sectionNumber) {
+                lines.append(line(forRelativePath: relativePath, values: values))
+            }
+            return
+        }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: resolved.path, isDirectory: &isDirectory),
+              isDirectory.boolValue,
+              folderCountsTowardFingerprint(relativePath: relativePath, sectionNumber: sectionNumber),
+              let inner = FileManager.default.enumerator(
+                  at: resolved,
+                  includingPropertiesForKeys: Array(wantedKeys),
+                  options: [.skipsHiddenFiles]
+              ) else {
+            // A broken link still contributes its own presence, so that
+            // repointing or removing it is not invisible.
+            let destination: String = (try? FileManager.default.destinationOfSymbolicLink(atPath: linkURL.path)) ?? ""
+            lines.append(relativePath + "|link|" + destination)
+            return
+        }
+        for case let innerURL as URL in inner {
+            let innerRelative: String = relativePath + "/" + relativePathOf(innerURL, under: resolved)
+            let innerValues = try? innerURL.resourceValues(forKeys: wantedKeys)
+            if innerValues?.isRegularFile != true {
+                if !folderCountsTowardFingerprint(relativePath: innerRelative, sectionNumber: sectionNumber) {
+                    inner.skipDescendants()
+                }
+                continue
+            }
+            if isExcluded(relativePath: innerRelative, by: excluding) {
+                continue
+            }
+            if !countsTowardFingerprint(relativePath: innerRelative, sectionNumber: sectionNumber) {
+                continue
+            }
+            lines.append(line(forRelativePath: innerRelative, values: innerValues))
+        }
+    }
 
     private static func pathParts(_ relativePath: String) -> [String] {
         var result: [String] = []

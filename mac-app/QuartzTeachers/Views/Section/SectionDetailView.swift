@@ -41,6 +41,15 @@ struct SectionDetailView: View {
     /// would walk the course folder every time a console line arrived.
     @State var hasUnpublishedEdits: Bool = false
 
+    /// Which refresh is the current one. `NSWindow.didBecomeKeyNotification`
+    /// fires for EVERY window and panel in the app — the assistant, a
+    /// settings sheet, an alert — and app activation fires alongside it, so
+    /// several walks can be in flight at once. Without this counter their
+    /// results land in whatever order they finish, and a walk begun before
+    /// a publish can overwrite the answer from one begun after it: the
+    /// window says " — Edited" about a section that has just gone out.
+    @State var refreshGeneration: Int = 0
+
     @Environment(WorkspaceModel.self) var workspace
 
     // MARK: - Computed properties
@@ -378,13 +387,27 @@ struct SectionDetailView: View {
     func refreshEditedMarker() {
         let courseDirectory: URL = course.directoryURL
         let sectionNumber: Int = self.sectionNumber
+        // A course that publishes into a folder inside itself would
+        // otherwise feed its own marker: `deploy.py` writes the whole
+        // built site there, so every check after a publish would differ
+        // from the one before it and the window would say " — Edited"
+        // permanently.
+        let excluded: [String] = SectionPublishState.selfPublishingSubpaths(
+            courseDirectory: courseDirectory,
+            destinations: course.configuration.allDeployDestinations
+        )
+        refreshGeneration += 1
+        let generation: Int = refreshGeneration
         Task.detached(priority: .utility) {
             let edited: Bool = SectionPublishState.hasUnpublishedEdits(
                 courseDirectory: courseDirectory,
-                sectionNumber: sectionNumber
+                sectionNumber: sectionNumber,
+                excludingRelativePaths: excluded
             )
             await MainActor.run {
-                hasUnpublishedEdits = edited
+                if generation == refreshGeneration {
+                    hasUnpublishedEdits = edited
+                }
             }
         }
     }
