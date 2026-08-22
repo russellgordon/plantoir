@@ -21,9 +21,7 @@ graph TD
     D["D. Professional Practice and Careers"] --> B
 ```
 
-## Overall and specific expectations
-
-### Strand A. Communications Technology Fundamentals
+## Strand A. Communications Technology Fundamentals
 *By the end of this course, students will:*
 
 ![[A1. Core Concepts, Techniques, and Skills]]
@@ -43,7 +41,7 @@ graph TD
 ![[A3.2]]
 ![[A3.3]]
 
-### Strand B. Communications Technology Skills
+## Strand B. Communications Technology Skills
 *By the end of this course, students will:*
 
 ![[B1. Project Management]]
@@ -62,7 +60,7 @@ graph TD
 ![[B3.1]]
 ![[B3.2]]
 
-### Strand C. Technology, the Environment, and Society
+## Strand C. Technology, the Environment, and Society
 *By the end of this course, students will:*
 
 ![[C1. Technology and the Environment]]
@@ -76,7 +74,7 @@ graph TD
 ![[C2.4]]
 ![[C2.5]]
 
-### Strand D. Professional Practice and Career Opportunities
+## Strand D. Professional Practice and Career Opportunities
 *By the end of this course, students will:*
 
 ![[D1. Health and Safety]]

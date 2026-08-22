@@ -1087,6 +1087,99 @@ Two rounds of adversarial subagent audits were performed to refute claims, verif
 - **All destination pages reachable within 2 hops of a class page.**
 - **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
 
+---
+
+### 1.1 Coverage depth: TGJ2O once-only expectations (1 code: D2.2)
+
+**Status:** Completed & Adversarially Audited (Certified Clean)  
+**Objective:** Eliminate thin coverage across TGJ2O (Grade 10 Communications Technology, Open) by ensuring all 35 curriculum expectations are genuinely addressed $\ge 2$ times (and $\ge 3$ across all codes) across authentic destination pages (concept summaries, exercises, studio activities, warm-ups, discussions, portfolios, setup, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding journalistic ethics, photography, audio/video production, layout/design, and career/society concepts over time.
+
+#### Baseline Findings (TGJ2O)
+- Total expectations: 35 specific expectations (`A1.1` to `D2.5`)
+- Addressed only once (1 code):
+  - `D2.2`: describe non-traditional career choices and the role of mentoring programs, support groups, and trade associations in promoting these choices (only on `shared/Concepts/Careers in Communications.md`)
+- Low-depth expectations identified in initial audit: `A3.1, A3.2, A3.3, B2.1, B2.4, B2.6, C1.1, C2.2, C2.3, D1.1, D2.1` (addressed only 2 times).
+
+---
+
+#### Actions Completed
+
+1. **Concepts Substantive Expansion (`shared/Concepts/`)**:
+   - `Concepts/The Footprint of Media.md`: Expanded with 4 substantive H2 sections to satisfy `enableToc: true` and deepen environmental lifecycle understanding: `## What this work costs the environment`, `## Lifecycle analysis: from raw materials to e-waste` (rare earth extraction, embodied energy, toxic e-waste, RPRA/Ontario recycling), `## Sustainable production habits in our newsroom` (energy management, LED lighting, modular repair), and `## What can actually be done about it`. Transclusions: `C1.1, C1.2`.
+   - `Concepts/The Software You Will Meet.md`: Expanded with 4 substantive H2 sections to satisfy `enableToc: true`: `## The categories, and what each one is actually for`, `## Free and paid, and why we use both`, `## File formats, handoffs, and non-destructive workflows` (raster adjustment layers, vector SVG exports, audio WAV stems, video intermediate codecs, CMYK PDF/X and MP4 delivery), and `## Choosing one for a job`. Transclusions: `A1.5, A1.2`.
+   - `Concepts/Typography.md`: Expanded with 4 substantive H2 sections to satisfy `enableToc: true`: `## Type is tone of voice`, `## Hierarchy, and the two-typeface rule`, `## Type anatomy, spacing, and micro-typography` (points, leading, tracking, kerning, measure, x-height, baseline), and `## Phones and paper`. Transclusions: `A1.2, A2.1`.
+   - `Concepts/Interviewing.md`: Expanded with 4 substantive H2 sections to satisfy `enableToc: true`: `## Questions that open people up`, `## Listening is the real skill`, `## Technical setup, audio hygiene, and location checks` (mic placement 15-20cm, acoustic absorption, room tone, -12 to -6 dB gain staging), and `## The quote promise`. Transclusions: `A1.3, A1.4`.
+   - `Concepts/Careers in Communications.md`: Retained full coverage of career opportunities, non-traditional career pathways, Essential Skills, and work habits. Transclusions: `D2.1, D2.2, D2.3, D2.4`.
+
+2. **Curriculum Landing & Navigation (`shared/Curriculum/` & `shared/Setup/`)**:
+   - `Curriculum/index.md`: Promoted Strand headings to `## Strand A...`, `## Strand B...`, `## Strand C...`, `## Strand D...` to satisfy the `enableToc: true` 4+ H2 invariant.
+   - `Setup/Safety in the Newsroom.md`: Expanded with 4 substantive H2 sections to satisfy `enableToc: true`: `## The hazards, and what prevents them`, `## Three habits worth having for life`, `## A safety audit, which you will run`, and `## WHMIS, equipment care, and incident reporting` (WHMIS chemical cleaning solvents, cable inspection, Ontario incident reporting, Passport to Safety). Transclusions: `D1.1, D1.2`.
+   - `Setup/How Marks Work.md`: Corrected US spelling `organization` to Canadian English `organisation`.
+   - `Setup/Our Newsroom Standards.md`: Transclusions: `C2.4, A3.1, A3.2, A3.3`.
+   - `Setup/What to Bring.md`: Transclusions: `D1.2, D1.1`.
+   - `Setup/How the Newsroom Runs.md`: Transclusions: `D1.1, D2.4, A3.1`.
+
+3. **Exercises & Warm-Ups Substantive Expansion (`shared/Exercises/` & `shared/Warm-Ups/`)**:
+   - `Exercises/Copyright Scenarios Practice.md`: Transclusions `C2.4, C2.5, C2.3` (Question 4 specifically addresses generative AI tools, training data, and synthetic image disclosures).
+   - `Exercises/Verification Practice.md`: Transclusions `B2.3, C2.5, C2.2` (Questions 4 and 5 address social media sharing dynamics, virality, and online context verification).
+   - `Exercises/Layout Practice.md`: Transclusions `A1.2, B3.2, B2.5, B2.6`.
+   - `Exercises/Interview Question Practice.md`: Transclusions `A1.1, A1.3, A3.2, D2.3`.
+   - `Exercises/Photo Critique Practice.md`: Transclusions `A1.2, A1.3, A1.4, B2.5`.
+   - `Warm-Ups/News or Not.md`: Transclusions `A1.1, C2.2`.
+   - `Warm-Ups/Spot the Edit.md`: Transclusions `C2.5, C2.3`.
+   - `Warm-Ups/One-Minute Pitch.md`: Transclusions `A1.1, B1.1, A3.2, B2.4`.
+
+4. **Discussions, Portfolios, Studio, Tutorials, and Tasks Alignment**:
+   - `Discussions/Whose Story Is It.md`: Enhanced discussion question 6 connecting newsroom diversity, mentoring networks, and non-traditional career pathways. Transclusions: `C2.1, A3.2, D2.4, D2.2, D2.1`.
+   - `Discussions/The Comment Section.md`: Transclusions: `C2.5, A3.3, C2.2`.
+   - `Discussions/When Is a Photo True.md`: Added question 5 evaluating generative AI tools, neural filters, and computational photo manipulation. Transclusions: `C2.5, C2.3`.
+   - `Discussions/Free Press, School Press.md`: Transclusions: `C2.4, C2.5, B2.4, B2.6`.
+   - `Portfolios/Final Reflection.md`: Enhanced Section 3 prompt to investigate non-traditional career mentoring programs (Skills Ontario, OYAP, community media associations). Transclusions: `D2.1, D2.2, D2.3, D2.4, D2.5`.
+   - `Portfolios/Newsroom Journal.md`: Set `enableToc: false` and transcluded `B1.2, D2.3, D2.4, D2.5`.
+   - `Portfolios/Judging Your Own Work.md`: Transclusions: `B1.2, A3.3, D2.5`.
+   - `Portfolios/Your First Entry.md`: Transclusions: `B1.2, A1.1, D1.1`.
+   - `Studio/Publish to the Web.md`: Transclusions: `B1.2, B3.2, A1.5, C1.2, C1.1`.
+   - `Studio/Build the Front Page.md`: Transclusions: `A1.2, B3.2, A1.5, A2.3, B2.5, B2.6`.
+   - `Tutorials/Planning a Production.md`: Transclusions: `B2.2, B2.5, B2.1, B1.1, B2.4, A3.1, A3.2`.
+   - `Tutorials/index.md`: Added `[[Scavenger Hunt]]` row to tutorials index table.
+   - `Tasks/The Front Page.md`: Transclusions: `A1.2, A1.3, B3.2, A2.3, B2.1, B2.2, B2.5, B2.6`.
+   - `Tasks/The Athletics Package.md`: Transclusions: `A1.3, A3.3, B3.1, B3.2, A2.2, D1.2, A1.5, A3.1, B1.1, B1.2`.
+   - `per_section/All Classes/Unit 1, Day 1.md`: Added links to `[[How Marks Work]]`, `[[Getting Help]]`, and `[[Scavenger Hunt]]`.
+
+---
+
+#### Adversarial Audit & Quality Control Review (TGJ2O)
+
+Two rounds of rigorous adversarial subagent audits were performed to refute coverage claims, verify Ontario curriculum alignment, check structural invariants, and enforce style contracts:
+
+- **Round 1:** Adversarial auditor flagged 3 files where `enableToc: true` was declared but only 3 visible H2 headings were present (`The Software You Will Meet.md`, `Typography.md`, `Interviewing.md`).
+- **Remediation:** Added substantive, authentic 4th H2 sections to all 3 files (`File formats, handoffs, and non-destructive workflows`, `Type anatomy, spacing, and micro-typography`, and `Technical setup, audio hygiene, and location checks`).
+- **Round 2:** Adversarial auditor performed a full re-audit across all 139 files in TGJ2O, verifying TOC invariants on all 28 `enableToc: true` files, curriculum transclusion counts, Task triangulation plain-text blocks, Canadian English spelling, table pipe escaping, and 2-hop reachability, issuing a definitive **PASS (Zero Defects Detected)**.
+
+---
+
+#### Final Verification Metrics (TGJ2O)
+
+- **Total Specific Expectations:** 35 (`A1.1` – `D2.5`)
+- **Expectations Addressed $\ge 2$ Times:** 35 / 35 (100%)
+- **Expectations Addressed $\ge 3$ Times:** 35 / 35 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Coverage Frequencies across all 35 codes:**
+  - `A1.1`: 14 | `A1.2`: 10 | `A1.3`: 11 | `A1.4`: 6 | `A1.5`: 6
+  - `A2.1`: 4  | `A2.2`: 6  | `A2.3`: 6
+  - `A3.1`: 4  | `A3.2`: 5  | `A3.3`: 4
+  - `B1.1`: 5  | `B1.2`: 13
+  - `B2.1`: 3  | `B2.2`: 5  | `B2.3`: 4  | `B2.4`: 4 | `B2.5`: 7 | `B2.6`: 6
+  - `B3.1`: 13 | `B3.2`: 12
+  - `C1.1`: 3  | `C1.2`: 3
+  - `C2.1`: 3  | `C2.2`: 5  | `C2.3`: 5  | `C2.4`: 7 | `C2.5`: 9
+  - `D1.1`: 4  | `D1.2`: 6
+  - `D2.1`: 3  | `D2.2`: 3  | `D2.3`: 5  | `D2.4`: 6 | `D2.5`: 5
+- **Linter Results (`lint_payload.py TGJ2O`):** Clean (229 pages checked; 86 class pages; 35/35 expectations addressed; 0 addressed exactly once; clean).
+- **All published destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+
 
 
 

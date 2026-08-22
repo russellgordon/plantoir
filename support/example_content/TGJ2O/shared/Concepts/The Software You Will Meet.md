@@ -40,6 +40,24 @@ enough for professional work. Two honest points:
   lapses, and that a student can keep making things at home. That is not
   a small thing.
 
+## File formats, handoffs, and non-destructive workflows
+
+Modern communications pipelines rely on smooth handoffs between different
+specialized applications:
+
+- **Non-destructive workflows.** Professional software protects original assets.
+  In raster editing, adjustment layers and layer masks alter appearance without
+  overwriting source pixels. In audio and video, timeline trims and volume
+  envelopes reference original clips without modifying raw media files.
+- **Interchange formats.** Moving a project between applications requires
+  standard exchange formats: vector graphics export as SVG or EPS for page
+  layout, audio stems export as uncompressed WAV for mastering, and video
+  sequences pass through EDL/XML or rendered intermediate codecs (such as
+  ProRes or DNxHR).
+- **Final delivery standards.** Output files must match the target medium: high-
+  resolution CMYK PDF/X for print presses, optimized WebP or JPEG for web
+  pages, and compressed H.264/H.265 MP4 for web streaming and social channels.
+
 ## Choosing one for a job
 
 Ask three questions in order: **what does the output have to be**

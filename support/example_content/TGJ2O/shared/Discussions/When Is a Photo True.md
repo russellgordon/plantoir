@@ -29,9 +29,12 @@ Questions worth arguing about:
 4. In a highlight cut, a roaring crowd shot from the second period
    lands after a third-period goal. Sequence can lie without one
    altered frame — is that worse than a doctored image, or quieter?
-5. If every option involves choices, is "the camera doesn't lie"
+5. Generative AI tools and neural filters can now remove background distractions,
+   generate missing elements, or re-render lighting entirely. When does computational
+   image generation cross from technical enhancement into fabricating evidence?
+6. If every option involves choices, is "the camera doesn't lie"
    ever true? Write the room's one-sentence line between choosing
-   and deceiving — then test it against questions 1 to 4.
+   and deceiving — then test it against questions 1 to 5.
 
 Carry it back to practice: [[Composition and Framing]] teaches the
 choices; this argument decides which ones we stand behind. Run your
@@ -44,4 +47,6 @@ the caption beside it.
 ## Curriculum connection
 
 ![[C2.5]]
+
+![[C2.3]]
 %%curriculum-end%%

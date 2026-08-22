@@ -38,7 +38,9 @@ taught — date it, quote your own words, then show the now:
 3. **Where this goes next.** The habits are only real once they
    have an address outside this room: a course you might take, a
    [[D2.1|field where these skills already earn a living]], a thing
-   you want to cover or make on your own — and a first step you
+   you want to cover or make on your own, or a [[D2.2|program, mentorship network, or support group]]
+   (such as Skills Ontario, OYAP, or community media associations) that supports
+   non-traditional career choices in communications — and a first step you
    could actually take this summer.
 
 > [!tip] Do not write it as a thank-you card
@@ -52,6 +54,8 @@ taught — date it, quote your own words, then show the now:
 ## Curriculum connection
 
 ![[D2.1]]
+
+![[D2.2]]
 
 ![[D2.3]]
 

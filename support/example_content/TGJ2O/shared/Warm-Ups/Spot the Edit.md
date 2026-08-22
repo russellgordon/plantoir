@@ -42,4 +42,6 @@ that ALMOST lies teaches the boundary better than spotting one.
 ## Curriculum connection
 
 ![[C2.5]]
+
+![[C2.3]]
 %%curriculum-end%%

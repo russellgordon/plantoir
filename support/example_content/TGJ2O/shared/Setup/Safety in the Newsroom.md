@@ -47,6 +47,27 @@ still worth recording — that is exactly what a workplace health and
 safety committee does, and it is where "somebody should do something"
 becomes a document with a date on it.
 
+## WHMIS, equipment care, and incident reporting
+
+Safety in media production includes the chemical and electrical standards
+mandated across Ontario workplaces:
+
+- **WHMIS and chemical cleaners.** Cleaning optical lenses, camera sensors, and
+  display glass requires specific solvents (such as high-purity isopropyl
+  alcohol and optical lens solutions). Always verify Workplace Hazardous
+  Materials Information System (WHMIS) supplier labels and ensure proper
+  ventilation before applying sprays or compressed gas dusters. Never mix
+  cleaning chemicals.
+- **Electrical and battery inspection.** Check camera battery packs for signs of
+  swelling, damage, or overheating before charging. Inspect power cables and
+  studio extension cords for fraying or exposed copper prior to every shoot;
+  damaged cables must be quarantined immediately rather than patched with tape.
+- **Incident reporting and Passport to Safety.** Any near-miss, equipment drop,
+  or physical strain must be reported to the teacher-editor immediately.
+  Documenting safety incidents ensures repairs happen promptly, mirrors
+  standard Ontario health and safety committee reporting, and reinforces the
+  work habits tracked in the Ontario Skills Passport.
+
 > [!important] The rule that overrides every deadline
 > No story is worth an injury, and no shot is worth going somewhere you
 > should not be. If a location, a crowd, or a situation feels wrong,

@@ -108,6 +108,12 @@ would you tell whoever holds it on the next beat?
 ![[D1.2]]
 
 ![[A1.5]]
+
+![[A3.1]]
+
+![[B1.1]]
+
+![[B1.2]]
 %%curriculum-end%%
 
 %%

@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - portfolio
-enableToc: true
+enableToc: false
 ---
 > [!abstract] At a glance
 > Individual · all course · one entry per class · collected each unit
@@ -55,4 +55,10 @@ arrangement rather than an oversight.
 ## Curriculum connection
 
 ![[B1.2]]
+
+![[D2.3]]
+
+![[D2.4]]
+
+![[D2.5]]
 %%curriculum-end%%

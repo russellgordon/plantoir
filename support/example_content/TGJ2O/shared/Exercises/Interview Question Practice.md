@@ -67,4 +67,10 @@ ones make the next question obvious.
 ## Curriculum connection
 
 ![[A1.1]]
+
+![[A1.3]]
+
+![[A3.2]]
+
+![[D2.3]]
 %%curriculum-end%%

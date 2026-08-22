@@ -85,9 +85,13 @@ someone — usually yourself — for the reader's sake.
 
 ![[A2.3]]
 
+![[B2.1]]
+
 ![[B2.2]]
 
 ![[B2.5]]
+
+![[B2.6]]
 %%curriculum-end%%
 
 %%

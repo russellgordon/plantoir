@@ -68,4 +68,8 @@ is [[Showing Growth]].
 ## Curriculum connection
 
 ![[B1.2]]
+
+![[A3.3]]
+
+![[D2.5]]
 %%curriculum-end%%

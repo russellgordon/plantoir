@@ -79,7 +79,7 @@ consolation prize. It is how the mark is meant to work.
 
 How you work is reported separately, in its own column on the same
 report card, as **E, G, S or N** — six habits: responsibility,
-organization, independent work, collaboration, initiative, and
+organisation, independent work, collaboration, initiative, and
 self-regulation. They matter, we will talk about them often, and they
 do not move your percentage. The mark is about the work; that column is
 about the worker, and mixing the two tells you less about both.

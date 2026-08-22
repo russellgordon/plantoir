@@ -42,4 +42,6 @@ not, and the room sorts them. A good decoy takes the same judgement.
 ## Curriculum connection
 
 ![[A1.1]]
+
+![[C2.2]]
 %%curriculum-end%%
