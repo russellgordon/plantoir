@@ -46,7 +46,15 @@ public sealed class AssistantSettingsDialog : ContentDialog
         {
             Content = _panel,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            MaxHeight = 560
+            MaxHeight = 560,
+            // Right padding wider than the others: WinUI's scrollbar overlays
+            // the content instead of reserving its own space, so with no
+            // gutter it draws straight over whatever sits at the trailing
+            // edge — here, the Stop/Remove/Download buttons. A scroll bar
+            // should never occlude the content beneath it; the extra 20px
+            // is the gutter it needs. Same convention as
+            // SectionDetailView's own ScrollViewer padding.
+            Padding = new Thickness(0, 0, 20, 0)
         };
 
         // Note trail on open

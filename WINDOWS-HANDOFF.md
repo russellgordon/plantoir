@@ -4901,6 +4901,51 @@ look identical on disk, so "it still says Edited after I published" has
 nothing to look at without it. The line also records that the publish
 succeeded at EVERY destination rather than merely at one.
 
+## WinUI scroll bars overlay content — always reserve a trailing gutter
+
+Found 2026-08-22, testing the model-in-use guard above: `AssistantSettingsDialog`'s
+"On this PC" housekeeping rows put a Stop/Remove/Download button flush against
+the `ScrollViewer`'s right edge, and the vertical scroll bar drew right over
+top of it — reported directly: "the scroll bar goes over the buttons — that
+seems a poor UI choice? […] scroll bars should never occlude content on a
+lower layer."
+
+**Why it happens.** WinUI's default `ScrollBar` visual (`MouseIndicator` mode)
+is an OVERLAY — it takes no layout space of its own and floats over whatever
+the `ScrollViewer`'s content places at its trailing edge. A `ScrollViewer`
+with no padding gives the scroll bar nothing to float over except the
+content itself, so anything docked to that edge — here, a button in the
+right-hand column of a two-column `Grid` — sits directly underneath it.
+
+**The fix, and the convention going forward**: give the `ScrollViewer` extra
+padding on the trailing side specifically — `Padding = new Thickness(0, 0, 20, 0)`
+in `AssistantSettingsDialog.cs`, 20px being enough to clear the thumb's hit
+target with room to spare. Not a fix specific to Settings: **any `ScrollViewer`
+whose content places an interactive control (a button, a toggle, a link)
+flush against the trailing edge needs the same trailing gutter**, checked at
+the point that content is designed, not discovered by a teacher clicking
+through a scrolled-down dialog. `SectionDetailView.xaml.cs`'s own
+`ScrollViewer` already does this by convention (`Padding="36,28,48,28"` —
+more on the right than the left), which is what made this fixable by pattern-
+matching rather than by inventing a number from nothing.
+
+**Swept the rest of the app for the same shape and found nothing else
+wrong**: `NewCourseDialog`'s form scroller and `CourseSettingsView`'s have no
+buttons docked to their trailing edge (toggles and text fields, not a
+two-column button row), and `AssistWindow`'s transcript scroller holds chat
+bubbles, not edge-docked controls. The housekeeping rows were the only place
+in the app with this exact shape today — but the rule is the general one
+above, not "fix this one dialog."
+
+**For the mac**: SwiftUI's `ScrollView` on macOS behaves differently — its
+system scroll bar is also typically an overlay, but AppKit's own controls
+already carry enough of their own trailing inset in most list/form contexts
+that this specific defect has not been reported there. Worth a quick look if
+a similar "button under the scroll bar" report ever comes in on that side,
+but this is not a ported behaviour — it is a Windows-specific rendering fact
+(the `MouseIndicator` overlay model) with no mac equivalent bug to fix in
+lockstep.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
