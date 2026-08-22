@@ -2,6 +2,7 @@
 title: How Canada Is Governed
 publish: true
 created: __CREATED__
+enableToc: true
 tags:
   - concepts
   - unit-1
@@ -40,6 +41,57 @@ most votes, not a majority. And a party can form government without a
 majority of seats, provided the House does not vote it down — a minority
 government, which in Canada is common rather than exotic.
 
+## Three branches of government, and why the split creates stability
+
+Canada's system of government divides power across three distinct branches
+at both federal and provincial levels:
+
+- **The Executive branch** (the Crown, represented by the Governor General
+  or Lieutenant Governor; the Prime Minister or Premier; the Cabinet; and the
+  professional public service). It proposes legislation, administers government
+  departments, and executes laws.
+- **The Legislative branch** (Parliament federally, comprising the elected
+  House of Commons, the appointed Senate, and the Crown; the unicameral
+  Legislative Assembly of Ontario provincially). It debates bills, votes on
+  taxation and spending, and holds the executive accountable during daily
+  question period and in standing committees.
+- **The Judicial branch** (independent courts, including provincial superior
+  courts, appeal courts, the Federal Court, and the Supreme Court of Canada).
+  It interprets laws, settles disputes, and determines whether laws or government
+  actions conform to the Constitution and the Charter.
+
+This separation of powers — combined with the principle of responsible
+government, where Cabinet ministers must maintain the confidence of the elected
+legislature — is fundamental to political, economic, and social stability in
+Canada. It ensures no single leader or faction can exercise unchecked authority,
+protects the independence of judges from political retaliation, and guarantees
+that the professional public service continues delivering essential services,
+collecting revenue, and issuing pensions uninterrupted through elections and
+transitions of power.
+
+## Passing a law, and amending an existing one
+
+Passing a new statute or amending an existing Act follows a rigorous, multi-stage
+legislative pathway designed to ensure public debate and committee scrutiny:
+
+1. **Notice and First Reading**: The bill is introduced, printed, and made public
+   without debate.
+2. **Second Reading**: Members debate the core principle and purpose of the bill,
+   culminating in a vote on whether the policy should proceed.
+3. **Committee Stage**: A parliamentary committee examines the bill clause by
+   clause, hears testimony from expert witnesses, affected citizens, and interest
+   groups, and votes on specific amendments.
+4. **Report Stage and Third Reading**: The amended bill is reported back to the
+   full House for final debate and a vote on its complete text.
+5. **Senate Review (Federal only)**: The bill repeats this process in the Senate,
+   which provides "sober second thought" and can propose further amendments.
+6. **Royal Assent**: The Governor General or Lieutenant Governor grants Royal
+   Assent, transforming the bill into an Act. The statute comes into force on
+   assent, on a date specified in the Act, or by Cabinet proclamation.
+
+To amend or repeal an existing law, an amending bill must travel this exact
+same legislative path from start to finish.
+
 ## The parties, described the way this course describes them
 
 Elections Canada maintains the register of federal parties; there are
@@ -75,4 +127,8 @@ The point is to make the reasoning visible so a reader can judge it.
 ![[B2.8]]
 
 ![[B2.1]]
+
+![[B2.4]]
+
+![[B2.6]]
 %%curriculum-end%%

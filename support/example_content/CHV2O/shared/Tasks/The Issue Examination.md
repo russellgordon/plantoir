@@ -82,6 +82,12 @@ fastest way to see how much sharper you have become.
 ![[A1.5]]
 
 ![[A2.1]]
+
+![[A2.3]]
+
+![[A2.4]]
+
+![[B1.3]]
 %%curriculum-end%%
 
 %%

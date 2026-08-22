@@ -57,9 +57,34 @@ in the world outside this building, and then a two-and-a-half-hour
 > genuinely disagree. [[Our Working Agreement]] sets out how we argue
 > about those — read it in the first week, not the week you need it.
 
+## Connecting to your community: youth service and leadership
+
+Civic participation extends beyond classroom analysis into active service. In
+Ontario, all secondary students complete forty hours of community involvement to
+graduate. This course helps you identify meaningful service and leadership
+opportunities in your community:
+
+- Serving on municipal youth advisory committees or school board student
+  senates.
+- Volunteering with local food banks, newcomer settlement agencies, and youth
+  advocacy groups.
+- Participating in environmental conservation projects and community cleanups.
+- Working as trained poll workers during municipal, provincial, or federal
+  elections.
+
+Connecting your coursework to real community service builds practical leadership
+and civic commitment that lasts well beyond Grade 10. See
+[[Service and Contribution]].
+
 ## If you fall behind
 
 Say so early. In a ten-week course there is no quiet stretch to catch up
 in, and a missed week in November is a real problem by December.
 [[Getting Help]] lists the ways to reach me, and [[Help Sessions]] has
 the times I am in the room.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C1.6]]
+%%curriculum-end%%

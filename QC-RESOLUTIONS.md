@@ -329,4 +329,65 @@ An adversarial subagent was invoked to refute claims of resolution, verify curri
 
 ---
 
+### 1.1 Coverage depth: CHV2O once-only expectations (13 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across CHV2O (Grade 10 Civics and Citizenship, 2022 Ontario Curriculum) by ensuring all 36 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (concepts, investigations, sources, discussions, tutorials, portfolios, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding civic inquiry, democratic values, governance structures, Charter rights, and youth action over time.
+
+#### Baseline Findings (CHV2O)
+- Total expectations: 36 specific expectations (`A1.1` to `C2.2`)
+- Addressed only once (13 codes): `A2.3, A2.4, B1.3, B2.4, B2.5, B2.6, B2.7, B2.8, B3.5, B3.6, C1.4, C1.5, C1.6`
+
+#### Actions Completed
+
+1. **Concept Pages Alignment & Deepening (`shared/Concepts/`)**:
+   - `How Canada Is Governed.md`: Added sections on the three branches of government in Canada (`B2.4` — executive, legislative, judicial) and how the separation of powers promotes stability, plus the detailed multi-stage process for passing and amending statutes (`B2.6`). Updated frontmatter with `enableToc: true` and curriculum block with `B2.8, B2.1, B2.4, B2.6`.
+   - `What Democracy Asks of You.md`: Added sections on Canada's first-past-the-post electoral system and majority vs minority government formation (`B2.8`), and on national symbols, commemorations (Remembrance Day, National Day for Truth and Reconciliation), and constructive patriotism (`C1.4`). Updated frontmatter with `enableToc: true` and curriculum block with `B1.1, B1.4, B2.8, C1.4`.
+   - `Who Decides What, and Where.md`: Added comprehensive section on revenue raising mechanisms across federal, provincial, municipal, and Indigenous orders and budget design balancing short-term operational costs with long-term capital investments (`B2.5`). Updated curriculum block with `B2.2, B2.4, B2.5`.
+   - `Rights, and What Limits Them.md`: Added section on rights in a global context (UDHR, ICCPR, UNCRC, UNDRIP) (`B3.5`), and evaluating international responses to human rights violations (targeted Magnitsky sanctions, ICC prosecutions, diplomatic censure, refugee protection) (`B3.6`). Updated frontmatter with `enableToc: true` and curriculum block with `B3.1, B3.4, B3.5, B3.6`.
+   - `How Change Actually Happens.md`: Added sections on how domestic advocacy groups (unions, business associations, environmental and Indigenous groups) and international bodies influence public policy and everyday economic life (`B2.7`), and how digital literacy, social media campaigns, and open data portals empower online and offline advocacy (`C1.5`). Updated frontmatter with `enableToc: true` and curriculum block with `B3.3, C2.2, B2.7, C1.5`.
+   - `Service and Contribution.md`: Added section detailing professional pathways and careers where civics education is central (public administration, law/justice, non-profit leadership, journalism, labour relations) (`A2.4`). Updated frontmatter with `enableToc: true` and curriculum block with `C1.1, C1.2, C1.6, A2.4`.
+
+2. **Sources & Investigations Enhancements (`shared/Sources/`, `shared/Investigations/`)**:
+   - `Sources/Judging Civic Information.md`: Added sections on foreign actor interference, bot networks, election disinformation, and democratic defence mechanisms (`B1.3`), and applying the four concepts of political thinking to current events analysis (`A2.3`). Updated frontmatter with `enableToc: true` and curriculum block with `A1.3, C1.5, B1.3, A2.3`.
+   - `Investigations/Who Decided This.md`: Added explicit investigation steps on budget and funding mechanisms (`B2.5`), statutory and bylaw amendment instruments (`B2.6`), and political thinking evaluation (`A2.3`). Updated curriculum block with `A1.1, B2.2, B2.7, B2.5, B2.6, A2.3`.
+   - `Investigations/Whose Rights Win.md`: Added analysis connecting Canadian Charter rights conflicts with international human rights conventions (`B3.5`), global violations and international responses (`B3.6`), and political thinking concepts (`A2.3`). Updated curriculum block with `B3.1, B3.4, B3.5, B3.6, A2.3`.
+
+3. **Tutorials, Setup & Portfolios (`shared/Tutorials/`, `shared/Setup/`, `shared/Portfolios/`)**:
+   - `Tutorials/Writing to Someone in Power.md`: Added section on digital channels, online consultation portals, social media advocacy, and formal deputations (`C1.5`). Updated frontmatter with `enableToc: true` and curriculum block with `A1.5, B3.3, C1.5`.
+   - `Setup/How This Course Works.md`: Added section connecting course inquiry directly to youth service, leadership, and Ontario's 40-hour graduation requirement (`C1.6`). Added curriculum block with `C1.6`.
+   - `Portfolios/Where You Stand Now.md`: Expanded Part 3 to connect skills to both professional careers (`A2.4`) and ongoing youth leadership and community service (`C1.6`). Updated curriculum block with `A2.1, A2.2, A2.4, B1.5, C1.6`.
+
+4. **Tasks & Summative Evaluations (`shared/Tasks/`)**:
+   - `The Issue Brief.md`: Added `B2.7` (influence of groups and economic/individual impacts of policy) and `A2.3` (applying political thinking concepts to analyze a live current issue) to curriculum block (`A1.1, A1.2, B1.1, B1.2, B2.7, A2.3`).
+   - `How Government Works.md`: Added `B2.4` (three branches and stability) and `B2.8` (Canada's form of government, elections, and government formation) to curriculum block (`B2.1, B2.2, B2.3, B2.4, B2.8`).
+   - `The Issue Examination.md`: Added `A2.3` (political thinking concepts in analyzing unseen issues and sources), `A2.4` (transferable skills and career reflection in Part 3), and `B1.3` (assessing foreign interference and disinformation in media/social media sources) to curriculum block (`A1.3, A1.4, A1.5, A2.1, A2.3, A2.4, B1.3`).
+
+---
+
+#### Adversarial Audit & Quality Control Review (CHV2O)
+
+An adversarial subagent was invoked to refute claims of resolution, audit curriculum alignment against primary Ministry documents, check KaTeX/Mermaid syntax, verify reachability, and inspect assessment constraints.
+
+**Audit Results:**
+- **Verdict:** **CERTIFIED CLEAN** (0 blocking defects found).
+- Confirmed all 36 specific expectations (`A1.1` to `C2.2`) are authentically taught and evaluated $\ge 2$ times.
+- Confirmed all 7 overall expectations (`A1, A2, B1, B2, B3, C1, C2`) are evaluated across `shared/Tasks/`.
+- Confirmed zero transclusions or links inside comments, zero curriculum blocks on class pages, and 100% two-hop graph reachability.
+- Confirmed Canadian spelling and stylistic conventions maintained throughout.
+
+---
+
+#### Final Verification Metrics (CHV2O)
+
+- **Total Specific Expectations:** 36 (`A1.1` – `C2.2`)
+- **Expectations Addressed $\ge 2$ Times:** 36 / 36 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Linter Results (`lint_payload.py CHV2O`):** Clean (149 pages checked, 42 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+---
+
+
 

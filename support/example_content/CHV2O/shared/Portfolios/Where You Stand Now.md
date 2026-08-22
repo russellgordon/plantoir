@@ -54,11 +54,11 @@ so its holder would accept it; write to a person in power and get an
 answer. Those are transferable, and they are the actual product of this
 course.
 
-## Part three — where it is paid for
+## Part three — where it is paid for and where it is lived
 
-The obvious ones are real: lawyer, policy analyst, journalist, municipal
-clerk, elected official, union or association staff, public servant. Less
-obvious and closer to what you actually did this term:
+The obvious career pathways are real: lawyer, policy analyst, journalist,
+municipal clerk, elected official, union or association staff, public servant.
+Less obvious and closer to what you actually did this term:
 
 - **Community and constituency staff**, who spend their week finding out
   which government holds a power and getting a decision moved.
@@ -67,13 +67,16 @@ obvious and closer to what you actually did this term:
 - **Consultation and engagement roles**, which exist because
   organisations that skip [[Who Is Missing From the Table|Who Is Missing From the Table?]] get their
   projects stopped.
+- **Youth leadership and service organisations**, where community organising,
+  advisory committee leadership, and ongoing civic commitment create real
+  change (see [[Service and Contribution]]).
 - **Anyone who has to write for a decision-maker** — a nurse manager
   requesting staffing, an engineer writing a submission, a coach asking a
   board for a budget.
 
-Pick one. Describe, in a paragraph, a task that job does in a week which
-you have already practised this term. Describe the work, not the job
-title.
+Pick one career pathway or community leadership role. Describe, in a
+paragraph, a task that role does in a week which you have already practised
+this term. Describe the work, not the job title.
 
 %%curriculum-start%%
 ## Curriculum connection
@@ -85,4 +88,6 @@ title.
 ![[A2.4]]
 
 ![[B1.5]]
+
+![[C1.6]]
 %%curriculum-end%%

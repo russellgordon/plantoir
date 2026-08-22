@@ -75,6 +75,10 @@ Build on [[How Canada Is Governed]], [[Who Decides What, and Where]] and
 ![[B2.2]]
 
 ![[B2.3]]
+
+![[B2.4]]
+
+![[B2.8]]
 %%curriculum-end%%
 
 %%

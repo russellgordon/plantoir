@@ -73,6 +73,10 @@ cannot work out who holds the power.
 ![[B1.1]]
 
 ![[B1.2]]
+
+![[B2.7]]
+
+![[A2.3]]
 %%curriculum-end%%
 
 %%

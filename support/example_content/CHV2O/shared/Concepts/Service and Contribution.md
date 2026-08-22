@@ -2,6 +2,7 @@
 title: Service and Contribution
 publish: true
 created: __CREATED__
+enableToc: true
 tags:
   - concepts
   - unit-2
@@ -64,6 +65,25 @@ Leadership in any of these is not a title. It is being the person who
 knows what happens next and tells everyone else, which is available to
 you in your first week and does not require an election.
 
+## Where civic education leads: careers and pathways
+
+The inquiry and communication skills you practise in this course are directly
+applicable in a wide range of professional fields:
+
+- **Public administration and municipal governance**: Policy analysts,
+  legislative assistants, municipal clerks, urban planners, and program officers
+  who design and implement government services.
+- **Law, justice, and human rights**: Lawyers, paralegals, legal aid workers,
+  mediators, and human rights tribunal officers who interpret legislation and
+  advocate for clients.
+- **Community leadership and non-profits**: Directors, community organisers, and
+  volunteer coordinators managing social service agencies and charities.
+- **Journalism and public affairs**: Reporters and editors who investigate
+  government decisions, analyse public records, and inform the public.
+- **Labour and stakeholder relations**: Union representatives and corporate
+  compliance officers who negotiate collective agreements and ensure regulatory
+  adherence.
+
 Log what you do in [[Your Civic Notebook]] as you go — hours, what you
 actually did, and what you would change. [[The Civic Action Project]]
 will ask for exactly that, and reconstructing it in January is much
@@ -77,4 +97,6 @@ harder than writing it down in November.
 ![[C1.2]]
 
 ![[C1.6]]
+
+![[A2.4]]
 %%curriculum-end%%
