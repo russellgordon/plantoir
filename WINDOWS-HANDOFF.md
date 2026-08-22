@@ -3860,6 +3860,65 @@ There is deliberately **no web manifest and no 192/512 PWA icon set**. That is
 Android home-screen and installable-app territory, not a favicon, and the
 teacher's site is neither.
 
+## A container's own network can wedge independently of everything else (entry 300)
+
+A real Cloudflare deploy failed with wrangler's own `fetch failed` ("Please
+check your network connection and try again") and a bare Python
+traceback — in a working folder that had deployed successfully many times
+before. A BRAND-NEW working folder deployed without a problem seconds
+later, using the identical image. Traced directly: the existing folder's
+long-lived container had a wedged network namespace — `docker exec
+<container> getent hosts google.com` failed outright — while every OTHER
+container on the same Colima VM, Colima itself, and a fresh THROWAWAY
+container built from that exact same image all resolved DNS instantly.
+This is a known Docker failure mode for containers that have been running
+a long time; it is not caused by anything in this project's code, and it
+is not something Colima's own health check would catch, because Colima
+and the Docker daemon are both genuinely fine — only this one container's
+own network state is not.
+
+**The risk this poses to a real teacher**: a course that deploys
+successfully for weeks, then fails once with a network-shaped error and a
+stack trace, for no reason visible from the teacher's side at all — no
+wifi change, no VPN, nothing they did. Exactly the kind of failure this
+project's own error-explaining machinery (`FailureExplainer` et al.) exists
+to prevent from ever reaching a teacher as raw Python.
+
+**The fix**, in `deploy.sh`, mirrors the shape of the existing
+`probe_container_write()` check (which already recreates a container whose
+mount has gone stale or wrong) rather than inventing a new pattern:
+
+```bash
+probe_container_network() {
+  if [[ "$TARGET" == "local_folder" ]]; then
+    return 0
+  fi
+  local PROBE_HOST="api.cloudflare.com"
+  if [[ "$TARGET" == "netlify" ]]; then
+    PROBE_HOST="app.netlify.com"
+  fi
+  docker exec "$CONTAINER_NAME" sh -lc "getent hosts $PROBE_HOST" >/dev/null 2>&1
+}
+```
+
+Checked in BOTH places an existing container is about to be reused
+(already running, or stopped and about to be `docker start`ed), right
+alongside the existing write-probe, in both cases recreating the
+container silently on failure exactly the way a bad mount already was.
+Skipped entirely for `local_folder`, which never touches the network at
+all — a teacher legitimately offline while publishing to a folder must
+never see this check invented as a new reason to fail.
+
+**What Windows needs from this**: nothing to port. Native Windows has no
+container at all to wedge (see row 292, "Windows: the container is gone" —
+no WSL2, no Docker Engine, no Colima) — this entire class of failure is
+structurally impossible there. Worth a mental note only: if a native
+Windows deploy is ever reported failing with a network-SHAPED error after
+a machine has been asleep or off a network for a long stretch, the
+equivalent question is whatever Windows' own native networking stack has
+to say for itself, not whether some container has gone stale — there is
+no container to check.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
