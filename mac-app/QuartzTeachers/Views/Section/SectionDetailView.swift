@@ -11,7 +11,12 @@ struct SectionDetailView: View {
     let sectionNumber: Int
 
     @State var previewRunner = ScriptRunner()
-    @State var deployRunner = ScriptRunner()
+
+    /// Runs every configured destination in sequence — see
+    /// `MultiDestinationDeployRunner`. For the overwhelming majority of
+    /// courses (exactly one destination) this behaves exactly like a
+    /// single `ScriptRunner` always did.
+    @State var deployRunner = MultiDestinationDeployRunner()
 
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
@@ -48,7 +53,7 @@ struct SectionDetailView: View {
             // which is what dragged the progress header under the
             // window's toolbar when a preview was restarted.
             VStack(spacing: 0) {
-                if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || !deployRunner.transcript.lines.isEmpty {
+                if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
                     consoleArea
                 } else {
                     ContentUnavailableView(
@@ -215,8 +220,10 @@ struct SectionDetailView: View {
     }
 
     /// Why this section's deploy would not get anywhere, or nil when it
-    /// would. Both destinations that need something from the teacher are
-    /// checked: the folder, and the Cloudflare Account ID.
+    /// would. EVERY configured destination is checked — the primary and
+    /// every additional one — so a redundancy target with no valid folder
+    /// or credential is caught here rather than discovered halfway
+    /// through a run that already published to the others.
     var deployRefusalReason: String? {
         return SectionDetailView.deployRefusalReason(
             configuration: course.configuration,
@@ -226,17 +233,10 @@ struct SectionDetailView: View {
 
     /// The same check, free of the view, so it can be tested.
     static func deployRefusalReason(configuration: CourseConfiguration, cloudflareAccountID: String) -> String? {
-        if configuration.deployTarget == "local_folder" {
-            if let folderProblem = CourseConfiguration.deployFolderProblem(forPath: configuration.deployFolderPath) {
-                return "\(folderProblem) Fix it in this course’s settings, under Deploying, then deploy again."
-            }
-        }
-        if configuration.deploysToCloudflare {
-            if let accountProblem = CourseConfiguration.cloudflareAccountProblem(forID: cloudflareAccountID) {
-                return "\(accountProblem) Add it in this course’s settings, under Deploying, then deploy again."
-            }
-        }
-        return nil
+        return MultiDestinationDeployRunner.refusalReason(
+            destinations: configuration.allDeployDestinations,
+            cloudflareAccountID: cloudflareAccountID
+        )
     }
 
     var deployRefusalBinding: Binding<Bool> {
@@ -264,13 +264,35 @@ struct SectionDetailView: View {
     var consoleArea: some View {
         VStack(spacing: 0) {
             if showsDeployProgress {
-                TaskProgressView(
-                    runner: deployRunner,
-                    title: "Deploying \(titleText)",
-                    onCancel: {
-                        cancelDeploy()
+                // .leading: DeployDestinationChecklist is a compact HStack
+                // with no content of its own that forces full width, so
+                // under this VStack's default (.center) alignment it would
+                // float centred while TaskProgressView's own text starts at
+                // the left margin — two different leading edges for what
+                // reads as one panel. Explicit .leading lines them up.
+                VStack(alignment: .leading, spacing: 0) {
+                    // Only appears once a course has more than one
+                    // destination — the overwhelming majority never see
+                    // this at all, and the progress panel beneath it
+                    // looks exactly as it always has.
+                    if deployRunner.legs.count > 1 {
+                        DeployDestinationChecklist(legs: deployRunner.legs)
                     }
-                )
+                    // DeployDestinationLinks renders INSIDE TaskProgressView
+                    // itself, in the same spot a single destination's own
+                    // "Your website is live" link would sit — above "Show
+                    // details", never pushed down past the (variable-height)
+                    // console.
+                    TaskProgressView(
+                        runner: deployRunner.activeRunner,
+                        title: deployProgressTitle,
+                        hidesSiteLink: deployRunner.legs.count > 1,
+                        allLegs: deployRunner.legs.count > 1 ? deployRunner.legs : nil,
+                        onCancel: {
+                            cancelDeploy()
+                        }
+                    )
+                }
             } else {
                 TaskProgressView(
                     runner: previewRunner,
@@ -282,6 +304,21 @@ struct SectionDetailView: View {
             }
             Spacer(minLength: 0)
         }
+    }
+
+    /// What the deploy panel is called. Names the destination currently
+    /// running only once there is more than one to distinguish between —
+    /// a course with a single destination keeps the plain title it has
+    /// always had.
+    var deployProgressTitle: String {
+        return SectionDetailView.deployProgressTitle(
+            sectionName: titleText,
+            isRunning: deployRunner.isRunning,
+            legCount: deployRunner.legs.count,
+            currentDestinationDescription: deployRunner.currentLeg.map { leg in
+                DeployCommand.destinationDescription(for: leg.destination)
+            }
+        )
     }
 
     /// What the preview panel is called. While the preview is being made
@@ -311,6 +348,26 @@ struct SectionDetailView: View {
             return "Preparing the preview of \(sectionName)"
         }
         return "Preview of \(sectionName)"
+    }
+
+    /// Names the destination CURRENTLY running only while the deploy is
+    /// still going — once it has finished, naming just one destination in
+    /// the title is misleading when every configured destination actually
+    /// ran (a teacher who deployed to Netlify AND Cloudflare should not see
+    /// a title that only mentions whichever one happened to run last). The
+    /// checklist above already names each destination with its own
+    /// checkmark, and `DeployDestinationLinks` below lists every live link,
+    /// so the finished title reverts to the plain single-destination form.
+    static func deployProgressTitle(
+        sectionName: String,
+        isRunning: Bool,
+        legCount: Int,
+        currentDestinationDescription: String?
+    ) -> String {
+        if isRunning, legCount > 1, let currentDestinationDescription {
+            return "Deploying \(sectionName) — \(currentDestinationDescription)"
+        }
+        return "Deploying \(sectionName)"
     }
 
     /// Whichever task is running now, or — once both have finished — the
@@ -462,7 +519,7 @@ struct SectionDetailView: View {
                 workspaceURL: workspaceURL
             )
         }
-        deployRunner.cancelByUser()
+        deployRunner.cancel()
     }
 
     /// Hands the port back, whatever ended the preview.
@@ -506,9 +563,12 @@ struct SectionDetailView: View {
             )
         }
 
-        // Whatever is wrong with the destination is said here, before a
-        // build starts: discovering it after several minutes of work would
-        // waste the teacher's time and read as a failure of the deploy.
+        let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
+
+        // Whatever is wrong with ANY configured destination is said here,
+        // before a build starts: discovering it partway through a
+        // redundancy run would waste the teacher's time and let some
+        // destinations quietly go out while others never got the chance.
         if let problem = deployRefusalReason {
             return AssistSiteWorkResult(
                 succeeded: false, message: problem, isAboutTheDestination: true
@@ -538,25 +598,12 @@ struct SectionDetailView: View {
         }
 
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
-        // A folder or Cloudflare deploy never touches Netlify, so their
-        // progress must not talk about it either.
-        if course.configuration.deploysToLocalFolder {
-            deployRunner.milestones = needsBuild ? TaskMilestones.buildAndDeployToFolder : TaskMilestones.deployToFolder
-        } else if course.configuration.deploysToCloudflare {
-            deployRunner.milestones = needsBuild ? TaskMilestones.buildAndDeployToCloudflare : TaskMilestones.deployToCloudflare
-        } else {
-            deployRunner.milestones = needsBuild ? TaskMilestones.buildAndDeploy : TaskMilestones.deploy
-        }
-
-        // When this section has a custom domain, the live-site link shown
-        // after publishing wears it instead of the Netlify address.
-        let customDomain: String = CourseConfiguration.normalizedCustomDomain(
-            course.configuration.customDomain(forSection: sectionNumber)
-        )
-        deployRunner.customDomainForLinks = customDomain.isEmpty ? nil : customDomain
 
         // Let the rest of the app know this course is mid-publish (so,
-        // for example, Add Section… declines until it finishes).
+        // for example, Add Section… declines until it finishes) — ONE
+        // bracket around the whole sequence of destinations, not one per
+        // destination: from outside this window, the course is "busy
+        // publishing" for the whole span.
         CourseActivity.beginPublish(
             folderPath: workspaceURL.path,
             courseCode: course.code,
@@ -570,57 +617,37 @@ struct SectionDetailView: View {
             )
         }
 
-        if needsBuild {
-            deployRunner.run(
-                scriptNamed: "preview.sh",
-                arguments: [course.code, String(sectionNumber), "--build-only"],
-                workingDirectory: workspaceURL
-            )
-            if let problem = deployRunner.launchProblem {
-                return AssistSiteWorkResult(succeeded: false, message: problem)
-            }
-            let built: Bool = await deployRunner.waitUntilFinished()
-            if !built {
-                // The failure and its output are already on screen.
-                return AssistSiteWorkResult(
-                    succeeded: false,
-                    message: AssistWording.couldNotBuildBeforeDeploying(
-                        course: course.code, section: String(sectionNumber)
-                    )
-                )
-            }
-        }
-
-        // What the launcher is asked to do is decided in one place —
-        // shared with the scheduled deploy, so an alarm set for half
-        // six sends the site to the same destination this button does.
-        let deployArguments: [String] = DeployCommand.arguments(
-            courseCode: course.code,
+        // What the launcher is asked to do, for each destination, is
+        // decided in one place — shared with the scheduled deploy and the
+        // assistant's headless path, so an alarm set for half six sends
+        // the site to the same destinations this button does.
+        await deployRunner.run(
+            course: course,
             sectionNumber: sectionNumber,
-            configuration: course.configuration,
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
-        )
-        deployRunner.run(
-            scriptNamed: DeployCommand.scriptName,
-            arguments: deployArguments,
+            destinations: destinations,
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
             workingDirectory: workspaceURL,
-            keepingTranscript: needsBuild
+            needsBuild: needsBuild
         )
-        if let problem = deployRunner.launchProblem {
-            return AssistSiteWorkResult(succeeded: false, message: problem)
-        }
-        let deployed: Bool = await deployRunner.waitUntilFinished()
-        if !deployed {
+
+        // A failed shared build is reported the same way regardless of
+        // how many destinations were configured — none of them were ever
+        // reached, so the wording says "could not be built", not "did
+        // not finish", which would wrongly suggest the upload failed.
+        if deployRunner.legs.first?.buildFailed == true {
             return AssistSiteWorkResult(
                 succeeded: false,
-                message: AssistWording.deployDidNotFinish(
+                message: AssistWording.couldNotBuildBeforeDeploying(
                     course: course.code, section: String(sectionNumber)
                 )
             )
         }
-        return AssistSiteWorkResult(
-            succeeded: true,
-            message: AssistWording.deployed(course: course.code, section: String(sectionNumber))
+
+        return MultiDestinationDeployRunner.result(
+            course: course.code,
+            section: String(sectionNumber),
+            destinationCount: destinations.count,
+            outcome: deployRunner.outcome
         )
     }
 

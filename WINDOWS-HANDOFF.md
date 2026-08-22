@@ -4073,6 +4073,489 @@ run, not that everything THOSE scripts try to do is still permitted —
 `eval`/`new Function`/`setTimeout(string)` are a separate capability
 (`'unsafe-eval'`) that a hash-only policy blocks by default, and nothing
 about "I scanned every inline script" catches that on its own.
+## Redundant deploy targets — piece 1: schema and configuration (entry 304)
+
+Motivated directly by the Netlify ad-badge fix (its own entry 301, on the
+`issue/netlify-badge-suppression` branch): if a host has a bad day, real
+redundancy needs a second copy of the site ALREADY live, not a scramble to
+reconfigure a new destination after the fact. Russell pushed back on the
+first design sketched for this (a chevron on the Deploy button to pick a
+*different* single destination) — that is a faster manual redeploy, not
+redundancy, since nothing keeps a second destination current until someone
+notices a problem and switches. The corrected design: **a course can
+configure more than one deploy destination, and deploying publishes to
+every configured one.**
+
+This is piece 1 of 2, done: **the config schema and the wizard/settings UI
+to configure additional destinations.** The Deploy button itself is
+UNCHANGED — it still publishes to `deployTarget` (the primary) only. Piece
+2 (not started) teaches it to publish to every configured destination.
+
+### The schema
+
+```json
+{
+  "deploy_target": "netlify",
+  "additional_deploy_targets": [
+    { "type": "cloudflare_pages" },
+    { "type": "local_folder", "path": "/Users/teacher/Sites" }
+  ]
+}
+```
+
+`deploy_target` is unchanged — same key, same meaning, same default. The new
+`additional_deploy_targets` key is an array of `{type, path}` objects,
+`type` using the identical spellings as `deploy_target`; `path` is present
+only for a `local_folder` entry (Netlify's and Cloudflare's credentials
+live in per-teacher app settings already, not per-course, so neither needs
+one). **Omitted entirely — never written as `[]` — for every course that
+has not opted in**, which is the overwhelming majority: the file an
+untouched course writes is byte-identical to what it always wrote. This
+was the whole point of "the default remains pick one."
+
+**One of each of the three known types, maximum, never two of the same
+type.** A destination can never be listed as both primary AND additional at
+once. That invariant lives in exactly one place —
+`CourseConfiguration.pruningAdditionalTargets(_:ofType:)`, a plain static
+function, not a method on an instance — called from two call sites that
+need it for different reasons:
+
+- `CourseConfiguration.deployTarget`'s own setter, so Course Settings
+  (which binds its picker straight to the live model) can never reach the
+  inconsistent state.
+- `PublishingChoiceView`'s picker `onChange`, so the WIZARD's plain
+  `@State` — which has no `CourseConfiguration` to route through until the
+  course is actually created — gets the identical guarantee live on
+  screen. `NewCourseWizardView.buildConfigurationDictionary()` also prunes
+  once more, defensively, at the point it actually writes the file, so the
+  file on disk is correct even in a hypothetical future case where the
+  view's own `onChange` did not fire before Create was clicked.
+
+A plain function was chosen deliberately over an instance method so it is
+testable without standing up either a live model or a rendered view — see
+`AdditionalDeployTargetsTests.testPruningAdditionalTargetsDropsOnlyTheMatchingType`.
+The first version of that test tried to exercise this by mutating a plain
+property on the `HeldPublishingChoice` test harness and expecting the
+pruning to have happened — it silently could not, because
+`HeldPublishingChoice` is a plain class with no logic of its own, and
+`.onChange` only fires on an actually-rendered SwiftUI view. The test would
+have passed for the wrong reason if the assertion direction had been
+different; testing the plain function directly is the fix, not a
+workaround.
+
+### The UI
+
+`PublishingChoiceView` — already shared by the wizard and Course
+Settings — gained a new section below the existing primary picker: "Also
+publish to, for redundancy", with one `Toggle` per known type that is not
+the current primary. Each toggle, switched on, reveals the SAME detail
+fields (Cloudflare Account ID + help + 25 MB caption, or the folder field +
+Choose… button) that the primary picker's own conditional block shows for
+that type — factored out into two `private` subviews
+(`CloudflareDetailFields`, `LocalFolderDetailFields`) so the primary and
+additional cases read from one definition each and cannot drift apart.
+They are never on screen at the same time for the same type, by
+construction — `availableAdditionalDeployTargetTypes` already excludes
+whichever type is primary.
+
+**A toggle that is already on does not disappear from the list.** The
+first test written for "all three slots filled" assumed the additional
+list would show only types NOT yet added, and asserted it went empty once
+all three were configured — that is wrong for a toggle list: every other
+toggle in this app stays visible and shows its own state, and a
+redundancy toggle that vanished the moment you turned it on would be the
+one control that did not. Fixed the test, not the view.
+
+**Validation matches the primary's, for the same reason the primary's
+exists**: an additional Cloudflare target with no Account ID, or an
+additional local-folder target with no valid path, blocks Save/Create —
+exactly like the primary case already does — rather than failing silently
+the first time piece 2 actually tries to deploy to it. Both the wizard's
+`validate()` and Settings' `savingProblem` gate loop over
+`additionalDeployTargets` with the identical two checks the primary
+already ran.
+
+### What Windows needs from this
+
+`windows-app/Plantoir.Core/Models/CourseConfiguration.cs` needs the
+equivalent `AdditionalDeployTargets` property, with the identical
+omit-when-empty write rule (checked by
+`AdditionalDeployTargetsTests.testWritingAnEmptyAdditionalTargetsListOmitsTheKeyEntirely`
+on the mac side — port that assertion, it is the one easy to get wrong).
+`windows-app/Plantoir/Views/PublishingChoiceView.cs` needs the equivalent
+toggle section. **Piece 2 (below) has now shipped on the mac** — Deploy
+really does publish to every configured destination there now, so a
+`course_config.json` written by a Windows teacher with `additional_deploy_
+targets` set, opened on the mac, would now actually redundantly deploy —
+which makes this genuinely urgent rather than a someday item: a Windows
+teacher who cannot configure a second destination is simply missing the
+feature, and a Mac teacher's config edited on Windows (schema written, but
+never acted on there) is a real cross-platform inconsistency, not a
+hypothetical one.
+
+## Redundant deploy targets — piece 2: Deploy publishes to every
+configured destination (entry 305)
+
+Piece 1 (above) built the schema and the settings UI; this is where Deploy
+itself changed. A course with no additional destinations configured — the
+overwhelming majority — behaves **exactly** as it always has: same single
+console, same progress bar, same "Live URL" link, same wording, byte for
+byte. A course with 2–3 configured destinations now gets an actual
+redundant deploy: each destination gets its own `deploy.sh` run, in
+sequence, and one failing does not stop the others.
+
+### Why sequential, and why one `ScriptRunner` per destination
+
+Both were open questions when this was designed (see the earlier
+conversation in this repo's history) and both were decided explicitly,
+not defaulted into:
+
+- **Sequential, not parallel**, for this first version. Netlify already
+  rate-limits aggressively on CONCURRENT uploads within a single
+  destination's own file transfers (measured and documented in
+  `documentation/07-deployment.md`'s "Rate limiting" section) — running
+  two or three destinations' uploads at once, each already juggling its
+  own concurrency, was judged too much unknown interaction for a first
+  version. Nothing about the design prevents parallelizing later if it
+  proves worth the complexity.
+- **One `ScriptRunner` per destination, never one shared runner reused
+  across legs.** This was the single most important implementation
+  decision, because the wrong choice fails SILENTLY. `ScriptRunner`'s
+  `publishedSiteURL(in:)` / `publishedFolderURL(in:)` only ever scan
+  THAT runner's own transcript tail. Route two destinations through one
+  reused `ScriptRunner` (even with `keepingTranscript: true`, which is
+  what makes a build-then-deploy pair read as one console today) and the
+  SECOND destination's "Live URL:" or "PUBLISHED_FOLDER=" line silently
+  overwrites the first's — the teacher would see only the last
+  destination's link, with the first one's simply gone, no error anywhere.
+  `MultiDestinationDeployRunner.Leg` gives each destination its own
+  runner specifically to avoid this.
+
+### The build happens exactly once
+
+`BuildFreshness.needsRebuild` is checked ONCE, before the destination
+loop starts — never per destination. If the site is stale, the FIRST
+destination's own run gets the combined build-and-deploy milestone list
+(`TaskMilestones.buildAndDeploy` / `.buildAndDeployToCloudflare` /
+`.buildAndDeployToFolder`, exactly the lists that already existed for the
+single-destination case) via `keepingTranscript: true`, so the build and
+that leg's deploy still read as one console, exactly as today. Every
+SUBSEQUENT destination always uses the deploy-only milestone list — by
+the time leg 2 runs, the site is already current. A failed shared build
+stops the WHOLE run (`Leg.buildFailed`) rather than letting every
+remaining destination deploy the same stale content, which would not be
+redundancy, it would be the same mistake published twice.
+
+### One sequencer, four callers
+
+`MultiDestinationDeployRunner.run(...)` is called from all four places a
+deploy can start, so none of them can drift the way `DeployCommand.
+arguments` itself once warned against (built separately in two places, one
+silently sent a Cloudflare course to Netlify):
+
+1. `SectionDetailView.deployAndWait()` — the toolbar button, and the
+   assistant when a section window is open (same choke-point as before).
+2. `AssistToolchainWork.deploy()` — the assistant with no window on
+   screen (Claude Code over MCP, or a scheduled deploy invoking the app
+   headlessly).
+3. `ScheduledDeploy.oneShotCommand(...)` — NOT a Swift caller of the
+   sequencer at all, since this path runs unattended with the app closed.
+   Instead, `scheduleDeploy(...)` now builds one `deployArgumentsList`
+   entry per destination (`CourseConfiguration.allDeployDestinations`,
+   same order as the other three callers) and `oneShotCommand` bakes ONE
+   shell line per destination into the generated script, none chained
+   with `&&` — a destination failing must not stop the others' shell
+   lines from running, the shell-script equivalent of the Swift
+   sequencer's own "one leg failing doesn't stop the loop" rule. Only a
+   failed BUILD (`$READY`) still skips every deploy line, matching the
+   Swift side's `Leg.buildFailed` early-exit.
+4. `ScheduledDeploy.problem(...)` — the pre-flight refusal check, run
+   when the teacher SCHEDULES the deploy, not when it fires. Generalized
+   to check every configured destination, not only the primary — an
+   additional Cloudflare target with no Account ID, or an additional
+   folder with no valid path, now refuses scheduling up front, with new
+   wording ("also deploys to a folder…") kept deliberately separate from
+   the PRIMARY destination's existing, contract-referenced wording, which
+   is untouched, so no existing check against this function needed to
+   change.
+
+### Wording: unchanged for the overwhelming majority, three new sentences
+for the rest
+
+`MultiDestinationDeployRunner.result(...)` is the one place that decides
+which sentence a teacher (or the assistant, relaying it) hears.
+`destinationCount <= 1` — true for every course that has not opted into
+redundancy — ALWAYS uses the original `AssistWording.deployed` /
+`.deployDidNotFinish`, unchanged, word for word: a teacher who never
+touched this feature must never see a different sentence. For 2+
+destinations, three new `AssistWording` functions cover the three real
+outcomes: all succeeded (`deployedToMultipleDestinations`), some
+succeeded and some did not (`deployPartiallySucceeded`, naming which
+failed — the failed-destination list is joined into words by
+`MultiDestinationDeployRunner.joinedWithAnd`, OUTSIDE `AssistWording`,
+since that table holds only whole sentences and never list-joining logic
+— see its own doc comment), and none succeeded
+(`deployToMultipleDestinationsDidNotFinish`). A build failure is reported
+identically regardless of destination count — "could not be built", never
+"did not finish", which would wrongly suggest the upload failed rather
+than the build.
+
+### The checklist UI
+
+`DeployDestinationChecklist` — a small new view, one row per configured
+destination with a symbol (pending / spinning / done / failed) and its
+name — appears above the existing `TaskProgressView` ONLY when
+`deployRunner.legs.count > 1`. **Update (entry 306): the paragraph below
+originally claimed `TaskProgressView` was unmodified — it needed one
+addition, `hidesSiteLink`, once the finished-state gap this same section
+describes ("bound to `activeRunner`... the same as it always was") turned
+out to hide the FIRST destination's own live link, not just risk it.**
+`TaskProgressView` is shared with the course-creation wizard and the
+preview panel, so reshaping it broadly for multi-destination deploy would
+have affected both of those unrelated callers — the actual change is a
+single `Bool` flag, defaulting `false`, that only ever changes behaviour
+for the one deploy-panel call site that passes `true`. It is bound to
+`deployRunner.activeRunner` — whichever leg is current, or the first leg
+before anything starts — which for a single-destination course is
+indistinguishable from binding directly to a plain `ScriptRunner`, the
+same as it always was.
+
+## The finished multi-destination deploy panel only showed the LAST destination's link (entry 306)
+
+Row 305 (above) gave every destination its own `ScriptRunner` specifically
+so one leg's "Live URL:" line could never overwrite another's — but the
+DISPLAY never used that. `TaskProgressView` is bound to
+`deployRunner.activeRunner`, and after a run finishes that is whichever leg
+ran LAST; its own "Your website is live." section only ever names and
+links that one leg. Reported directly, after a real deploy to both Netlify
+and Cloudflare: "only Cloudflare, the second deploy target, is visible" —
+the checklist above it correctly showed both destinations checked off, but
+the body below told a story where only the second one had happened.
+
+**The fix has two parts, matching the two places the same "last leg only"
+assumption was baked in:**
+
+1. **The link itself.** A new view, `DeployDestinationLinks`, lists every
+   SUCCEEDED leg's own site link (or, for a `local_folder` destination, its
+   own "Show in Finder" button) — shown only once
+   `deployRunner.legs.count > 1 && !deployRunner.isRunning`, right below the
+   existing `TaskProgressView`. To avoid showing the LAST destination's
+   link twice (once from `TaskProgressView`'s own section, once from the
+   new list), `TaskProgressView` gained `hidesSiteLink: Bool = false` — set
+   `true` only from the multi-destination deploy call site, so every other
+   caller (the wizard's preview, a single-destination deploy) is
+   byte-identical to before.
+2. **The title.** `deployProgressTitle` had the identical bug one layer
+   up: it kept appending "— Cloudflare Pages" even once the WHOLE run had
+   finished, which reads as though only that one destination had
+   published. Refactored into a testable static function
+   (`SectionDetailView.deployProgressTitle(sectionName:isRunning:legCount:
+   currentDestinationDescription:)`, matching the existing
+   `previewTaskTitle`/`showsDeployProgress` pattern) so naming the CURRENT
+   destination only happens `if isRunning` — once the run is done, the
+   title reverts to the plain single-destination form, and the checklist
+   plus the new links list carry the per-destination detail instead.
+
+Both gaps were found the same way row 305 found its own defect worth
+guarding against: not by reading the code, but by actually deploying to
+two destinations and looking at what a teacher would see. The unit suite
+(`MultiDestinationDeployRunnerTests`, `ConsoleFocusTests`) stayed green
+through both the broken and the fixed version, because nothing in it
+renders the finished-state SwiftUI view — the same shape as row 300's
+folder-adoption bug and row 297's screenshot fallback, and the reason rule
+9 keeps insisting on driving the real app before calling a change done.
+
+**What Windows needs from this**: check whether its own multi-destination
+deploy panel (once row 305's behavioural piece is implemented there) is
+similarly bound to whichever runner ran last. The fix is the same SHAPE —
+list every succeeded destination's own link once the whole run is done,
+and stop a title from naming one destination after the fact — not this
+Swift.
+
+## Custom domain: per-destination, not per-section, or one host's domain leaks onto another's (entry 307)
+
+Row 306 (above) fixed the multi-destination deploy PANEL showing only the
+last destination's live link. "Advanced → Custom domain" in Course
+Settings had the identical bug one layer up, and worse: it was applied
+SILENTLY at deploy time rather than merely misdisplayed. One section-wide
+domain (`custom_domains.sections.sectionN`, a bare string) was substituted
+onto EVERY destination's link — a domain meant only for Netlify was also
+swapped onto the Cloudflare Pages leg's own address, a Cloudflare project
+that in the overwhelming majority of real cases does not answer to that
+DNS record at all.
+
+Reported directly, asking for exactly the shape row 306 already
+established for the same underlying problem: "ask the user which deploy
+target this applies to. Whatever target exists that is not using a custom
+domain should still show the default assigned to that service."
+
+### The new shape
+
+`custom_domains.sections.sectionN` is now a map keyed by destination TYPE:
+
+```json
+{
+  "custom_domains": {
+    "sections": {
+      "section1": {
+        "netlify": "ics3u.school.ca",
+        "cloudflare_pages": "ics3u-mirror.school.ca"
+      }
+    }
+  }
+}
+```
+
+Never a `local_folder` key — a domain is something a browser visits, and a
+folder is not, so `CourseConfiguration.customDomain(forSection:
+destinationType:)` is simply never called with that type from the UI (the
+settings view filters `allDeployDestinations` to exclude it before
+building any field at all).
+
+**An OLDER shape is still read**: `custom_domains.sections.sectionN` used
+to be a bare string, written before a course could have more than one
+destination. That value is treated as belonging to the section's PRIMARY
+destination (`deployTarget`) — the only destination that existed when it
+could have been set — and is invisible to every other type. Setting a
+SECOND destination's domain migrates a bare string it finds into the new
+per-type shape rather than silently discarding it (`CourseConfiguration.
+setCustomDomain`, `mac-app/QuartzTeachers/Models/CourseConfiguration.swift`).
+
+### The settings UI
+
+`SectionSettingsView`'s "Advanced" disclosure now shows one field per
+destination that can have a domain (never `local_folder`), via
+`ForEach(customDomainDestinations, id: \.type)`. The LABEL stays plain
+"Custom domain" — byte-identical to what a course has always shown — for
+the overwhelming majority (exactly one destination); only once there is
+more than one does it become "`<Service>` custom domain"
+(`SectionSettingsView.customDomainFieldLabel(destination:destinationCount:)`).
+The CAPTION is a smaller, separate fix that applies even in the
+single-destination case: it used to hardcode "the Netlify address"
+unconditionally, so a course whose one destination was Cloudflare Pages
+was told to "leave empty to use the Netlify address" — simply wrong.
+`customDomainCaption(forDestinationType:)` always names the real service.
+
+### The deploy-time fix — resolved per LEG, not passed in once
+
+`MultiDestinationDeployRunner.run()` no longer takes a
+`customDomainForLinks: String?` parameter at all. It used to be resolved
+ONCE by the caller and applied to every leg's `ScriptRunner` identically —
+which is the actual mechanism of the bug. Now `run()` resolves the domain
+itself, per leg, inside its own loop:
+
+```swift
+let domainForThisDestination: String = CourseConfiguration.normalizedCustomDomain(
+    course.configuration.customDomain(forSection: sectionNumber, destinationType: destination.type)
+)
+runner.customDomainForLinks = domainForThisDestination.isEmpty ? nil : domainForThisDestination
+```
+
+A genuine, incidental bonus this produced: `AssistSiteWork.swift` (the
+assistant's headless deploy path, no section window on screen) was passing
+`customDomainForLinks: nil` UNCONDITIONALLY — the assistant never wore a
+teacher's custom domain, even for an ordinary single-destination course.
+Removing the parameter meant every caller now resolves it the same way,
+fixing that silently for free.
+
+### The Python side — one baseUrl per build, so it follows the PRIMARY only
+
+`build_site.py`'s `resolve_section_domain()` decides the baseUrl baked
+into a build's sitemap, RSS feed, and social-card absolute URLs. A single
+build's `public/` folder is uploaded to EVERY configured destination (see
+row 305's "a build runs exactly once, fused into the first destination's
+own progress") — so unlike the Swift GUI's per-destination LINK DISPLAY,
+there is no way for the baseUrl itself to be different per destination; it
+is one value baked into the actual files. The fix there reads the new
+dict shape through the PRIMARY destination's own entry (`config.get
+("deploy_target")`), matching what the "Live URL" link on a finished
+deploy has always pointed at — an old bare string is read as-is,
+unchanged. This needed its own test file
+(`scripts/test_build_site_domain_resolution.py`) run against the real
+built image rather than the host-side fast pre-checks the other Python
+tests here use, because `build_site.py` imports `frontmatter`, which lives
+only inside the container.
+
+### What Windows needs from this — a real cross-platform risk, not just a schema gap
+
+This is NOT merely "Windows hasn't caught up to a new key yet." Windows's
+`CourseConfiguration.CustomDomain`/`SetCustomDomain`
+(`windows-app/Plantoir.Core/Models/CourseConfiguration.cs:279-283`) still
+read and write the bare-string shape unconditionally, via `NestedString`/
+`SetNestedValue`. Two distinct failure modes follow from the SAME course
+file being opened on both platforms:
+
+- **Read side (degrades, does not crash)**: `NestedString` type-checks for
+  a `JValue` of `JTokenType.String` and returns `""` for anything else,
+  including the new shape's `JObject` — so a Windows teacher opening a
+  course a mac teacher has multi-destination-enabled sees their custom
+  domain silently VANISH (read as never set), not an error.
+- **Write side (genuine data loss)**: `SetNestedValue` always writes a
+  plain string. A Windows teacher who edits and saves ANY custom-domain
+  field on such a course — even just retyping the same value — CLOBBERS
+  the whole per-destination map back down to one bare string, discarding
+  every other destination's domain the mac side had configured. This is
+  not a display glitch; it is data a Windows session would actually
+  destroy on write.
+
+Windows needs the equivalent per-destination-type shape — reading the new
+dict form (falling back to the primary destination's own key, mirroring
+`build_site.py`'s own migration logic) and writing per-destination-type
+rather than one flat string — before it is safe for a course to move
+between the two apps once BOTH multi-destination deploy and more than one
+custom domain are in play. There is no urgency purely from "Windows has no
+`MultiDestinationDeployRunner` yet" (true, and fine on its own), but the
+read/write asymmetry above is a real risk today, for any course a teacher
+happens to open on both platforms.
+
+## The multi-destination console dropped the first destination's output (entry 308)
+
+Reported directly, right alongside row 307: "output to the faux terminal
+should show details from both deploys, not replace the deploy details
+from the first deploy with the second." `TaskConsoleView` — the "Show
+details" panel beneath the progress header — is bound to one
+`ScriptRunner`, and the caller was always `deployRunner.activeRunner`:
+whichever leg is CURRENT. The moment a second destination started, the
+first destination's own console output was simply gone — not scrolled
+past, gone — replaced by the second leg's own, mostly-empty transcript.
+
+The fix threads an optional `allLegs: [MultiDestinationDeployRunner.Leg]?`
+through `TaskProgressView` into `TaskConsoleView`. When set (and there is
+more than one leg), the console shows every leg that has produced ANY
+output so far, each under a `"── <Service> ──"` heading, joined in deploy
+order:
+
+```swift
+static func combinedTranscriptText(runner: ScriptRunner, allLegs: [MultiDestinationDeployRunner.Leg]?) -> String {
+    guard let allLegs, allLegs.count > 1 else {
+        let text = runner.transcript.displayText
+        return text.isEmpty ? "Starting…" : text
+    }
+    var sections: [String] = []
+    for leg in allLegs where !leg.runner.transcript.lines.isEmpty {
+        sections.append("── \(DeployCommand.destinationDescription(for: leg.destination)) ──\n" + leg.runner.transcript.displayText)
+    }
+    return sections.isEmpty ? "Starting…" : sections.joined(separator: "\n\n")
+}
+```
+
+`runner` itself is untouched and still drives the status header (Finished
+/ Failed / spinner), the input field, and the auto-scroll trigger —
+exactly one leg is ever actually RUNNING at a time, so there is only ever
+one place a teacher's answer to a prompt needs to go. A leg the run never
+reached (stopped by a cancel, or an earlier failed shared build) is
+filtered out by the "has produced any output" check rather than shown as
+an empty, confusing section. `allLegs` defaults to `nil` everywhere else
+— a single-destination deploy, and the wizard's own preview — so those
+callers are byte-for-byte unchanged.
+
+**What Windows needs from this**: the same shape, once row 306's
+behavioural piece exists there — concatenate every destination's own
+output that exists so far, under its own heading, rather than showing only
+whichever one is current. Not this Swift; the decision that travels is
+"a multi-destination console must never let an earlier destination's
+output simply disappear."
+
 
 ## Testing
 

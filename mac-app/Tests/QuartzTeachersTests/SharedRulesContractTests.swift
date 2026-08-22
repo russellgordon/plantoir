@@ -35,7 +35,12 @@ final class SharedRulesContractTests: XCTestCase {
                 folderPath: (given["folderProblem"] as? Bool == true)
                     ? root.appendingPathComponent("no-such-folder").path
                     : root.path,
-                hasDeployedBefore: given["hasDeployedBefore"] as? Bool ?? true
+                hasDeployedBefore: given["hasDeployedBefore"] as? Bool ?? true,
+                additionalTarget: given["additionalTarget"] as? String,
+                additionalFolderPath: (given["additionalFolderProblem"] as? Bool == true)
+                    ? root.appendingPathComponent("no-such-additional-folder").path
+                    : root.path,
+                additionalTargetHasDeployedBefore: given["additionalTargetHasDeployedBefore"] as? Bool ?? true
             )
 
             let when: Date = (given["whenIsInThePast"] as? Bool == true)
@@ -665,11 +670,24 @@ final class SharedRulesContractTests: XCTestCase {
         if said.contains("has already passed") {
             return "hasAlreadyPassed"
         }
+        // The ADDITIONAL-destination phrasings are checked first in each
+        // pair — "also deploys to a folder" contains "deploys to a
+        // folder", so checking the general one first would misclassify
+        // every additional-destination refusal as the primary's.
+        if said.contains("also deploys to a folder") {
+            return "additionalDeployFolderNeedsAttention"
+        }
         if said.contains("deploys to a folder") {
             return "deployFolderNeedsAttention"
         }
+        if said.contains("also deploys to Cloudflare Pages") {
+            return "additionalCloudflareAccountMissing"
+        }
         if said.contains("Account ID") {
             return "cloudflareAccountMissing"
+        }
+        if said.contains("never been deployed to") {
+            return "additionalDestinationNeverDeployed"
         }
         if said.contains("never been deployed") {
             return "neverDeployed"
@@ -677,8 +695,13 @@ final class SharedRulesContractTests: XCTestCase {
         return "other"
     }
 
-    private func makeCourse(in root: URL, target: String?, folderPath: String,
-                            hasDeployedBefore: Bool) throws -> Course {
+    private func makeCourse(
+        in root: URL, target: String?, folderPath: String,
+        hasDeployedBefore: Bool,
+        additionalTarget: String? = nil,
+        additionalFolderPath: String = "",
+        additionalTargetHasDeployedBefore: Bool = true
+    ) throws -> Course {
         let courseURL: URL = root.appendingPathComponent("courses").appendingPathComponent("ICS3U")
         try FileManager.default.createDirectory(
             at: courseURL.appendingPathComponent("section1/All Classes"), withIntermediateDirectories: true
@@ -693,13 +716,33 @@ final class SharedRulesContractTests: XCTestCase {
             configuration["deploy_target"] = target
             configuration["deploy_folder_path"] = folderPath
         }
+        if let additionalTarget {
+            var entry: [String: Any] = ["type": additionalTarget]
+            if additionalTarget == "local_folder" {
+                entry["path"] = additionalFolderPath
+            }
+            configuration["additional_deploy_targets"] = [entry]
+        }
         try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
             .write(to: courseURL.appendingPathComponent("course_config.json"))
         let loaded: CourseConfiguration = try CourseConfiguration(
             contentsOf: courseURL.appendingPathComponent("course_config.json")
         )
+        // Markers are keyed purely by destination TYPE, never by whether
+        // that type is this course's primary or an additional one — see
+        // DeployCommand.firstDeployMarkerURL. The primary's own marker
+        // has always assumed netlify here, which happens to be correct
+        // for every existing case (none combines hasDeployedBefore with a
+        // non-netlify primary target).
         if hasDeployedBefore {
             let marker: URL = courseURL.appendingPathComponent(".netlify_sites")
+            try FileManager.default.createDirectory(at: marker, withIntermediateDirectories: true)
+            try "{}".write(to: marker.appendingPathComponent("section1.json"),
+                           atomically: true, encoding: .utf8)
+        }
+        if let additionalTarget, additionalTarget != "local_folder", additionalTargetHasDeployedBefore {
+            let folderName: String = additionalTarget == "cloudflare_pages" ? ".cloudflare_sites" : ".netlify_sites"
+            let marker: URL = courseURL.appendingPathComponent(folderName)
             try FileManager.default.createDirectory(at: marker, withIntermediateDirectories: true)
             try "{}".write(to: marker.appendingPathComponent("section1.json"),
                            atomically: true, encoding: .utf8)

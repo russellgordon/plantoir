@@ -554,12 +554,43 @@
         "why": "A deliberate divergence, and the reason is worth keeping. The mac's plist carries --account, so the question is asked here and answered once. On Windows the scheduled task could not be handed one, which would make Cloudflare unschedulable - if that is still true, refuse it with a sentence that says so rather than scheduling something that will fail at 06:30."
       },
       {
+        "expectRefusal": "additionalDeployFolderNeedsAttention",
+        "given": {
+          "additionalFolderProblem": true,
+          "additionalTarget": "local_folder",
+          "hasDeployedBefore": true
+        },
+        "name": "an ADDITIONAL folder destination whose folder is not usable",
+        "why": "Checked after the primary's own two checks, in the same order additional destinations are deployed to (primary first, then each additional one) - a redundancy target with no valid folder would otherwise sit silently broken until the scheduled moment, exactly what asking everything up front exists to prevent. hasDeployedBefore is true here so the PRIMARY's own checks pass first and this is genuinely the additional check firing."
+      },
+      {
+        "expectRefusal": "additionalCloudflareAccountMissing",
+        "given": {
+          "additionalTarget": "cloudflare_pages",
+          "cloudflareAccountID": "",
+          "hasDeployedBefore": true
+        },
+        "name": "an ADDITIONAL Cloudflare destination with no Account ID",
+        "why": "cloudflareAccountID is the SAME key the primary's own Cloudflare check uses - it is one credential per teacher, not one per destination, so a missing Account ID refuses whichever destination (primary or additional) actually needs it."
+      },
+      {
         "expectRefusal": "neverDeployed",
         "given": {
           "hasDeployedBefore": false
         },
         "name": "a section that has never been deployed",
         "why": "The FIRST deploy of a section asks what to call the website. Nobody is there to answer at the scheduled time and it would simply wait. Deploy once by hand, then it can be scheduled - which is what the refusal says."
+      },
+      {
+        "expectRefusal": "additionalDestinationNeverDeployed",
+        "given": {
+          "additionalTarget": "cloudflare_pages",
+          "additionalTargetHasDeployedBefore": false,
+          "cloudflareAccountID": "0123456789abcdef0123456789abcdef",
+          "hasDeployedBefore": true
+        },
+        "name": "the PRIMARY has deployed before, but an additional destination has not",
+        "why": "The same reasoning as the primary's own check, for whichever additional destination is new - a brand-new Netlify or Cloudflare destination also asks what to call the site; local_folder never does, so it can never trigger this one. A valid cloudflareAccountID is given so THAT check passes first and this is genuinely the never-deployed check firing."
       },
       {
         "expectRefusal": null,

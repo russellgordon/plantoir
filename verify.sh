@@ -153,6 +153,22 @@ else
   fi
 fi
 
+# ---- build_site.py: custom-domain resolution follows the primary destination ----
+# Needs the real image, not a host run — build_site.py imports `frontmatter`,
+# which lives only inside the container (see Dockerfile's `pip install`), so
+# this cannot join the fast host-side pre-checks above. The test file itself
+# is mounted in rather than baked into the image — it is dev-only, and the
+# image should not carry test fixtures a teacher's build never needs.
+echo ""
+echo "🔎 Checking build_site.py's custom-domain resolution against the real image…"
+if docker run --rm \
+  -v "$(pwd)/scripts/test_build_site_domain_resolution.py:/opt/scripts/test_build_site_domain_resolution.py:ro" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_build_site_domain_resolution.py >/dev/null 2>&1; then
+  pass "build_site.py: custom-domain resolution follows the primary destination (scripts/test_build_site_domain_resolution.py)"
+else
+  fail "build_site.py: custom-domain resolution follows the primary destination (scripts/test_build_site_domain_resolution.py)"
+fi
+
 # -------------------- 3. export-scripts fidelity --------------------
 # NOTE: must live under $HOME — Colima's VM only shares the home directory,
 # so a /var/folders/... temp dir would silently arrive empty in the container.
