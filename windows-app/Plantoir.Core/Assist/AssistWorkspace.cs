@@ -37,6 +37,18 @@ public sealed class AssistWorkspace
     private readonly string? _lockedCourse;
     private readonly UndoHistory? _undo;
 
+    /// <summary>
+    /// Set only by tests. A test that read the real, machine-global
+    /// %LOCALAPPDATA%\Plantoir\settings.json would behave differently
+    /// depending on whatever Cloudflare Account ID happens to be configured
+    /// on the machine running the suite — exactly the kind of surprise this
+    /// override exists to make deterministic instead.
+    /// </summary>
+    internal static Func<string>? CloudflareAccountIdOverrideForTests;
+
+    private static string CurrentCloudflareAccountId() =>
+        CloudflareAccountIdOverrideForTests?.Invoke() ?? AppSettings.Load().CloudflareAccountId;
+
     /// <param name="lockedCourse">
     /// When given, the session can see and touch this course and nothing else.
     /// Plantoir uses it when a teacher starts an assistant from a particular
@@ -1103,6 +1115,24 @@ public sealed class AssistWorkspace
 
         // Every destination's own deploy — one FAILING does not stop the
         // others, the whole point of a course having more than one.
+        //
+        // This is a SEPARATE loop from MultiDestinationDeployRunner.RunAsync,
+        // not a reuse of it, and that is a deliberate, not accidental,
+        // divergence from the mac's own AssistSiteWork.deploy(), which calls
+        // "the same sequencer the Deploy button uses." RunAsync is built on
+        // ScriptRunner — ConPTY, live progress notifications, a WinUI
+        // SynchronizationContext — which is GUI-only infrastructure this
+        // process (plantoir-mcp.exe, a separate headless process with no
+        // window) cannot use. ILauncherRunner is the existing, narrower
+        // abstraction this whole class already runs every operation through
+        // for exactly that reason. The one-build-then-N-deploys shape and the
+        // "a failure never stops the others" rule ARE kept in step by hand
+        // here — found and reasoned through in a parity audit, not missed —
+        // rather than by sharing code, because forcing the two abstractions
+        // together would be a larger, riskier change than this feature
+        // warranted, with no way to verify it against the real MCP process
+        // in this environment. If this drifts from RunAsync's own rules
+        // again, that is the trade being made.
         var outcomeLegs = new List<(Models.CourseConfiguration.DeployDestination Destination, bool Succeeded)>();
         foreach (var destination in destinations)
         {
@@ -2064,8 +2094,17 @@ public sealed class AssistWorkspace
         int section = Section(course, sectionNumber);
 
         // Shared with the sidebar's own "Schedule Deploy…", so a refusal
-        // cannot be walked around by using the other door.
-        if (ScheduledDeploy.Problem(course, section, when, DateTime.Now) is { } problem)
+        // cannot be walked around by using the other door. The Cloudflare
+        // Account ID is a per-teacher, machine-global setting — not tied to
+        // this workspace — so it's read the same way the GUI's
+        // SidebarPane does, via AppSettings.Load(), rather than assumed
+        // unreachable from a headless process. Found missing here entirely
+        // (defaulted to "") while auditing this feature for mac parity:
+        // scheduling a Cloudflare-destination deploy through the assistant
+        // always refused with "Paste your Cloudflare Account ID" even when
+        // one was correctly configured, because this check never saw it.
+        string cloudflareAccountId = CurrentCloudflareAccountId();
+        if (ScheduledDeploy.Problem(course, section, when, DateTime.Now, cloudflareAccountId) is { } problem)
             throw new AssistRefusal(problem);
 
         var unpublished = new List<string>();

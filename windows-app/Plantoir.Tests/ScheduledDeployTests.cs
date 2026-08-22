@@ -102,6 +102,73 @@ public sealed class ScheduledDeployTests : IDisposable
     }
 
     [Fact]
+    public void PlanScheduledDeployReadsTheRealCloudflareAccountIdRatherThanAlwaysRefusing()
+    {
+        // Found while auditing this feature for mac parity: PlanScheduledDeploy
+        // called ScheduledDeploy.Problem with no cloudflareAccountID argument
+        // at all, so it defaulted to "" — a Cloudflare-destination course
+        // scheduled through the assistant always refused with "Paste your
+        // Cloudflare Account ID," even when one was correctly configured in
+        // Plantoir's own settings. CloudflareAccountIdOverrideForTests stands
+        // in for AppSettings.Load() here so the assertion does not depend on
+        // whatever is (or isn't) in the real machine's settings.json.
+        File.WriteAllText(Path.Combine(_folder, "courses", "ICS3U", "course_config.json"),
+            """
+            {
+              "course_code": "ICS3U",
+              "course_name": "Computer Science",
+              "deploy_target": "cloudflare_pages",
+              "num_sections": 1,
+              "per_section_folders": ["All Classes"],
+              "per_section_files": [],
+              "section_numbers": [1]
+            }
+            """);
+        Directory.CreateDirectory(Path.Combine(_folder, "courses", "ICS3U", ".cloudflare_sites"));
+        File.WriteAllText(Path.Combine(_folder, "courses", "ICS3U", ".cloudflare_sites", "section1.json"), "{}");
+
+        AssistWorkspace.CloudflareAccountIdOverrideForTests = () => "0123456789abcdef0123456789abcdef";
+        try
+        {
+            var plan = Open().PlanScheduledDeploy("ICS3U", 1, Tomorrow);
+            Assert.True(plan.Describe().Length > 0);   // did not throw AssistRefusal
+        }
+        finally
+        {
+            AssistWorkspace.CloudflareAccountIdOverrideForTests = null;
+        }
+    }
+
+    [Fact]
+    public void PlanScheduledDeployStillRefusesWithNoCloudflareAccountIdConfigured()
+    {
+        File.WriteAllText(Path.Combine(_folder, "courses", "ICS3U", "course_config.json"),
+            """
+            {
+              "course_code": "ICS3U",
+              "course_name": "Computer Science",
+              "deploy_target": "cloudflare_pages",
+              "num_sections": 1,
+              "per_section_folders": ["All Classes"],
+              "per_section_files": [],
+              "section_numbers": [1]
+            }
+            """);
+
+        AssistWorkspace.CloudflareAccountIdOverrideForTests = () => "";
+        try
+        {
+            var refusal = Assert.Throws<AssistRefusal>(
+                () => Open().PlanScheduledDeploy("ICS3U", 1, Tomorrow));
+            Assert.Contains("needs your Account ID", refusal.Message);
+        }
+        finally
+        {
+            AssistWorkspace.CloudflareAccountIdOverrideForTests = null;
+        }
+    }
+
+    [Fact]
     public void ATimeThatHasPassedIsRefused()
     {
         var refusal = Assert.Throws<AssistRefusal>(
