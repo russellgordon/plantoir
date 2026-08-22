@@ -10,16 +10,17 @@ tags:
 ---
 ## Agenda
 
-1. [[The Math Symposium]] — present [[Inaccessible Heights]] to our
-   invited guests
-2. Guests circulate; every team answers the same question: how confident
-   are you in your number, and why?
-3. Read: [[Showing Growth]] — start flagging the journal entries that
-   show how far you have come
-4. Circle up: one thing this course changed about how you think
+1. [[The Math Symposium]] — half the room exhibits while half visits,
+   then we swap. Your exhibit, your growth statement, and a conversation
+   you defend from understanding rather than from a script
+2. Visitors and invited guests ask real questions at every table.
+   Visiting well is part of the task, so arrive with questions of your
+   own and leave one at somebody else's table
+3. Circle up: one thing this course changed about how you think
 
 ## Things to do before our next class
 
-- [ ] Flag your growth entries using [[Showing Growth]] — collection is
-      next class.
-- [ ] Journal: the question a guest asked that you want another run at.
+- [ ] Your [[Math Journal]] comes in next class — run
+      [[Journal Checklist]] before then.
+- [ ] Journal: the question a visitor asked that you want another run
+      at.

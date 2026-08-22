@@ -276,3 +276,17 @@ and that difference is usually a promise to a person.
 > readability and buys nothing, which is the argument in
 > [[Efficiency and Big-O]].
 
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.5]]
+
+![[A3.3]]
+
+![[C1.1]]
+
+![[C1.2]]
+
+![[C2.1]]
+%%curriculum-end%%
+

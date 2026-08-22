@@ -11,9 +11,11 @@ tags:
 ## Agenda
 
 1. Number talk: [[Dot Talks]]
-2. [[A Data Story]], day 10 — working period: rehearsal in threes, with the
-   listeners writing down the claim they heard
-3. Fix whatever they heard that you did not say
+2. First twenty minutes: fix the row you named last class — this period
+   is where that lands
+3. [[A Data Story]], day 8 of 9 — working period: rehearsal in threes,
+   with the listeners writing down the claim they heard; then fix
+   whatever they heard that you did not say
 
 ## Things to do before our next class
 

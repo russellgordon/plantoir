@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Black communities in Canada since 1982
-2. Systemic issues, organising, and public response
+1. Black communities in Canada since 1982: [[Rights, Movements, and Resistance]]
+2. Systemic issues, organising, and public response: [[Who Counted as Canadian]]
 3. Sources, and whose reporting
 
 ## Things to do before our next class

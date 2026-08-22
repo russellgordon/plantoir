@@ -63,3 +63,11 @@ entry.
 > result. That loop is exactly what [[Showing Growth]] will ask you
 > to point at, so spend the semester leaving yourself things to point
 > at.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D3.4]]
+
+![[D3.6]]
+%%curriculum-end%%

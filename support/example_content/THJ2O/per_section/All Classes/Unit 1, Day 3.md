@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. What makes a plant a plant: [[What Makes a Plant a Plant]]
-2. Sorting real material into groups on the bench
-3. Starting the file: [[The Plant Identification File]]
+1. Sorting real material into groups on the bench — no marks; it shows
+   me what this class already notices
+2. What makes a plant a plant: [[What Makes a Plant a Plant]]
+3. Starting the file, criteria read together:
+   [[The Plant Identification File]]
 
 ## Things to do before our next class
 

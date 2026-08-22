@@ -67,4 +67,6 @@ answer the real question: *may we publish this*, and why or why not?
 ![[C2.4]]
 
 ![[C2.5]]
+
+![[C2.3]]
 %%curriculum-end%%

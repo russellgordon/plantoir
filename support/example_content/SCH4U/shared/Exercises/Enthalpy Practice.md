@@ -320,4 +320,6 @@ rather than measuring them: [[Hess's Law]] and
 ![[D2.2]]
 
 ![[D2.3]]
+
+![[D2.4]]
 %%curriculum-end%%

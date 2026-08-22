@@ -11,6 +11,9 @@ actually get tested.
 
 ## Before
 
+- **Set a listening purpose**: Decide what you are listening for — tracking
+  the relationship between claim and evidence, identifying unstated
+  assumptions, or preparing counterarguments.
 - **Read with marks**, per [[Close Reading]].
 - **Write two questions that cannot be answered yes or no.** The best
   seminar questions begin "Why does…", "What is the effect of…", or
@@ -18,7 +21,7 @@ actually get tested.
 - **Choose two passages** you will bring, with page numbers. Nobody
   waits while you find it.
 
-## During
+## During: active listening and speaking
 
 | Move | Sounds like |
 | --- | --- |
@@ -31,6 +34,17 @@ actually get tested.
 
 The last one is worth more than any of the others. A seminar where nobody
 concedes anything is four people practising a speech.
+
+## Presentation strategies
+
+When presenting your passage or leading a discussion segment:
+
+- **Pacing and tone**: Do not rush. Slow down deliberately on key phrases,
+  and let silence work after a probing question.
+- **Fluent reading**: Rehearse your key passage so that your reading itself
+  communicates an interpretation rather than just decoding text.
+- **Non-verbal cues**: Look at participants across the room, not only at
+  the teacher or your notes.
 
 ## What lowers the quality of a seminar
 
@@ -51,17 +65,23 @@ uses.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[A1.5]]
+![[A1.1]]
 
-![[A2.2]]
-
-![[A3.1]]
+![[A1.2]]
 
 ![[A1.3]]
 
+![[A1.5]]
+
 ![[A1.6]]
 
+![[A1.7]]
+
 ![[A1.8]]
+
+![[A1.9]]
+
+![[A2.2]]
 
 ![[A2.3]]
 
@@ -71,5 +91,5 @@ uses.
 
 ![[A2.7]]
 
-![[A1.7]]
+![[A3.1]]
 %%curriculum-end%%

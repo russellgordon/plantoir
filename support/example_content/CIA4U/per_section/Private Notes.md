@@ -10,7 +10,7 @@ students. %%
 
 ## Section __SECTION_NUMBER__ — notes to myself
 
-- Book the culminating audiences in September. Eight consecutive periods
+- Book the culminating audiences at the start of the course. Eight consecutive periods
   in Unit 4 are already reserved for the report; the audience is the
   part that is hard to arrange late.
 - Confirm the federal budget's release date before planning Unit 3. The
@@ -47,8 +47,7 @@ exactly the habit this course is trying to break.
 
 Built from *The Ontario Curriculum, Grades 11 and 12: Canadian and World
 Studies, 2015*, unrevised. Five strands, fifteen overall and sixty-four
-specific expectations — the largest expectation count of any course in
-this collection.
+specific expectations.
 
 Note for the citation-minded: **"110 hours" is not printed in the
 curriculum document.** What is printed is that each course has a credit
@@ -61,13 +60,13 @@ Twenty-two periods each for Units 1 to 3, twenty for Unit 4. Inside Unit
 4: eight content periods, then the eight named culminating periods, one
 reflection period, and three review periods before the examination.
 
-Strand A is not a unit. Its stem is *throughout this course*, so the
-inquiry process, the data-handling pages, and the concepts of economic
-thinking recur in every unit rather than sitting in a block in September.
-The models work the same way: supply and demand is built in Unit 1, comes
-back as a labour market and a housing market in Unit 2, and is set
-against aggregate supply and demand in Unit 3. If you reorder anything,
-keep those returns.
+Strand A is not a unit. Its stem is *throughout this course*, so the inquiry
+process, the data-handling pages, and the concepts of economic thinking
+recur in every unit rather than sitting in a block at the start of the
+course. The models work the same way: supply and demand is built in Unit 1,
+comes back as a labour market and a housing market in Unit 2, and is set
+against aggregate supply and demand in Unit 3. If you reorder anything, keep
+those returns.
 
 ## Why The Trade Question lands where it does
 

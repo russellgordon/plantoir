@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Launch: [[The Energy Report]] — one technology, followed all the way
-   through
+   through, and the four rows it is marked against read before you choose
 2. Reference: [[Asking and Researching Well]] — the question, the sources,
    and how to judge them
 3. Choose your technology and find two sources before you leave

@@ -18,7 +18,7 @@ tags:
    limits, and the name of who to ask next
 4. Structured team review: what the plan said, what actually happened,
    and one recommendation for whoever inherits this
-5. Hand in [[Final Reflection]] and your [[Code Journal]]
+5. Hand in the written team review, one document per team
 
 ## Things to do before our next class
 

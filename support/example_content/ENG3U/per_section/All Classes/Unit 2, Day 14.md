@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Seminars: groups three and four
+1. [[The Macbeth Seminar]], day 5 of 6 — seminars: groups three and
+   four
+2. Leaders' write-ups in the last part of the period, in before you go
 
 ## Things to do before our next class
 

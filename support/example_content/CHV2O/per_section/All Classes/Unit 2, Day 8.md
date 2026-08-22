@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Responsibilities]] — the half of citizenship nobody campaigns on
-2. Legal duties, and the ones that are only expected
-3. Where a responsibility turns out to be somebody else's right
+1. Oral answers taken, one hostile question each for [[The Rights Case]] — two minutes a student, and the class hears every one
+2. What held up under the question, and what did not
+3. The other half of citizenship, opened: what do you owe, and to whom? [[Responsibilities]]
 
 ## Things to do before our next class
 
-- [ ] Read [[Responsibilities]].
+- [ ] Read [[Responsibilities]] and [[Service and Contribution]].

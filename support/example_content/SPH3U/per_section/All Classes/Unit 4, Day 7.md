@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: predict the next three resonant lengths
-2. In groups: closed and open pipes, and the pattern that explains both
-3. Consolidate: [[Resonance and Standing Waves]] — one diagram, all cases
+1. Hand in the [[Measuring the Speed of Sound]] analysis
+2. Warm-up: predict the next three resonant lengths
+3. In groups: closed and open pipes, and the pattern that explains both
+4. Consolidate: [[Resonance and Standing Waves]] — one diagram, all cases
 
 ## Things to do before our next class
 

@@ -258,3 +258,17 @@ class is responsible for which fact.
 > emergency contact appears on exactly one card, which is where the
 > conversation about what you actually need to store belongs.
 
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.5]]
+
+![[A2.2]]
+
+![[A4.3]]
+
+![[C1.1]]
+
+![[C1.4]]
+%%curriculum-end%%
+

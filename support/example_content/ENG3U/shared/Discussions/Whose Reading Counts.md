@@ -2,6 +2,8 @@
 title: Whose Reading Counts
 publish: true
 created: __CREATED__
+tags:
+  - discussions
 enableToc: true
 ---
 ## The question

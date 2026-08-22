@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: mitosis or meiosis — six micrographs, sorted
+1. Warm-up: mitosis or meiosis — six micrographs, sorted: [[Mitosis]] and [[Meiosis]]
 2. Random groups — build both processes with chromosome models, side by
    side, and find the two differences that matter
-3. Consolidate: why meiosis produces variation and mitosis must not
+3. Consolidate: why meiosis produces variation and mitosis must not — [[Genetics Practice]]
 
 ## Things to do before our next class
 

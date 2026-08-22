@@ -13,7 +13,9 @@ tags:
 1. Warm-up: [[Read the Schematic]] — no notes, timed
 2. Bench check, on your own: a pin calculation, a sensor conversion, and
    a program traced by hand
-3. Mark your own; note what to practise
+3. Mark your own. It is worth no marks by design — it exists to find
+   what still needs a class, while there is still a class. Note the one
+   you want back
 
 ## Things to do before our next class
 

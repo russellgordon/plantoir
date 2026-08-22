@@ -5239,3 +5239,59 @@ first candidates for the next session.
 **Untested overall:** a true fresh `wsl --install` (WSL itself was
 already present), the docker-group/usermod fallback, and pwsh 7 runs
 (everything above ran under Windows PowerShell 5.1).
+
+---
+
+## Multi-Jurisdiction Course Catalog & Curriculum Support (Added 2026-08-19)
+
+Plantoir now supports course codes and curriculum registries beyond Ontario, starting with **British Columbia (Grades 9–12)** for Mathematics, Technology Education, and Computer Science.
+
+### 1. Course Registries
+- Regional secondary course catalogs are bundled under `support/*_secondary_courses.json`.
+- `support/ontario_secondary_courses.json` (Ontario Ministry of Education).
+- `support/british_columbia_secondary_courses.json` (BC Ministry of Education and Child Care).
+- `CourseNameCatalog.cs` in `Plantoir.Core` now supports loading multiple paths via `CourseNameCatalog.Load(params string[] jsonPaths)` or scanning `support/*_secondary_courses.json`.
+
+### 2. Grade Label Derivation
+- Ontario course codes encode grade in the 4th character (`1`=Grade 9, `2`=Grade 10, `3`=Grade 11, `4`=Grade 12).
+- BC course codes use trailing 2-digit grades (e.g. `MCMPR11` -> Grade 11, `MFMP-10` -> Grade 10, `MMA--09` -> Grade 9).
+- `SectionAdder.GradeLabel(string courseCode)` checks trailing `09`–`12` before checking the 4th character.
+- Contract cases pinned in `contracts/course-management.json` (`gradeLabels` and `defaultCourseName`).
+
+### 3. Subject Skeleton Matching
+- `support/skeletons/families.json` now maps multi-character prefixes (e.g. `MCMPR` -> `computer-science`, `MMA` -> `mathematics`, `MTROB` -> `computer-engineering`).
+- `SkeletonCatalog.cs` tests prefixes of decreasing length (5, 4, 3, 2) against `families.json["prefixes"]`.
+
+### 4. Curriculum Expectations & Heat Map
+- Curricular standards in BC use lettered domains: `D` (Applied Design), `S` (Applied Skills), `T` (Applied Technologies), `K` (Content Knowledge), or `R`/`U`/`C`/`F` in Mathematics.
+- Regexes in `scripts/build_site.py` and `.claude/skills/example-content/lint_payload.py` generalize from `[A-F]` to `[A-Z]`.
+- Standard credits: 1.0 credit in Ontario = 110 scheduled hours; 4.0 credits in BC = 110–120 scheduled hours.
+
+### 5. Reference BC Example Content (`MCMPR11`)
+- Authored complete example content payload for `support/example_content/MCMPR11` (Computer Programming 11 in BC).
+- 86 class pages, 4 units, ~110.5 hours scheduled time.
+- Completely distinct tasks from Ontario `ICS3U`: Pacific Trail Route Planner, Salish Sea Marine Sensor Tracker, Indigenous Language Lexicon Engine, Wildfire Early Warning Dashboard, and Cumulative Software Portfolio.
+- Verified 100% clean with `lint_payload.py`.
+
+> [!note] Correction (2026-08-20) — the curriculum coding scheme above was wrong
+> The `D1.1`–`D7.1` / `S1.1`–`S1.2` / `T1.1`–`T1.2` / `K1.1`–`K6.1` codes this
+> section originally described were **not verbatim** — the `K1`–`K6` content
+> taxonomy was invented (BC's real Content standards are a single flat,
+> ungrouped list, not six named strands), several competency bullets were
+> paraphrased rather than quoted, and one page fabricated the phrase "First
+> Peoples cultural contexts," which appears nowhere in the Ministry document.
+> This has been rebuilt: BC prints no codes on any curriculum document (not
+> just this one), so positional codes are now assigned in Ministry order —
+> `D1`–`D7` for Applied Design's seven named stages (Understanding context,
+> Defining, Ideating, Prototyping, Testing, Making, Sharing), `S1` for Applied
+> Skills, `T1` for Applied Technologies, and a single `K1` umbrella for BC's
+> flat 17-item Content list (`K1.1`–`K1.17`) — 47 verbatim expectations in
+> total, disclosed once on `Curriculum/About These Standards.md`. See
+> `.claude/skills/bc-example-content/SKILL.md` for the full model (BC's
+> Big Ideas/Curricular Competencies/Content shape, why it differs
+> structurally from Ontario's strand model, and the research/verification
+> workflow) — it is the current source of truth for BC curriculum work, not
+> this section. The regexes noted in §4 above (`[A-F]` generalized to
+> `[A-Z]`) still hold; only the CODE SCHEME they were generalized to build
+> your BC payload against was wrong.
+

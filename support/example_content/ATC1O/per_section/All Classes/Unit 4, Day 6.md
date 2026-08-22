@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[The Standard Warm-Up]]
-2. Day 2 of 8: generating — everyone brings movement
+2. Day 2 of 9: generating — everyone brings movement
 3. [[Devising in a Group]] in practice
-4. Coaching
+4. Coaching: refining choreographic transitions and timing for [[The Showing]]
 5. Cool-down
 
 ## Things to do before our next class

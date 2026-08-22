@@ -11,6 +11,7 @@ moment you need it, and every one of these moments arrives for every
 student in this course, usually more than once.
 
 - [[Using This Site]] — five minutes that make the whole site fast
+- [[Scavenger Hunt]] — a hands-on tour of the tools behind this site
 - [[Showing Your Thinking]] — reasoning made visible, on paper and at
   the boards
 - [[Using Desmos]] — sliders as conjecture-testing machines

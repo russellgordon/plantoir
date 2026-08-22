@@ -10,7 +10,7 @@ Nobody in this industry is hired on a mark. They are hired on evidence —
 what you can show you have done, and how well you can account for it.
 Your file runs from the first week to [[The Evidence Portfolio]], your
 final evaluation. Collect as you go: a semester rebuilt from memory in
-June produces a thin file.
+Leaving it to the end produces a thin file.
 
 ## What counts as evidence
 
@@ -22,6 +22,10 @@ June produces a thin file.
   when the first version did not fit.
 - **Data.** Germination counts from [[The Growing Trial]], yields from
   [[The Production Run]], the log behind [[The Pest and Disease Report]].
+- **Your self-checks**, dated — the criteria you judged your own work
+  against, what you called weakest, and what you changed. See
+  [[Judging Your Own Work]]. Read end to end at the end of the course they show the
+  change over the semester better than the finished jobs do.
 - **Safety credentials.** [[The Safety Ticket]], WHMIS, first aid.
 - **Maintenance and tool logs**, which employers read closely.
 - **What other people said** — a note from a client or a supervisor.
@@ -41,7 +45,7 @@ Every item therefore gets a caption — what it is, when, what your part
 was, and what you would do differently. Without one it is decoration.
 
 > [!success]- What a strong entry looks like (click to expand)
-> **Raised bed, north grounds — 14 October.** Built from my own 1:20 plan
+> **Raised bed, north grounds — Unit 2, Day 14.** Built from my own 1:20 plan
 > with one other student. I cut and squared the frame and calculated the
 > soil volume at 0.72 m³, which came out one bag short because I measured
 > the depth after the frame settled. Photographs: plan, framing, done.

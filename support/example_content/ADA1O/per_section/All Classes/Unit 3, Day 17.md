@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: partner's choice
-2. [[Drama in the World]], day 4 — working period: rehearse the whole five
-   minutes to time, and cut what runs long
+2. [[Drama in the World]], day 4 — working period: start from what the pair
+   who tested you on Day 13 said, then rehearse the whole five minutes to
+   time and cut what runs long
 3. Timed practice run with another pair as your audience
 
 ## Things to do before our next class

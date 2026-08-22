@@ -31,14 +31,14 @@ back" prompt to capture.
 ## Feelings are welcome — anchored to a moment and a part
 
 The journal is not a lab report; frustrated, proud, embarrassed, and
-delighted all belong in it. The rule is that a feeling arrives
-*attached to the moment that caused it and the hardware involved*.
-"I felt useless" floats free and teaches you nothing in June. "I
-felt useless when my third crimp failed the tester — then I lined
-the wires against the diagram before seating them, and the fourth
-passed" is a feeling with an address and an exit. The feeling is
-real data about you; the fault is the handle you can actually turn —
-the same pairing [[Getting Unstuck]] builds its whole method on.
+delighted all belong in it. The rule is that a feeling arrives *attached to
+the moment that caused it and the hardware involved*. "I felt useless"
+floats free and teaches you nothing at the end of the course. "I felt
+useless when my third crimp failed the tester — then I lined the wires
+against the diagram before seating them, and the fourth passed" is a feeling
+with an address and an exit. The feeling is real data about you; the fault
+is the handle you can actually turn — the same pairing [[Getting Unstuck]]
+builds its whole method on.
 
 %%curriculum-start%%
 ## Curriculum connection

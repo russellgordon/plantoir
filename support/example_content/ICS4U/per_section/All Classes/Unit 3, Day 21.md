@@ -13,7 +13,10 @@ tags:
 1. Warm-up: [[Predict the Output]]
 2. Clinic: the algorithm questions the room found hardest, worked
    together at the board
-3. [[The Software Project]], day 9 — working period with the time that remains
+3. [[The Software Project]], day 9 — working period with the time that
+   remains, on the second row your own check named
+4. Last fifteen minutes: your Unit 3 milestone entry in your
+   [[Code Journal]], written here
 
 ## Things to do before our next class
 

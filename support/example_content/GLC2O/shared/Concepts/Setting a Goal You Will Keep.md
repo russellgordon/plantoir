@@ -21,7 +21,7 @@ Four parts, and it is short:
 2. **The by-when.** A date, not "this term".
 3. **The first step.** The one action you can take this week.
 4. **The reason.** Why it matters to you, in your own words. This is the
-   part that gets you back to it in November.
+   part that gets you back to it weeks later.
 
 ## Short, medium, and long
 

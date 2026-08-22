@@ -48,5 +48,7 @@ in an examination, naming what you would need is itself worth marks.
 > how anyone would know it worked. If your draft has three of those four,
 > start again from the four questions.
 
-The cases in this course are marked against these habits, and the final
-[[The Case Examination]] is nothing but this method under a clock.
+The cases are not marked. What you say while you work one is evidence
+all the same — [[How Marks Work]] explains why the things you say count
+— and the final [[The Case Examination]] is nothing but this method
+under a clock.

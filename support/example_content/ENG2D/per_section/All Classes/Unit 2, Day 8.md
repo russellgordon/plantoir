@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Practise: [[Paraphrase Practice]] to the end, on your own scene
-2. [[The Scene, Staged]], day 2 — the cuts, and the argument for each
+2. [[The Scene, Staged]], day 2 — the cuts, and the argument for each;
+   or the ten lines you put into contemporary English instead
 
 ## Things to do before our next class
 

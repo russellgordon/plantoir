@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval clinic: Units 1 and 2 mixed
-2. An unseen document set from the 1850s, worked together
+1. Retrieval clinic: Units 1 and 2 mixed — [[The Document Examination]]
+2. An unseen document set from the 1850s, worked together: [[Historical Significance]]
 3. Looking ahead: an industrial country
 
 ## Things to do before our next class

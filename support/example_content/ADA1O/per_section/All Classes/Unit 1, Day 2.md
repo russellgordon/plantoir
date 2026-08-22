@@ -13,7 +13,9 @@ tags:
 1. Circle up; finalise [[Our Ensemble Agreement]] from your suggestions
 2. Warm-up: [[Mirrors]], then [[Group Counting]]
 3. Discussion: [[Why Trust Comes First]]
-4. Launch the [[Drama Journal]] — write [[Your First Entry]] in class
+4. Launch the [[Drama Journal]] — write [[Your First Entry]] in class, and
+   read the criteria for [[Milestone Journal Entries]] while the book is
+   still empty
 5. Read together: [[What a Strong Entry Looks Like]]
 
 ## Things to do before our next class

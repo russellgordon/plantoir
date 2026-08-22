@@ -71,3 +71,15 @@ the calculator sits this one out until the final question.
 > total more than triples. Hold that thought: in
 > [[Money Over Time]], "1% per period for 120 periods" is called a
 > loan.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B1.1]]
+
+![[B1.2]]
+
+![[B1.3]]
+
+![[B2.4]]
+%%curriculum-end%%

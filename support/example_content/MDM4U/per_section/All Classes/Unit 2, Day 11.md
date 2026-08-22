@@ -12,7 +12,8 @@ tags:
 
 1. Number talk: [[Number Strings]]
 2. Clinic: the distribution the room found hardest, worked at the boards
-3. Then alone: four of the same kind, marked together
+3. Then alone: four of the same kind, marked together against the
+   answers. Nothing is collected and nothing goes in a mark
 
 ## Things to do before our next class
 

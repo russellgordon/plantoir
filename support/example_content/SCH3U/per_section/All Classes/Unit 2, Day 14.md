@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: classify five reactions, cold
+1. Warm-up: classify five reactions, cold: [[Types of Chemical Reactions]]
 2. Clinic: whichever reaction type the room is weakest on
 3. Mixed practice: type, balance, and predict, twenty questions against
-   the clock
+   the clock: [[Reaction Types Practice]] and [[Predicting Products]]
 
 ## Things to do before our next class
 

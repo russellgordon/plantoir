@@ -38,10 +38,28 @@ Polymerase checks each base as it adds it, and mismatch repair catches
 more afterwards. The final error rate is about one in a billion — low
 enough for stability, not zero, which is where variation comes from.
 
+## Historical discovery of the mechanism
+
+Our understanding of replication rests on foundational historical experiments:
+- **Semi-conservative replication:** Meselson and Stahl (1958) grew *E. coli*
+  in heavy nitrogen ($\ce{^{15}N}$) and transferred them to light nitrogen
+  ($\ce{^{14}N}$). Density-gradient centrifugation proved each daughter
+  molecule consists of one conserved parental strand and one newly synthesised
+  strand.
+- **DNA as genetic material:** Frederick Griffith (1928, transformation in
+  *Streptococcus pneumoniae*), Avery, MacLeod, and McCarty (1944, DNA as the
+  transforming principle), and Hershey and Chase (1952, radioactive $\ce{^{32}P}$
+  phage experiments) established DNA's hereditary role before Watson, Crick,
+  and Franklin solved its double-helix structure in 1953.
+
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D2.1]]
+
 ![[D3.1]]
 
-![[D2.1]]
+![[D3.2]]
+
+![[D3.7]]
 %%curriculum-end%%

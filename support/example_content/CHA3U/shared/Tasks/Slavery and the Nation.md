@@ -77,4 +77,53 @@ and the investigation [[Whose Story Gets Taught|Whose Story Gets Taught?]] for t
 ![[C3.1]]
 
 ![[C3.2]]
+
+![[C3.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+The care this task asks for is care about EVIDENCE. Both prompts below watch
+how a student handles the record, never how they feel about what is in it.
+
+OBSERVE — Unit 2, Day 5, the research period that follows the archive
+lesson
+  Watch for: what a student does when a finding aid returns nothing. There
+  are four moves and they are not equivalent. Climb the LADDER the lesson
+  they have just had describes — ask which agency was obliged to create
+  this document, find its record group, read the series descriptions.
+  Change the search TERMS. Change the ARCHIVE. Or change the QUESTION so
+  that the gap stops mattering. The last is the common one, and it is
+  invisible in the finished essay, because the essay is about whichever
+  question survived — most often the sixth part, "what outlasted it",
+  quietly missing.
+  Going well: the ladder, used unprompted — a student who stops typing into
+  the box and starts asking who would have had to write this down. That is
+  the whole point of the day's tutorial and this is the only place you find
+  out whether it took.
+  Stuck: the same words retyped into the same box for twenty minutes; or a
+  part of the task dropped with "there was nothing".
+  Record: initials and one letter on the day plan — L for ladder, T for
+  terms, A for archive, Q for question. The Ls are the ones who have
+  understood the lesson.
+
+TALK — Unit 2, Day 7, the conferences already on that agenda
+  Ask: "Read me the clause you chose. Which single word would you have to
+  strike out to stop it working?"
+  Then: "Who would have had to enforce this, and how would they have
+  known?"
+  A strong answer puts a finger on one operative word rather than
+  paraphrasing the whole clause, and then names a person inside the
+  machinery — a constable, a patroller, a ship's captain, a neighbour with
+  a reward to collect. Seeing that a statute needs an enforcer who needs
+  knowledge is how a student gets from the law to C1.2 — the daily lives of
+  different groups, INCLUDING how they responded to the challenges of
+  everyday life, which is the expectation's own phrase. A written essay
+  can quote the clause and paraphrase a textbook around it; only this shows
+  you whether the student found the load-bearing word themselves.
+  Record: one line per student, the word they chose. It is a good record of
+  who is reading and who is summarising.
+
+The product evidence is the essay handed in on Day 9.
+%%

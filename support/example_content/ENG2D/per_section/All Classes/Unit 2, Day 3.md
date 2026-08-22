@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Two passages marked for the seminar-style discussion next class.
+- [ ] 1.4 read once on your own, and the four lines that made least
+      sense marked.

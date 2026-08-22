@@ -15,6 +15,8 @@ tags:
    addressing, topologies, security, and troubleshooting
 2. By request: [[Microcontroller Code Practice]], [[Networking Practice]],
    [[Number Systems Practice]]
+3. Last fifteen minutes: start [[Final Reflection]], journal open beside
+   you. It is marked, so it is written here rather than at home
 
 ## Things to do before our next class
 

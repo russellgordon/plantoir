@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Checkpoint, on your own: data structures, recursion, and
-   two-dimensional processing
-2. Mark your own; revision list written
+   two-dimensional processing — [[Recursion Practice]]
+2. Mark your own; revision list written: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

@@ -14,7 +14,9 @@ tags:
    today's bottles, before today's bottles
 2. Writing it up: [[Writing a Lab Report]] — the sections, and what
    belongs in each
-3. Write the bond-type investigation up IN class, with me reading over
+3. Launch: [[The Lab Reports]] — the six criteria used on all four
+   write-ups this semester, read before you write the first one
+4. Write the bond-type investigation up IN class, with me reading over
    shoulders
 
 ## Things to do before our next class

@@ -1,8 +1,8 @@
 ---
 title: The Greenhouse Effect
-createdSection1: 2026-10-14T07:00:00.000-0400
+createdSection1: 2026-10-13T07:00:00.000-0400
 publishForSection1: true
-createdSection2: 2026-10-15T07:00:00.000-0400
+createdSection2: 2026-10-14T07:00:00.000-0400
 publishForSection2: true
 enableToc: true
 tags:

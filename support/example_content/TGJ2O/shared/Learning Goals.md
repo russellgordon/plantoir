@@ -36,4 +36,6 @@ Put plainly, week to week that means:
 - **Work as a team on deadline** — because a publication is a promise
   a whole newsroom makes together.
 - **Grow visibly** — your [[Newsroom Journal]] is where spiked stories
-  turn into evidence; see [[How Marks Work]].
+  turn into evidence you can point at, and
+  [[Judging Your Own Work]] is how you use it before a deadline rather
+  than after one.

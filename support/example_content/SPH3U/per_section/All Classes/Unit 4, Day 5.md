@@ -17,5 +17,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Analysis of [[Measuring the Speed of Sound]], due next class.
+- [ ] Method A analysis drafted; both methods are compared next class.
 - [ ] Journal: which method would you trust, and why?

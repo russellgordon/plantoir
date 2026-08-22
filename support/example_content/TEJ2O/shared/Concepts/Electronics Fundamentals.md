@@ -54,10 +54,33 @@ controlling a large one, the trick that computers are millions of.
 [[Electronics Calculations Practice]] drills the numbers, and
 [[Predict the Circuit]] asks what happens before you power anything.
 
+## Measuring voltage, current, and resistance safely
+
+A digital multimeter is the technician's eyes on the bench. Each
+measurement requires a specific procedure:
+
+- **Measuring resistance ($\Omega$):** Power must be completely
+  disconnected from the circuit. The meter sends its own tiny test
+  current through the component to calculate resistance; measuring an
+  energized component produces false readings and can damage the meter.
+- **Measuring voltage ($\text{V}$):** Connected in **parallel** across
+  the two points of interest while the circuit is powered. The black
+  probe connects to ground ($\text{COM}$) and the red probe to the
+  positive measurement point.
+- **Measuring current ($\text{A}$ or $\text{mA}$):** Connected in
+  **series** by breaking the circuit loop and inserting the meter so
+  all current passes through it. The internal shunt fuse protects the
+  meter from overcurrent.
+
+Observing proper probe placement and range selection prevents blown
+meter fuses and ensures reliable circuit diagnostics.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[B2.1]]
 
 ![[B2.5]]
+
+![[D1.1]]
 %%curriculum-end%%

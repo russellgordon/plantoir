@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Working period: the study's evidence
-2. Conferences with me — each pair, five minutes, bring what you have
+2. Conferences with me — each pair, five minutes, bring what you have; you each leave with one change named, and tomorrow opens with time to make it
 3. Stuck? [[The Tools of the Trade]] on keeping sources findable
 
 ## Things to do before our next class

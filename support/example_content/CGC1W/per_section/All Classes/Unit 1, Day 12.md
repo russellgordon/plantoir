@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Working period: the region study
-2. Map clinic — bring your draft map
-3. Conferences with me
+1. First fifteen minutes, modelled together: judging a draft against the
+   criteria — [[Judging Your Own Work]], on a study nobody here wrote
+2. Working period: the region study, starting with the same check on
+   your own
+3. Map clinic — bring your draft map
+4. Conferences with me
 
 ## Things to do before our next class
 

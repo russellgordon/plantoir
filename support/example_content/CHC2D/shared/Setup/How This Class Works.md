@@ -30,7 +30,10 @@ and [[Cause and Consequence]] assume you have met the idea already.
 - **Separate what a source says from what you conclude.** That
   distinction is most of the discipline.
 - **Name your source every time you state a fact.**
-- **Represent fairly the positions you disagree with.** It is marked.
+- **Represent fairly the positions you disagree with.** On several tasks
+  it is a criterion in its own right — the counter-argument row on
+  [[The War Question]] is where you meet it first — and everywhere else
+  it is what separates an argument from an opinion.
 
 ## The shape of the year
 

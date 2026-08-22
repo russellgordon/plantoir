@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. [[Forces in a Real Situation]], day 4 — working period: the change
-   analysed, and the safety sentence written
-2. Trade drafts; challenge one number each
+1. First ten minutes: [[Judging Your Own Work]] against the criteria on
+   [[Forces in a Real Situation]] — your weakest row named
+2. [[Forces in a Real Situation]], day 3 — working period: the change
+   analysed, the safety sentence written, and both your weakest row and
+   whatever last class's conference turned up dealt with
+3. Trade drafts; challenge one number each
 
 ## Things to do before our next class
 

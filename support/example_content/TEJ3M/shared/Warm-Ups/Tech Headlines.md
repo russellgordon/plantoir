@@ -64,3 +64,13 @@ to argue for it.
     two different achievements, measured in different units — watts
     against watt-hours — and a headline that praises one while
     implying the other has not lied, exactly.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.3]]
+
+![[C2.1]]
+
+![[C2.2]]
+%%curriculum-end%%

@@ -2,6 +2,8 @@
 title: Exercises
 publish: true
 created: __CREATED__
+tags:
+  - exercises
 ---
 > [!tip] How to use these pages
 > Answer on paper first. Every answer is folded away, and reading a
@@ -16,3 +18,4 @@ created: __CREATED__
 - [[Evidence and Analysis Practice]] — quoting short, analysing long
 - [[Sight Passage Practice]] — unseen prose and poetry under time
 - [[Source Use Practice]] — support, extend, complicate, disagree
+- [[Media Analysis Practice]] — documentaries, podcasts, and who paid for them

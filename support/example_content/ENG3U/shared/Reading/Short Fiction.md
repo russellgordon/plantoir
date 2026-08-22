@@ -2,15 +2,16 @@
 title: Short Fiction
 publish: true
 created: __CREATED__
-enableToc: true
+tags:
+  - reading
 ---
 Five stories in the first unit, read for structure and voice rather than
 for plot.
 
 | Story | Writer | What it teaches |
 | --- | --- | --- |
-| "The Boat" | Alistair MacLeod (Nova Scotia) | Retrospective narration, and a debt that cannot be paid |
-| "Boys and Girls" | Alice Munro | Free indirect style, and a childhood in which the roles close |
+| "The Boat" | Alistair MacLeod | Retrospective narration, and a debt that cannot be paid |
+| "Boys and Girls" | Alice Munro | A narrator judging her younger self, and a childhood in which the roles close |
 | "A Short History of Indians in Canada" | Thomas King | Satire compressed into three pages |
 | "The Painted Door" | Sinclair Ross | Isolation, weather as pressure, an ending readers still argue about |
 | "Borders" | Thomas King | A refusal that becomes a position |

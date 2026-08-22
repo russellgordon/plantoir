@@ -25,7 +25,7 @@
 
   <ItemGroup>
     <None Include="..\..\contracts\*.json" CopyToOutputDirectory="PreserveNewest" Link="contracts\%(Filename)%(Extension)" />
-    <None Include="..\..\support\ontario_secondary_courses.json" CopyToOutputDirectory="PreserveNewest" Link="support\%(Filename)%(Extension)" />
+    <None Include="..\..\support\*_secondary_courses.json" CopyToOutputDirectory="PreserveNewest" Link="support\%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

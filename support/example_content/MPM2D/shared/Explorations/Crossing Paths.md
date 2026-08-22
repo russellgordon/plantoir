@@ -6,8 +6,8 @@ tags:
   - explorations
 enableToc: true
 ---
-Two stories, one grid. Jo has $90 saved and adds $5 every week. Sam
-has $30 and adds $10 every week. Somewhere ahead of them is a week
+Two stories, one grid. Jo has \$90 saved and adds \$5 every week. Sam
+has \$30 and adds \$10 every week. Somewhere ahead of them is a week
 when the two bank balances say the same number — and everything about
 that moment is readable from a picture, before any algebra exists.
 
@@ -59,7 +59,9 @@ crossing, costs against revenue, runs through [[Break-Even]], and
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B1.1]]
+
 ![[B1.2]]
 
-![[B1.1]]
+![[B1.4]]
 %%curriculum-end%%

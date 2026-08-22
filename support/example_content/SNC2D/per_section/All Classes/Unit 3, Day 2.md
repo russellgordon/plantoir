@@ -10,11 +10,14 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Modelling the Greenhouse Effect]] in class
-2. The limitation paragraph: what a jar under a lamp does NOT model
+1. Bench: write up [[Modelling the Greenhouse Effect]] in class — report
+   three on [[Lab Reports]]
+2. The closing paragraph, both halves: use your model to explain the
+   human-caused greenhouse effect, then say where a jar under a lamp stops
+   standing in for it
 3. Back to [[The Greenhouse Effect]] — the natural one, and why life
    depends on it
 
 ## Things to do before our next class
 
-- [ ] Report finished, with the model's limits named.
+- [ ] Nothing on the report; it went in at the bell.

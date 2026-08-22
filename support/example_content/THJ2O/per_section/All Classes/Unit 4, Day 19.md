@@ -11,8 +11,8 @@ tags:
 ---
 ## Agenda
 
-1. Review: safety, law, tools, and measurement
-2. Practical stations, timed
+1. Review: safety, law, tools, and measurement: [[The Law on the Job]] and [[Power Tools and Equipment]]
+2. Practical stations, timed: [[Hand Tools]]
 3. Questions
 
 ## Things to do before our next class

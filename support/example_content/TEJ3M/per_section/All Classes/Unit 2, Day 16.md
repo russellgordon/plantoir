@@ -11,8 +11,10 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Read the Schematic]] — unit-two finale
-2. Consolidation: logic on one page, built by the room
-3. Look ahead: a chip that holds the logic in software instead
+2. Acting on last class's check: the two the room asked for most, worked
+   properly at the boards
+3. Consolidation: logic on one page, built by the room
+4. Look ahead: a chip that holds the logic in software instead
 
 ## Things to do before our next class
 

@@ -115,8 +115,9 @@ public class ContractTests
     [Fact]
     public void CourseManagement_DefaultCourseName_MatchesContract()
     {
-        string supportFile = ContractLoader.GetSupportPath("ontario_secondary_courses.json");
-        var catalog = CourseNameCatalog.Load(supportFile);
+        string onFile = ContractLoader.GetSupportPath("ontario_secondary_courses.json");
+        string bcFile = ContractLoader.GetSupportPath("british_columbia_secondary_courses.json");
+        var catalog = CourseNameCatalog.Load(onFile, bcFile);
 
         var doc = ContractLoader.LoadJson("course-management.json");
         var cases = doc["defaultCourseName"]!["cases"]!.AsArray();

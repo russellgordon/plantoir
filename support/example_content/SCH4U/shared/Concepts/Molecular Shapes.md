@@ -132,5 +132,7 @@ picture and starts predicting whether two liquids will mix.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C2.1]]
+
 ![[C2.3]]
 %%curriculum-end%%

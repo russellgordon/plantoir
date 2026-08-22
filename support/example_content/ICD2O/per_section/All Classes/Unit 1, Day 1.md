@@ -12,9 +12,10 @@ tags:
 
 1. Welcome — what a workshop classroom is (and is not)
 2. Unplugged build: [[The Sandwich Robot]] — programme your teacher,
-   literally
+   literally. Where it breaks tells me what this room already assumes
+   about instructions, and that is where the unit starts
 3. Read together: [[Our Classroom Norms]]
-4. Tour of the site: [[Using This Site]] and [[How This Site Is Organised]]
+4. Tour of the site: [[Using This Site]], [[How This Site Is Organised]], and [[What This Site Can Do]]
 5. The daily rhythm we will live by: [[How Tech Class Works]] — and
    the year ahead: [[Learning Goals]]
 
@@ -24,3 +25,4 @@ tags:
 - [ ] Check [[What to Bring]] — unplugged days and keyboard days both
       start immediately.
 - [ ] Skim [[How Tech Class Works]] so tomorrow's pairs are no surprise.
+- [ ] Try the 10-minute [[Scavenger Hunt]] to get comfortable with the site's layout.

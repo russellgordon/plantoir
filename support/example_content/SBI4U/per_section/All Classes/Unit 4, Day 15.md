@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Checkpoint, on your own: nervous and endocrine control, the kidney,
-   and one feedback analysis
-2. Mark your own; revision list written
+   and one feedback analysis: [[Homeostasis Practice]] and [[Kidneys and Water Balance]]
+2. Mark your own; revision list written: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

@@ -112,7 +112,7 @@ On the board, all together:
 > [!note]- Facilitation notes
 > **Do not say the words.** Not "linear", not "quadratic", not "order
 > n", not "Big-O", not "hash". None of it, for the whole period. The
-> vocabulary arrives in Unit 3, Day 5, and it arrives as a *name for a
+> vocabulary arrives in Unit 3, Day 8, and it arrives as a *name for a
 > table the room already made*. Saying it today costs you the whole
 > arc.
 >
@@ -122,8 +122,9 @@ On the board, all together:
 > group's numbers, not a summary. Twenty on the count. Ten to write the
 > journal entry while the table is still up.
 >
-> **The table is the artefact.** Keep the doubling table. On Day 5 you
-> will point at it and say "this row has a name", and Big-O will be a
+> **The table is the artefact.** Keep the doubling table. On Unit 3,
+> Day 8 you will point at it and say "this row has a name", and Big-O
+> will be a
 > description of something the room measured rather than a definition
 > they were handed.
 >

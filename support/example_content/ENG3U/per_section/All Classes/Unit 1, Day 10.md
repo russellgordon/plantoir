@@ -12,7 +12,8 @@ tags:
 
 1. Concept: [[Thesis and Argument]] — from pattern to claim with a
    mechanism
-2. Practise: [[Thesis Practice]], first three
+2. Practise: [[Thesis Practice]], first three — not marked; it is where
+   you find out whether your claim is arguable or merely true
 
 ## Things to do before our next class
 

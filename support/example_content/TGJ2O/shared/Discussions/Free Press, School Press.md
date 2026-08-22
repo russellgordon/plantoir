@@ -47,4 +47,8 @@ press looks like: not permission, preparation.
 ![[C2.4]]
 
 ![[C2.5]]
+
+![[B2.4]]
+
+![[B2.6]]
 %%curriculum-end%%

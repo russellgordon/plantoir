@@ -14,6 +14,8 @@ tags:
 2. [[The Remix Project]], day 4 — working period: get one change working end to
    end before starting the second
 3. When you stall: [[Getting Unstuck]] first, then a neighbour, then me
+4. Last ten minutes: add today to your own before-and-after write-up —
+   what you changed, what broke, and which of it was yours
 
 ## Things to do before our next class
 

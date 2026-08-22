@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Number talk: [[Estimation Duels]]
-2. [[The Signature Function]], day 4 — working period: the model built and
+2. [[The Signature Function]], day 3 — working period: the model built and
    tested against a point you did not use
 3. Conference: what does your function claim outside your data?
 

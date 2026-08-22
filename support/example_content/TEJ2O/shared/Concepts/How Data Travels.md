@@ -51,8 +51,34 @@ describes; each router passes the packet one network closer; the
 server's replies make the same journey back, packet by packet, and
 your machine quietly reassembles the answer.
 
+## Transmission media and network hardware in the data path
+
+Packets traverse different physical transmission media and active
+hardware devices depending on where they travel:
+
+- **Unshielded twisted-pair (UTP) copper:** Carries electrical
+  signals over four colour-coded pairs. Standard for local runs inside
+  a room or building up to 100 metres.
+- **Fibre-optic cable:** Pulses light through flexible glass strands.
+  Immune to electrical interference, with vast bandwidth over tens of
+  kilometres — the backbone connecting buildings and cities.
+- **Wireless (Wi-Fi and cellular radio):** Modulates radio waves
+  through air. Provides mobile access but shares radio frequencies
+  and suffers signal loss through walls.
+
+Every workstation connects through a **network interface card (NIC)**,
+which turns digital data into physical signals. Inside a local area
+network (LAN), **switches** forward data frames directly to the
+destination port based on MAC addresses. To reach an external wide area
+network (WAN) or web server, **routers** inspect the destination IP
+address and choose the next network path.
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A2.1]]
+
+![[A2.2]]
 
 ![[A2.3]]
 

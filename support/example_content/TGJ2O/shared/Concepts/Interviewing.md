@@ -42,6 +42,24 @@ often fill it with the honest version.
 - [ ] Person told who you are, what this is for, and that you are
       recording
 
+## Technical setup, audio hygiene, and location checks
+
+Clean audio capture requires technical discipline before asking the first
+question:
+
+- **Microphone positioning.** Place a directional microphone (or lavalier) 15
+  to 20 cm from the subject's mouth, aimed toward the chin. This isolates the
+  speaker's direct vocal sound while minimizing room reverberation and off-axis
+  noise.
+- **Location acoustics and background noise.** Choose an interior space with soft
+  furnishings that absorb reflections. Avoid hard parallel walls, running
+  refrigerators, and air vents. Record thirty seconds of silent room tone at the
+  start of every location shoot to enable clean noise profiling during editing.
+- **Level monitoring and gain staging.** Monitor audio live with wired
+  headphones throughout the entire interview. Set pre-amplifier gain so dialogue
+  peaks consistently between -12 dB and -6 dB, leaving adequate headroom to
+  prevent digital clipping and distortion when a subject speaks louder.
+
 ## The quote promise
 
 Recording someone is making a promise: their words will reach readers

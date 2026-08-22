@@ -23,7 +23,7 @@ they are pointing at.
 | **Audio editing (DAW)** | Records and edits multitrack audio, with noise reduction and levels | Interview clean-up, podcasts, and voice-over |
 | **Animation and motion graphics** | Moves type and graphics over time | Lower thirds, title cards, explainer graphics |
 | **Web publishing / CMS** | Manages stories, media, and publication on the web | [[Publish to the Web]] |
-| **Asset management** | Catalogues, tags, and finds media | The archive you will be grateful for in April |
+| **Asset management** | Catalogues, tags, and finds media | The archive you will be grateful for a year from now |
 | **Collaboration and scheduling** | Assignments, deadlines, and versions | The newsroom board in [[The Production Pipeline]] |
 
 ## Free and paid, and why we use both
@@ -39,6 +39,24 @@ enough for professional work. Two honest points:
 - The free tools mean the work does not stop when a subscription
   lapses, and that a student can keep making things at home. That is not
   a small thing.
+
+## File formats, handoffs, and non-destructive workflows
+
+Modern communications pipelines rely on smooth handoffs between different
+specialized applications:
+
+- **Non-destructive workflows.** Professional software protects original assets.
+  In raster editing, adjustment layers and layer masks alter appearance without
+  overwriting source pixels. In audio and video, timeline trims and volume
+  envelopes reference original clips without modifying raw media files.
+- **Interchange formats.** Moving a project between applications requires
+  standard exchange formats: vector graphics export as SVG or EPS for page
+  layout, audio stems export as uncompressed WAV for mastering, and video
+  sequences pass through EDL/XML or rendered intermediate codecs (such as
+  ProRes or DNxHR).
+- **Final delivery standards.** Output files must match the target medium: high-
+  resolution CMYK PDF/X for print presses, optimized WebP or JPEG for web
+  pages, and compressed H.264/H.265 MP4 for web streaming and social channels.
 
 ## Choosing one for a job
 

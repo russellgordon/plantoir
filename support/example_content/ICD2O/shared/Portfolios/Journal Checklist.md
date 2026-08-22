@@ -5,19 +5,22 @@ created: __CREATED__
 tags:
   - portfolio
 ---
-Your [[Dev Journal]] is collected at the end of each unit. Before you
-hand it in, run this check — it is the same lens I read with, so
-anything you catch here is something we never need to have a
-conversation about. Ten minutes with this list is usually worth more
-than one extra entry.
+Your [[Dev Journal]] is collected once in each unit. Before you hand it in,
+run this check. The coverage boxes are for you — a way of finding the gaps
+before they surprise you; the quality and growth boxes are the lens I
+actually read with, so anything you catch there is something we never need
+to have a conversation about. Ten minutes with this list is usually worth
+more than one extra entry.
 
 ## The check
 
 **Coverage**
 
-- [ ] There is an entry for every class in the unit
-- [ ] Entries were written close to the day, not reconstructed the
-      night before collection — reconstructed entries always show
+- [ ] Every period that ended with "log it" has its entry, written
+      then and there — including any since the last collection, because
+      those are the ones this collection is read on
+- [ ] Nothing was reconstructed the night before collection —
+      reconstructed entries always show
 - [ ] All four prompts appear across the unit: what I built, what
       broke, what I learned, what I would try next
 - [ ] At least one entry includes a real artifact — a pasted error
@@ -52,5 +55,5 @@ than one extra entry.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[A1.1]]
+![[C2.6]]
 %%curriculum-end%%

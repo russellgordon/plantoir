@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Working period: the population profile
-2. Mapping clinic: choropleth maps and their traps
-3. Conferences
+1. Working period: [[The Population Profile]]
+2. Mapping clinic: choropleth maps and their traps: [[Working With Census Data]]
+3. Conferences on demographic trends and census data analysis for [[The Population Profile]]
 
 ## Things to do before our next class
 
-- [ ] Draft two of your three graphs.
+- [ ] Bring the table your next graph needs, and the year it comes from. The graphs themselves are built in class.

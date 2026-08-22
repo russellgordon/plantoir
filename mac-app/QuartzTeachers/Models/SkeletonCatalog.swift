@@ -49,9 +49,16 @@ enum SkeletonCatalog {
               let map = decoded as? [String: Any] else {
             return nil
         }
-        let prefix: String = String(normalized.prefix(3))
-        if let prefixes = map["prefixes"] as? [String: String], let name = prefixes[prefix] {
-            return name
+        if let prefixes = map["prefixes"] as? [String: String] {
+            let prefixLengths: [Int] = [5, 4, 3, 2]
+            for length in prefixLengths {
+                if normalized.count >= length {
+                    let prefix: String = String(normalized.prefix(length))
+                    if let name = prefixes[prefix] {
+                        return name
+                    }
+                }
+            }
         }
         return map["default"] as? String
     }

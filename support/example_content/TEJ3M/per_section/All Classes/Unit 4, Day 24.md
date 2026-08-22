@@ -13,8 +13,11 @@ tags:
 1. Warm-up: [[Which One Doesn't Belong]] — four project proposals
 2. [[The Engineering Project]], day 2 — the proposal: what it does, for whom,
    and how you will prove it works
-3. Conference: is it buildable in the periods that remain?
+3. Design review, bench by bench while you write: is it buildable in
+   the periods that remain? Have the calculations and the current budget
+   on the desk, not just the idea
+4. Proposals in at the end of the period
 
 ## Things to do before our next class
 
-- [ ] Proposal written.
+- [ ] Begin [[Final Reflection]] by rereading your journal from Unit 1.

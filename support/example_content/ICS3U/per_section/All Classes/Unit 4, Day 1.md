@@ -11,9 +11,13 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Name That Error]]
-2. [[The Community App]], day 4: the walking skeleton — it runs end to
+2. On an index card: the two things this project needs that you do not
+   yet know how to do. I collect them — they set what the debugging
+   clinic on Day 7 works on, and who I reach first in every build
+   period between now and then, so guessing politely helps nobody
+3. [[The Community App]], day 4: the walking skeleton — it runs end to
    end today, with fake data and placeholder output
-3. Stuck? [[Getting Unstuck]] before you ask; [[Ways to Find a Bug]]
+4. Stuck? [[Getting Unstuck]] before you ask; [[Ways to Find a Bug]]
    once you have
 
 ## Things to do before our next class

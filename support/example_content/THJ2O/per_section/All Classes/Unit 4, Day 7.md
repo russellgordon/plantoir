@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Period 3 of 8: costing and approval
-2. Quantities, prices, and sign-off before anything is ordered
+1. Period 3 of 8: costing and approval: [[The Site Project]]
+2. Quantities, prices, and sign-off before anything is ordered: [[Reading a Working Drawing]]
 3. Revisions where the cost does not work
 
 ## Things to do before our next class

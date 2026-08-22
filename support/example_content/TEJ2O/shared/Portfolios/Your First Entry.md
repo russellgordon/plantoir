@@ -8,7 +8,8 @@ tags:
 The first entry in your [[Tech Journal]] is the hardest: the page
 is blank and you do not yet trust what belongs on it. So for week
 one only, the entry is guided — the three prompts below, a few
-sentences each, written the same day as class. Ten minutes, done.
+sentences each, written in class before tools away on the day of the
+first teardown. Ten minutes, done.
 
 ## The three prompts
 

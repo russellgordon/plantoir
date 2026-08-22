@@ -8,8 +8,9 @@ tags:
   - unit-1
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Pairs.** Prediction submitted BEFORE the test
-> shot — that is the whole design.
+> **Time:** one class. **Pairs.** Written up next period as the unmarked
+> practice run for [[Investigation Write-Ups]]. Prediction submitted
+> BEFORE the test shot — that is the whole design.
 
 A launcher, an angle, and one shot to prove you understand independence of
 motion.

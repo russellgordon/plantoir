@@ -13,7 +13,8 @@ tags:
 1. Warm-up: [[Name That Part]] — chips and sockets
 2. Concept: [[How Computers Got Faster]] — transistors, cores, cache, and
    why GHz stopped being the headline
-3. In pairs: two machines, ten years apart, compared honestly
+3. In pairs: two machines, ten years apart, compared honestly, then one
+   sentence each on the board — I am reading the room, not marking it
 
 ## Things to do before our next class
 

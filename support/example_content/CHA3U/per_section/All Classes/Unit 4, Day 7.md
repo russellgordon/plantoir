@@ -12,8 +12,9 @@ tags:
 
 1. [[Immigration and Exclusion]] a third time — the Hart-Cellar Act of 1965 and what followed it
 2. Who arrived after 1965, and how the argument changed shape
-3. Conferences
+3. Conferences on movement claims and public-facing format for [[Rights and Movements]]
 
 ## Things to do before our next class
 
 - [ ] Draft the public-facing piece.
+- [ ] Bring a legal fact and a lived one for the seminar next class, both sourced.

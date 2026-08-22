@@ -10,11 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. Bench: write up [[Evidence of a Chemical Change]] in class
+1. Bench: write up [[Evidence of a Chemical Change]] in class — report two
+   on [[Lab Reports]]
 2. The criteria list, finalised as a class and written into every
    journal
 3. Where the criteria disagree: colour change that is only mixing
 
 ## Things to do before our next class
 
-- [ ] Report finished; criteria list copied.
+- [ ] Criteria list copied into your journal. The report went in at the bell.

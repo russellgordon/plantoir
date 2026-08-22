@@ -12,9 +12,9 @@ tags:
 
 1. Number talk: [[Number Strings]]
 2. Clinic: [[Sequences, Series, and Interest Practice]] to the end
-3. [[Your Financial Future]], day 3 — working period: the decision chosen and
-   the real numbers gathered
+3. [[Your Financial Future]], day 3 — working period: the goal chosen, and a
+   real advertised rate hunted down and cited
 
 ## Things to do before our next class
 
-- [ ] Situation chosen; numbers gathered.
+- [ ] Goal chosen; a real advertised rate found and cited.

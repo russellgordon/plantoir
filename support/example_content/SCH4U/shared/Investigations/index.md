@@ -30,6 +30,11 @@ and another takes a decade.
 | [[Disturbing an Equilibrium]] | Poke a system that had settled. What does it do, and why that? |
 | [[Building a Galvanic Cell]] | Which metal wins, and how many volts is winning worth? |
 
+Four of the eight are written up in full, in class, and marked — the
+first, third, fifth and seventh in that list. Which four, on which days,
+and against what criteria: [[The Lab Reports]]. The other four are read
+back in the consolidation and live in your [[Chemistry Journal]].
+
 Every page has the same seven parts: what you are trying to find out,
 what you have to work with, safety for **that** procedure, the
 prediction you write down first, what to collect, what to bring to the

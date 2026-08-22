@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Which One Doesn't Belong]] — four control strategies
-2. Practise: [[Control Systems Practice]] — open against closed loop, and
-   what each fails at
+2. Practise: [[Control Systems Practice]] — open against closed loop,
+   and what each fails at. Feedback while you work; nothing collected
 3. Consolidate: [[Open and Closed Loop Control]]
 
 ## Things to do before our next class

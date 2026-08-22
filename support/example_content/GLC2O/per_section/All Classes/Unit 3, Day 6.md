@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. [[Researching a Pathway]], period two
+1. [[Researching a Pathway]], period two: the requirements you copied, against the courses you have so far
 2. Finding one person who took this route, and writing to them
-3. Conferences on what the requirements actually said
+3. Conferences on what the requirements actually said, and on what is missing and by when
 
 ## Things to do before our next class
 

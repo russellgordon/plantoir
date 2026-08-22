@@ -57,10 +57,41 @@ Different forms of the equation surrender different features —
 [[Quadratic Graphing Practice]] builds fluency with the whole
 anatomy at once.
 
+## Comparing with exponential growth
+
+Not all non-linear curves behave the same way. In
+[[Squares Against Doubling]], we race $y = x^2$ against $y = 2^x$:
+
+| $x$ | $y = x^2$ (Quadratic) | $y = 2^x$ (Exponential) |
+| --- | --- | --- |
+| $-2$ | $(-2)^2 = 4$ | $2^{-2} = \frac{1}{2^2} = \frac{1}{4}$ |
+| $-1$ | $(-1)^2 = 1$ | $2^{-1} = \frac{1}{2^1} = \frac{1}{2}$ |
+| $0$ | $0^2 = 0$ | $2^0 = 1$ |
+| $1$ | $1^2 = 1$ | $2^1 = 2$ |
+| $2$ | $2^2 = 4$ | $2^2 = 4$ |
+| $3$ | $3^2 = 9$ | $2^3 = 8$ |
+| $4$ | $4^2 = 16$ | $2^4 = 16$ |
+| $5$ | $5^2 = 25$ | $2^5 = 32$ |
+
+Examining patterns in the table explains zero and negative exponents:
+- **Zero as an exponent ($2^0 = 1$)**: moving one step left in the
+  $2^x$ column divides by 2; $\frac{2^1}{2} = 2^{1-1} = 2^0 = 1$.
+- **Negative exponents ($2^{-n} = \frac{1}{2^n}$)**: continuing to
+  divide by 2 produces unit fractions ($2^{-1} = \frac{1}{2}$,
+  $2^{-2} = \frac{1}{4}$, $2^{-3} = \frac{1}{8}$).
+- **Contrasting features**: the parabola $y = x^2$ is symmetric about
+  the $y$-axis with a minimum turning point at $(0, 0)$ and constant
+  second differences of 2. The exponential curve $y = 2^x$ has no
+  symmetry, approaches the $x$-axis as an asymptote without ever
+  touching zero, and eventually overtakes polynomial growth for all
+  $x > 4$.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A1.2]]
 
 ![[A1.3]]
+
+![[A1.4]]
 %%curriculum-end%%

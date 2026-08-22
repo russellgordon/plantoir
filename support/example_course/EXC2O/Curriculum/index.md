@@ -1,8 +1,8 @@
 ---
 title: Curriculum
-createdSection1: 2026-08-14T12:24:26.000-0400
+createdSection1: 2027-01-18T07:00:00.000-0500
 publishForSection1: true
-createdSection2: 2026-08-14T12:24:26.000-0400
+createdSection2: 2027-01-19T07:00:00.000-0500
 publishForSection2: true
 enableToc: true
 ---

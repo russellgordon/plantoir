@@ -95,3 +95,21 @@ always.
 > the model's maximum — this is high tide, and the water is
 > momentarily still. A rate of zero at the crest is the model
 > agreeing with the ocean.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.4]]
+
+![[A2.5]]
+
+![[A2.6]]
+
+![[A2.7]]
+
+![[A2.8]]
+
+![[B2.2]]
+
+![[B2.3]]
+%%curriculum-end%%

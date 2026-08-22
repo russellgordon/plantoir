@@ -11,8 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Spot the Bug]]
-2. Workday: [[The Remix Project]] — driver and navigator, swap on the
-   timer
+2. [[The Remix Project]], day 3 — workday: begin with whatever
+   yesterday's conference sharpened, then driver and navigator, swap on
+   the timer
 3. Mini-lesson: [[Finding Answers Online]] — searching well is a skill,
    not a shortcut
 4. Compare: one remix idea per pair, thirty seconds each

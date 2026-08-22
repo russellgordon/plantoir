@@ -11,10 +11,12 @@ tags:
 ## Agenda
 
 1. Number talk: [[Number Strings]]
-2. [[Inaccessible Heights]], day 5 — working period: the write-up, with a
-   diagram somebody else could follow
-3. Rehearse the symposium questions on another team
+2. [[Inaccessible Heights]], day 5 — working period: your weakest row
+   first, then the write-up, with a diagram somebody else could follow
+3. Brackets on the board: every team's interval for the same target,
+   side by side. Whose is widest, and what made it so?
 
 ## Things to do before our next class
 
-- [ ] Write-up finished; symposium next.
+- [ ] Report handed in — the working periods were what it was written
+      in.

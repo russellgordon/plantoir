@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Production run day 1: setting up the line
-2. Timing the steps; recording materials
-3. Bench care
+1. Production run day 1: setting up the line: [[The Production Run]]
+2. Timing the steps; recording materials: [[Propagation From Cuttings]]
+3. Bench care, and I come round the bench with each of you
 
 ## Things to do before our next class
 
-- [ ] Update the production log.
+- [ ] Check the production log has today's timings.

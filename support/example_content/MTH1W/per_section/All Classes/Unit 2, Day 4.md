@@ -13,7 +13,8 @@ tags:
 1. Number talk: [[Which One Doesn't Belong]] — expressions edition
 2. Random groups — code tracing at the boards: what will this loop print?
 3. Coding: [[Coding Visual Patterns]] — your first growing pattern, in Python
-4. Launch our task: [[Pattern Machines]] — code a pattern, predict term 100
+4. Launch our task: [[Pattern Machines]], day 1 of 7 — code a pattern,
+   predict term 100
 5. Reference for the road: [[Variables and Formulas in Code]]
 
 ## Things to do before our next class

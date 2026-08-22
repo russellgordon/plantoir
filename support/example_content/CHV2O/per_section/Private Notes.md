@@ -15,7 +15,7 @@ students. %%
   each group can find a real decision point with a real date — a council
   or committee agenda, a board meeting, a consultation closing date, a
   bill at committee, a budget deputation window. Build that list in
-  December: municipal and school-board agendas for January and February,
+  Early on: municipal and school-board agendas for the months ahead,
   any provincial or federal consultations still open, and the dates
   deputations must be requested by. Groups that cannot find a date end up
   writing to nobody in particular, and the mark suffers for a reason that

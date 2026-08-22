@@ -12,7 +12,7 @@ These questions follow [[News Values]] and the repair work you did in
 
 1. Write a headline for this story: the robotics club placed second
    at Saturday's qualifier and will compete at the provincial
-   championship in April — a first in school history.
+   championship a year from now — a first in school history.
 2. **Sharpen this.** "Student Council Meeting Held" — the story: the
    council voted to cancel the winter semi-formal after ticket sales
    covered less than a third of the venue cost.

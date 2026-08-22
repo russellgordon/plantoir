@@ -10,8 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 4 — a variable that oscillates is a variable under control
-2. [[Homeostasis and Feedback]]: the loop, named part by part
+1. Start of Unit 4 — the thing your body regulates without your noticing,
+   on the board. Unmarked: it shows me which loops you already have words
+   for
+2. [[Homeostasis and Feedback]]: the loop, named part by part — and why a
+   variable that oscillates is a variable under control
 3. Thermoregulation and blood glucose as worked examples
 4. Hand in [[Biotechnology Brief]]
 

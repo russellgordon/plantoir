@@ -18,4 +18,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Journal entry comparing September with now.
+- [ ] Journal entry comparing your first entry with now.

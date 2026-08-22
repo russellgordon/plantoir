@@ -22,3 +22,5 @@ tags:
 - [ ] Continue [[Slope and Graphing Practice]].
 - [ ] Journal: which representation — table, graph, or equation — feels
       most like home?
+- [ ] Bring your own example for [[When Will I Use This]] — we take the
+      question apart next class.

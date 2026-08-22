@@ -12,7 +12,7 @@ tags:
 
 1. [[Elasticity]] — how much, not merely which way
 2. Elasticity calculated from two points, and what the number means
-3. Six goods sorted by elasticity, and the order defended
+3. Six goods sorted by elasticity, and the order defended — I note where the room splits, and we settle it
 
 ## Things to do before our next class
 

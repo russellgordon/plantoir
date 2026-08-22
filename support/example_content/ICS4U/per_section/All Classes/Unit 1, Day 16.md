@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic: write a class from a specification, spot the
-   encapsulation failure, and predict a floating-point comparison
-2. Compare and correct in pairs
+   encapsulation failure, and predict a floating-point comparison: [[Objects and Classes]], [[Encapsulation]], and [[How Numbers Actually Fit]]
+2. Compare and correct in pairs; practice: [[Classes and Objects Practice]]
 
 ## Things to do before our next class
 

@@ -7,8 +7,8 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo or pairs · five working periods spread across two weeks · stories
-> shared in Week 14 · one page, one two-minute talk
+> Solo or pairs · six working periods spread across three weeks ·
+> one page, one two-minute talk
 
 ## What you are making
 
@@ -20,9 +20,11 @@ honestly what that model can and cannot say.
 You finish with two things. A one-page **data story** — your question,
 your evidence, your model, and its limits, written for a reader who was
 not in the room. And a two-minute talk that tells the same story out
-loud. If your question involves one variable, your representation is a
-[[Box Plots and Quartiles|box plot]]; if it involves two, it is a
-[[Scatter Plots and Trends|scatter plot]] with a fitted model.
+loud. Your question has to be about a relationship between two things,
+so the display at the centre of the story is a
+[[Scatter Plots and Trends|scatter plot]] with a model fitted to it.
+Where a one-variable summary would help a reader see the spread, put a
+[[Box Plots and Quartiles|box plot]] beside it.
 
 ## How to work
 
@@ -33,28 +35,54 @@ loud. If your question involves one variable, your representation is a
    vary and what stays the same. Check the plan with me before you
    collect anything.
 3. Carry out the plan, and keep notes on what surprised you.
-4. Represent and model. For two variables, build the scatter plot in
-   [[Using Desmos]] and test more than one regression model — the model
-   you keep should earn its place, not be the first one you tried.
+4. Represent and model. Build the scatter plot in [[Using Desmos]] and
+   test at least two regression models against it — the model you keep
+   should earn its place, not be the first one you tried.
 5. Write the story — [[Writing About Math]] is the guide. Say plainly
    what the model cannot claim, and say who is in your data and who is
    missing, in the spirit of [[Who Does Data Serve]].
-6. Rehearse the two-minute talk with a partner in class before telling
+6. **Find the same question being asked at scale, and say what changes.**
+   Somebody with far more data than you is already asking a version of
+   your question — a transit authority with every tap of every card, a
+   platform with every second of watch time, a health unit with every
+   visit. Name one such collection that genuinely exists, then answer
+   three things about it in a short paragraph: what is collected and
+   how long it is kept, what it lets somebody do that your class-sized
+   dataset cannot, and who is affected by a decision made from it who
+   never agreed to be in it. Your own data has this problem in
+   miniature — a classmate who was away the week you collected is
+   missing from your conclusion too — and the point is to see that it
+   is the *same* problem, scaled until it stops being harmless.
+7. Rehearse the two-minute talk with a partner in class before telling
    it for real.
 
-The working periods are class time, and using them well is part of the
-task — [[How Marks Work]] explains how.
+The working periods are class time, and that is the point: work that
+carries a mark is done where I can watch it happen and talk to you while
+it does — [[How Marks Work]] explains why. Two periods before the talks
+you will judge the story against the table below, using
+[[Judging Your Own Work]], with a working period left to act on it.
+
+## What is marked as yours
+
+If you work in a pair, the page and the data are shared and the mark is
+not. Two things are yours alone: the **closing reflection**, written
+separately by each of you in class rather than agreed between you, and
+**your half of the two-minute talk** — you divide it however you like,
+but each of you speaks, and each of you answers questions about the part
+you spoke to.
 
 ## Success criteria
 
-| Quality | What it looks like in your story |
+| Quality | What it looks like in your story, and at your talk |
 | --- | --- |
 | A genuine question | The question is yours, and the needed data is named |
 | An honest plan | Assumptions and sources are stated before collecting |
 | Fitting representation | The display matches the shape and kind of the data |
 | A tested model | The kept model was compared against at least one rival |
-| Stated limits | The page says clearly what the model cannot tell us |
+| Stated limits | The page says how well the model fits, and what it cannot tell us |
 | Careful prediction | Any prediction arrives with its uncertainty attached |
+| Your own closing | Your reflection is yours: what surprised you, what you would collect differently |
+| Your half, spoken | You answer questions about the part you presented, not only the part you wrote |
 
 ## Reflect
 
@@ -70,11 +98,54 @@ that surprised its maker is evidence of a question worth asking.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D1.1]]
+
 ![[D2.2]]
 
 ![[D2.3]]
+
+![[D2.4]]
 
 ![[D2.5]]
 
 ![[D1.3]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 9, the collection working period
+  Some of the collecting happens outside this room, which is exactly why
+  this period matters: Day 9 is where what they brought back meets the
+  plan they wrote on Day 4 for the first time. Watch what happens to the
+  plan when it does not survive contact: is it amended in writing, with
+  a reason, or quietly abandoned? A finished
+  story presents whatever was collected as though it had always been
+  the intention, so the page cannot tell you — and D2.3 asks for a plan
+  carried out, not a plan filed.
+  Going well: a line struck through in the plan with a sentence beside
+  it.
+  Stuck: a plan in the folder and a different set of numbers on the
+  desk.
+  Record: a star on the class list for a plan amended in writing. No
+  star is itself the finding.
+
+TALK — Unit 3, Day 11, at the conference already on that agenda
+  That agenda already tells them the conference is about what their
+  graph does not show, so they will arrive with an answer to that. Ask
+  instead:
+  "Somebody reads this and disagrees with you. What do they point at
+  first?"
+  Then: "Which model did you drop, and what was it doing at the edges
+  of your data that made you drop it?"
+  A strong first answer names a real weakness — the sample, the range,
+  the one week the data came from — rather than defending. A strong
+  second one is D1.3 heard properly: the task requires two models tried,
+  and the page keeps only the survivor, so whether the rejection was
+  reasoned or arbitrary exists nowhere except in the saying.
+  Record: per student, the objection they conceded and the model they
+  dropped. A pair shares the page and not the mark.
+
+The product evidence arrives on Day 14: the one-page story, the talk,
+and each person's closing reflection.
+%%

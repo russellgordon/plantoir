@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Skills you already have and did not learn at a job: [[Skills That Transfer]]
-2. Reading the table in both directions — your evidence, then an employer's need
-3. Where 'resilience' is the right word, and where it is not
+1. [[The Skills Inventory]], period one: twelve minutes, situations rather than adjectives
+2. Naming the skill beside each situation
+3. Drawing on all of it — classes, teams, jobs, family, volunteering
 
 ## Things to do before our next class
 
-- [ ] Read [[Skills That Transfer]] to the end, including the last section.
+- [ ] Add three more situations tonight, away from this room.

@@ -80,9 +80,23 @@ somebody who knows you is still the one marking it.
 ## How this is assessed
 
 Against the same expectations as everything else. Per [[How Marks Work]],
-this examination is part of the final 30% of the course mark alongside
-[[The Math Symposium]], so that neither one afternoon nor one project
-decides your grade alone.
+this examination is part of the final thirty per cent of the course mark
+alongside [[The Math Symposium]] — the examination being the larger of
+the two — so that neither one afternoon nor one conversation decides your
+grade alone. The other seventy per cent is already behind you, in the
+four unit tasks.
+
+| Quality | What it looks like on the page |
+| --- | --- |
+| Method visible | Every answer shows how it was reached, not only what it came to |
+| The right tool | The rule, the test, or the product the question actually calls for |
+| Exact where exact exists | Radians and radicals left alone, not rounded away |
+| Meaning stated | Optima, intersections and rates answered in a sentence, with units |
+| Nothing blank | A stalled question still carries, in words, the method you intended |
+
+Nothing there is new. They are the same five things every task page has
+asked of you since [[The Speed Camera]], written for a room where nobody
+can ask you what you meant.
 
 %%curriculum-start%%
 ## Curriculum connection
@@ -101,3 +115,55 @@ decides your grade alone.
 
 ![[C3.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Say the awkward thing first: three hours of silent writing is product
+evidence and nothing else. Nobody observes in an examination room, nobody
+converses, and any attempt to do either is invigilation rather than
+assessment. The observation and conversation evidence for these
+expectations therefore has to come out of the four review classes, Unit
+4, Days 23 to 26 — where it can also still change somebody's
+preparation, which is the only argument for spending the time.
+
+OBSERVE — Unit 4, Day 24, review part two
+  Watch for: what a student does when handed a curve with no equation on
+  it. Reading slopes straight off the picture is the skill B1.1 names —
+  the graph is what you are GIVEN — and it survives a curve that has no
+  equation to guess. Trying first to decide what kind of function it is,
+  and differentiating that, produces the same sketch on an easy question
+  and nothing at all on a hard one. Both students hand in a sketch; only
+  one of them has the skill.
+  Going well: a finger tracking the curve, flat spots marked before
+  anything else, then the steep stretches.
+  Stuck: "it is a cubic, so" spoken before a single slope has been read.
+  Record: a tick or a cross down the seating plan, one pass of the room.
+  The crosses are the students to sit beside on Day 26, while it still
+  matters.
+
+TALK — Unit 4, Day 26, the last class before the examination, at the
+individual conferences already on that agenda
+  That day is already about where each student stands, so ask something
+  they cannot have prepared. One question each, a minute or two, threaded
+  through the open clinic — you will not reach everybody, so start with
+  the crosses from Day 24.
+  Ask: "Write me two plane equations whose system collapses to zero
+  equals zero. Now change one number so it collapses to a contradiction
+  instead — and tell me what moved, geometrically."
+  Or: "Describe a graph to me that is always rising and always getting
+  less steep. Tell me the sign of the first derivative, the sign of the
+  second, and which of the two you were least sure of."
+  Reading a collapse off somebody else's algebra is Day 14's lesson and
+  they will have it. BUILDING one is not: a student who can manufacture
+  coincident planes on demand, and then slide them apart into a parallel
+  pair, has C3.2's caveat about coincident and parallel planes in their
+  hands rather than in their notes, and it takes thirty seconds to see.
+  A strong answer to the second gives positive and negative, and then
+  notices that the description pins down neither the function's own sign
+  nor its values — B1.2 heard, with no pencil involved.
+  Record: two words per student in the margin of the seating plan, as
+  they leave.
+
+The product evidence is the paper itself.
+%%

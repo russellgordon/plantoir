@@ -13,7 +13,8 @@ tags:
 1. Warm-up: three sentences on the board, one splice. Find it
 2. [[Who You Are, in Three Hundred Words]], day 3 — workshop: read to a
    partner, who says what they saw and what they wanted more of
-3. Revise while the reading is fresh
+3. Revise while the reading is fresh — your partner's reaction, and the
+   thing I asked you to try on Day 9
 
 ## Things to do before our next class
 

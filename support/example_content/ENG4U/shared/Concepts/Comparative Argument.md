@@ -47,11 +47,13 @@ does everything. A comparison is worth writing when the two texts
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B1.6]]
+
 ![[C1.2]]
 
 ![[C1.4]]
 
-![[B1.6]]
-
 ![[C2.4]]
+
+![[C3.4]]
 %%curriculum-end%%

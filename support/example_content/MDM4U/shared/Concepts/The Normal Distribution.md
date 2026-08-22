@@ -107,11 +107,15 @@ Three consequences worth knowing before you argue about a poll:
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D1.4]]
+![[B2.3]]
+
+![[B2.5]]
 
 ![[B2.6]]
 
 ![[B2.7]]
 
 ![[B2.8]]
+
+![[D1.4]]
 %%curriculum-end%%

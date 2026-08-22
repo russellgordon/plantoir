@@ -12,7 +12,8 @@ tags:
 
 1. Seminar: [[Is Sustainable Development a Real Thing|Is Sustainable Development a Real Thing?]]
 2. [[Arguing About Sustainability]] — the strongest version of each side
-3. Working period
+3. Working period: your own answer to your investigation question,
+   written alone and signed
 
 ## Things to do before our next class
 

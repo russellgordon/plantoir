@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Work period: the wartime decision
+1. Work period: [[The Wartime Decision]]
 2. Conferences on the 'what was known' section
-3. Writing clinic
+3. Writing clinic: [[Using Evidence]]
 
 ## Things to do before our next class
 

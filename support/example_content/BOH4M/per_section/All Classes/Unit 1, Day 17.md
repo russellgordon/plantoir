@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Working period: the brief
-2. Conferences — bring your recommendation and the cost you are naming
-3. Peer read: swap drafts, mark one place where a claim needs a source
+1. Working period: [[The Ethics Brief]]
+2. Conferences — bring your recommendation and the cost you are naming; you leave with one change named, and next class opens with time to make it
+3. Peer read: swap drafts, mark one place where a claim needs a source: [[Citing Business Sources]]
 
 ## Things to do before our next class
 

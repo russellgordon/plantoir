@@ -155,11 +155,23 @@ and argue about who carries the cost in [[Whose Climate, Whose Cost]].
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D3.1]]
-
-![[D3.2]]
+![[D2.4]]
 
 ![[D2.6]]
 
 ![[D2.7]]
+
+![[D2.9]]
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[D3.4]]
+
+![[D3.6]]
+
+![[D3.7]]
+
+![[D3.8]]
 %%curriculum-end%%

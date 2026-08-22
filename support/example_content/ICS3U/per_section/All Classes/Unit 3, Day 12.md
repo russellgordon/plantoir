@@ -15,6 +15,9 @@ tags:
    from [[Writing a Test Plan]]
 3. Hand-worked cases only — a test whose expected value came from
    running the code is not a test
+4. Read the criteria on [[The Toolbox]] now, before the note is
+   written — two of them are about somebody else being able to use
+   this, which is what tomorrow tests
 
 ## Things to do before our next class
 

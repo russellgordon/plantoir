@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 The board you were handed in [[Blink, Read, React]] has no screen, no
 keyboard, no hard drive, and no operating system in any sense you would

@@ -89,3 +89,46 @@ checking, not producing.
 > $(0, -36)$: $k(4)(9) = 36k = -36$, so $k = -1$ and
 > $f(x) = -(x + 2)^2(x - 3)^2$. A negative $k$ makes sense: the
 > graph opens downward, touching the axis from below.
+
+## One last audit
+
+9. Which of these define polynomial functions, and which do not?
+   $f(x) = 4$; $g(x) = 3x - 7$; $h(x) = x^2 - 5x$;
+   $p(x) = 2x^3 - \sqrt{x}$; $q(x) = \dfrac{5}{x} + 1$;
+   $r(x) = x^4 - 2x^{-1}$. For each one that does, say why the
+   equation defines a *function* at all — and say where the linear and
+   quadratic functions you met in Grade 10 sit in this family.
+
+> [!success]- Answer 9
+> Polynomials: $f$, $g$ and $h$. A polynomial expression is a sum of
+> terms, each a constant times a power of $x$ with a whole-number
+> exponent — so $\sqrt{x} = x^{1/2}$ disqualifies $p$, and the
+> negative exponents hiding inside $\frac{5}{x}$ and $2x^{-1}$
+> disqualify $q$ and $r$. Every one of them is a *function*, though,
+> and for the same reason: substituting a number for $x$ triggers a
+> chain of additions and multiplications with no choices in it, so one
+> input can only ever produce one output.
+>
+> And the family is older than it looks. $f(x) = 4$ is a polynomial of
+> degree zero, $g$ is degree one, $h$ is degree two — the lines and
+> parabolas of Grade 10 are simply the first two rungs of the ladder
+> this whole unit climbs. Nothing new was invented at the start of the course; the
+> degree just went up.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[C1.1]]
+
+![[C1.3]]
+
+![[C1.5]]
+
+![[C1.7]]
+
+![[C1.8]]
+
+![[C1.9]]
+
+![[C4.3]]
+%%curriculum-end%%

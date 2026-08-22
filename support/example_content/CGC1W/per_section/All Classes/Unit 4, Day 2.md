@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. The surveys compared — what does this community actually do with its land?
+1. The surveys compared — what does this community actually do with its
+   land? A diagnostic for the unit: I am finding out what you already
+   believe decides that, and none of it counts
 2. [[Forces That Shape a Community]]
 3. Who wanted it this way?
 

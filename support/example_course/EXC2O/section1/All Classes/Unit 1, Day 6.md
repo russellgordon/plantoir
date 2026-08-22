@@ -18,5 +18,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] First [[Science in the News]] submission due in one week.
-- [ ] Dress for outdoors later this week — we work on the field rain or shine.
+- [ ] Find your first [[Science in the News]] article. You take it apart in
+      class.
+- [ ] Bring one headline you do not believe, and one you do.

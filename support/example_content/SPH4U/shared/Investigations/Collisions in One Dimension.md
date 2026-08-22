@@ -8,8 +8,10 @@ tags:
   - unit-2
 ---
 > [!abstract] At a glance
-> **Time:** one class. **Groups of three.** Bring the energy question with
-> you: is kinetic energy conserved here?
+> **Time:** one class, written up in the next period and handed in at the
+> bell — the second of the marked [[Investigation Write-Ups]]. **Groups of
+> three at the track, write-up yours alone.** Bring the energy question
+> with you: is kinetic energy conserved here?
 
 Two carts on a track, magnets for elastic collisions and velcro for
 inelastic ones, and photogates or video for the speeds.
@@ -43,6 +45,10 @@ kinetic energy before and after.
    disappeared, and where did it go?
 4. Your momentum totals will not balance exactly. Give the percentage,
    and name the two most likely reasons.
+5. For the sticky collision, compute the impulse on each cart from its
+   own change in momentum. Newton's third law says the two should come
+   out equal and opposite. Do they, inside your uncertainty? If the
+   collision lasted 40 ms, what average force was each cart carrying?
 
 %%curriculum-start%%
 ## Curriculum connection

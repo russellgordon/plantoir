@@ -5,17 +5,20 @@ created: __CREATED__
 tags:
   - portfolio
 ---
-Your [[Math Journal]] is collected at the end of each unit. Before you
-hand it in, run this check — it is the same lens I read with, so
-anything you catch here is something we never need to have a
+Your [[Math Journal]] comes in once a unit, in the class after that
+unit's big task. Before you hand it in, run this check — the **Quality**
+and **Growth** boxes are the same lens I read your milestone entries
+with, so anything you catch here is something we never need to have a
 conversation about. Ten minutes with this list is usually worth more
 than one extra entry.
 
 ## The check
 
-**Coverage**
+**Coverage** — this section is for you, not for the mark. Nothing you
+do between classes is marked (see [[How Marks Work]]); a thin unit is
+just a unit you will have less to point at later.
 
-- [ ] There is an entry for every class in the unit
+- [ ] There is an entry for every class of the unit so far
 - [ ] Entries were written close to the day, not reconstructed the
       night before collection — reconstructed entries always show
 - [ ] All four prompts appear across the unit: what we did, what

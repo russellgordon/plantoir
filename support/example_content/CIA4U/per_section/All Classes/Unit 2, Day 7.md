@@ -12,7 +12,7 @@ tags:
 
 1. [[The Firm Study]] handed in
 2. [[Efficiency and Equity]] — two questions, and economics settles only one of them
-3. Ten statements sorted into efficiency claims and fairness claims
+3. Ten statements sorted into efficiency claims and fairness claims — sorted sheets collected, read tonight
 
 ## Things to do before our next class
 

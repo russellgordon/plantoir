@@ -67,4 +67,10 @@ the vocabulary from the concept page — name the problem, then fix it.
 ## Curriculum connection
 
 ![[A1.2]]
+
+![[A1.3]]
+
+![[A1.4]]
+
+![[B2.5]]
 %%curriculum-end%%

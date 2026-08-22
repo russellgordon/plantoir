@@ -6,8 +6,11 @@ description: Build or revise a per-course-code example-content payload (support/
 # Building example content for a course code
 
 A payload is a complete, working course a teacher keeps: real pages, a real
-semester, real curriculum. **ADA1O is the reference implementation** — when
-in doubt, open it and copy its shape. `support/example_course/EXC2O` is the
+semester, real curriculum. **ADA1O is the reference implementation** for
+page shape and voice — when in doubt, open it and copy its shape. **For the
+ASSESSMENT rules below — the three modes, the per-unit sequence, the hidden
+triangulation blocks, `How Marks Work` — the reference is `ICS3U`**, which
+was brought to them first; ADA1O predates them and does not conform yet. `support/example_course/EXC2O` is the
 older standalone example course; match its depth and warmth, not its
 mechanics.
 
@@ -17,26 +20,95 @@ folder should exist without purpose. Machinery lives in
 `scripts/setup_course.py` (`install_example_content` and friends) and needs
 NO changes for a new course code — a new payload is pure content.
 
+## Authoring is two passes, and the second one is adversarial
+
+**A primary agent writes; an adversarial sub-agent then checks its work.
+This is not optional and it is not a proofread.** Every payload, every
+revision to a payload, and every change to this skill goes through both
+passes before anybody calls it done.
+
+The reason is measured, not theoretical. Each of these was produced by a
+careful first pass that reported success, and each was found by a second
+agent briefed to disbelieve it:
+
+- A worked example written into this skill named the wrong unit and the
+  wrong days for the task it was drawn from — Unit 2 for a task that runs
+  in Unit 1 — and tied its evidence to a terminology expectation that does
+  not describe that evidence. It broke three of the six rules printed
+  directly beneath it.
+- Ten of fourteen policy citations in the same section were off by one.
+  Every quotation was real; every page number was wrong.
+- A course revised to satisfy these rules sent a teacher to observe a
+  counting period that does not exist on that day, quoted an expectation
+  as evidence-in-conversation when its verbatim text says "in writing",
+  and stated the homework rule correctly on one page while five other
+  pages went on breaking it — including a paragraph the same revision
+  had just written.
+
+None of these is the kind of mistake re-reading your own work finds. They
+read as entirely plausible, which is exactly the property that makes them
+survive a self-review and fail a teacher.
+
+**How to run the second pass:**
+
+- **Brief it to REFUTE, not to review.** Tell it to assume every factual
+  claim is misremembered until checked against a primary source, and every
+  new rule conflicts with an existing one until it has read the
+  surrounding file. "Look this over" produces praise; "find what is wrong
+  here, and do not pad" produces findings.
+- **Hand it the primary sources and say where they are** — the live
+  curriculum document, the class pages, the expectation texts in
+  `Curriculum/`, `lint_payload.py`, `build_site.py`. A reviewer working
+  from memory reproduces the first agent's errors.
+- **Name the attack surfaces in priority order**, highest-value first. For
+  a payload that is: do the days, task names and curriculum codes a page
+  names match what the arc actually does; is every quotation verbatim and
+  every citation right; does any page contradict another; could a teacher
+  actually run each period as written.
+- **Require file:line, the claim, what is actually true, the EVIDENCE, and
+  the smallest fix** — and require CONFIRMED to be separated from
+  SUSPECTED. A finding without evidence is a second opinion, not a check.
+- **Verify what it reports before you act on it.** It is a check, not an
+  oracle: an adversarial pass in this repository was itself wrong about how
+  many payloads a defect affected, because it used a looser rule than the
+  code does. Confirm each finding against the source yourself, then fix.
+- **Do not let it edit.** It reviews; the primary agent fixes. A reviewer
+  that repairs what it finds stops looking for more.
+
+The linter is not this pass and cannot become it. It checks structure —
+links resolve, markers balance, coverage is complete — and almost nothing
+in the assessment rules is machine-checkable. A payload can be `clean` and
+still send a teacher to the wrong day on Monday.
+
 ## Phase 1 — Research the curriculum (verbatim or not at all)
 
-**From the LIVE site, every time.** `dcp.edu.gov.on.ca` is the source; do not
-work from a saved copy, and do not add one to this repository. A copy held here
+**From the LIVE official government portal, every time** —
+`dcp.edu.gov.on.ca` and `edu.gov.on.ca/eng/curriculum/secondary/`.
+
+**This skill is Ontario only.** A British Columbia course code goes to
+[`.claude/skills/bc-example-content/SKILL.md`](../bc-example-content/SKILL.md),
+which is self-contained and reads `curriculum.gov.bc.ca` instead. BC
+payloads use the tool scripts in this folder unmodified — the scripts are
+jurisdiction-AWARE (`lint_payload.py` branches on `manifest["jurisdiction"]`
+for credit arithmetic) rather than Ontario-only. The GUIDANCE below is
+Ontario-only: it assumes Ontario strands, expectation codes, the provincial
+achievement chart, and *Growing Success*. Several of its rules are not
+actually jurisdiction-bound — the hidden triangulation block, success
+criteria on task pages, the per-unit assessment sequence — and a BC payload
+would be better for them, but the BC skill does not currently ask for them;
+raise it rather than assuming either answer.
+
+Do not work from a saved copy, and do not add one to this repository. A copy held here
 does not preserve the curriculum, it manufactures a stale second version of it —
-the ministry updates these documents whenever it likes. (One was kept for two
-days in August 2026 and removed for exactly this reason; see
-[`research/README.md`](../../../research/README.md).)
+the ministry updates these documents whenever it likes.
 
 Launch a research agent (WebSearch/WebFetch) to capture, from the
 Ministry's own published document, for the exact course code:
 strand titles; every OVERALL expectation (code + verbatim text); every
 SPECIFIC expectation (code + verbatim text, including the italic
-parenthetical examples); teacher prompts verbatim; the "By the end of this
-course, students will:" stems; and the citation (document title, year,
-copyright holder, the dcp.edu.gov.on.ca course URL, and the source PDF URL
-with page range). Old curricula live at
-`edu.gov.on.ca/eng/curriculum/secondary/*.pdf`; newer ones on
-`dcp.edu.gov.on.ca`. Two-column PDFs detach teacher prompts from their
-expectations — cross-check against a layout-preserving extraction. Anything
+parenthetical examples); teacher prompts verbatim; the official stems; and the citation (document title, year,
+copyright holder, official course URL, and source PDF URL
+with page range). Anything
 unverifiable gets flagged and is NOT published as Ministry wording.
 
 Save the result as a structured markdown file (see the format the ADA1O
@@ -58,7 +130,7 @@ culminating. Name class pages `Unit N, Day M.md`. Write the arc down
 before authoring — it is the skeleton everything hangs from, and
 class-page links are the schedule.
 
-**An Ontario credit is 110 hours of scheduled time, and the arc must
+**A standard secondary credit requires 110–120 hours of scheduled time (1.0 credit), and the arc must
 account for all of it.** One class page is one period. At the 75-minute
 period a semestered day school runs, that is **about 86 class pages plus a
 three-hour final evaluation** — roughly 18/22/22/24 across four units,
@@ -119,6 +191,195 @@ without them produces a course that is longer and worse:
   coverage: an expectation genuinely addressed three times in three
   different contexts is worth more than the same lesson written out
   three ways.
+
+**Every Ontario course must show all three kinds of assessment, and two of
+them live in the ARC rather than in the `Tasks` folder.** *Growing Success:
+Assessment, Evaluation, and Reporting in Ontario Schools* (2010) is the
+companion document to every Ontario curriculum, and although it reads as
+assessment policy it has strong consequences for course DESIGN: several of
+its rules are hard to satisfy honestly unless the course was built with
+them in mind. Read it live at
+`https://www.edu.gov.on.ca/eng/policyfunding/growSuccess.pdf` when a
+decision turns on the wording. **Cite it by chapter and heading**, not by
+page — the ministry repaginates, and this skill's own Phase 1 rule about
+stale copies applies to policy documents too; the page numbers in
+parentheses below are the 2010 first edition and are a convenience, not the
+citation. Each chapter is in two halves, `POLICY` then `CONTEXT`, and the
+difference matters when you are deciding whether something is required or
+merely recommended. The three modes:
+
+- **Assessment *of* learning** is evaluation — judging quality against the
+  achievement chart and assigning a mark. It belongs at or near the END of
+  a unit, and at the end of the course (the culminating task, then the
+  final evaluation). This is what `Tasks` mostly already holds, and it is
+  the mode no payload forgets.
+- **Assessment *for* learning** is evidence gathered to decide what to
+  teach next and to give the student descriptive feedback: diagnostic
+  before a unit bites, formative all the way through. Any day.
+- **Assessment *as* learning** is the student judging their own work
+  against criteria they understand, setting a goal, and acting on it. Any
+  day — and it has to be TAUGHT, on the gradual release of responsibility
+  GS describes (demonstrate during instruction → guided practice → share
+  the responsibility → assess independently; Ch. 4 CONTEXT, p. 35), which
+  means it occupies real periods rather than a sentence on a task page.
+
+A payload that ships four units and five summative tasks has written only
+the FIRST of these. The other two live in the AGENDAS, which is where a
+reader can tell whether they were designed or merely assumed.
+
+**The arc's assessment requirements come straight out of Chapter 4's POLICY
+half** (*Assessment for Learning and as Learning*, pp. 28–29), which says
+teachers "need to" plan assessment concurrently with instruction, "share
+learning goals and success criteria with students at the outset of
+learning", "gather information about student learning before, during, and
+at or near the end of a period of instruction", "give and receive specific
+and timely descriptive feedback", and "help students to develop skills of
+peer and self-assessment". **Per unit, that means all of the following, in
+this order:**
+
+1. a **diagnostic** near the unit's start — a warm-up, a "what do you
+   already think", a low-stakes problem — whose named purpose on the class
+   page is finding out where this class is starting from;
+2. the unit's **learning goals and success criteria in student language**,
+   in the students' hands at launch rather than at hand-in. They live on
+   the TASK page (or a unit page), which the class page links to on the day
+   the task launches — a class page is a schedule, so the criteria go where
+   the work is. GS's practice discussion is worth following on the wording:
+   learning goals are written "in language that students can readily
+   understand" (Ch. 4 CONTEXT, p. 33), not expectation text lifted from the
+   Curriculum folder;
+3. **formative work on at least a third of the unit's class pages**, named
+   as such on the agenda — an exit ticket, a rehearsal share, a code
+   review, a draft read aloud;
+4. at least one **feedback checkpoint before the summative**, and at least
+   one working period after THAT CHECKPOINT whose stated job is acting on
+   the feedback. GS's discussion of descriptive feedback is explicit that
+   "multiple opportunities for feedback and follow-up are planned during
+   instruction to allow for improvement in learning prior to assessment of
+   learning" (Ch. 4 CONTEXT, p. 34) — so a unit that launches a task and
+   then collects it, with nothing in between, has no place for the feedback
+   to land. This is the assessment reason behind the working-period rule
+   above: "a checkpoint with the teacher" and "revision after feedback" are
+   not flavour, they are the two periods that make the unit work;
+5. at least one **self- or peer-assessment episode** the teacher has
+   modelled first — GS treats the modelling as part of the job, not a
+   preliminary, so the arc needs a day for each;
+6. the **summative task**, at or near the end.
+
+**Evaluation lands on OVERALL expectations, and once is thin.** "For Grades
+1 to 12, all curriculum expectations must be accounted for in instruction
+and assessment, but evaluation focuses on students' achievement of the
+overall expectations" (Ch. 5 POLICY, p. 38) — which is why the coverage
+rule in Phase 5 wants every overall reachable through a task. The grading
+rule adds a second, less obvious demand: a report card grade "should
+reflect the student's most consistent level of achievement, with special
+consideration given to more recent evidence" (Ch. 5 POLICY, p. 39).
+Consistency and recency mean little for an overall expectation the course
+evaluates once, in Unit 1, and never returns to. So **"ideas come back" is
+an assessment rule as much as a learning one**: where the course honestly
+allows, an overall should be evaluated in more than one unit, and the
+culminating task is the natural second look at most of them.
+
+**The four categories are a design instrument, not just a rubric.** GS
+lists "help teachers to plan instruction for learning" among the
+achievement chart's purposes (Ch. 3 POLICY, p. 16) and requires learning to
+be "assessed and evaluated in a balanced manner with respect to the four
+categories" — Knowledge and Understanding, Thinking, Communication,
+Application (Ch. 3 POLICY, p. 17; repeated in Ch. 4 POLICY, p. 28).
+"Balanced" is NOT "equal", and the document says so in the next breath: the
+relative importance of each category "may vary" by subject and course, and
+should reflect the emphasis the curriculum expectations themselves give it.
+So weight the categories the way this course's expectations do — and check
+that none is missing altogether. The Application row of every achievement
+chart includes transferring knowledge and skills "to new contexts" (see the
+sample charts, pp. 21 and 25), so at least one task in the course should
+put the learning into a context the class has not practised. A course whose
+tasks are all "build the thing we just built together" has thin Application
+evidence in it, whatever its rubric claims.
+
+**Four things that must stay out of a mark**, each of which a payload can
+get wrong in a single sentence. The first three are flat prohibitions in
+GS's policy half; the fourth is hedged, and the hedge is quoted:
+
+- **A peer's judgement, or the student's own.** "The evaluation of student
+  learning is the responsibility of the teacher and must not include the
+  judgement of the student or of the student's peers" (Ch. 5 POLICY,
+  p. 39). Self- and peer-assessment are *for* and *as* learning, full stop;
+  no task page may imply a classmate's rating becomes part of anyone's
+  mark.
+- **A common group mark.** Group projects are allowed "as long as each
+  student's work within the group project is evaluated independently and
+  assigned an individual mark, as opposed to a common group mark" (Ch. 5
+  POLICY, p. 39). Every group task must therefore NAME the
+  individually-evaluated thing — the role, the section, the personal build
+  log, the recorded two-minute conversation. (Roughly half the payloads
+  shipped so far do this; the rest are a fair retrofit.)
+- **Ongoing homework.** "Assignments for evaluation must not include
+  ongoing homework that students do in order to consolidate their knowledge
+  and skills or to prepare for the next class" (Ch. 5 POLICY, p. 39). The
+  class pages' "Things to do before our next class" list is practice, and
+  the practice itself is never the evaluated thing. It MAY remind a student
+  to submit an assignment for evaluation that the class periods were for —
+  that is a reminder, not homework being marked. Evaluated work is done
+  "whenever possible, under the supervision of a teacher" (same page),
+  which is the second assessment reason for giving every substantial task
+  real working periods.
+- **Learning skills and work habits.** Responsibility, Organization,
+  Independent Work, Collaboration, Initiative and Self-regulation are
+  evaluated and reported SEPARATELY, as E/G/S/N. GS hedges this one, and
+  the hedge is part of the rule: "**To the extent possible, however,** the
+  evaluation of learning skills and work habits, apart from any that may be
+  included as part of a curriculum expectation in a subject or course,
+  should not be considered in the determination of a student's grades"
+  (Ch. 2 POLICY, p. 10). The escape hatch is narrow and specific — a
+  curriculum expectation that genuinely contains the skill, as health and
+  physical education's Living Skills and mathematics' process expectations
+  do. It is not a licence to mark participation. Write success criteria
+  that describe the WORK, not the worker.
+
+**`How Marks Work` must tell the truth about the credit.** For Grades 9–12:
+seventy per cent from evaluation throughout the course, reflecting the most
+consistent level with weight given to more recent evidence, and thirty per
+cent from a final evaluation at or towards the end that lets a student
+"demonstrate comprehensive achievement of the overall expectations for the
+course" (Ch. 5 POLICY, p. 41). The `final-evaluation` page the arc already
+requires IS that thirty per cent, so it must reach across the whole course
+rather than be a fifth unit test. Name the four categories in student
+words, say that learning skills are reported separately from the mark, and
+say where the evidence comes from — all three kinds.
+
+**This was retrofitted across every payload in August 2026, and the base
+rate is the finding worth keeping: every single course had at least one
+mark the policy forbids.** "Ensemble and audience skills : 10",
+"Seminars 10% — prepared participation", "Professionalism — on time,
+prepared, discreet", and — worst, because the class pages said "mark your
+own" — TEJ3M's "Measurement and calculation checks : 20" and MCV4U's
+"Quizzes and check-ins : 25". None of these looked wrong to the author who
+wrote them. Assume the same of yours: the mark page is where a course
+quietly grades the worker instead of the work, and it is the first page to
+audit rather than the last. ADA1O carried the first of those and no longer
+does; it is again safe to copy for VOICE, and its `How Marks Work` is now
+a worked example of the two-slice pie as well.
+
+Every payload now states the split, so a missing 70/30 is no longer the
+common failure. Two live ones remain: a pie that charts an inventory
+instead of the shape (see the mermaid rules in Phase 5), and a mark page
+promising a weighting the task arc does not actually deliver.
+
+**Triangulate: observation, conversation, product.** "Evidence of student
+achievement for evaluation is collected over time from three different
+sources — observations, conversations, and student products" (Ch. 5 POLICY,
+p. 39). Products look after themselves: they arrive, they hold still, they
+can be marked on a Sunday. The other two are the hardest and slowest
+evidence to gather well, they leave no trace unless the teacher
+deliberately makes one, and they are therefore the two that quietly vanish
+from a real course — leaving a teacher evaluating on a third of the
+evidence the policy describes. A payload cannot gather that evidence for
+anybody, but it CAN tell the teacher exactly where in each task it is
+available, which is what the hidden triangulation block in Phase 5 is for.
+Design the arc so those moments exist in the first place: a task whose
+every period is silent individual work gives a teacher nothing to watch and
+nobody to talk to.
 
 **Lean constructivist in the lesson plans.** Students meet an idea by
 working a problem, exploration, or activity BEFORE the idea gets its
@@ -227,7 +488,8 @@ from Phase 5 apply here too.
   learning) followed by a folded `[!success]- Try it: click this line`
   demo. The linter enforces the no-hint rule. One-off folded self-checks
   on concept pages may keep a brief "(click to expand)" affordance hint.
-- Curriculum references: end-of-page block
+- Curriculum references: near-the-end-of-page block (only the hidden
+  triangulation block below sits after it)
   `%%curriculum-start%%` / `## Curriculum connection` / blank-line-separated
   `![[A2.2]]` transclusions of SPECIFIC expectations / `%%curriculum-end%%`.
   Inline prose links to curriculum pages must be piped
@@ -285,6 +547,18 @@ from Phase 5 apply here too.
   held-back page — the final class — therefore contributes nothing, which is
   another reason curriculum blocks belong on destination pages rather than
   class pages.
+- **A task page states its success criteria in student language, before
+  the work starts.** A short table of qualities and what each looks like to
+  a reader, an audience or a user is the usual shape, but a plain list is
+  fine where the page's one demonstrated Obsidian feature is something else
+  — the requirement is the criteria, not the table.
+  `ADA1O/shared/Tasks/Tableau Story Sequence.md` is the reference: note
+  that its criteria sit BELOW its "How to work" steps but are still on the
+  page a student opens on launch day, which is what "before the work
+  starts" means. They must be writable from the achievement chart without
+  quoting it — describe the WORK, never the worker (Phase 2). A task with
+  no success criteria cannot support assessment *as* learning, because
+  there is nothing for a student to judge their own work against.
 - **Checklists on the site are READ-ONLY.** `- [ ]` renders a box that
   cannot be ticked: nothing is saved, and clicking does nothing. Never
   write "click to check off", "tick these as you go", or any wording that
@@ -321,6 +595,35 @@ from Phase 5 apply here too.
   everything else: 1") and put the detail in a footnote. Sweep every pie
   in a payload for this before shipping: no slice rounding to zero, no two
   slices under 3%.
+- **A pie carries the SHAPE of an answer, never an inventory. Chart the
+  split that matters and put the members of each part in prose beneath
+  it.** Past about four slices a pie stops being a picture and becomes a
+  legend with a decoration attached: the reader's eye has nowhere to
+  land, and the one comparison the page exists to make is buried among
+  nine others it does not care about. If you find yourself needing a
+  legend as tall as the chart, the content wanted a table, a list, or a
+  sentence.
+
+  ICS3U's `How Marks Work` is the worked example, and it is instructive
+  because it broke NO existing rule. Ten slices, every one legible,
+  nothing under 3%, title within length — and it still failed, because a
+  student opening that page needs one fact (seventy per cent from the
+  semester, thirty from the end) and had to reconstruct it by summing
+  eight numbers. Redrawn as two slices, with the seven tasks named in a
+  paragraph underneath, the same page answers the question in the first
+  glance and keeps every detail it had.
+
+  There is a second reason beyond legibility, and it is the one that
+  survives a bigger monitor: **per-item percentages are false precision
+  whenever the underlying numbers are a professional judgement.** The
+  split between six comparable tasks shifts with the class and with the
+  year; printing 6% against 5% presents a judgement as arithmetic and
+  invites an argument about the wrong thing. Say which piece is the heavy
+  one and why, and offer the exact numbers to anyone who asks for them.
+
+  So: keep the two mechanical rules above — they are necessary and they
+  are not sufficient. Then ask what single comparison the chart is FOR,
+  and whether a reader would see it without counting.
 - **CHEMISTRY: write it with mhchem (`\ce{...}`), never by hand.** The
   build enables the extension (`build_site.py` adds
   `import "katex/contrib/mhchem"` to `latex.ts`), so a whole equation
@@ -355,6 +658,104 @@ from Phase 5 apply here too.
 - Link only to pages that will exist. Maintain the full page inventory
   BEFORE fanning out authoring agents; hand every agent the complete
   sanctioned link list.
+
+**Every task page ends with a hidden triangulation prompt for the
+teacher.** Observation and conversation are the two evidence sources a real
+course loses first (Phase 2), so every task carries a `%%` comment naming
+where in THAT task they are actually available. `%%` is Obsidian's comment
+marker, and the vendored Quartz strips it at text level before parsing —
+`commentRegex = /%%[\s\S]*?%%/g` in
+`quartz/plugins/transformers/ofm.ts`, whose `[\s\S]` is what makes the
+MULTI-LINE form safe. Nothing inside the markers is ever published.
+`SBI4U/per_section/index.md` is a published page carrying one in exactly
+the shape prescribed here, delimiters on their own lines.
+
+**"Task" means a page in `Tasks/`, and that is a technical constraint, not
+a style preference.** Both gates decide what counts as assessed work by
+FOLDER — `lint_payload.py` tests `"/Tasks/" in path`, and `build_site.py`
+looks for "task" in a path component — so evaluated work that lives only in
+`Investigations` or `Portfolios` leaves red strand chips on the Curriculum
+Coverage map and fails the linter's "never reached by assessed work"
+check. If a course's real evaluated work is an investigation, the task page
+belongs in `Tasks/` and links to it.
+
+The block goes at the very END of the page, AFTER `%%curriculum-end%%` —
+last of all, because the curriculum block above it is PUBLISHED and
+student-visible, and this is the only part of the page students never see.
+Never put it INSIDE the curriculum markers: `strip_curriculum_blocks()` in
+`scripts/setup_course.py` deletes everything between them for a teacher who
+declines curriculum pages, so a nested comment vanishes silently. Every task
+template (like `ADA1O/shared/Tasks/_DUPLICATE ME.md`) places the triangulation
+block after `%%curriculum-end%%` for this reason.
+
+**Plain text only inside the block.** No `[[wikilinks]]` and no
+`![[transclusions]]`: the linter and `build_site.py` read the raw markdown
+without stripping comments, so a `![[C1.2]]` written here would silently
+count as curriculum coverage for an expectation no student page addresses,
+and a `[[Page]]` would satisfy the two-hop reachability check for a page
+nothing visible reaches. Write bare codes as text.
+
+```
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 11, the working period on building the images
+  Watch for: whether a group tests one image at a time, or stages all five
+  and hopes. Visible only while they work; the finished piece can look the
+  same either way.
+  Going well: someone steps out of the picture, looks, and changes it.
+  Stuck: everyone is in the picture and nobody is watching it.
+  Record: initials in the margin of your day plan, three columns.
+
+TALK — Unit 1, Day 9, the two-minute conference already on that agenda
+  Ask: "Why does your story break at that moment, and not the one before?"
+  Then: "What does the picture show us that the words would not?"
+  A strong answer names the change the moment carries — that is A2.2 heard
+  in conversation, and a still image will not show you it was a choice.
+  Record: one line per group, right then.
+
+The product evidence is the performance on Day 15. That one arrives on
+its own.
+%%
+```
+
+Six rules for writing one:
+
+- **Specific to THIS task, naming real days from the arc — check them.**
+  The example above is drawn from ADA1O's Tableau Story Sequence, which
+  runs Unit 1, Days 8–15; writing "Unit 2, Day 12" because it sounded
+  plausible would send a teacher to a different task's rehearsal. Open the
+  class pages and read them. Boilerplate repeated across eight tasks fails
+  differently but just as badly: a teacher stops reading it at the second
+  task.
+- **Name what is visible only in the DOING and invisible in the product.**
+  That is the whole argument for observing. If no such thing can be named,
+  the observation prompt is decoration — and the task itself may be worth
+  reopening.
+- **Give the conversation two or three ACTUAL questions**, plus what a
+  strong answer sounds like. "Talk to each student about their progress"
+  is not a prompt, it is the burden the teacher already knows about. And
+  check the question is not already printed on the task page — one the
+  students have read is a prompt, not a probe.
+- **Say how to record it in seconds.** The reason this evidence goes
+  missing is time, so a prompt that ignores the recording cost gets
+  ignored back.
+- **Prefer a slot the arc already has.** Where a class page already
+  schedules a conference, a check-in or a half-class share, put the
+  conversation THERE rather than inventing a new one. Never point at a day
+  of silent individual work, or at a performance or dress run, when the
+  teacher is running the room.
+- **Tie it to a curriculum code the task already lists, and check the code
+  says what you claim.** In the example, A2.2 is "use a variety of
+  conventions to develop character and shape the action"; C1.2 — also on
+  that task — is about correct terminology and would NOT be evidenced by
+  the answer described. This is evidence for the mark, not a warm-up, and
+  saying so is what earns the two minutes from a teacher who has none.
+
+Add the same block, with the two headings and blank lines beneath them, to
+`Tasks/_DUPLICATE ME.md`, so a teacher's own new task inherits the habit
+rather than only the paperwork. No payload carries one yet — this is new
+with this section, so a payload you are revising will need them written.
 
 **`Style/What This Site Can Do.md` is the showcase**, and it teaches by
 working example, not by comparison. Where the subject has notation the
@@ -502,7 +903,12 @@ the linter.
    once. Anything short of N/N is a failure, not a note — the built map
    would show a red cell. The counts here and on the built page come from
    the same rule, so they must agree; if they ever differ, one of the two
-   regexes has drifted and that is the bug to fix first.
+   regexes has drifted and that is the bug to fix first. Then READ TWO
+   task pages' triangulation blocks, from different units, end to end:
+   the linter cannot tell a prompt naming a real day and a real question
+   from boilerplate, and boilerplate is the failure mode this block has —
+   which only shows up when you compare two of them. Check the days named
+   are days that task actually runs on.
 2. Installer E2E without Docker: import `scripts/setup_course.py` via
    importlib, call `install_example_content` into a temp dir for both
    curriculum states; assert no curriculum folder/links remain when

@@ -33,9 +33,15 @@ believed, and who decides.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.2]]
+
 ![[A1.5]]
+
+![[A1.8]]
 
 ![[B1.6]]
 
 ![[B1.8]]
+
+![[D1.5]]
 %%curriculum-end%%

@@ -104,7 +104,11 @@ work.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B1.1]]
+
 ![[B1.2]]
 
 ![[B1.3]]
+
+![[B2.7]]
 %%curriculum-end%%

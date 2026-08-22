@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic: name the components, distinguish the natural and
-   human greenhouse effects, and read an unseen graph — no notes
-2. Compare and correct in pairs
+   human greenhouse effects, and read an unseen graph — no notes: [[Natural and Human Influences on Climate]]
+2. Compare and correct in pairs: [[Feedback Loops in Climate]]
 
 ## Things to do before our next class
 

@@ -93,5 +93,7 @@ evidence supports, and separately states what it cannot yet decide.
 - [ ] At least one limitation, with the direction it pushed the result
 - [ ] One specific change you would make, not "be more careful"
 
-Language: [[Writing About Science]]. Assessment:
+Language: [[Writing About Science]]. Which four investigations are written
+up this way, when each one is written, and the criteria they are marked
+against: [[Lab Reports]]. Where those marks sit in the credit:
 [[How Marks Work]].

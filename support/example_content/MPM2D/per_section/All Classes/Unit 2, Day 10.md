@@ -13,11 +13,12 @@ tags:
 1. Number talk: [[True or False]] — a triangle with two equal sides has
    two equal angles
 2. Random groups — three vertices on the boards: is this triangle
-   isosceles? Convince a skeptic
+   isosceles? Convince a sceptic
 3. Consolidate + notes to your future self — [[Properties on the Grid]]
 4. Discussion: [[What Makes a Proof Convincing]] — "it looks like it"
    is not evidence
-5. Launch: [[The Quadrilateral Case File]] — four vertices, one verdict
+5. Launch: [[The Quadrilateral Case File]] — four vertices, one verdict,
+   and its criteria table read aloud today rather than on filing day
 
 ## Things to do before our next class
 

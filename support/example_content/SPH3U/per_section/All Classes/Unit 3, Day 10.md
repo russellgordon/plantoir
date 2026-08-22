@@ -18,4 +18,3 @@ tags:
 ## Things to do before our next class
 
 - [ ] Finish [[Energy Practice]].
-- [ ] [[Model Roller Coaster]] analysis due next class.

@@ -7,7 +7,7 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Pairs · launched in Unit 3 and presented six classes later · four
+> Pairs · launched on Unit 3, Day 9 and presented on Day 18 or 19 · four
 > working periods · one form, where it came from, and five minutes in
 > which you teach it to us by making us do it
 
@@ -63,6 +63,13 @@ presentation.
 
 ## How this is assessed
 
+> [!note] You present in a pair, and you are marked as yourself
+> There is no shared mark. Split the five minutes into named halves and
+> tell me who is taking which before you present — one of you carries the
+> origins and the purpose, the other runs the two minutes on our feet, or
+> whatever division suits your form. Name the sources you personally read
+> where you use them. I mark your half and your sources.
+
 | Quality | What it looks like |
 | --- | --- |
 | Researched | Specific, sourced, and beyond one summary page |
@@ -89,3 +96,41 @@ because of it.
 
 ![[B2.4]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 3, Day 10, the research period and source clinic
+  The presentation names its sources, so the criteria table already asks
+  the pair to self-report this. What you are checking here is whether the
+  list is a list of things they read. Watch what a pair does when the first
+  three results all say the same three sentences.
+  Going well: one of them is reading something long and arguing with it out
+  loud, or has found a source that contradicts the others.
+  Stuck: four tabs open that are the same summary page in different
+  colours, and a paragraph already being copied out.
+  Record: against each pair on your class list, the title of the one source
+  you saw them actually reading. If you cannot write one, that is the note.
+
+TALK — Unit 3, Day 13, while they design their two minutes and test it on
+another pair
+  Ask: "Who was sitting in front of this when it was new, and what did they
+  already know that we do not?"
+  Then: "When we run your two minutes and it goes wrong, which part will it
+  be?"
+  A strong first answer names a particular audience and something they
+  brought with them — a story everybody had heard, a festival that happened
+  once a year, masks whose meanings were common knowledge, a language the
+  players did not share with the crowd — rather than "people in the past".
+  That is B2.1 heard rather than read: the purposes drama served in one
+  community. The presentation five classes later will hand you the polished
+  version of the origins, so this is where you find out whether the pair
+  understands what they are about to teach. The second question is worth
+  the two minutes on its own: a pair who has already found the fragile part
+  of their exercise has taught before.
+  Record: one line per pair — the audience they named and the one thing
+  that audience already knew. Bring the list to the presentations and see
+  who says something different on the day.
+
+The product evidence is the presentation itself, on Day 18 or Day 19.
+%%

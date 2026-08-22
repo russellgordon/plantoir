@@ -13,7 +13,8 @@ tags:
 1. Warm-up: [[The Standard Warm-Up]]
 2. Seminar: [[Does a Dance Belong to a Culture|Does a Dance Belong to a Culture?]]
 3. Ground rules; positions; the argument left open
-4. Journal
+4. Journal, and the last fifteen minutes on the gap yesterday's
+   check-in found
 5. Cool-down
 
 ## Things to do before our next class

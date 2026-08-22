@@ -9,6 +9,7 @@ these pages are how it is done here without dread.
 **Unit 1 — Seeing and making**
 
 - [[The Class Critique]]
+- [[Judging Your Own Work]]
 
 **Unit 2 — Media and technique**
 

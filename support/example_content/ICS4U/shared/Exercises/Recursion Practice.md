@@ -57,6 +57,11 @@ call get closer to it. Write those two lines first, every time.
    number of calls it made, then report the counts for `n` of 5, 10,
    20, and 25. Explain the growth, and write the loop version that
    does not have the problem.
+10. **Theoretical foundations.** Write the recurrence relations for
+    `sum_to(n)` and for naive `fib(n)`. Explain how mathematical
+    induction proves that a recursive function with a correct base
+    case terminates for all legal inputs, and how the call stack depth
+    governs auxiliary space complexity.
 
 ## Answers
 
@@ -248,4 +253,42 @@ call get closer to it. Write those two lines first, every time.
 > ```
 > Recursion is the right tool when the *data* is nested. Fibonacci is
 > a sequence, and sequences are loops.
+
+> [!success]- Answer 10
+> The recurrence relations express running time in terms of subproblem
+> costs:
+>
+> - `sum_to(n)`: $T(n) = T(n - 1) + O(1)$ with $T(0) = O(1)$.
+>   Unrolling this gives $T(n) = O(n)$ time.
+> - Naive `fib(n)`: $T(n) = T(n - 1) + T(n - 2) + O(1)$ with
+>   $T(0) = T(1) = O(1)$. The recurrence matches the Fibonacci
+>   sequence itself, yielding $T(n) = O(\phi^n) \approx O(1.618^n)$, an
+>   exponential complexity class ($O(2^n)$).
+>
+> **Termination via mathematical induction**:
+> 1. *Base case ($n = 0$)*: The base condition is explicitly handled
+>    and terminates in $O(1)$ without further recursion.
+> 2. *Inductive hypothesis*: Assume the function terminates correctly
+>    for all non-negative integers $k < n$.
+> 3. *Inductive step*: For input $n$, the recursive call executes with
+>    $n - 1$ (which is $< n$). By the hypothesis, the subproblem
+>    terminates in finite steps, so the call at $n$ terminates.
+>
+> **Auxiliary space**: Each recursive call allocates a stack frame
+> storing local variables and return addresses. The peak call stack
+> depth equals the maximum recursion tree depth, so linear recursion
+> requires $O(n)$ auxiliary memory even when the return value is a
+> single number.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A3.6]]
+
+![[C1.3]]
+
+![[C2.4]]
+
+![[D4.2]]
+%%curriculum-end%%
 

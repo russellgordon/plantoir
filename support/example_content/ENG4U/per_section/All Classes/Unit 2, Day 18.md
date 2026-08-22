@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Disease, ears and poison, acting, gardens: the tracking tables
-   finished
-2. Where each cluster changes meaning, and what the change argues
+   finished: [[Shakespeare's Language]]
+2. Where each cluster changes meaning, and what the change argues: [[Close Reading]]
 
 ## Things to do before our next class
 

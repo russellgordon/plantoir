@@ -10,11 +10,15 @@ tags:
 ---
 ## Agenda
 
-1. Tutorial: [[Research and Sources]] — secondary sources at this level
-2. Concept: [[Research Writing]] — support, extend, complicate, disagree
-3. [[The Independent Study]] — work period: thesis drafted with a
+1. First ten minutes: three of last night's reading lists read aloud and
+   tested — whose canon is it, and against what?
+2. Tutorial: [[Research and Sources]] — secondary sources at this
+   level, then twenty minutes finding and judging two of them here
+3. Concept: [[Research Writing]] — support, extend, complicate, disagree
+4. [[The Independent Study]] — work period: thesis drafted with a
    mechanism; conferences on request
 
 ## Things to do before our next class
 
-- [ ] Two sources logged; thesis and outline drafted for checkpoint three.
+- [ ] Third source logged; thesis and outline drafted for checkpoint
+      three.

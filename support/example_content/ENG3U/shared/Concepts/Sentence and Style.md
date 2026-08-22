@@ -2,6 +2,9 @@
 title: Sentence and Style
 publish: true
 created: __CREATED__
+enableToc: true
+tags:
+  - concepts
 ---
 Style is not ornament. At this level it is the difference between an
 essay a reader has to decode and one they can follow at speed.
@@ -46,6 +49,8 @@ just harder to read.
 
 ![[C2.3]]
 
+![[C3.2]]
+
 ![[C3.4]]
 
 ![[C2.5]]
@@ -53,4 +58,6 @@ just harder to read.
 ![[C2.6]]
 
 ![[C3.3]]
+
+![[B3.3]]
 %%curriculum-end%%

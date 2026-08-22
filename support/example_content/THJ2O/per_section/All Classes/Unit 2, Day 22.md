@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Bench prepared: media mixed, containers ready, labels made
+1. Bench prepared: media mixed, containers ready, labels made: [[Soils and Growing Media]]
 2. Sanitation, and why it matters more than you think
-3. Setting up the propagation bench
+3. Setting up [[The Propagation Bench]]
 
 ## Things to do before our next class
 

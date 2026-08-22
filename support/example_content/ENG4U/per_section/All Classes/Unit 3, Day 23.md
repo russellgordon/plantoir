@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: one claim that needs both texts, written cold
-2. In fours: test each other's claims with the deletion test
+1. Warm-up: one claim that needs both texts, written cold: [[Comparative Argument]]
+2. In fours: test each other's claims with the deletion test for [[The Comparative Essay]]
 
 ## Things to do before our next class
 

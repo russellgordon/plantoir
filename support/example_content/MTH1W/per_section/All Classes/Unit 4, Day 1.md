@@ -12,10 +12,11 @@ tags:
 
 1. Number talk: [[Which One Doesn't Belong]] — four shapes
 2. Random groups — at the boards: double a box's edges; what happens to
-   what?
+   what? A diagnostic, and unmarked — I want to see what this class
+   expects before anybody measures anything
 3. Consolidate: lengths, areas, and volumes grow at different speeds
 4. Notes to your future self — naming [[Geometric Relationships]]
-5. Launch our task: [[Design Under Constraints]]
+5. Launch our task: [[Design Under Constraints]], day 1 of 5
 
 ## Things to do before our next class
 

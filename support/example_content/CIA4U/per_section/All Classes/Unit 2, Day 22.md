@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval across Unit 2: the firm, the structure, the failure, the remedy
-2. Units 1 and 2 mixed — one market analysed end to end against the clock
+1. [[A Model of Your Own]] revised, here, in the light of yesterday's conference
+2. Twenty-five minutes: milestone entry, written here from a table you have not seen — [[The Notebook and Portfolio]], with [[Your Economics Notebook]] open beside you
 3. Looking ahead: the same reasoning, now for a whole economy
 
 ## Things to do before our next class
 
-- [ ] Nothing tonight.
+- [ ] Bring [[A Model of Your Own]] to hand in next class.

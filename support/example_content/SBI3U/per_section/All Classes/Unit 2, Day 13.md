@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: name the six lines of evidence and give
-   one example of each
-2. Random groups — which line of evidence would settle a given dispute?
+   one example of each: [[Evidence for Evolution]]
+2. Random groups — which line of evidence would settle a given dispute? [[Evolution Practice]]
 
 ## Things to do before our next class
 

@@ -16,4 +16,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Find one real pathway that interests you and read about it.
+- [ ] Find one course or program and one job that use this, and read
+      about both.

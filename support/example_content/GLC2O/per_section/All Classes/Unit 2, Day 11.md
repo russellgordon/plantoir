@@ -16,4 +16,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Finish both documents for your reader tomorrow.
+- [ ] Finish both documents for your reader next class.

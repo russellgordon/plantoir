@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Standup
-2. Portfolio: your five strongest pieces, chosen and captioned as a
-   portfolio rather than as an archive
+2. Portfolio: the last thing [[Publication Day]] asks for — five
+   pieces, chosen and captioned as a portfolio rather than an archive
 3. In pairs: read each other's portfolios cold and say what they show
 
 ## Things to do before our next class

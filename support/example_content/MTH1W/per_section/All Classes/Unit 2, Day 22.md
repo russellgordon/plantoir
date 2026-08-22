@@ -18,3 +18,5 @@ tags:
 ## Things to do before our next class
 
 - [ ] Journal: where two plans crossing tells you something to act on.
+- [ ] Skim [[Who Does Data Serve]] — Unit 3 opens with it next class.
+- [ ] Bring a question you would like the class to collect data on.

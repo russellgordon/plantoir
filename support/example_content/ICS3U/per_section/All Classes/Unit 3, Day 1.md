@@ -12,7 +12,8 @@ tags:
 
 1. Warm-up: [[Spot the Bug]] — the bug is in the third copy
 2. The problem of the day: [[The Repeated Chunk]] — the same eight
-   lines, four times, and a change request at the worst moment
+   lines, four times, and a change request at the worst moment. Where
+   each of you gives up copying is the measure I take today
 3. Compare and name it: [[Functions]]
 4. Read and change: [[Writing Functions]]
 5. Practise: [[Functions Practice]]

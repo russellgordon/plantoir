@@ -56,6 +56,8 @@ keeping, and [[Showing Your Thinking]] shows how to lay it out.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
 ![[A1.2]]
 
 ![[Mathematical Process Expectations]]

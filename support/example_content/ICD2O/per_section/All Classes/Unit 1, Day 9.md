@@ -14,12 +14,14 @@ tags:
 2. Explore, then name it: [[Software and Operating Systems]] and
    [[Files and the Cloud]]
 3. Discussion: [[Who Owns Your Data]] — where your files actually live
-4. Workday: [[The Algorithm Field Guide]] in pairs, driver and navigator
+4. [[The Algorithm Field Guide]], day 4 — workday in pairs, driver and
+   navigator: assemble and illustrate what you have documented so far,
+   then decompose the task you are designing and write its first draft
 5. Log it in your [[Dev Journal]]
 
 ## Things to do before our next class
 
-- [ ] Bring your field guide ready to present — a classmate will run your
-      designed algorithm exactly as written.
+- [ ] Bring your three entries ready to be run by somebody who has
+      never done that task.
 - [ ] Journal: one thing about the cloud you believed yesterday but not
       today.

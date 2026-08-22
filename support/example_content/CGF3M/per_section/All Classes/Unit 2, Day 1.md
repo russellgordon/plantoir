@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval; then the distinction the whole unit turns on: [[Hazard, Exposure, Vulnerability]]
-2. Two communities and one flood — the table worked line by line, then read as a design brief
-3. Six real events sorted into what was physical and what was decided
+1. Diagnostic, three minutes in writing: what makes something a disaster rather than a big storm? Unmarked. I keep these and hand them back on Day 22
+2. The distinction the whole unit turns on: [[Hazard, Exposure, Vulnerability]]
+3. Two communities and one flood — the table worked line by line, then read as a design brief
+4. Six real events sorted into what was physical and what was decided — feedback only, nothing recorded
 
 ## Things to do before our next class
 

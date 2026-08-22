@@ -2,6 +2,8 @@
 title: Discussions
 publish: true
 created: __CREATED__
+tags:
+  - discussions
 ---
 - [[Whose Reading Counts]] — can an interpretation be wrong?
 - [[Do the Witches Do Anything]] — cause, prophecy, and responsibility.

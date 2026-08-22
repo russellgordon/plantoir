@@ -86,7 +86,9 @@ worth investigating, and say how you would test one.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B2.7]]
+
 ![[B2.8]]
 
-![[B2.7]]
+![[B2.9]]
 %%curriculum-end%%

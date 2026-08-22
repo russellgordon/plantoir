@@ -241,3 +241,13 @@ commands above are the same wherever it is hosted.
 
 The idea behind all of this, rather than the mechanics, is
 [[Version Control]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.3]]
+
+![[B1.7]]
+
+![[B2.1]]
+%%curriculum-end%%

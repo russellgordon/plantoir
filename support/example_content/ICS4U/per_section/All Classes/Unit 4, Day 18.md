@@ -13,7 +13,8 @@ tags:
 1. Warm-up: [[Read the Diff]]
 2. [[The Software Project]], day 17 — working period: rehearse the handover on
    another team, who play your partner and ask their questions
-3. Fix whatever they could not follow
+3. Fix whatever they could not follow, and whatever your own check
+   named yesterday
 
 ## Things to do before our next class
 

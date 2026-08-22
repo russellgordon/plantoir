@@ -18,7 +18,9 @@ tags:
    Mark every sentence the data actually supports
 4. Consolidate: what a defensible report contains — question, method,
    evidence, limitations, and the follow-up you would run next
-5. Investigation: written reports are handed in at the end of today
+5. Investigation: the report itself is assembled over the next five
+   periods — limitations, conclusion, graphs, rehearsal, and the final
+   assembly on Day 15, when it comes in
 
 ## Things to do before our next class
 

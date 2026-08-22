@@ -1,6 +1,7 @@
 ---
 title: Politics of a Growing Republic
 publish: true
+enableToc: true
 created: __CREATED__
 tags:
   - concepts
@@ -37,6 +38,19 @@ Tammany Hall in New York is the famous example, and the honest description
 of it includes both halves: genuine services delivered to immigrants nobody
 else would help, and systematic corruption on a large scale.
 
+## Foreign relations, territory, and domestic power
+
+Foreign policy in this period repeatedly redrew domestic politics. The War of
+1812 and the Treaty of Ghent cemented American sovereignty and destroyed the
+Federalist Party after its opposition at the Hartford Convention. The Monroe
+Doctrine of 1823 asserted hemispheric authority against European powers, while
+the Texas annexation, the Mexican-American War (1846–1848), and the Treaty of
+Guadalupe Hidalgo forced the question of whether newly acquired territories
+would permit enslavement — turning foreign expansion into the primary trigger
+of domestic crisis. During the Civil War, Union diplomacy worked to block
+British recognition of the Confederacy, while the Confederacy pursued "cotton
+diplomacy" in an unsuccessful bid for European intervention.
+
 ## When the machinery failed
 
 Parties had held the Union together by being national — each with northern
@@ -56,4 +70,6 @@ the two points you are comparing.
 ## Curriculum connection
 
 ![[C1.5]]
+
+![[C2.4]]
 %%curriculum-end%%

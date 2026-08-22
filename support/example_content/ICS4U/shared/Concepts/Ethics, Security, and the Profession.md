@@ -118,6 +118,34 @@ your team when you broke the build, do not read data you were given
 access to for another purpose, and do not ship a feature you would not
 explain to the person it affects.
 
+## Interdisciplinary computing and research frontiers
+
+Modern computer science rarely works in isolation. The most significant
+advances happen at the intersection of computing and other disciplines,
+as documented in research published by professional bodies like the ACM
+and IEEE:
+
+- **Bioinformatics and genomics**: algorithms for sequence alignment,
+  phylogenetic tree construction, and deep learning models for protein
+  structure prediction (such as AlphaFold) have transformed molecular
+  biology and drug discovery.
+- **Climatology and earth systems**: high-performance numerical
+  simulations, finite-element differential solvers, and carbon
+  accounting pipelines enable predictive climate modelling across
+  decades.
+- **Health informatics and medical imaging**: diagnostic computer vision
+  for radiographic scans, privacy-preserving federated learning across
+  hospital networks, and real-time clinical telemetry processing.
+- **Computational linguistics**: transformer architectures and natural
+  language processing models that parse syntactic structures, perform
+  multilingual machine translation, and model semantic representations.
+- **Economics and mechanism design**: algorithmic game theory, auction
+  theory for spectrum allocation, and market-clearing algorithms.
+
+Investigating an emerging technology (`D3.2`) or interdisciplinary research
+paper (`D4.1`) requires evaluating primary sources — distinguishing peer-reviewed
+methodological rigor from vendor marketing.
+
 ## The profession you are joining
 
 The people who write software are not only "programmers". Systems
@@ -149,6 +177,10 @@ in hand, and keep track of what you actually believe in your
 ![[D2.2]]
 
 ![[D2.3]]
+
+![[D3.2]]
+
+![[D4.1]]
 
 ![[D4.3]]
 %%curriculum-end%%

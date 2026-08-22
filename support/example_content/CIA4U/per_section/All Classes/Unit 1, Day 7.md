@@ -12,7 +12,7 @@ tags:
 
 1. Positive and normative sorted: [[How Economists Think]]
 2. [[Judging an Economic Claim]] — the four things a claim usually leaves out
-3. Ten claims from this week's news, sorted and interrogated
+3. Ten claims from this week's news, sorted and interrogated — your sorting handed to me on the way out
 
 ## Things to do before our next class
 

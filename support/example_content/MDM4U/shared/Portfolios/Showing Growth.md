@@ -25,7 +25,7 @@ entries:
 > caught myself refusing to report a difference between two groups
 > because one of them had eleven people in it — I could not tell the
 > difference from noise, and I said so in the write-up instead of
-> hiding it. I would not have noticed the group size in September,
+> hiding it. I would not have noticed the group size at the start of the course,
 > and I definitely would not have admitted it.
 
 The claim is *uncertainty became something I handle rather than

@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[The Skills Inventory Task]] handed in
-2. [[Looking After Yourself While You Work]] — pressure, and where it turns into harm
-3. Who to go to, in this building and outside it
+1. Work period: [[The Skills Inventory Task]] — part three first, because the local list is in the room and the routes need checking against it
+2. Conferences — the checkpoint on the task so far, and you get it in writing before you leave
+3. Where a claim needs a better situation, and where it needs a different skill
 
 ## Things to do before our next class
 
-- [ ] Read [[Looking After Yourself While You Work]] and note one support you did not know existed.
+- [ ] Nothing to hand in. Next class is the revision period, and the task goes in at the end of it.

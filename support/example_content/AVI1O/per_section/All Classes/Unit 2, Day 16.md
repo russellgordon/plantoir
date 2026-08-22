@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Studio time
+1. Studio time: acting on the mid-point critique for [[The Information Piece]]
 2. Typography by hand: legibility at distance
-3. Conferences
+3. Conferences on feedback received: [[Giving Feedback]]
 
 ## Things to do before our next class
 

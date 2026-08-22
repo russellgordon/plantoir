@@ -14,8 +14,8 @@ tags:
 1. Review, part three: sampling methods and their weaknesses, one- and
    two-variable summaries, correlation against causation, and reading a
    published claim
-2. Format walk-through: what the written final asks for, and how long
-   to spend on each part
+2. Format walk-through: [[The Final Examination]] — what each of the
+   four parts asks for, and how long to spend on it
 
 ## Things to do before our next class
 

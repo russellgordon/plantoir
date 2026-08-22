@@ -10,9 +10,11 @@ tags:
 ---
 ## Agenda
 
-1. Case: [[Who Gets the Housing|Who Gets the Housing?]]
-2. Density, cost, and who decides
-3. Bridge into Unit 4: from people to the places they live
+1. The second half of the room argues their recommendation: ninety
+   seconds each, one objection taken
+2. Case: [[Who Gets the Housing|Who Gets the Housing?]]
+3. Density, cost, and who decides
+4. Bridge into Unit 4: from people to the places they live
 
 ## Things to do before our next class
 

@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Hand in [[The Independent Study]] — day 11
-2. Defences begin: three students, ten minutes each
+2. Defences begin: six students, ten minutes each. These three days run
+   end to end — no opening, no landing
 
 ## Things to do before our next class
 

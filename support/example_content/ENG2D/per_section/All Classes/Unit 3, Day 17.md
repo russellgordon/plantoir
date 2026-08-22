@@ -12,8 +12,9 @@ tags:
 
 1. Retrieval warm-up — no notes: three passages placed and explained
 2. Checkpoint, on your own: one paragraph on an unseen passage from the
-   novel
-3. Mark your own; revision list written
+   novel: [[Moon of the Crusted Snow]]
+3. Mark your own — nothing on it reaches your percentage; revision list
+   written: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

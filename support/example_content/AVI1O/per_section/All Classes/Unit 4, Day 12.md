@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Exhibition period 1 of 8: selection defended
-2. Why these works, in this order
-3. Studio time
+1. Exhibition period 1 of 8: selection defended — [[The Exhibition]]
+2. Why these works, in this order: [[The Portfolio and Reflection]]
+3. Studio time: drafting artist statements and layout curation for [[The Exhibition]]
 
 ## Things to do before our next class
 

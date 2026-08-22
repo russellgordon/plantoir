@@ -1,8 +1,8 @@
 ---
 title: The Carbon Cycle
-createdSection1: 2026-10-07T07:00:00.000-0400
+createdSection1: 2026-10-06T07:00:00.000-0400
 publishForSection1: true
-createdSection2: 2026-10-08T07:00:00.000-0400
+createdSection2: 2026-10-07T07:00:00.000-0400
 publishForSection2: true
 enableToc: true
 tags:

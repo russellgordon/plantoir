@@ -14,11 +14,13 @@ tags:
 2. Argue what must be true of the electrons for those drops to happen
 3. Name it: [[Atomic Structure and Orbitals]] — orbitals, not tidy shells
 4. [[The Blocks of the Periodic Table]] — the map you just drew by hand
-5. Task launch: [[The Property Prediction]] — read the criteria before you
-   choose a substance, and read [[How Marks Work]] alongside them
+5. Task launch: [[The Property Prediction]] — read the criteria before
+   your coded substance is handed out, and read [[How Marks Work]]
+   alongside them
 
 ## Things to do before our next class
 
-- [ ] Choose and post your substance for [[The Property Prediction]].
+- [ ] Collect your code from me before you leave, and read the criteria
+      table on [[The Property Prediction]] properly.
 - [ ] Read [[What a Strong Entry Looks Like]], then reread your own
       entries with it open beside them.

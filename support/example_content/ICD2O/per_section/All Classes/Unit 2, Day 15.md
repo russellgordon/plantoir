@@ -18,5 +18,6 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Skim [[The Dice Roller]] — we read it together next class.
-- [ ] Check [[How Marks Work]] — task feedback lands there first.
+- [ ] Skim [[The Dice Roller]] — we read it together when Unit 3 opens.
+- [ ] Reread [[How Marks Work]] now that a real task is in — the part
+      about the seventy is the part that matters today.

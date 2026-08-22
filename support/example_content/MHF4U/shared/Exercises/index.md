@@ -30,7 +30,8 @@ Nothing here is timed, counted, or collected. Ever.
 | [[Polynomial Graphing Practice]] | [[Polynomial Functions]], [[Zeros and Multiplicity]], [[Even and Odd Functions]] |
 | [[Factor Theorem Practice]] | [[The Factor Theorem]] |
 | [[Rational Functions Practice]] | [[Rational Functions]], [[Asymptotes]], [[Polynomial and Rational Inequalities]] |
-| [[Radian Measure Practice]] | [[Radian Measure]], [[The Unit Circle]], [[Reciprocal Trigonometric Functions]] |
+| [[Radian Measure Practice]] | [[Radian Measure]], [[The Unit Circle]] |
+| [[Sinusoid Practice]] | [[Sinusoids in Radians]], [[Reciprocal Trigonometric Functions]] |
 | [[Identities and Equations Practice]] | [[Compound Angles]], [[Trigonometric Identities]] |
 | [[Logarithm Practice]] | [[The Logarithm]], [[Laws of Logarithms]] |
 | [[Rates of Change Practice]] | [[Rates of Change]] |

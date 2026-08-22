@@ -13,21 +13,25 @@ public sealed class CourseNameCatalog
 {
     private readonly Dictionary<string, CourseNames> _entries = new();
 
-    public static CourseNameCatalog Load(string jsonPath)
+    public static CourseNameCatalog Load(params string[] jsonPaths)
     {
         var catalog = new CourseNameCatalog();
-        try
+        foreach (var jsonPath in jsonPaths)
         {
-            if (JsonNode.Parse(File.ReadAllBytes(jsonPath)) is JsonObject root)
-                foreach (var (code, value) in root)
-                {
-                    if (value is not JsonObject entry) continue;
-                    if (entry["formal_name"] is not JsonValue f || !f.TryGetValue<string>(out string? formal)) continue;
-                    if (entry["short_name"] is not JsonValue s || !s.TryGetValue<string>(out string? shortName)) continue;
-                    catalog._entries[code] = new CourseNames(formal, shortName);
-                }
+            if (!File.Exists(jsonPath)) continue;
+            try
+            {
+                if (JsonNode.Parse(File.ReadAllBytes(jsonPath)) is JsonObject root)
+                    foreach (var (code, value) in root)
+                    {
+                        if (value is not JsonObject entry) continue;
+                        if (entry["formal_name"] is not JsonValue f || !f.TryGetValue<string>(out string? formal)) continue;
+                        if (entry["short_name"] is not JsonValue s || !s.TryGetValue<string>(out string? shortName)) continue;
+                        catalog._entries[code] = new CourseNames(formal, shortName);
+                    }
+            }
+            catch { }
         }
-        catch { }
         return catalog;
     }
 

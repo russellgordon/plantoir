@@ -13,7 +13,9 @@ tags:
 1. [[The Independent Study]], checkpoint four: the draft, workshopped
 2. Partner marks: unsupported claims, source stacking, the weakest
    section
+3. Then your own judgement against the criteria —
+   [[Judging Your Own Work]]. Name the row you will start on tomorrow
 
 ## Things to do before our next class
 
-- [ ] Rewrite the weakest section.
+- [ ] Start on the row you named.

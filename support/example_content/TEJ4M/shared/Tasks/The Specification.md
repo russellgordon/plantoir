@@ -44,15 +44,19 @@ can already see how it would be checked.
       range, connector, signal levels, protocol, and what happens when
       each one is connected wrongly.
 - [ ] **Component selection** for at least four parts, each with a real
-      part number, a datasheet reference, and the calculation or the
-      tolerance figure that justified it.
+      part number, a datasheet reference, and — for every part that
+      carries current — the calculation that sized it, plus the
+      tolerance figure wherever a tolerance is what decided it.
 - [ ] **Power budget**, as a table: every block, its current, and the
       total with margin stated.
 - [ ] **Acceptance tests** — a numbered procedure another person could
       run with our bench equipment, each with a pass criterion in
       numbers.
-- [ ] **Peer build check**: another bench runs your acceptance tests as
-      written and reports what they could not do.
+- [ ] **Peer build check**: another bench runs your acceptance tests
+      exactly as written and reports, in writing, what they could not
+      do. You say nothing while they work — every question you answer
+      out loud is one your document failed to answer, and the point of
+      the exercise is to find out how many there are.
 
 ## How it is assessed
 
@@ -79,9 +83,9 @@ habit is the whole of [[Reading a Datasheet Like an Engineer]].
 | One clear job | The opening sentence names a device, a person, and a difficulty |
 | Testable requirements | Every requirement has a number, a unit, and a condition |
 | Honest interfaces | Voltages, connectors, and protocols stated, including failure cases |
-| Justified components | Real part numbers, with the calculation or tolerance that chose them |
+| Justified components | Real part numbers, with the calculation that sized each one and the tolerance where that decided it |
 | A power budget that adds up | Every block accounted for, margin stated as a figure |
-| Runnable acceptance tests | Another bench ran them without asking you anything |
+| Runnable acceptance tests | The test another bench ran went through as written, and what stopped them is written down |
 | Sourced numbers | Datasheet figures cited, calculations shown, estimates labelled |
 | Evidence of revision | The journal shows what changed after the peer check, and why |
 
@@ -101,13 +105,48 @@ habit is the whole of [[Reading a Datasheet Like an Engineer]].
 
 ![[A3.1]]
 
+![[A3.3]]
+
 ![[A3.5]]
 
-![[B3.1]]
-
-![[D3.3]]
-
 ![[B2.1]]
-
-![[D2.2]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 1, Day 16, while the benches trade documents
+  The agenda already tells authors to stay quiet, so silence is not the
+  thing to watch. Watch what they WRITE while silent. An author noting
+  "clause 4.2 — they read it twice and then asked which supply" has
+  located a defect; an author noting "they got confused" has recorded a
+  mood and will change nothing on Day 17. The handed-in document shows
+  the fixed version and cannot tell you which of those two notes
+  produced it.
+  Going well: a numbered list of clauses, growing, with the tester's
+  actual words beside each.
+  Stuck: nothing on the page, or one line at the end.
+  Record: a tick against each name for clause-level notes, a dot for
+  the rest. One pass of the room, and the dots are the students to
+  stand beside on Day 17.
+
+TALK — Unit 1, Day 15, at the feedback checkpoint already on that agenda
+  Ask: "Read me requirement four. Now describe a device that meets
+  every word of it and would still be useless to the person you wrote
+  it for."
+  Then: "Which of your chosen parts would you change first if the
+  supplier discontinued it, and what else in the document moves when
+  you do?"
+  A strong first answer finds the loophole in their own wording and can
+  say what clause would close it — A3.1 under load, terminology precise
+  enough that a reader does not have to come and ask. A strong second
+  answer reaches for the parameter that drove the choice — dropout,
+  tolerance, package, temperature range — rather than for another part
+  number, which is A3.5 asked backwards and much harder to fake than a
+  citation.
+  Record: one word beside each name — loophole, or none — and the
+  parameter they named. Thirty seconds each.
+
+The product evidence is the specification itself, handed in at the end
+of Day 17. That one arrives on its own.
+%%

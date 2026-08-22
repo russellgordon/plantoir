@@ -64,4 +64,6 @@ Work the method in [[Continuity and Change]], read the period in
 ![[C2.5]]
 
 ![[C1.1]]
+
+![[C3.1]]
 %%curriculum-end%%

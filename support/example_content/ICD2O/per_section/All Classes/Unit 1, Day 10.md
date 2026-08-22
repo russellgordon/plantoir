@@ -11,10 +11,12 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Predict the Output]]
-2. [[The Algorithm Field Guide]], day 6 — working period: each entry tested on
-   somebody who has never done that task
+2. [[The Algorithm Field Guide]], day 5 — working period: each entry
+   tested on somebody who has never done that task, and your original
+   design run [[Human Robot]]-style by a partner who reads it exactly
+   as written
 3. Rewrite the step that confused them — that step was always the bug
 
 ## Things to do before our next class
 
-- [ ] Every entry tested on a real person.
+- [ ] Every entry tested on a real person, and the original run once.

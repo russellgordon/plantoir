@@ -14,7 +14,9 @@ tags:
    labelled, no marks attached
 2. The mystery box: a sealed enclosure, two terminals, one lamp that
    glows dimly. What is inside? Every bench commits to a guess and to
-   the one measurement that would settle it — box stays shut
+   the one measurement that would settle it — box stays shut. Nothing
+   here is marked; I keep the guesses because they tell me what this
+   class already reaches for
 3. Read together, agree together: [[Safety in the Lab]] and
    [[Our Classroom Norms]] — the standing agreement every bench day
    after this one depends on

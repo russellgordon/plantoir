@@ -18,8 +18,11 @@ tags:
    that are not synonyms
 4. One line of yours, three layers deep: what `open()` actually asks
    for, and who answers
+5. Last ten minutes, in your [[Code Journal]]: the milestone entry for
+   [[The Spec Sheet]] — which of their answers changed your
+   recommendation, and what you would ask first next time
 
 ## Things to do before our next class
 
-- [ ] Journal: one thing your recommendation would change if the person's
-      budget were halved.
+- [ ] Add to today's entry if the budget question is still bothering
+      you: what would change if theirs were halved.

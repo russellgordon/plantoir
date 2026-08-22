@@ -15,7 +15,9 @@ tags:
    time both, and say honestly which one you would hand to a partner
 3. Where recursion costs you: depth, repeated work, and the limit
    Python enforces so your machine does not fall over
-4. Hand in [[The Structure Study]]
+4. [[The Structure Study]], day 3 — working period: write the one
+   shared test input all three of your versions will have to survive,
+   awkward cases included
 5. Midpoint look back: [[Showing Growth]] — read your own first journal
    entry out loud, to yourself
 

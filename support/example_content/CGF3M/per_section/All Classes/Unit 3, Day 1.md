@@ -10,9 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval; then [[Renewing What Is Damaged]] — renewable is a statement about rate, not about kind
-2. Rate of use against rate of replacement, tested on a forest, an aquifer and a gravel deposit
-3. Fire as damage and repair at once, using [[Wildfire]] from last unit
+1. Diagnostic sort: a woodlot, groundwater, topsoil, a peat bog, a fish stock, sunlight, an ore body and a gravel esker, into renewable and not, with a reason each. Unmarked; it shows me who already thinks in rates
+2. [[Renewing What Is Damaged]] — renewable is a statement about rate, not about kind
+3. Rate of use against rate of replacement, tested on a forest, an aquifer and a gravel deposit
+4. Fire as damage and repair at once, using [[Wildfire]] from last unit
 
 ## Things to do before our next class
 

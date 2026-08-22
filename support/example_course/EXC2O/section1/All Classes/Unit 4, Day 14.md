@@ -11,10 +11,11 @@ tags:
 ## Agenda
 
 1. Discussion: [[Energy Source Debate]] — you argue the side you were given
-2. [[Design Challenge]] demonstrations — two minutes each
+2. [[Design Challenge]] demonstrations — two minutes each; devices and
+   design logs handed in
 3. Where the electricity in this room came from while we were arguing
 
 ## Things to do before our next class
 
 - [ ] Debate paragraph: what would you actually choose, and what changed it?
-- [ ] Design log handed in with the device.
+- [ ] Journal: the change you made that mattered most, and how you knew.

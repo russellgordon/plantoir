@@ -10,9 +10,13 @@ tags:
 ---
 ## Agenda
 
-1. [[The Property Prediction]], day 4 — working period: predicted against
-   measured, and the paragraph about the disagreement
-2. Trade with another group; challenge one explanation each
+1. [[The Property Prediction]], day 4 — working period: start with what
+   yesterday's two minutes turned up, then predicted against measured,
+   and the paragraph about the disagreement
+2. In the last twenty minutes: [[Judging Your Own Work]], run together
+   on last year's property sheet first and then on your own draft. Trade
+   with the person beside you, challenge one explanation each, and fix
+   your weakest row before you leave
 
 ## Things to do before our next class
 

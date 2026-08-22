@@ -11,10 +11,11 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Tech Headlines]] — the last one
-2. Bench time: [[The Shop Showcase]], day 4 — rehearse the four-part talk
+2. First fifteen minutes at the bench: act on yesterday's note — this
+   period is what the checkpoint was for
+3. Bench time: [[The Shop Showcase]], day 4 — rehearse the four-part talk
    on another bench, who ask one hard question each
-3. Work habits, named: the Ontario Skills Passport list, against your own
-   term
+4. Tools away, log it in your [[Tech Journal]]
 
 ## Things to do before our next class
 

@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. [[The Water Report]], day 5 — working period: writing. The claim, the
-   evidence, and the uncertainty in that order
+   evidence, and the uncertainty in that order — beginning with the row
+   your self-check flagged last class
 2. Trade with another group and challenge one claim each
 
 ## Things to do before our next class

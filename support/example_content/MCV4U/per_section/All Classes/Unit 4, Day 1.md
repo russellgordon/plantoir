@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Random groups — [[The Treasure Walk]] at the boards: a deck of
-   walking instructions, a treasure, and one suspicious shuffle
+   walking instructions, a treasure, and one suspicious shuffle. It is
+   the unit's diagnostic as well — what you already believe an arrow can
+   do is where the vectors half starts from
 2. Discuss: the shuffle moved nothing — what, exactly, must an
    instruction carry for that to work?
 3. Consolidate: [[What Vectors Are]] — magnitude and direction,

@@ -12,7 +12,8 @@ tags:
 
 1. Seminar: [[Should We Build There|Should We Build There?]]
 2. Density as the real argument
-3. Launch: [[The Land Use Proposal]] — sites chosen
+3. Launch: [[The Land Use Proposal]] — sites chosen, and who writes
+   which of the three sections
 
 ## Things to do before our next class
 

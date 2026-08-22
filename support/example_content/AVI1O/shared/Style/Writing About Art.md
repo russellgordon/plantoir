@@ -5,10 +5,10 @@ created: __CREATED__
 tags:
   - style
 ---
-You will write about art in every unit of this course, and it is marked the
-same way each time. The standard is not how much you liked the work — it is
-whether a reader who has never seen it can tell, from your sentences, what
-is actually there.
+You will write about art in every unit of this course, and one standard
+runs through all of it. That standard is not how much you liked the
+work — it is whether a reader who has never seen it can tell, from your
+sentences, what is actually there.
 
 ## Describe before you judge
 
@@ -52,8 +52,8 @@ the reader can check you. [[Interpreting a Work]] and
 Two different sentences: what the artist appears to have been after, and
 what the work actually does to a viewer. Keep them apart, including about
 your own work — "I wanted it crowded, and it reads as busy instead" is
-stronger than either half alone, and it is what earns marks in
-[[Assessing Your Own Work]].
+stronger than either half alone, and it is the move
+[[Assessing Your Own Work]] teaches.
 
 ## Citing an image or a source
 

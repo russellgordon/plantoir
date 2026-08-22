@@ -65,3 +65,15 @@ Treat your earlier entries the way an essay treats sources:
 > quotes an early entry *and* points at a commit is about as strong
 > as evidence gets in this course — and it is the same standard
 > [[How Marks Work]] applies to everything: what can you point to?
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.3]]
+
+![[B2.3]]
+
+![[D4.3]]
+
+![[D4.4]]
+%%curriculum-end%%

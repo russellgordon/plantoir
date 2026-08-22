@@ -76,3 +76,11 @@ committed to an answer.
 > each instruction maps to one letter: $a = -2$, $d = 5$, $c = 3$.
 > Check one point: the parent's $(4, 2)$ should land at
 > $(9, -1)$, and substituting $x = 9$ gives $-2(2) + 3 = -1$. ✓
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.8]]
+
+![[A1.9]]
+%%curriculum-end%%

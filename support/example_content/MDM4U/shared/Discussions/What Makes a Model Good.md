@@ -76,3 +76,13 @@ your data, what your method could not rule out, and what would change
 your mind. That section is where the mathematics grows up. The habit
 of asking what a picture *claims* starts small, every morning, in
 [[Graph Talks]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B2.3]]
+
+![[D2.2]]
+
+![[E1.5]]
+%%curriculum-end%%

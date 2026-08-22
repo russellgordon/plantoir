@@ -10,7 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. [[The Critical Essay]], day 3 — outline, including the counter-reading
+1. [[The Critical Essay]], day 3 — outline, built from what yesterday's
+   conference sent you back to, and including the counter-reading
    section
 2. Concept: [[The Extended Essay]] — ordering the moves
 

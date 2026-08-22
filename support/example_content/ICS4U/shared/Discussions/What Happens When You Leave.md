@@ -5,12 +5,12 @@ created: __CREATED__
 tags:
   - discussions
 ---
-Everyone on your team leaves. Not eventually — in June. The community
-partner you are building for will still have the program, still need
-it to work, and will not have any of you. That fact is not the sad
-part at the end of the project. It is a design constraint from the
-first week, and it is the one most student projects ignore until the
-last day, when it is far too late to fix.
+Everyone on your team leaves. Not eventually — at the end of the course. The
+community partner you are building for will still have the program, still
+need it to work, and will not have any of you. That fact is not the sad part
+at the end of the project. It is a design constraint from the first week,
+and it is the one most student projects ignore until the last day, when it
+is far too late to fix.
 
 Teams use a blunt phrase for this: the **bus factor**. How many
 people would have to disappear before the project became
@@ -38,7 +38,7 @@ head:
   half-finished part, the thing hard-coded because there was no time,
   the assumption about the data that held for one term.
 - **Who to ask, and until when.** An honest answer, including "nobody,
-  after June", is worth more than a vague offer nobody will take up.
+  after this course", is worth more than a vague offer nobody will take up.
 
 > [!important] A handover is a promise, not a formality
 > Somebody agreed to let a group of students build something they
@@ -76,3 +76,15 @@ demonstration. The practical craft sits in
 the record of what you decided and why — the thing nobody else can
 reconstruct — is your [[Code Journal]]. The related question, about
 who carries the cost after you go, is [[Who Maintains This]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.3]]
+
+![[B1.5]]
+
+![[B1.6]]
+
+![[D4.3]]
+%%curriculum-end%%

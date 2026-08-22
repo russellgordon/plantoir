@@ -55,7 +55,7 @@ they add to give a resultant pointing from the hydrogens towards the
 oxygen, reinforced by the two lone pairs sitting on the other side.
 Water is strongly polar, and that stream bends.
 
-$$\ce{CO2} \text{ (linear, symmetric)} \rightarrow \text{non-polar} \qquad \ce{H2O} \text{ (bent)} \rightarrow \text{polar}$$
+$$\ce{CO2 \text{ (linear, symmetric)} -> \text{non-polar}} \qquad \ce{H2O \text{ (bent)} -> \text{polar}}$$
 
 A working test, in the order you should apply it:
 

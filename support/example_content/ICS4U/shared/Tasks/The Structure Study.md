@@ -7,9 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Individual · launched Unit 2, Day 5 and due Unit 2, Day 6 · one
-> problem solved three ways, timed and measured, with a written
-> judgement about which container actually fits
+> Individual · launched Unit 2, Day 10 and due Unit 2, Day 16 · four
+> working periods · one problem solved three ways, timed and measured,
+> with a written judgement about which container actually fits
 
 ## What you are making
 
@@ -79,11 +79,20 @@ For each of the three versions:
 
 ## Milestones
 
-- [ ] **Unit 2, Day 5 — problem chosen**, with the reason at least two
-      containers are arguable for it.
-- [ ] **Unit 2, Day 5, homework — first version running** and the
-      operation list drafted.
-- [ ] **Unit 2, Day 6 — submitted.** Three versions, one shared test
+- [ ] **Unit 2, Day 10 — problem chosen**, with the reason at least
+      two containers are arguable for it.
+- [ ] **Unit 2, Day 12 — the operation list, costed.** Every
+      operation your problem needs, with what it costs under each of
+      the three containers, and every one of those costs worked out
+      rather than remembered.
+- [ ] **Unit 2, Day 13 — the shared test input written**, awkward
+      cases included: a duplicate, an empty structure, a removal from
+      the middle.
+- [ ] **Unit 2, Day 14 — judged against the criteria table** by you,
+      with your weakest row named and the fix booked into Day 15. The
+      routine is [[Judging Your Own Work]], and the row you cannot
+      defend is the thing to bring to that day's conference.
+- [ ] **Unit 2, Day 16 — submitted.** Three versions, one shared test
       input, and the study with a recommendation you can say out loud.
 
 ## How this is assessed
@@ -143,3 +152,48 @@ the same?
 
 ![[C2.1]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+OBSERVE — Unit 2, Day 12, the working period where each operation
+gets a cost written beside it
+  Watch for: where the cost comes from. A student who works out that a
+  removal from the middle has to shift everything after it is doing
+  something entirely different from a student writing down the number
+  they remember belongs there, and by the end of the period the two
+  tables are indistinguishable. The finished study reports the costs;
+  it cannot report whether they were derived or recalled.
+  Going well: a small example on scrap paper with the steps counted,
+  or a sentence out loud that begins "it has to walk the whole".
+  Stuck: costs appearing at the speed of handwriting, or the same
+  three verdicts — fast, slow, slow — copied down the column with no
+  step counted anywhere.
+  Record: two columns on the day plan — worked it out, wrote it down.
+  Initials only; one pass of the room.
+  That is A3.3 — creating the subprograms that insert and delete
+  elements — met at the point where a student either understands what
+  those operations actually do to a structure or does not, which is
+  invisible once the code runs and the table is typed up.
+
+TALK — Unit 2, Day 14, at the conference already on that agenda
+  That agenda tells them the conference is about the operation they
+  are least sure of, so they will arrive with that prepared. Start
+  somewhere else.
+  Ask: "After your remove-one operation has run, what is true of the
+  structure that was not true before it? And is that answer the same
+  for all three of your versions?"
+  Then: "Which of the three would you have to warn somebody about
+  before they could use it safely, and what is the sentence you would
+  say?"
+  A strong answer describes an ending state rather than restating what
+  the operation does, and can say where the three versions differ.
+  That is C2.1 — analysing a precondition and a postcondition — and
+  the written study asks for preconditions in prose, so a student can
+  meet it on paper without ever having thought about what the code
+  leaves behind. This is where you find out.
+  Record: one line each on the conference sheet.
+
+The product evidence is the three programs and the study handed in on
+Day 16.
+%%

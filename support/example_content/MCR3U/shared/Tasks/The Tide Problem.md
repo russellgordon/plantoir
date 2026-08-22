@@ -7,8 +7,9 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Pairs · launched with the sinusoid recipe, due on the modelling day ·
-> one model, four letters explained, one prediction defended
+> Pairs · launched at the wave gallery · two working periods, then
+> defended the following class · one model, four letters explained, one
+> prediction defended, one question posed
 
 ## What you are making
 
@@ -36,24 +37,38 @@ cross?*
       until the disagreement is small and stated
 - [ ] Each letter translated into a sentence about water
 - [ ] Prediction and harbour answer written and defended
+- [ ] One question of your own posed for another pair — something your
+      model can answer that the tide table alone cannot — and the one
+      they pose for you answered from your graph
 
 ## How it is assessed
 
 Per [[How Marks Work]], the reasoning is the product: a model that
 misses slightly, with the miss measured and explained, outranks a
 perfect curve with silent letters. On the due date your pair defends
-the prediction out loud. The [[Math Journal]] entry on where your
-model disagreed with the data completes the evidence.
+the prediction out loud.
+
+You work in pairs and you are marked one at a time. The plot, the
+fitted model and the measured miss belong to the pair. **Yours alone**
+are two of the four letter-paragraphs — signed by whichever of you
+wrote them, two each — the question you posed and the one you answered
+at the swap, what you tell me at the conference in the second working
+period, and the ten minutes of [[Math Journal]] you write in class on the
+day it is due. [[Judging Your Own Work]] closes that second period, and
+the twenty minutes at the start of the next class is where both the
+conference and your own verdict land.
 
 ## Success criteria
 
 | Quality | What it looks like in your work |
 | --- | --- |
 | Picture first | Amplitude, period, and axis read from the plot |
-| Letters that speak | Every parameter tied to something wet |
+| Letters that speak | Every parameter tied to something wet, each paragraph signed by the partner who wrote it |
 | A measured miss | Model-versus-data disagreement stated in metres |
 | A brave prediction | An unmeasured time, with reasoning shown |
 | A useful answer | The harbour question answered in clock hours |
+| A question you set | One problem posed for another pair that your model answers and the table cannot, and theirs answered from your graph |
+| The entry that goes with it | Your in-class journal entry names the moment model and data disagreed, and whose side you took |
 
 > [!success]- If the wave will not fit
 > Check the period before anything else — tides run on roughly a
@@ -70,3 +85,63 @@ model disagreed with the data completes the evidence.
 
 ![[D3.5]]
 %%curriculum-end%%
+
+%%
+Triangulation — the evidence you will not have unless you go and get it.
+
+Pairs, so ask them one at a time. The watching belongs to the first working
+period and the talking to the conferences in the second, which keeps both off
+the day the model is due.
+
+OBSERVE — Unit 3, Day 17, the working period that follows the launch
+
+  Watch for the moment a pair fixes what t = 0 means. The tide table gives
+  clock times; the equation needs hours counted from some agreed zero, and that
+  zero is a decision somebody has to say out loud. The paragraph tying d to the
+  arrival of high tide gets written after the pair have reconciled, and no row
+  asks them to say where the clock started — so what is gone by hand-in is the
+  moment of agreement, or its absence.
+
+  Going well: a line written at the top of the page — "t = 0 is midnight on
+  the first day" — before any letter is chosen, and both pages using it.
+
+  Stuck: two pages, two zeros, discovered only when the graphs refuse to lie on
+  top of each other.
+
+  Record: a tick against each pair the moment you hear the zero declared. The
+  pairs with no tick when the period ends are the conferences to reach first
+  tomorrow.
+
+TALK — Unit 3, Day 18, at the conferences already on that agenda
+
+  Ask: "A harbour master takes your crossing window and uses it. What would you
+  want them to know about it that is not written anywhere on your page?"
+
+  Then: "Tell me what your t is actually counting, and from when. If I handed
+  your equation to another pair with nothing else, could they use it?"
+
+  On the first, the strong answer is a method read off their own plot, not a
+  slogan: half a metre of disagreement shifts EACH END of the window by that
+  half metre divided by the steepness of the curve where the crossing depth
+  cuts it, so the window itself changes by roughly twice that. Where the
+  crossing depth cuts the steep middle of the wave, the cost is at its
+  smallest; the nearer it sits to high water the flatter the curve is there and
+  the wider the swing, and if it sits within the disagreement of the peak the
+  window can vanish altogether. That is D3.5 — an application problem solved
+  off the graph — in a form the page cannot hold: the page states the window,
+  and only the conversation says whether the student knows what its ends are
+  worth.
+
+  On the second, listen for a refusal: no, the equation alone is not usable,
+  because d is measured from an instant that lives on another page. D3.3 is
+  about modelling a phenomenon that is not an angle, and the whole of that
+  connection sits in what t counts — its own sample problem pins high tide to
+  midnight before it writes anything down. A pair who cannot say where their
+  clock starts have fitted a curve rather than modelled a tide.
+
+  Record: one line per student on your class list. The pair's name is no use to
+  you here.
+
+The product evidence is the model handed in on Day 19, the question posed at
+the swap, and the journal entry written in class that day.
+%%

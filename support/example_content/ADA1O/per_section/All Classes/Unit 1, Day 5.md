@@ -11,7 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Machine]] — build one, then change its tension
-2. In fours: three photographs, and the story each one implies
+2. In fours: three photographs, and the story each one implies. This one
+   is for me — I am finding out what this class already sees in an image,
+   so I know where Unit 1 has to start
 3. Back to [[The Elements of Drama]] — name the element doing the work
    in each image
 4. On your feet: recreate one photograph exactly, then change ONE thing

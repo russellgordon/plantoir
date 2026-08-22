@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. PESTLE, and why a strategy cannot float free of its country
-2. Porter's five forces on an industry you know
+1. PESTLE, and why a strategy cannot float free of its country: [[Analysing a Strategy]]
+2. Porter's five forces on an industry you know: [[Strategy and Its Levels]]
 3. Choosing the two entries that decide it
 
 ## Things to do before our next class

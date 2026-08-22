@@ -28,6 +28,7 @@ your own. Nothing here is timed, counted, or collected. Ever.
 | [[Function Notation Practice]] | [[What Is a Function]] and [[Function Notation]] |
 | [[Domain and Range Practice]] | [[Domain and Range]] |
 | [[Transformations Practice]] | [[Transformations of Functions]] |
+| [[Equivalent Expressions Practice]] | [[Equivalent Algebraic Expressions]] |
 | [[Exponent Laws Practice]] | [[Exponent Laws]] and [[Rational Exponents]] |
 | [[Exponential Models Practice]] | [[The Exponential Function]] |
 | [[Trig Ratios and Laws Practice]] | [[Special Angles]], [[The Sine Law]], [[The Cosine Law]] |

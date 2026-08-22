@@ -11,11 +11,14 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Spot the Bug]]
-2. [[Launch Day]], day 3 — working period: make the thing you are showing
-   actually work, on the machine you will use
-3. Every demo runs end to end before you leave, or it is on tomorrow's
-   list
+2. [[Launch Day]], day 3 — working period: build the core until it
+   actually works, on the machine you will use
+3. Last ten minutes: [[Judging Your Own Work]] against this task's
+   criteria table — name your worst row, and the period you will fix
+   it in
 
 ## Things to do before our next class
 
-- [ ] Demo runs. On your machine, from a cold start.
+- [ ] Nothing to finish at home. Bring a note of what would not run,
+      so day 4 starts there.
+- [ ] Worst row named.

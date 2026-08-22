@@ -14,4 +14,4 @@ Our semester runs in four units:
 - **Unit 1 — Number Rebuilt**: estimation, fractions, ratios, and integers, ending in the [[Fermi Festival]].
 - **Unit 2 — Algebra, Patterns, and Code**: expressions, equations, and Python, ending in [[Pattern Machines]].
 - **Unit 3 — Data Tells Stories**: box plots, scatter plots, and honest claims, told through [[A Data Story]].
-- **Unit 4 — Measure, Build, Budget**: geometry, optimization, and money — [[Design Under Constraints]], shown at [[The Math Fair]].
+- **Unit 4 — Measure, Build, Budget**: geometry, optimization, and money — [[The Money Decision]] and [[Design Under Constraints]], then [[The Math Fair]] to finish the course.

@@ -50,7 +50,9 @@ disagrees with its own equation is the cheapest alarm in
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B1.1]]
+![[A3.5]]
 
 ![[A3.8]]
+
+![[B1.1]]
 %%curriculum-end%%

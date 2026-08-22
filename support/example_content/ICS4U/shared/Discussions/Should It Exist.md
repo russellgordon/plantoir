@@ -77,3 +77,15 @@ the scope you agree in the first week is the scope you will defend at
 [[The Handover]]. The groundwork is [[When Code Hurts]]; the
 professional frame, including what it means to refuse work, is
 [[Ethics, Security, and the Profession]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D2.1]]
+
+![[D3.1]]
+
+![[D3.2]]
+
+![[D4.2]]
+%%curriculum-end%%

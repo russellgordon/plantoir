@@ -13,7 +13,8 @@ tags:
 1. Two speakers, one tone, and a room with quiet spots
 2. [[Interference and Beats]] — and tuning by beats
 3. [[The Doppler Effect]] with a swung buzzer
-4. Launch: [[Sound in a Space]]
+4. Launch: [[Sound in a Space]] — with the five rows it is marked
+   against read together, before anybody picks a room
 
 ## Things to do before our next class
 

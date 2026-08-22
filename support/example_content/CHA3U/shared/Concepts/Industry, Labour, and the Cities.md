@@ -76,7 +76,15 @@ and set the labour question beside the racial one in
 
 ![[D1.2]]
 
+![[D1.3]]
+
 ![[D2.1]]
 
 ![[D2.2]]
+
+![[D2.3]]
+
+![[D3.2]]
+
+![[D3.3]]
 %%curriculum-end%%

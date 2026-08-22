@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Hand in [[Forces in a Real Situation]] — day 5
+1. Hand in [[Forces in a Real Situation]] — day 4
 2. Gallery: five situations, five analyses, compared at the boards
 3. The technologies behind them: seatbelts, crumple zones, prosthetics —
    who benefits, and what they cost

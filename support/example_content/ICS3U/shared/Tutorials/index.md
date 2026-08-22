@@ -20,7 +20,7 @@ instead of explaining it again.
 | [[Writing Code Others Can Read]] | Code a stranger can pick up |
 | [[Interviewing Your Client]] | Asking well, and asking permission |
 | [[Getting Unstuck]] | Being stuck well instead of spinning |
-| [[Organizing Your Files]] | Folders and names you can still use in January |
+| [[Organizing Your Files]] | Folders and names you can still use at the end of the course |
 | [[Backing Up Your Work]] | Three copies, and one of them elsewhere |
 | [[Starting from a Skeleton]] | Beginning from a shape instead of a blank file |
 | [[Reading the Documentation]] | Finding out what a function actually does |

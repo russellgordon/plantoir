@@ -70,4 +70,6 @@ to learn how a caption gets written is to write one. See
 ## Curriculum connection
 
 ![[A1.4]]
+
+![[D3.5]]
 %%curriculum-end%%

@@ -11,7 +11,8 @@ tags:
 ## Agenda
 
 1. Discussion: [[Testing on Animals]]
-2. Work time: [[Homeostasis Report]], diagrams drawn in class
+2. Work time: [[Homeostasis Report]] — the note I left on your treatment
+   paragraph, acted on, and the diagrams drawn in class
 3. Consolidate: four loops, one structure
 4. Hand in [[Homeostasis Report]]
 

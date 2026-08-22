@@ -10,7 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Start of Unit 2 — where does the energy in glucose actually go?
+1. Start of Unit 2 — the food labels you brought, on the board: where do
+   you think that energy goes? Unmarked, and it tells me which half of
+   this unit needs the most time
 2. [[Cellular Respiration]]: four stages, one gradient
 3. Chemiosmosis as a waterwheel — and why it was rejected for years
 4. Hand in [[Enzyme Investigation]]

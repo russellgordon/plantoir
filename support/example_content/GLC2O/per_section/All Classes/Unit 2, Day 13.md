@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[Evidence of What You Can Do]] — the audit, then the build
-2. Passive footprint and active footprint, and why only one is chosen
-3. The privacy half: what never goes online anywhere
+1. Launched: [[The Application]] — what earns the marks read today, and the opportunity chosen: the posting from [[Reading a Job Ad]] or one you have found since
+2. [[Evidence of What You Can Do]] — the audit here in a private window, then the build, then the privacy half, which is item five of the task
+3. What the page of explanation will have to carry: why this one, and what you seriously considered instead
 
 ## Things to do before our next class
 
-- [ ] Search your own name, signed out, and write the audit.
+- [ ] Nothing to write — the audit and the build were done here. If you decided to change something, do it tonight: it has to be true before the package goes in.

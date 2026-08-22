@@ -37,12 +37,24 @@ It also binds oxygen, wastefully — photorespiration. $\ce{C4}$ and CAM
 plants have evolved workarounds that concentrate carbon dioxide around the
 enzyme, which is why maize and cacti outperform wheat in heat.
 
+## Ecosystem energy flow and the carbon cycle
+
+Photosynthesis is the planetary bridge between abiotic solar flux and biotic
+biomass:
+- **Trophic energy base:** photolysis of water coupled to carbon fixation
+  generates virtually all organic carbon sustaining heterotrophic food webs.
+- **Bioreactors and carbon capture:** engineered microalgae culture systems
+  harness Calvin cycle metabolism for industrial carbon sequestration and
+  biofuel synthesis.
+
 %%curriculum-start%%
 ## Curriculum connection
+
+![[C1.1]]
+
+![[C2.3]]
 
 ![[C3.3]]
 
 ![[C3.4]]
-
-![[C2.3]]
 %%curriculum-end%%

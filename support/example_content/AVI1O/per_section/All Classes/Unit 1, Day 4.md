@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Value: light, shadow, and the range between
+1. Value: light, shadow, and the range between: [[The Elements of Design]]
 2. Measuring by eye — proportion without a ruler
-3. Studio time: a value study
+3. Studio time: a value study — [[Drawing]]
 
 ## Things to do before our next class
 

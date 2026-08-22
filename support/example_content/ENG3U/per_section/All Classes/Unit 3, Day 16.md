@@ -10,9 +10,12 @@ tags:
 ---
 ## Agenda
 
-1. [[The Comparative Response]], day 4 — workshop: does the comparison do
-   work, or does it merely exist?
-2. Rewrite the paragraph where the comparison is weakest
+1. [[The Comparative Response]], day 4 of 5 — workshop: your partner marks
+   every place the comparison exists without doing any work
+2. [[Judging Your Own Work]] against the criteria, on your own — the
+   third time you have done this alone, and still not part of anybody's
+   mark; by now the weakest row should take a minute to find
+3. Rewrite the paragraph where the comparison is weakest
 
 ## Things to do before our next class
 

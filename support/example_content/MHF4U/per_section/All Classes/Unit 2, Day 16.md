@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Checkpoint, on your own: rational functions, equations, inequalities
-2. Mark your own; revision list written
+1. Checkpoint, on your own: rational functions, equations, inequalities — [[Rational Functions Practice]]
+2. Mark your own; revision list written: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 
-- [ ] Journal: what September-you would have made of today's paper.
+- [ ] Journal: what the you who started this course would have made of today's paper.

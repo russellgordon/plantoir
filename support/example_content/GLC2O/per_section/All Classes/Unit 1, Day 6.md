@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. [[The Skills Inventory]], period two: the partner pass
-2. One question of every line — how would someone else know that?
-3. Two skills your partner saw in you and you did not
+1. Routines that run without deciding: [[Habits That Actually Help]]
+2. Choosing the three you will actually keep for the rest of the course
+3. Turning one intention into the shape of a habit, out loud
 
 ## Things to do before our next class
 
-- [ ] Finish the list. Bring it to every class from now on.
+- [ ] Read [[Habits That Actually Help]] to the end.

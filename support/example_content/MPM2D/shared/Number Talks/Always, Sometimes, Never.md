@@ -39,7 +39,13 @@ sometimes, and saying *when* is the line [[Similar Triangles]] draws.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B3.1]]
+
 ![[B3.3]]
 
+![[C1.1]]
+
 ![[C1.2]]
+
+![[C2.1]]
 %%curriculum-end%%

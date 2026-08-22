@@ -15,7 +15,9 @@ tags:
 2. Review, part two: exposure and lighting ratios, composition, the
    five-shot sequence, microphone placement, and the edit
 3. By request: [[Photo Critique Practice]], [[Layout Practice]]
+4. Then one sentence each on what the camera and the edit taught you —
+   more raw material for your [[Final Reflection]]
 
 ## Things to do before our next class
 
-- [ ] One question of each kind, worked cold.
+- [ ] One frame and one cut you would defend to a stranger, chosen.

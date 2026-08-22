@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Second extract from King: the film chapter
+1. Second extract from King: the film chapter: [[The Inconvenient Indian]]
 2. How representation in popular culture becomes an argument about
-   policy
+   policy: [[Media Texts and Their Arguments]]
 
 ## Things to do before our next class
 

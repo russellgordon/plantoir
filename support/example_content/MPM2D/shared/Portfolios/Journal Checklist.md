@@ -5,42 +5,55 @@ created: __CREATED__
 tags:
   - portfolio
 ---
-Your [[Math Journal]] is collected at the end of each unit. Before you
-hand it in, run this check — it is the same lens I read with, so
-anything you catch here is something we never need to have a
-conversation about. Ten minutes with this list is usually worth more
-than one extra entry.
+Your [[Math Journal]] is collected at the end of each unit, and the last
+ten minutes of that class are for writing the milestone entry — the one
+that is evaluated. Run this check before you write it, and again before
+you hand the journal in. It is the same lens I read with, so anything
+you catch here is something we never need to have a conversation about.
 
-## The check
+## Before you write
 
-**Coverage**
+These are the raw material. None of it is marked — it is what makes a
+milestone entry possible, and a unit of blank pages leaves you nothing
+to point at.
 
-- [ ] There is an entry for every class in the unit
-- [ ] Entries were written close to the day, not reconstructed the
-      night before collection — reconstructed entries always show
-- [ ] All four prompts appear across the unit: what we did, what
-      clicked, what is foggy, what I would try
+- [ ] There are entries across the unit, written close to the day
+      rather than reconstructed the night before — reconstructed
+      entries always show
+- [ ] All four prompts appear somewhere across the unit: what we did,
+      what clicked, what is foggy, what I would try
 - [ ] At least one entry records a conjecture of my own — dated and
       testable, even if it later fell to a counter-example
+- [ ] Entries are dated, because the milestone entry has to cite them
 
-**Quality**
+## The milestone entry
 
-- [ ] Every entry names at least one specific moment — a method, a
-      classmate's idea, a place I got stuck (see
-      [[What a Strong Entry Looks Like]])
-- [ ] Foggy things are located, not just felt — "I lose the sign on
-      $h$ in vertex form", not "quadratics are confusing"
-- [ ] At least one entry admits a real difficulty, not just victories
+**Grounded**
+
+- [ ] Every claim about my learning points at a dated entry, not at a
+      general impression of the unit
+- [ ] At least one phrase is quoted from that entry, in the words I
+      used at the time
+
+**Honesty**
+
+- [ ] A real difficulty is named, not only the victories
 - [ ] My own part is named, not hidden inside "we" — what *I* tried,
       suggested, avoided, or misread
 
+**Precision**
+
+- [ ] Foggy things are located, not just felt — "I lose the sign on
+      $h$ in vertex form", not "quadratics are confusing"
+- [ ] A specific moment is named — a method, a classmate's idea, a
+      place I got stuck (see [[What a Strong Entry Looks Like]])
+
 **Growth**
 
-- [ ] Each entry ends with one concrete "what I would try"
-- [ ] At least one earlier "try" item shows up later as a thing I
-      actually tried — with a sentence about how it went
+- [ ] One earlier "what I would try" is traced through to what actually
+      happened when I tried it
 
-> [!tip] The last two boxes are the whole game
+> [!tip] The Growth box is the whole game
 > Anyone can write "I will check my work more." The journal becomes
 > evidence of growth the day a later entry says "I substituted my
 > answers into both equations before calling the system solved, and

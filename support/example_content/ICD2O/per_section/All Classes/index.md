@@ -11,7 +11,7 @@ the page holds the plan, but the ideas earn their names in the room.
 
 Our semester runs in four units:
 
-- **Unit 1 — How Computers Think**: unplugged algorithms, hardware, and software, ending in [[The Algorithm Field Guide]].
+- **Unit 1 — How Computers Think**: unplugged algorithms, hardware, and software — [[The Algorithm Field Guide]] and [[The Device Recommendation]].
 - **Unit 2 — First Programs**: Python, variables, and conditionals, ending in [[The Quiz Machine]].
-- **Unit 3 — Programs with Power**: loops, subprograms, and debugging as a craft, ending in [[The Remix Project]].
-- **Unit 4 — Technology and Us**: security, AI, bias, and innovation — [[The Innovation Brief]], shown at [[Launch Day]].
+- **Unit 3 — Programs with Power**: loops, subprograms, and debugging as a craft — [[The Remix Project]], then the start of [[The Innovation Brief]].
+- **Unit 4 — Technology and Us**: security, AI, bias, and innovation — finishing [[The Innovation Brief]], then [[Launch Day]].

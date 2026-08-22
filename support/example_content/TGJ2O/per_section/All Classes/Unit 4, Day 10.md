@@ -10,16 +10,18 @@ tags:
 ---
 ## Agenda
 
-1. Standup — two classes until readers arrive
+1. Standup — three classes until readers arrive
 2. Drills: [[Copyright Scenarios Practice]] — then audit your own
    package against [[Copyright and Fair Dealing]]
-3. Discussion: [[Free Press, School Press]]
-4. Desk time: polish — every piece checked against
-   [[Writing for Publication]]
+3. [[Judging Your Own Work]] on your own piece, against
+   [[Writing for Publication]] — weakest row named first
+4. Desk time: curate and polish — the editorial board chooses what
+   runs, and you fix what your own check just found
 5. File and log: [[Newsroom Journal]]
 
 ## Things to do before our next class
 
-- [ ] Finish polishing — tomorrow we publish for invited readers.
+- [ ] Finish polishing — the proof is tomorrow, readers three classes
+      from now.
 - [ ] Journal: one thing in your package you fixed before anyone
       could ask.

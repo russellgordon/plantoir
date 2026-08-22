@@ -52,6 +52,13 @@ def lint(course_code: str) -> int:
     curriculum_folder = manifest.get("curriculum_folder")
 
     problems = []
+    # Obsidian comments, paired exactly the way the vendored Quartz pairs
+    # them (`commentRegex = /%%[\s\S]*?%%/g` in ofm.ts): non-greedy, so
+    # `%%curriculum-start%%` consumes its own delimiters and the
+    # transclusions between the markers are NOT inside a comment.
+    comment_pattern = re.compile(r"%%(.*?)%%", re.S)
+    missing_triangulation = []
+    bulky_pies = []
     link_pattern = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
     class_sentinel = re.compile(r"created: __CREATED_CLASS_(\d+)__")
 
@@ -139,6 +146,20 @@ def lint(course_code: str) -> int:
                 problems.append(f"{rel}: a pie slice rounds to 0% — combine it into a larger one")
             elif len(crowded) > 1:
                 problems.append(f"{rel}: two pie slices under 3% will print their labels on top of each other")
+            # A pie carries the SHAPE of an answer, never an inventory. The
+            # mark page's pie is the seventy and the thirty and nothing
+            # else: per-item weights are a professional judgement that
+            # shifts with the class and the year, so printing them as
+            # slices presents a judgement as arithmetic. Six payloads had
+            # drifted to four- and five-slice weighting pies before this
+            # check existed, because the rule lived only in prose.
+            if page.stem == "How Marks Work" and len(values) != 2:
+                problems.append(
+                    f"{rel}: the mark page's pie has {len(values)} slices — it "
+                    f"must be exactly two, the 70/30 split, with the tasks "
+                    f"making up each part named in prose beneath it")
+            elif len(values) > 4:
+                bulky_pies.append((rel, len(values)))
 
         # The whole link graph, so reachability can be checked below.
         outside_fences = re.sub(r"```[\s\S]*?```", "", text)
@@ -173,6 +194,34 @@ def lint(course_code: str) -> int:
 
         if text.count("%%curriculum-start%%") != text.count("%%curriculum-end%%"):
             problems.append(f"{rel}: unbalanced curriculum markers")
+
+        # A link inside a `%%` comment is invisible to every reader and
+        # visible to both gates: this script and build_site.py read the raw
+        # markdown without stripping comments, so a hidden `![[A1.2]]`
+        # counts as curriculum coverage no student page provides, and a
+        # hidden `[[Page]]` satisfies the two-hop reachability check for a
+        # page nothing on the site reaches. Comments hold plain text.
+        for comment in comment_pattern.finditer(text):
+            body = comment.group(1)
+            if body.strip().startswith("curriculum-"):
+                continue
+            for hidden in link_pattern.finditer(body):
+                problems.append(
+                    f"{rel}: link inside a %% comment: "
+                    f"[[{hidden.group(1).strip()}]] — it is stripped before "
+                    f"anyone can follow it, but still counts for coverage "
+                    f"and reachability. Write the name as plain text"
+                )
+
+        # Observation and conversation are the two evidence sources a real
+        # course loses first, so every task carries a hidden prompt saying
+        # where in THAT task they are available. This is a note rather than
+        # a failure: no payload written before the rule existed has one.
+        rel_posix = rel.replace("\\", "/")
+        if "/Tasks/" in rel_posix and page.stem not in ("index", "_DUPLICATE ME"):
+            if not any("triangulation" in c.group(1).lower()
+                       for c in comment_pattern.finditer(text)):
+                missing_triangulation.append(rel)
 
         in_fence = False
         for line in text.split("\n"):
@@ -411,9 +460,9 @@ def lint(course_code: str) -> int:
         specific = set()
         overall = set()
         for page in curriculum_dir.glob("*.md"):
-            if re.fullmatch(r"[A-F]\d+\.\d+", page.stem):
+            if re.fullmatch(r"[A-Z]\d+\.\d+", page.stem):
                 specific.add(page.stem)
-            elif re.match(r"^[A-F]\d+\.\s", page.stem):
+            elif re.match(r"^[A-Z]\d+\.\s", page.stem):
                 overall.add(page.stem.split(".")[0])
 
         addressed_by = {code: set() for code in specific}
@@ -452,8 +501,8 @@ def lint(course_code: str) -> int:
                     f"a page in Tasks must transclude one of its specific expectations"
                 )
 
-    # ---- Hours: an Ontario credit is 110 hours of scheduled time, and a
-    # half credit is 55.
+    # ---- Hours: an Ontario credit is 110 hours of scheduled time (half credit is 55).
+    # In British Columbia, a standard senior secondary course is 4 credits (110–120 hours).
     #
     # One class page is one period. The final evaluation is not a class
     # page, so its hours are added separately; several review periods
@@ -461,12 +510,14 @@ def lint(course_code: str) -> int:
     # length of the final evaluation are declared in the manifest, so a
     # half credit is a stated property of the payload rather than a
     # tolerance stretched until it fits.
-    credit_value = float(manifest.get("credit_value", 1.0))
+    jurisdiction = manifest.get("jurisdiction", "ON").upper()
+    credit_value = float(manifest.get("credit_value", 4.0 if jurisdiction == "BC" else 1.0))
     final_hours = float(manifest.get("final_evaluation_hours",
                                      DEFAULT_FINAL_EVALUATION_HOURS))
-    credit_hours = FULL_CREDIT_HOURS * credit_value
-    tolerance = HOURS_TOLERANCE * credit_value
-    review_needed = max(2, round(MINIMUM_REVIEW_CLASSES * credit_value))
+    credit_multiplier = (credit_value / 4.0) if jurisdiction == "BC" else credit_value
+    credit_hours = FULL_CREDIT_HOURS * credit_multiplier
+    tolerance = HOURS_TOLERANCE * credit_multiplier
+    review_needed = max(2, round(MINIMUM_REVIEW_CLASSES * credit_multiplier))
     if class_ordinals:
         hours = len(class_ordinals) * PERIOD_MINUTES / 60 + final_hours
         if not credit_hours - tolerance <= hours <= credit_hours + tolerance:
@@ -503,6 +554,13 @@ def lint(course_code: str) -> int:
         print(f"PROBLEM  {problem}")
     for rel in unlinked:
         print(f"note     no class links {rel} (it will carry the Unit 1, Day 1 date)")
+    for rel in missing_triangulation:
+        print(f"note     no triangulation prompt {rel} (a hidden %% block "
+              f"naming where to observe and what to ask)")
+    for rel, count in bulky_pies:
+        print(f"note     {rel} has a {count}-slice pie — past about four a pie "
+              f"is an inventory rather than a shape; fine for a real "
+              f"composition, wrong for a weighting")
     print("clean" if not problems else f"{len(problems)} problem(s)")
     return 1 if problems else 0
 

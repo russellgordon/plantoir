@@ -28,7 +28,7 @@ That is a much smaller problem than pretending.
 
 ## Following one issue all term
 
-Choose one civic issue in the first week and follow it until January.
+Choose one civic issue in the first week and follow it until the end of the course.
 Local is better than national, because you can reach the people deciding
 it. Save every article, minute, and document you find about it in one
 place, dated.
@@ -36,7 +36,7 @@ place, dated.
 By the time [[The Civic Action Project]] starts you will either have ten
 weeks of material on a live issue, or you will have discovered it is the
 wrong issue — and both of those are worth more than starting from nothing
-in December.
+at the end of the course.
 
 ## What you do not need
 
