@@ -81,7 +81,7 @@ nobody else's.
 > mark, on one day, standing beside something you made. The other
 > seventy is already in — five jobs across the semester. Bring the
 > device, the documentation and the journal; everything else you need
-> you have been assembling since September.
+> you have been assembling since the first week.
 
 > [!example]- What a useful recommendation sounds like
 > **Not useful:** "Maybe add more features." **Useful:** "Your sensor
@@ -111,7 +111,7 @@ nobody else's.
 
 Journals come in today. [[Journal Checklist]] is your last look before
 they leave your hands, [[Showing Growth]] is the entry that puts
-September beside January, and [[Final Reflection]] is the one that
+your first entry beside your last, and [[Final Reflection]] is the one that
 answers what you would build next. The last thing that happens in this
 room is the same thing that happened on the first day: tools away,
 benches clear, one final log in your [[Tech Journal]].

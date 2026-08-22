@@ -61,5 +61,7 @@ dismiss a position once you have had to make its best case yourself.
 
 ![[D3.3]]
 
+![[D4.3]]
+
 ![[T1.3]]
 %%curriculum-end%%

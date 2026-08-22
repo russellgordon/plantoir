@@ -29,7 +29,7 @@ Three kinds of thing:
 Somewhere you will still have access in Grade 12 — a school drive
 folder, a document, a physical folder, or your Individual Pathways Plan.
 Whichever you choose, choose one, and put everything in it the same day
-you make it. Assembling a portfolio from six locations in November is a
+you make it. Assembling a portfolio from six locations at the end is a
 task nobody completes.
 
 ## The entries that matter most

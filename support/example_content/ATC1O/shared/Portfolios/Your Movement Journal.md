@@ -54,11 +54,11 @@ same in both directions: replace the verdict with the moment.
 
 Nobody marks you for how you feel about your dancing. What the milestone
 entries are read for is whether you can see it. The entries where you were
-honest about something not working are the ones you will quote in June, because
-they are the only ones that prove anything changed.
+honest about something not working are the ones you will quote at the end of
+the course, because they are the only ones that prove anything changed.
 
 [^format]: Paper or digital, both are fine — but pick one and stay with it for
-    the year. Half a journal in a notebook and half in an app is a portfolio
+    the semester. Half a journal in a notebook and half in an app is a portfolio
     that cannot be handed in.
 
 %%curriculum-start%%

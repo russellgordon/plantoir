@@ -16,7 +16,8 @@ apprenticeship sponsor — evidence that you can do this work.
 
 ## The portfolio
 
-Assembled all year, not in June — see [[The Evidence File]]:
+Assembled all semester, not at the end of the course — see
+[[The Evidence File]] :
 
 - Photographs of every build, bed, and planting, before and after
 - Your propagation log and growing trial data

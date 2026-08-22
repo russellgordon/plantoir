@@ -152,7 +152,7 @@ can still change somebody's week.
 
 OBSERVE — Unit 5, Day 14, review part one, on the questions they bring
   Watch for: the first mark a student makes on a problem they have not
-  seen since September. Axes, a free-body diagram, a positive direction
+  seen since the first week. Axes, a free-body diagram, a positive direction
   — or an equation off the formula sheet with numbers pushed into it.
   The paper will show diagrams wherever a question asks for one; this
   room shows whether drawing is anybody's first move when nobody asked.

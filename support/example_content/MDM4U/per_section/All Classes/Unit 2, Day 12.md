@@ -19,7 +19,7 @@ tags:
 4. Launch: [[The Culminating Investigation]] — it runs to the last day
    of the course; [[Choosing a Data Set]] makes a question answerable.
    Read the milestone schedule and the criteria table on the task page
-   today: between them they are the standard from here to January
+   today: between them they are the standard from here to the end of the course
 5. Practise: [[Normal Distribution Practice]], first set
 
 ## Things to do before our next class

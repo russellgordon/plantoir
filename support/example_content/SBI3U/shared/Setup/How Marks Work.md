@@ -17,11 +17,11 @@ will be judged, that is a bug — tell me and I will fix the page.
 
 ## The seventy and the thirty
 
-Every Grade 11 credit in Ontario is built the same way. Seventy per cent
-of your mark comes from work spread across the whole semester, and it
-leans towards your **most recent and most consistent** work rather than
-averaging September against January. The remaining thirty per cent comes
-from a final evaluation at the end of the course.
+Every Grade 11 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it. The remaining thirty per cent
+comes from a final evaluation at the end of the course.
 
 **The seventy** is one task per unit — [[Biodiversity Field Study]],
 [[An Evolution Case Study]], [[Genetic Counselling Brief]] and

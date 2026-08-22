@@ -59,9 +59,12 @@ Your program must implement:
    - Fatigue/pack modifier: If pack weight exceeds $20\%$ of hiker body weight, add $10\%$ to total moving time.
 2. **Environmental Lapse Rate Calculation:**
    - Standard atmospheric temperature lapse rate: Temperature drops by $6.5^\circ\text{C}$ per $1000\text{ m}$ of elevation gain:
-     $$T_{\text{summit}} = T_{\text{base}} - \left(6.5 \times \frac{\text{elevation}}{1000}\right)$$
+
+$$T_{\text{summit}} = T_{\text{base}} - \left(6.5 \times \frac{\text{elevation}}{1000}\right)$$
+
    - Freezing level calculation: Altitude where temperature reaches $0.0^\circ\text{C}$:
-     $$\text{Freezing Level (m)} = \text{Elevation}_{\text{base}} + \left(\frac{T_{\text{base}}}{6.5} \times 1000\right)$$
+
+$$\text{Freezing Level (m)} = \text{Elevation}_{\text{base}} + \left(\frac{T_{\text{base}}}{6.5} \times 1000\right)$$
 3. **Multi-Tier Risk Assessment Logic:**
    - **Hypothermia Risk:** Evaluated from the combination of summit temperature, wind exposure factor, and precipitation volume.
    - **Daylight Hazard:** Compares total travel time against entered daylight hours. If moving time $\ge$ daylight, trigger critical darkness alert.
@@ -97,7 +100,7 @@ If a navigation app underestimates travel time by 3 hours in the North Shore Mou
 
 ## Success Criteria
 
-| Quality | Exemplary (Level 4) | Developing (Level 2) |
+| Quality | What strong work looks like | What it looks like when it is not there yet |
 | --- | --- | --- |
 | **Algorithmic Accuracy** | Mathematical models (Naismith, lapse rate, pack ratios) faithfully implemented with correct units. | Calculations produce incorrect results on non-trivial elevation or pace values. |
 | **Conditional Logic** | Nested conditionals cleanly evaluate all compound risk states without dead branches or duplicate checks. | Incomplete conditional checks miss boundary risk conditions (e.g. freezing level at summit). |
@@ -139,15 +142,17 @@ If a navigation app underestimates travel time by 3 hours in the North Shore Mou
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 1, Day 16, while students are implementing Naismith pace calculations and elevation penalty algorithms
-  Watch for: how students decompose the multi-variable risk rules and structure nested branching before writing Python code.
-  Going well: edge cases like negative distance or summit elevations exceeding 4000 m are caught by defensive input guards before calculations run.
-  Stuck: copy-pasting repetitive if statements without structuring boolean operators or mixing up elevation units (metres vs kilometres).
-  Record: note on the seating chart who independently handled compound boundary conditions and who required prompting on environmental lapse rate formulas.
+OBSERVE — Unit 1, Day 16, during the work period on freezing-level logic, multi-tier hazard warnings, and defensive input gates
+  Watch for: how a student works the branching out before typing it — on paper, at the whiteboard, or straight into the editor and then rearranged three times.
+  Going well: tries a value right at a threshold the moment the branch is written rather than saving every check for the Day 17 test matrix, and says out loud which case is being tested.
+  Stuck: re-runs the whole program to check one condition instead of tracing it by hand; sits with a blank editor for several minutes without reaching for paper, for the Day 14 flowchart, or for a neighbour.
+  Record: three columns on the seating chart — traced it, guessed it, needed a prompt — and a word on who you had to prompt and about what.
 
-TALK — Unit 1, Day 17, during the test matrix verification and peer sanity checks
-  Ask: "If a hiker inputs a summit temperature of 2°C with 25 mm of precipitation at 1500 m, how does your code decide between high hypothermia risk and an avalanche warning? Walk me through the branch condition that fires."
-  Then: "Why is a false sense of safety in wilderness navigation software more dangerous than an outright crash?"
+TALK — Unit 1, Day 17, during the test matrix and boundary testing period
+  Ask: "If a hiker enters a summit temperature of 2°C with 25 mm of precipitation at 1500 m, how does your code decide between a high hypothermia risk and an avalanche warning? Walk me through the branch that fires."
+  A strong answer names the actual condition and the order things are evaluated in — "the hypothermia check runs first because it can be true at the same time as the avalanche check, so I let both fire" — and can say what would change the answer. A weak one narrates what the screen prints.
+  Then: "Your program has just printed HIGH RISK with a 1.5-hour sunset shortfall. What would have to be wrong in the inputs for that advisory to be dangerously optimistic instead?"
+  A strong answer picks a real input and follows it through — an under-reported pack weight, a base temperature taken at the trailhead on a warm afternoon, a distance that ignores the approach road — and says what the hiker would do on the strength of the wrong number. A weak one says the program would just be wrong, without anybody in the answer.
   The first checks D2.3 and K1.8 heard out loud: whether the student can trace compound boolean logic without guessing.
   The second checks T1.2: understanding the real-world safety consequences of algorithmic assumptions.
   Record: two sentences per conversation on the daily tracking sheet.

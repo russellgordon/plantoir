@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: one gene, several proteins — how?
+1. Warm-up: one gene, several proteins — how? [[Transcription and Translation]]
 2. Random groups — alternative splicing, and why the gene count came in
-   so much lower than anybody predicted
+   so much lower than anybody predicted: [[Regulating Gene Expression]]
 3. Consolidate: the genome as a set of instructions read differently in
    different cells
 

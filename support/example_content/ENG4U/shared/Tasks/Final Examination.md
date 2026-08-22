@@ -32,7 +32,7 @@ tags:
 ## How it is marked
 
 The same four categories as everything else, and the criteria are the
-ones you have been marked against since September. Nothing on this paper
+ones you have been marked against since the first week. Nothing on this paper
 asks for a skill that has not already been practised in class.
 
 | Category | What I am looking for |

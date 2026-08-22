@@ -261,7 +261,7 @@ TALK — Unit 4, Day 12, the working period comparing your numbers with
 the published record
   Ask, of each partner on their own, about whichever quantity they
   actually measured — chloride for most of them: "Would you expect this
-  figure to be higher in April or in November here, and what is doing
+  figure to be higher a year from now or in November here, and what is doing
   that?"
   Then: "Suppose this school put refill stations in tomorrow. What would
   you want measured six months later to know whether it had been worth

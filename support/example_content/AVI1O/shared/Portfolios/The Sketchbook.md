@@ -34,9 +34,9 @@ starting the real thing three times.
 
 ## Date everything, keep the failures
 
-Put the date on every page. It costs two seconds and it turns the book
-into a record of change — by March you will be able to open it to October
-and see, precisely, what you could not do yet.
+Put the date on every page. It costs two seconds and it turns the book into
+a record of change — by the end of the course you will be able to open it to
+your earliest pages and see, precisely, what you could not do yet.
 
 Tearing out a page you dislike removes the evidence that you improved. This
 course expects your portfolio to show how your thinking changed, and a

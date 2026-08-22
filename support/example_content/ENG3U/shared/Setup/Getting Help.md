@@ -26,5 +26,5 @@ ten minutes to fix at a table with the outline in front of us.
 > [!tip] The independent study
 > If you are behind on [[The Independent Study]], say so at the
 > checkpoint rather than after it. Every plan I have made with a student
-> who spoke up at checkpoint two has worked; the ones made in January are
+> who spoke up at checkpoint two has worked; the ones made at the end of the course are
 > triage.

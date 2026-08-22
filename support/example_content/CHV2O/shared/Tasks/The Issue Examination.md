@@ -13,7 +13,7 @@ Individual. Sources you have not seen before.
 
 A dossier arrives on a civic issue you have not studied. Nothing in it
 requires you to have memorised anything. Everything in it requires you to
-do what this course has been practising since November.
+do what this course has been practising since the first class.
 
 ## What you are given
 
@@ -63,7 +63,7 @@ The second-to-last class is where the examination is explained and where
 you write [[Where You Stand Now]]; the last class works an old dossier
 against the clock, first twenty minutes included. Bring
 [[Your Civic Notebook]] to both. The weekly current-events entries are
-the best preparation there is, and rereading your November entries is the
+the best preparation there is, and rereading your earliest entries is the
 fastest way to see how much sharper you have become.
 
 > [!tip] Establish who made a source before you read it for content

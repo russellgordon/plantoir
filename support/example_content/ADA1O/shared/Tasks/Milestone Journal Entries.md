@@ -23,7 +23,7 @@ the letter [[Writing in Role]], the response to something you watched.
 Practice is not marked, and that is what makes it usable — you can write
 that a rehearsal fell apart and it costs you nothing. But a milestone entry
 is built out of that practice. It asks you to quote your earlier self, and
-there is nothing to quote if September wrote nothing.
+there is nothing to quote if the earliest entries say nothing.
 
 ## The four days
 
@@ -56,8 +56,9 @@ they had at home.
 
 ## Success criteria
 
-The same five rows, all four times. You will not be given a new table in
-January — you will be given the same one, and by then you will know it.
+The same five rows, all four times. You will not be given a new table in the
+end of the course — you will be given the same one, and by then you will
+know it.
 
 | Quality | What it looks like |
 | --- | --- |
@@ -69,7 +70,7 @@ January — you will be given the same one, and by then you will know it.
 
 > [!success]- If you cannot find anything to say (click to expand)
 > That usually means you are looking for a big change. Look for a small
-> one instead: a thing you now notice that was invisible in September —
+> one instead: a thing you now notice that was invisible at the start of the course —
 > where the [[Focus and Emphasis|focus]] of a scene sits, who has the
 > [[Status|status]] in a corridor conversation. New noticing is growth,
 > and your earlier entries prove it was not always there.
@@ -98,7 +99,7 @@ rather than like a diary.
 Triangulation — the evidence you will not have unless you go and get it.
 
 OBSERVE — Unit 3, Day 22, the last fifteen minutes, while they write
-  Watch which journals are open at a page from October. The entry itself
+  Watch which journals are open at an early page. The entry itself
   will carry dated quotations, because the criteria table asks for them —
   what it cannot show you is whether those quotations were FOUND or
   remembered and rounded off. Unit 1, Day 16 is no good for this: that

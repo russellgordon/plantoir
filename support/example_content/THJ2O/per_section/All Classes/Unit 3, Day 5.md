@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. What we saw at the farm, compared with our bench
+1. What we saw at the farm, compared with our bench: [[The Farm Visit]]
 2. Scale, and what changes when it grows
-3. Bench care
+3. Bench care: [[The Propagation Bench]]
 
 ## Things to do before our next class
 

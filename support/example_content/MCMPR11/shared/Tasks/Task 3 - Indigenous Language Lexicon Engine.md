@@ -8,7 +8,7 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo or pairs · launched in Unit 3, Day 18 and due Unit 3, Day 22 · dictionary indexing, morphological lookup, and spaced-repetition pronunciation engine for Indigenous languages of British Columbia · dictionaries, key-value modeling, Unicode diacritics, and OCAP® data sovereignty.
+> Solo or pairs · launched in Unit 3, Day 16 and due Unit 3, Day 20 · dictionary indexing, morphological lookup, and spaced-repetition pronunciation engine for Indigenous languages of British Columbia · dictionaries, key-value modeling, Unicode diacritics, and OCAP® data sovereignty.
 
 ## What you are making
 
@@ -87,7 +87,7 @@ Discuss in your submission:
 
 ## Success Criteria
 
-| Quality | Exemplary (Level 4) | Developing (Level 2) |
+| Quality | What strong work looks like | What it looks like when it is not there yet |
 | --- | --- | --- |
 | **Dictionary Data Structures** | Elegant use of nested dictionaries, sets, and inverted lookup tables; $O(1)$ search efficiency. | Linear scanning of unindexed lists; clumsy data organization. |
 | **Unicode & String Handling** | Flawless normalization of combining diacritics, glottal marks, and accented vowels; search tolerates keyboard approximations. | Crashes on special characters; fails to match accented search terms. |
@@ -111,6 +111,8 @@ Discuss in your submission:
 
 ![[K1.7]]
 
+![[K1.8]]
+
 ![[K1.13]]
 
 ![[T1.4]]
@@ -119,17 +121,19 @@ Discuss in your submission:
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 3, Day 20, while students are implementing nested dictionary lookups and Unicode character normalization
-  Watch for: how students structure the inverted index mapping English definitions back to Hul'q'umi'num' root morphemes.
-  Going well: search queries normalize combining diacritics using unicodedata rather than hardcoding fragile character replacement maps.
-  Stuck: key errors on missing words, or attempting to use mutable lists as dictionary keys.
-  Record: note who correctly implemented the Leitner box interval transitions and file serialization.
+OBSERVE — Unit 3, Day 17, during the work period on Unicode diacritic normalization and the instructor check-in on normalization helpers
+  Watch for: what a student does the first time a search fails on an accented term — reads the term, or guesses at the code.
+  Going well: keeps a real term with a diacritic to hand and pastes it in after every change; asks what the community's own spelling is instead of quietly inventing a simpler one.
+  Stuck: edits the normalization function several times without running anything in between; starts deleting the accented characters as though they were damage.
+  Record: tick the seating chart for who tested with a real accented term without being told to, and note who needed the idea of normalization explained a second time.
 
-TALK — Unit 3, Day 21, during inverted index testing and OCAP data sovereignty reviews
-  Ask: "Why does an inverted index provide faster search performance than iterating through a list of dictionary entries?"
-  Then: "How does your data export model ensure that the First Nations community retains sovereign ownership and possession of their linguistic heritage?"
-  The first assesses D4.1, K1.4, and K1.7: analyzing algorithm complexity and dictionary lookups in spoken dialogue.
-  The second assesses T1.4: applying Indigenous data sovereignty principles to software architecture.
+TALK — Unit 3, Day 18, at the milestone check on search query performance, and again Unit 3, Day 21 during the OCAP® stewardship review
+  Ask, on Day 18: "Why does your inverted index find a word faster than looking through every entry in the lexicon?"
+  A strong answer describes the structure rather than the speed: the index is a dictionary whose keys are the English words, so a lookup lands on the matching terms instead of walking the whole lexicon — and it says what that costs, because the index has to be built and kept in step when an entry changes. A weak answer repeats "O(1)" without being able to say what the key is.
+  Then, on Day 21: "Are there entries a lexicon app should refuse to show at all — and who decides which ones?"
+  A strong answer separates the mechanism from the authority: a restricted field or a community-only export is a morning's work, but the decision about what goes in it is not the developer's to make. Listen for a named decision-maker — the community, an Elder, the language authority — and for where that decision would live in their own program. A weak answer argues that all data should be open, or that none of it should be shared, with nobody deciding.
+  The first is K1.4 and K1.8 heard out loud: whether the student can explain the structures inside their own code, and the loop the index replaced, rather than only having typed them.
+  The second is T1.4: applying Indigenous data sovereignty — Control and Access in particular — to decisions inside the software.
   Record: two sentences per student in the unit conferencing notes.
 
 The product evidence is the Python lexicon engine code, persistent JSON study state, and OCAP data stewardship statement in the Learning Journey Log.

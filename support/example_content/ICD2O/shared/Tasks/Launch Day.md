@@ -98,7 +98,7 @@ purpose.
 The growth statement is the reflection, and it feeds your
 [[Final Reflection]]: read your [[Dev Journal]] from the first entry
 forward, find where your thinking changed, then add one last entry —
-what would you tell September-you about building for other people?
+what would you tell the you who started this course about building for other people?
 
 > [!success]- If you cannot find a user (click to expand)
 > Look closer. The sibling with spelling words to practise, the club

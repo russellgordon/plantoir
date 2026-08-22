@@ -41,7 +41,19 @@ Where a one-variable summary would help a reader see the spread, put a
 5. Write the story — [[Writing About Math]] is the guide. Say plainly
    what the model cannot claim, and say who is in your data and who is
    missing, in the spirit of [[Who Does Data Serve]].
-6. Rehearse the two-minute talk with a partner in class before telling
+6. **Find the same question being asked at scale, and say what changes.**
+   Somebody with far more data than you is already asking a version of
+   your question — a transit authority with every tap of every card, a
+   platform with every second of watch time, a health unit with every
+   visit. Name one such collection that genuinely exists, then answer
+   three things about it in a short paragraph: what is collected and
+   how long it is kept, what it lets somebody do that your class-sized
+   dataset cannot, and who is affected by a decision made from it who
+   never agreed to be in it. Your own data has this problem in
+   miniature — a classmate who was away the week you collected is
+   missing from your conclusion too — and the point is to see that it
+   is the *same* problem, scaled until it stops being harmless.
+7. Rehearse the two-minute talk with a partner in class before telling
    it for real.
 
 The working periods are class time, and that is the point: work that
@@ -86,9 +98,13 @@ that surprised its maker is evidence of a question worth asking.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D1.1]]
+
 ![[D2.2]]
 
 ![[D2.3]]
+
+![[D2.4]]
 
 ![[D2.5]]
 

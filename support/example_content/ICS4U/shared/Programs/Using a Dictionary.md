@@ -132,7 +132,7 @@ summary.txt now contains:
 
 `totals` starts as `{}` — an empty dictionary — and grows a key the
 first time each item is seen. The four lines at the heart of the
-program are the tally pattern, and you will write them again all year:
+program are the tally pattern, and you will write them again all semester:
 
 ```python
 if item in totals:

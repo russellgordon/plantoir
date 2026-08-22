@@ -13,14 +13,14 @@ work does — for you, and for somebody else.
 
 ## The seventy and the thirty
 
-Every Grade 11 credit in Ontario is built the same way. Seventy per
-cent of your mark comes from work spread across the whole semester,
-and it leans towards your **most recent and most consistent** work
-rather than averaging September against January. The remaining thirty
-per cent comes from a final evaluation at the end: the
-[[Final Examination]], plus handing your project over to the person you
-built it for on [[Launch Day]]. Two very different rooms, deliberately,
-so that neither one afternoon nor one project decides this alone.
+Every Grade 11 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it. The remaining thirty per cent
+comes from a final evaluation at the end: the [[Final Examination]], plus
+handing your project over to the person you built it for on [[Launch Day]].
+Two very different rooms, deliberately, so that neither one afternoon nor
+one project decides this alone.
 
 ```mermaid
 pie title Where your mark comes from

@@ -11,10 +11,10 @@ tags:
 ## Agenda
 
 1. Acting on the conferences: the presentation and your half-page
-   reworked
+   reworked: [[The Interpretation]]
 2. Studio time: a work of your own responding to what you studied,
-   with conventions used deliberately
-3. Conferences
+   with conventions used deliberately: [[Conventions in Art]]
+3. Conferences on studio response pieces and contextual connections for [[The Interpretation]]
 
 ## Things to do before our next class
 

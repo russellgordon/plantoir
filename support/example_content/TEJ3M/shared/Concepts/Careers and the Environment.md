@@ -115,7 +115,7 @@ Start collecting the evidence now. Your [[Tech Journal]] and the
 portfolio it feeds are the artefact every one of these routes asks to
 see — circuit diagrams, photographs of builds, a video of something
 working, and your own account of what went wrong first. See
-[[Final Reflection]] for what a strong one looks like by June.
+[[Final Reflection]] for what a strong one looks like by the end of the course.
 
 %%curriculum-start%%
 ## Curriculum connection

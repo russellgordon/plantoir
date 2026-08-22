@@ -68,9 +68,9 @@ a classmate's — [[How Marks Work]] says why. That cuts both ways:
 nothing you write here can cost you anything, which is exactly what
 makes it worth writing honestly.
 
-What it changes is the work. A self-check that leads to one real fix is
-the cheapest improvement available in this course, and by January it is
-something you do without being told — which is the actual point of it.
+What it changes is the work. A self-check that leads to one real fix is the
+cheapest improvement available in this course, and by the end of the course
+it is something you do without being told — which is the actual point of it.
 
 One thing worth trying: read your judgement of the weakest row out loud
 to the person beside you. You will usually hear the generous bits

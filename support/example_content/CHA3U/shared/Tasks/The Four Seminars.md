@@ -45,8 +45,8 @@ that cannot happen is the evidence not existing at all.
 | Precision | You concede what has been shown and say exactly what has not |
 
 Five rows, four times, and the fourth seminar is the one that counts most —
-your mark reflects where you got to, not the average of September and
-January.
+your mark reflects where you got to, not the average of the start and
+the end of the course.
 
 > [!tip] Preparation is not the marked thing, and it is what makes the mark
 > possible

@@ -60,7 +60,7 @@ about whether the part survives.
 > **Judgement:** that is 98 % of a quarter-watt rating. Arithmetically
 > inside the limit; professionally not acceptable. Ratings assume still
 > air at room temperature, and your circuit will live in a case, in
-> June, next to other warm parts. Fit a half-watt resistor and design to
+> summer, next to other warm parts. Fit a half-watt resistor and design to
 > roughly half of any rating as a habit.
 
 > [!success]- Answer 4

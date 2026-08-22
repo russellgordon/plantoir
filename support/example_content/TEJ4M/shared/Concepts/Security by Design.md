@@ -107,8 +107,8 @@ the system less secure. Say what you traded and why; a design review will
 respect a stated trade-off and will not respect a claim of perfection.
 
 Finally, security is a maintenance activity, not a build activity. The
-network that was well configured in September is running unpatched
-software by March unless somebody owns the job — which is why
+network that was well configured a year ago is running unpatched
+software within months unless somebody owns the job — which is why
 [[B4.2|maintaining and checking a network's security]] is written as
 ongoing work in the curriculum, and why your handover documentation has
 to name who does it and how often. Take the arguments about who gets to

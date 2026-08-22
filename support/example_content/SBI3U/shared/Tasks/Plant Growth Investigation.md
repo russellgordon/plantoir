@@ -34,6 +34,36 @@ Light colour and stem elongation · salt concentration and germination ·
 crowding and final height · soil pH and leaf area · day length and
 flowering.
 
+## Controlling a variable is a physical act, not a promise
+
+"Everything else controlled" is easy to write in a plan and hard to do
+on a bench three weeks long. Before you plant anything, walk the list
+below and write down *how* each factor is being held steady — not that
+it will be.
+
+| Factor | How it changes plant growth | What holding it steady actually requires |
+| --- | --- | --- |
+| Light — intensity, duration, and colour | Drives photosynthesis, and day length triggers flowering in many species | Same shelf position for every tray, or a rotation schedule you follow; a timer rather than a memory |
+| Water | Too little closes stomata and stops growth; too much drowns roots by excluding air | The same volume, on the same days, measured with a cylinder — not "until it looks damp" |
+| Temperature | Sets the rate of every enzyme reaction in the plant | Trays away from the window and the radiator; a thermometer left in the tray, read and recorded |
+| Nutrients | Nitrogen, phosphorus and potassium each limit growth in a different way | Same soil from the same bag, same volume per pot, same feeding schedule |
+| Acidity | Changes which nutrients the roots can take up at all, even when the nutrients are present | Same soil, and a pH reading taken at the start and the end rather than assumed |
+| Growth regulators | Plant hormones — auxin, gibberellin — drive elongation and tropism | Not added; but note that unequal light produces a tropic response, which is a growth regulator acting whether you invited it or not |
+| Crowding | Competition for all of the above at once | The same number of seeds per pot, thinned to the same number of seedlings |
+
+Two of these repay a second look. **The one you are manipulating still
+has to be manipulated cleanly** — if your variable is light colour and
+the coloured filters also cut the intensity, you are testing two things
+and can separate neither. And **tropism will happen to you**: a tray lit
+from one side grows towards it, so a height measurement records the
+lean as well as the growth. Rotate the trays on a schedule, or light
+from above, and say in your method which you did.
+
+Anything you cannot hold steady is not a disaster — it is a limitation,
+and it belongs in the report. A group that names the three days the room
+was cold has written a better conclusion than a group whose results were
+inexplicably odd.
+
 ## The report
 
 Purpose, hypothesis with reasoning, method, observations (a table and a
@@ -103,6 +133,10 @@ period left in which to act on what you find.
 ![[F3.1]]
 
 ![[A1.1]]
+
+![[A1.5]]
+
+![[F3.4]]
 
 ![[F1.1]]
 

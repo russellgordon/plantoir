@@ -81,5 +81,7 @@ A **regression** occurs when a bug fix or new feature quietly breaks an existing
 
 ![[D5.2]]
 
+![[K1.10]]
+
 ![[K1.15]]
 %%curriculum-end%%

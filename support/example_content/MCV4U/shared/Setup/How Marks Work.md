@@ -18,7 +18,7 @@ Ontario builds every Grade 12 credit to the same shape, and this one is
 no exception. Seventy per cent of the mark is gathered while the course
 runs, weighted towards the work that is **most recent** and towards the
 level you reach **most consistently** — not averaged flatly from
-September to January, which would hold the first fortnight of limits
+the first class to the last, which would hold the first fortnight of limits
 against you for five months. That is what "growth" means once it is
 inside a mark: the later evidence counts for more, because it is the
 truer picture of what you can now do. The last thirty per cent is a

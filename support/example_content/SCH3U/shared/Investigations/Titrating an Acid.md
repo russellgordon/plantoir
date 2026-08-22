@@ -13,7 +13,7 @@ three significant figures, using nothing but a solution of known
 concentration and the ability to notice the exact moment a colour
 changes.
 
-This is the most precise measurement you will make all year. It is also
+This is the most precise measurement you will make all semester. It is also
 the one where technique matters most, because every shortcut has a
 direction and most of them push the same way.
 

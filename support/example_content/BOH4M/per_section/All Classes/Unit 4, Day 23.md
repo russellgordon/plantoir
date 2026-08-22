@@ -11,9 +11,9 @@ tags:
 ---
 ## Agenda
 
-1. Review: leading people — a case worked against the clock
+1. Review: leading people — a case worked against the clock: [[The Case Examination]]
 2. Comparing diagnoses: where the class split, and why
-3. The tools that keep earning their place
+3. The tools that keep earning their place: [[Solving Management Problems]]
 
 ## Things to do before our next class
 

@@ -11,7 +11,7 @@ intend to be, and what you are doing about it.
 
 ## Before you write
 
-Re-read [[Your Management Profile]] from September, your notes from
+Re-read [[Your Management Profile]] from the first week, your notes from
 [[Bosses We Have Known]], and the observer's notes from
 [[The Performance Conversation]].
 
@@ -39,9 +39,9 @@ evidence says you would need: a co-lead who is unlike you, a structure
 that forces you to consult, a habit you have not built yet.
 
 **The next three years.** Using [[Management Careers]], name a realistic
-route: the field, the entry role, the qualification, and the first step
-you can take before June. Cite where you got the requirement from — a
-current posting, an association, a person you spoke to.
+route: the field, the entry role, the qualification, and the first step you
+can take before the end of the course. Cite where you got the requirement
+from — a current posting, an association, a person you spoke to.
 
 > [!tip] Write it for yourself in five years
 > The version that is useful later is the specific one. "I will work on

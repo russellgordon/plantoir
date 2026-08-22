@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Production run day 2
+1. Production run day 2: [[The Production Run]]
 2. Adjusting the process after day one's data
-3. Conferences
+3. Conferences and logging progress in [[The Evidence File]]
 
 ## Things to do before our next class
 

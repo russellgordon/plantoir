@@ -20,7 +20,8 @@ the opposite. Five times this semester you will walk out of a bench
 period, sit down the next day with your own numbers, and have a marked
 piece of work finished by the bell. Nothing else in the seventy per cent
 measures what you can do in one sitting, and nothing else shows a report
-card that your January is not your September.
+card that the physicist you are at the end is not the one you were at
+the start.
 
 ## Which five, and the day each is written
 

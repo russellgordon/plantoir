@@ -9,14 +9,16 @@ tags:
 ## Seventy, then thirty
 
 Ontario builds every Grade 12 credit out of two unequal pieces, and it is
-worth knowing which is which in September rather than in January.
+worth knowing which is which at the start of the course rather than at the
+end of the course.
 
 **Seventy per cent** is the semester's work. Putting a number on it means
 asking two questions of the evidence — what level do you reach
 **consistently**, and what does the **most recent** evidence say — and
-neither of those is answered by averaging September into January. Almost
-everybody in this room gets better at two-dimensional problems somewhere
-around November. The mark is supposed to notice.
+neither of those is answered by averaging the start of the course into
+the end of it. Almost everybody in this room gets better at
+two-dimensional problems somewhere around the midpoint. The mark is
+supposed to notice.
 
 **The seventy** is five things, in the order you meet them: the
 [[Circular Motion Design Challenge]], the five marked

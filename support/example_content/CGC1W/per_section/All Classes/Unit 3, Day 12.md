@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Working period: the policy brief
+1. Working period: [[The Policy Brief]]
 2. Writing clinic: one page, in the order the brief asks for, and a
    recommendation you can say in one sentence — [[Writing About Geography]]
-3. Conferences
+3. Conferences on policy recommendations and trade-off analysis for [[The Policy Brief]]
 
 ## Things to do before our next class
 

@@ -68,7 +68,7 @@ not, and somewhere near the end of every set is a question asking you to
 say what is wrong with somebody else's answer. Those are the ones worth
 doing slowly — finding the flaw in a plausible piece of reasoning is the
 skill the tests are actually built around, and it is also what you will
-be doing to your own lab data all year.
+be doing to your own lab data all semester.
 
 Stuck partway through a set? That is the set doing its job. Start with
 [[Getting Unstuck]], and bring the specific question to

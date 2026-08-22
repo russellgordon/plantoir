@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Period 6 of 8: build or plant, day two
+1. Period 6 of 8: build or plant, day two: [[The Site Project]]
 2. Adjusting where the ground disagreed with the plan
-3. Progress photographs
+3. Progress photographs: [[Photographing Your Work]]
 
 ## Things to do before our next class
 

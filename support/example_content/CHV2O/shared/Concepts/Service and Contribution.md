@@ -85,9 +85,9 @@ applicable in a wide range of professional fields:
   adherence.
 
 Log what you do in [[Your Civic Notebook]] as you go — hours, what you
-actually did, and what you would change. [[The Civic Action Project]]
-will ask for exactly that, and reconstructing it in January is much
-harder than writing it down in November.
+actually did, and what you would change. [[The Civic Action Project]] will
+ask for exactly that, and reconstructing it at the end of the course is much
+harder than writing it down in the first week.
 
 %%curriculum-start%%
 ## Curriculum connection

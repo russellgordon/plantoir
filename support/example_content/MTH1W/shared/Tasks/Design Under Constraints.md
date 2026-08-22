@@ -38,15 +38,31 @@ evidence your argument stands on.
    — area, surface area, volume — using [[Geometric Relationships]].
    Remember [[The Best Box]]: designs holding the same amount can
    differ wildly in what they cost to build.
-4. Take one candidate and change a single dimension by a stated amount.
+4. **Prove the drawing is possible before you trust it.** Every design
+   in this task has at least one length nobody can measure directly —
+   the diagonal across a floor plan, the slant of a lid, the brace
+   across a corner. Find it with the right-triangle side-length
+   relationship rather than with a ruler on the sketch, and show the
+   working: a scale floor plan whose diagonal does not match its sides
+   is not a room, and a package whose flap is drawn too short does not
+   fold. Where a shape is composite — an L-shaped room, a box with a
+   triangular gusset — cut it into rectangles and right triangles you
+   can each account for, and say where you cut.
+5. **Put one circle or triangle property to work on purpose.** Not
+   decoration: a corner radius that has to clear a hinge, a triangular
+   brace that makes a rectangle rigid, a circular lid whose
+   circumference must match the tube it caps. Name the property you
+   used from [[Geometric Relationships]] and say what would fail
+   without it.
+6. Take one candidate and change a single dimension by a stated amount.
    Show what that does to the flat shape it is built from and to the
    space it encloses — the footprint's area and the package's volume,
    or the room's floor area and the air above it. The two do not move
-   together, and the argument in step 5 usually turns on that.
-5. Choose, and write the argument: what your group optimised for, what
+   together, and the argument in step 7 usually turns on that.
+7. Choose, and write the argument: what your group optimised for, what
    you traded away, and the numbers for every candidate — "it uses 18%
    less material and still clears the shelf" is an argument.
-6. Draw the final annotated diagram to scale — every measurement
+8. Draw the final annotated diagram to scale — every measurement
    labelled, every constraint shown satisfied.
 
 Studio periods are class time, and that is the point: work that carries
@@ -91,9 +107,13 @@ it out? No close second usually means the group stopped designing early.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E1.2]]
+
 ![[E1.3]]
 
 ![[E1.4]]
+
+![[E1.5]]
 %%curriculum-end%%
 
 %%

@@ -17,7 +17,7 @@ doubles — populations, rumours, debts left alone — grows the way
 [[Double or Nothing]] makes visceral.
 
 The second answer is about transfer: you may never state the domain
-of a function after June, but you will spend a lifetime modelling
+of a function after this course, but you will spend a lifetime modelling
 messy situations, checking claims before trusting them, and arguing
 from constraints. That training happens here whether the algebra
 resurfaces or not.

@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Full literacy-test practice under timed conditions
-2. Marked together against the published criteria
+1. Full literacy-test practice under timed conditions: [[The Literacy Test]]
+2. Marked together against the published criteria: [[Paragraph Practice]]
 
 ## Things to do before our next class
 

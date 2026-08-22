@@ -90,7 +90,7 @@ not, and somewhere near the end of every set is a question asking you to
 say what is wrong with somebody else's answer. Those are the ones worth
 doing slowly — finding the flaw in a plausible piece of reasoning is the
 skill the examination is actually built around, and it is also what you
-will be doing to your own lab data all year.
+will be doing to your own lab data all semester.
 
 Two habits that Grade 12 rewards and Grade 11 did not need:
 

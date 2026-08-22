@@ -11,9 +11,9 @@ tags:
 term.** Individual. Your field notebook, four maps with their reflections,
 and one closing entry on the skills the whole thing built.
 
-This is the one piece of assessed work that is not finished in a
-fortnight. It is where the course's continuity lives: the profile you
-surveyed in September is the baseline for the hazard map you draw in the
+This is the one piece of assessed work that is not finished in a fortnight.
+It is where the course's continuity lives: the profile you surveyed at the
+start of the course is the baseline for the hazard map you draw in the
 culminating task, and neither is worth much without the other.
 
 ## What is collected

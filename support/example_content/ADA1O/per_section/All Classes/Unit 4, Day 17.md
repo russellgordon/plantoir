@@ -12,8 +12,8 @@ tags:
 ## Agenda
 
 1. Dress rehearsal, one: costumes, props, and technical elements, run
-   as though the audience were here
-2. Notes to companies afterwards, in writing
+   as though the audience were here: [[Culminating Performance]] and [[Simple Costumes and Props]]
+2. Notes to companies afterwards, in writing: [[Giving and Receiving Notes]]
 3. Stage managers rehearse the running order and the house lights
 
 ## Things to do before our next class

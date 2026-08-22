@@ -42,10 +42,20 @@ scale where the decisions have consequences somebody else pays for.
 5. **The network**: cabled, addressed and proven end to end from the
    second machine, then documented per [[Addressing at Scale]] — what
    is static, what is reserved, what is dynamic, and where the subnet
-   boundaries fall.
+   boundaries fall. **Prove it with instruments, not with assertions**:
+   a cable tester result for every run you terminated, and one capture
+   showing a request and its reply. When something does not work — and
+   something will not — the fault log records what you suspected, the
+   tool that settled it, and what you changed, one line per attempt.
+   A fault chased by swapping parts until it goes away is not
+   troubleshooting and does not count here.
 6. **At least three services**, configured as in
    [[Stand Up a Service]], with users, privileges, and a permission
-   matrix tested row by row.
+   matrix tested row by row — who may read, write and execute at each
+   drive, folder and file that matters, tested from an account that
+   should be refused as well as one that should be allowed. Say which
+   folders are encrypted, which are compressed, and which are marked
+   for archiving, and give the one-line reason for each.
 7. **The security position**, per [[Security by Design]]: what is
    allowed through, who holds administrative access, what is encrypted,
    and what you deliberately left out and why.
@@ -115,6 +125,8 @@ this is what each one looks like in what you hand over.
 
 ![[A1.2]]
 
+![[A2.1]]
+
 ![[A2.2]]
 
 ![[A2.3]]
@@ -132,6 +144,8 @@ this is what each one looks like in what you hand over.
 ![[B4.3]]
 
 ![[B4.4]]
+
+![[B4.5]]
 
 ![[C1.2]]
 

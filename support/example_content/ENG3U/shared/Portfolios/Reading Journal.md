@@ -29,8 +29,8 @@ bring is what you can remember having thought.
 
 ## The habit
 
-Write the entry the same day. An entry written in January about a
-September class is a memory of a memory.
+Write the entry the same day. An entry written at the end of the course about a
+the first class is a memory of a memory.
 
 The entries that count towards a mark are the ones written **in class, at
 a milestone** — see [[How Marks Work]]. Everything else in here is yours,

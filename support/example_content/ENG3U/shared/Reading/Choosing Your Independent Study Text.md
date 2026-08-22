@@ -5,8 +5,8 @@ created: __CREATED__
 tags:
   - reading
 ---
-[[The Independent Study]] runs from early November to early January. This
-page is how to choose the text you will live with.
+[[The Independent Study]] runs from the middle of the course to its
+final weeks. This page is how to choose the text you will live with.
 
 ## The rules
 
@@ -34,7 +34,7 @@ page is how to choose the text you will live with.
 ## Pitching something else
 
 Bring the book, tell me what you think it is doing, and say why it will
-still interest you in January, when you are writing about it. Most
+still interest you at the end of the course, when you are writing about it. Most
 pitches are accepted. The ones that are not are usually too short to
 sustain 2,000 words, or already written about by half the internet in a
 form you would have to fight.

@@ -15,13 +15,13 @@ of them, and what is marked is the work they produce.
 
 ## The seventy and the thirty
 
-Every Grade 12 credit in Ontario is built the same way. Seventy per
-cent of your mark comes from work spread across the whole semester,
-and it leans towards your **most recent and most consistent** work
-rather than averaging September against January — which matters in a
-course where almost everybody is visibly better in December than they
-were in September. The other thirty per cent comes from one final
-evaluation at the end.
+Every Grade 12 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it — which matters in a course
+where almost everybody is visibly better at the end of the course than they
+were at the start of the course. The other thirty per cent comes from one
+final evaluation at the end.
 
 ```mermaid
 pie title Where the mark comes from
@@ -29,7 +29,7 @@ pie title Where the mark comes from
     "The Engineering Review" : 30
 ```
 
-**The seventy** is everything you hand in between September and the
+**The seventy** is everything you hand in between the first class and the
 last build day. In the order you meet them: your ten
 [[The Bench Record|bench records]], one for each lab;
 [[The Specification]] in Unit 1; [[The Interface]] in Unit 2;

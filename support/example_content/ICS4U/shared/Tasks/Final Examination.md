@@ -136,12 +136,12 @@ made in Unit 1.
 
 ## How this is assessed
 
-On exactly the expectations this course has been working towards since
-September. Per [[How Marks Work]], this paper and [[The Handover]] together
-make up the thirty per cent that is not the semester's tasks, and the
-bigger share of it sits here. The other seventy is the semester's six
-tasks and the milestone entries in your journal,
-[[The Software Project]] included.
+On exactly the expectations this course has been working towards since the
+start of the course. Per [[How Marks Work]], this paper and [[The Handover]]
+together make up the thirty per cent that is not the semester's tasks, and
+the bigger share of it sits here. The other seventy is the semester's six
+tasks and the milestone entries in your journal, [[The Software Project]]
+included.
 
 %%curriculum-start%%
 ## Curriculum connection

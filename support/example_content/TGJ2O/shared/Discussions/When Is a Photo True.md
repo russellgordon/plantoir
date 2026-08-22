@@ -11,7 +11,7 @@ out; the camera then chose an exposure that made the scene brighter
 or grimmer than your eyes had it. "No edits" was never on the menu —
 the real question is which choices serve the truth of what happened
 and which manufacture a better story than the one that occurred.
-Sports coverage keeps this argument warm all year: the crop that
+Sports coverage keeps this argument warm all semester: the crop that
 hides the empty bleachers, the celebration re-posed "just like you
 did it," the reaction shot cut beside a play it never saw.
 

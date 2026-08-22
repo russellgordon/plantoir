@@ -20,7 +20,7 @@ tags:
 4. Discussion: [[Who Owns the Firmware]] — you wrote it, the school
    owns the board, and somebody else will have to service it
 5. Journals open: [[Showing Growth]] asks you to set today's
-   integration failure beside your first entry from September
+   integration failure beside your first entry from the first week
 
 ## Things to do before our next class
 

@@ -64,6 +64,6 @@ exactly what makes it safe to write it honestly. The same goes for the
 bench checks that close the first three units, which you mark yourself.
 
 What it changes is the work. A walk-round that leads to a fix is the
-cheapest mark improvement available in this course, and by January it
-is a habit you run without being told — which was the point of teaching
-it.
+cheapest mark improvement available in this course, and by the end of the
+course it is a habit you run without being told — which was the point of
+teaching it.

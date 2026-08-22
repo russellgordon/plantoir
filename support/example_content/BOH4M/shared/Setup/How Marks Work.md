@@ -24,9 +24,9 @@ pie title Where your mark comes from
 
 The seventy is not an average of everything you have ever handed in. It
 leans towards your **most recent and most consistent** work, because the
-question a mark answers is what you can do now, not what you could do in
-September. A strand you were weak in and then got good at is marked
-where you ended up.
+question a mark answers is what you can do now, not what you could do in the
+start of the course. A strand you were weak in and then got good at is
+marked where you ended up.
 
 **The seventy** is the assessed work of the four units, in the order you
 meet it: [[The Organization Study]] and [[The Ethics Brief]] in Unit 1;

@@ -9,7 +9,7 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Solo or pairs · launched Unit 4, Day 1 and running across 15 working days through Unit 4, Day 17 · a multi-module emergency management system modeled after the BC Wildfire Service and BC Air Quality Health Index · modular decomposition, defensive programming, automated regression test suites, and critical infrastructure ethics · the culminating project of this course.
+> Solo or pairs · launched Unit 4, Day 3 and running across 14 working days through Unit 4, Day 16 · a multi-module emergency management system modeled after the BC Wildfire Service and BC Air Quality Health Index · modular decomposition, defensive programming, automated regression test suites, and critical infrastructure ethics · the culminating project of this course.
 
 ## What you are making
 
@@ -79,18 +79,39 @@ A faulty sensor configuration update (`Channel File 291`) pushed by cybersecurit
 Accounting software (Horizon) contained silent bugs that recorded phantom financial shortfalls in subpostmasters' branch accounts. Post Office executives trusted the software over human operators, resulting in over 900 wrongful criminal convictions of innocent people.
 - **Lesson for Developers:** Software is never infallible. Transparent audit trails, reproducible logs, and the ability to challenge automated outputs are foundational human rights in digital systems.
 
-## Milestones Across Unit 4 (15 Working Days)
+## Milestones Across Unit 4 (14 Working Days)
 
-- **Day 1–2 (System Architecture):** Define file structures, module interfaces, and data schemas.
-- **Day 3–5 (FWI Engine & Unit Tests):** Implement mathematical index formulas and write automated `assert` tests.
-- **Day 6–8 (Air Quality & Weather Parsing):** Build telemetry ingestion and AQHI classification algorithms.
-- **Day 9–11 (Integration & Error Recovery):** Connect modules together and implement chaos testing (corrupted data files, missing fields).
-- **Day 12–14 (Advisory Output & Code Review):** Polish console formatting, export JSON/CSV advisories, and conduct peer code audit.
-- **Day 15 (Handover & Submission):** Deliver final codebase, test report, and software engineering reflection.
+Every day below is a class day in Unit 4, so this list and your class pages
+name the same day.
+
+- **Days 3–4 (System Architecture):** Define file structures, module interfaces, and data schemas, and set up the repository.
+- **Days 5–7 (FWI Engine & Unit Tests):** Implement the six index formulas, check them against the Canadian Forestry Service reference tables, and write the automated `assert` tests. Milestone 1 check on Day 7.
+- **Days 8–9 (Air Quality & Failure Handling):** Build AQHI classification and smoke dispersion, then run chaos testing against dropouts, corrupted rows, and frozen sensors.
+- **Days 10–11 (Integration & Regression Safety):** Connect the modules, build the end-to-end regression harness, and remove circular dependencies. Milestone 2 check on Day 11.
+- **Days 12–13 (Advisory Output & Code Review):** Polish console formatting, export JSON/CSV advisories, and take a classmate's audit of your codebase.
+- **Day 14 (Handover Assembly):** Package the code, the test harness, and user documentation, and test the guide on somebody who has not seen the project.
+- **Days 15–16 (Demonstration & Post-Mortem):** Run the pipeline on unannounced meteorological datasets, take peer critique, and write the architecture post-mortem.
+
+**The list above is a plan, and no fourteen-day build has ever survived
+one intact.** Something will be harder than it looks: a reference table
+that disagrees with your formula, a library that does not do what its
+documentation implies, a data schema you chose on Day 3 that fights you
+on Day 10. When that happens, changing the plan is the correct move and
+abandoning the milestone is not — you are expected to change tools,
+change the data structure, or reorder the work, and then to say so.
+
+Each milestone check therefore asks two questions, and the second is the
+one worth preparing: *what runs now*, and *what did you change since the
+last check, and why*. A schema replaced because the first one made every
+lookup a search is a good answer. A schema replaced because the code
+"felt messy" is an answer that needs a measurement behind it. Record
+each of these in [[Learning Journey Log]] as you go, with the commit
+that carried it — reconstructing on Day 14 what you decided on Day 8 is
+guesswork, and it shows.
 
 ## Success Criteria
 
-| Quality | Exemplary (Level 4) | Developing (Level 2) |
+| Quality | What strong work looks like | What it looks like when it is not there yet |
 | --- | --- | --- |
 | **Modular Decomposition** | Codebase cleanly separated into single-responsibility modules with clear contracts and no circular imports. | Monolithic single-file script; tightly coupled logic with global variable leakage. |
 | **FWI Calculation Accuracy** | All 6 FWI components (FFMC, DMC, DC, ISI, BUI, FWI) match benchmark reference values to within 0.1% tolerance. | Mathematical formulas contain order-of-operation errors or unit mismatches. |
@@ -105,7 +126,11 @@ Accounting software (Horizon) contained silent bugs that recorded phantom financ
 
 ![[D3.3]]
 
+![[D3.4]]
+
 ![[D4.2]]
+
+![[D4.4]]
 
 ![[D5.2]]
 
@@ -114,6 +139,8 @@ Accounting software (Horizon) contained silent bugs that recorded phantom financ
 ![[D6.1]]
 
 ![[D6.2]]
+
+![[D7.1]]
 
 ![[D7.4]]
 
@@ -133,17 +160,19 @@ Accounting software (Horizon) contained silent bugs that recorded phantom financ
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 4, Day 8, while students integrate telemetry parsing and the Canadian Forest Fire Weather Index module
-  Watch for: how students decouple modules, manage function imports, and verify intermediate fuel moisture calculations against reference test data.
-  Going well: calculations are broken into discrete pure functions, and missing sensor readings produce defensive warnings rather than unhandled tracebacks.
-  Stuck: tight coupling with monolithic scripts, global variable leakage across modules, or circular import dependencies.
-  Record: note on the milestone board who has green unit test runs across all 6 FWI mathematical models.
+OBSERVE — Unit 4, Day 7, at the Milestone 1 check, while students write assertions in test_suite.py and verify the Fire Weather Index engine against the reference tables
+  Watch for: how a student chooses what to assert — the test that would catch a real mistake, or the test that is certain to pass.
+  Going well: opens the Canadian Forestry Service reference table and picks a benchmark row on purpose; runs the suite after each new assertion instead of writing fifteen and hoping.
+  Stuck: only asserts values already seen to pass; cannot say which module a failure came from, and starts changing lines at random to see what happens.
+  Record: on the milestone board, tick who took a red test to green inside the period — the sequence matters more than the final count.
 
-TALK — Unit 4, Day 12, during integration testing and emergency alert dispatch reviews
-  Ask: "Walk me through how your test_suite.py proves that the Initial Spread Index formula produces correct results under extreme wind gusts."
-  Then: "How did lessons from the CrowdStrike outage or Horizon scandal shape your error handling and audit logging?"
-  The first assesses D5.3, K1.11, and K1.15: evaluating test harness architecture and numerical verification orally.
-  The second assesses T1.1 and T1.2: articulating software engineering ethics and developer accountability.
+TALK — Unit 4, Day 11, at the Milestone 2 integration check and instructor review
+  Ask: "Walk me through how your test suite proves the Initial Spread Index is right when the wind gusts are extreme."
+  A strong answer names the specific case and why that one — the wind speed where the exponential term starts to dominate — and says where the expected number came from, a reference table or a calculation done by hand. A weak one says "it passes".
+  Then: "How did the CrowdStrike outage or the Horizon scandal change what your code does when it meets bad data?"
+  A strong answer points at their own error handling — a quarantined row logged rather than silently dropped, a fallback state the advisory labels as stale — and ties it to the failure it came from: an unvalidated update that reached production, or an output nobody was allowed to challenge. A weak one retells the case study without touching the program.
+  The first assesses D5.2 and K1.15: designing a test that could actually fail, and defending the numbers it checks against.
+  The second assesses T1.2 and D7.4: naming the unintended consequences of a design choice and what the student changed in their own process because of it.
   Record: two sentences per team in the culminating evaluation record.
 
 The product evidence is the multi-module Python codebase, automated test suite, sample exported incident advisories, and technical reflection in the Learning Journey Log.

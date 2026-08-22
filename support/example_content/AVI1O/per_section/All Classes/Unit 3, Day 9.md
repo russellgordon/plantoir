@@ -12,7 +12,7 @@ tags:
 
 1. The jobs art does: [[What Art Is For]]
 2. Sorting works by function rather than by style
-3. Studio time
+3. Studio time: exploratory sketches categorizing art by social and utilitarian function
 
 ## Things to do before our next class
 

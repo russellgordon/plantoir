@@ -18,4 +18,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] Journal: what you now know about a computer that you did not in
-      September.
+      the start of the course.

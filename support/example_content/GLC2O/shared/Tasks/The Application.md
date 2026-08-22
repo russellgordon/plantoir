@@ -54,7 +54,7 @@ program you would apply to in Grade 12. Pick one you found in
 
 > [!example] What "research showing" looks like in one line
 > Weak: "I have always been interested in your company." Strong: "You
-> have added evening hours since September, and evenings are when I am
+> have added evening hours since the first week, and evenings are when I am
 > available and when I have worked before." One of those could be sent
 > to any employer; the other could only be sent to this one.
 

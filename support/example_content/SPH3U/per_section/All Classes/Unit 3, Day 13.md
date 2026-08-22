@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Warm-up: read three heating curves — melting point, boiling point,
-   which state change costs more
+   which state change costs more: [[Heating and Cooling Curves]]
 2. The three routes energy takes: conduction, convection, radiation, on
-   the same beaker
+   the same beaker: [[Thermal Energy and Heat]]
 3. A vacuum flask, taken apart: every part of the design blocks one route
 
 ## Things to do before our next class

@@ -53,7 +53,7 @@ sign chart does not care what kind of function it is analysing.
 [[The Same Four Parameters]] belongs to the whole course rather than to
 this unit: it is where the four families finally admit they were one
 family all along, and it is the last page written and the first one to
-reread in June.
+reread at the end of the course.
 
 Most pages end by pointing at the practice set that turns the idea
 into a reflex, and at the curriculum expectations the page serves — so

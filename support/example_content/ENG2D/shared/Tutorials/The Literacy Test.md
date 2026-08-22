@@ -42,12 +42,12 @@ students answer with impressions.
 Not by drilling. The forms appear inside real work: news reports in the
 media unit, opinion writing in [[The Media Deconstruction]] and in
 [[Whose Reading Counts]], and evidence-based short answers in every close
-reading period. Three periods in December are spent on the test's own
-formats — the news report, then the opinion piece, then a full practice
-under timed conditions.
+reading period. Three periods at the end of the course are spent on the
+test's own formats — the news report, then the opinion piece, then a full
+practice under timed conditions.
 
 > [!note] If you are worried about it
-> Come and tell me in September rather than in December. Accommodations,
+> Come and tell me at the start of the course rather than at the end of the course. Accommodations,
 > extra practice, and a plan are all straightforward when there is time,
 > and this is a test that rewards preparation more than talent.
 

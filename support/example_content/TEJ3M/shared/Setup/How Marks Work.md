@@ -17,8 +17,8 @@ how it got that way.
 Ontario builds a Grade 11 credit out of two unequal parts, and this one
 is no different. Seventy of your hundred marks come from the term
 itself, weighted towards what you were doing **most recently and most
-consistently** — a January technician is not marked as the average of
-themselves and a September one. The remaining thirty come from a single
+consistently** — the technician you are at the end is not marked as the average of
+themselves and the one you were at the start. The remaining thirty come from a single
 final evaluation at the end.
 
 ```mermaid
@@ -103,16 +103,15 @@ The two describe different things — one the build, one the builder —
 and averaging them together would tell you less about either.
 
 This course has exactly one genuine exception, and it comes out of the
-curriculum rather than out of my preferences. Expectation D3.5 asks you
-to understand and *apply* the work habits the computer technology
-industry runs on — working safely, teamwork, reliability, organisation,
-initiative — as the Ontario Skills Passport sets them out. The verb is
-*apply* and the object is the habits, so a habit the curriculum itself
-names is judged the way every other expectation in it is judged. D3.5
-is reached through [[The Engineering Showcase]], and the evidence for it
-comes from the whole last stretch of the course as much as from the five
-minutes you spend at your station. Nothing else on that report-card
-column is in your percentage.
+curriculum rather than out of my preferences. Expectation
+[[D3.5|the work habits this industry runs on]] asks you to understand and
+*apply* the habits the computer technology industry runs on — working safely,
+teamwork, reliability, organisation, initiative — as the Ontario Skills
+Passport sets them out. Where [[The Engineering Showcase]] marks those, it
+marks what they produced — a station set up and ready when the period began,
+a critique specific enough to act on, a tidy and safe bench managed
+professionally — never how hard somebody appeared to be trying. Nothing else
+on that report-card column is in your percentage.
 
 No opinion of your work decides your mark except mine. Not yours: you
 will hold your own build against the criteria table often, because

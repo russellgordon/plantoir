@@ -57,7 +57,7 @@ graph LR
   steps would happen.
 - **Honesty about the unknowns.** A plan that admits what is uncertain
   and says how it would be resolved beats a plan that sounds certain.
-- **Revision visible.** What changed since September, and what changed
+- **Revision visible.** What changed since the first week, and what changed
   it.
 
 %%curriculum-start%%

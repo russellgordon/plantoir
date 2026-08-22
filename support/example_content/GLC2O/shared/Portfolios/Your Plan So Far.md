@@ -44,10 +44,10 @@ Six parts, and it can be two pages:
 
 ## Then say what changed
 
-Close with a short paragraph comparing this plan to what you thought in
-September. Name what changed and what caused it — a piece of research,
-an interview, a budget that did not balance, a conversation. That is the
-part you will be asked about in [[The Plan Defence]], and it is the
+Close with a short paragraph comparing this plan to what you thought in the
+start of the course. Name what changed and what caused it — a piece of
+research, an interview, a budget that did not balance, a conversation. That
+is the part you will be asked about in [[The Plan Defence]], and it is the
 clearest evidence that the course did something.
 
 %%curriculum-start%%

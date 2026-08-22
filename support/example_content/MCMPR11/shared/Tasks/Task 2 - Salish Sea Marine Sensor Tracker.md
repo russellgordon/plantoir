@@ -8,7 +8,7 @@ tags:
 enableToc: true
 ---
 > [!abstract] At a glance
-> Pairs · launched in Unit 2, Day 18 and due Unit 2, Day 22 · telemetry stream analyzer for Ocean Networks Canada and DFO marine observation stations · batch processing, rolling window statistics, anomaly detection, and ethical data handling.
+> Pairs · launched in Unit 2, Day 17 and due Unit 2, Day 21 · telemetry stream analyzer for Ocean Networks Canada and DFO marine observation stations · batch processing, rolling window statistics, anomaly detection, and ethical data handling.
 
 ## What you are making
 
@@ -80,7 +80,7 @@ Discuss with your partner and answer in your [[Learning Journey Log]]:
 
 ## Success Criteria
 
-| Quality | Exemplary (Level 4) | Developing (Level 2) |
+| Quality | What strong work looks like | What it looks like when it is not there yet |
 | --- | --- | --- |
 | **Data Parsing & Cleaning** | Flawlessly parses CSV data; filters out missing values, NaN markers, and sensor disconnect codes (`-999.0`) without crashing. | Crashes when encountering empty lines, corrupted numbers, or missing CSV headers. |
 | **Statistical Computations** | Accumulator loops calculate precise minimum, maximum, mean, and moving averages using clean, readable algorithms. | Inaccurate statistical math; incorrect accumulator formulas. |
@@ -118,17 +118,19 @@ Discuss with your partner and answer in your [[Learning Journey Log]]:
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 2, Day 20, while pairs are implementing list accumulators and rolling window calculations
-  Watch for: how partners divide driver and navigator roles when writing the 24-hour moving average algorithm.
-  Going well: accumulator variables are cleanly initialized outside loops, and index arithmetic is checked against list boundaries before slicing.
-  Stuck: off-by-one errors when computing moving averages, or attempting to modify the data list in-place while iterating over it.
-  Record: mark on the seating plan which pairs successfully quarantined corrupted sensor rows without halting the data ingestion pipeline.
+OBSERVE — Unit 2, Day 19, during the work period on descriptive statistics and 24-hour rolling moving averages
+  Watch for: how the pair divides driver and navigator, and whether the keyboard actually changes hands when the timer goes.
+  Going well: the pair works one window out on paper before trusting the loop with a thousand rows, and the navigator is reading the data rather than waiting.
+  Stuck: one partner has held the keyboard for the whole period; the pair re-runs the entire pipeline after every small edit instead of testing the one function they changed.
+  Record: two ticks per pair on the seating plan — "swapped on the timer" and "checked a window by hand" — plus a name where one partner has gone quiet.
 
-TALK — Unit 2, Day 21, during the anomaly detection testing and ethics case study discussion
-  Ask: "How does your pipeline distinguish between a single faulty sensor reading and a sustained 48-hour marine heatwave?"
-  Then: "If your employer asked you to smooth out dissolved oxygen telemetry to hide a localized industrial fish kill, what code of ethics governs your response?"
-  The first assesses D4.4 and K1.6: explaining nested list filtering and statistical threshold algorithms verbally.
-  The second assesses T1.2 and T1.4: professional responsibility, developer whistleblowing, and public data integrity.
+TALK — Unit 2, Day 21, during peer verification on unannounced chaos datasets and the ethics review
+  Ask: "How does your pipeline tell the difference between one faulty sensor reading and a sustained 48-hour marine heatwave?"
+  A strong answer names the counter or window and what resets it — "I count consecutive hours over the threshold and reset on the first hour under it, so a single spike can never trigger the alert" — and can say what happens when a reading is missing rather than merely low. A weak one says "it checks the threshold" and stops.
+  Then: "Your incident report goes to a DFO scientist. If your threshold is set a little wrong, which mistake would you rather your program made — a false alarm, or a hypoxic event it never flagged? Defend the choice."
+  A strong answer commits to one and says who pays for it: a false alarm costs a scientist an afternoon, a missed event costs a benthic community nobody was watching. Listen for the threshold being treated as a decision somebody made, with a reason, rather than as a number that came with the assignment. A weak answer says "I would make it accurate".
+  The first assesses K1.6 and K1.15: predicting what a change to the threshold logic would do, and what a test on a chaos dataset would show.
+  The second assesses T1.2 and T1.4: naming who bears the cost of a design choice, and the values sitting behind where a threshold gets set.
   Record: note key arguments and student reasoning in the course tracking log.
 
 The product evidence is the Python data pipeline script, exported cleaned CSV and incident JSON files, and reflection in the Learning Journey Log.

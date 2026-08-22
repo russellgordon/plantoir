@@ -70,7 +70,7 @@ seven lab reports, and therefore A1.2.
 
 OBSERVE — Unit 5, Day 13, the period the reflection is begun in
   Watch for: what they open that nobody asked them to. That day's agenda
-  already sends everybody back to their September entry, so seeing that proves
+  already sends everybody back to their your earliest entry, so seeing that proves
   nothing. What is not asked for is a lab report, a plan or a program being
   opened and read. A reflection assembled from the portfolio's contents list
   and one written out of the work carry the same three required links.
@@ -85,7 +85,7 @@ TALK — Unit 5, Day 14, the half hour set aside to finish it
   Everybody has their own work in front of them and you are circulating anyway.
   Do not ask the four questions on this page back at them; they have spent a
   period answering those.
-  Ask: "Somebody starts this course in February and asks you what the lab
+  Ask: "Somebody starts this course partway through and asks you what the lab
   reports were actually for. What do you tell them?"
   Then: "Where in this course could somebody have got a decent mark without
   understanding much — and what would have given them away?"

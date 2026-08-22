@@ -24,13 +24,13 @@ Every one of those has a page that says, before the work starts, what
 earns the marks in it. Nothing else on this site carries a mark.
 
 Within the term work, the most recent and most consistent evidence counts
-most. A skill you could not do in September and can do in December is
-assessed on December, not on the average of the two. It is also why some
-of the course's central skills are assessed twice: choosing and
-organising sources, synthesising evidence into a judgement, and assessing
-whether a protective measure works are each marked once in Units 1 to 3
-and again in the culminating task. The later reading is the one that
-counts for more.
+most. A skill you could not do at the start of the course and can do at the
+end of the course is assessed on the most recent evidence, not on the
+average of the two. It is also why some of the course's central skills are
+assessed twice: choosing and organising sources, synthesising evidence into
+a judgement, and assessing whether a protective measure works are each
+marked once in Units 1 to 3 and again in the culminating task. The later
+reading is the one that counts for more.
 
 ## The four categories
 

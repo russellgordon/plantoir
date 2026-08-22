@@ -15,7 +15,7 @@ tags:
 2. Mark your own; revision list written. I do not mark this one —
    [[How Marks Work]] says why
 3. Last fifteen minutes: your milestone journal entry, written here —
-   and [[Showing Growth]] is how you will use it in January
+   and [[Showing Growth]] is how you will use it at the end of the course
 
 ## Things to do before our next class
 

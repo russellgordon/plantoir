@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Portfolio: [[Tech Journal]] against [[Journal Checklist]], and
-   [[Showing Growth]] — September beside January. The checklist is
+   [[Showing Growth]] — your first entry beside your last. The checklist is
    yours to run; I come round to talk rather than to collect
 2. The career and work-habit note for the front of your handover
    package, written here with your journal open — the four paragraphs

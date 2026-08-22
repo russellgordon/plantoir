@@ -16,11 +16,11 @@ can follow is not a result. It is a number.
 
 ## The seventy and the thirty
 
-Every Grade 12 credit in Ontario is built the same way. Seventy per
-cent of your mark comes from work you hand in across the semester,
-and it leans towards your **most recent and most consistent** work
-rather than averaging September against January. The other thirty per
-cent comes from a final evaluation at the end.
+Every Grade 12 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from work you hand in across the semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it. The other thirty per cent
+comes from a final evaluation at the end.
 
 ```mermaid
 pie title Where your mark comes from

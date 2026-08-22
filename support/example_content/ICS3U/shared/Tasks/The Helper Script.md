@@ -45,13 +45,13 @@ actually uses it. Ambition in this task is spent on *fit*, not on size.
 - **A named person** and, in one sentence, the chore in their words.
 - **Input** typed by that person, **processing** you wrote, and
   **output** they can act on — the shape of every program you will
-  build this year.
+  build this semester.
 - **At least one decision**: something the program handles differently
   depending on the answer.
 - **Prompts a stranger could follow.** No `ENTER VAL:`. Ask a whole
   question, in whole words.
 - **Comments and honest names**, so that the version of you who opens
-  this file in June still knows what it does.
+  this file at the end of the course still knows what it does.
 
 ## How to work
 
@@ -91,7 +91,7 @@ down what you watched somebody else struggle with.
 | Input, process, output | The program asks, works, and answers |
 | A decision that matters | Different answers produce different advice |
 | Written for a stranger | Prompts are whole questions; output is plain |
-| Readable in June | Names say what they hold; comments say why |
+| Readable at the end of the course | Names say what they hold; comments say why |
 | Honest hand-off | You logged what your partner hesitated over |
 
 ## Reflect
@@ -123,6 +123,8 @@ different?
 ![[B1.3]]
 
 ![[A4.2]]
+
+![[C3.2]]
 %%curriculum-end%%
 
 %%

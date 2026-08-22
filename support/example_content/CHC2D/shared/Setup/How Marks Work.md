@@ -11,12 +11,12 @@ of the past you can recall on demand.
 
 ## The seventy and the thirty
 
-Every Grade 10 credit in Ontario is built the same way. **Seventy per
-cent** of your mark comes from the work you do across the semester — and
-it is not September averaged against January. It leans towards your
-**most recent and most consistent** work, because what you can do with a
-document in December is a better account of what you learned than what
-you could do with one in the second week.
+Every Grade 10 credit in Ontario is built the same way. **Seventy per cent**
+of your mark comes from the work you do across the semester — and it is not
+the start of the course averaged against the end of the course. It leans
+towards your **most recent and most consistent** work, because what you can
+do with a document at the end of the course is a better account of what you
+learned than what you could do with one in the second week.
 
 **Thirty per cent** comes from a final evaluation at the end of the
 course, which has to reach across the whole of it rather than test the

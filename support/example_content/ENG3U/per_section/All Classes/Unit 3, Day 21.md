@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval warm-up — no notes: three passages placed and explained
-2. Checkpoint, on your own: an unseen non-fiction passage, analysed
+1. Retrieval warm-up — no notes: three passages placed and explained: [[The Inconvenient Indian]]
+2. Checkpoint, on your own: an unseen non-fiction passage, analysed: [[Sight Passage Practice]]
 3. Mark your own; revision list written — no mark of mine goes anywhere
    near this. It is the third of these, and the list ought to be
    shorter than the last one

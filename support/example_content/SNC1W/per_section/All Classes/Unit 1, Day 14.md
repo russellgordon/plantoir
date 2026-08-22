@@ -13,7 +13,7 @@ tags:
 1. First twenty minutes: the revision list you wrote at yesterday's
    checkpoint, worked now — that period is what the checkpoint was for
 2. Consolidation: one small investigation, start to finish in what is left
-   of the period — question, measure, graph, conclude
+   of the period — question, measure, graph, conclude: [[Graphing Practice]] and [[Writing a Lab Report]]
 3. Look ahead: the same method, on a living system
 
 ## Things to do before our next class

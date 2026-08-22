@@ -40,7 +40,7 @@ That number matters because the ordinary resistors in the parts drawer
 are rated at one quarter of a watt.[^rating] Asking a quarter-watt part
 to shed 0.294 W is asking for 118 % of its rating, continuously. It will
 not fail on the bench in front of you. It will fail in the display case
-in March.
+later in the course.
 
 [^rating]: Physically small resistors are typically sold as 1/8 W, 1/4 W,
     1/2 W, 1 W and upward, and the rating describes how much heat the

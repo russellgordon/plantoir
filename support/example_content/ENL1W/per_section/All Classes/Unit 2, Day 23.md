@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval warm-up — no notes: point of view, theme, and one device
-   named and explained
-2. Checkpoint, on your own: an unseen passage, read closely
+   named and explained: [[Point of View]] and [[Theme]]
+2. Checkpoint, on your own: an unseen passage, read closely — [[Close Reading Practice]]
 3. Mark your own; write your revision list
 
 ## Things to do before our next class

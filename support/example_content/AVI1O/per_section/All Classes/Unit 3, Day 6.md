@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Contemporary work: what changes when the artist is alive
+1. Contemporary work: what changes when the artist is alive: [[Interpreting a Work]]
 2. Studio time: drafting the interpretation and connecting the context,
-   with the work in front of you
+   with the work in front of you: [[The Interpretation]]
 3. Peer reading of drafts
 
 ## Things to do before our next class

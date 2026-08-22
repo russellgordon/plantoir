@@ -147,7 +147,7 @@ TALK, second half — Unit 4, Day 23, the "comparing diagnoses" discussion
   specific organizations).
   Record: names in two columns on the day plan as you go. Four names,
   realistically. The rest of this class's conversation evidence came from
-  the seminars, which is why it had to start in October.
+  the seminars, which is why it had to start in the opening weeks.
 
 The product evidence is the paper, written in the examination period.
 %%

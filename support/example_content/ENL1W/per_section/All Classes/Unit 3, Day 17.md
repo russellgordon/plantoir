@@ -11,8 +11,7 @@ tags:
 ## Agenda
 
 1. Consolidation: what makes writing sound like a person, on one page
-2. Portfolio: [[Showing Growth]] — pair your September piece with a
-   November one and find three differences
+2. Portfolio: [[Showing Growth]] — pair an early piece with a later one and find three differences
 
 ## Things to do before our next class
 

@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval warm-up — no notes: name three things voice is made of, and
-   find them in an unseen paragraph
-2. Checkpoint, on your own: a poem read closely, in one paragraph
+   find them in an unseen paragraph: [[Voice]]
+2. Checkpoint, on your own: a poem read closely, in one paragraph: [[Poems We Will Argue About]]
 3. Mark your own; revision list written
 
 ## Things to do before our next class

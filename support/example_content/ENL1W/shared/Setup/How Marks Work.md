@@ -35,13 +35,13 @@ pie title Where your mark comes from
 
 **Seventy per cent** comes from the work of the semester: the five tasks
 you hand in — [[Who You Are, in Three Hundred Words]], [[The Book Club]],
-[[Say It Out Loud]], [[The Fact Check]], and [[The Argument]]. They are
-not weighted equally and they are not averaged. What counts is what you
-can do *consistently*, with the later work weighing more than the
-earlier: a paragraph written in September and one written in January are
-not equal evidence of what you can do now. Ask me for the exact split
-whenever you want it — it is not a secret, it is just not the useful
-thing to memorise.
+[[Say It Out Loud]], [[The Fact Check]], and [[The Argument]]. They are not
+weighted equally and they are not averaged. What counts is what you can do
+*consistently*, with the later work weighing more than the earlier: a
+paragraph written at the start of the course and one written at the end of
+the course are not equal evidence of what you can do now. Ask me for the
+exact split whenever you want it — it is not a secret, it is just not the
+useful thing to memorise.
 
 **Thirty per cent** is the final evaluation: [[The Portfolio Conversation]]
 in the last week, with your work from the whole course on the desk
@@ -70,7 +70,7 @@ of it is evidence.
 
 **What you say** is the third, and in an English class it is the big one.
 A reading often exists out loud before it exists on paper — you will say
-something in a circle in October that you could not have written that
+something in a circle early on that you could not have written that
 week. The conferences, the circle meetings, and the fifteen minutes of
 [[The Portfolio Conversation]] are not progress checks. They are evidence
 in their own right, and for some of you they are where the strongest

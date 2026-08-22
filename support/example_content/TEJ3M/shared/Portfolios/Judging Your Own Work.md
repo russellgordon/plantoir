@@ -80,7 +80,7 @@ honestly about their own work.
 What it does reach is the build. One self-check that produces one fix
 is the cheapest improvement available in this course. Put the verdict
 and the fix into your [[Tech Journal]] as you go: it is the same loop
-[[Showing Growth]] will ask you to point at in January, and by the
+[[Showing Growth]] will ask you to point at when the course ends, and by the
 capstone it is something you run without being told, which is the
 actual point of it.
 

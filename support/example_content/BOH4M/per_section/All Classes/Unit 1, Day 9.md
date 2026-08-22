@@ -13,7 +13,7 @@ tags:
 1. The memo, worked from a blank page: [[Writing a Management Memo]]
 2. The conventions behind it: [[Writing for Business]]
 3. Rewrite a bad memo, in pairs, and compare
-4. Research time
+4. Research time: drafting the memo format and organizational analysis for [[The Organization Study]]
 
 ## Things to do before our next class
 

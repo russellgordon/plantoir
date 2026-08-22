@@ -15,7 +15,7 @@ tags:
    a piece of mine
 3. Studio time: initial reaction written cold, then drafting the
    description and cultural context with your work in front of you
-4. Conferences
+4. Conferences on cultural context and artist research for [[The Interpretation]]
 
 ## Things to do before our next class
 

@@ -13,12 +13,12 @@ communication** — things entirely inside your control.
 
 ## The seventy and the thirty
 
-Every Grade 10 credit in Ontario is built the same way. Seventy per cent
-of your mark comes from work spread across the whole semester, and it
-leans towards your **most recent and most consistent** work rather than
-averaging September against January — the mathematician who finishes this
-course is the one being reported on. The remaining thirty per cent comes
-from a final evaluation at the end of it.
+Every Grade 10 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it — the mathematician who
+finishes this course is the one being reported on. The remaining thirty per
+cent comes from a final evaluation at the end of it.
 
 ```mermaid
 pie title Where your mark comes from

@@ -16,7 +16,7 @@ the record of a year of work, and the reflection is what you make of it.
 
 ## The portfolio
 
-Everything, organized, from September to now — see
+Everything, organized, from the first week to now — see
 [[The Dance Portfolio]] for how it is kept:
 
 - Journal entries, including the improvisation notes from Unit 1. The
@@ -30,7 +30,7 @@ Everything, organized, from September to now — see
 
 ## The reflection (written in the examination period, about 900 words)
 
-1. **What changed.** Compare your September video with your final one.
+1. **What changed.** Compare your first video with your final one.
    Be specific: what does your body do now that it did not?
 2. **What dance gave you that is not dance.** Skills, qualities, and
    habits you have taken into other settings — and the evidence. Name one
@@ -50,7 +50,7 @@ Everything, organized, from September to now — see
 | Range | The account covers what did not work as well as what did |
 | Communication | Clear writing, dance terminology used correctly |
 
-> [!tip] The September video is the whole trick
+> [!tip] The first video is the whole trick
 > Nobody enjoys watching their first one. It is also the only way to see
 > a year of change in two minutes, and every strong reflection in this
 > course leans on it — see [[Video of Yourself]].
@@ -68,7 +68,7 @@ Everything, organized, from September to now — see
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 4, Day 17, the June filming and the first side-by-side
+OBSERVE — Unit 4, Day 17, the final filming and the first side-by-side
 comparison
   Watch for: what a student points at when the two clips run beside each
   other. A specific difference — where the weight arrives now, what the
@@ -79,13 +79,13 @@ comparison
   corroborates the Evidence row, which the written piece can rehearse.
   Going well: a finger on the screen and a sentence with a body part in
   it.
-  Stuck: "I'm better now"; or the September clip left unopened.
+  Stuck: "I'm better now"; or the first clip left unopened.
   Record: two columns on the class list — "named a change", "named a
   feeling".
 
 TALK — Unit 4, Day 22, at the portfolio conferences already on that
 agenda, one dancer at a time
-  Ask: "If I handed your portfolio to next September's Grade 9 class,
+  Ask: "If I handed your portfolio to a year from now's Grade 9 class,
   which three files would you pull out, and what would you tell them each
   one is for?"
   Then: "Has anybody outside this room said something about a change in

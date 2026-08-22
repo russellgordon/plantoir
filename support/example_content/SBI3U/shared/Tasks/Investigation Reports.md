@@ -58,10 +58,10 @@ analysis have handed in one piece of work.
 
 ## Success criteria
 
-The same six rows every time, so that by January you can run them from
-memory. Use them with [[Judging Your Own Work]] before you hand a report
-in — the criteria do not change, which is exactly what makes improvement
-across five reports visible.
+The same six rows every time, so that by the end of the course you can run
+them from memory. Use them with [[Judging Your Own Work]] before you hand a
+report in — the criteria do not change, which is exactly what makes
+improvement across five reports visible.
 
 | Quality | What it looks like in your write-up |
 | --- | --- |
@@ -79,6 +79,8 @@ it could have moved the number, is a finding.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A1.1]]
 
 ![[A1.6]]
 

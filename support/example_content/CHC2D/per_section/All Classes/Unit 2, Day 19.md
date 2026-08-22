@@ -10,7 +10,7 @@ tags:
 ---
 ## Agenda
 
-1. Work period
+1. Work period: drafting historical perspective analysis and evaluation for [[The Wartime Decision]]
 2. Peer reading: is the judgement's standard stated? Then your own draft
    against the criteria: [[Judging Your Own Work]]
 3. Revision, acting on my conference notes from last class and on the row you

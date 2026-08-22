@@ -56,8 +56,8 @@ ways: nothing you write here can cost you anything, which is exactly what
 makes it worth writing honestly.
 
 What it changes is the work. A self-check that leads to one fix is the
-cheapest improvement available in this course, and by January it is
-something you do without being asked.
+cheapest improvement available in this course, and by the end of the course
+it is something you do without being asked.
 
 > [!tip] Read your judgement out loud to the person beside you
 > It catches the rows where you were being generous. You will usually hear

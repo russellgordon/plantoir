@@ -42,7 +42,7 @@ else. That is the whole standard, and it is the same one
 
 | What you are writing | Who reads it | What it must do |
 | --- | --- | --- |
-| Commit message | A teammate, and you in March | Say what changed and why, in one line |
+| Commit message | A teammate, and you later in the course | Say what changed and why, in one line |
 | Review comment | The person who wrote the code | Describe the code, ask before asserting, state a decision |
 | Journal entry | Only me | Record what you decided, what you rejected, and what broke |
 | Handover notes | Someone who is not a programmer | How to run it, what it will not do, who to ask |

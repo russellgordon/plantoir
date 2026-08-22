@@ -8,8 +8,8 @@ tags:
 excludeBacklinks: true
 ---
 Grade 11 university English is where reading becomes an argument you can
-defend in front of people who have read the same book. By January you
-will be able to:
+defend in front of people who have read the same book. By the end of the
+course you will be able to:
 
 **Build a reading of a difficult text and defend it with evidence** —
 including when somebody in the room has a better one.

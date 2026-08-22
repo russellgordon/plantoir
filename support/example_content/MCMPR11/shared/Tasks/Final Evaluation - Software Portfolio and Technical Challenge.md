@@ -132,17 +132,19 @@ Choose **two** of the following real-world software engineering ethical crises a
 %%
 Triangulation — the evidence you will not have unless you go and get it.
 
-OBSERVE — Unit 4, Day 17, during the final evaluation orientation and code review walkthrough
-  Watch for: how students identify edge-case bugs in the legacy reservoir telemetry script without executing the code.
-  Going well: students quickly spot division by zero on empty lists, unhandled negative depth readings, and fragile string concatenation.
-  Stuck: treating the script as functional based on variable naming without tracing logic on paper.
-  Record: note who independently identified all three latent defects on the diagnostic sheet.
+OBSERVE — Unit 4, Day 17, during the final evaluation walkthrough and the Part A code review practice
+  Watch for: how a student reads code they did not write — top to bottom once, or straight to the loop that looks wrong.
+  Going well: traces the reservoir script by hand with a small set of readings, including an empty list, before saying anything about it; annotates the printout rather than holding it all in their head.
+  Stuck: declares the script fine because the variable names read sensibly; hunts for a syntax error when the fault is in the logic.
+  Record: on the diagnostic sheet, note who found each of the three latent defects unaided, and who found one only after a nudge.
 
-TALK — Unit 4, Day 18, during one-on-one portfolio review and technical defense
-  Ask: "In Part B, how does your flood dispatch allocation algorithm ensure that Tier 1 emergency requests are fully satisfied before lower tiers receive inventory?"
-  Then: "In Part C, what ethical duty does a programmer have when pressure from management conflicts with public safety standards?"
-  The first assesses K1.8 and K1.11: defending algorithmic decisions and allocation data structures in conversation.
-  The second assesses T1.2 and T1.4: articulating ethical frameworks and developer liability.
+TALK — Unit 4, Day 18, during the one-on-one portfolio review and open clinic
+  Ask: "Part B will ask you to fill Tier 1 emergency requests before anything goes to lower tiers. Your Task 4 dispatch code is the closest thing you have already built — walk me through the structure you would reach for, and what the loop does when the stock runs out halfway through a tier."
+  A strong answer commits to a structure and a rule — requests sorted by tier, stock decremented as it is allocated, a partial fill recorded rather than skipped — and can say what their program should print when nothing is left. A weak one describes the situation again without naming a data structure.
+  Then: "Of the four cases in Part C, which one is closest to a mistake you could actually make in code you write next year — and what in your own practice would catch it first?"
+  A strong answer picks the case for a specific reason — an unvalidated file reaching production, an output nobody was allowed to challenge — and names something real from this course that would catch it: the test that runs before the merge, the log that keeps the raw row, the peer review on Day 13. A weak one picks the most famous case and retells it.
+  The first assesses K1.8 and K1.11: choosing control structures and turning a written specification into a plan for code, out loud, before the evaluation.
+  The second assesses T1.2 and T1.4: recognizing the unintended consequence at the heart of a real failure, and locating the same risk in their own practice.
   Record: one line per student in the final assessment record.
 
 The product evidence is the completed refactored code (Part A), flood dispatch program (Part B), technical ethics essay (Part C), and cumulative software portfolio in the Learning Journey Log.

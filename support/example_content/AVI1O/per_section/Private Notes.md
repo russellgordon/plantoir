@@ -10,7 +10,7 @@ students. %%
 
 ## Section __SECTION_NUMBER__ — notes to myself
 
-- Order lino and ink in September, not October. The printmaking block in
+- Order lino and ink in the first week, not once the unit has started. The printmaking block in
   Unit 2 stalls every year waiting on supplies.
 - Book the display space for the last two weeks of Unit 4 before the
   music department takes it.

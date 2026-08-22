@@ -3,9 +3,9 @@ title: Portfolios
 publish: true
 created: __CREATED__
 ---
-Work built across the whole term rather than handed in on one day. This
-is where the course's continuity lives: what you recorded in September
-becomes evidence in January.
+Work built across the whole term rather than handed in on one day. This is
+where the course's continuity lives: what you recorded at the start of the
+course becomes evidence at the end of the course.
 
 - [[Your Field Notebook]] — every field day, observation on the left and
   inference on the right

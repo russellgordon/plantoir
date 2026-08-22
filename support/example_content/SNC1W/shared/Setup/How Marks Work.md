@@ -12,12 +12,12 @@ how the pieces add up.
 
 ## The seventy and the thirty
 
-Every Grade 9 credit in Ontario is built the same way. **Seventy per cent** of
-your mark comes from work spread across the whole semester — and it is not an
-average of September against January. It leans towards your **most recent**
-work, and towards the level you reach **most consistently**, because what you
-can do in January is the better answer to the question the report card is
-actually asking.
+Every Grade 9 credit in Ontario is built the same way. **Seventy per cent**
+of your mark comes from work spread across the whole semester — and it is
+not an average of the start of the course against the end of it. It leans
+towards your **most recent** work, and towards the level you reach **most
+consistently**, because what you can do at the end of the course is the
+better answer to the question the report card is actually asking.
 
 **Thirty per cent** comes from a final evaluation at the very end: the
 [[Final Examination]], your [[Culminating Reflection]], and your
@@ -41,7 +41,7 @@ once. Ask me for the exact split whenever you want it. It is not a secret; it
 is just not the useful thing to memorise.
 
 The lab reports matter more than their size suggests. Seven pieces arriving
-steadily from September to January are what let a mark describe your most
+steadily from the first week to the last are what let a mark describe your most
 recent and most consistent work rather than four busy weeks.
 
 ## Four kinds of thinking, not one

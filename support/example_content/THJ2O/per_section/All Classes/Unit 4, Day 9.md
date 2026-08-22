@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Period 5 of 8: build or plant, day one
+1. Period 5 of 8: build or plant, day one: [[The Site Project]]
 2. On site, working to the plan
-3. Progress photographs
+3. Progress photographs: [[Photographing Your Work]]
 
 ## Things to do before our next class
 

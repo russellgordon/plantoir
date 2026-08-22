@@ -9,7 +9,7 @@ Civics is not a course about being a good citizen. It is a course about
 how public decisions are actually made in Canada, who has the power to
 make them, and what you can do when you think one of them is wrong.
 
-It is short — a half credit, running from early November to mid-January —
+It is short — a half credit, running across the second half of the semester —
 so almost every period does something.
 
 ## A normal period
@@ -37,7 +37,7 @@ Naming the concept comes afterwards. That is why the pages in
   have seen; arriving without it means catching up on what everyone else
   is already arguing about.
 - **Keep the notebook.** [[Your Civic Notebook]] is where the culminating
-  project comes from, and it cannot be reconstructed in December.
+  project comes from, and it cannot be reconstructed at the end of the course.
 
 ## The shape of the term
 
@@ -79,7 +79,7 @@ and civic commitment that lasts well beyond Grade 10. See
 ## If you fall behind
 
 Say so early. In a ten-week course there is no quiet stretch to catch up
-in, and a missed week in November is a real problem by December.
+in, and a missed week early on is a real problem by the end of the course.
 [[Getting Help]] lists the ways to reach me, and [[Help Sessions]] has
 the times I am in the room.
 

@@ -68,8 +68,8 @@ what makes it worth writing honestly.
 
 What it does change is the work. A self-check that leads to a fix is the
 cheapest mark improvement available in this course, and it belongs in
-your [[Math Journal]] too — a weakest row named in October and closed in
-November is precisely the evidence [[Showing Growth]] will ask you for.
+your [[Math Journal]] too — a weakest row named early and closed
+weeks later is precisely the evidence [[Showing Growth]] will ask you for.
 
 One last thing worth doing: read your judgement out loud to the person
 next to you. It catches the rows where you were being generous, and you

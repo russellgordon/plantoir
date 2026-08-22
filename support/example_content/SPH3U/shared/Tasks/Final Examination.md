@@ -139,15 +139,15 @@ OBSERVE — Unit 5, Days 13 to 15, the three review periods
 
 TALK — Unit 5, Day 16, at the individual conferences already on that
 agenda
-  Ask: "Show me a question from Unit 1 you could not do in September and
+  Ask: "Show me a question from Unit 1 you could not do at the start of the course and
   can do now. Talk me through it."
   Then: "Which of the five units would you rather be examined on twice,
   and why that one?"
   A strong first answer reconstructs the reasoning rather than reciting
   the answer, and it is worth more than a memory of it: a grade is
   supposed to lean on the most recent and most consistent evidence, and a
-  student explaining kinematics fluently in January is current evidence
-  about B2.7 that the October mark cannot see. Where you hear that, it
+  student explaining kinematics fluently at the end of the course is current evidence
+  about B2.7 that the earlier mark cannot see. Where you hear that, it
   changes the seventy, not the thirty.
   Record: one line per student, with a star beside anything that should
   move a Unit 1 or Unit 2 judgement before you calculate the grade.

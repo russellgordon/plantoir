@@ -12,7 +12,7 @@ tags:
 
 1. Period 6 of 8: drafting
 2. [[Using Evidence]] — every claim attached to something a reader could check
-3. Conferences
+3. Conferences on argument coherence and evidence integration for [[The Long Argument]]
 
 ## Things to do before our next class
 

@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval: measurement, tools, drawings, safety
-2. What Unit 3 asks: growing at production scale
+1. Retrieval: measurement, tools, drawings, safety: [[Measuring and Marking]] and [[Reading a Working Drawing]]
+2. What Unit 3 asks: growing at production scale: [[The Propagation Bench]]
 3. Bench preparation for propagation
 
 ## Things to do before our next class

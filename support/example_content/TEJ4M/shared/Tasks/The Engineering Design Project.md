@@ -75,7 +75,7 @@ it is assessed as engineering.
 Third, this project is the main evidence in your [[Tech Journal]] for
 the year. [[Showing Growth]] asks you to set it beside your first entry
 from Unit 1, and [[Final Reflection]] asks what specifically you can now
-do that you could not do in September.
+do that you could not do at the start of the course.
 
 Safety runs through every bench period: separate supplies for loads,
 protection on anything inductive, current budgets checked before power,

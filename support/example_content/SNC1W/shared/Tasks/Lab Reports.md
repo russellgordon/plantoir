@@ -8,7 +8,7 @@ tags:
   - assessment
 ---
 > [!abstract] At a glance
-> **Seven write-ups**, spread from September to January · each written **in
+> **Seven write-ups**, spread from the first week to the last · each written **in
 > class**, in the period set aside for it · **individually**, from data your
 > group collected · **Format:** the six sections on [[Writing a Lab Report]]
 
@@ -58,11 +58,12 @@ have handed in one piece of work between them.
 
 ## Success criteria
 
-Seven rows, the same seven every time, so that by January you can run them
-from memory. Use them with [[Judging Your Own Work]] before you hand a report
-in. Two of the rows bend to the investigation — you cannot plot a graph of six
-stations, and nobody should pretend otherwise — but the list itself never
-changes, which is what makes improvement across seven reports visible.
+Seven rows, the same seven every time, so that by the end of the course you
+can run them from memory. Use them with [[Judging Your Own Work]] before you
+hand a report in. Two of the rows bend to the investigation — you cannot
+plot a graph of six stations, and nobody should pretend otherwise — but the
+list itself never changes, which is what makes improvement across seven
+reports visible.
 
 | Quality | What it looks like in your work |
 | --- | --- |

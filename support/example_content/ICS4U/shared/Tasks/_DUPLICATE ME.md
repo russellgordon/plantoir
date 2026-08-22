@@ -40,9 +40,8 @@ Link to the specific curriculum expectations this page substantively addresses.
 Use good judgement when choosing expectations: these links directly inform how the Curriculum Coverage heat map is filled in on your course website.
 
 Keep this note OUTSIDE the curriculum markers below. Everything between
-%%curriculum-start%% and %%curriculum-end%% is removed for a teacher who sets up
-a course without curriculum pages, and a note tucked inside them disappears with
-it.
+the curriculum markers is removed for a teacher who sets up a course without
+curriculum pages, and a note tucked inside them disappears with it.
 %%
 
 %%curriculum-start%%

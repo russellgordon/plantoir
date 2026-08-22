@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. The hearing, second half — same rule, a question from the floor to every speaker
-2. What the class decided, and where two pairs on the same case reached opposite positions
+1. The hearing, second half — same rule, a question from the floor to every speaker: [[The Land Use Question]]
+2. What the class decided, and where two pairs on the same case reached opposite positions: [[The Stewardship Argument]]
 3. Where the disagreement was about evidence, and where it was about values
 
 ## Things to do before our next class

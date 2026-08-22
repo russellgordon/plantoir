@@ -103,7 +103,10 @@ chosen and rebuilt
   picks the neatest page is choosing a poster. Both arrive next class
   with an exhibit that looks the same from the doorway.
   Going well: journal open, a date said out loud, and the first
-  sentence of the growth statement quoting it.
+  sentence of the growth statement quoting it. Tracing how an algebraic
+  method developed across entries is A3.7 and the Reflecting process
+  expectation watched in action: connecting the steps rather than copying
+  a tidy final result.
   Stuck: an exhibit settled in under a minute, journal never opened.
   Record: class list, one column — journal open / journal shut. One
   pass of the room does it.

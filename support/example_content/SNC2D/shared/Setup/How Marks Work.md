@@ -7,8 +7,8 @@ tags:
   - setup
 ---
 Every Grade 10 credit in Ontario is built the same way, and this one is no
-exception. It is worth reading once properly in September rather than
-guessing at it in January.
+exception. It is worth reading once properly at the start of the course
+rather than guessing at it at the end of the course.
 
 ## The seventy and the thirty
 
@@ -19,10 +19,10 @@ pie title Where your mark comes from
 ```
 
 **Seventy per cent** of your mark comes from work spread across the whole
-semester. It is not an average of September against January: it leans
-towards your **most recent and most consistent** work, because what you can
-do in the last month is a better description of you than what you could do
-in the first.
+semester. It is not an average of the start of the course against the end of
+it: it leans towards your **most recent and most consistent** work, because
+what you can do in the last month is a better description of you than what
+you could do in the first.
 
 The seventy comes from three places, in the order you meet them:
 

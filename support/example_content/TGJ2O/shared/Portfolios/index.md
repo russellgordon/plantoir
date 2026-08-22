@@ -30,5 +30,5 @@ here is training you for.
 
 > [!tip] Written forwards, read backwards
 > Entries take ten minutes and feel small. The value arrives months
-> later, when [[Showing Growth]] calls September-you as a witness —
-> and that only works if September wrote honestly.
+> later, when [[Showing Growth]] calls the you who started this course as a witness —
+> and that only works if the person who wrote it did so honestly.

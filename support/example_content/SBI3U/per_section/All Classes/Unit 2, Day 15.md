@@ -12,10 +12,10 @@ tags:
 
 1. Your Day 1 diagnostic, handed back — read what you wrote about the
    five forelimbs before we teach anything else, then write one line
-   underneath it
+   underneath it: [[Evidence for Evolution]]
 2. Warm-up: antibiotic resistance in the news this week
 3. Consolidate: evolution as something happening now, at a speed you
-   can measure
+   can measure: [[Humans and Evolution]]
 4. Look ahead: next unit is the molecule all of this depends on
 
 ## Things to do before our next class

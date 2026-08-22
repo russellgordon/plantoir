@@ -102,7 +102,7 @@ Come with these answered in writing, not improvised at the front:
       either one is carried home tonight.
 
 The reflection's last section is the one this task adds to what your
-journal has been doing all year: **your own evaluation of the
+journal has been doing all semester: **your own evaluation of the
 Essential Skills and work habits** the Ontario Skills Passport names —
 three of them, where you started, where you are now, and the dated
 evidence for both. It is written in the Unit 4, Day 21 period along
@@ -149,7 +149,7 @@ the documentation and the history, and which is the entire argument of
 | Data explained | Where it lives, how to back it up, how to delete |
 | Review is about the work | Plan versus reality, stated plainly |
 | A named next owner | A person, and a check-in date you will keep |
-| Skills judged on evidence | Three skills, September and now, each claim dated and citable |
+| Skills judged on evidence | Three skills, the first week and now, each claim dated and citable |
 
 ## Reflect
 
@@ -202,7 +202,7 @@ arrive.
 OBSERVE — Unit 4, Day 18, the rehearsal, when the stand-in team asks
 about item seven
   Watch for: what a team does when somebody playing their partner
-  asks who to contact in March. The criteria table asks for a named
+  asks who to contact later in the course. The criteria table asks for a named
   next owner and a check-in date, and every package will carry one by
   Day 20 — a name written in the night before reads exactly like a
   name that was arranged with a real person. Watching the rehearsal is
@@ -211,7 +211,7 @@ about item seven
   Going well: a name, plus when the team last spoke to that person and
   what they said.
   Stuck: a pause, then a name invented on the spot — or a name that
-  turns out to belong to somebody who is graduating in June.
+  turns out to belong to somebody who is graduating at the end of the course.
   Record: one line per team on the day plan — arranged, named only,
   not yet.
   That is B1.5, closing the project by planning its support and

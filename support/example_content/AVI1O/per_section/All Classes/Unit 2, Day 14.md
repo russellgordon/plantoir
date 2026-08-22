@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. [[Working From Reference]] — using images ethically
-2. Studio time
-3. Conferences on direction
+2. Studio time: drafting graphic layout and typography for [[The Information Piece]]
+3. Conferences on layout direction and ethical reference use for [[The Information Piece]]
 
 ## Things to do before our next class
 

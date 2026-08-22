@@ -33,6 +33,38 @@ After completing the evaluation, discuss or write about the following:
 2. **The "Happy Path" Bias:** Programmers usually test the "happy path" — the sequence of inputs that works perfectly. How does focusing only on the happy path exclude certain users?
 3. **Inclusive Design:** In BC, software built for public service (like BC Ferries or BC Hydro) must meet WCAG accessibility standards. Why is it a democratic necessity that government digital services are usable by everyone?
 
+### From a low score to a design space
+
+A rubric that produces five numbers and stops has wasted the exercise.
+The numbers are there to find **gaps** — places where something a user
+needs is simply not present — and each gap opens a space of possible
+answers rather than a single obvious fix.
+
+Take the worst-scoring row from your table and work it out:
+
+1. **Name the gap as an absence, not as a complaint.** Not "the error
+   messages are bad" but "there is nothing that tells a user what format
+   the date should be in *before* they type it".
+2. **Generate at least three different answers**, deliberately unlike
+   each other — show an example in the prompt; accept several formats and
+   normalise them; ask for day, month and year as separate questions. Do
+   not evaluate them yet. The instinct to grab the first workable idea is
+   what makes a design space collapse to one point before it has been
+   looked at.
+3. **Say what each one costs.** More code, more places to be wrong, a
+   slower interaction, a change that helps one user and hinders another.
+   Every one of these has a cost, and an option presented without one has
+   not been thought about.
+4. **Then choose**, and record why the others were rejected. That record
+   is worth more later than the choice is — when the requirement changes,
+   you will want to know what you already considered.
+
+Do this for two rows rather than one, and notice something: the gaps you
+find in somebody else's program are far easier to see than the ones in
+your own. That is not a fact about the programs. It is why
+[[Running a Peer Code Review]] exists, and why professional teams do not
+let a developer be the only person who evaluates their own work.
+
 ### Challenge Activity
 
 Take a piece of code that strictly requires an integer input and crashes on letters. Rewrite it using a `while` loop and `try/except` to trap the error and provide a warm, helpful, human-readable prompt that guides the user back to the right path.
@@ -41,6 +73,8 @@ Take a piece of code that strictly requires an integer input and crashes on lett
 ## Curriculum connection
 
 ![[D2.2]]
+
+![[D3.1]]
 
 ![[K1.17]]
 %%curriculum-end%%

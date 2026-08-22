@@ -44,7 +44,7 @@ route from *me in a costume* to someone else.
 
 ## The silence prompt
 
-The sharpest question we ask all year: *what changes if we do the scene
+The sharpest question we ask all semester: *what changes if we do the scene
 without words?* Remove speech and everything the body was mumbling must speak
 clearly — the want, the obstacle, the relationship, all carried by movement
 alone. This is the whole discipline of [[Mime]], and even one silent run of a

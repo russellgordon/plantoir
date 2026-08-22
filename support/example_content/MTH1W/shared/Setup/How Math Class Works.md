@@ -31,7 +31,7 @@ defend today becomes the method someone else reaches for tomorrow.
 
 Groups of three, drawn visibly at random at the door — cards, not
 choices. Nobody owns a seat, nobody gets stuck being "the one who
-writes", and by October you will have thought hard alongside everyone in
+writes", and a few weeks in you will have thought hard alongside everyone in
 the room. It feels strange for about a week; then it feels like the
 obvious way to run a room.
 
@@ -60,7 +60,7 @@ being on a board matters more than it being finished.
 
 Then, and only then, notes: a few sentences and one worked example in
 your own words, written for the version of you who opens the binder in
-January having forgotten today. The [[Concepts/index|concept pages]]
+months from now, having forgotten today. The [[Concepts/index|concept pages]]
 hold the clean, complete statements — your notes hold what YOU need to
 remember about them.
 

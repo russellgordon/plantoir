@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Period 2 of 8: preparation — mounting, edges, backing
+1. Period 2 of 8: preparation — mounting, edges, backing: [[The Exhibition]]
 2. Handling and storing work safely
-3. Studio time, and your permissions and credit note written here
+3. Studio time, and your permissions and credit note written here: [[Copyright, Ownership, and Credit]]
 
 ## Things to do before our next class
 

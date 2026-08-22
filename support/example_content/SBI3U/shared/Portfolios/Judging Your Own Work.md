@@ -64,9 +64,9 @@ both ways: nothing you write here can cost you anything, which is exactly
 what makes it worth writing honestly.
 
 What it does change is the work. A self-check that leads to a fix is the
-cheapest mark improvement available in this course. Keep the entries in
-your [[Biology Journal]]; by January they are also the clearest record
-you have of what you got better at, which is what
+cheapest mark improvement available in this course. Keep the entries in your
+[[Biology Journal]]; by the end of the course they are also the clearest
+record you have of what you got better at, which is what
 [[Portfolio Checklist]] is asking for.
 
 One last thing worth doing: read your judgement out loud to the person

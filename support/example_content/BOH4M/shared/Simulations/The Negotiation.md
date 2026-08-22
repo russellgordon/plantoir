@@ -37,7 +37,7 @@ opening position hides.
    What was said just before it?
 3. Which pairs found the solution that needed information from both
    briefs? What did those pairs do differently in the first five minutes?
-4. Whose agreement will still be working in March? Read the sentences out
+4. Whose agreement will still be working later in the course? Read the sentences out
    and decide as a class.
 
 > [!tip] The two questions again

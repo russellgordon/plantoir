@@ -38,6 +38,8 @@ they are replaced at roughly two million per second.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E3.3]]
+
 ![[E3.4]]
 
 ![[E2.2]]

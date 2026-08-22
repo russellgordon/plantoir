@@ -684,9 +684,9 @@ last of all, because the curriculum block above it is PUBLISHED and
 student-visible, and this is the only part of the page students never see.
 Never put it INSIDE the curriculum markers: `strip_curriculum_blocks()` in
 `scripts/setup_course.py` deletes everything between them for a teacher who
-declines curriculum pages, so a nested comment vanishes silently. (That is
-not hypothetical — `ADA1O/shared/Tasks/_DUPLICATE ME.md` nests one today
-and loses it on every curriculum-free install.)
+declines curriculum pages, so a nested comment vanishes silently. Every task
+template (like `ADA1O/shared/Tasks/_DUPLICATE ME.md`) places the triangulation
+block after `%%curriculum-end%%` for this reason.
 
 **Plain text only inside the block.** No `[[wikilinks]]` and no
 `![[transclusions]]`: the linter and `build_site.py` read the raw markdown

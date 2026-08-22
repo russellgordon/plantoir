@@ -6,7 +6,7 @@ transcludeTitleSize: h2
 excludeBacklinks: true
 ---
 Grade 12 university English is the last English course most people take.
-By January you will be able to:
+By the end of the course you will be able to:
 
 **Read a text through more than one lens, and say what each one shows and
 costs.** Not "apply a theory" — use a critical approach the way a tool is

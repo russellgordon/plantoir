@@ -5,7 +5,7 @@ created: __CREATED__
 ---
 What you should be able to do by the end of AVI1O, in plain words.
 
-## By June you should be able to
+## By the end of the course you should be able to
 
 - **Generate ideas** and develop them — not wait for one.
 - **Make work in several media**, choosing the medium for a reason.

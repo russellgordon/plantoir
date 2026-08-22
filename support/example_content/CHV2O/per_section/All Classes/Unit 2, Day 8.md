@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Oral answers taken, one hostile question each — two minutes a student, and the class hears every one
+1. Oral answers taken, one hostile question each for [[The Rights Case]] — two minutes a student, and the class hears every one
 2. What held up under the question, and what did not
-3. The other half of citizenship, opened: what do you owe, and to whom? Five minutes on paper, no marks, before any of it is named
+3. The other half of citizenship, opened: what do you owe, and to whom? [[Responsibilities]]
 
 ## Things to do before our next class
 

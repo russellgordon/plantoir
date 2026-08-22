@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Checkpoint, on your own: formulas, names, balancing, reaction types,
-   and one explanation of evidence for chemical change
-2. Mark your own; revision list written
+   and one explanation of evidence for chemical change: [[Formulas and Names Practice]]
+2. Mark your own; revision list written: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

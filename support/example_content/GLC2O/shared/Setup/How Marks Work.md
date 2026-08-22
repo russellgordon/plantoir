@@ -6,8 +6,8 @@ tags:
   - setup
 ---
 Career Studies is a **half credit — 55 hours**, which here is 42 periods
-plus a two-and-a-half-hour final evaluation, running from September to
-early November in the period Civics takes over afterwards. Half a credit
+plus a two-and-a-half-hour final evaluation, running from the first week to
+the halfway point, in the period Civics takes over afterwards. Half a credit
 is still a credit on your transcript and it is compulsory for your
 diploma, so the ten weeks count for exactly as much per hour as any
 other course.
@@ -17,7 +17,7 @@ other course.
 Every Ontario credit, half or whole, is built the same way. **Seventy per
 cent** of your mark comes from the work you do across the term, and it
 leans towards your **most recent and most consistent** work rather than
-averaging September against November. Something you could not do in the
+averaging the start of the course against the end of it. Something you could not do in the
 first week and can do in the eighth is something you can do. **Thirty per
 cent** comes from a final evaluation at the end: [[The Plan Defence]],
 where you present [[The Pathway Plan]] and walk an adult through
@@ -84,7 +84,7 @@ prize. It is how the mark is meant to work.
   posting beats an imagined one.
 - **Evidence for claims about yourself.** A situation someone else could
   confirm, every time.
-- **Thinking that changed.** Showing what you believed in September and
+- **Thinking that changed.** Showing what you believed at the start of the course and
   what moved it is worth more than consistency.
 - **Named unknowns.** "I could not find this out, and here is who I
   would ask" is a strength, not a gap.

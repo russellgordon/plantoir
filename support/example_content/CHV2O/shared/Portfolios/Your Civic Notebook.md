@@ -6,11 +6,10 @@ tags:
   - portfolios
   - unit-1
 ---
-One notebook, kept from the first week in November to the last class in
-January. It is not a set of class notes. It is the running record of what
-you noticed, where you checked it, and what you concluded — and it is the
-reason [[The Civic Action Project]] will not start from a blank page in
-December.
+One notebook, kept from the first class of the course to the last. It is
+not a set of class notes. It is the running record of what you noticed,
+where you checked it, and what you concluded — and it is the reason
+[[The Civic Action Project]] will not start from a blank page.
 
 Start it in the first week. This course is short, and a notebook begun in
 week five is a notebook with nothing in it.
@@ -21,7 +20,7 @@ week five is a notebook with nothing in it.
 | --- | --- | --- |
 | The issue | One sentence, naming who has to settle it | Half of civic writing fails because the issue was never stated |
 | The question | A question, not a topic — see below | A topic cannot be answered, so it cannot be finished |
-| The source | Who produced it, when, and where you found it | You will cite it in January; see [[Judging Civic Information\|the three-blank check]] |
+| The source | Who produced it, when, and where you found it | You will cite it at the end of the course; see [[Judging Civic Information\|the three-blank check]] |
 | What it says | A short quotation or a figure, copied exactly | Paraphrasing early loses the wording you will want to quote |
 | Who disagrees | One group, and what they want instead | This is the entry that turns an opinion into an argument |
 | So what | Two sentences of your own | Nobody else can write this part for you |
@@ -46,8 +45,8 @@ perspective is being reported and whose is missing? What is changing and
 what is staying the same? What was the stated objective, and what was the
 actual result?
 
-Four questions, one item, ten minutes. Do it every week and by January
-you will have a dozen worked examples, which is exactly what
+Four questions, one item, ten minutes. Do it every week and by the end of
+the course you will have a dozen worked examples, which is exactly what
 [[The Issue Examination]] rewards and exactly what cannot be produced the
 night before.
 

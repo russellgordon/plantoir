@@ -10,7 +10,7 @@ enableToc: true
 > Yours, even when the bench is shared · one record for each of the ten
 > labs in [[Labs/index|Labs]] · written at the bench in the periods that
 > lab runs · handed in at tools-away on the last of them · one criteria
-> table, all year
+> table, all semester
 
 ## What you are making
 
@@ -25,7 +25,7 @@ You predict, you measure, you reconcile the two, you name what fought
 back, and you say what you would change so the thing survives. That is
 the three-part shape [[Labs/index|Labs]] opens with, plus the fault and the
 instrument settings, and it is the same on the first record in
-September as on the last one in January.
+the first bench day as on the last one at the end of the course.
 
 Two of the ten labs use their own words for the first move and they
 still count as a prediction: the logic block's truth table is filled in
@@ -102,8 +102,8 @@ the margin decision are yours to make and to defend.
 
 ## Success criteria
 
-The same table for all ten. Read it once properly in September and you
-will know it by Unit 2.
+The same table for all ten. Read it once properly at the start of the course
+and you will know it by Unit 2.
 
 | Quality | What it looks like in the record |
 | --- | --- |

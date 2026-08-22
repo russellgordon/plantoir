@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: a monohybrid, a dihybrid, a pedigree,
-   and one non-Mendelian case
+   and one non-Mendelian case: [[Punnett Squares and Probability]] and [[Pedigree Practice]]
 2. Compare methods in pairs
 
 ## Things to do before our next class

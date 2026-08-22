@@ -28,7 +28,7 @@ chose in [[The Culminating Investigation]], which is the closest
 thing school offers to the actual job.
 
 The second answer is about transfer: you may never compute a
-hypergeometric probability after June, but you will spend a lifetime
+hypergeometric probability after this course, but you will spend a lifetime
 being handed numbers by people who want something from you.
 Advertisers, campaigns, employers, and recommendation algorithms all
 run on statistics you did not see calculated. Knowing what to ask —

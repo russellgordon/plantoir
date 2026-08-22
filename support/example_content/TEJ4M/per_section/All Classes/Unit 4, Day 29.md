@@ -12,10 +12,12 @@ tags:
 ## Agenda
 
 1. Review, part one, against [[The Engineering Review]]: specifications
-   and margins, transistors and op-amps, filters, sampling, and buses
+   and margins, transistors and op-amps, filters, sampling, buses, and
+   gate-level logic
 2. By request: [[Specification Practice]],
    [[Transistor and Op-Amp Practice]], [[Power and Regulation Practice]],
-   [[Sampling and Resolution Practice]], [[Bus and Protocol Practice]]
+   [[Sampling and Resolution Practice]], [[Bus and Protocol Practice]],
+   [[Boolean Logic Practice]]
 
 ## Things to do before our next class
 

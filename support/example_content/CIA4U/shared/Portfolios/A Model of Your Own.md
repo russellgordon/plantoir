@@ -41,7 +41,7 @@ where it stops working is worth more than one presented as the truth.
 > same amount whether it is the first or the eighth. **Where it breaks:**
 > the third assumption, immediately — returns to study hours fall off, so
 > the first hours given up cost more than the last. And the wage rises in
-> October, which changes one side of the comparison and not the other.
+> early in the course, which changes one side of the comparison and not the other.
 
 The reasoning underneath is in [[Opportunity Cost]]; the model you will
 have met first is [[Supply and Demand]]. What this piece is judged on,

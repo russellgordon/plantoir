@@ -48,7 +48,7 @@ question about what a town believed goes to its newspaper.
 
 Practise the walk-in itself in [[Working in an Archive]], and record every
 reference number as you go — [[Citing Historical Sources]] explains why the
-number you did not write down is the one you will need in January.
+number you did not write down is the one you will need at the end.
 
 %%curriculum-start%%
 ## Curriculum connection

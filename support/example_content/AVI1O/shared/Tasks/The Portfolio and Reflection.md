@@ -16,7 +16,7 @@ is a term's work; half is what you can do with an unfamiliar image.
 
 ## The portfolio
 
-Everything, organised, from September — see [[The Portfolio]]:
+Everything, organised, from the first week — see [[The Portfolio]]:
 
 - The drawing you made on the first day, before anything was explained
 - The sketchbook, complete
@@ -38,11 +38,11 @@ interpretation, cultural context, aesthetic judgement. Those few lines
 are there because the third stage asks who and what a work was for, and
 you cannot research it in an examination room.
 
-**Part two — your own year** (about 60 minutes):
+**Part two — your own semester** (about 60 minutes):
 
-1. What changed between your September sketchbook and your June one,
+1. What changed between your earliest sketchbook and your most recent one,
    and where in it can you see the creative process working better than
-   it did in September?
+   it did at the start of the course?
 2. What has making and analysing art done to how you see things outside
    this room?
 3. What skills has this course built that are not about art, and where
@@ -61,13 +61,13 @@ you cannot research it in an examination room.
 | --- | --- |
 | Completeness | The record is there, organised and dated |
 | Analysis | The unseen work is read carefully, with evidence, and all four stages are there and named |
-| Self-assessment | Your written judgement of your own work is specific, points at evidence anyone could go and look at, and says where the portfolio shows the creative process serving you better than it did in September |
+| Self-assessment | Your written judgement of your own work is specific, points at evidence anyone could go and look at, and says where the portfolio shows the creative process serving you better than it did at the start of the course |
 | Transfer | You name skills this course built that are not about art, and say where each of them would be worth having |
 | Insight | You notice something not obvious about your own year |
 | Routes | Four real ones — a course, a program or job, and two things in this community — named accurately enough that somebody could act on them |
 | Communication | Clear writing, correct terminology |
 
-> [!tip] The September sketchbook is the evidence
+> [!tip] The earliest sketchbook is the evidence
 > Nobody enjoys looking at their first pages. They are also the only way
 > to see a term of change, and every strong reflection leans on them —
 > which is why [[The Sketchbook Habit]] starts on the second day of the
@@ -107,7 +107,7 @@ OBSERVE — Unit 4, Day 21, the portfolio work period
   folder of best work, which is a different object and the one this task
   explicitly is not — and a submitted portfolio that is complete and
   organised looks the same either way.
-  Going well: the September work is out where they can see it, and
+  Going well: the earliest work is out where they can see it, and
   somebody is holding two versions of the same piece side by side.
   Stuck: a pile face-down, and a student asking whether the failed ones
   have to go in.

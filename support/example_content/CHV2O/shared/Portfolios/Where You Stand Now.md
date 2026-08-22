@@ -11,7 +11,7 @@ handed in. Three parts, about 700 words in total: what you think, what
 this course did to how you think, and where the skill gets paid for.
 
 It is written **in class**, in one period near the end of Unit 3, with
-your notebook open beside you. Bring the November entries; part two is
+your notebook open beside you. Bring the earliest entries; part two is
 unwritable without them.
 
 ## Part one — your position, stated properly
@@ -36,7 +36,7 @@ you take. Nobody in this course has ever lost a mark for a conclusion.
 
 ## Part two — what changed
 
-Compare this to what you wrote in November. Name one thing you believed
+Compare this to what you wrote in the first week. Name one thing you believed
 then that you no longer believe, or one thing you now hold for different
 reasons than you did.
 
@@ -47,7 +47,7 @@ reasons than you did.
 > that was never examined and simply persisted is worth writing about
 > too, provided you say that is what happened.
 
-Then say what you can now do that you could not in November. Be
+Then say what you can now do that you could not in the first week. Be
 concrete: find who made a decision; read a bill and know whether it is in
 force; check a claim against its original source; state an opposing view
 so its holder would accept it; write to a person in power and get an

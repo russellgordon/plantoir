@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Interviews reported back to a small group
+1. Interviews reported back to a small group: [[The Informational Interview]]
 2. What surprised people, and what nobody had read anywhere
-3. Work period on the skills section — starting with whatever the checkpoint sent back to you
+3. Work period on the skills section — starting with whatever the checkpoint sent back to you: [[Skills That Transfer]] and [[The Skills Inventory Task]]
 
 ## Things to do before our next class
 

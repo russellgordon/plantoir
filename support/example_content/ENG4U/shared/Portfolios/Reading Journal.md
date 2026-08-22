@@ -28,8 +28,8 @@ bring is what you can remember having thought.
 
 ## The habit
 
-Write the entry the same day. An entry written in January about a
-September class is a memory of a memory.
+Write the entry the same day. An entry written at the end of the course about a
+the first class is a memory of a memory.
 
 > [!tip] If journals have never worked for you
 > Three sentences: what happened in the text, what you thought, one

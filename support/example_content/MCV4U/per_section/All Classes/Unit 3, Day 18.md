@@ -16,7 +16,7 @@ tags:
 3. Consolidation: one function, fully analysed and sketched, then used
    in an optimisation — the same object doing two jobs
 4. Look ahead: the last unit is the other half of this course, and it
-   started in September
+   started at the start of the course
 
 ## Things to do before our next class
 

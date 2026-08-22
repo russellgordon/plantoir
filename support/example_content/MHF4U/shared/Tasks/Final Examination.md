@@ -196,6 +196,9 @@ OBSERVE — Unit 4, Day 20, the review clinic at the boards
 
   Going well: the family named out loud, then the form of the answer
   predicted ("this is going to be an interval"), and only then a pen.
+  Predicting the interval and distinguishing inequalities from equations
+  before calculating is C4.3 watched in the doing: selecting valid strategies
+  for inequalities rather than blindly running an algebraic routine.
 
   Stuck: the pen moves first, and the first move is whatever was practised
   most recently rather than whatever the question asked for. Watch
@@ -224,6 +227,9 @@ TALK — Unit 4, Day 23, at the individual conferences already on that agenda
   when they ask me to describe end behaviour" — rather than "everything" or
   "trig". A student who cannot name one has not yet looked at the paper's
   shape, and the fix is two minutes with the table at the top of this page.
+  Naming that connection is C2.3 and D1.4 heard in conversation: connecting
+  the key features of a rational sketch to rates and end behaviour rather
+  than treating each unit as a sealed silo.
 
   Record: one line per student, and a tally on the board of the topics named.
   The top three are what the open clinic runs on.

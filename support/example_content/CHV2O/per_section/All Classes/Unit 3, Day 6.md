@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. **Period 4 of 10:** comparing the routes, and choosing one
-2. Letter, deputation, submission, campaign, or a meeting you ask for
+1. **Period 4 of 10:** comparing the routes, and choosing one for [[The Civic Action Project]]
+2. Letter, deputation, submission, campaign, or a meeting you ask for — [[Writing to Someone in Power]]
 3. Writing the success criterion before you know the answer, and finishing the plan here
 
 ## Things to do before our next class

@@ -151,7 +151,7 @@ built around
   perpendicular, and through the midpoint — where a written answer
   arrives as arithmetic that can have a guess hidden inside it. It is
   the final time you and that student will talk about mathematics
-  together, and for one who has said very little all year it can tell
+  together, and for one who has said very little all semester it can tell
   you more than the paper does.
   Record: one line each, plus which sketch you put in front of them.
 

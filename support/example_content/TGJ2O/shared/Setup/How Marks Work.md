@@ -14,10 +14,10 @@ on what your work does for a reader.
 
 ## The seventy and the thirty
 
-Every Grade 10 credit in Ontario is built the same way. Seventy per
-cent of your mark comes from work spread across the whole semester, and
-it leans towards your **most recent and most consistent** work rather
-than averaging September against January — a reporter is judged on the
+Every Grade 10 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it — a reporter is judged on the
 beat they are filing now, not the one they filed in week two. The other
 thirty per cent comes from a final evaluation at the end of the term.
 

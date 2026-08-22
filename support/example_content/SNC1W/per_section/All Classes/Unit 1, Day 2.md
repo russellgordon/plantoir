@@ -17,7 +17,7 @@ tags:
 3. Setup: [[Your Lab Notebook]] — set up your first pages
 4. Where the equipment lives, and the safety walk
 5. Portfolio: [[Why We Keep a Portfolio]], then [[Portfolio Checklist]] — the
-   standard it is judged against, read now rather than in January
+   standard it is judged against, read now rather than at the end of the course
 
 ## Things to do before our next class
 

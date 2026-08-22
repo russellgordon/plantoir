@@ -38,6 +38,8 @@ better biology than pretending it is airtight.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C3.3]]
+
 ![[C3.4]]
 
 ![[C2.4]]

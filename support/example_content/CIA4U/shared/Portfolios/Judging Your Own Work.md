@@ -64,9 +64,9 @@ and neither is a classmate's — [[How Marks Work]] says why. Nothing you
 write on a self-check can cost you anything, which is exactly the
 property that makes it worth writing honestly.
 
-What it changes is the work. A self-check that produces one repair is
-the cheapest improvement available in this course, and by January most
-people run it without being told to.
+What it changes is the work. A self-check that produces one repair is the
+cheapest improvement available in this course, and by the end of the course
+most people run it without being told to.
 
 One last thing worth doing: read your verdicts out loud to the person
 beside you before you act on them. You will hear the rows where you

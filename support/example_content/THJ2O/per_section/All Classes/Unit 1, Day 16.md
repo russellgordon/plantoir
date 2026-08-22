@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. **Site — the woodlot**, second visit: what changed in a month
+1. **Site — the woodlot**, second visit: what changed in a month: [[Pests and Diseases in Our Woodlot]]
 2. Seasonal change, and reading a site over time
-3. Final field entries, and the fixes set at yesterday's conferences
+3. Final field entries into [[The Plant Identification File]], and the fixes set at yesterday's conferences
 
 ## Things to do before our next class
 

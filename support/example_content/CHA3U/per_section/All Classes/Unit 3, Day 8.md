@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Washington and Du Bois, argued from their own words rather than from summaries
+1. Washington and Du Bois, argued from their own words rather than from summaries: [[Jim Crow and Resistance]]
 2. The NAACP, the Great Migration, and the segregation that awaited in the north
-3. Work period: the weakest row you named on Day 6, and what your conference turned up
+3. Work period: the weakest row you named on Day 6, and what your conference turned up for [[The Industrial Republic]]
 
 ## Things to do before our next class
 

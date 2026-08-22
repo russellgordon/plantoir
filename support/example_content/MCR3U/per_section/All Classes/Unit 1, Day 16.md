@@ -19,4 +19,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Journal: the restriction you would have missed in September.
+- [ ] Journal: the restriction you would have missed at the start of the course.

@@ -112,7 +112,7 @@ checking, not producing.
 > And the family is older than it looks. $f(x) = 4$ is a polynomial of
 > degree zero, $g$ is degree one, $h$ is degree two — the lines and
 > parabolas of Grade 10 are simply the first two rungs of the ladder
-> this whole unit climbs. Nothing new was invented in September; the
+> this whole unit climbs. Nothing new was invented at the start of the course; the
 > degree just went up.
 
 %%curriculum-start%%

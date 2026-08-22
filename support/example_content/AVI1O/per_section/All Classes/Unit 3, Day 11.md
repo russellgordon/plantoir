@@ -12,7 +12,7 @@ tags:
 
 1. Sourcing properly: [[Writing About Art]]
 2. Research, and your own half-page on the comparison written here
-3. Conferences
+3. Conferences on research and slide design for [[Art and Society Study]]
 
 ## Things to do before our next class
 

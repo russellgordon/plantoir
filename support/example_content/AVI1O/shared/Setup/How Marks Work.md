@@ -7,7 +7,7 @@ tags:
   - setup
 ---
 You are marked on what you make, and on how you think about what you
-make — not on how much art you had done before September.
+make — not on how much art you had done before this course.
 
 ## The seventy and the thirty
 
@@ -15,7 +15,7 @@ Every Grade 9 credit in Ontario is built the same way. **Seventy per
 cent** of your mark comes from work spread across the whole semester,
 and it leans towards your **most recent and most consistent** work
 rather than averaging your first month against your last. That matters
-more in this subject than in most: almost nobody's September drawing is
+more in this subject than in most: almost nobody's first drawing is
 their best one, and it is not meant to be.
 
 The other **thirty per cent** comes from a single final evaluation at

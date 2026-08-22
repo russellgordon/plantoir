@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Read aloud: "Letter to Sir John A. Macdonald" by Marilyn Dumont
-2. What it means for a poem to answer a country's founding story
+1. Read aloud: "Letter to Sir John A. Macdonald" by Marilyn Dumont — [[Poems We Will Argue About]]
+2. What it means for a poem to answer a country's founding story: [[Indigenous Storywork]]
 3. In fours: who is the poem addressed to, and what does direct address
    do?
 

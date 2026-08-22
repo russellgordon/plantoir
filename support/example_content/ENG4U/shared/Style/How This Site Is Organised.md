@@ -26,8 +26,8 @@ work backwards; every class page links to everything that class used.
 ## Why concepts live apart from classes
 
 Because an idea meets you once and gets used eleven times. Irony turns up
-in a short story in September, in *Hamlet* in October, and in an
-extended essay in December. It is explained properly once — [[Ambiguity and Indeterminacy]] — and
+in a short story at the start of the course, in *Hamlet* later, and in an
+extended essay at the end of the course. It is explained properly once — [[Ambiguity and Indeterminacy]] — and
 every class that uses it links there.
 
 > [!tip] Search beats clicking

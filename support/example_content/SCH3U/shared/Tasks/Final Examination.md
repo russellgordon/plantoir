@@ -117,11 +117,11 @@ OBSERVE — Unit 5, Day 15, the mole map redrawn from memory
   Avogadro's number on the next and molar volume on the third is the
   relationships themselves. Both look like a map from across the room,
   and on the examination the first one becomes a route the student
-  cannot actually walk. Watch also who opens their September journal to
+  cannot actually walk. Watch also who opens their earliest journal to
   compare, and who leaves it shut because they would rather not know.
   Going well: labelled arrows, and a hand going to the old version.
   Stuck: four boxes and four arrows, drawn quickly and confidently;
-  a September page never opened.
+  an early page never opened.
   Record: three columns — arrows labelled, boxes only, did not try it
   from memory. That is D3.2 in the one form a written answer rarely
   shows you, and the third column is who to find on Day 18.

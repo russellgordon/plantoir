@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Defences: the last six
-2. Journal: the argument you wish you had written
+1. Defences: the last six — [[The Independent Study]]
+2. Journal: the argument you wish you had written: [[Reading Journal]]
 
 ## Things to do before our next class
 

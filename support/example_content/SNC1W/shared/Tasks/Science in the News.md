@@ -9,7 +9,7 @@ tags:
 ---
 > [!abstract] At a glance
 > Individual · **three submissions** across the semester — one in
-> September, one in November, one in the final weeks · each **written in
+> the first unit, one in the middle, one in the final weeks · each **written in
 > class**, in the period it is handed in · **Format:** one page each, five
 > questions answered
 

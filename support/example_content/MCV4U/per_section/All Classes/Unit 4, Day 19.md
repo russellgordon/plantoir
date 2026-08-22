@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Checkpoint, on your own: vectors, lines, and planes
-2. Mark your own; write your revision list — bring it to the review
+1. Checkpoint, on your own: vectors, lines, and planes — [[Lines and Planes Practice]]
+2. Mark your own; write your revision list: [[Judging Your Own Work]] — bring it to the review
    classes, because Day 23's clinic starts with what is on them
 
 ## Things to do before our next class

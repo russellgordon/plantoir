@@ -18,7 +18,7 @@ clickable.
 
 At this level, the annotated text is the tool. In a seminar you need to
 find a passage in ten seconds; in an essay you need the note you made in
-November. If buying a copy is a problem, tell me privately in the first
+later on. If buying a copy is a problem, tell me privately in the first
 week — there are copies in this room and there is no version of this
 where it matters.
 

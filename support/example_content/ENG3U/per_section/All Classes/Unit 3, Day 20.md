@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: one claim that needs both texts, written cold
+1. Warm-up: one claim that needs both texts, written cold: [[Thesis and Argument]]
 2. In fours: test each other's claims — does it need both? Nothing is
    collected and nothing is marked; a claim that survives three readers
-   has earned the essay it is heading for
+   has earned the essay it is heading for: [[The Comparative Response]]
 
 ## Things to do before our next class
 

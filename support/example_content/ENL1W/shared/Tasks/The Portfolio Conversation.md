@@ -39,7 +39,7 @@ every one of them:
   it?
 - Where did somebody else's reading beat yours, and what did you do
   about it?
-- What can you do now as a writer that you could not do in September?
+- What can you do now as a writer that you could not do at the start of the course?
   Prove it with the pair.
 - What still does not work? What is your plan for it?
 - Which text from this course will you still be thinking about in a year,

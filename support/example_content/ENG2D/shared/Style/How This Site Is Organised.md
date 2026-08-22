@@ -30,10 +30,10 @@ work backwards; every class page links to everything that class used.
 
 ## Why concepts live apart from classes
 
-Because an idea meets you once and gets used eleven times. Irony turns up
-in a short story in September, in *Romeo and Juliet* in October, and in
-an advertisement in December. It is explained properly once — [[Irony]] —
-and every class that uses it links there.
+Because an idea meets you once and gets used eleven times. Irony turns up in
+a short story at the start of the course, in *Romeo and Juliet* later, and
+in an advertisement at the end of the course. It is explained properly once
+— [[Irony]] — and every class that uses it links there.
 
 > [!tip] Search beats clicking
 > <kbd>⌘</kbd> + <kbd>K</kbd> or <kbd>Ctrl</kbd> + <kbd>K</kbd>, three

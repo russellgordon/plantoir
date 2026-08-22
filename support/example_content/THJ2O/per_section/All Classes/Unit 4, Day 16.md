@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Practical revision: propagation, measurement, tool selection
-2. The three demonstration tasks practised — no marks; I tell you
+1. Practical revision: propagation, measurement, tool selection: [[Propagation From Cuttings]] and [[Measuring and Marking]]
+2. The three demonstration tasks practised: [[Hand Tools]] — no marks; I tell you
    which one to spend your time on
 3. Shop and bench work
 

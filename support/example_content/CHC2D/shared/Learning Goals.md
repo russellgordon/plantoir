@@ -6,7 +6,7 @@ created: __CREATED__
 What you should be able to do by the end of CHC2D, in plain words first
 and in the Ministry's words underneath.
 
-## By June you should be able to
+## By the end of the course you should be able to
 
 - **Read a primary source** for what it is evidence of, not just what it
   says.

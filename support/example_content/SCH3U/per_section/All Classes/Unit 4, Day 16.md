@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Checkpoint, on your own: solubility prediction, net ionic equation,
-   dilution, and a titration calculation
+   dilution, and a titration calculation: [[Precipitation and Net Ionic Equations]] and [[The Water Report]]
 2. Mark your own; revision list written
 
 ## Things to do before our next class

@@ -77,7 +77,7 @@ OBSERVE — Unit 1, Day 5, identification in the woodlot
 TALK — Unit 1, Day 15, at the conferences on entries so far
   The file already asks in writing what distinguishes each plant, so
   they have that one prepared. Ask past it.
-  Ask: "Which of your twenty would you get wrong in January, with the
+  Ask: "Which of your twenty would you get wrong at the end of the course, with the
   leaves off it?"
   Then: "Describe that one to me out loud, the way you would to a
   supplier on the phone who cannot see it."

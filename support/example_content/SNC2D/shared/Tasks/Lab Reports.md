@@ -8,7 +8,7 @@ tags:
   - skills
 ---
 > [!abstract] At a glance
-> **Four write-ups**, one per unit, September to January · each written **in
+> **Four write-ups**, one per unit, the first class to the last · each written **in
 > class**, in the period after the bench work · **individually**, from data
 > your bench collected together · **Format:** the seven sections on
 > [[Writing a Lab Report]]
@@ -67,9 +67,9 @@ the same analysis have handed in one piece of work between them.
 
 ## Success criteria
 
-Eight rows, the same eight every time, so that by January you can run them
-from memory. Use them with [[Judging Your Own Work]] before you hand a
-report in.
+Eight rows, the same eight every time, so that by the end of the course you
+can run them from memory. Use them with [[Judging Your Own Work]] before you
+hand a report in.
 
 Several of the rows bend, and the table says where. The first bends because
 each investigation asks a different question. Three more bend because

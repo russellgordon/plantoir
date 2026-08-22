@@ -12,10 +12,10 @@ tags:
 > everything from the ecosystems unit, weighted the way we spent the time
 
 This is the only test in the course, and it is here on purpose. The
-[[Final Examination]] in January is three hours long and, for most of you, the
-first examination you will ever have written. Meeting that format once, in
-seventy-five minutes, on one unit you have just finished, is a much better
-introduction than meeting it cold at the end.
+[[Final Examination]] at the end of the course is three hours long and, for
+most of you, the first examination you will ever have written. Meeting that
+format once, in seventy-five minutes, on one unit you have just finished, is
+a much better introduction than meeting it cold at the end.
 
 ## What is on it
 

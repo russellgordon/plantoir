@@ -4,8 +4,8 @@ publish: true
 created: __CREATED__
 enableToc: true
 ---
-[[The Independent Study]] runs from September to January and ends in an oral
-defence. Choose accordingly.
+[[The Independent Study]] runs from the first week to the last and ends in
+an oral defence. Choose accordingly.
 
 ## The rules
 

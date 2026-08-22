@@ -86,6 +86,52 @@ Budget about **10 minutes per review**. If you're reviewing more than one
 piece of code in a class, that's roughly how many rounds will fit in a
 single period — plan accordingly rather than rushing the last one.
 
+## Building on what the author already has
+
+The rubric above is mostly about noticing. The most valuable part of a
+review is usually the next step after noticing: **offering a possibility
+the author had not considered**, without taking the decision away from
+them.
+
+The move is to add to their idea rather than replace it. "You could use
+a dictionary here" replaces. "Your list works, and if the lookup ever
+runs inside the loop, a dictionary keyed on the station name would let
+you skip the search — worth it only if that loop gets long" adds
+something to what they built and hands back the judgement about whether
+it is worth doing.
+
+Where two reviewers suggest different things, put both on the author's
+list rather than arguing about which is right in front of them. A review
+that produces three possibilities is more useful than one that produces a
+verdict, because the author knows things about their own program that
+neither of you do.
+
+## What the author does with it
+
+Feedback that changes nothing was a conversation, not a review. Before
+the period ends, the author writes a short list — on paper or in the
+issue tracker, it does not matter — with every suggestion raised, and
+one of three decisions beside each:
+
+| Decision | When it is the right call | What to write |
+| --- | --- | --- |
+| **Doing it now** | It is a correctness problem, or it is cheap and clearly better | The commit that will carry it |
+| **Doing it later** | It is a real improvement but not on the path to the next milestone | What would have to be true for it to move up the list |
+| **Not doing it** | You considered it and the trade-off does not suit your program | The reason — this is the most valuable entry of the three |
+
+**Prioritising is the skill here, not agreeing.** You will finish a
+review with more good ideas than you have periods left, and a list where
+everything is important is a list you will ignore. Rank by what breaks
+if you skip it: a case that produces a wrong answer outranks a structure
+that offends a reviewer's taste, every time.
+
+Carry that list into your next working period and into
+[[Learning Journey Log]] — "changed X because Y raised Z" is exactly the
+kind of entry that shows your design responding to evidence rather than
+to preference. And when you decline a suggestion in writing, with a
+reason, you have done something better than taking it: you have shown
+you understood it.
+
 ## For the author, receiving feedback
 
 Listen for the specific observation underneath the comment, rather than
@@ -98,7 +144,11 @@ code.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D3.2]]
+
 ![[D3.4]]
+
+![[D5.3]]
 
 ![[D5.1]]
 

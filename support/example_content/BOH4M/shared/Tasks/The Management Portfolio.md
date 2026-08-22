@@ -83,7 +83,7 @@ task.
 
 > [!tip] Keep them where you will find them
 > [[Your Leadership Statement]] asks you to re-read
-> [[Your Management Profile]] from September and say what changed. That
+> [[Your Management Profile]] from the first week and say what changed. That
 > is much easier if the file is still somewhere sensible — see
 > [[The Tools of the Trade]].
 
@@ -125,11 +125,11 @@ TALK — Unit 2, Day 6, while you go round the room during the writing
   period for Your Management Profile
   You will reach eight or ten students in twenty minutes, not the whole
   class, so choose. This is the first entry, so nobody has a thin one
-  yet: go to the students you have heard least from since September.
+  yet: go to the students you have heard least from since the first week.
   There are five of these writing periods across the term (Unit 2 Day 6,
   Unit 3 Day 22, Unit 4 Day 11, Unit 4 Day 12 and Unit 4 Day 22) — keep
   the list, choose by thinnest written entry after this one, and everyone
-  gets two conversations by June.
+  gets two conversations by the end of the course.
   Ask: "Your answers to that instrument were shaped long before you sat
   down to it. Which of your family's habits, or your community's, is in
   there — and would you have answered the same at twelve?" A strong

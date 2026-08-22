@@ -80,7 +80,7 @@ where you explain your choices.
 
 The growth statement is this task's written reflection; the defended
 conversation is its spoken one. Together they answer: what can you see
-now that you could not see in September, and how do you know?
+now that you could not see at the start of the course, and how do you know?
 
 > [!success]- If you cannot choose (click to expand)
 > For the problem panel, flip through your journal for the entry with

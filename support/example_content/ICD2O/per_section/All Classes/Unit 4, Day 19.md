@@ -14,7 +14,7 @@ tags:
 1. Warm-up: [[Tech Headlines]]
 2. Retrieval clinic, the last one: a loop, a conditional, a subprogram,
    and a security question — cold, in pairs, on paper. Nothing here is
-   marked; this one is about what is still there in June
+   marked; this one is about what is still there at the end of the course
 3. Compare and correct together
 
 ## Things to do before our next class

@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Presentations, second half
-2. What the class found: functions across centuries
-3. Studio time
+1. Presentations, second half: [[The Interpretation]]
+2. What the class found: functions across centuries — [[What Art Is For]]
+3. Studio time: developing the artistic response piece connecting historical themes to contemporary practice
 
 ## Things to do before our next class
 

@@ -15,7 +15,7 @@ did not arrive with?*
 ## Before you write
 
 Reread your journal front to back in one sitting — expect the
-September entries to feel written by someone else. Flag:
+your earliest entries to feel written by someone else. Flag:
 
 - one entry that embarrasses you a little — growth is buried there
 - one "what I would try next" you actually tried, and what happened
@@ -27,7 +27,7 @@ Three sections, roughly a page, built the way [[Showing Growth]]
 taught — date it, quote your own words, then show the now:
 
 1. **How my hands changed.** The biggest difference between what
-   September-you and now-you can *do at a bench*, proven with two
+   the you who started this course and now-you can *do at a bench*, proven with two
    dated entries — from the teardown in [[Take It Apart]] where
    every screw felt risky, to whatever you stood behind at
    [[The Shop Showcase]].

@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Demand shocks and supply shocks distinguished on the diagram
+1. Demand shocks and supply shocks distinguished on the diagram: [[Aggregate Supply and Demand]]
 2. Stagflation, and why one policy cannot answer both at once
-3. Indicators report work period: sections one and two, now that the model is built
+3. Indicators report work period: sections one and two, now that the model is built: [[The Indicators Report]]
 
 ## Things to do before our next class
 

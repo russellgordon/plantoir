@@ -18,8 +18,8 @@ the front of your notebook and use it as a table of contents.
 - [ ] The murky questions, with any that got answered marked as answered
 
 That last line is the one worth keeping. A list of questions you could not
-answer in September and can in January IS the evidence that the course
-worked.
+answer at the start of the course and can at the end of the course IS the
+evidence that the course worked.
 
 > [!note] Read-only boxes
 > The boxes above do not tick on this site — nothing is saved when you

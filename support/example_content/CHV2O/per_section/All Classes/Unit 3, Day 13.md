@@ -11,7 +11,7 @@ tags:
 ---
 ## Agenda
 
-1. The notebook closed: reread November, and see what January thinks
+1. The notebook closed: reread your first entries, and see what you think now
 2. [[Where You Stand Now]] — the final portfolio entry, your own position stated properly, written here this period
 3. How [[The Issue Examination]] works, and what to bring to it
 

@@ -28,6 +28,6 @@ tags:
 
 - [ ] Milestone: repository set up, with at least one commit from every
       single member of your team.
-- [ ] Read [[The Handover]] tonight, not in June. It is the standard
+- [ ] Read [[The Handover]] tonight, not at the end of the course. It is the standard
       the next five weeks are being built to, and today is the day it
       is cheapest to design for.

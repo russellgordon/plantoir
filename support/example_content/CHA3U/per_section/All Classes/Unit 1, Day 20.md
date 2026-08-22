@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Retrieval across Unit 1, with your Day 1 assumptions about the map handed back to read against it
-2. What 1791 settled, and what it deliberately deferred
-3. Portfolio milestone, written here from your notebook: how your answer to what the Revolution was for has moved
+2. What 1791 settled, and what it deliberately deferred: [[Revolution and the Republic It Made]]
+3. Portfolio milestone, written here from your notebook: how your answer to [[What Was the Revolution For|what the Revolution was for]] has moved
 4. Looking ahead: a republic that grows faster than its arguments
 
 ## Things to do before our next class

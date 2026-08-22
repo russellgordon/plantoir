@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Seneca Falls, 1848: the Declaration of Sentiments set beside the Declaration of Independence
+1. Seneca Falls, 1848: the Declaration of Sentiments set beside the Declaration of Independence: [[Reform Movements]]
 2. Abolitionists divided — moral suasion, politics, and force
-3. Work period: acting on what your conference last class turned up
+3. Work period: acting on what your conference last class turned up for [[Slavery and the Nation]]
 
 ## Things to do before our next class
 

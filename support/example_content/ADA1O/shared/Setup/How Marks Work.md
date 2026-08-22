@@ -15,10 +15,10 @@ and growth** — things entirely inside your control.
 Every Grade 9 credit in Ontario is built to the same shape, and this one is
 no exception. Seventy per cent of your mark comes from the work you do
 across the semester, weighted towards your **most recent and most
-consistent** work rather than averaging September against January — the
-freeze that collapsed in week two is not held against the actor you become
-by week fifteen. The remaining thirty per cent comes from one final
-evaluation at the end of the course.
+consistent** work rather than averaging the start of the course against the
+end of it — the freeze that collapsed in week two is not held against the
+actor you become by week fifteen. The remaining thirty per cent comes from
+one final evaluation at the end of the course.
 
 ```mermaid
 pie title Where your mark comes from
@@ -137,9 +137,9 @@ That is deliberate, and it protects the rest of the journal. You can write
 in an ordinary entry that a rehearsal went badly, that you froze, that your
 group is not working, and it costs you nothing. But a milestone entry is
 only as good as the record behind it: it asks you to quote your earlier
-self, the way [[Showing Growth]] describes, and there is nothing to quote
-if September wrote nothing. The practice is not marked and it is what makes
-the marked writing possible.
+self, the way [[Showing Growth]] describes, and there is nothing to quote if
+the earliest entries say nothing. The practice is not marked and it is what
+makes the marked writing possible.
 
 If a mark ever surprises you, ask — the criteria on each task page, and on
 [[Drama Journal]], are the whole story, and [[Getting Help]] explains the

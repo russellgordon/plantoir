@@ -20,4 +20,4 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Journal: what you would tell September-you about algebra.
+- [ ] Journal: what you would tell the you who started this course about algebra.

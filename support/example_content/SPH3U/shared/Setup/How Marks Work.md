@@ -13,11 +13,12 @@ and every piece of it is written down before you start.
 
 ## The seventy and the thirty
 
-Every Grade 11 credit in Ontario is built the same way. **Seventy per
-cent** of your mark comes from work spread across the whole semester, and
-it leans towards your **most recent and most consistent** work rather than
-averaging September against January. A unit you struggled through in
-October and understand properly by December is judged on December.
+Every Grade 11 credit in Ontario is built the same way. **Seventy per cent**
+of your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it. A unit you struggled through
+in early on and understand properly by the end of the course is judged on
+the most recent evidence.
 
 **The seventy** is six things, in the order you meet them:
 [[Investigation Reports]] — the five lab write-ups that carry a mark —

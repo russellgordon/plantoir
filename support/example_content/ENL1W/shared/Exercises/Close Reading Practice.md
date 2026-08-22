@@ -23,7 +23,7 @@ does the repetition tell you that the sentences do not say?
 > the fact that the narrator noticed and counted. Neither is stated,
 > which is why it works.
 
-**3.** *He was the kind of teacher who remembered your name in September
+**3.** *He was the kind of teacher who remembered your name at the start of the course
 and used it in July.* — What is the effect of the dates?
 
 > [!success]- Answer 3

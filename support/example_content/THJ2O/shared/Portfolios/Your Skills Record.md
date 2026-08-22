@@ -30,12 +30,12 @@ organisation, working independently, initiative, self-advocacy, and
 customer service, all exercised on [[The Site Project]].
 
 An entry has three parts: the skill, what you did, and where the evidence
-is. **Numeracy — 3 November.** Calculated the growing medium for the
+is. **Numeracy — Unit 3, Day 6.** Calculated the growing medium for the
 propagation bench at 0.4 m³ and ordered it. Evidence: the calculation
 sheet and delivery note in [[The Evidence File]].
 
 Notice what that is not — "I am good at numeracy" is a claim without an
-example. Be honest about the weak ones too: "I was late twice in October,
+example. Be honest about the weak ones too: "I was late twice early on,
 so I now pack tools the period before" beats unbroken excellence.
 
 How highly you rate yourself is never part of your mark — see

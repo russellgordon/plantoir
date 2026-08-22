@@ -42,11 +42,11 @@ words, then show the now.
    [[Efficiency and Big-O]] stops being vocabulary and becomes
    something you use.
 3. **How I work with other people, and their code.** What you now do
-   that you did not do in September: reading before rewriting, asking
+   that you did not do at the start of the course: reading before rewriting, asking
    in review instead of assuming, saying "I am stuck" on the day
    rather than the week after. Be specific about what a teammate
    taught you. Be specific, too, about what you were like to work
-   with in October, if you can bear it.
+   with in the first weeks, if you can bear it.
 4. **What I left behind, and where this goes next.** What condition
    [[The Handover]] left your partner in, honestly, including what
    will break first. Review your team and individual progress across
@@ -66,7 +66,7 @@ words, then show the now.
    (problem solving and decision making), working with others, and
    continuous learning. Take three of them — not all seven, and not
    the three you are best at. For each one, say where you were in
-   September, where you are now, and cite the dated evidence for both:
+   where you started, where you are now, and cite the dated evidence for both:
    an entry, a commit, a review, a thing that went wrong. Then name the
    one you would work on next and what you would do about it. This
    section is marked on the evidence you cite and the reasoning you

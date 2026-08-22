@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. The economy since 1982: agreements, regions, and work
-2. Work period: acting on the conference notes from last class
-3. Conferences
+1. The economy since 1982: agreements, regions, and work — [[Regions, Relationships, and the World Since 1982]]
+2. Work period: acting on the conference notes from last class for [[The Recent Past]]
+3. Conferences on drafting arguments and historical significance for [[The Recent Past]]
 
 ## Things to do before our next class
 

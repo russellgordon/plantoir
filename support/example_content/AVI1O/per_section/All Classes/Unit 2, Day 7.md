@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Studio time: a second state of your block
-2. What changed between states — both states into the sketchbook before
+1. Studio time: a second state of your block: [[Printmaking]]
+2. What changed between states — both states into [[The Sketchbook]] before
    you leave
-3. Conferences
+3. Conferences on printmaking block cutting and registration for [[The Media Trials]]
 
 ## Things to do before our next class
 

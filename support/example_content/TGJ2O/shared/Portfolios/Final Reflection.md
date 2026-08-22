@@ -14,7 +14,7 @@ that matters: *what do you leave with that you did not arrive with?*
 ## Before you write
 
 Reread your journal front to back in one sitting — expect the
-September entries to feel written by someone else. As you read,
+your earliest entries to feel written by someone else. As you read,
 flag:
 
 - one entry that embarrasses you a little — growth hides there
@@ -27,7 +27,7 @@ Three sections, roughly a page, built the way [[Showing Growth]]
 taught — date it, quote your own words, then show the now:
 
 1. **How my craft changed.** The biggest difference between what
-   September-you and now-you can *make* — writing, shooting,
+   the you who started this course and now-you can *make* — writing, shooting,
    cutting — proven with two cited entries, from the nerves of
    [[Your First Byline]] to [[Publication Day]].
 2. **How my news judgement changed.** The other axis, just as real:

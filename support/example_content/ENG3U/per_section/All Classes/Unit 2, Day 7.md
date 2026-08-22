@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. 3.1–3.3: Banquo, and the second murder
-2. What has changed in how Macbeth plans
+1. 3.1–3.3: Banquo, and the second murder: [[Macbeth]]
+2. What has changed in how Macbeth plans: [[Character as Argument]]
 3. Who is not told, and what the play does with that
 
 ## Things to do before our next class

@@ -23,7 +23,7 @@ the larger half of the thirty per cent described in
 two together are why neither an afternoon nor a project decides this
 alone.
 
-Because it reaches across the whole course, September is on it. The
+Because it reaches across the whole course, the first unit is on it. The
 counting arguments from the first fortnight turn up again inside a
 binomial probability in Part B, and the sampling frame you argued
 about in Unit 3 turns up again in Part D. That is not a trick; it is

@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. In pairs: try to break each other's theses
-2. The counter-reading section, planned in class
+1. In pairs: try to break each other's theses: [[Thesis and Argument]]
+2. The counter-reading section, planned in class: [[The Extended Essay]]
 
 ## Things to do before our next class
 

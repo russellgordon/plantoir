@@ -56,8 +56,8 @@ exactly what makes it worth writing honestly. A self-check performed for an
 audience is useless to the only person it was built for.
 
 What it changes is the work. A self-check that leads to one fix is the
-cheapest improvement available in this course, and by January most of you
-run it without being asked, which is the actual point.
+cheapest improvement available in this course, and by the end of the course
+most of you run it without being asked, which is the actual point.
 
 > [!tip] The version that takes ninety seconds
 > No time for the whole table? Read the criteria row you liked least when

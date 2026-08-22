@@ -44,7 +44,7 @@ genuinely theirs. Neither starts ahead in the marks — read
 Four units — the moving body, making a dance, dance in the world, and
 bringing work to an audience — ending in [[The Showing]], performed for
 an invited audience, and the portfolio you have been building since
-September.
+the start of the course.
 
 ## If something hurts
 

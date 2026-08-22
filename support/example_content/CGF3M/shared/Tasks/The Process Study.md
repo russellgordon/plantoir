@@ -89,7 +89,7 @@ TALK — Unit 1, Day 19, at the conferences already scheduled while the
   strong answer names a specific reading and the value it would have had
   to take. It tells you whether the inference is fastened to the evidence
   or floating above it.
-  Then: "Somebody surveys your site next September and gets exactly the
+  Then: "Somebody surveys your site a year from now and gets exactly the
   same numbers. Does that support you or embarrass you?" A strong answer
   works out what their own rate predicts over twelve months and sets it
   against their measurement error. That is A1.6 heard — findings

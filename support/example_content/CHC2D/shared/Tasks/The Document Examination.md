@@ -46,9 +46,9 @@ The remaining time is for reading and planning. Use it.
 ## Preparing for it
 
 The three review periods work old dossiers against the clock. Bring your
-[[Your Inquiry Notebook]] — the source work you did in September is the
-best preparation there is, and rereading your own early attempts is the
-fastest way to see how much sharper you have become.
+[[Your Inquiry Notebook]] — the source work you did at the start of the
+course is the best preparation there is, and rereading your own early
+attempts is the fastest way to see how much sharper you have become.
 
 > [!tip] Establish provenance before you read for content
 > Who made this, when, and why — thirty seconds per document, before you

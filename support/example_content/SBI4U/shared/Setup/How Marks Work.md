@@ -18,10 +18,10 @@ will be judged, that is a bug — tell me and I will fix the page.
 ## The seventy and the thirty
 
 Every Grade 12 credit in Ontario is put together the same way. Seventy per
-cent of your mark comes from work done across the semester, weighted
-toward your **most recent and most consistent** biology rather than
-averaged flat from September to January. The other thirty per cent comes
-from a final evaluation at the end of the course.
+cent of your mark comes from work done across the semester, weighted toward
+your **most recent and most consistent** biology rather than averaged flat
+from the first week to the end of the course. The other thirty per cent
+comes from a final evaluation at the end of the course.
 
 **The seventy** is four unit tasks — [[Enzyme Investigation]],
 [[Metabolism Case Study]], [[Biotechnology Brief]] and

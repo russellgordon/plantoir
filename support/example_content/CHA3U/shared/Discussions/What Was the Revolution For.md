@@ -58,7 +58,7 @@ is whose purposes prevailed, which turns a seminar about ideals into one
 about power. That is a legitimate move, and it has to be argued for.
 
 The five things marked in every seminar are on [[The Four Seminars]]; read
-them once, in September, and they hold for all four.
+them once, at the start of the course, and they hold for all four.
 
 Open with your position, name the evidence that would move you, and carry
 the disagreement into [[Was the Revolution Inevitable|Was the Revolution Inevitable?]] and

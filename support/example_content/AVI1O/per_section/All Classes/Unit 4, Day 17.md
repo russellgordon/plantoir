@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Period 6 of 8: installation, starting with the statement and the
-   grouping the conference sent you back to
+   grouping the conference sent you back to: [[The Exhibition]]
 2. Centre lines, spacing, labels at readable height — hanging, properly
-3. Rehearsing how to talk about your work
+3. Rehearsing how to talk about your work: [[Where Visual Arts Leads]]
 
 ## Things to do before our next class
 

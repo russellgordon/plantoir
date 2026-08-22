@@ -13,8 +13,8 @@ tags:
 1. First fifteen minutes: work the revision list you wrote last class.
    I circulate — this is what the checkpoint was for
 2. Consolidation: one data set, taken from question to claim, with the
-   limitations written before the conclusion
-3. Look ahead: next unit, other people's claims — and then your own,
+   limitations written before the conclusion: [[One-Variable Statistics]] and [[Two-Variable Statistics]]
+3. Look ahead: next unit, other people's claims — [[What a Statistical Study Is For]] — and then your own,
    defended
 
 ## Things to do before our next class

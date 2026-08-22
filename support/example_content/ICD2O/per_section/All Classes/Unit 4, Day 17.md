@@ -12,8 +12,8 @@ tags:
 
 1. Finish [[Final Reflection]] in class
 2. Your last look at the journal before tomorrow's conference:
-   [[Journal Checklist]], then [[Showing Growth]] with September's
-   entry open beside January's
+   [[Journal Checklist]], then [[Showing Growth]] with your first
+entry open beside your most recent
 3. Circle up one final time
 
 ## Things to do before our next class

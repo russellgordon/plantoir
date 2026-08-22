@@ -40,7 +40,7 @@ taught — date it, quote your own words, then show the now:
    and in this course the more interesting one. What do you do now
    when a number arrives without a source? How do you feel about
    saying "I cannot tell from this data" out loud — and is that the
-   same as it was in September? Your first entry is the baseline;
+   same as it was at the start of the course? Your first entry is the baseline;
    quote it.
 3. **Where the thinking goes next.** This course does not end at an
    edge so much as open onto everywhere. Inference is the front door

@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: four organisms, four solutions to the same problem
+1. Warm-up: four organisms, four solutions to the same problem: [[The Digestive System]]
 2. Consolidate the strand: structure suits function, at every scale
-3. Look ahead: the last unit is the organism that feeds the rest
+3. Look ahead: the last unit is the organism that feeds the rest — [[Plant Structure]]
 
 ## Things to do before our next class
 

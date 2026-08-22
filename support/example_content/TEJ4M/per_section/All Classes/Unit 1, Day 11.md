@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Warm-up: [[Name That Part]] — the derating round. Name the part,
-   then name the figure that decides whether it survives July
+   then name the figure that decides whether it survives a hot attic
 2. Bench: run a quarter-watt resistor at four-fifths of its rating and
    read its body temperature with the infrared thermometer. Predict
    the rise first; keep fingertips away, because the answer burns

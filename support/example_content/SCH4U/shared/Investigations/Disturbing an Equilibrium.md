@@ -125,7 +125,7 @@ Your design decisions, written before the lab:
 >   watch from the marked line. If a tube ever breaks, the room is
 >   evacuated immediately and that is not a drill.
 > - **You blow OUT through the straw and you never draw in.** This is
->   the one activity all year where a tube goes near a mouth, and the
+>   the one activity all semester where a tube goes near a mouth, and the
 >   rule is worth saying out loud: exhale only, one person per straw,
 >   straw in the bin afterwards, and if there is any chance you will
 >   inhale, use the pump instead. **Never pipette by mouth** still means

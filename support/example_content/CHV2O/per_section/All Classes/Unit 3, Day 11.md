@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. **Period 9 of 10:** the report, written here, against the criterion you set yourself
+1. **Period 9 of 10:** the report, written here, against the criterion you set yourself for [[The Civic Action Project]]
 2. What happened, why you think it happened, what you would do differently
-3. The routes you did not take, assessed
+3. The routes you did not take, assessed: [[Where You Stand Now]]
 
 ## Things to do before our next class
 

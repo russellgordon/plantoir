@@ -13,7 +13,7 @@ measured by: *what do you leave with that you did not arrive with?*
 
 ## Before you write
 
-Reread your journal front to back in one sitting — expect your September
+Reread your journal front to back in one sitting — expect your earliest
 entries to feel written by someone else. As you read, flag three things:
 
 - one entry that embarrasses you a little — that is usually where the
@@ -27,8 +27,8 @@ Three sections, roughly a page — claims and evidence in the spirit of
 [[Writing About Drama]], built the way [[Showing Growth]] taught: date
 it, quote your own words, then show the now.
 
-1. **Then and now.** The single biggest difference between your September
-   self and your January self, proven with two cited entries.
+1. **Then and now.** The single biggest difference between your earliest
+self and your most recent one, proven with two cited entries.
 2. **What I made and what it taught me.** One task —
    [[Tableau Story Sequence]], [[Scene Study from a Story]], the
    [[Culminating Performance]] — examined honestly: what the group needed

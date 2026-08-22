@@ -60,8 +60,9 @@ ways: nothing you say here can cost you anything, which is exactly what
 makes it worth saying honestly.
 
 What it changes is the work. A self-check that leads to a fix is the
-cheapest improvement available in this course, and by January it is
-something your group does without being asked — which is the actual point.
+cheapest improvement available in this course, and by the end of the course
+it is something your group does without being asked — which is the actual
+point.
 
 %%curriculum-start%%
 ## Curriculum connection

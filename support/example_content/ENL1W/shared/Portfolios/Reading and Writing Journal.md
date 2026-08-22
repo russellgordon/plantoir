@@ -5,7 +5,8 @@ created: __CREATED__
 enableToc: true
 ---
 One notebook, kept all semester, for two purposes: to think on paper, and to
-leave a trail of what you can now do that you could not in September.
+leave a trail of what you can now do that you could not at the start of the
+course.
 
 ## What goes in it
 
@@ -31,7 +32,7 @@ neatness contest. Not a place where being wrong costs you anything.
 Twice a term I read a page you choose, and once a term we look through
 the whole thing together for two minutes. None of that is marked — it is
 how I find out what to teach next. The [[Portfolio Checklist]] tells you
-what has to be there by January.
+what has to be there by the end of the course.
 
 The one exception is the reading log for [[The Book Club]]. Those entries
 are written in the meeting, in class, and they are part of that task's
@@ -40,9 +41,9 @@ yours.
 
 ## The habit that makes it work
 
-Write the entry within a day of the class. An entry written in January
-about a September class is a memory of a memory; an entry written that
-night is evidence.
+Write the entry within a day of the class. An entry written at the end of
+the course about a the first class is a memory of a memory; an entry written
+that night is evidence.
 
 > [!tip] If you hate journals
 > Plenty of people do, usually because "write your feelings" was never a

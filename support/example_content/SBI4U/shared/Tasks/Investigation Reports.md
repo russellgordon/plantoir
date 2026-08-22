@@ -13,10 +13,10 @@ tags:
 > Investigation, Communication, and Knowledge wherever a row asks for a
 > mechanism.
 
-Eight of this course's investigations are written up in class. Five of
-those write-ups are marked, and they are deliberately spread one to a
-unit, so that by January there is a line of evidence running through the
-whole semester rather than four large points with a gap between each.
+Eight of this course's investigations are written up in class. Five of those
+write-ups are marked, and they are deliberately spread one to a unit, so
+that by the end of the course there is a line of evidence running through
+the whole semester rather than four large points with a gap between each.
 
 ## Which five, and when
 

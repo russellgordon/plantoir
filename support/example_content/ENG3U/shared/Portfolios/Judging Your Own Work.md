@@ -47,7 +47,7 @@ you were hoping nobody would notice.
 Keep the entry in your [[Reading Journal]], dated, next to the draft it
 judges. At the end of the course they are what makes
 [[Showing Growth]] possible: you will have the record of what you thought
-was weak in October and what you can now do about it.
+was weak at the start and what you can now do about it.
 
 ## Where this fits
 

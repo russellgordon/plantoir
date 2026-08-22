@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Studio time: sculpture
+1. Studio time: sculpture — [[Sculpture]]
 2. Working around a form — drawing what you have built
-3. Last fifteen minutes: the sculpture trial annotated; then dust,
-   tools, and safety
+3. Last fifteen minutes: the sculpture trial annotated for [[The Media Trials]]; then dust,
+   tools, and safety: [[Materials and Safety]]
 
 ## Things to do before our next class
 

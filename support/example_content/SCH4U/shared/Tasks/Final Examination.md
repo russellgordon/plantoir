@@ -95,7 +95,7 @@ semester, applied to a paper instead of a report:
 Nothing in that table is new. If it looks familiar it is because it is
 the right-hand column of nearly every criteria table in
 [[Tasks/index|Tasks]], which is the point of writing them the same way
-all year.
+all semester.
 
 %%curriculum-start%%
 ## Curriculum connection

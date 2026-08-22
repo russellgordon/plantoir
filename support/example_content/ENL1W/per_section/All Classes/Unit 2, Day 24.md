@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Consolidation: how stories work, on one page, built by the room
-2. Look ahead: next unit, everything gets shorter and louder
+1. Consolidation: how stories work, on one page, built by the room: [[What Makes a Story]]
+2. Look ahead: next unit, everything gets shorter and louder — [[The Marrow Thieves]]
 
 ## Things to do before our next class
 

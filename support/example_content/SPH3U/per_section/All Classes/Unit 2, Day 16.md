@@ -11,8 +11,8 @@ tags:
 ## Agenda
 
 1. Warm-up: one situation, forces named, motion predicted — starting
-   with whatever came top of your revision list
-2. Consolidation: the unit on one page, built by the room
+   with whatever came top of your revision list: [[Forces and Free-Body Diagrams]]
+2. Consolidation: the unit on one page, built by the room: [[Newton's Laws]]
 3. Look ahead: force and motion, in the currency of energy instead
 
 ## Things to do before our next class

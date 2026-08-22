@@ -65,8 +65,8 @@ what makes this worth doing honestly: nothing you write here can cost
 you anything.
 
 What it changes is the work. A self-check that leads to one fix is the
-cheapest improvement available in this course, and by June it is
-something you do in the first five minutes of a working period without
+cheapest improvement available in this course, and by the end of the course
+it is something you do in the first five minutes of a working period without
 being asked, which is the actual point.
 
 Keep the sheets. A row you marked *not yet* in Unit 1 and *yes* in Unit 4

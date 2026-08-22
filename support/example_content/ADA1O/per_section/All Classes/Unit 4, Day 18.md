@@ -12,10 +12,10 @@ tags:
 ## Agenda
 
 1. Dress rehearsal, two: full technical run, no stopping for anything
-   short of a safety problem
+   short of a safety problem: [[Culminating Performance]]
 2. Front of house rehearses too — doors, seating, programmes
 3. Notes: the short list only. At this point, big changes cost more
-   than they gain
+   than they gain: [[Giving and Receiving Notes]]
 
 ## Things to do before our next class
 

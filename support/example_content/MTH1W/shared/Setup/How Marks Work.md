@@ -13,10 +13,10 @@ communication** — things entirely inside your control.
 
 ## The seventy and the thirty
 
-Every Grade 9 credit in Ontario is built the same way. Seventy per cent
-of the mark comes from the work you do across the semester, weighted
-towards your **most recent and most consistent** thinking rather than
-averaging September against January. The other thirty comes from one
+Every Grade 9 credit in Ontario is built the same way. Seventy per cent of
+the mark comes from the work you do across the semester, weighted towards
+your **most recent and most consistent** thinking rather than averaging the
+start of the course against the end of it. The other thirty comes from one
 final evaluation at the end of the course.
 
 ```mermaid

@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Writing period: your position stated plainly, with the condition under which you would change it
+1. Writing period: your position stated plainly, with the condition under which you would change it: [[The Land Use Question]]
 2. Paired rehearsal — summarise your opponent's strongest point before you answer it
-3. Checkpoint conferences on evidence: is anything here true of this site rather than of the industry? Feedback only, and you take a line away for Day 21
+3. Checkpoint conferences on evidence: is anything here true of this site rather than of the industry? Feedback only, and you take a line away for Day 21: [[Judging Your Own Work]]
 
 ## Things to do before our next class
 

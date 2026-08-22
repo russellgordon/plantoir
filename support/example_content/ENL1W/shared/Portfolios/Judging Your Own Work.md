@@ -66,13 +66,13 @@ think.
 
 ## Where it shows up later
 
-Two of the six questions in [[The Portfolio Conversation]] are this
-routine in another form: the sentences you are proudest of, and what
-still does not work along with your plan for it. By January you will
-have run it often enough that the answers are already written down, in
-your [[Reading and Writing Journal]], in your own words. People who have
-never done it spend the first five minutes of that conversation
-inventing opinions about their own writing, and it shows.
+Two of the six questions in [[The Portfolio Conversation]] are this routine
+in another form: the sentences you are proudest of, and what still does not
+work along with your plan for it. By the end of the course you will have run
+it often enough that the answers are already written down, in your
+[[Reading and Writing Journal]], in your own words. People who have never
+done it spend the first five minutes of that conversation inventing opinions
+about their own writing, and it shows.
 
 %%curriculum-start%%
 ## Curriculum connection

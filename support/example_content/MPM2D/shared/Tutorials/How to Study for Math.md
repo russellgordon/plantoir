@@ -27,13 +27,13 @@ test, and it is not close.
 
 ## Space it out
 
-Cramming stores things where next week cannot find them. Revisit ideas
-after a day, then a few days, then a week — practice pages such as
-[[Quadratic Formula Practice]] and [[Trig Ratios and Laws Practice]]
-exist exactly for the return visits, long after their units end. By
-June, completing the square should have been retrieved in November,
-February, and April — not met once and abandoned. Forgetting a little
-and re-retrieving is not a failure of studying; it *is* the studying.
+Cramming stores things where next week cannot find them. Revisit ideas after
+a day, then a few days, then a week — practice pages such as
+[[Quadratic Formula Practice]] and [[Trig Ratios and Laws Practice]] exist
+exactly for the return visits, long after their units end. By the end of the
+course, completing the square should have been retrieved again weeks later,
+and again after that — not met once and abandoned. Forgetting a little and
+re-retrieving is not a failure of studying; it *is* the studying.
 
 ## Notes to your future forgetful self
 

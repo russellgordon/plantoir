@@ -65,7 +65,7 @@ geography.
 > [!warning] An absence is a finding
 > If the stretch you surveyed has no exposed roots, no debris line, and
 > nothing built on it, write that down. "No evidence of retreat on this
-> stretch" is a real observation and it will be worth more in January
+> stretch" is a real observation and it will be worth more at the end of the course
 > than an inference somebody expected you to make.
 
 ## Working in pairs, marked on your own

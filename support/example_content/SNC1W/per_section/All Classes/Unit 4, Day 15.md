@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: read a circuit diagram, apply Ohm's law,
-   and calculate an efficiency
+   and calculate an efficiency: [[Ohm's Law Practice]] and [[Efficiency Calculations]]
 2. Compare answers in pairs
 
 ## Things to do before our next class

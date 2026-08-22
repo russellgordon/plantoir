@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Printing: registration, pressure, and the edition
+1. Printing: registration, pressure, and the edition: [[Printmaking]]
 2. Studio time: pulling prints
-3. Last fifteen minutes: the printmaking trial annotated, then clearing
-   up ink properly
+3. Last fifteen minutes: the printmaking trial annotated for [[The Media Trials]], then clearing
+   up ink properly: [[Clearing Up]]
 
 ## Things to do before our next class
 

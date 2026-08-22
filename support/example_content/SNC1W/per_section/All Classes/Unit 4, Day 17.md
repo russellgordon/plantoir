@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. First fifteen minutes: yesterday's revision list, worked
-2. Warm-up: one device, traced from the wall to the work it does
+2. Warm-up: one device, traced from the wall to the work it does: [[Where Our Electricity Comes From]]
 3. Consolidation: a circuit designed on paper to a specification, then
-   built and measured
+   built and measured: [[Circuit Components and Symbols]] and [[Using a Multimeter]]
 4. Look ahead: the last unit is the biggest thing there is
 
 ## Things to do before our next class

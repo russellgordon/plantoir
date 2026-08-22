@@ -27,5 +27,5 @@ tags:
 
 ## Things to do before our next class
 
-- [ ] Read your September entries one more time — the pairing your
+- [ ] Read your earliest entries one more time — the pairing your
       growth statement needs is already in there.

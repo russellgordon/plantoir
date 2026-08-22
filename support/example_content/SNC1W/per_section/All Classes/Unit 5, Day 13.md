@@ -12,7 +12,7 @@ tags:
 
 1. [[Culminating Reflection]] — begun in class, with your portfolio open
    beside you
-2. [[Showing Growth]]: your September entry beside your January one
+2. [[Showing Growth]]: your earliest entry beside your most recent one
 
 ## Things to do before our next class
 

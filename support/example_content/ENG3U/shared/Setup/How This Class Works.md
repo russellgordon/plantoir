@@ -30,12 +30,12 @@ repeatedly.
 
 ## The independent study
 
-The longest thing you will write here is [[The Independent Study]]: a
-text you choose, read alone, and write about at length. It runs from
-early November to early January in parallel with everything else, with
-four checkpoints. It is the closest thing here to university work, and
-the students who leave it until January say so afterwards, at length, to
-anybody who will listen.
+The longest thing you will write here is [[The Independent Study]]: a text
+you choose, read alone, and write about at length. It runs from the middle
+of the course to its final weeks in parallel with everything else, with four
+checkpoints. It is the closest thing here to university work, and the
+students who leave it until the end of the course say so afterwards, at
+length, to anybody who will listen.
 
 ## Talking
 

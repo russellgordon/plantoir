@@ -13,7 +13,7 @@ reasoning. It does not reflect which positions you hold — see
 
 Civics and Citizenship is a **half credit**: 55 hours of scheduled
 instructional time, which here is 42 periods plus a two-and-a-half-hour
-final evaluation. It runs from **early November to mid-January**, picking
+final evaluation. It runs across **the second half of the semester**, picking
 up the timetable slot Career Studies had for the first half of the
 semester.
 
@@ -25,8 +25,9 @@ almost nothing in this course is a review period.
 Every Ontario credit, half or whole, is built the same way. **Seventy per
 cent** of your mark comes from work spread across the term, and it leans
 towards your **most recent and most consistent** work rather than
-averaging November against January. A skill you did not have in week two
-and have in week nine is a skill you have. **Thirty per cent** comes from
+averaging the start of the course against the end of it. A skill you did
+not have in week two and have in week nine is a skill you have.
+**Thirty per cent** comes from
 a final evaluation at the end: [[The Issue Examination]], two and a half
 hours on sources nobody has seen before.
 

@@ -14,7 +14,7 @@ tags:
 2. Working period: revision
 3. Coaching: a minute with each dancer on their own, while their group
    works
-4. Rehearsal
+4. Dress rehearsal: full run-through with performance focus for [[The Composition Study]]
 5. Cool-down
 
 ## Things to do before our next class

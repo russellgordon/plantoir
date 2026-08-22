@@ -110,13 +110,15 @@ on the row you called weakest.
 
 ![[A2.1]]
 
-![[D2.3]]
-
 ![[D1.1]]
 
 ![[D1.2]]
 
 ![[D1.3]]
+
+![[D2.3]]
+
+![[D2.8]]
 %%curriculum-end%%
 
 %%

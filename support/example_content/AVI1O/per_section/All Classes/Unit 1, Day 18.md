@@ -10,8 +10,8 @@ tags:
 ---
 ## Agenda
 
-1. Sketchbook check, first of three — in the first ten minutes
-2. Drawing outdoors or from the window: light and distance
+1. Sketchbook check, first of three — in the first ten minutes: [[The Sketchbook Habit]]
+2. Drawing outdoors or from the window: light and distance — [[Drawing]]
 3. Studio time, with the book open at whatever the check flagged
 
 ## Things to do before our next class

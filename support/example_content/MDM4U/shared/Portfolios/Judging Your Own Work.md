@@ -54,19 +54,19 @@ cuts both ways: nothing you write here can cost you anything, which is
 exactly what makes it worth writing honestly.
 
 What it changes is the work. A self-check that leads to a fix is the
-cheapest improvement available in this course, and by January it is a
-habit you run without being asked — which is the actual point. It is
-also the same move the whole subject is built on: [[What Makes a Model Good]]
-asks where a model fails before it asks how well it fits, and
-[[The Culminating Investigation]] gives its limitations section real
-weight for the same reason.
+cheapest improvement available in this course, and by the end of the course
+it is a habit you run without being asked — which is the actual point. It is
+also the same move the whole subject is built on:
+[[What Makes a Model Good]] asks where a model fails before it asks how well
+it fits, and [[The Culminating Investigation]] gives its limitations section
+real weight for the same reason.
 
 ## Where it goes
 
 Write the judgement in your [[Math Journal]], dated, on the day you
 make it. Two months later, when [[Showing Growth]] asks you to prove
-you changed, a row you called "not yet" in October and fixed by
-November is the cleanest evidence in the notebook.
+you changed, a row you called "not yet" early on and
+fixed weeks later is the cleanest evidence in the notebook.
 
 One last thing worth doing: read your judgement out loud to the person
 beside you. It catches the rows where you were being generous, and you

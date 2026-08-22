@@ -17,11 +17,11 @@ in the page — tell me and I will fix it.
 
 ## The seventy and the thirty
 
-Every Grade 12 credit in Ontario is built the same way. Seventy per cent
-of your mark comes from work spread across the whole semester, and it
-leans towards your **most recent and most consistent** work rather than
-averaging September against January. The remaining thirty per cent comes
-from a final evaluation at the end of the course.
+Every Grade 12 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it. The remaining thirty per cent
+comes from a final evaluation at the end of the course.
 
 ```mermaid
 pie title Where your mark comes from
@@ -68,12 +68,12 @@ milestone entries possible, and it is not something I mark.
 Ontario reports chemistry in four categories, and they ask genuinely
 different questions of the same piece of work.
 
-| Category | Weight | The question it asks, and where I look |
-| --- | --- | --- |
-| Knowledge and understanding | 25% | Do you know the chemistry, and do you know where it stops applying? Mostly the examination, the identity section of the dossier, and the chemistry written out in the cell report |
-| Thinking and investigation | 30% | Can you design an investigation and reason from the data it gives you? The four reports, and the two investigations you design yourself |
-| Communication | 20% | Could a reader who was not there follow you and check every number? Every report, and the showcase |
-| Application | 25% | Can you use the chemistry somewhere it has not been used for you? The property prediction, the buffer design, and the course of action in the dossier |
+| Category | The question it asks, and where I look |
+| --- | --- |
+| Knowledge and understanding | Do you know the chemistry, and do you know where it stops applying? Mostly the examination, the identity section of the dossier, and the chemistry written out in the cell report |
+| Thinking and investigation | Can you design an investigation and reason from the data it gives you? The four reports, and the two investigations you design yourself |
+| Communication | Could a reader who was not there follow you and check every number? Every report, and the showcase |
+| Application | Can you use the chemistry somewhere it has not been used for you? The property prediction, the buffer design, and the course of action in the dossier |
 
 A perfect calculation with no unit, no route shown and no sentence is not
 a perfect answer. It is a strong Knowledge answer and a weak

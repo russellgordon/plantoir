@@ -10,9 +10,10 @@ problem it was. Writing code is the easy half. Deciding what to build,
 for whom, and knowing when it is genuinely finished is the part this
 course is really about.
 
-In the curriculum's own words, the overall expectations are:
-
 %%curriculum-start%%
+In the Ministry's own words, the Curricular Competency groups this course
+is built around are:
+
 ![[D2. Defining]]
 
 ![[D5. Testing]]

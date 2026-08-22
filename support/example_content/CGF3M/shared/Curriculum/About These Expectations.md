@@ -36,13 +36,13 @@ gathered in one place.
 
 ## Strand A is not a unit
 
-Strand A's stem reads **"Throughout this course, students will:"** while
-B through E say *by the end of this course*. That is not a typographical
-accident. The geographic inquiry process, mapping and spatial
-technologies, and the concepts of geographic thinking are meant to be
-woven through every unit rather than taught as a block in September, and
-this course is built that way — you will meet strand A in the first week
-and in the last.
+Strand A's stem reads **"Throughout this course, students will:"** while B
+through E say *by the end of this course*. That is not a typographical
+accident. The geographic inquiry process, mapping and spatial technologies,
+and the concepts of geographic thinking are meant to be woven through every
+unit rather than taught as a block at the start of the course, and this
+course is built that way — you will meet strand A in the first week and in
+the last.
 
 ## What "FOCUS ON" means
 
@@ -68,5 +68,5 @@ PDF when you are planning a unit.
 
 A code is a shared address. When a student asks "why are we studying
 this?", the answer is a link. When a department writes a course outline,
-or a teacher takes over a class in February, the codes are what make one
+or a teacher takes over a class partway through, the codes are what make one
 person's planning legible to another.

@@ -53,7 +53,7 @@ where the weak part is.
 > A student's process study said the bank was retreating quickly. The
 > criteria pass found no sentence giving a rate. The evidence pass found
 > the roots-exposed measurement in the notebook, with a date, and the
-> September photograph beside it. The two lines came out as: *keep the
+> first-week photograph beside it. The two lines came out as: *keep the
 > paired photograph, it is the only dated comparison in here; fix the
 > word "quickly" — twenty minutes plotting the two root heights and
 > saying how many centimetres over how many months, with the error.*

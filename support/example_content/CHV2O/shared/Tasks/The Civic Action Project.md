@@ -76,7 +76,7 @@ it cannot be reconstructed in the last period.
 >
 > A course that only rewarded success would be teaching that
 > participation works in proportion to effort. It does not, you already
-> know it does not, and the sharpest reports in January are usually
+> know it does not, and the sharpest reports at the end of the course are usually
 > written by students whose action failed and who worked out why. Do not
 > overstate a result, do not quietly change your success criterion after
 > the fact, and do not manufacture an outcome. Inventing a response you

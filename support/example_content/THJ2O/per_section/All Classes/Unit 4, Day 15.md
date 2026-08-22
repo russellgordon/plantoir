@@ -12,7 +12,7 @@ tags:
 
 1. Skills and work habits assessed honestly
 2. [[Your Skills Record]] completed with evidence
-3. Conferences
+3. Conferences on skills evidence and employability summaries for [[The Evidence Portfolio]]
 
 ## Things to do before our next class
 

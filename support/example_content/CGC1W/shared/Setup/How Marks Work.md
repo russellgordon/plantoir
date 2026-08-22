@@ -10,16 +10,16 @@ recall about it.
 
 ## The seventy and the thirty
 
-Every Grade 9 credit in Ontario is built the same way. **Seventy per
-cent** comes from work spread across the whole semester — and it is not
-an average. It leans towards your **most consistent** work and towards
-your **most recent**, because what you can do with a map in January
-says more than what you could do with one in September. **Thirty per
-cent** comes from a final evaluation at the end, which here is two
-things on two different days: [[The Inquiry Examination]], written on
-paper about a place you have never studied, and [[The Local Inquiry]],
-answered out loud in front of somebody who works on it. The
-examination is the larger of the two.
+Every Grade 9 credit in Ontario is built the same way. **Seventy per cent**
+comes from work spread across the whole semester — and it is not an average.
+It leans towards your **most consistent** work and towards your **most
+recent**, because what you can do with a map at the end of the course says
+more than what you could do with one at the start of the course. **Thirty
+per cent** comes from a final evaluation at the end, which here is two
+things on two different days: [[The Inquiry Examination]], written on paper
+about a place you have never studied, and [[The Local Inquiry]], answered
+out loud in front of somebody who works on it. The examination is the larger
+of the two.
 
 **The seventy** is the work you hand in during the term, in the order
 you meet it: [[The Field Record]], [[The Region Study]],

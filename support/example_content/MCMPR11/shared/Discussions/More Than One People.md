@@ -52,38 +52,45 @@ digitization efforts of the same history.
 ### The Komagata Maru
 
 In May 1914, the ship *Komagata Maru* arrived in Vancouver's Burrard
-Inlet carrying 376 passengers from Punjab, almost all Sikh, who were
-British subjects with a legal right to enter Canada. Canada used a
-deliberately race-targeted rule — the "continuous journey" regulation,
-requiring immigrants to travel directly from their country of origin
-without any stop, a route that was effectively impossible from India —
-to keep all but 24 of them out. The ship was forced to leave after a
-two-month standoff. A monument now stands at Harbour Green Park in
-Vancouver, and the federal government has formally apologized twice:
-Prime Minister Stephen Harper in Surrey in 2008, and Prime Minister
-Justin Trudeau in the House of Commons in 2016. What is harder to point
-to is a single, comprehensive public digital archive of the incident's
-own records — a reminder that a monument and an apology are not the same
-thing as a documented, searchable record.
+Inlet carrying 376 passengers from Punjab (337 Sikhs, 27 Muslims, and
+12 Hindus), all British subjects with a legal right to enter Canada.
+Canada used a deliberately race-targeted rule — the "continuous journey"
+regulation, requiring immigrants to travel directly from their country of
+origin without any stop, a route that was effectively impossible from
+India — to keep all but 24 of them out. The ship was forced to leave
+after a two-month standoff in the harbour.
+
+A monument stands at Harbour Green Park in Vancouver, and the federal
+government has formally apologized twice: Prime Minister Stephen Harper
+in Surrey in 2008, and Prime Minister Justin Trudeau in the House of
+Commons in 2016. Alongside physical memorials, digital archiving of the
+incident began in 2011 when the Simon Fraser University (SFU) Library
+launched *Komagata Maru: Continuing the Journey*, digitizing passenger
+lists, diaries, legal records, and oral histories. In 2022, that collection
+was transitioned to the South Asian Studies Institute at the University
+of the Fraser Valley (UFV) as part of the South Asian Canadian Digital
+Archive (SACDA) — showing how community-university stewardship of
+historical data evolves across platforms over time.
 
 ### Discussion Prompts
 
-1. **Who paid for it, who built it, who benefits.** Landscapes of
-   Injustice was university-led, the Chinese Canadian Museum's project
-   was community-and-university crowdsourced, and Komagata Maru's
-   memorialization so far is mostly a monument and an apology, not an
-   archive. Does it matter who does the digitizing? What is different
-   about a project a community starts itself, versus one a university or
-   government undertakes on a community's behalf?
-2. **What a monument doesn't do.** A monument tells you an event
-   happened. It doesn't let you search a document, look up a name, or
-   verify a claim the way a digital archive does. Why might a community
-   push for a searchable archive even after receiving a formal apology?
-3. **The missing archive.** Of the three cases here, Komagata Maru is
-   the one without a comprehensive public digital archive attached to
-   it. If you were pitching a project to build one, what would you need
-   from the descendant community before writing any code — and who
-   should end up controlling it once it exists?
+1. **Three models of digital memory.** Landscapes of Injustice was a
+   multi-year research partnership led by UVic; the Chinese Canadian Museum
+   relies on community crowdsourcing of family certificates; and the
+   Komagata Maru collection began as a university library project at SFU
+   before transitioning to UFV's South Asian Canadian Digital Archive.
+   What are the strengths and trade-offs of each model? Who decides what
+   gets included in each archive?
+2. **What a monument doesn't do.** A monument commemorates that an event
+   occurred, and an official apology acknowledges historical harm. Why is
+   a searchable digital archive — with raw ship manifests, land seizure
+   records, and head tax certificates — essential for descendants and
+   historians in a way that physical monuments alone cannot replace?
+3. **Data stewardship across generations.** When digital archives move
+   between institutions — as when the Komagata Maru collection transferred
+   from SFU Library to UFV's South Asian Canadian Digital Archive — what
+   technical and ethical challenges arise for database schemas, persistent
+   identifiers, and community access?
 
 ### How we run this
 

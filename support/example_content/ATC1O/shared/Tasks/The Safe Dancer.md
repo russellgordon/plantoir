@@ -84,7 +84,7 @@ that follows it, where students are on their own in pairs
   Record: a tick beside the name on the day plan the first time you see a
   modification used. One tick is enough.
 
-TALK — Unit 1, Day 15, at the check-in in the writing period, when they
+TALK — Unit 1, Day 15, at the check-in the writing period, when they
 bring you their first two points
   Ask: "Show me the movement you said is not compatible. What happens at
   the point where it stops?"

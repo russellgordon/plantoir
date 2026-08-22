@@ -18,9 +18,9 @@ the one example that stops a listener misunderstanding it.
 
 **One figure a week.** Take a number from a current release — the
 Consumer Price Index, the Labour Force Survey, real GDP — and write the
-value, the reference period, the release date, and the table number. By
-January you will have a series you built yourself, and you will have
-noticed revisions: data is produced rather than found.
+value, the reference period, the release date, and the table number. By the
+end of the course you will have a series you built yourself, and you will
+have noticed revisions: data is produced rather than found.
 
 **The citations.** A statistical table is documented like any source:
 author, title, table number, release date, and the date you retrieved it.

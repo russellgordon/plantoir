@@ -18,7 +18,7 @@ students. %%
   school's counsellor, the board's service, the local youth agency, the
   provincial line — in front of the class the day that page is taught,
   and leave them written somewhere students can find them again.
-- Book the defence audience in the last week of September. Guidance,
+- Book the defence audience in the last week of the start of the course. Guidance,
   administrators, and co-op employers all fill up, and every student
   needs an adult who is not me.
 - Order the spreadsheet room for Unit 3, days 2 to 5. The budget cannot

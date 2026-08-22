@@ -22,4 +22,4 @@ tags:
 ## Things to do before our next class
 
 - [ ] One sentence written down: something you can do now that you
-      could not in September.
+      could not at the start of the course.

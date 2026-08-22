@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Retrieval across Unit 1, and your Day 1 photograph paragraph handed back —
-   read it before you write anything else
+   read it before you write anything else: [[Historical Significance]]
 2. What the three lenses gave us: context, conflict, identity
-3. Looking ahead: the decade that broke
+3. Looking ahead: the decade that broke — [[The Twenties, Unevenly]]
 
 ## Things to do before our next class
 

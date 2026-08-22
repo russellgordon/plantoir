@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Build day 4: finishing for outdoors, and the fixes you set yourself
+1. Build day 4: finishing for outdoors, and the fixes you set yourself: [[The Shop Build]]
 2. Why this finish, on this material, in this climate
-3. Progress photographs
+3. Progress photographs: [[Photographing Your Work]]
 
 ## Things to do before our next class
 

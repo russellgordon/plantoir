@@ -12,11 +12,11 @@ the American past you can recall on demand.
 
 Every Grade 11 credit in Ontario is built the same way. **Seventy per cent**
 comes from work done across the semester, and it leans towards your **most
-recent and most consistent** work rather than averaging September against
-January — a habit you did not have in October is not held against you in
-January if it is plainly there by then. **Thirty per cent** comes from a
-final evaluation at the end, which has to reach across the whole course
-rather than test the last unit.
+recent and most consistent** work rather than averaging the start of the
+course against the end of the course — a habit you did not have early on is
+not held against you at the end of the course if it is plainly there by
+then. **Thirty per cent** comes from a final evaluation at the end, which
+has to reach across the whole course rather than test the last unit.
 
 ```mermaid
 pie title Where your mark comes from
@@ -112,7 +112,7 @@ the paragraph [[Skills You Are Building]] asks for, about an occasion
 OUTSIDE this class where you noticed a task going wrong and changed your
 approach, is marked like anything else in the curriculum. Note where the
 weight falls: it is the transfer out of here that the expectation is about,
-not how organised you were in September. That is the whole of the
+not how organised you were at the start of the course. That is the whole of the
 exception, and it lives on one page.
 
 **Your own judgement of your work, and your classmates', are not part of

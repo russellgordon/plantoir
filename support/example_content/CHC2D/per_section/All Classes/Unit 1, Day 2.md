@@ -14,7 +14,7 @@ tags:
 2. Provenance in thirty seconds — who, when, for whom, why
 3. Starting [[Your Inquiry Notebook]] — and what it is eventually marked
    as part of: [[The Portfolio Case]], criteria read today, closing in
-   January
+   the end of the course
 
 ## Things to do before our next class
 

@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Studio time
+1. Studio time: mixed media experimentation and technical refinement
 2. Critique: [[Giving Feedback]] with a rotating focus
-3. Revision
+3. Revision: applying peer feedback to resolve mixed media composition challenges
 
 ## Things to do before our next class
 

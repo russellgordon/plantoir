@@ -53,11 +53,11 @@ is a classmate's — [[How Marks Work]] says why. That cuts both ways:
 nothing you write here can cost you anything, which is exactly what
 makes it worth writing honestly.
 
-What it changes is the work. A self-check that produces one real fix is
-the cheapest improvement available in this course, and by January you
-run it without being asked — which was the point the whole time. The
-same move, pointed backwards across the term instead of at one piece,
-is [[Showing Growth]].
+What it changes is the work. A self-check that produces one real fix is the
+cheapest improvement available in this course, and by the end of the course
+you run it without being asked — which was the point the whole time. The
+same move, pointed backwards across the term instead of at one piece, is
+[[Showing Growth]].
 
 > [!tip] Read it aloud to the desk beside you
 > Say your judgement out loud to one person. You will hear the rows

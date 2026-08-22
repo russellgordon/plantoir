@@ -93,6 +93,8 @@ redesign if the machine shipped again?
 
 ![[C1.2]]
 
+![[C2.1]]
+
 ![[C2.2]]
 
 ![[C3.2]]

@@ -43,8 +43,8 @@ using household reagents with biochemical mechanisms behind each step.
 1. Explain the biochemical role of each reagent:
    - Why does dishwashing detergent break open the plasma membrane and nuclear
      envelope? (Relate this to the amphipathic structure of phospholipids from
-     [[Carbohydrates and Lipids|Carbohydrates and Lipids]]).
-   - What is the chemical function of $\\ce{Na+}$ ions from the salt? (Relate this
+     [[Carbohydrates and Lipids]]).
+   - What is the chemical function of $\ce{Na+}$ ions from the salt? (Relate this
      to the negatively charged phosphate backbone of DNA from [[Nucleic Acids]]).
    - Why is protease required to isolate pure nucleic acids?
    - Why does DNA precipitate in cold ethanol but remain dissolved in aqueous buffer?

@@ -56,6 +56,48 @@ If you made a change to `rainfall.py` and want to see what is different before s
 git diff
 ```
 
+## Your commit history is your prototype record
+
+Every task in this course asks you to record how your program changed
+and why — and if you are committing properly, you have already written
+most of that record without noticing. A commit is a prototype, dated,
+with a note attached saying what you were trying.
+
+That only works if the messages are worth reading later. Compare:
+
+```
+update stuff
+fixed it
+more changes
+```
+
+against:
+
+```
+Add avalanche check for freezing-level input
+Fix hypothermia branch firing before the guard condition
+Replace nested ifs with a single elevation lookup after peer review
+```
+
+The second set is a story about a program's development. The first set
+is three photographs of a room with the lights off.
+
+Two habits make the history usable:
+
+- **Commit at each decision, not at each save.** When you have tried
+  something and it now works differently than it did — that is a
+  prototype. When you have changed a variable name, that is not.
+- **Say what changed and why, in that order.** "Replace the dictionary
+  with a list because lookups were never the slow part" tells your
+  future self something they cannot recover from the code itself.
+
+When you write up your iterations in [[Learning Journey Log]], run
+`git log --oneline` first and read down it. The turning points in your
+project are the commits where the message stops describing an addition
+and starts describing a change of mind — those are the ones worth a
+paragraph, and they are very hard to remember three weeks later without
+the log in front of you.
+
 ## Common mistakes and fixes
 
 > [!warning] Committing everything blindly
@@ -72,6 +114,8 @@ git commit --amend -m "New, corrected message"
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[D4.5]]
 
 ![[D7.1]]
 

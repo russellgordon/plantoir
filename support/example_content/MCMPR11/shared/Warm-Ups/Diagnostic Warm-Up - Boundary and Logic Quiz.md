@@ -9,7 +9,7 @@ tags:
   - diagnostic
 ---
 
-This is a quick temperature check, not a graded test. Six short questions, no code to write — just read, decide, and check yourself. It is worth revisiting this same page again later in the course; if a question that felt easy in September suddenly feels shaky before a bigger milestone, that is exactly the kind of thing worth reviewing before it costs you marks on something bigger.
+This is a quick temperature check, not a graded test. Six short questions, no code to write — just read, decide, and check yourself. It is worth revisiting this same page again later in the course; if a question that felt easy at the start of the course suddenly feels shaky before a bigger milestone, that is exactly the kind of thing worth reviewing before it costs you marks on something bigger.
 
 **Question 1.** A test case checks that a function correctly handles the smallest and largest values it is meant to accept. What is the general name for those extreme, edge-of-range input values?
 

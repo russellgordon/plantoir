@@ -11,9 +11,9 @@ tags:
 ## Agenda
 
 1. Studio time: third piece, and the note on what the second one taught
-   you
-2. Conferences
-3. Clearing up
+   you: [[The Body of Work]]
+2. Conferences on series progression and third piece execution for [[The Body of Work]]
+3. Clearing up: [[Clearing Up]]
 
 ## Things to do before our next class
 

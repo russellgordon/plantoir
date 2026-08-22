@@ -23,7 +23,7 @@ they are pointing at.
 | **Audio editing (DAW)** | Records and edits multitrack audio, with noise reduction and levels | Interview clean-up, podcasts, and voice-over |
 | **Animation and motion graphics** | Moves type and graphics over time | Lower thirds, title cards, explainer graphics |
 | **Web publishing / CMS** | Manages stories, media, and publication on the web | [[Publish to the Web]] |
-| **Asset management** | Catalogues, tags, and finds media | The archive you will be grateful for in April |
+| **Asset management** | Catalogues, tags, and finds media | The archive you will be grateful for a year from now |
 | **Collaboration and scheduling** | Assignments, deadlines, and versions | The newsroom board in [[The Production Pipeline]] |
 
 ## Free and paid, and why we use both

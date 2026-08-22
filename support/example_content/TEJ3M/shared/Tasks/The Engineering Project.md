@@ -101,8 +101,8 @@ the practical answer to.
 Your [[Final Reflection]] takes this project as its main evidence, and
 [[Showing Growth]] asks you to set it beside your first entry from Unit 1.
 The question is not whether you got better — you did — but *what
-specifically* you can now do that you could not do in September, and what
-you would need next in order to do this professionally.
+specifically* you can now do that you could not do at the start of the
+course, and what you would need next in order to do this professionally.
 
 > [!warning]- If your scope is slipping and there are two periods left
 > Cut, and cut early. Decide today which single function is the device,

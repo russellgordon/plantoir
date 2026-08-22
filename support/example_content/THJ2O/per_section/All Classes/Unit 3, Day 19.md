@@ -12,7 +12,7 @@ tags:
 
 1. Bench assessment: [[The Propagation Bench]] inspected
 2. Germination and strike rates calculated honestly
-3. Conferences
+3. Conferences on propagation log data and strike rate calculations for [[The Propagation Bench]]
 
 ## Things to do before our next class
 

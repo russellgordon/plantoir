@@ -8,7 +8,7 @@ tags:
 ---
 Every question here is three steps wearing different clothes:
 
-$$\text{mass given} \rightarrow \text{moles} \rightarrow \text{moles} \rightarrow \text{mass wanted}$$
+$$\ce{\text{mass given} -> \text{moles} -> \text{moles} -> \text{mass wanted}}$$
 
 The first arrow is $n = \frac{m}{M}$. The middle arrow — the only one
 that is actually chemistry — is the **coefficient ratio** from the

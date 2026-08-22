@@ -92,10 +92,10 @@ the substance, which is not balancing — it is inventing.
 > exactly a half.
 
 **3.** Predict the products, then balance.
-(a) $\ce{CaO + H2O} \rightarrow$
-(b) $\ce{SO3 + H2O} \rightarrow$
-(c) $\ce{CaCO3} \rightarrow$ (strongly heated)
-(d) $\ce{H2O} \rightarrow$ (electrical decomposition)
+(a) $\ce{CaO + H2O ->}$
+(b) $\ce{SO3 + H2O ->}$
+(c) $\ce{CaCO3 ->}$ (strongly heated)
+(d) $\ce{H2O ->}$ (electrical decomposition)
 
 > [!success]- Answer 3
 > **(a)** A metal oxide plus water gives the metal hydroxide.

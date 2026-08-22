@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Development measured: GDP per capita against the Human Development Index
+1. Development measured: GDP per capita against the Human Development Index: [[Measuring an Economy]]
 2. Why two countries with similar output rank differently — two minutes in writing, collected
-3. Trade question work period: your Day 5 conference acted on, starting with what came off worst
+3. Trade question work period: your Day 5 conference acted on, starting with what came off worst: [[The Trade Question]]
 
 ## Things to do before our next class
 

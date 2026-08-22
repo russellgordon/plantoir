@@ -19,7 +19,7 @@ moves through space: navigation, wind, forces, the graphics pipeline
 drawing this very screen. [[The Flight Path]] flies on them.
 
 The second answer is about transfer: you may never compute a cross
-product after June, but you will spend a lifetime modelling messy
+product after this course, but you will spend a lifetime modelling messy
 situations, checking claims before trusting them, and arguing from
 constraints. That training happens here whether the algebra
 resurfaces or not.

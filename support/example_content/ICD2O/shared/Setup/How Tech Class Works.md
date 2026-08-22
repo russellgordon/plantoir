@@ -46,9 +46,9 @@ then does the idea get its proper name and its clean statement on a
 ## Notes to your future self
 
 A few sentences and one small example in your own words, written for the
-version of you who opens this in January having forgotten everything.
-The concept pages hold the full statements; your notes hold what YOU
-need.
+version of you who opens this at the end of the course having forgotten
+everything. The concept pages hold the full statements; your notes hold what
+YOU need.
 
 ## Log it
 

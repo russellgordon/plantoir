@@ -13,7 +13,7 @@ tags:
 1. [[Giving Feedback]] practised in threes
 2. What the critique said, written into the sketchbook here — then
    studio time acting on it
-3. Conferences
+3. Conferences on colour harmonies and composition balance for [[The Elements Study]]
 
 ## Things to do before our next class
 

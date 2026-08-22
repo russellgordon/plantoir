@@ -99,6 +99,8 @@ the context is gone.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D7.3]]
+
 ![[K1.14]]
 
 ![[K1.9]]

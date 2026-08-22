@@ -34,7 +34,7 @@ the same day as class. Ten minutes, done.
 Prompts four and five are the new ones, and they are new because this
 is the year the course stops handing you the decisions. Naming your
 starting point is the first piece of data in the record, and it is the
-one you will want most in April.
+one you will want most a year from now.
 
 ## What honest looks like
 

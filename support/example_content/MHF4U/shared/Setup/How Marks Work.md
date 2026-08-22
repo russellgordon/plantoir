@@ -14,12 +14,12 @@ change in Grade 12, and it will not change in the course after this one.
 
 ## The seventy and the thirty
 
-Every Grade 12 credit in Ontario is built to the same plan. Seventy per
-cent of your mark is gathered while the course runs, and it is not an
-average: it leans on your **most consistent** level of work and on your
-**most recent** work, because a course is a thing you get better at and
-the mark is meant to describe the mathematician who walks out in January.
-The remaining thirty per cent comes from a final evaluation at the end.
+Every Grade 12 credit in Ontario is built to the same plan. Seventy per cent
+of your mark is gathered while the course runs, and it is not an average: it
+leans on your **most consistent** level of work and on your **most recent**
+work, because a course is a thing you get better at and the mark is meant to
+describe the mathematician who walks out at the end of the course. The
+remaining thirty per cent comes from a final evaluation at the end.
 
 ```mermaid
 pie title Where your mark comes from

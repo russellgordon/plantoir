@@ -7,9 +7,9 @@ tags:
   - unit-1
 ---
 One physical notebook, carried to every field day, kept for the whole
-course. It is the only record of what you actually saw, and by January it
-will be the difference between a report built on evidence and a report
-built on memory. It is marked as part of
+course. It is the only record of what you actually saw, and by the end of
+the course it will be the difference between a report built on evidence
+and a report built on memory. It is marked as part of
 [[The Field and Map Portfolio]].
 
 ## What goes on a page
@@ -26,8 +26,9 @@ weather, and who you worked with. Then the page splits.
 | "Water standing in wheel ruts, none between" | "Compaction reducing infiltration" |
 
 The split is not a formatting preference. It is the discipline the whole
-course is built on, and it lets you revisit an inference in December
-without having to trust the version of you who wrote it in September.
+course is built on, and it lets you revisit an inference at the end of the
+course without having to trust the version of you who wrote it at the start
+of the course.
 
 ## Sketches beat photographs, and go beside them
 

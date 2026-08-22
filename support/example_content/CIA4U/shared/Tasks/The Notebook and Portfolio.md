@@ -106,7 +106,7 @@ OBSERVE — Unit 1, Day 22, the first milestone entry written in class
   printed on Your Economics Notebook and everyone can copy those. What
   the checklist cannot supply is the last line — what the figure does
   not tell you — and the students who write a good one are almost always
-  the ones who first go back and read how they phrased it in September.
+  the ones who first go back and read how they phrased it at the start of the course.
   The finished entry shows you whether that last line is real; only the
   room shows you whether it came out of the notebook.
   Going well: an old entry found and read before the last line is

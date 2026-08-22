@@ -65,10 +65,10 @@ of your mark, and neither is a classmate's — [[How Marks Work]] says
 why. Nothing you write here can cost you anything, which is precisely
 what makes it worth writing honestly.
 
-What it changes is the work. By January most of you run these three
-passes without being asked, on a program nobody is going to collect,
-because you would rather find the broken row than be told about it.
-That habit is the actual point of the page.
+What it changes is the work. By the end of the course most of you run these
+three passes without being asked, on a program nobody is going to collect,
+because you would rather find the broken row than be told about it. That
+habit is the actual point of the page.
 
 > [!tip] Read your ruling out loud
 > To the person beside you, or to the wall. Generosity is much easier

@@ -11,7 +11,7 @@ tags:
 ## Agenda
 
 1. Retrieval clinic — no notes: label three systems, explain one
-   feedback loop, and trace one failure through two systems
+   feedback loop, and trace one failure through two systems: [[The Circulatory System]] and [[Keeping Conditions Steady]]
 2. Compare answers in pairs
 
 ## Things to do before our next class

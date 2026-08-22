@@ -14,13 +14,13 @@ task tells you what it is looking for before you start.
 
 ## The seventy and the thirty
 
-Every Grade 10 credit in Ontario is built the same way. Seventy per
-cent of your mark comes from work spread across the whole semester, and
-it leans towards your **most recent and most consistent** work rather
-than averaging September against January. A thing you understood badly
-in October and understand well in December is marked on December. The
-remaining thirty per cent comes from one final evaluation at the end of
-the course, which in this course is [[Launch Day]].
+Every Grade 10 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it. A thing you understood badly
+early on and understand well at the end of the course is marked on the most
+recent evidence. The remaining thirty per cent comes from one final
+evaluation at the end of the course, which in this course is [[Launch Day]].
 
 ```mermaid
 pie title Where your mark comes from

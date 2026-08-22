@@ -13,7 +13,7 @@ tags:
 1. Portfolio work period: [[The Evidence File]] assembled
 2. What is missing, found and photographed
 3. Your portfolio judged against the criteria: [[Judging Your Own Work]]
-4. Conferences
+4. Conferences on portfolio completeness and photographic evidence for [[The Evidence Portfolio]]
 
 ## Things to do before our next class
 

@@ -76,7 +76,7 @@ measurement, or someone getting tired?
 Every time you understand a piece of somebody else's program, write
 down the thing that unlocked it — the experiment you ran, the line
 you changed, the commit message that finally explained a mystery. You
-will be doing this all year, in [[The Inherited Program]], in
+will be doing this all semester, in [[The Inherited Program]], in
 [[The Maintenance Sprint]], and every day of a team build, and the
 techniques transfer far better than the specific programs do.
 

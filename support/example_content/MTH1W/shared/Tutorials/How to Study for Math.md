@@ -36,7 +36,7 @@ is not a failure of studying; it *is* the studying.
 ## Notes to your future forgetful self
 
 The notes you write after each thinking task have one reader: you, in
-January, having forgotten today. Write for that person — one worked
+months from now, having forgotten today. Write for that person — one worked
 example in your own words, a sentence about when the idea gets used,
 and the mistake you almost made. Then, when studying, resist opening
 them: close the binder, attempt a problem, and consult the notes only

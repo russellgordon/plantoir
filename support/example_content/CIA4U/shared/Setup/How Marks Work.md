@@ -13,12 +13,12 @@ some combination of them.
 
 ## The seventy and the thirty
 
-Every Grade 12 credit in Ontario is built the same way. Seventy per
-cent of your mark comes from the work you do across the term, and it
-leans towards your **most recent and most consistent** work rather than
-averaging September against January — a term spent getting better is
-marked as a term spent getting better. The other thirty per cent is a
-final evaluation at the end.
+Every Grade 12 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from the work you do across the term, and it leans towards
+your **most recent and most consistent** work rather than averaging the
+start of the course against the end of it — a term spent getting better is
+marked as a term spent getting better. The other thirty per cent is a final
+evaluation at the end.
 
 **The seventy** is the eight tasks you hand in during the term, plus
 the marked parts of [[The Notebook and Portfolio]]. In the order you

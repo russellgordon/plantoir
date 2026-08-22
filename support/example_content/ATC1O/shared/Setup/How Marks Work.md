@@ -7,16 +7,17 @@ tags:
   - setup
 ---
 You are marked on what you do with movement, and on how you think about
-it — not on how much dance you had done before September.
+it — not on how much dance you had done before this course.
 
 ## The seventy and the thirty
 
-Every Grade 9 credit in Ontario is built the same way. Seventy per cent
-of your mark comes from the work you do as the course goes along, and it
-leans towards your **most recent and most consistent** work rather than
-averaging September against June. That seventy runs from September to
-the end of Unit 3. Unit 4's work is the final evaluation, and it is the
-other thirty per cent.
+Every Grade 9 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from the work you do as the course goes along, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it. The other thirty per cent
+comes from the final evaluation at the end of the course, which is
+deliberately built to reach back across the whole semester rather than test
+a single unit.
 
 **The seventy** is the seven tasks you show or hand in as we go, in the
 order you meet them: [[The Movement Signature]], [[The Safe Dancer]],
@@ -96,13 +97,13 @@ anything.
 
 ## Why ten years of training does not start you ahead
 
-Nothing above marks how much you could already do in September. What is
-marked is the movement you generate, how you structure it, whether the
-second version is better than the first, and whether you can say what
-you chose and why. A trained dancer who repeats a combination they were
-given three years ago meets almost none of that. A beginner who makes
-four movements that are theirs and can defend the order they are in
-meets most of it.
+Nothing above marks how much you could already do at the start of the
+course. What is marked is the movement you generate, how you structure it,
+whether the second version is better than the first, and whether you can say
+what you chose and why. A trained dancer who repeats a combination they were
+given three years ago meets almost none of that. A beginner who makes four
+movements that are theirs and can defend the order they are in meets most of
+it.
 
 ## If you are injured
 

@@ -13,7 +13,7 @@ The portfolio is the only assessed work in this course that is about your
 own thinking rather than about the American past. It is where you keep the
 record of what you asked, what you found, and where your position moved —
 and it is the reason [[The Long Argument]] will not begin from a blank
-page in January.
+page at the end of the course.
 
 ## Written in class, and why
 
@@ -88,11 +88,11 @@ OBSERVE — Unit 1, Day 20, the first portfolio milestone written in class
   a bag. The milestone entry asks how a position moved across the unit,
   which cannot be answered from memory — but it can be answered
   plausibly from memory, and a plausible entry written in one pass looks
-  the same on the page in January as one written from three dated entries
+  the same on the page at the end of the course as one written from three dated entries
   in front of it. This is the single cheapest thing to see all term and it
   is invisible in the finished set.
   Going well: pages turned backwards before anything is written; a student
-  quoting their own October wording and disagreeing with it.
+  quoting their own earliest wording and disagreeing with it.
   Stuck: a notebook opened at a blank page and filled forwards; a student
   who cannot find the entry they are describing.
   Record: three columns on your day plan — open, shut, no notebook. Two
@@ -107,7 +107,7 @@ History Leads" with the notebooks in front of them
   and the marking is what you are already doing. It is also the one period
   all term when every notebook is open and the careers list is the thing
   being worked on, which is why the questions belong here and not earlier.
-  Ask: "Open the notebook at October. What were you asking then that you
+  Ask: "Open the notebook at its first pages. What were you asking then that you
   would now say was the wrong shape of question?"
   Then: "Which of the jobs on that list actually does the thing you have
   got best at — and which one does the thing you avoid?"

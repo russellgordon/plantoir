@@ -11,12 +11,12 @@ tags:
 ---
 ## Agenda
 
-1. Review: biology, growth factors, and production
+1. Review: biology, growth factors, and production: [[How a Plant Actually Works]]
 2. Retrieval across all four units
 3. Practical stations
-4. Portfolio: the fixes your conference asked for. It closes in two
+4. Portfolio: the fixes your conference asked for — [[The Evidence Portfolio]]. It closes in two
    periods
 
 ## Things to do before our next class
 
-- [ ] Review your own logs from September.
+- [ ] Review your own logs from the first week.

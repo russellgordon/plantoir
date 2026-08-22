@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Period 7 of 8: finishing and clean-up
-2. Site left properly; waste dealt with correctly
-3. Final photographs
+1. Period 7 of 8: finishing and clean-up: [[The Site Project]]
+2. Site left properly; waste dealt with correctly: [[Safe Shop and Site Practice]]
+3. Final photographs: [[Photographing Your Work]]
 4. Your section of the maintenance schedule, written on site while the
    job is still in front of you
 

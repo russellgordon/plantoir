@@ -13,12 +13,12 @@ does, what it shows, and what somebody else could do with it.
 
 ## The seventy and the thirty
 
-Every Grade 10 credit in Ontario is built the same way. Seventy per
-cent of your mark comes from work spread across the whole semester, and
-it leans towards your **most recent and most consistent** work rather
-than averaging September against January — the technician you are in
-December is the one being reported on. The other thirty per cent comes
-from a final evaluation towards the end of the course.
+Every Grade 10 credit in Ontario is built the same way. Seventy per cent of
+your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it — the technician you are in
+the most recent evidence is what is reported on. The other thirty per cent
+comes from a final evaluation towards the end of the course.
 
 ```mermaid
 pie title Where your mark comes from

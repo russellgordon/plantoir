@@ -20,7 +20,7 @@ what you predicted and what the meter said. This year it records
 **what you decided** — the choice you made, the alternative you turned
 down, the margin you left, and the measurement that showed whether you
 were right. A journal like that is not a diary of a semester. It is the
-raw material of a design record, and by April it is the strongest
+raw material of a design record, and a year from now it is the strongest
 evidence you own that you can do this work.
 
 The hub is [[Tech Journal]]. These pages support it, roughly in the
@@ -43,7 +43,7 @@ it is the same habit pointed at something else.
 
 Entries take ten minutes and feel trivial while you are writing them.
 The value arrives months later, when your capstone documentation needs
-the reason you chose a part in November and only your journal has it —
+the reason you chose a part weeks earlier and only your journal has it —
 and when [[Showing Growth]] calls first-week-you as a witness. Both of
 those only work if first-week-you wrote honestly, including the part
 where you had no idea why the circuit was doing that.

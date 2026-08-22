@@ -30,7 +30,7 @@ Questions worth arguing about:
    now? What could you do instead, on purpose?
 4. Which is worth more: a program that worked on the first try, or a
    bug you hunted down yourself? What did each one actually teach —
-   and which will you remember in June?
+   and which will you remember at the end of the course?
 5. In [[Spot the Bug]], hunting a planted bug is genuinely fun. The
    identical hunt in your own program feels awful. The bug is the
    same — so what changed? Is the difference in the code, or in what

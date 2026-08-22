@@ -10,6 +10,49 @@ A program that works perfectly but cannot be used by its intended audience is a 
 
 Consider the FirstVoices platform, a suite of web and mobile tools designed to support the revitalization of Indigenous languages across BC. The interface must be usable by young digital natives in schools, but also by Elders in remote communities who hold the language knowledge but may have visual impairments or minimal tech experience. 
 
+## Deciding who it is for, before deciding what it does
+
+The FirstVoices example above contains a decision that is easy to read
+past. Its designers did not build "a language app". They built for a
+specific pair of users — a student in a classroom and an Elder in a
+remote community — and almost every interface choice follows from having
+named those two people rather than an average of them.
+
+That named user, held onto deliberately while you build, is a **point of
+view**. It is written as a sentence, and a good one is uncomfortably
+specific:
+
+> An Elder in Haida Gwaii, on a five-year-old tablet over a slow
+> connection, who reads best at large text sizes, needs to record a word
+> and hear it played back, because the recording is the thing the
+> community is trying to keep.
+
+Compare that to "users need a good experience". The first sentence
+settles arguments — it tells you that a fast animation is worth nothing
+here and a large touch target is worth a great deal. The second settles
+nothing, which is why it survives so long in so many projects.
+
+**A design opportunity is the gap the point of view exposes.** Not a
+feature request and not a technology looking for a use: the shape is
+*somebody specific cannot currently do something that matters to them,
+and here is why*. Notice what that rules out — "build an app that uses
+machine learning" is a technology with no person in it, and "make it
+better" has a person but no gap.
+
+Three questions to ask before you write a line of code, on every task in
+this course:
+
+1. **Who exactly?** One or two named users, with their circumstances —
+   device, connection, environment, what they already know.
+2. **What can they not do now, and what does that cost them?** If
+   nothing is lost, there is no opportunity.
+3. **How would you know you had solved it?** Something observable,
+   decided before you start rather than after.
+
+Answer those honestly and you will sometimes discover the problem is not
+a software problem at all — which is a real result and worth writing
+down in [[Learning Journey Log]], not a failed start.
+
 ## Key Principles of Accessibility
 
 Accessibility is often guided by the Web Content Accessibility Guidelines (WCAG), but the core ideas apply to everything from terminal scripts to mobile apps.
@@ -68,7 +111,11 @@ This version provides context, handles mistakes gently without crashing, and cle
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D2.1]]
+
 ![[D2.2]]
+
+![[K1.1]]
 
 ![[K1.17]]
 %%curriculum-end%%

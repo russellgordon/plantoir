@@ -76,7 +76,7 @@ one, and it is worth stating on its own.
 
 Two consequences follow. Your capstone documentation gets written from
 this journal rather than from memory, which saves you an entire
-evening in April. And when somebody at [[The Engineering Review]] asks
+evening a year from now. And when somebody at [[The Engineering Review]] asks
 why you chose a part, you will have an answer that was written before
 you knew you would need it, which is the only kind anybody believes.
 

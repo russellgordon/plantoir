@@ -5,11 +5,11 @@ created: __CREATED__
 tags:
   - portfolio
 ---
-By mid-course, your [[Tech Journal]] stops being only a diary and
-becomes something rarer: **evidence**. The person who wrote your
-September entries no longer quite exists — and because that person
-wrote honestly, you can prove it: put September-you and now-you
-side by side and let the difference speak.
+By mid-course, your [[Tech Journal]] stops being only a diary and becomes
+something rarer: **evidence**. The person who wrote your your earliest
+entries no longer quite exists — and because that person wrote honestly, you
+can prove it: put the you who started this course and now-you side by side
+and let the difference speak.
 
 ## Growth is a claim plus evidence — like a service log
 
@@ -19,7 +19,7 @@ symptom, the tests, the part replaced, and the verification, so the
 next technician can trust it. Growth writing meets the same
 standard: every claim backed by two dated entries of your own.
 
-> In September I wrote: "I was scared to pull anything in case I
+> At the start of the course I wrote: "I was scared to pull anything in case I
 > broke it." Last week our machine threw three beeps and I had the
 > panel off, sticks reseated, and the fault narrowed to one slot
 > before anyone else reached the bench. The fear became a checklist.
@@ -34,7 +34,7 @@ that suspects you have not changed. It is the standard
 
 Treat your earlier entries the way an essay treats sources:
 
-- **Date it** — "In my September 24 entry…" — the distance matters.
+- **Date it** — "In my entry from the third week…" — the distance matters.
 - **Quote a phrase, not a page.** Your words then carry more truth
   than your summary now. "The CPU is smaller than a Timbit and
   apparently it does everything", from [[Your First Entry]], says

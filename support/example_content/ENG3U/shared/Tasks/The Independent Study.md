@@ -28,7 +28,7 @@ essay you have written. See
 
 Each checkpoint is assessed. They exist because a project this long done
 in the last fortnight reads exactly like one, and because the fix is easy
-in November and impossible in January.
+at the second checkpoint and impossible at the last.
 
 ## The essay
 
@@ -51,7 +51,7 @@ where your argument is at its clearest.
 strategies actually moved this forward and which you abandoned; what the
 passage log did for you that annotating alone did not; and — reading your
 own first checkpoint beside the finished essay — what you can now do as a
-writer that you could not do in November. Add two sentences on the
+writer that you could not do at the start. Add two sentences on the
 defence once you have given it: what your voice did well in those two
 minutes, and what you would work on before the next time you have to say
 an argument out loud. Write it after the essay is finished, not before.
@@ -66,9 +66,9 @@ an argument out loud. Write it after the essay is finished, not before.
 | Application | Research integrated, cited, and used for something; the argument survives being said out loud to a room |
 
 > [!warning] The failure mode, stated in advance
-> Choosing in November, reading in January. The checkpoints catch it. If
+> Choosing late, reading later still. The checkpoints catch it. If
 > you are behind at checkpoint two, say so at checkpoint two — every plan
-> made then has worked; the ones made in January are triage.
+> made then has worked; the ones made at the end of the course are triage.
 
 %%curriculum-start%%
 ## Curriculum connection

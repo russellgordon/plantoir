@@ -3,9 +3,9 @@ title: Portfolios
 publish: true
 created: __CREATED__
 ---
-The record of your year: journal, video, and the reflection that closes
-the course. This is the final evaluation, so it is built from September
-rather than assembled in June.
+The record of your semester: journal, video, and the reflection that closes
+the course. This is the final evaluation, so it is built from the first week
+rather than assembled at the end of the course.
 
 **Unit 1 — The moving body**
 

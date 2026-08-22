@@ -10,9 +10,9 @@ tags:
 ---
 ## Agenda
 
-1. Warm-up: orbital speed from first principles, in symbols
+1. Warm-up: orbital speed from first principles, in symbols: [[Gravitational Fields and Orbits]]
 2. Practise: orbits, periods, and energy at the boards
-3. The technology: GPS, and the two relativistic corrections it needs
+3. The technology: GPS, and the two relativistic corrections it needs: [[Newton's Law of Universal Gravitation]]
 
 ## Things to do before our next class
 

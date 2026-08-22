@@ -10,10 +10,10 @@ tags:
 ---
 ## Agenda
 
-1. Retrieval warm-up — no notes: four passages placed and explained
+1. Retrieval warm-up — no notes: four passages placed and explained: [[Sight Passage Practice]]
 2. Checkpoint, on your own: an unseen prose passage, analysed, then
    marked against the criteria by you
-3. Consolidation: what both texts think a testimony needs
+3. Consolidation: what both texts think a testimony needs: [[Narration and Testimony]]
 
 ## Things to do before our next class
 

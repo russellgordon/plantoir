@@ -15,7 +15,7 @@ tags:
 2. Finish [[Final Reflection]] here, with your [[Code Journal]] open
    beside you — including its last section, where you evaluate your own
    development of three of the Essential Skills and work habits the
-   Ontario Skills Passport names, September against now, with the
+   Ontario Skills Passport names, the start of the course against now, with the
    dated evidence for each. Both are handed in at the end of the
    period.
 3. Course feedback, written and anonymous

@@ -34,9 +34,10 @@ tested by the next one.
 
 ## What the curriculum has to do with it
 
-[[A2.1]] asks you to explain your rights *and* responsibilities online,
-and to make decisions that build the reputation you want. This discussion
-is that expectation with the comfortable parts removed.
+[[A2.1|Digital citizenship and online identity]] asks you to explain your
+rights *and* responsibilities online, and to make decisions that build the
+reputation you want. This discussion is that expectation with the comfortable
+parts removed.
 
 ## Ground rules for today
 

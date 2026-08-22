@@ -6,18 +6,18 @@ enableToc: true
 tags:
   - setup
 ---
-You are marked on what you can do, on how well you can account for it,
-and on how you conduct yourself on a site — not on how much you already
-knew about plants in September.
+You are marked on what you can grow and build, on the safe practices you
+demonstrate, and on how well you can account for your choices — not on how
+much you already knew about plants at the start of the course.
 
 ## The seventy and the thirty
 
-Every Grade 10 credit in Ontario is built the same way. **Seventy per
-cent** of your mark comes from work spread across the whole semester,
-and it leans towards your **most recent and most consistent** work
-rather than averaging September against January. That matters in a
-practical course more than most: the joint you cut in week three is not
-the joint you can cut in week fifteen, and the mark should say so.
+Every Grade 10 credit in Ontario is built the same way. **Seventy per cent**
+of your mark comes from work spread across the whole semester, and it leans
+towards your **most recent and most consistent** work rather than averaging
+the start of the course against the end of it. That matters in a practical
+course more than most: the joint you cut in week three is not the joint you
+can cut in week fifteen, and the mark should say so.
 
 The seventy is the assessed tasks and the records behind them. Roughly
 in the order you meet them: [[The Plant Identification File]] and
@@ -34,7 +34,7 @@ is just not the number that changes what you do on Monday.
 examination period where you set up a task, choose and check the tools,
 work safely, and explain what you are doing while you do it. It is not
 an essay, and it is not a fifth unit test — it reaches back across the
-whole year on purpose.
+whole semester on purpose.
 
 ## Four kinds of thinking, not one
 

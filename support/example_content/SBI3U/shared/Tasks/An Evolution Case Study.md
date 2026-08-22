@@ -28,11 +28,28 @@ humans · herbicide-resistant weeds in Ontario fields.
 3. **The change**, with actual data — frequencies, not adjectives.
 4. **The mechanism**, connecting your case to
    [[Natural Selection]] step by step.
-5. **What would falsify it.** State what evidence would have shown the
+5. **Which mechanism, out of the several available.** Name the one your
+   case turns on and say why the others do not fit it: natural
+   selection, artificial selection, sexual selection, or genetic
+   drift — and where a technology did the selecting, say so, because
+   herbicide-resistant weeds and antibiotic resistance are cases of
+   human activity supplying the pressure rather than of a landscape
+   doing it.
+6. **What would falsify it.** State what evidence would have shown the
    change was NOT selection — genetic drift, migration, or a measurement
    artefact.
+7. **Where this leaves the species.** Two paragraphs on what your case
+   says about vulnerability. If the environmental change had been
+   faster, or the starting population less varied, would the species
+   have adapted at all? Name what the population needed in order to
+   respond — standing variation, a short generation time, somewhere to
+   move — and say which of those a species facing the *same* pressure
+   today might not have. A case where selection produced a fitter
+   population and a case where it produced an extinction are the same
+   mechanism meeting different starting conditions, and this is where
+   you say which yours was and why.
 
-Point 5 is the difference between a report and an argument.
+Points 5 and 7 are the difference between a report and an argument.
 
 ## Success criteria
 
@@ -53,6 +70,10 @@ Published here on the day you choose your case, and used again with
 ## Curriculum connection
 
 ![[C1.1]]
+
+![[C1.2]]
+
+![[C3.4]]
 
 ![[C2.2]]
 

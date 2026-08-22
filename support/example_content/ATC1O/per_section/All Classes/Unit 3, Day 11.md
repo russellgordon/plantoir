@@ -13,7 +13,7 @@ tags:
 1. Warm-up: [[The Standard Warm-Up]]
 2. Writing clinic: [[Writing About Dance]]
 3. Evidence in a review — moments, not impressions
-4. Working period
+4. Working period: drafting the initial reaction and movement description for [[The Dance Review]]
 5. Cool-down
 
 ## Things to do before our next class

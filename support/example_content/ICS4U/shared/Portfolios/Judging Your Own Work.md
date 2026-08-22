@@ -101,9 +101,9 @@ anything is submitted, and that habit outlasts every mark it rescues.
 > [!tip] Put the verdict in the journal, not in your head
 > A self-check written into your [[Code Journal]] gets a date on it,
 > and a dated verdict is the only kind [[Showing Growth]] can use in
-> June. It is also the fastest way to find out whether you act on
-> your own findings — the entry that says "not yet" in October and
-> the entry that says "fixed it, and here is the commit" in November
+> the end of the course. It is also the fastest way to find out whether you act on
+> your own findings — the entry that says "not yet" early on and
+> the entry that says "fixed it, and here is the commit" weeks later
 > are the same claim, three weeks apart, with proof in between.
 
 %%curriculum-start%%

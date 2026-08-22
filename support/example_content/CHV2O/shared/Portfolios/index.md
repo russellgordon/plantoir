@@ -3,8 +3,8 @@ title: Portfolios
 publish: true
 created: __CREATED__
 ---
-Your own record across the term — what you thought in November, and what
-you think in January.
+Your own record across the term — what you thought in the first week, and what
+you think at the end of the course.
 
 **Unit 1 — How Decisions Get Made**
 

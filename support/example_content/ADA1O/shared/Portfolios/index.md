@@ -33,6 +33,6 @@ days they are written on.
 
 > [!tip] The journal is written forwards and read backwards
 > Each entry takes ten minutes and feels small. The value arrives later,
-> when [[Showing Growth]] asks you to compare your September self to your
-> January self — and the comparison is only possible if September wrote
+> when [[Showing Growth]] asks you to compare your starting self to your
+> most recent self — and the comparison is only possible if the earliest entries were written
 > honestly. Write for the person you will be in four months.

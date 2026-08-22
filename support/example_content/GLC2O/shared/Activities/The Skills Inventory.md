@@ -15,9 +15,9 @@ to a moment when you did it. Nobody marks the list itself; it feeds
 
 Set a timer for twelve minutes and write down every situation you can
 remember where you finished something, fixed something, taught someone,
-organised something, or kept going when it would have been easier to
-stop. Situations, not adjectives. "Reliable" is an adjective and proves
-nothing; "covered three shifts nobody else would take in December" is a
+organised something, or kept going when it would have been easier to stop.
+Situations, not adjectives. "Reliable" is an adjective and proves nothing;
+"covered three shifts nobody else would take at the end of the course" is a
 situation and proves several things.
 
 Draw from all of it: classes, teams, clubs, jobs, volunteering, family

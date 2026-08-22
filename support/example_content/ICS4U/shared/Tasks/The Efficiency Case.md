@@ -120,7 +120,7 @@ pair leaves the code and starts on what else they would change
   up — at these machines, this printer, the way this room is left at
   four o'clock — and ask whether the thing they have named could be
   checked. Others write down a list that could have been produced in
-  September, before any of the measuring. The case will carry a list
+  the first week, before any of the measuring. The case will carry a list
   of measures either way, and the criteria row asking for one that is
   correctly sourced is satisfied by both, so read this as corroborating
   that row: what it adds is whether the measure was found or recalled.

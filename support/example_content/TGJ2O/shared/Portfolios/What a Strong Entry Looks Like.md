@@ -29,15 +29,15 @@ actually hold onto.
 
 ## Feelings are welcome — anchored to a moment
 
-The journal is not a news report; nervous, proud, embarrassed, and
-delighted all belong in it. The rule is that a feeling arrives
-*attached to the moment that caused it*. "I felt embarrassed" floats
-free and teaches you nothing in June. "I felt embarrassed when the
-coach corrected my spelling of his name mid-interview — so now every
-name gets checked letter by letter before I leave" is a feeling with
-an address and an exit, and the exit is exactly the accuracy habit
-[[Our Newsroom Standards]] asks for. The feeling is real data about
-you; the moment is the handle you can actually turn.
+The journal is not a news report; nervous, proud, embarrassed, and delighted
+all belong in it. The rule is that a feeling arrives *attached to the moment
+that caused it*. "I felt embarrassed" floats free and teaches you nothing at
+the end of the course. "I felt embarrassed when the coach corrected my
+spelling of his name mid-interview — so now every name gets checked letter
+by letter before I leave" is a feeling with an address and an exit, and the
+exit is exactly the accuracy habit [[Our Newsroom Standards]] asks for. The
+feeling is real data about you; the moment is the handle you can actually
+turn.
 
 %%curriculum-start%%
 ## Curriculum connection

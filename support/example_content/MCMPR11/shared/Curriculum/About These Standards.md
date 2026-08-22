@@ -35,7 +35,7 @@ Education and Child Care** for **Applied Design, Skills, and Technologies
 > sentence — the group's own page carries that label rather than an
 > invented summary.
 
-Every specific expectation on this site links back to the page here that
+Every learning standard cited on this site links back to the page here that
 carries its verbatim wording. If you ever want to check a page against the
 source, follow that link.
 

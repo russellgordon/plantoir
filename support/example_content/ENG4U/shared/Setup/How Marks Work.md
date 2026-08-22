@@ -11,12 +11,12 @@ a reader can follow it without going back.
 
 ## The seventy and the thirty
 
-Grade 12 university English is built the way every Ontario credit is
-built. **Seventy per cent** of your mark comes from work done across the
-course, weighted towards the **most recent and most consistent**
-evidence rather than averaged from the first week onwards. An argument
-you could not make in September and can make now is evidence of what you
-can do now, and now is the thing a mark is supposed to describe.
+Grade 12 university English is built the way every Ontario credit is built.
+**Seventy per cent** of your mark comes from work done across the course,
+weighted towards the **most recent and most consistent** evidence rather
+than averaged from the first week onwards. An argument you could not make at
+the start of the course and can make now is evidence of what you can do now,
+and now is the thing a mark is supposed to describe.
 
 ```mermaid
 pie title Where your mark comes from

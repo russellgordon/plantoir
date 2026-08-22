@@ -111,7 +111,7 @@ OBSERVE — Unit 4, Day 19, the evidence day, on site or in the lab
   citations; this is about the conditions of the evidence they generate
   themselves, which nobody has told them to write down today.
   Going well: the four headers on the page before the first count —
-  date, time, location, weather — the same discipline as September.
+  date, time, location, weather — the same discipline as the first week.
   Stuck: a photograph, a number in a group chat, and nothing else.
   Record: group name and a tick. You are off-site; keep it to that.
 

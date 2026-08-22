@@ -12,13 +12,13 @@ leaves a record.
 
 ## The seventy and the thirty
 
-Ontario builds every Grade 12 credit out of two numbers. Seventy of
-the hundred are earned across the semester itself, and they lean on
-your **most consistent** work with extra weight given to the **most
-recent** — not on an average of September against January. Something
-you could not do in October and can do reliably in January counts as
-something you can do. The other thirty come from one final evaluation
-at the end of the course.
+Ontario builds every Grade 12 credit out of two numbers. Seventy of the
+hundred are earned across the semester itself, and they lean on your **most
+consistent** work with extra weight given to the **most recent** — not on an
+average of the start of the course against the end of it. Something you
+could not do early on and can do reliably at the end of the course counts as
+something you can do. The other thirty come from one final evaluation at the
+end of the course.
 
 ```mermaid
 pie title Where the mark comes from
@@ -143,12 +143,11 @@ seriously in week one rather than week eight.
 > record proves it. This is deliberate — it is also true of
 > professional teams, where it is routinely forgotten.
 
-If your team is genuinely not working — somebody has stopped
-contributing, or one person is carrying everything — that is a
-problem to raise with me early, not to absorb quietly and mention in
-June. [[Working in a Team]] has the protocols; [[Getting Help]] has
-the ways to reach me. Nothing about that conversation counts against
-you.
+If your team is genuinely not working — somebody has stopped contributing,
+or one person is carrying everything — that is a problem to raise with me
+early, not to absorb quietly and mention in the end of the course.
+[[Working in a Team]] has the protocols; [[Getting Help]] has the ways to
+reach me. Nothing about that conversation counts against you.
 
 ## What stays out of your mark
 

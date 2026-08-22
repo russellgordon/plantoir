@@ -69,7 +69,7 @@ possible — but practice between classes is practice, and it is not marked.
 
 The notebook feeds [[Skills You Are Building]] and, in the end,
 [[The Long Argument]] — where the question you settle on will very likely be
-one you first wrote down in October.
+one you first wrote down in the opening weeks.
 
 %%curriculum-start%%
 ## Curriculum connection

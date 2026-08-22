@@ -98,7 +98,7 @@ are two people who have each done half the reading.
 > promise it.
 
 > [!note] Why this is the culminating task
-> It is the only piece of work all year that asks you to build a device,
+> It is the only piece of work all semester that asks you to build a device,
 > measure it, improve it on evidence, and then argue about what the same
 > physics does at the scale of a province — four periods, after two spent
 > getting the motor to turn at all — forces on a current-carrying

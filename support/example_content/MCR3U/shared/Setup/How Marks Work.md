@@ -13,14 +13,14 @@ communication** — things entirely inside your control.
 
 ## The seventy and the thirty
 
-Every Grade 11 credit in Ontario is assembled the same way, and this one
-is no exception. Seventy per cent of your mark is gathered while the
-course is running, and it leans on your **most consistent** level of work
-and on your **most recent** work rather than averaging September flatly
-against January. That is deliberate: a course is a thing you get better
-at, and the mark is supposed to describe the mathematician who walks out
-in January, not the one who walked in. The last thirty per cent is a
-final evaluation at the end.
+Every Grade 11 credit in Ontario is assembled the same way, and this one is
+no exception. Seventy per cent of your mark is gathered while the course is
+running, and it leans on your **most consistent** level of work and on your
+**most recent** work rather than averaging the start of the course flatly
+against the end of the course. That is deliberate: a course is a thing you
+get better at, and the mark is supposed to describe the mathematician who
+walks out at the end of the course, not the one who walked in. The last
+thirty per cent is a final evaluation at the end.
 
 ```mermaid
 pie title Where your mark comes from

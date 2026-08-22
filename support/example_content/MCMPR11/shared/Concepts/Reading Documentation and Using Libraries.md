@@ -108,6 +108,8 @@ place to look.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[D4.1]]
+
 ![[K1.12]]
 
 ![[K1.13]]
