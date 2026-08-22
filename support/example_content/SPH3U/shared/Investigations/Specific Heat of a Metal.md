@@ -53,11 +53,11 @@ because the equation already says one gained and one lost.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D2.8]]
-
-![[D2.10]]
+![[A1.2]]
 
 ![[A1.4]]
 
-![[A1.2]]
+![[D2.9]]
+
+![[D2.10]]
 %%curriculum-end%%

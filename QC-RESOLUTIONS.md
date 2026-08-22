@@ -1,0 +1,188 @@
+# Example-content QC pass — resolutions and progress log
+
+**Date:** 2026-08-21 · **Branch:** `bc-curriculum` · **Scope:** all 38 payloads in `support/example_content/`
+
+---
+
+## Priority 1 — Resolutions
+
+### 1.1 Coverage depth: SBI4U once-only expectations (29 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across SBI4U by ensuring all 69 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (investigations, concept summaries, exercises, discussions, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md`.
+
+#### Baseline Findings (SBI4U)
+- Total expectations: 69 specific expectations (`A1.1` to `F3.5`)
+- Addressed only once (29 codes): `A1.2, A1.3, A1.4, A1.7, A2.2, B1.1, B1.2, B2.1, B2.2, B3.2, B3.3, B3.4, B3.5, C1.1, C1.2, C3.4, D2.1, D2.3, D2.4, D3.2, D3.3, D3.5, D3.7, E1.2, E2.3, E2.4, F2.3, F3.3, F3.4`
+- Unlinked tutorial with transclusion: `shared/Tutorials/Using a Microscope.md` (carried `A1.2`)
+- Duplicate transclusion in single file: `shared/Investigations/Sampling a Population.md` (had two `![[F2.3]]`)
+
+#### Actions Completed
+
+1. **Exercises Enhancement (`shared/Exercises/`)**:
+   - `Biochemistry Practice.md`: Added questions 6–8 (immobilized lactase, potato tissue osmometry, condensation/hydrolysis) and curriculum block for `B1.1`, `B2.1`, `B2.2`, `B3.2`, `B3.3`, `B3.4`, `B3.5`.
+   - `Metabolism Practice.md`: Added questions 6–8 (microbial bioremediation, chloroplast vs mitochondria chemiosmosis energetics, mitochondrial myopathies/MELAS) and curriculum block for `C1.1`, `C1.2`, `C3.1`, `C3.2`, `C3.3`, `C3.4`.
+   - `Molecular Genetics Practice.md`: Added questions 6–9 (DNA vs RNA chemical stability, DNA extraction chemical mechanisms, Hershey-Chase bacteriophage experiment, PCR & Bt corn) and curriculum block for `D2.1`, `D2.3`, `D2.4`, `D3.2`, `D3.3`, `D3.4`, `D3.5`, `D3.7`.
+   - `Homeostasis Practice.md`: Added questions 6–8 (endocrine disruptors/BPA/synthetic estrogens, isopod kinesis/taxis in choice chambers, ADH osmoregulation loop) and curriculum block for `E1.2`, `E2.1`, `E2.2`, `E2.3`, `E2.4`, `E3.1`, `E3.2`, `E3.3`.
+   - `Population Practice.md`: Added questions 6–8 (Lotka-Volterra predator-prey lag, 10% trophic efficiency & human food security, population age-structure momentum) and curriculum block for `F1.1`, `F1.2`, `F2.1`, `F2.2`, `F2.3`, `F3.1`, `F3.2`, `F3.3`, `F3.4`.
+
+2. **Concept Pages Alignment & Deepening (`shared/Concepts/`)**:
+   - `Proteins and Enzymes.md`: Added section on Canadian biochemist Maud Menten (acknowledging curriculum spelling *Maude Menten*) (`A2.2`), industrial/pharmaceutical applications (`B1.1`), and transclusions `A2.2, B1.1, B2.1, B2.3, B2.4, B3.2, B3.3, B3.4, B3.5`.
+   - `Carbohydrates and Lipids.md`: Enriched functional groups and reactions (ester/glycosidic linkages, condensation, hydrolysis), transclusions `B3.2, B3.3, B3.5`.
+   - `Nucleic Acids.md`: Enriched functional groups, DNA/RNA chemical comparison, phosphodiester linkages, transclusions `B3.2, B3.3, B3.5, D3.2`.
+   - `Water and Life.md`: Transclusions `B2.1, B3.1`.
+   - `Membranes and Transport.md`: Added liposomes/targeted drug delivery (`B1.2`), plant tissue osmometry (`B2.2`), transport terminology (`B2.1`), transclusions `B1.2, B2.1, B2.2, B2.5, B3.6, C1.2`.
+   - `Cellular Respiration.md`: Added exercise physiology/diet/mitochondrial disorders (`C1.2`), microbial metabolism in bioremediation (`C1.1`), transclusions `C1.1, C1.2, C2.2, C3.1, C3.2, C3.4`.
+   - `Photosynthesis in Detail.md`: Added ecosystem energy flow and global carbon cycling (`C1.1`), transclusions `C1.1, C2.3, C3.3, C3.4`.
+   - `DNA Replication in Detail.md`: Added historical discoveries (Meselson-Stahl $\ce{^{15}N}$, Griffith, Avery-MacLeod-McCarty, Hershey-Chase $\ce{^{32}P}$) (`D3.7`), transclusions `D2.1, D3.1, D3.2, D3.7`.
+   - `Transcription and Translation.md`: Added ribosome subunit structure and translation factors (`D2.4`), transclusions `D2.1, D2.2, D2.4, D3.2, D3.3`.
+   - `Regulating Gene Expression.md`: Added Jacob & Monod discovery (`D3.7`), prokaryotic operon switch vs eukaryotic chromatin/epigenetic control (`D3.3`), transclusions `D3.3, D3.6, D3.7`.
+   - `Mutations.md`: Transclusions `D3.4, D3.5`.
+   - `Biotechnology.md`: Transclusions `B1.2, D1.1, D1.2, D3.5`.
+   - `The Endocrine System.md`: Added Canadian discovery of insulin (Banting, Best, Collip, Macleod) (`A2.2`), environmental endocrine disruptors (`E1.2`), transclusions `A2.2, E1.2, E2.3, E3.3`.
+   - `Kidneys and Water Balance.md`: Transclusions `E2.1, E3.3`.
+   - `The Nervous System.md`: Added invertebrate response mechanisms (giant axons, taxis/kinesis) (`E2.4`), transclusions `E2.2, E2.4, E3.2`.
+   - `Homeostasis and Feedback.md`: Transclusions `E2.1, E2.3, E3.1`.
+   - `Population Growth.md`: Added fecundity and fluctuation mechanisms (`F3.3`), simulation connection (`F2.3`), transclusions `F2.1, F2.3, F3.1, F3.3`.
+   - `Interactions Between Species.md`: Transclusions `F3.2, F3.3, F3.5`.
+   - `Human Population and Sustainability.md`: Transclusions `F1.1, F1.2, F3.4`.
+
+3. **Investigations & Lab Protocols (`shared/Investigations/`)**:
+   - `Extracting DNA.md`: Created new investigation on isolating plant genomic DNA with detergent lysis, protease digestion, and ice-cold ethanol precipitation (`A1.2, A1.4, D2.3`).
+   - `Enzyme Activity.md`: Transclusions `A1.4, A1.8, B2.3, B2.4, B3.4`.
+   - `Osmosis in Plant Tissue.md`: Transclusions `A1.2, B2.2, B2.5, B3.6`.
+   - `Gel Electrophoresis.md`: Transclusions `A1.4, A1.6`.
+   - `Modelling Molecular Genetics.md`: Transclusions `A1.2, D2.1, D2.2, D2.4, D3.4`.
+   - `Heart Rate and Recovery.md`: Transclusions `A1.2, E2.1, E2.3, E3.1`.
+   - `Reaction Time and the Nervous System.md`: Transclusions `A1.2, E2.2, E2.4, E3.2`.
+   - `Sampling a Population.md`: Deduplicated `F2.3`, transclusions `A1.5, F2.2, F2.3`.
+   - `Modelling Population Growth.md`: Transclusions `F2.1, F2.2, F2.3, F3.1, F3.3`.
+
+4. **Tasks & Summative Evaluations (`shared/Tasks/`)**:
+   - `Biotechnology Brief.md`: Transclusions `A1.3, A1.7, A1.9, A2.1, B1.2, D1.1, D1.2, D3.5, D3.6`.
+   - `Enzyme Investigation.md`: Transclusions `A1.1, A1.5, A1.8, B1.1, B2.5, B3.4`.
+   - `Metabolism Case Study.md`: Transclusions `A1.7, A1.13, C1.1, C1.2, C2.1, C2.2, C3.1`.
+   - `Homeostasis Report.md`: Added academic documentation requirement and rubric row for citing clinical literature (`A1.7`), transclusions `A1.7, A1.11, E1.1, E1.2, E2.1, E2.3, E3.1, E3.3`.
+   - `Population Study.md`: Transclusions `A1.8, F1.1, F2.2, F3.2, F3.3, F3.4`.
+   - `Final Examination.md`: Transclusions `A1.12, B3.1, B3.2, B3.4, B3.5, C3.1, C3.2, C3.4, D2.2, D3.1, E3.1, F3.3, F3.5`.
+   - `Investigation Reports.md`: Transclusions `A1.6, A1.8, A1.10, A1.12, A1.13`.
+
+5. **Discussions, Setup & Class Pages**:
+   - `Discussions/What Can This Planet Support.md`: Transclusions `F1.1, F1.2, F3.4`.
+   - `Discussions/Testing on Animals.md`: Transclusions `E1.1, E1.2`.
+   - `Discussions/Who Gets the Cure.md`: Transclusions `A1.3, D1.1, D1.2`.
+   - `Setup/Working with Living Things.md`: Transclusion `A1.4`.
+   - `per_section/All Classes/Unit 1, Day 1.md`: Linked `[[Using a Microscope]]`.
+   - `per_section/All Classes/Unit 3, Day 2.md`: Linked `[[Extracting DNA]]`.
+
+---
+
+#### Adversarial Audit & Quality Control Review
+
+An adversarial subagent was invoked with instructions to refute, audit alignment against primary Ontario curriculum documents, check formatting rules in `SKILL.md`, and verify reachability.
+
+**Defects Found & Resolved:**
+1. *Defect:* `Final Examination.md` transcluded `E2.3` ("plan and conduct an investigation of a feedback system"), which is impossible on a 3-hour seated exam.  
+   *Resolution:* Removed `E2.3` from `Final Examination.md` (relying on `Homeostasis Report.md` where a physical/computational model is constructed).
+2. *Defect:* `Final Examination.md` transcluded `D3.7` ("historical scientific contributions") without any historical questions in the exam outline.  
+   *Resolution:* Removed `D3.7` from `Final Examination.md` (relying on `DNA Replication in Detail.md`, `Regulating Gene Expression.md`, and `Molecular Genetics Practice.md`).
+3. *Defect:* `Homeostasis Report.md` transcluded `A1.7` (academic documentation) without an explicit research citation requirement in the instructions or rubric.  
+   *Resolution:* Added a research evidence requirement and rubric row for primary clinical/physiological literature citations in accepted academic format.
+4. *Defect:* `Gel Electrophoresis.md` transcluded `D2.3` (DNA extraction) and `D2.4` (protein synthesis components), which did not match the gel run protocol.  
+   *Resolution:* Removed `D2.3` and `D2.4` from `Gel Electrophoresis.md`. Created `Extracting DNA.md` to authentically investigate DNA extraction (`D2.3`). Confirmed `D2.4` is authentically addressed in `Concepts/Transcription and Translation.md`, `Exercises/Molecular Genetics Practice.md`, and `Investigations/Modelling Molecular Genetics.md`.
+5. *Observation:* `Proteins and Enzymes.md` mentioned "Maud Menten", whereas the Ministry document spells it "Maude Menten".  
+   *Resolution:* Updated to note both historical accuracy and the curriculum spelling.
+
+---
+
+#### Final Verification Metrics (SBI4U)
+
+- **Total Specific Expectations:** 69 (`A1.1` – `F3.5`)
+- **Expectations Addressed $\ge 2$ Times:** 69 / 69 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Linter Results (`lint_payload.py SBI4U`):** Clean (266 pages checked, 86 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+---
+
+### 1.1 Coverage depth: SPH3U once-only expectations (28 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across SPH3U (Grade 11 Physics) by ensuring all 100 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (investigations, concept summaries, exercises, discussions, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding physics concepts over time.
+
+#### Baseline Findings (SPH3U)
+- Total expectations: 100 specific expectations (`A1.1` to `F3.10`)
+- Addressed only once (28 codes): `A2.2, B1.2, B2.9, B3.2, C1.1, C1.2, C2.2, D1.1, D2.1, D2.11, D2.6, D2.8, D2.9, D3.10, D3.11, D3.6, D3.7, D3.9, E1.2, E2.7, E3.3, E3.6, F1.1, F1.2, F2.4, F2.5, F3.1, F3.9`
+- Misplaced transclusions identified:
+  - `shared/Investigations/Specific Heat of a Metal.md` carried `D2.8` (mass-energy equivalence $E=mc^2$), which had no relevance to calorimetry; replaced with `D2.9` (specific heat capacity inquiry).
+  - `shared/Concepts/The Doppler Effect.md` carried `E2.7` (resonance in air columns); replaced with `E2.1` and placed `E2.7` appropriately in resonance-focused pages.
+
+#### Actions Completed
+
+1. **Exercises Enhancement (`shared/Exercises/`)**:
+   - `Kinematic Equation Practice.md`: Added questions 5–6 (stopping distance/photo radar/fuel efficiency, scalar vs vector distance/displacement/speed/velocity) and curriculum block for `B1.2`, `B2.3`, `B2.7`, `B3.2`.
+   - `Projectile Practice.md`: Added `B2.9` to curriculum block for 2D projectile motion inquiry and component calculations.
+   - `Force and Acceleration Practice.md`: Added questions 5–7 (low-friction magnetic bearings vs athletic shoe friction, vehicle crumple zones impact force reduction, elevator apparent weight and FBDs) and curriculum block for `C1.1`, `C1.2`, `C2.2`, `C2.5`, `C2.6`, `C3.3`.
+   - `Free-Body Diagram Practice.md`: Added questions 5–6 (sprinter starting blocks action-reaction/static friction, skydiver terminal velocity & parachute drag FBDs and net force) and curriculum block for `C1.1`, `C1.2`, `C2.1`, `C2.2`, `C3.1`, `C3.2`.
+   - `Energy Practice.md`: Added questions 6–10 (electric water heater power/efficiency/thermal losses, heating curve segments & KMT plateaus, nuclear fission mass defect and $E=mc^2$ vs fusion, calorimeter mixture specific heat capacity inquiry, radioisotope half-life decay & radiation shielding comparison) and curriculum block for `D1.1`, `D2.1`, `D2.2`, `D2.3`, `D2.4`, `D2.6`, `D2.8`, `D2.9`, `D2.11`, `D3.1`, `D3.3`, `D3.4`, `D3.6`, `D3.7`, `D3.9`, `D3.10`, `D3.11`.
+   - `Waves and Sound Practice.md`: Added questions 5–8 (principle of superposition and beat frequency, open/closed air column resonance and structural tuned mass dampers, bat echolocation time-of-flight and ultrasound resolution, decibel sound intensity comparison and noise cancellation/wall baffles) and curriculum block for `E1.2`, `E2.2`, `E2.4`, `E2.6`, `E2.7`, `E3.2`, `E3.3`, `E3.5`, `E3.6`.
+   - `Circuit Practice.md`: Added questions 5–8 (solenoid RHR and 3D closed magnetic field loops, high-voltage transformer transmission line $I^2R$ power loss and electrical safety/GFCI/clearance rules, Maglev trains and MRI superconducting electromagnet applications, Ontario electricity generation mix comparative efficiency and lifecycle sustainability) and curriculum block for `F1.1`, `F1.2`, `F2.3`, `F2.4`, `F2.5`, `F3.1`, `F3.4`, `F3.5`, `F3.6`, `F3.9`.
+
+2. **Concept Pages Alignment & Deepening (`shared/Concepts/`)**:
+   - `Describing Motion.md`: Added scalar vs vector classifications and transclusion `B3.2`.
+   - `Projectile Motion.md`: Added transclusion `B2.9`.
+   - `Newton's Laws.md`: Added technological and societal applications (low-friction bearings, athletic footwear, vehicle crumple zones, biomechanical prosthetics) and transclusions `C1.1, C1.2, C2.2`.
+   - `Thermal Energy and Heat.md`: Added heat pumps, refrigeration cycle, thermal power generation, and transclusions `D1.1, D2.1, D3.7`.
+   - `Conservation of Energy.md`: Added transclusion `D2.1`.
+   - `Nuclear Energy.md`: Added fission vs fusion comparison, mass defect and $E=mc^2$, Canadian scientists Harriet Brooks and Louis Slotin, and transclusions `A2.2, D2.8, D3.6, D3.9, D3.10, D3.11`.
+   - `Resonance and Standing Waves.md`: Added transclusions `E2.7, E3.3`.
+   - `Interference and Beats.md`: Added transclusions `E1.2, E3.3`.
+   - `Sound Waves.md`: Added natural wave phenomena (infrasound in earthquakes/whales, ultrasound in echolocation/sonography) and transclusion `E3.6`.
+   - `The Doppler Effect.md`: Replaced misplaced `E2.7` with `E2.1`.
+   - `Magnetic Fields.md`: Added transclusions `F1.1, F2.4`.
+   - `The Motor Principle.md`: Added transclusion `F3.1`.
+   - `Electromagnetic Induction.md`: Added transclusion `F1.2`.
+   - `Electric Current and Circuits.md`: Added practical electrical safety (GFCI outlets, fuses/circuit breakers, high-voltage clearances) and transclusion `F3.9`.
+
+3. **Investigations & Lab Protocols (`shared/Investigations/`)**:
+   - `Newton's Second Law.md`: Added transclusion `C2.2`.
+   - `Specific Heat of a Metal.md`: Replaced misplaced `D2.8` with `D2.9`.
+   - `Measuring the Speed of Sound.md`: Added transclusion `E2.7` (Method B air column resonance).
+   - `Mapping Magnetic Fields.md`: Added transclusions `F2.5, F3.1`.
+
+4. **Discussions & Tasks (`shared/Discussions/`, `shared/Tasks/`)**:
+   - `Discussions/Nuclear Power in Ontario.md`: Added transclusions `D1.1, D2.8, D3.6, D3.9, D3.10, D3.11`.
+   - `Discussions/Where Our Electricity Comes From.md`: Added transclusion `F1.2`.
+   - `Tasks/Motion Story.md`: Added transclusion `B3.2`.
+   - `Tasks/Model Roller Coaster.md`: Added transclusions `C1.1, D2.1`.
+   - `Tasks/The Energy Report.md`: Added transclusion `D2.1`.
+   - `Tasks/Sound in a Space.md`: Added transclusions `E1.2, E2.7`.
+   - `Tasks/Motor and Generator Report.md`: Added transclusions `F1.1, F3.9`.
+
+---
+
+#### Adversarial Audit & Quality Control Review (SPH3U)
+
+An adversarial subagent was invoked to refute claims of resolution, check curriculum fidelity, test KaTeX math syntax, and inspect task rubric alignments.
+
+**Defects Identified & Corrected:**
+1. *Defect:* `The Energy Report.md` initially carried transclusions for `A2.2, D2.6, D2.8, D2.11, D3.6, D3.9, D3.10, D3.11` without corresponding evaluation criteria in the task brief/rubric.  
+   *Resolution:* Removed those 8 transclusions from `The Energy Report.md`. Confirmed all 8 expectations are fully and authentically addressed $\ge 2$ times across `Nuclear Energy.md`, `Nuclear Power in Ontario.md`, `Energy Practice.md`, `Heating and Cooling Curves.md`, and `Where This Physics Leads.md`.
+2. *Defect:* `Motion Story.md` initially transcluded `B1.2` (technology assessment) while the brief only assesses video motion analysis.  
+   *Resolution:* Removed `B1.2` from `Motion Story.md`. Confirmed `B1.2` is authentically covered in `Speed Limiters and Highway Safety.md` and `Kinematic Equation Practice.md` (Question 5).
+3. *Defect:* `Sound in a Space.md` initially transcluded `E3.6` (natural phenomena: echolocation/infrasound) on an architectural acoustics task.  
+   *Resolution:* Removed `E3.6` from `Sound in a Space.md`. Confirmed `E3.6` is authentically covered in `Sound Waves.md`, `The Doppler Effect.md`, and `Waves and Sound Practice.md` (Question 7).
+
+---
+
+#### Final Verification Metrics (SPH3U)
+
+- **Total Specific Expectations:** 100 (`A1.1` – `F3.10`)
+- **Expectations Addressed $\ge 2$ Times:** 100 / 100 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Linter Results (`lint_payload.py SPH3U`):** Clean (319 pages checked, 86 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+---

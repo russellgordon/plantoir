@@ -83,15 +83,23 @@ Published at launch, on Unit 3, Day 11. Run them against your draft with
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.3]]
+
+![[A1.7]]
+
+![[A1.9]]
+
+![[A2.1]]
+
+![[B1.2]]
+
 ![[D1.1]]
 
 ![[D1.2]]
 
+![[D3.5]]
+
 ![[D3.6]]
-
-![[A2.1]]
-
-![[A1.9]]
 %%curriculum-end%%
 
 %%

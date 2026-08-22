@@ -38,7 +38,11 @@ sudden ones, because the electronics need a moment to catch up.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[E1.2]]
+
 ![[E2.6]]
+
+![[E3.3]]
 
 ![[E3.4]]
 %%curriculum-end%%

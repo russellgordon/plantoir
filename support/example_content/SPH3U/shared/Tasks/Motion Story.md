@@ -69,6 +69,8 @@ draw and your answer to step 4 are yours.
 
 ![[B3.1]]
 
+![[B3.2]]
+
 ![[A1.11]]
 %%curriculum-end%%
 

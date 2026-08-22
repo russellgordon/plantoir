@@ -109,6 +109,8 @@ are two people who have each done half the reading.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[F1.1]]
+
 ![[F1.2]]
 
 ![[F2.6]]
@@ -122,6 +124,8 @@ are two people who have each done half the reading.
 ![[F3.6]]
 
 ![[F3.8]]
+
+![[F3.9]]
 %%curriculum-end%%
 
 %%

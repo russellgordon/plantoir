@@ -51,11 +51,13 @@ acceleration against $1/m$.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[C2.5]]
+![[A1.1]]
 
 ![[A1.5]]
 
 ![[A1.10]]
 
-![[A1.1]]
+![[C2.2]]
+
+![[C2.5]]
 %%curriculum-end%%

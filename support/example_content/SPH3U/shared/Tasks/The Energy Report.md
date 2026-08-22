@@ -80,12 +80,6 @@ back to a press release is one source, not three.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D1.1]]
-
-![[D1.2]]
-
-![[D2.7]]
-
 ![[A1.3]]
 
 ![[A1.7]]
@@ -95,6 +89,14 @@ back to a press release is one source, not three.
 ![[A1.11]]
 
 ![[A2.1]]
+
+![[D1.1]]
+
+![[D1.2]]
+
+![[D2.1]]
+
+![[D2.7]]
 %%curriculum-end%%
 
 %%

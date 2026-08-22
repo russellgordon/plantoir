@@ -141,6 +141,10 @@ friction". The number is the point.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C1.1]]
+
+![[D2.1]]
+
 ![[D2.4]]
 
 ![[D3.1]]

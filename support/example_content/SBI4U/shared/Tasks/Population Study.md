@@ -86,13 +86,17 @@ with [[Judging Your Own Work]] on Unit 5, Day 12.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.8]]
+
 ![[F1.1]]
 
 ![[F2.2]]
 
 ![[F3.2]]
 
-![[A1.8]]
+![[F3.3]]
+
+![[F3.4]]
 %%curriculum-end%%
 
 %%

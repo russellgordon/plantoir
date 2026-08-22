@@ -52,9 +52,11 @@ $L_1$, $L_2$, three trials. Room temperature for both.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.13]]
+
 ![[E2.3]]
 
 ![[E2.5]]
 
-![[A1.13]]
+![[E2.7]]
 %%curriculum-end%%

@@ -29,9 +29,12 @@ disease.
 3. **The consequences**, followed through at least two systems.
 4. **Treatment**, named — the drug, hormone, or procedure — and which
    part of the loop it substitutes for.
-5. **What it cannot fix**, and why.
+5. **Research evidence and documentation**: Primary clinical or physiological
+   sources cited in accepted academic format for the disorder's molecular
+   mechanism and treatment efficacy.
+6. **What it cannot fix**, and why.
 
-6. **A working model you built.** Construct something physical or
+7. **A working model you built.** Construct something physical or
    computational that shows the loop behaving — a thermostat rig, a
    water-bath analogue, a spreadsheet or short program that oscillates
    around a set point and overshoots when the delay is lengthened.
@@ -41,7 +44,7 @@ disease.
    insulin, glucagon, ADH, the pituitary, the nephron, the synapse,
    dialysis where it applies, negative feedback, set point.
 
-Point 5 is where the strongest reports separate themselves: insulin
+Point 6 is where the strongest reports separate themselves: insulin
 replaces the effector's output but not its regulation, and saying exactly
 that is a Grade 12 answer.
 
@@ -56,6 +59,7 @@ Published on launch day, Unit 4, Day 8. Run them against your draft with
 | The break is located, not gestured at | One component named, and how it fails — a receptor that no longer binds is a different report from a gland that no longer secretes |
 | The consequences travel | Followed through at least two body systems, in the order they actually happen, with the intermediate step shown rather than skipped |
 | Treatment mapped onto the loop | Which component the treatment stands in for, and what it therefore cannot restore |
+| Documented from research | Primary clinical or physiological sources cited in accepted academic format, distinguishing established mechanisms from clinical trials |
 | The model behaves | Your rig, bath or program oscillates around a set point, its three components can be pointed at, and it does something different when you change one thing about it |
 | The words are the right words | Insulin, glucagon, ADH, the pituitary, the nephron, the synapse, dialysis, negative feedback, set point, receptor, effector — the ones your disorder touches, used where they belong and not as decoration |
 | A reader could follow it cold | Four pages that somebody who has not studied your disorder can read start to finish without going elsewhere for a definition |
@@ -63,17 +67,21 @@ Published on launch day, Unit 4, Day 8. Run them against your draft with
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.7]]
+
+![[A1.11]]
+
 ![[E1.1]]
+
+![[E1.2]]
+
+![[E2.1]]
+
+![[E2.3]]
 
 ![[E3.1]]
 
 ![[E3.3]]
-
-![[E2.1]]
-
-![[E2.2]]
-
-![[A1.11]]
 %%curriculum-end%%
 
 %%

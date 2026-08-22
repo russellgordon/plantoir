@@ -37,5 +37,9 @@ see [[Measuring the Speed of Sound]].
 
 ![[E2.5]]
 
+![[E2.7]]
+
+![[E3.3]]
+
 ![[E3.5]]
 %%curriculum-end%%

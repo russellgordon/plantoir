@@ -13,12 +13,15 @@ quickly" could mean almost anything.
 Physics fixes this with four quantities, each with a definition you can
 measure:
 
-| Quantity | Question it answers | Unit |
-| --- | --- | --- |
-| Position | Where is it, relative to an origin you chose? | m |
-| Displacement | How far from where it started, and in what direction? | m |
-| Velocity | How fast is the position changing, and which way? | m/s |
-| Acceleration | How fast is the velocity changing? | m/s² |
+| Quantity | Question it answers | Type | Unit |
+| --- | --- | --- | --- |
+| Time | When does it happen or how long does it take? | Scalar | s |
+| Distance | How much ground did it cover in total? | Scalar | m |
+| Position | Where is it, relative to an origin you chose? | Vector | m |
+| Displacement | How far from where it started, and in what direction? | Vector | m |
+| Speed | How fast is it covering ground? | Scalar | m/s |
+| Velocity | How fast is the position changing, and which way? | Vector | m/s |
+| Acceleration | How fast is the velocity changing? | Vector | m/s² |
 
 The chain matters: acceleration is a statement about velocity, and
 velocity is a statement about position. An object can have a large
@@ -41,4 +44,6 @@ numbers, and [[Motion Graphs]] for what it does to the pictures.
 ![[B2.1]]
 
 ![[B3.1]]
+
+![[B3.2]]
 %%curriculum-end%%
