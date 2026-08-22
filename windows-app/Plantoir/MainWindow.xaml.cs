@@ -655,7 +655,19 @@ public sealed partial class MainWindow : Window
     private async void Settings_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new AssistantSettingsDialog(Workspace.Settings) { XamlRoot = Content.XamlRoot };
-        await dialog.ShowAsync();
+        try
+        {
+            await dialog.ShowAsync();
+        }
+        finally
+        {
+            // Normally a no-op — Closed already did this — but if ShowAsync
+            // never got the dialog on screen at all (WinUI allows only one
+            // ContentDialog at a time), Closed never fires, and without this
+            // the dialog stays subscribed to the app-lifetime
+            // AssistModelStores registry forever.
+            dialog.DetachFromStores();
+        }
     }
 
     private async void About_Click(object sender, RoutedEventArgs e)
