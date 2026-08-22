@@ -101,34 +101,86 @@ APP, not as the shell it happens to run, or the operating system tells the
 teacher that "bash" — or, on the second attempt here, a person's name — wants
 to run in the background.
 
-### A bigger flag than any single item above
+## Windows no longer runs any of this in a container
 
-While verifying this file, it became clear that **no `setup.ps1` / `preview.ps1`
-/ `deploy.ps1` exist at the repository root any more, and `windows-app/` carries
-its own `Vendor/fetch-runtime.ps1` / bundled native runtime instead of a
-Docker/WSL2 container path.** Several reference sections further down this file
-(and in `WINDOWS-HANDOFF-COMPLETED.md`) still describe Windows driving PowerShell
-launchers that wrap a container — including the entire "Get-ToolchainHash batching"
-item and the WSL2 appendix's test plan. That architecture appears to have been
-superseded by a native-runtime approach (compare the favicon section's aside
-that this was written "after the Windows container was retired," and
-row 311's "Windows: the container is gone"). This was outside the scope of the
-26-item list this pruning pass was scoped to, so it has **not** been chased
-down or rewritten here — flagging it so the next session (or Russell) can
-decide whether `WINDOWS-HANDOFF.md`'s architecture sections need a fuller
-rewrite to match. See `MAC-HANDOFF.md` and `GUI-IMPROVEMENTS.md` entry 292 for
-whatever record already exists of that change.
+**Read this before the architecture sections below.** Windows dropped Docker,
+WSL2 and the whole image/container model on 2026-08-19 (`GUI-IMPROVEMENTS.md`
+entry 290) in favour of a **native runtime**: `windows-app/Vendor/fetch-runtime.ps1`
+fetches pinned, portable pieces — Node 20 (zip, no installer), Python 3.11
+(the embeddable distribution plus `python-frontmatter` and `Pillow`), a clone
+of Quartz v4.5.0 with this repo's `patches/` applied, wrangler, and the Noto
+emoji font — into `windows-app/Vendor/runtime/`, which the app then ships
+inside its own bundle the same way it ships the assistant's `llama/` engine.
+`setup.ps1` / `preview.ps1` / `deploy.ps1` **do still live at the repository
+root** (an earlier draft of this note said otherwise; that was wrong) and are
+mirrored into a working folder exactly as before, but their bodies changed:
+each now calls `Enter-NativeRuntime`, which points a shared set of
+`PLANTOIR_*` environment variables at the bundled runtime and the working
+folder, then runs `scripts/setup_course.py` / `build_site.py` / `deploy.py`
+directly with the runtime's own `python.exe` — no `docker`, no `wsl`, no
+image build, no administrator rights, and no one-time "Setting up this PC"
+wait. If a copy is missing its bundled runtime the launcher fails outright
+("This copy of Plantoir is missing its website builder... Reinstall
+Plantoir") rather than falling back to a container path, because there no
+longer is one.
+
+What replaces the old container concepts:
+
+- **No image, no tag, no registry.** There is nothing to hash into a
+  `teaching-quartz:src-<hash>` tag any more, and `Get-ToolchainHash` /
+  `Get-BuildContext` / `Ensure-ContainerRuntime` do not exist in the current
+  `.ps1` files — do not port them, and do not go looking for the batching fix
+  described further down this file (below, under "The recipe hash is on the
+  hot path") as if it still applies; it was superseded by removing the image
+  entirely, not fixed further.
+- **Isolation between working folders is a hashed *working-folder ID*, not a
+  container name.** All three launchers still compute `$WORKDIR_ID` — the
+  first 8 hex characters of SHA-256 over the folder's physical path (via
+  `GetFinalPathNameByHandleW`, the same Win32 call as before) plus a
+  newline, matching the mac's `pwd -P | shasum -a 256` derivation. A
+  `$CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"` variable is still
+  assigned in each script for parity with the mac's naming scheme, but
+  nothing native reads it — the real use of `$WORKDIR_ID` today is naming a
+  per-folder build directory, `%LOCALAPPDATA%\Plantoir\builds\<WORKDIR_ID>`,
+  so two working folders' builds never collide, and it moves build output
+  entirely **out of the working folder**, because teachers keep working
+  folders in OneDrive and a build's thousands of small files would sync and
+  lock in place there.
+- **Concurrent previews are still isolated by port, exactly as before.**
+  `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
+  base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
+  websocket) and prints the exact "Preview will be available at:" line the
+  app watches for. What changed is only what is listening on that port: a
+  Node process running directly on the PC, bound to `127.0.0.1` (patched at
+  runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
+  entry below), not a container's forwarded port.
+- **`preview.ps1 CODE N --stop` reclaims native processes, not a
+  container.** It matches `node.exe` / `python.exe` by command line
+  (`build_site.py --course=/--section=` for the build, the section's own
+  build-root path for the server) and walks parent/child links to catch
+  descendants, then kills them with `Stop-Process`. No container, no `docker
+  exec`, no engine to stop.
+
+`GUI-IMPROVEMENTS.md` entries 290 and 292 are the log rows for this change;
+`MAC-HANDOFF.md` is where its origin and reasoning are written up in full.
+The sections below that still described the old Docker/WSL2 container
+architecture as current have been corrected to match the above — where the
+old material is useful as history (why containers were tried, what WSL2 and
+Colima-parity cost, lessons that still generalize), it is kept but labelled
+as history, not as what Windows does today.
 
 
 ## What you are building
 
 A native Windows app wrapping the same toolchain the macOS app wraps. The
-toolchain itself is **shared and already done**: the Docker image recipe
-(`Dockerfile`, `patches/`, `scripts/`, `support/`), the Python that runs
-inside the container, and the PowerShell launchers (`setup.ps1`,
-`preview.ps1`, `deploy.ps1`) all live in this repository. The Windows app's
-job is the interface: the same behaviours as the macOS app, driving the
-`.ps1` launchers instead of the `.sh` ones.
+scripts themselves are **shared and already done**: `scripts/`, `support/`,
+and `patches/` (applied to a vendored Quartz clone) all live in this
+repository and are shared with the macOS app, which still runs them inside a
+Colima container — see the note above for why Windows itself does not. The
+PowerShell launchers (`setup.ps1`, `preview.ps1`, `deploy.ps1`) drive that
+shared Python natively on Windows; the Windows app's job is the interface:
+the same behaviours as the macOS app, driving the `.ps1` launchers instead of
+the `.sh` ones.
 
 **The specification is [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md)** — every
 numbered entry describes a behaviour the macOS app has, and every one carries
@@ -160,33 +212,49 @@ a judgement call on yours.
    them. Progress comes from parsing their output (milestone markers,
    `#N [k/n]` build steps, "N of M" upload counts, the announced preview
    address).
-3. **Free resources whenever possible.** Close a folder's last window →
-   stop that folder's container. Quit the app → stop the engine only if
-   nothing else is using it.
+3. **Free resources whenever possible.** On Windows there is no engine or
+   container to stop — the launchers run native processes directly, and
+   `preview.ps1 CODE N --stop` kills exactly that section's processes (see
+   below). Close a folder's last window → stop that folder's live previews.
+   Quit the app → nothing else to release; there is no shared engine.
 
 ## Architecture the app must reproduce
 
 - **Working folders**: a folder holding `courses/`, the three launchers,
-  and `.toolchain/` (the full image recipe, mirrored there by the app from
-  its own bundled copy — refresh any launcher/recipe file that differs
-  whenever the app works in a folder).
-- **Local image builds, no registry**: the launchers hash the recipe
-  (every file in the build context, pruning `.git`, `courses`, `mac-app`,
-  `node_modules`, `.merged_output`) and tag `teaching-quartz:src-<hash8>`.
-  A changed recipe → new tag → rebuild → recreated container. The `.ps1`
-  launchers already implement this (`Get-ToolchainHash`).
-- **One container per working folder**: named
-  `teaching-quartz-<first 8 hex of SHA-256 of the folder's physical path + newline>`.
-  The app must derive the identical name the launcher derives — beware
-  path canonicalization differences (macOS needed POSIX `realpath`; check
-  what PowerShell's `pwd -P` equivalent emits on Windows).
-- **Port blocks**: each container publishes a probed host block
-  (bases 8081, 8091, 8101, 8111, 8121, 8131): base..base+3 → container
-  8081–8084 (four concurrent previews per folder) and base+1000..+1003 →
-  9081–9084 (Quartz's live-reload websockets). The app leases ports per
-  folder (`PreviewLeases` in the macOS app), parses the announced
-  "Preview will be available at:" address rather than assuming it, and
-  refuses a duplicate preview of the same section in the same folder.
+  and `.toolchain/` (a mirror of `scripts/`, `support/` and the launchers
+  themselves, refreshed by the app from its own bundled copy whenever a
+  launcher/script file differs — a much smaller mirror than before, now
+  that there is no image recipe to carry). The bundled **native runtime**
+  (Node, Python, patched Quartz, wrangler, the emoji font — see
+  `Vendor/fetch-runtime.ps1`) is separate again: it lives once per Plantoir
+  install, not per working folder, and every working folder's launchers
+  point at the same copy via `PLANTOIR_RUNTIME`.
+- **No image, no tag, no registry.** There is nothing to build or cache
+  locally any more — `Get-ToolchainHash` does not exist in the current
+  `.ps1` files, and there is no equivalent to reproduce. (History: the old
+  container path hashed every file in the build context and tagged
+  `teaching-quartz:src-<hash8>`, rebuilding only when the recipe changed —
+  see "The recipe hash is on the hot path" below for why that mattered
+  while it existed, and note that it no longer does.)
+- **Isolation between working folders is a hashed working-folder ID, not a
+  container name.** Each launcher computes `$WORKDIR_ID` — the first 8 hex
+  characters of SHA-256 over the folder's physical path (via
+  `GetFinalPathNameByHandleW`) plus a newline — and uses it to name a
+  per-folder build directory, `%LOCALAPPDATA%\Plantoir\builds\<WORKDIR_ID>`,
+  outside the working folder entirely (so a working folder kept in OneDrive
+  never has its build output synced and locked). A `$CONTAINER_NAME =
+  "teaching-quartz-$WORKDIR_ID"` variable is still assigned in each script,
+  matching the mac's naming scheme, but nothing native reads it today —
+  don't build app logic around a container name existing.
+- **Port blocks**: `preview.ps1` still probes a free host port block
+  (bases 8081, 8091, 8101, 8111, 8121, 8131): base..base+3 for the preview
+  site (four concurrent previews per folder) and base+1000..+1003 for
+  Quartz's live-reload websockets. What is listening on those ports is now
+  a native Node process bound to `127.0.0.1`, not a container's forwarded
+  port. The app leases ports per folder (`PreviewLeases` in the macOS app),
+  parses the announced "Preview will be available at:" address rather than
+  assuming it, and refuses a duplicate preview of the same section in the
+  same folder.
 - **Course activity registry** (entry 104): one cross-window record of
   which courses are previewing (the port leases already know) or
   publishing (begin/end records around the publish flow, ended on EVERY
@@ -195,13 +263,17 @@ a judgement call on yours.
   Staleness lesson: read the enabled state when the menu OPENS, or make
   registry changes re-render whatever hosts the menu — a state captured
   at an earlier render shows yesterday's answer.
-- **Stopping a preview reclaims the container side** (entry 105): killing
-  the host-side launcher orphans the build or server INSIDE the
-  container (an orphaned build burns real CPU). `preview.ps1 CODE N
-  --stop` kills that section's container-side processes (found by
-  working directory, so other sections are safe) and never starts
-  anything. Call it fire-and-forget — output discarded — wherever a
-  preview ends: stop button, navigating away, window close.
+- **Stopping a preview reclaims native processes** (entry 105): killing
+  the host-side launcher orphans the build or server process it started
+  (an orphaned build burns real CPU). `preview.ps1 CODE N --stop` matches
+  that section's `node.exe` / `python.exe` processes by command line and
+  working directory (so other sections are safe), walks their descendants,
+  and `Stop-Process`es them — and never starts anything itself. Call it
+  fire-and-forget — output discarded — wherever a preview ends: stop
+  button, navigating away, window close. (History: this used to reclaim
+  the container-side processes an orphaned host script would otherwise
+  leave running inside Docker; the mechanism moved, the reason for having
+  it did not.)
 - **Backups and archives** (entry 106): three zip kinds share
   `courses/_backups/<CODE>/`, told apart ONLY by name —
   `<CODE>_backup_<timestamp>.zip` (teacher-made backups),
@@ -215,12 +287,17 @@ a judgement call on yours.
   confirmation states a FACT about what remains (live course / other
   copies / only remaining copy — a whole-course archive covers a
   section archive, never the reverse).
-- **Container engine**: Docker Engine in WSL2. The macOS zero-prerequisite
-  bootstrap (static Colima/Lima/docker/buildx downloads into the app's own
-  Application Support folder) needs a Windows analogue — silent WSL2 +
-  engine setup, per entry 72's note. Stop-at-quit analogue:
-  `wsl --terminate` only when nothing else runs in the distro.
-- **BuildKit is mandatory** — the legacy builder corrupts a layer.
+- **No engine to bootstrap.** `fetch-runtime.ps1` downloads pinned, portable
+  Node/Python/Quartz/wrangler binaries once (run before building the
+  Windows app, or shipped inside its bundle to a teacher) — there is no
+  WSL2, no Docker Engine, and nothing for the app to start, poll, or stop
+  at quit. (History: earlier Windows builds provisioned Docker Engine
+  inside WSL2 automatically, mirroring the mac's Colima bootstrap — see the
+  appendix at the end of this file. That entire path is gone; do not build
+  toward it.)
+- **BuildKit, the image tag, and "the legacy builder corrupts a layer" are
+  mac-only facts now** — Colima still needs them; native Windows has no
+  image and no builder of any kind.
 
 ## Config is the contract
 
@@ -360,35 +437,31 @@ shared Python: course-level pages now arrive with
   with a stable identity or Windows will re-prompt for permissions —
   same class of problem as macOS ad-hoc signing.
 - **Social cards & OpenGraph preview metadata** (entries 88, 268): nothing to do in C# — `scripts/social_card.py`
-  runs inside the container on every build to draw the 1200×630 card. `patches/Head.tsx`
+  draws the 1200×630 card on every build (inside the container on macOS,
+  natively on Windows — see the note above), `patches/Head.tsx`
   wires OpenGraph and Twitter card metadata, and `scripts/build_site.py` / `scripts/deploy.py`
   sync the live site domain into Quartz's `baseUrl` (falling back to `undefined` when unpublished).
-  Because the entire flow lives in the shared container toolchain, Windows inherits it automatically.
-- **The recipe hash is on the hot path** (entry 118) — and it was slow
-  on BOTH platforms, for the same reason in two dialects. The image tag
-  is a SHA-256 over every file in `.toolchain/`, and the recipe carries
-  the eighteen example-content payloads and the fifty subject skeletons:
-  **11,378 files** as of 2026-08-15, and still growing — it was 5,694 two days
-  earlier, which is the rate that makes this matter. The `.sh`
-  launchers spawned one `shasum` process per file (36s of a 36.75s
-  preview startup on an M4 Pro); they now pipe
-  `find -print0 | sort -z | xargs -0 shasum` and take 0.16s.
-  `Get-ToolchainHash` in the three `.ps1` launchers had the quadratic
-  version of the same bug: `$combined += (Get-FileHash …).Hash` inside
-  the loop, and PowerShell strings are immutable, so every one of those
-  thousands of appends reallocated a string heading for a third of a
-  megabyte. They now collect into `$hashes` and `-join` once. Measure this
-  when you test: on macOS the batched version hashed 5,694 files in 0.25s,
-  so anything near a second on Windows means the fix did not take.
-  **This change is committed but never executed — there is no PowerShell
-  on the Mac it was written on.** Please run it early and confirm two
-  things: that a preview still starts promptly, and that the tag it
-  prints is UNCHANGED from before the edit. The characters and their
-  order are meant to be identical, so the tag should be too; if it is
-  not, every Windows teacher takes one needless image rebuild.
-  Whatever else changes here, keep any per-file work out of a
-  per-invocation loop — this cost half a minute before every preview and
-  publish, and it grows with each payload added.
+  Because the entire flow lives in the shared Python scripts, Windows inherits it automatically
+  regardless of which runtime carries them.
+- **HISTORY — the recipe hash used to be on the hot path** (entry 118).
+  This entry describes a bug that existed only in the old container/image
+  architecture and **no longer applies**: Windows dropped the image tag
+  entirely on 2026-08-19 (see the note at the top of this file), and
+  `Get-ToolchainHash` does not exist in the current `.ps1` files. Kept here
+  because the underlying lesson generalises — **keep per-file work out of a
+  per-invocation loop** — and because the mac side still hashes something
+  comparable for its own image tag. What it used to say: the image tag was
+  a SHA-256 over every file in `.toolchain/`, which by 2026-08-15 carried
+  **11,378 files** across the example-content payloads and subject
+  skeletons; the `.sh` launchers originally spawned one `shasum` process
+  per file (36s of a 36.75s preview startup on an M4 Pro) before being
+  batched to `find -print0 | sort -z | xargs -0 shasum` (0.16s), and
+  `Get-ToolchainHash` in the old `.ps1` files had the same bug in its
+  PowerShell dialect — `$combined += (Get-FileHash …).Hash` inside a loop,
+  reallocating an immutable string thousands of times — fixed the same way
+  by collecting into an array and joining once. If a future Windows change
+  reintroduces any per-folder hash (for a future runtime version check, say),
+  re-learn this lesson rather than re-discovering it.
 
 
 ## The assistant's division of labour — the rule everything else follows
@@ -1781,10 +1854,14 @@ than a promise about always having a reader attached.
 
 - The **PowerShell launchers are tested on real Windows** — all three have
   been driven end to end through the app: course creation, preview (including
-  `--stop` reclaiming container-side processes), and publishing to all three
-  destinations, most recently a live Cloudflare Pages publish. The WSL2
-  background and the original test plan are the appendix at the end of this
-  file; read it for *why* the launchers look as they do, not as a to-do list.
+  `--stop` reclaiming native processes), and publishing to all three
+  destinations, most recently a live Cloudflare Pages publish. The appendix at
+  the end of this file is **doubly historical**: it documents the WSL2/Docker
+  Engine architecture the launchers used before the 2026-08-19 move to the
+  native runtime (see the note near the top of this file) — read it for the
+  reasoning behind that earlier design and the ConPTY/path-translation lessons
+  that still generalise, not as a description of what `setup.ps1` /
+  `preview.ps1` / `deploy.ps1` do today, and not as a to-do list.
   (An earlier version of this bullet said they were UNTESTED and told you to
   test them first. That was a week out of date and would have sent a session
   down a dead end.)
@@ -1849,38 +1926,53 @@ should mirror it:
 - [`research/ai-assist/`](research/README.md) — the assistant's
   measurements, and `HISTORY.md`, which is the feasibility work, the build
   handoff and the original MCP proposal in one place.
-- The WSL2 launcher background is the **appendix at the end of this file**.
+- The WSL2/Docker launcher background — history, superseded by the native
+  runtime on 2026-08-19 — is the **appendix at the end of this file**.
 - [`mac-app/`](mac-app/README.md) — the reference implementation; when an
   entry's Windows note is thin, read the Swift it references.
 
 
 ---
 
-# Appendix — WSL2 background and the original .ps1 test plan
+# Appendix — WSL2/Docker background and the original .ps1 test plan (SUPERSEDED)
 
-*Folded in from the former `WINDOWS-TESTING.md` on 2026-08-15. Read it for **why** the
-launchers look the way they do — the WSL2 container-runtime reasoning, the
-`ProcessStartInfo` token injection, the path translation — not as a to-do list.
-The launchers have since been driven end to end on real Windows 11, including a
-live Cloudflare Pages publish. Two facts in it were corrected on the way in: the
-token file is `/tmp/deploy_pat` (renamed when Cloudflare support arrived, since
-one file now serves both providers), and deploys are no longer Netlify-only.*
+> **This entire appendix describes an architecture Windows no longer runs.**
+> On 2026-08-19 the launchers dropped the Docker-Engine-inside-WSL2 path this
+> appendix documents in favour of a native runtime — see "Windows no longer
+> runs any of this in a container" near the top of this file, and
+> `GUI-IMPROVEMENTS.md` entry 290. There is no `Ensure-ContainerRuntime`, no
+> `docker` function, no image tag, and no WSL2 dependency in the current
+> `.ps1` files. **Read what follows as history** — why the WSL2/Docker design
+> was chosen over plain Docker Desktop, the `ProcessStartInfo`
+> token-injection and path-translation lessons (some of which still
+> generalise to the native code, some of which no longer apply at all), and
+> the shape of a real end-to-end test pass on Windows 11 — never as a
+> description of current behaviour or as a to-do list for new work.
 
-> **Status (2026-08-13): the launchers are no longer untested.** All three
-> have been exercised repeatedly on real Windows 11 through the app —
-> course creation, preview (including `--stop` reclaiming container-side
-> processes), and publishing to all three destinations, most recently a
-> live Cloudflare Pages publish end to end. Treat this file as **the WSL2
-> background and the original test plan**, not as a to-do list: the
-> historical detail on the Docker-Engine-in-WSL2 path, port blocks, and
-> line-ending traps is still the best explanation of *why* the Windows
-> launchers look the way they do.
+*Folded in from the former `WINDOWS-TESTING.md` on 2026-08-15, back when the
+WSL2/Docker path below was current. Two facts in it were corrected on the way
+in: the token file is `/tmp/deploy_pat` (renamed when Cloudflare support
+arrived, since one file now serves both providers), and deploys are no longer
+Netlify-only. Both of those facts are themselves now mac-only, since the
+token file and its container no longer exist on Windows.*
+
+> **Status (2026-08-13): the launchers are no longer untested.** — true at
+> the time, of the WSL2/Docker launchers this appendix describes. All three
+> had been exercised repeatedly on real Windows 11 through the app — course
+> creation, preview (including `--stop` reclaiming container-side
+> processes), and publishing to all three destinations, most recently a live
+> Cloudflare Pages publish end to end. Superseded by the same rewrite: the
+> current launchers have been re-tested end to end against the native
+> runtime (see "Testing" above), and this status line is left in place only
+> as part of the historical record, not as a current claim.
 >
 > One thing it does NOT cover, and worth knowing: `verify.sh`, the
 > toolchain gate named in [`CLAUDE.md`](CLAUDE.md), **cannot run
-> on Windows** — it is bash and expects `docker` on `PATH`, where here it
-> lives inside WSL2. Toolchain changes made on Windows are verified by
-> driving a real publish through the app instead.
+> on Windows** — it is bash and (as originally written) expected `docker` on
+> `PATH`. That remains true today, though the reason has changed: there is no
+> longer a `docker` to expect on Windows at all, containerized or otherwise.
+> Toolchain changes made on Windows are verified by driving a real publish
+> through the app instead.
 
 > **Audience:** a Claude Code session running on the maintainer's Windows 11 Pro
 > machine. This file gives you the context needed to test (and fix) this
