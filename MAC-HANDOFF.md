@@ -1126,6 +1126,129 @@ Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
 
+- ✅ DONE (Windows, 2026-08-22). **The Settings window's Download button did
+  nothing at all — fixed by porting the mac's shared-store architecture, not
+  just wiring the click.**
+
+  **The bug, reported directly**: "Nothing visibly happens when you press the
+  Download button to download the large or small model in the Settings
+  window for the local AI assistant. This works on macOS." The cause was
+  exactly that plain: `AssistantSettingsDialog.cs`'s Download button handler
+  was `button.Click += (_, _) => { /* Trigger download or inform */ };` — a
+  comment where the call should have been. The download MECHANICS
+  (`LocalModel.Install`, streaming with progress, exact-byte-size validation)
+  already existed and already worked — they were only ever wired to the
+  "open the assistant with no model yet" flow in `AssistWindow.xaml.cs`, never
+  to Settings.
+
+  **Fixed as a straight button-wiring patch would have shipped the mac's own
+  already-paid-for double-download bug.** Before touching the click handler,
+  read `mac-app/QuartzTeachers/Models/Assist/AssistModelStore.swift` and
+  `AssistModelStores.swift` — the mac's own doc comment on
+  `AssistModelStores` names the exact failure a naive Windows fix would have
+  reintroduced: "there used to be one `AssistModelStore` per PLACE that
+  cared: the settings panel made its own, and every assistant window made
+  another. A teacher who pressed Download in Settings and then opened the
+  assistant while it ran got a second store... deleting it... and starting
+  again. Two transfers writing to one destination, each undoing the other,
+  on a school connection, for gigabytes." Wiring Settings' button straight to
+  a fresh `LocalModel.Install()` call would have reproduced this immediately,
+  since `AssistWindow.xaml.cs` already ran its OWN independent download with
+  no shared state at all.
+
+  **What was built instead, matching the mac's architecture**: new
+  `Plantoir.Core/Assist/AssistModelStore.cs` — `AssistModelStore` (per-tier
+  state machine: Missing/Downloading/Ready/Failed, wrapping the pre-existing
+  `LocalModel.Install`, idempotent `Download()`/`Cancel()`/`Remove()`, a
+  `Changed` event in place of Swift's `@Observable`) and `AssistModelStores`
+  (a static per-tier registry — direct port of the mac's enum-based
+  singleton). `AssistantSettingsDialog.cs`'s housekeeping rows now read
+  live store state instead of raw file checks, with a progress bar, a "Stop"
+  button while downloading, and a failure line — matching
+  `AssistantSettingsView.swift`'s `downloadRow(for:)` shape.
+  `AssistWindow.xaml.cs`'s own download flow was rewired onto the SAME
+  shared store, so a download started in either place is visible — and is
+  the SAME download — in the other.
+
+  **Verified live against the real app** (UI Automation, no mock): clicked
+  Download in Settings, watched a genuine Hugging Face download run with
+  live-updating progress ("525.3 MB of 1.04 GB (49%)" → "Downloaded · 1.04 GB
+  on this PC"), clicked Remove, confirmed it correctly reverted to "Not
+  downloaded" with the file actually gone from disk. Screenshots taken at
+  each step. This is the class of bug a green unit suite would never have
+  caught on its own — nothing here was previously tested at all, on either
+  platform's Settings surface specifically.
+
+  **An adversarial audit (fresh sub-agent, no memory of this session, asked
+  to independently re-verify) caught a real regression before this shipped**:
+  the new `AssistWindow.xaml.cs` cancelled the SHARED download unconditionally
+  whenever its own window closed — including when Settings, not that window,
+  had started it. This is not a new mistake; it is the IDENTICAL bug the mac
+  found and fixed, on record as GUI-IMPROVEMENTS.md row 219 and
+  `AssistSession.swift`'s own `startedTheDownload` flag and doc comment:
+  "Closing a window that merely WATCHED must not cancel that." Fixed the same
+  way: a local `startedByThisWindow` bool, true only when THIS window's own
+  offer dialog was accepted, gating the cancel-on-close — an explicit Stop
+  (Settings' own button) still cancels unconditionally either way, matching
+  the mac's `stopDownload()` "an explicit stop is honoured wherever it came
+  from."
+
+  The same audit also found the `AssistModelRemoved` trail line was missing
+  the "how much space it freed" clause `shared-rules.json`'s
+  `activityTrail.mustRecord` requires and the mac's own line includes —
+  fixed (`"removed {tier} — {size} freed"`, word-for-word shape match) — and
+  a narrow leak where a Settings dialog that never actually got shown (WinUI
+  allows only one `ContentDialog` on screen; a fast double-invoke throws)
+  would stay subscribed to the app-lifetime store registry forever — fixed
+  with an idempotent `DetachFromStores()`, called from both `Closed` and a
+  `try/finally` at the call site.
+
+  **Two low-severity findings assessed and deliberately left as-is, not
+  silently dropped**: (1) two `AssistWindow`s opened within the same instant
+  for an un-downloaded tier can both show the "Download the assistant?"
+  offer dialog — `Download()`'s own guard makes this harmless in DATA terms
+  (no double-download), the only cost is a redundant dialog a teacher could
+  decline while a download genuinely runs elsewhere; a real fix needs new
+  synchronization surface on `AssistModelStore` this session judged not
+  worth adding blind, with no way to drive an actual two-window race live in
+  this environment. (2) `AssistModelStore`'s mutable state has no lock —
+  the mac's `@Observable` store is implicitly main-actor-isolated and race-
+  free by construction, this one is not, but every touched field is
+  atomically-sized on 64-bit .NET, so the worst case is one stale UI redraw,
+  self-correcting on the next `Changed` event, never a crash or torn read.
+
+  **Test coverage, and its honest boundary**: 12 new tests in
+  `AssistModelStoreTests.cs` cover store identity/sharing (the exact
+  double-download guarantee), disk-state reflection, and the synchronous
+  Download/Remove/Cancel guards — none touch the real network, since
+  `LocalModel`'s `HttpClient` has no injection seam, matching the mac's own
+  boundary (no dedicated `AssistModelStore` test file exists there either).
+  The `startedByThisWindow` fix itself is UI-embedded
+  (`ContentDialog.ShowAsync`, `Root.XamlRoot`) and not unit-testable in
+  isolation, same as the mac's equivalent `AssistSession`/`AssistWindowView`
+  logic — verified by direct code reading against the mac's own pattern, not
+  by an automated test, on both platforms.
+
+  **A real, pre-existing test-infrastructure bug found and fixed along the
+  way**: `LocalModelTests.cs` already set the static
+  `LocalModel.ModelDirectoryOverride` with no xUnit collection guard: adding
+  `AssistModelStoreTests.cs` (a second class touching the same static)
+  produced a genuine, observed intermittent failure the moment both classes
+  existed — xUnit parallelises test classes by default. Fixed by sharing a
+  new `DisableParallelization = true` collection between the two classes,
+  the identical pattern `ModelTests.cs`'s `SharedActivityState` already
+  established for the preview-lease/publish-registry statics. Confirmed
+  clean on 3 full-suite runs plus 5 targeted runs of the two classes
+  together after the fix, versus a real failure observed before it.
+
+  Full suite after every fix above: **620 tests, 620 passed**. Reference:
+  `Plantoir.Core/Assist/AssistModelStore.cs` (new),
+  `Plantoir/Views/AssistantSettingsDialog.cs`,
+  `Plantoir/Views/AssistWindow.xaml.cs`, `Plantoir/MainWindow.xaml.cs`
+  (`Settings_Click`), `Plantoir.Tests/AssistModelStoreTests.cs` (new),
+  `Plantoir.Tests/LocalModelTests.cs`
+  (`SharedLocalModelStateCollection`).
+
 - ✅ DONE (Windows, 2026-08-22). **An adversarial audit of the multi-destination
   deploy port found two real bugs in the assistant/MCP path — both fixed,
   both real, one predating this feature entirely.**

@@ -5,6 +5,21 @@ using Xunit;
 
 namespace Plantoir.Tests;
 
+/// <summary>
+/// LocalModel.ModelDirectoryOverride is a process-wide static, so every test
+/// class that sets it must not run at the same time as another one doing
+/// the same — xUnit runs test CLASSES in parallel by default, and two
+/// classes racing to set this to two different temp folders is exactly the
+/// hazard CLAUDE.md names for PreviewLeaseTests/CourseActivityTests: found
+/// here the same way, as a real (if occasional) test failure once a second
+/// class (AssistModelStoreTests) started touching the same static.
+/// </summary>
+[CollectionDefinition(SharedLocalModelState.Name, DisableParallelization = true)]
+public class SharedLocalModelStateCollection { }
+
+public static class SharedLocalModelState { public const string Name = "Process-wide local model directory override"; }
+
+[Collection(SharedLocalModelState.Name)]
 public class LocalModelTests : IDisposable
 {
     private readonly string _tempDir;
