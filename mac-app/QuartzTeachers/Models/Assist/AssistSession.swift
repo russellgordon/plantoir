@@ -169,7 +169,13 @@ final class AssistSession {
 
     /// Work out what this window can offer, and get as far towards a
     /// conversation as it can without asking the teacher anything.
-    func prepare() async {
+    ///
+    /// `openMainWindow` comes from `AssistWindowView`'s own `@Environment
+    /// (\.openWindow)` — the one capability only the local in-app assistant
+    /// has, letting a deploy or preview it starts put the section on screen
+    /// itself rather than running silently. See `AssistToolRunner.
+    /// revealSectionOnScreen`.
+    func prepare(openMainWindow: @escaping @MainActor () -> Void) async {
         // Claimed as the window opens, not when the engine is ready. A
         // teacher three minutes into a download has the assistant open as
         // far as they are concerned, and a second window started meanwhile
@@ -195,7 +201,7 @@ final class AssistSession {
             }
         }
 
-        await startEngine()
+        await startEngine(openMainWindow: openMainWindow)
     }
 
     /// Watch the download until it finishes or fails, mirroring its progress
@@ -231,7 +237,7 @@ final class AssistSession {
     }
 
     /// Start the server and build the agent.
-    private func startEngine() async {
+    private func startEngine(openMainWindow: @escaping @MainActor () -> Void) async {
         readiness = .starting
         let startedAt: Date = Date()
         ActivityTrail.note(
@@ -257,7 +263,9 @@ final class AssistSession {
             // needs the folder, not this window's particular section.
             let workspace: WorkspaceModel = WorkspaceModel()
             workspace.adoptRestoredPath(workingFolder.path)
-            let runner: AssistToolRunner = AssistToolRunner(workspace: workspace)
+            let runner: AssistToolRunner = AssistToolRunner(
+                workspace: workspace, openMainWindow: openMainWindow
+            )
             self.toolRunner = runner
             let agent: AssistAgent = AssistAgent(
                 courseCode: courseCode,

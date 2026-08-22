@@ -24,7 +24,8 @@ enum AssistFixture {
 
     @MainActor
     static func makeRunner(hasDeployedBefore: Bool = false,
-                            registeringPreview: Bool = false) throws
+                            registeringPreview: Bool = false,
+                            openMainWindow: (@MainActor () -> Void)? = nil) throws
         -> (root: URL, course: Course, runner: AssistToolRunner, siteWork: StubSiteWork) {
         let fileManager: FileManager = FileManager.default
         let root: URL = fileManager.temporaryDirectory
@@ -77,7 +78,8 @@ enum AssistFixture {
             workspace: workspace,
             siteWork: siteWork,
             today: CalendarDay(year: 2026, month: 9, day: 8)!,
-            launchControl: SilentLaunchControl()
+            launchControl: SilentLaunchControl(),
+            openMainWindow: openMainWindow
         )
 
         SectionWindowControllers.shared.forgetAll()

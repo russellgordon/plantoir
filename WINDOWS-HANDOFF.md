@@ -3860,6 +3860,165 @@ There is deliberately **no web manifest and no 192/512 PWA icon set**. That is
 Android home-screen and installable-app territory, not a favicon, and the
 teacher's site is neither.
 
+## The local assistant opens a window rather than deploying silently (entry 300)
+
+Reported directly, after driving the real app: "Deploying from the
+assistant does not show anything in the GUI... Using that command in the
+local assistant should simply do the same thing as pressing the Deploy
+button in the GUI." Traced before touching anything — this turned out to
+be a **pre-existing, deliberately documented design decision**
+(`documentation/10-local-ai-assistant.md`), not a regression from any
+recent change: `AssistToolRunner.deploySection`/`bringThePreviewUpToDate`
+have always forked on whether `SectionWindowControllers` has a registered
+controller for the section — window found, press its own Deploy/Preview
+(visible); no window, run the launcher headlessly (invisible) — and that
+fork groups THREE genuinely different callers as if they were the same
+case: the local in-app assistant, Claude Code over MCP
+(`Plantoir --mcp-stdio`), and a 6:30 a.m. scheduled deploy.
+
+**Only one of those three can actually do anything about it.** MCP is a
+separate process that never constructs a Scene graph at all — confirmed by
+reading `QuartzTeachersApp.init()`: `AssistMCPServer.serve(workingFolder:)`
+returns `Never` and blocks on `dispatchMain()` before `body` (and therefore
+every `WindowGroup`) is ever touched. A scheduled deploy runs with the app
+closed. Both must keep the silent fallback — there is no window for either
+to open, structurally, not as a design choice. The **local** assistant is
+different: it runs inside the same real, on-screen app session pressing
+the Deploy button would, with a live SwiftUI Scene graph and a genuine
+`@Environment(\.openWindow)` available — it was simply never given the
+capability to use it.
+
+### The fix: `openMainWindow`, threaded down from the one place that has it
+
+`AssistToolRunner` gained an optional stored closure,
+`openMainWindow: (@MainActor () -> Void)?`, defaulting to `nil` (so every
+existing caller — MCP, every test — needs zero changes). It is populated
+on exactly one path: `AssistWindowView` (a real SwiftUI `View`, therefore
+the only place `@Environment(\.openWindow)` is legally readable) declares
+`@Environment(\.openWindow) private var openWindow`, wraps it in a closure,
+and passes it through `AssistSession.prepare(openMainWindow:)` →
+`.startEngine(openMainWindow:)` → `AssistToolRunner.init(...,
+openMainWindow:)`.
+
+`AssistToolRunner.revealSectionOnScreen(course:sectionNumber:)` is the new
+function both `deploySection` and `bringThePreviewUpToDate` call when
+`sectionWindow(for:)` finds nothing, right before falling back to the old
+headless path:
+
+1. **Reuse an already-open window on the same working folder if one
+   exists** (`WorkspaceModel.windowModels`, a static registry every
+   on-screen window's model already adds itself to). This is the COMMON
+   case, not the exception — the assistant is almost always opened FROM an
+   already-open window's sidebar (`SidebarView.swift`'s
+   `openWindow(value: AssistWindowRequest(...))`), so most of the time a
+   window already exists, just not necessarily showing this section.
+2. **Only if none exists, open a fresh one** via the injected
+   `openMainWindow()`, then poll `WorkspaceModel.windowModels` briefly for
+   it to appear — its own `WindowRootView.onAppear` adopts the right
+   folder automatically via the pre-existing `adoptFolderForNewWindow()` /
+   `mostRecentKeyFolderPath` mechanism (a mid-session window opens where
+   the teacher most recently had a window key), so nothing new had to be
+   built for folder discovery.
+3. **Set that window's `.selection` to the target section**, activate the
+   app, and bring the window's own `NSWindow` forward
+   (`makeKeyAndOrderFront`) — `WorkspaceModel.window` already tracks this
+   per-window reference; no new AppKit plumbing beyond calling a method
+   that already existed.
+4. **Wait for `SectionWindowControllers` to actually register a
+   controller** before proceeding — moving `.selection` is not the section
+   appearing; `SectionDetailView` still has to mount on a real SwiftUI
+   render pass and run its own `.onAppear` first. Polled, the same shape
+   `ScriptRunner.waitUntilFinished()` already uses for a different kind of
+   "wait for something async to become true."
+
+If none of that produces a controller in time (should be rare — a few
+render passes, polled at 50ms), it falls through to the pre-existing
+headless path exactly as before. Nothing about the fallback itself
+changed; only the fork's THIRD branch (local assistant, no window YET)
+gained a real chance to become the first branch (window found) before
+falling all the way through.
+
+### Two things that did not work the way a first draft assumed — write them down so nobody re-tries them
+
+- **There is no bare, id-less `openWindow()` that opens "the app's one
+  plain WindowGroup."** A first pass assumed `WindowGroup("Plantoir") {
+  ... }` (no `id:`) could be opened in code with plain `openWindow()`,
+  mirroring how the Cmd+N default works automatically. It does not compile
+  — `error: missing argument for parameter 'id' in call`. Fixed by giving
+  the group an explicit `id: "main"` and calling `openWindow(id: "main")`,
+  the same pattern this codebase already uses successfully for `"about"`
+  and (with a data payload) `"assistant"`.
+- **Giving the main WindowGroup an id needed checking, not assuming, was
+  safe** — SwiftUI's own scene-keyed window restoration could plausibly
+  have started behaving differently. It doesn't, here: `WindowRootView`'s
+  own comment says outright that "per-window SwiftUI persistence is not
+  used for the folder at all" — restoration is handled entirely by the
+  app's own frame-keyed `WindowFolderMemory`, independent of any SwiftUI
+  scene id. Cmd+N is similarly unaffected, since SwiftUI generates the
+  standard New Window menu item per-scene regardless of whether that scene
+  has an id.
+
+### What is NOT covered by an automated test, and why
+
+The actual "a brand-new window appears with the right section on screen"
+flow needs a real SwiftUI render pass and a real `NSWindow` — no unit test
+can produce either. `AssistRevealsSectionOnScreenTests.swift` covers every
+piece of the DECISION logic that does not require one: an already-open
+window is found and reused (never re-opened); `openMainWindow` is
+never invoked when a matching window is already open, at both the
+`revealSectionOnScreen` layer and through the real `deploy_section` tool
+call; the nil-capability (MCP/scheduled) path returns immediately without
+touching any window state.
+
+**The full flow was verified by hand, driving the real app — and it
+caught a real bug the design above did not anticipate.** First pass: quit
+the main window, leave only the assistant chat open, ask it to preview.
+A brand-new window DID open — but it landed on "Choose Your Working
+Folder" instead of the section, because `revealSectionOnScreen` was
+relying on the new window's own `WindowRootView.onAppear` to guess the
+right folder (`adoptFolderForNewWindow`, keyed off whichever window was
+most recently KEY in AppKit's own terms) — a heuristic built for Cmd+N,
+where the app genuinely has no better answer. It has one here: the
+assistant's own `workspace.workspaceURL` already IS the answer. The
+fallback handled the miss safely (no crash, the pre-existing headless
+message), but the reveal itself failed — so `revealSectionOnScreen` was
+changed to identify the new window by IDENTITY (a before/after snapshot of
+`WorkspaceModel.windowModels`, not by folder path, since the new one has
+none yet) and call `adoptRestoredPath` on it directly, unconditionally,
+rather than trust the heuristic. Rebuilt, retested the identical way: the
+new window opened straight to "MCV4U-S1" with the correct working folder
+in its own breadcrumb, "Stop Preview" showing a build genuinely in
+progress, and the assistant's reply reading
+`AssistWording.previewIsRebuilding` — the SUCCESS path, not the fallback.
+This is exactly what rule 9 in `CLAUDE.md` promises and exactly why it is
+not optional for a change like this one: the unit suite was green through
+both the broken and the fixed version, because nothing in it constructs a
+real second window.
+
+### What Windows needs from this
+
+If the Windows local assistant has the same fork (window found → visible;
+no window → silent launcher run), it likely has the identical gap, since
+the underlying mistake — grouping "the in-app assistant with no window
+open yet" together with genuinely headless callers — is a reasoning error
+independent of platform. The fix is the same SHAPE, not this Swift: find
+whether a capability exists on that platform to open/focus a window from
+outside a View's own scope (WinUI's equivalent of `@Environment
+(\.openWindow)`), thread it down ONLY on the local-assistant path, and
+reuse an already-open window before opening a new one. Nothing here is
+shared code to port — it is the decision that travels.
+
+**One specific trap worth naming, since it cost a round trip here too:**
+if WinUI's new-window creation has any equivalent of "guess which folder
+to open based on whichever window was last active," do not lean on it for
+this feature. The caller (the local assistant) already knows the exact
+answer — set it directly on the freshly created window rather than trusting
+a heuristic built for a different situation (a teacher pressing New Window
+themselves, with no better source of truth available). Identify the new
+window by IDENTITY (whatever WinUI's equivalent of "not in the list of
+windows that existed a moment ago" is), not by the folder it's supposed to
+end up with — it has none yet.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
