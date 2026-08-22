@@ -175,9 +175,13 @@ day you had? And what did you not get to, and who should be told?
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B1.3]]
+
 ![[B1.5]]
 
 ![[B1.6]]
+
+![[B2.2]]
 
 ![[B2.3]]
 

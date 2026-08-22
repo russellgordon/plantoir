@@ -78,6 +78,16 @@ companion argument, about what you owe the people who come after you
 rather than the people who came before, is
 [[What Happens When You Leave]].
 
+%%curriculum-start%%
+## Curriculum connection
+
+![[D2.1]]
+
+![[D2.2]]
+
+![[D2.3]]
+%%curriculum-end%%
+
 [^licence]: Projects normally state their terms in a plain text file
     named `LICENSE` or `LICENCE` in the top folder, and often
     summarise it in the README. When your team publishes anything,

@@ -107,3 +107,13 @@ made from, and practice you do at home is never something I mark.
 That fourth row does double duty. It is how you see your own
 progress, and it is the individual evidence inside a team project
 that [[How Marks Work]] relies on.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A4.1]]
+
+![[B2.2]]
+
+![[D4.4]]
+%%curriculum-end%%

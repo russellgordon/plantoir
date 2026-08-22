@@ -18,11 +18,13 @@ want the idea in one place and in plain words.
 - [[Attributes and Methods]]
 - [[Encapsulation]]
 - [[Objects Working Together]]
+- [[How Numbers Actually Fit]]
 
 **Unit 2 — Data structures**
 
 - [[Dictionaries]]
 - [[Stacks and Queues]]
+- [[Two-Dimensional Data]]
 - [[Choosing a Data Structure]]
 - [[Recursion]]
 
@@ -37,6 +39,7 @@ want the idea in one place and in plain words.
 - [[Version Control]]
 - [[Testing and Regression]]
 - [[Software Project Management]]
+- [[Computing's Footprint]]
 - [[Ethics, Security, and the Profession]]
 
 Grade 11 asked whether your program works. This year the questions get

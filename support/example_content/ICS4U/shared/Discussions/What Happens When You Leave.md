@@ -76,3 +76,15 @@ demonstration. The practical craft sits in
 the record of what you decided and why — the thing nobody else can
 reconstruct — is your [[Code Journal]]. The related question, about
 who carries the cost after you go, is [[Who Maintains This]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.3]]
+
+![[B1.5]]
+
+![[B1.6]]
+
+![[D4.3]]
+%%curriculum-end%%

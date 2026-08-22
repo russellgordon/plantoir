@@ -19,7 +19,7 @@ tags:
    starts.
 3. Compare and name it: [[Reading Somebody Else's Code]]
 4. Tour of the site, so nothing here is hidden from you:
-   [[Using This Site]]
+   [[Using This Site]] and [[What This Site Can Do]]
 5. The year ahead: [[Learning Goals]] — where all of this is going
 6. Post your group's one-sentence answer to "what does it actually
    do?" — we keep every sentence on the wall all semester
@@ -28,4 +28,6 @@ tags:
 
 - [ ] Check [[What to Bring]] — every class this semester needs a
       machine that runs Python 3.
+- [ ] Try the five-minute [[Scavenger Hunt]] to get comfortable finding
+      things across the course.
 - [ ] Skim [[Code Journal]]; you write your first entry next class.

@@ -271,3 +271,15 @@ honest about how much Python will help you.
 > collected — the argument in
 > [[Ethics, Security, and the Profession]].
 
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.2]]
+
+![[A4.3]]
+
+![[C1.2]]
+
+![[C1.4]]
+%%curriculum-end%%
+

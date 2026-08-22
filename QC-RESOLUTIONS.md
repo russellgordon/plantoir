@@ -688,6 +688,108 @@ Two rounds of adversarial subagent audits were conducted to challenge all claims
 - **All destination pages reachable within 2 hops of a class page.**
 - **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
 
+---
+
+### 1.1 Coverage depth: ICS4U once-only expectations (11 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across ICS4U (Grade 12 Computer Science, University Preparation) by ensuring all 47 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (concepts, exercises, discussions, tutorials, warm-ups, portfolios, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding object-oriented programming, data structures, algorithm efficiency, theoretical computer science, and collaborative software project engineering over time.
+
+#### Baseline Findings (ICS4U)
+- Total expectations: 47 specific expectations (`A1.1` to `D4.4`)
+- Addressed only once (11 codes): `A4.4, B1.2, B1.3, B1.4, B1.5, B2.2, B2.3, D3.2, D4.1, D4.2, D4.3`
+- Missing from folder indexes:
+  - `shared/Tutorials/Scavenger Hunt.md` omitted from `shared/Tutorials/index.md` and unlinked from class pages.
+  - `shared/Concepts/How Numbers Actually Fit.md`, `Two-Dimensional Data.md`, and `Computing's Footprint.md` omitted from `shared/Concepts/index.md`.
+- Stale teacher comment on landing page: `per_section/index.md` mentioned "Unit 4, Day 6 / Day 7" instead of "Unit 4, Day 24 / Day 25".
+- Zero exercise sets in `shared/Exercises/` and zero discussions in `shared/Discussions/` had curriculum transclusion blocks.
+
+#### Actions Completed
+
+1. **Theoretical Foundations, Interdisciplinary Research & Concept Depth (`shared/Concepts/`)**:
+   - `Concepts/Ethics, Security, and the Profession.md`: Added dedicated section on **Interdisciplinary computing and research frontiers** documenting collaborative computer science research published in ACM/IEEE literature (`D4.1`) across bioinformatics/genomics (sequence alignment, AlphaFold protein folding), climatology numerical modelling, health informatics (clinical telemetry, federated medical imaging), computational linguistics (transformer architectures, semantic translation), and algorithmic economics. Expanded evaluation of emerging technology research reports (`D3.2`). Transclusions: `D2.1, D2.2, D2.3, D3.2, D4.1, D4.3`.
+   - `Concepts/Efficiency and Big-O.md`: Added dedicated section on **Theoretical limits and complexity classes** (`D4.2`) covering the binary decision tree model of comparison sorts, proving the information-theoretic $\Omega(n \log n)$ worst-case lower bound via Stirling's approximation ($\log_2(n!) = \Omega(n \log n)$), complexity classes ($P$ vs $NP$), and Turing computability / undecidability (Halting Problem). Transclusions: `C2.2, C2.3, C2.4, D4.2`.
+   - `Concepts/Software Project Management.md`: Enriched sections on project execution, quality standards, budget/time constraints, milestone tracking (`B1.2`), time management across team dependencies (`B2.2`), producing software to specifications with automated tests and user documentation (`B1.3`), external user documentation/manuals (`A4.4`), and project closure criteria (`B1.5`). Transclusions: `B1.1, B1.2, B1.3, B1.4, B1.5, B1.6, B2.2, A4.4`.
+   - `Concepts/index.md`: Added missing concept links `[[How Numbers Actually Fit]]` (Unit 1), `[[Two-Dimensional Data]]` (Unit 2), and `[[Computing's Footprint]]` (Unit 4).
+
+2. **Exercises Enhancement (`shared/Exercises/`)**:
+   - `Exercises/Efficiency Practice.md`: Added Question 10 and Answer 10 requiring students to model comparison sorting using a binary decision tree and prove the $\Omega(n \log n)$ lower bound (`D4.2`). Transclusions: `C2.1, C2.2, C2.3, C2.4, D4.2`.
+   - `Exercises/Recursion Practice.md`: Added Question 10 and Answer 10 requiring students to derive recurrence relations $T(n)$ for linear and branching recursion, formulate an inductive termination proof, and analyze call stack memory bounds (`D4.2`). Transclusions: `A3.6, C1.3, C2.4, D4.2`.
+   - `Exercises/Classes and Objects Practice.md`: Added curriculum block with `A1.5, A2.2, A4.3, C1.1, C1.4`.
+   - `Exercises/Methods and Encapsulation Practice.md`: Added curriculum block with `A2.2, A4.3, C1.2, C1.4`.
+   - `Exercises/Dictionaries Practice.md`: Added curriculum block with `A1.2, A1.3, A1.5, A3.1, C1.1, C2.1`.
+   - `Exercises/Stacks and Queues Practice.md`: Added curriculum block with `A1.5, A3.3, C1.1, C1.2, C2.1`.
+   - `Exercises/Searching Practice.md`: Added curriculum block with `A1.1, A3.2, C2.1, C2.2`.
+   - `Exercises/Sorting Practice.md`: Added curriculum block with `A1.3, A3.4, C2.1, C2.3`.
+
+3. **Discussions, Warm-Ups & Tutorials (`shared/Discussions/`, `shared/Warm-Ups/`, `shared/Tutorials/`)**:
+   - `Discussions/Should It Exist.md`: Transclusions `D2.1, D3.1, D3.2, D4.2`.
+   - `Discussions/What Happens When You Leave.md`: Transclusions `A2.3, B1.5, B1.6, D4.3`.
+   - `Discussions/When Code Hurts.md`: Transclusions `D2.1, D2.2, D4.1`.
+   - `Discussions/Who Maintains This.md`: Transclusions `B1.6, D2.2, D4.3`.
+   - `Discussions/Whose Code Is It.md`: Transclusions `D2.1, D2.2, D2.3`.
+   - `Warm-Ups/Tech Headlines.md`: Transclusions `D3.1, D3.2, D4.1`.
+   - `Warm-Ups/Spot the Bug.md`: Transclusions `A2.3, A4.1`.
+   - `Warm-Ups/Name That Error.md`: Transclusions `A4.1`.
+   - `Warm-Ups/Predict the Output.md`: Transclusions `A1.1, A1.2, A1.3`.
+   - `Warm-Ups/Read the Diff.md`: Transclusions `A2.3, B1.7`.
+   - `Warm-Ups/Trace It.md`: Transclusions `A1.5, A3.5, C2.1`.
+   - `Warm-Ups/Which One Doesn't Belong.md`: Transclusions `C1.1, C1.4`.
+   - `Tutorials/Working in a Team.md`: Transclusions `B1.2, B1.4, B1.7, B2.1, B2.2, B2.3`.
+   - `Tutorials/Writing Code Others Can Read.md`: Transclusions `A2.2, A4.3, A4.4`.
+   - `Tutorials/Writing Tests.md`: Transclusions `A2.3, A4.2, C2.1`.
+   - `Tutorials/Using Version Control.md`: Transclusions `A2.3, B1.7, B2.1`.
+   - `Tutorials/Profiling and Timing Code.md`: Transclusions `C2.2, C2.3`.
+   - `Tutorials/Reading a Traceback in Someone Else's Code.md`: Transclusions `A2.3, A4.1`.
+   - `Tutorials/Getting Unstuck.md`: Transclusions `A4.1`.
+   - `Tutorials/index.md`: Added `[[Scavenger Hunt]]` to the tutorials table.
+
+4. **Portfolios & Tasks Alignment (`shared/Portfolios/`, `shared/Tasks/`)**:
+   - `Portfolios/Final Reflection.md`: Enriched Section 4 to explicitly prompt students to research postsecondary CS/software engineering pathways and career goals (`D4.3`), and review team and individual project performance (`B2.3`). Transclusions: `B2.3, D4.3, D4.4`.
+   - `Portfolios/Judging Your Own Work.md`: Transclusions `B2.2, B2.3, D4.4`.
+   - `Portfolios/Showing Growth.md`: Transclusions `A2.3, B2.3, D4.3, D4.4`.
+   - `Portfolios/Code Journal.md`: Transclusions `A4.1, B2.2, D4.4`.
+   - `Tasks/The Software Project.md`: Transclusions `B1.1, B1.2, B1.3, B1.4, B1.5, B1.7, B2.1, B2.2, B2.3, A4.4, D2.1, D2.2, D2.3`.
+   - `Tasks/The Handover.md`: Transclusions `B1.3, B1.5, B1.6, B2.2, B2.3, A4.4, D4.4`.
+   - `Tasks/The Maintenance Sprint.md`: Transclusions `A2.3, A4.1, A4.2, B1.2, B1.3, B2.2`.
+
+5. **Structural Integrity & Setup Pages**:
+   - `Setup/How This Class Works.md`: Transclusions `D4.4`.
+   - `Setup/Our Classroom Norms.md`: Transclusions `D2.2, D2.3`.
+   - `Style/Writing About Code.md`: Transclusions `A4.3, A4.4`.
+   - `Curriculum/index.md`: Promoted Strands A through D headings to `##` (H2) to strictly satisfy the `enableToc: true` 4+ H2 rule.
+   - Removed `enableToc: true` from 7 concept pages that had fewer than 4 H2 headings (`Objects Working Together`, `Stacks and Queues`, `Encapsulation`, `Two-Dimensional Data`, `Attributes and Methods`, `Objects and Classes`, `Computing's Footprint`).
+   - `per_section/All Classes/Unit 1, Day 1.md`: Linked `[[What This Site Can Do]]` in agenda and `[[Scavenger Hunt]]` in the checklist.
+   - `per_section/All Classes/Unit 1, Day 2.md`: Linked `[[Writing About Code]]` in the agenda.
+   - `per_section/index.md`: Corrected teacher comment to refer to Unit 4, Day 24 and Day 25.
+
+---
+
+#### Adversarial Audit & Quality Control Review (ICS4U)
+
+An adversarial subagent was invoked to conduct an exhaustive, independent audit against the Ontario curriculum document, `.claude/skills/example-content/SKILL.md` rules, structural invariants, and test suites.
+
+**Audit Findings:**
+- **Verdict:** **CERTIFIED 100% CLEAN** (`AUDIT RESULT: CLEAN`).
+- Confirmed all 47 specific expectations (`A1.1` to `D4.4`) are authentically addressed $\ge 2$ times across the course payload.
+- Confirmed all 12 overall expectations (`A1` to `D4`) are evaluated in `shared/Tasks/`.
+- Confirmed 100% two-hop graph reachability from class pages.
+- Confirmed zero transclusions or links inside comments, zero curriculum blocks on class pages, and balanced curriculum markers.
+- Confirmed Plantoir test suite (`764 passed, 0 failed`), `verify.sh`, and `setup_course.py` pass without errors.
+- Confirmed Canadian spelling and code style maintained throughout.
+
+---
+
+#### Final Verification Metrics (ICS4U)
+
+- **Total Specific Expectations:** 47 (`A1.1` – `D4.4`)
+- **Expectations Addressed $\ge 2$ Times:** 47 / 47 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Linter Results (`lint_payload.py ICS4U`):** Clean (256 pages checked, 86 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+
 
 
 

@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 Two requests arrived from the library in the same week. The front desk
 wanted an undo button, because somebody keeps deleting the wrong hold.

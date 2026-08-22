@@ -95,3 +95,11 @@ Strong writing about technology sounds like a strong bug report: a
 claim, the evidence, and an honest note about what you do not yet
 know — which is exactly how the arguments in [[Should It Exist]] and
 [[When Code Hurts]] are meant to be conducted.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A4.3]]
+
+![[A4.4]]
+%%curriculum-end%%

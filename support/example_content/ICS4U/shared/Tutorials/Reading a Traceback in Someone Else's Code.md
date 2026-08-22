@@ -113,3 +113,11 @@ catch those. That is what [[Writing Tests]] is for, and it is why
 Drill the reading itself in [[Name That Error]]; the wider skill of
 finding your way around a program you did not write is
 [[Reading Somebody Else's Code]].
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A2.3]]
+
+![[A4.1]]
+%%curriculum-end%%

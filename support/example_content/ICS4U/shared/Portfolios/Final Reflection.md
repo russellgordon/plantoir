@@ -49,9 +49,16 @@ words, then show the now.
    with in October, if you can bear it.
 4. **What I left behind, and where this goes next.** What condition
    [[The Handover]] left your partner in, honestly, including what
-   will break first. Then the personal version: a course you might
-   take, something you want to build, and one first step you could
-   genuinely take in the next month.
+   will break first. Review your team and individual progress across
+   the project (`B2.3`) — what worked in your collaboration, what
+   failed, and what you learned about software teamwork. Then the
+   pathways reflection (`D4.3`): research and describe a postsecondary
+   pathway you are considering (such as university computer science,
+   software engineering, computer engineering, or college software
+   development) and the careers associated with computer studies that
+   excite you (systems analyst, site reliability engineer, software
+   architect, machine learning researcher), along with the preparation
+   they require.
 5. **Where I stand on the Essential Skills.** The Ontario Skills
    Passport names a set of skills and work habits that every kind of
    employment and study runs on; the ones this course leans on hardest
@@ -77,6 +84,10 @@ words, then show the now.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[B2.3]]
+
+![[D4.3]]
 
 ![[D4.4]]
 %%curriculum-end%%

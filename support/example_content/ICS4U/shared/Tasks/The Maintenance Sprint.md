@@ -175,6 +175,12 @@ and put a date on when it gets written down.
 ![[A4.1]]
 
 ![[A4.2]]
+
+![[B1.2]]
+
+![[B1.3]]
+
+![[B2.2]]
 %%curriculum-end%%
 
 %%

@@ -105,3 +105,13 @@ anything is submitted, and that habit outlasts every mark it rescues.
 > your own findings — the entry that says "not yet" in October and
 > the entry that says "fixed it, and here is the commit" in November
 > are the same claim, three weeks apart, with proof in between.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[B2.2]]
+
+![[B2.3]]
+
+![[D4.4]]
+%%curriculum-end%%

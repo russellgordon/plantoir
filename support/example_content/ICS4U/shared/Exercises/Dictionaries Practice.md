@@ -247,3 +247,19 @@ work below is one of two patterns: tally, or look up safely.
 > remove a member, or the two will drift apart. That trade is set out
 > in [[Choosing a Data Structure]].
 
+%%curriculum-start%%
+## Curriculum connection
+
+![[A1.2]]
+
+![[A1.3]]
+
+![[A1.5]]
+
+![[A3.1]]
+
+![[C1.1]]
+
+![[C2.1]]
+%%curriculum-end%%
+

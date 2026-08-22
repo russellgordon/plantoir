@@ -4,7 +4,6 @@ publish: true
 created: __CREATED__
 tags:
   - concepts
-enableToc: true
 ---
 The booking program had one rule: a room holds between one and thirty
 people. The rule was written, tested, and correct. Then a second file
