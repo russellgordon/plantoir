@@ -168,6 +168,11 @@ public sealed class AssistantSettingsDialog : ContentDialog
         // teacher opens the assistant while it runs, and vice versa.
         foreach (var tier in new[] { AssistModelTier.Small, AssistModelTier.Large })
             AssistModelStores.Store(tier).Changed += OnStoreChanged;
+
+        // So the Remove button disables itself live if a teacher opens an
+        // assistant window while Settings is already on screen, rather than
+        // only reflecting whatever was open when this dialog was built.
+        AssistActivity.Changed += OnStoreChanged;
         Closed += (_, _) => DetachFromStores();
 
         UpdateUI();
@@ -189,6 +194,7 @@ public sealed class AssistantSettingsDialog : ContentDialog
         _detached = true;
         foreach (var tier in new[] { AssistModelTier.Small, AssistModelTier.Large })
             AssistModelStores.Store(tier).Changed -= OnStoreChanged;
+        AssistActivity.Changed -= OnStoreChanged;
     }
 
     /// <summary>
@@ -286,8 +292,11 @@ public sealed class AssistantSettingsDialog : ContentDialog
         var info = new StackPanel { Spacing = 2 };
         info.Children.Add(new TextBlock { Text = tier.ChoiceLabel(), FontWeight = FontWeights.SemiBold });
 
+        string? removalReason = store.ReasonItCannotBeRemoved();
         string statusText = sizeOnDisk.HasValue && sizeOnDisk.Value >= tier.DownloadBytes()
-            ? $"Downloaded · {FormatBytes(sizeOnDisk.Value)} on this PC"
+            ? removalReason is not null
+                ? $"Downloaded · {FormatBytes(sizeOnDisk.Value)} on this PC · {removalReason}"
+                : $"Downloaded · {FormatBytes(sizeOnDisk.Value)} on this PC"
             : sizeOnDisk.HasValue
                 ? "A part-finished download · downloading again replaces it"
                 : $"Not downloaded · {tier.DownloadDescription()}";
@@ -315,7 +324,18 @@ public sealed class AssistantSettingsDialog : ContentDialog
         {
             button.Content = "Remove";
             AutomationProperties.SetAutomationId(button, $"assistantRemove{tier}");
-            button.Click += (_, _) => store.Remove();
+            if (removalReason is not null)
+            {
+                // Disabled rather than hidden — a teacher who wants the space
+                // back needs to see the button exists and read WHY it won't
+                // act yet, not wonder if Settings forgot this row.
+                button.IsEnabled = false;
+                ToolTipService.SetToolTip(button, removalReason);
+            }
+            else
+            {
+                button.Click += (_, _) => store.Remove();
+            }
         }
         else
         {

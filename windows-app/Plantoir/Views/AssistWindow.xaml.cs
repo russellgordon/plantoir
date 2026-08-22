@@ -97,6 +97,12 @@ public sealed partial class AssistWindow : Window
     /// </summary>
     private async Task Begin()
     {
+        // Claimed as the window opens, not once the engine is ready — a
+        // teacher three minutes into a download still has the assistant open
+        // as far as Settings' "may I remove this model" question is
+        // concerned. Mirrors the mac's AssistSession.prepare().
+        AssistActivity.Begin(_folder, _course.Code, _section);
+
         ActivityTrail.Note(ActivityTrail.Event.AssistantOpened,
             "assistant opened", _course.Code, _section);
         var startingAt = DateTime.UtcNow;
@@ -819,6 +825,12 @@ public sealed partial class AssistWindow : Window
     private void Shutdown()
     {
         try { _closing.Cancel(); } catch { }
+
+        // Released unconditionally, even if Begin() never got this far (the
+        // server was missing, or the teacher declined a download): if this
+        // does not run, Settings stays locked out of removing anything until
+        // the app restarts, which is worse than briefly under-counting.
+        try { AssistActivity.End(_folder, _course.Code, _section); } catch { }
 
         // WAITED ON, not fired and forgotten. The old version started this on
         // a background task and returned, so closing the window — or closing

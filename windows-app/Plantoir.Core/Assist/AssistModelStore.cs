@@ -133,12 +133,42 @@ public sealed class AssistModelStore
     }
 
     /// <summary>
-    /// Delete the weights to get the space back. Deliberately does no
-    /// "is it safe" check — whether it is safe to remove is a question
-    /// about which windows are open, which this type cannot see.
+    /// Why this model cannot be removed right now, in a teacher's words, or
+    /// null when it can be. Naming the section rather than saying "not
+    /// available" is the same rule <c>AssistActivity</c> follows elsewhere:
+    /// somebody told they cannot do a thing needs to know what to close.
+    ///
+    /// The guard is deliberately about ANY open assistant, not about whether
+    /// that window happens to be using this particular rung — mirrors the
+    /// mac's `AssistModelLibrary.reasonItCannotBeRemoved`. The window loaded
+    /// whatever was chosen when it opened, and the choice can have changed
+    /// since; working out which file is genuinely mapped into a running
+    /// `llama-server.exe` means tracking state this app does not keep, and
+    /// getting it wrong deletes the weights out from under a running engine.
+    /// </summary>
+    public string? ReasonItCannotBeRemoved()
+    {
+        if (!IsReady) return null;
+        if (AssistActivity.Active is not { } active) return null;
+        return $"Close the assistant for {active.CourseCode} Section {active.SectionNumber} " +
+               "before removing this.";
+    }
+
+    /// <summary>Whether the Remove button should do anything right now.</summary>
+    public bool MayRemove()
+    {
+        if (!IsReady) return false;
+        return ReasonItCannotBeRemoved() is null;
+    }
+
+    /// <summary>
+    /// Delete the weights to get the space back. Does nothing when it is not
+    /// allowed, so a stale view cannot remove what the panel says it cannot —
+    /// see <see cref="MayRemove"/>.
     /// </summary>
     public void Remove()
     {
+        if (!MayRemove()) return;
         Cancel();
         try
         {

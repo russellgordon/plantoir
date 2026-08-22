@@ -27,11 +27,16 @@ public sealed class AssistModelStoreTests : IDisposable
         // last test's temporary folder would answer questions about this
         // one's — the exact trap CLAUDE.md names for process-wide statics.
         AssistModelStores.Reset();
+        // Same reasoning: which assistant windows are "open" is process-wide
+        // too, and a session left over from a previous test would make this
+        // one's removal guard fire (or not fire) for the wrong reason.
+        AssistActivity.Reset();
     }
 
     public void Dispose()
     {
         AssistModelStores.Reset();
+        AssistActivity.Reset();
         LocalModel.ModelDirectoryOverride = null;
         try { Directory.Delete(_modelsFolder, recursive: true); } catch { }
     }
@@ -165,5 +170,102 @@ public sealed class AssistModelStoreTests : IDisposable
         AssistModelStores.Reset();
         var after = AssistModelStores.Store(AssistModelTier.Small);
         Assert.NotSame(before, after);
+    }
+
+    // ---- Remove refuses a model an open assistant window is using ------------
+    //
+    // The bug: a teacher downloads a model, opens the assistant (which spawns
+    // a llama-server.exe holding that file open), goes back to Settings and
+    // removes it — the current reply may survive on luck (the file handle
+    // Windows already opened), but the next prompt, a server restart, or a
+    // second window sees the weights gone. Settings must refuse before that
+    // point, not discover it later as a hang.
+
+    [Fact]
+    public void MayRemoveIsTrueWithNoAssistantWindowOpen()
+    {
+        PlaceModel(AssistModelTier.Small);
+        var store = AssistModelStores.Store(AssistModelTier.Small);
+        Assert.True(store.MayRemove());
+        Assert.Null(store.ReasonItCannotBeRemoved());
+    }
+
+    [Fact]
+    public void MayRemoveIsFalseWhileAnyAssistantWindowIsOpen()
+    {
+        PlaceModel(AssistModelTier.Small);
+        var store = AssistModelStores.Store(AssistModelTier.Small);
+        AssistActivity.Begin("C:\\Course", "COMP1", 1);
+
+        Assert.False(store.MayRemove());
+        Assert.NotNull(store.ReasonItCannotBeRemoved());
+    }
+
+    [Fact]
+    public void TheReasonNamesTheOpenSection()
+    {
+        PlaceModel(AssistModelTier.Small);
+        var store = AssistModelStores.Store(AssistModelTier.Small);
+        AssistActivity.Begin("C:\\Course", "COMP1", 3);
+
+        string? reason = store.ReasonItCannotBeRemoved();
+        Assert.Contains("COMP1", reason);
+        Assert.Contains("3", reason);
+    }
+
+    [Fact]
+    public void RemoveDoesNothingWhileAnAssistantWindowIsOpen()
+    {
+        PlaceModel(AssistModelTier.Small);
+        var store = AssistModelStores.Store(AssistModelTier.Small);
+        AssistActivity.Begin("C:\\Course", "COMP1", 1);
+
+        store.Remove();
+
+        Assert.True(store.IsReady);
+        Assert.Equal(AssistModelStoreState.Ready, store.State);
+        Assert.True(File.Exists(Path.Combine(_modelsFolder, AssistModelTier.Small.FileName())));
+    }
+
+    [Fact]
+    public void RemoveWorksAgainOnceTheWindowCloses()
+    {
+        PlaceModel(AssistModelTier.Small);
+        var store = AssistModelStores.Store(AssistModelTier.Small);
+        AssistActivity.Begin("C:\\Course", "COMP1", 1);
+        store.Remove();
+        Assert.True(store.IsReady);
+
+        AssistActivity.End("C:\\Course", "COMP1", 1);
+        store.Remove();
+
+        Assert.False(store.IsReady);
+    }
+
+    [Fact]
+    public void AnAssistantOpenForOneRungStillBlocksRemovingTheOtherRung()
+    {
+        // Mirrors the mac: the guard is about ANY open assistant, not about
+        // whether that window happens to be using this particular rung —
+        // working out which file is genuinely mapped into the running
+        // engine is state this app does not keep.
+        PlaceModel(AssistModelTier.Large);
+        var store = AssistModelStores.Store(AssistModelTier.Large);
+        AssistActivity.Begin("C:\\Course", "COMP1", 1);
+
+        Assert.False(store.MayRemove());
+    }
+
+    [Fact]
+    public void MayRemoveIsFalseWithNothingDownloadedRegardlessOfActivity()
+    {
+        // Nothing to remove is its own reason to say no — but the disabled
+        // button should not carry a confusing "close the assistant" message
+        // when there is no file to protect in the first place.
+        var store = AssistModelStores.Store(AssistModelTier.Small);
+        AssistActivity.Begin("C:\\Course", "COMP1", 1);
+
+        Assert.False(store.MayRemove());
+        Assert.Null(store.ReasonItCannotBeRemoved());
     }
 }
