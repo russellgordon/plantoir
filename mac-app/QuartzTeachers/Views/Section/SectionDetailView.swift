@@ -656,6 +656,28 @@ struct SectionDetailView: View {
             )
         }
 
+        // Claim the console for the deploy panel before touching the preview
+        // runner below. Stopping a running preview here sets its own
+        // `wasStoppedByUser`, which — until `deployRunner.run()` gives this a
+        // real timestamp a little further down — left `showsDeployProgress`
+        // comparing stale timestamps and picking the just-stopped preview
+        // panel, flashing "Stopped" for a beat before the deploy panel took
+        // over. Marking the deploy as started immediately keeps the console
+        // on the deploy panel through that whole window. The legs are reset
+        // to fresh, empty ones too — `run()` will do the same a little
+        // further down, but not resetting them here left the panel showing
+        // the PREVIOUS deploy's finished outcome (its own stale success or
+        // failure) for that same beat, which is no more honest than
+        // "Stopped" was.
+        deployRunner.startedAt = Date()
+        deployRunner.legs = []
+        for destination in destinations {
+            deployRunner.legs.append(MultiDestinationDeployRunner.Leg(destination: destination))
+        }
+        deployRunner.currentLegIndex = 0
+        deployRunner.wasCancelled = false
+        deployRunner.wasStoppedByUser = false
+
         // Stop any running or building preview before deploying, and wait for
         // container processes to exit so they cannot kill or race the deploy build.
         if previewRunner.isRunning {
