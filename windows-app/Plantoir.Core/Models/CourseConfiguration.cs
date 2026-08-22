@@ -129,7 +129,148 @@ public sealed class CourseConfiguration
     public string DeployTarget
     {
         get { var raw = StringValue("deploy_target"); return raw.Length == 0 ? "netlify" : raw; }
-        set => _values["deploy_target"] = value;
+        set
+        {
+            _values["deploy_target"] = value;
+            // A destination can never be both primary and additional at
+            // once — deploying to the same place twice makes no sense.
+            AdditionalDeployTargets = PruningAdditionalTargets(AdditionalDeployTargets, value);
+        }
+    }
+
+    /// <summary>
+    /// One additional (non-primary) destination this course also publishes
+    /// to, for redundancy — <see cref="DeployTarget"/> remains the primary.
+    /// <c>Type</c> uses the same spellings as <see cref="DeployTarget"/>;
+    /// <c>Path</c> is only meaningful when <c>Type</c> is "local_folder".
+    /// </summary>
+    public readonly record struct AdditionalDeployTarget(string Type, string Path);
+
+    /// <summary>One place this course publishes to — either the primary or one of <see cref="AdditionalDeployTargets"/>.</summary>
+    public readonly record struct DeployDestination(string Type, string Path);
+
+    /// <summary>
+    /// The three destinations Plantoir knows how to publish to, in the order
+    /// they are offered — shared by the primary picker and the
+    /// additional-targets list, so "one of each type" has a single place
+    /// that defines what a "type" even is. Mirrors the mac's
+    /// `CourseConfiguration.knownDeployTargetTypes`.
+    /// </summary>
+    public static readonly IReadOnlyList<string> KnownDeployTargetTypes =
+        new[] { "netlify", "cloudflare_pages", "local_folder" };
+
+    /// <summary>
+    /// Removes <paramref name="type"/> from <paramref name="targets"/> if
+    /// present — the one place that knows how to keep a primary choice and
+    /// an additional-targets list from ever agreeing on the same
+    /// destination twice. A plain function rather than an instance method,
+    /// so it is usable both by this class's own <see cref="DeployTarget"/>
+    /// setter and by a wizard's plain in-memory list, which has no
+    /// <see cref="CourseConfiguration"/> to route through until the course
+    /// is actually created.
+    /// </summary>
+    public static List<AdditionalDeployTarget> PruningAdditionalTargets(
+        IReadOnlyList<AdditionalDeployTarget> targets, string type) =>
+        targets.Where(t => t.Type != type).ToList();
+
+    /// <summary>Types available to add as an ADDITIONAL target for a given primary — every known type except that one.</summary>
+    public static List<string> AvailableAdditionalDeployTargetTypes(string primaryType) =>
+        KnownDeployTargetTypes.Where(t => t != primaryType).ToList();
+
+    /// <summary>Whether <paramref name="type"/> is present in <paramref name="targets"/>.</summary>
+    public static bool HasAdditionalDeployTarget(IReadOnlyList<AdditionalDeployTarget> targets, string type) =>
+        targets.Any(t => t.Type == type);
+
+    /// <summary>The stored path for an additional local-folder target, or "" when that type is not configured.</summary>
+    public static string AdditionalDeployTargetPath(IReadOnlyList<AdditionalDeployTarget> targets, string type)
+    {
+        foreach (var target in targets)
+            if (target.Type == type) return target.Path;
+        return "";
+    }
+
+    /// <summary>
+    /// Turns an additional target on or off. Turning one off drops it
+    /// entirely, including any path it carried — re-enabling it later starts
+    /// from a blank path rather than resurrecting the old one, so a stale
+    /// folder from months ago can never come back silently.
+    /// </summary>
+    public static List<AdditionalDeployTarget> SettingAdditionalDeployTarget(
+        IReadOnlyList<AdditionalDeployTarget> targets, bool enabled, string type)
+    {
+        var result = targets.Where(t => t.Type != type).ToList();
+        if (enabled) result.Add(new AdditionalDeployTarget(type, ""));
+        return result;
+    }
+
+    /// <summary>Updates the folder path for an additional local-folder target. A no-op if that type is not currently enabled.</summary>
+    public static List<AdditionalDeployTarget> SettingAdditionalDeployTargetPath(
+        IReadOnlyList<AdditionalDeployTarget> targets, string path, string type) =>
+        targets.Select(t => t.Type == type ? t with { Path = path } : t).ToList();
+
+    /// <summary>
+    /// Extra places this course ALSO publishes to, beyond <see cref="DeployTarget"/> —
+    /// for redundancy against one host having a bad day, never a replacement
+    /// for the primary choice: <see cref="DeployTarget"/> still decides where
+    /// the "Live URL" link on a finished deploy points.
+    ///
+    /// Empty for every course that has not opted in, which is the
+    /// overwhelming majority: the key is OMITTED from course_config.json
+    /// entirely rather than written as [], so a course nobody has touched
+    /// writes the exact same file this app has always written. At most one
+    /// entry per known type, and never a type that already IS the primary.
+    /// </summary>
+    public List<AdditionalDeployTarget> AdditionalDeployTargets
+    {
+        get
+        {
+            var result = new List<AdditionalDeployTarget>();
+            if (_values["additional_deploy_targets"] is not JArray array) return result;
+            foreach (var entry in array)
+            {
+                if (entry is not JObject obj) continue;
+                if (obj["type"] is not JValue { Type: JTokenType.String } typeValue) continue;
+                string type = (string)typeValue!;
+                if (type.Length == 0) continue;
+                string path = obj["path"] is JValue { Type: JTokenType.String } pathValue ? (string)pathValue! : "";
+                result.Add(new AdditionalDeployTarget(type, path));
+            }
+            return result;
+        }
+        set
+        {
+            if (value.Count == 0)
+            {
+                _values.Remove("additional_deploy_targets");
+                return;
+            }
+            var encoded = new JArray();
+            foreach (var target in value)
+            {
+                var entry = new JObject { ["type"] = target.Type };
+                if (target.Path.Length > 0) entry["path"] = target.Path;
+                encoded.Add(entry);
+            }
+            _values["additional_deploy_targets"] = encoded;
+        }
+    }
+
+    /// <summary>
+    /// Every destination this course publishes to, in deploy order — the
+    /// primary first, then each additional target in the order it was
+    /// added. This is the one list a multi-destination deploy walks; the
+    /// primary is not special beyond going first, which is only how the
+    /// "Live URL" link on a finished deploy is chosen.
+    /// </summary>
+    public List<DeployDestination> AllDeployDestinations
+    {
+        get
+        {
+            var result = new List<DeployDestination> { new(DeployTarget, DeployFolderPath) };
+            foreach (var target in AdditionalDeployTargets)
+                result.Add(new DeployDestination(target.Type, target.Path));
+            return result;
+        }
     }
 
     /// <summary>

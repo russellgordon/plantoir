@@ -603,9 +603,14 @@ public sealed partial class SidebarPane : UserControl
         if (Chosen() is not { } when) return;
 
         if (Workspace.WorkspacePath is not { } folder) return;
-        var deployArgs = DeployCommand.Arguments(course.Code, number, course.Configuration, Workspace.Settings.CloudflareAccountId);
+        // One argument list per configured destination, in the same order
+        // AllDeployDestinations deploys in — the primary first, then each
+        // additional destination.
+        var deployArgumentsList = course.Configuration.AllDeployDestinations
+            .Select(destination => DeployCommand.Arguments(course.Code, number, destination, Workspace.Settings.CloudflareAccountId))
+            .ToList();
         if (TaskScheduling.Schedule(TaskScheduling.NameFor(course.Code, number),
-                                    folder, course.Code, number, when, deployArgs) is { } failure)
+                                    folder, course.Code, number, when, deployArgumentsList) is { } failure)
         {
             await ShowError("That couldn't be scheduled", failure);
             return;

@@ -740,16 +740,28 @@ public class ContractTests
             string cloudflareAccountID = given["cloudflareAccountID"]?.ToString() ?? "0123456789abcdef0123456789abcdef";
             bool hasDeployed = given["hasDeployedBefore"]?.GetValue<bool>() ?? true;
 
+            // An ADDITIONAL destination — present only on the cases entry
+            // 305 added. additionalTargetHasDeployedBefore defaults to true
+            // so the "never deployed" case fires only when a scenario asks
+            // for it explicitly.
+            string? additionalTarget = given["additionalTarget"]?.ToString();
+            string additionalFolderPath = given["additionalFolderProblem"]?.GetValue<bool>() == true ? "" : "C:\\Sites\\additional";
+            bool additionalHasDeployed = given["additionalTargetHasDeployedBefore"]?.GetValue<bool>() ?? true;
+
             string tempDir = Directory.CreateTempSubdirectory("contract-sched-deploy").FullName;
             try
             {
+                string additionalTargetsJson = additionalTarget is null
+                    ? "[]"
+                    : $$"""[{"type": "{{additionalTarget}}", "path": "{{additionalFolderPath.Replace("\\", "\\\\")}}"}]""";
                 var config = CourseConfiguration.FromBytes(System.Text.Encoding.UTF8.GetBytes($$"""
                 {
                     "course_code": "ICS3U",
                     "course_name": "Computer Science",
                     "section_numbers": [1],
                     "deploy_target": "{{target}}",
-                    "deploy_folder_path": "{{folderPath.Replace("\\", "\\\\")}}"
+                    "deploy_folder_path": "{{folderPath.Replace("\\", "\\\\")}}",
+                    "additional_deploy_targets": {{additionalTargetsJson}}
                 }
                 """));
                 var course = new Course("ICS3U", tempDir, config);
@@ -766,6 +778,12 @@ public class ContractTests
                         Directory.CreateDirectory(Path.Combine(tempDir, ".netlify_sites"));
                         File.WriteAllText(Path.Combine(tempDir, ".netlify_sites", "section1.json"), "{}");
                     }
+                }
+                if (additionalTarget is not null && additionalHasDeployed)
+                {
+                    string folderName = additionalTarget == "cloudflare_pages" ? ".cloudflare_sites" : ".netlify_sites";
+                    Directory.CreateDirectory(Path.Combine(tempDir, folderName));
+                    File.WriteAllText(Path.Combine(tempDir, folderName, "section1.json"), "{}");
                 }
 
                 string? problem = ScheduledDeploy.Problem(course, 1, when, now, cloudflareAccountID);
@@ -790,6 +808,16 @@ public class ContractTests
                             break;
                         case "neverDeployed":
                             Assert.Contains("has never been deployed", problem);
+                            break;
+                        case "additionalDeployFolderNeedsAttention":
+                            Assert.Contains("also deploys to a folder", problem);
+                            Assert.Contains("needs attention first", problem);
+                            break;
+                        case "additionalCloudflareAccountMissing":
+                            Assert.Contains("also deploys to Cloudflare Pages, which needs your Account ID", problem);
+                            break;
+                        case "additionalDestinationNeverDeployed":
+                            Assert.Contains("has never been deployed to", problem);
                             break;
                         default:
                             Assert.Fail($"Unknown refusal case: {expectRefusal}");

@@ -44,6 +44,33 @@ public static class AssistWording
     public static string DeployDidNotFinish(string course, string section) =>
         $"The deploy of {course} Section {section} did not finish. {WhereTheOutputIs}";
 
+    /// <summary>
+    /// Said only when a course has MORE THAN ONE deploy destination
+    /// configured and every one of them succeeded — a course with exactly
+    /// one destination (the overwhelming majority) always uses
+    /// <see cref="Deployed"/> above instead, unchanged, so nothing about a
+    /// teacher's experience changes unless they opted into redundancy.
+    /// </summary>
+    public static string DeployedToMultipleDestinations(string course, string section, int destinationCount) =>
+        $"{course} Section {section} is deployed to all {destinationCount} destinations you " +
+        "configured. Students can reach it now.";
+
+    /// <summary>
+    /// Said when a multi-destination deploy finished with SOME destinations
+    /// succeeding and others not. <paramref name="failedDestinations"/> is
+    /// already joined into words ("Cloudflare Pages" or "Cloudflare Pages
+    /// and your folder") by the caller, which is the one place that knows
+    /// the list — this table only ever holds whole sentences, never
+    /// list-joining logic.
+    /// </summary>
+    public static string DeployPartiallySucceeded(string course, string section, string failedDestinations) =>
+        $"{course} Section {section} deployed to some of its destinations, but not " +
+        $"{failedDestinations}. {WhereTheOutputIs}";
+
+    /// <summary>Said when a multi-destination deploy finished and NONE of its destinations succeeded.</summary>
+    public static string DeployToMultipleDestinationsDidNotFinish(string course, string section) =>
+        $"The deploy of {course} Section {section} did not finish, on any of its destinations. {WhereTheOutputIs}";
+
     public static string SectionIsBusy(string course, string section) =>
         $"{course}-S{section} is already busy in Plantoir. Wait for that to finish, then deploy.";
 

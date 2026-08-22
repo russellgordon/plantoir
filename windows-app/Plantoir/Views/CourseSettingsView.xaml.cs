@@ -155,7 +155,8 @@ public sealed partial class CourseSettingsView : UserControl
             // kept in app settings and saved as it is typed — a teacher
             // should never enter it twice.
             () => _window.Workspace.Settings.CloudflareAccountId,
-            v => { _window.Workspace.Settings.CloudflareAccountId = v; _window.Workspace.Settings.Save(); });
+            v => { _window.Workspace.Settings.CloudflareAccountId = v; _window.Workspace.Settings.Save(); },
+            () => Config.AdditionalDeployTargets, v => Config.AdditionalDeployTargets = v.ToList());
         _publishingChoice.Changed += MarkChanged;
         Form.Children.Add(_publishingChoice.Root);
 
@@ -269,7 +270,10 @@ public sealed partial class CourseSettingsView : UserControl
 
         BuildFontRows(section);
 
-        // Advanced: the custom domain, collapsed by default.
+        // Advanced: the custom domain, collapsed by default. One field per
+        // destination that can have a domain (never local_folder — a
+        // domain is something a browser visits, and a folder is not).
+        // Mirrors the mac's SectionSettingsView (row 307).
         var advanced = new Expander
         {
             Header = "Advanced",
@@ -277,28 +281,40 @@ public sealed partial class CourseSettingsView : UserControl
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             Margin = new Thickness(0, 8, 0, 0),
         };
-        var domainBox = new TextBox
+        var domainDestinations = Config.AllDeployDestinations.Where(d => d.Type != "local_folder").ToList();
+        var domainArea = new StackPanel { Spacing = 8 };
+        foreach (var destination in domainDestinations)
         {
-            Text = Config.CustomDomain(section),
-            IsSpellCheckEnabled = false,
-        };
-        var domainPanel = FormBuilders.LabeledRow("Custom domain", domainBox);
-        var domainCaption = FormBuilders.ExampleCaption(
-            "e.g. ics3u.yourschool.ca — links to your live site will use this domain instead of the Netlify address. Your site must already answer there (set the domain up in Netlify first). Leave empty to use the Netlify address.");
-        var domainWarning = FormBuilders.WarningCaption("That doesn't look like a domain — e.g. ics3u.yourschool.ca");
-        domainWarning.Visibility = Visibility.Collapsed;
-        domainPanel.Children.Add(domainWarning);
-        domainPanel.Children.Add(domainCaption);
-        domainBox.TextChanged += (_, _) =>
-        {
-            Config.SetCustomDomain(section, domainBox.Text);
-            MarkChanged();
-            string entry = domainBox.Text.Trim();
-            bool odd = entry.Length > 0 && (entry.Contains(' ') || !entry.Contains('.'));
-            domainWarning.Visibility = odd ? Visibility.Visible : Visibility.Collapsed;
-            domainCaption.Visibility = odd ? Visibility.Collapsed : Visibility.Visible;
-        };
-        advanced.Content = domainPanel;
+            string destinationType = destination.Type;
+            string label = domainDestinations.Count > 1
+                ? $"{DeployCommand.DestinationDescription(destination)} custom domain"
+                : "Custom domain";
+            string serviceName = DeployCommand.DestinationDescription(destination);
+
+            var domainBox = new TextBox
+            {
+                Text = Config.CustomDomain(section, destinationType),
+                IsSpellCheckEnabled = false,
+            };
+            var domainPanel = FormBuilders.LabeledRow(label, domainBox);
+            var domainCaption = FormBuilders.ExampleCaption(
+                $"e.g. ics3u.yourschool.ca — links to your live site will use this domain instead of the {serviceName} address. Your site must already answer there (set the domain up in {serviceName} first). Leave empty to use the {serviceName} address.");
+            var domainWarning = FormBuilders.WarningCaption("That doesn't look like a domain — e.g. ics3u.yourschool.ca");
+            domainWarning.Visibility = Visibility.Collapsed;
+            domainPanel.Children.Add(domainWarning);
+            domainPanel.Children.Add(domainCaption);
+            domainBox.TextChanged += (_, _) =>
+            {
+                Config.SetCustomDomain(section, destinationType, domainBox.Text);
+                MarkChanged();
+                string entry = domainBox.Text.Trim();
+                bool odd = entry.Length > 0 && (entry.Contains(' ') || !entry.Contains('.'));
+                domainWarning.Visibility = odd ? Visibility.Visible : Visibility.Collapsed;
+                domainCaption.Visibility = odd ? Visibility.Collapsed : Visibility.Visible;
+            };
+            domainArea.Children.Add(domainPanel);
+        }
+        advanced.Content = domainArea;
         Form.Children.Add(advanced);
     }
 

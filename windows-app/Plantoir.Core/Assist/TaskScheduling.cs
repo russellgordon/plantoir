@@ -23,11 +23,33 @@ public static class TaskScheduling
     private static readonly string[] DateFormats = ["yyyy/MM/dd", "MM/dd/yyyy", "dd/MM/yyyy"];
 
     /// <summary>
-    /// Create (or replace) a scheduled deploy. Returns null on success, or the
-    /// reason it could not be scheduled.
+    /// Create (or replace) a scheduled deploy for a SINGLE destination.
+    /// Returns null on success, or the reason it could not be scheduled. A
+    /// thin wrapper over the multi-destination overload below, kept so
+    /// every existing caller written against "this course's ONE
+    /// destination" keeps working unchanged.
     /// </summary>
     public static string? Schedule(string taskName, string workingFolder, string courseCode,
-                                   int section, DateTime when, IReadOnlyList<string>? deployArguments = null)
+                                   int section, DateTime when, IReadOnlyList<string>? deployArguments = null) =>
+        Schedule(taskName, workingFolder, courseCode, section, when,
+            new List<IReadOnlyList<string>> { deployArguments ?? new List<string> { courseCode, section.ToString() } });
+
+    /// <summary>
+    /// Create (or replace) a scheduled deploy across one or more
+    /// destinations. Returns null on success, or the reason it could not be
+    /// scheduled.
+    ///
+    /// A single destination — the overwhelming majority of courses —
+    /// behaves EXACTLY as before: one inline command, no wrapper script.
+    /// Two or more write a small wrapper .ps1 that runs each destination's
+    /// deploy.ps1 invocation in turn, deliberately NOT chained with
+    /// `-and`/`&amp;&amp;` — a destination failing must not stop the others
+    /// from running, the same "redundancy" rule the mac's `oneShotCommand`
+    /// encodes as un-chained shell lines. Mirrors
+    /// `ScheduledDeploy.oneShotCommand`.
+    /// </summary>
+    public static string? Schedule(string taskName, string workingFolder, string courseCode,
+                                   int section, DateTime when, IReadOnlyList<IReadOnlyList<string>> deployArgumentsList)
     {
         // The launcher does the deploy, exactly as the app does it. Quoted for
         // schtasks, which takes the whole command as one argument and would
@@ -36,13 +58,20 @@ public static class TaskScheduling
         if (!File.Exists(launcher))
             return $"There is no deploy.ps1 in {workingFolder}, so there is nothing to schedule.";
 
-        string argString = deployArguments != null && deployArguments.Count > 0
-            ? string.Join(" ", deployArguments)
-            : $"{courseCode} {section}";
-
-        string command =
-            $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\\"{launcher}\\\" " +
-            argString;
+        string command;
+        if (deployArgumentsList.Count <= 1)
+        {
+            string argString = deployArgumentsList.Count == 1 && deployArgumentsList[0].Count > 0
+                ? string.Join(" ", deployArgumentsList[0])
+                : $"{courseCode} {section}";
+            command = $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\\"{launcher}\\\" " + argString;
+        }
+        else
+        {
+            if (WriteWrapperScript(taskName, launcher, deployArgumentsList) is not { } scriptPath)
+                return "The scheduled deploy's wrapper script could not be written.";
+            command = $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\\"{scriptPath}\\\"";
+        }
 
         // schtasks accepts the date in the format the MACHINE's locale uses,
         // and rejects every other one outright — "Invalid Start Date (Date
@@ -73,9 +102,64 @@ public static class TaskScheduling
         return $"Windows would not accept the scheduled task: {lastError}";
     }
 
-    /// <summary>Remove a scheduled deploy. Returns null on success.</summary>
+    /// <summary>
+    /// Where a multi-destination task's wrapper script is written —
+    /// %LOCALAPPDATA%\Plantoir\scheduled, not a temp folder, because the
+    /// task may fire hours or days later and a temp-folder sweep must never
+    /// be the reason an overnight deploy silently does nothing.
+    /// </summary>
+    public static string ScheduledScriptsDirectory() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "scheduled");
+
+    private static string WrapperScriptPath(string taskName)
+    {
+        string safeName = new string(taskName.Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
+        return Path.Combine(ScheduledScriptsDirectory(), safeName + ".ps1");
+    }
+
+    /// <summary>
+    /// Writes a small PowerShell wrapper: one un-chained invocation of
+    /// deploy.ps1 per destination, so one destination failing does not stop
+    /// the others' lines from running. Returns the script's path, or null if
+    /// it could not be written.
+    /// </summary>
+    private static string? WriteWrapperScript(string taskName, string launcherPath,
+                                              IReadOnlyList<IReadOnlyList<string>> deployArgumentsList)
+    {
+        try
+        {
+            Directory.CreateDirectory(ScheduledScriptsDirectory());
+            var lines = new List<string>
+            {
+                "# Generated by Plantoir for a scheduled multi-destination deploy.",
+                "# Each line below runs on its own — one destination failing must",
+                "# not stop the others from being tried.",
+            };
+            foreach (var arguments in deployArgumentsList)
+            {
+                string quoted = string.Join(" ", arguments.Select(a => "'" + a.Replace("'", "''") + "'"));
+                lines.Add($"& '{launcherPath}' {quoted}");
+            }
+            string scriptPath = WrapperScriptPath(taskName);
+            File.WriteAllLines(scriptPath, lines);
+            return scriptPath;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Remove a scheduled deploy. Returns null on success. Also removes any
+    /// multi-destination wrapper script left by <see cref="Schedule(string,string,string,int,DateTime,IReadOnlyList{IReadOnlyList{string}})"/> —
+    /// schtasks deleting the task does not delete a script it merely pointed
+    /// at, and a leftover one is not runnable on its own so it is simply
+    /// litter, but it should not accumulate every time a teacher reschedules.
+    /// </summary>
     public static string? Cancel(string taskName)
     {
+        try { File.Delete(WrapperScriptPath(taskName)); } catch { /* best effort — litter, not a failure */ }
         var (exitCode, output) = Run(["/Delete", "/F", "/TN", taskName]);
         return exitCode == 0 ? null : output.Trim();
     }
