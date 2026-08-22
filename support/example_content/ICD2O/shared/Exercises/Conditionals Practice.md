@@ -64,7 +64,9 @@ road — the whole skill is knowing which branch runs, and why.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[C2.3]]
+![[C1.4]]
 
 ![[C1.5]]
+
+![[C2.3]]
 %%curriculum-end%%

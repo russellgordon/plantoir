@@ -14,9 +14,9 @@ tags:
    people at the door
 2. Full technical run: every machine, every cable, in place
 3. Dress run: the whole event, in order, with the class as the audience
-   — opening sentences included, timed
+   — opening sentences included, timed; check requirements against [[Launch Day]]
 4. Notes to each demo: one thing that landed, one thing to change. Fix
-   the top note before you leave
+   the top note before you leave — review [[Showing Growth]]
 
 ## Things to do before our next class
 

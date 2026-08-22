@@ -60,6 +60,11 @@ what they do into requirements, and recommend one thing you can defend.
   backed up, and the one habit you would ask them to keep. From
   [[Staying Secure Online]] and [[Files and the Cloud]] — and you have
   to be able to explain each item to them in one sentence.
+- **Research sources and verification**: cite the credible sources used to
+  verify component specifications, software compatibility, and benchmark
+  performance (manufacturer spec sheets, independent test reviews,
+  accessibility compatibility guides) as practised in
+  [[Finding Answers Online]].
 
 ## The working periods
 
@@ -81,6 +86,7 @@ see [[Judging Your Own Work]].
 | Careful with their information | The brief says what was recorded with permission, what was left out, and where the notes lived |
 | Correct vocabulary | Memory, storage, processor, application, operating system used precisely |
 | Requirements drive the choice | Every number traces back to something they do |
+| Research practices verified | Hardware specs, benchmarks, and compatibility are confirmed against credible sources |
 | Connected device justified | Chosen for what it adds, not for the box it comes in |
 | Honest about trade-offs | Says what was given up and who notices |
 | Safe from day one | The checklist names the security settings, where their files will live, and how they are backed up |
@@ -95,7 +101,7 @@ skipped the interview and gone straight to shopping?
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B2.3]]
+![[A2.2]]
 
 ![[B1.1]]
 
@@ -103,7 +109,9 @@ skipped the interview and gone straight to shopping?
 
 ![[B1.3]]
 
-![[A2.2]]
+![[B2.2]]
+
+![[B2.3]]
 
 ![[B3.1]]
 %%curriculum-end%%

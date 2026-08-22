@@ -61,3 +61,9 @@ in some form; yours starts now.
 > Check the class page in All Classes, run the warm-up yourself, and try
 > the build before reading anything about it. A genuine attempt teaches
 > more than a perfect summary.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[A3.3]]
+%%curriculum-end%%

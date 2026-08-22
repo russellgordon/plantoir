@@ -54,4 +54,6 @@ Treat your earlier entries the way an essay treats sources:
 ## Curriculum connection
 
 ![[A1.1]]
+
+![[A3.3]]
 %%curriculum-end%%

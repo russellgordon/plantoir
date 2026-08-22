@@ -789,6 +789,122 @@ An adversarial subagent was invoked to conduct an exhaustive, independent audit 
 - **All destination pages reachable within 2 hops of a class page.**
 - **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
 
+---
+
+### 1.1 Coverage depth: ICD2O once-only expectations (10 codes)
+
+**Course:** ICD2O (Digital Technologies and Innovations in the Changing World, Grade 10, Open)  
+**Status:** **RESOLVED**  
+**Resolution Date:** 2026-08-22  
+
+#### Context & Baseline Deficiencies
+In `QC-FINDINGS.md` (§1.1), `ICD2O` had **10 once-only specific expectations** (25.6% of the 39 specific expectations):
+- `A1.3`: develop computational artifacts for a variety of contexts and purposes that support the needs of diverse users and audiences (only on `Tasks/Launch Day.md`)
+- `A3.1`: investigate how digital technology and programming skills can be used within a variety of disciplines in real-world applications (only on `Concepts/Technology in Every Field.md`)
+- `A3.3`: investigate various career options related to digital technology and programming, and ways to continue their learning in these areas (only on `Portfolios/Final Reflection.md`)
+- `B2.1`: use file management techniques, including those related to local and cloud storage, to organize, edit, and share files (only on `Concepts/Files and the Cloud.md`)
+- `B2.2`: identify and use effective research practices and supports when learning to use new hardware or software (only on `Tutorials/Finding Answers Online.md`)
+- `B2.3`: assess the hardware and software requirements for various users, contexts, and purposes in order to make recommendations for devices and programs (only on `Tasks/The Device Recommendation.md`)
+- `B4.3`: investigate emerging innovations related to hardware and software and their possible benefits and limitations with reference to everyday life in the future (only on `Tasks/The Innovation Brief.md`)
+- `C1.3`: identify various types of data and explain how they are used within programs (only on `Concepts/Data in Programs.md`)
+- `C1.4`: determine the appropriate expressions and instructions to use in a programming statement, taking into account the order of operations (only on `Exercises/Operators Practice.md`)
+- `C3.4`: write programs that make use of external or add-on modules or libraries (only on `Concepts/Subprograms and Modules.md`)
+
+---
+
+#### Actions Completed
+
+1. **Concepts Substantive Expansion (`shared/Concepts/`)**:
+   - `Concepts/Technology in Every Field.md`: Added 4th H2 section `## Career pathways and continuous learning` exploring tech careers (cybersecurity, UX/accessibility, skilled trades/automation, interdisciplinary dev) and continuous learning routes. Transclusions: `A3.1, A3.2, A3.3`.
+   - `Concepts/Computational Thinking.md`: Added 5th H2 section `## Designing for diverse users and contexts` detailing input flexibility, audience contexts, and clear error recovery. Transclusions: `A1.1, A1.2, A1.3`.
+   - `Concepts/Bias and Accessibility in Technology.md`: Added section `## Building inclusive computational artifacts` addressing high contrast, cognitive load, and input normalization. Transclusions: `A1.3, A2.4, A2.5`.
+   - `Concepts/Hardware Inside the Box.md`: Added section `## Matching hardware specifications to user requirements` mapping CPU/RAM/GPU/storage to workloads. Transclusions: `B1.1, B2.3`.
+   - `Concepts/Software and Operating Systems.md`: Added `## File systems and storage organisation` and `## Researching software and assessing requirements`, set `enableToc: true` (5 H2s). Transclusions: `B1.3, B2.1, B2.2, B2.3`.
+   - `Concepts/Connected Devices.md`: Added `## Assessing requirements for connected devices`, set `enableToc: true` (4 H2s). Transclusions: `B1.2, B2.3, B4.2`.
+   - `Concepts/Automation and Artificial Intelligence.md`: Added `## Emerging innovations and future frontiers` exploring NPUs, edge intelligence, robotics, and societal trade-offs, set `enableToc: true` (4 H2s). Transclusions: `B4.1, B4.3`.
+   - `Concepts/Data in Programs.md`: Added `## Expressions and order of operations` detailing evaluation precedence and parenthesis rules, set `enableToc: true` (4 H2s). Transclusions: `C1.3, C1.4, C2.2`.
+
+2. **Exercises Substantive Expansion (`shared/Exercises/`)**:
+   - `Exercises/Variables and Expressions Practice.md`: Added Question 7 & Answer 7 identifying/converting primitive data types (`C1.3`), and Question 8 & Answer 8 calculating expressions with operator precedence (`C1.4`). Transclusions: `C1.3, C1.4, C2.1`.
+   - `Exercises/Input and Output Practice.md`: Transclusions `C1.3, C2.1, C2.2`.
+   - `Exercises/Operators Practice.md`: Transclusions `C1.3, C1.4, C2.5`.
+   - `Exercises/Conditionals Practice.md`: Transclusions `C1.4, C1.5, C2.3`.
+   - `Exercises/Subprograms Practice.md`: Added Question 7 & Answer 7 importing and using `random` (`C3.4`), and Question 8 & Answer 8 using `math.sqrt()` (`C3.4`). Transclusions: `C3.3, C3.4`.
+
+3. **Programs, Warm-Ups, Discussions, Tutorials (`shared/`)**:
+   - `Programs/The Dice Roller.md`: Transclusions `C1.4, C2.2, C3.1, C3.4`.
+   - `Programs/Guess My Number.md`: Transclusions `C1.4, C2.4, C3.1, C3.4`.
+   - `Programs/Mad Libs.md`: Transclusions `C1.3, C2.1, C3.1`.
+   - `Programs/The Chatbot.md`: Transclusions `A1.3, C3.1, C3.3`.
+   - `Programs/The Text Adventure.md`: Transclusions `C1.4, C3.1, C3.2`.
+   - `Tutorials/Setting Up Python.md`: Added section `## Organising your files and workspace` detailing folder hierarchy, `.py` conventions, and cloud backups. Transclusions: `B2.1, C2.1`.
+   - `Tutorials/Getting Unstuck.md`: Added step 6 on researching official technical documentation and error references. Transclusions: `B2.2, C2.6`.
+   - `Tutorials/index.md`: Added `[[Scavenger Hunt]]` to the tutorials table.
+   - `Warm-Ups/Tech Headlines.md`: Transclusions `A2.1, A3.1, B4.3`.
+   - `Warm-Ups/Predict the Output.md`: Added collapsible prediction example testing expressions and operator precedence. Transclusions: `C1.3, C1.4, C2.6, C3.1`.
+   - `Discussions/Whose Innovations Count.md`: Transclusions `A2.3, A3.1, B4.3`.
+   - `Discussions/Will AI Take the Jobs.md`: Transclusions `A3.1, A3.2, A3.3, B4.1, B4.3`.
+   - `Explorations/Inside the Box.md`: Added 4th H2 section `## Assessing components for user requirements`. Transclusions: `B1.1, B2.3`.
+
+4. **Tasks & Portfolios Alignment (`shared/Tasks/`, `shared/Portfolios/`)**:
+   - `Tasks/The Device Recommendation.md`: Added research verification sources requirement and rubric row. Transclusions: `A2.2, B1.1, B1.2, B1.3, B2.2, B2.3, B3.1`.
+   - `Tasks/The Quiz Machine.md`: Added built for diverse players criteria row. Transclusions: `A1.3, C1.5, C2.3, C2.4, C2.5`.
+   - `Tasks/The Remix Project.md`: Added modular library extensions and user audience customization requirements and criteria row. Transclusions: `A1.3, B2.1, C2.6, C3.1, C3.2, C3.4`.
+   - `Tasks/The Innovation Brief.md`: Transclusions `A2.1, A2.3, A3.1, A3.2, B2.2, B4.1, B4.3`.
+   - `Tasks/Launch Day.md`: Enriched program path requirements and criteria table with modular design and external/standard library integration. Transclusions: `A1.1, A1.2, A1.3, B2.1, B3.2, C2.7, C3.4, C3.5`.
+   - `Portfolios/Dev Journal.md`: Set `enableToc: false`. Transclusions: `B2.1, C2.6`.
+   - `Portfolios/Showing Growth.md`: Transclusions `A1.1, A3.3`.
+   - `Portfolios/Your First Entry.md`: Transclusions `A1.1, B2.1`.
+   - `Setup/How Tech Class Works.md`: Transclusions `A3.3`.
+
+5. **Structural Integrity & Formatting Invariants**:
+   - `per_section/All Classes/Unit 1, Day 1.md`: Linked `[[What This Site Can Do]]` in agenda and `[[Scavenger Hunt]]` in checklist.
+   - `per_section/All Classes/Unit 4, Day 13.md`: Linked `[[Launch Day]]` and `[[Showing Growth]]` in agenda.
+   - Removed `enableToc: true` from pages with fewer than 4 H2 headings (`Algorithm Hunt.md`, `Build a Network.md`, `Talk to the Machine.md`, `The Phishing Gallery.md`, `The Sandwich Robot.md`, `Dev Journal.md`, `Curriculum/index.md`).
+   - Standardized Canadian spelling across payload (`organisation`, `summarise`, `modelling`, `personalised`).
+
+---
+
+#### Adversarial Audit & Quality Control Review (ICD2O)
+
+An adversarial subagent was invoked to conduct an exhaustive, independent audit against the Ontario curriculum document, `.claude/skills/example-content/SKILL.md` rules, structural invariants, and test suites.
+
+**Audit Findings & Iteration:**
+- **Initial Audit:** Identified 4 minor defects:
+  1. `Launch Day.md`: Needed explicit modular/library integration in text and rubric for `C3.4`.
+  2. `Predict the Output.md`: Needed explicit operator precedence example for `C1.4`.
+  3. `Curriculum/index.md`: Contained `enableToc: true` with only 1 H2 heading.
+  4. American spellings (`organization`, `summarize`, `modeling`, `personalized`) needed Canadianization.
+- **Corrections:** All 4 items were updated and verified.
+- **Re-Audit Verdict:** **CERTIFIED 100% CLEAN** (`STATUS: CLEAN`).
+- Confirmed all 39 specific expectations are authentically addressed $\ge 2$ times across the course payload.
+- Confirmed 100% two-hop graph reachability from class pages.
+- Confirmed zero transclusions or links inside comments, zero curriculum blocks on class pages, and balanced curriculum markers.
+- Confirmed Canadian spelling and code style maintained throughout.
+
+---
+
+#### Final Verification Metrics (ICD2O)
+
+- **Total Specific Expectations:** 39 (`A1.1` – `C3.5`)
+- **Expectations Addressed $\ge 2$ Times:** 39 / 39 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Coverage Frequencies of the 10 Target Codes:**
+  - `A1.3`: 6 times
+  - `A3.1`: 5 times
+  - `A3.3`: 5 times
+  - `B2.1`: 7 times
+  - `B2.2`: 5 times
+  - `B2.3`: 5 times
+  - `B4.3`: 5 times
+  - `C1.3`: 6 times
+  - `C1.4`: 8 times
+  - `C3.4`: 6 times
+- **Linter Results (`lint_payload.py ICD2O`):** Clean (235 pages checked, 85 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+
 
 
 

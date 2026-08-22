@@ -84,15 +84,19 @@ kind — and "same impression, better reasons" counts as change too.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B4.1]]
-
-![[B4.3]]
-
-![[A3.2]]
-
 ![[A2.1]]
 
 ![[A2.3]]
+
+![[A3.1]]
+
+![[A3.2]]
+
+![[B2.2]]
+
+![[B4.1]]
+
+![[B4.3]]
 %%curriculum-end%%
 
 %%

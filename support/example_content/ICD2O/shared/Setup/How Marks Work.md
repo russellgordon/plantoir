@@ -92,7 +92,7 @@ work.
 ## What is not in your mark
 
 How you work is reported separately, on the same report card, as **E,
-G, S or N** — six habits: responsibility, organization, independent
+G, S or N** — six habits: responsibility, organisation, independent
 work, collaboration, initiative, and self-regulation. They matter, we
 will talk about them, and they do not move your percentage. The policy
 allows one exception, for a habit that is itself written into a

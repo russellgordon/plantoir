@@ -18,14 +18,19 @@ The culminating task: a computational artifact designed and built for a
 **real user who is not you** — a younger sibling, a club you belong to,
 a teacher, a coach, a family business. Two full-credit paths exist:
 
-- a **working program** that does something your user needs, or
+- a **working program** that does something your user needs —
+  structured into subprograms and leveraging standard or add-on
+  libraries/modules (such as `random`, `math`, `time`, or string
+  utilities as introduced in [[Subprograms and Modules]]) where
+  appropriate, or
 - a **thoroughly designed plan plus prototype** — the user research,
   the algorithm, the interface sketches, and a working core piece —
   for something bigger than one course can build.
 
 Either way, five things must be present: a **plan** (what the core is,
 and the pieces it breaks into), a **user-needs statement** (who they
-are, and what they need), a **working core**, an honest
+are, and what they need), a **working core** (leveraging modular design
+and external or built-in modules as needed), an honest
 **known-limits list**, and **documentation clear enough for a stranger
 to reuse your work**. The launch itself: a short demo, the questions
 your guests ask, and a **growth statement** built from your
@@ -80,6 +85,7 @@ purpose.
 | A real user served | The needs statement names a person, in their words, and the documentation says who else this touches |
 | A plan you can point at | The pieces of the artifact match the way you broke the problem up |
 | A working core | The central thing your user needs demonstrably works |
+| Modular and library integration | Subprograms, functions, or external/built-in modules are used cleanly to solve user tasks |
 | Honest limits | The known-limits list is specific, current, and unashamed |
 | Built for reuse | A stranger could run it, follow the code, and change it — your comments and names do that work |
 | Careful with what it keeps | The documentation says what the artifact stores, where that lives, who can see it, and what you chose to do about it |
@@ -109,9 +115,13 @@ what would you tell September-you about building for other people?
 
 ![[A1.3]]
 
+![[B2.1]]
+
 ![[B3.2]]
 
 ![[C2.7]]
+
+![[C3.4]]
 
 ![[C3.5]]
 %%curriculum-end%%

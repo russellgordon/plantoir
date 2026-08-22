@@ -27,6 +27,17 @@ the gap between prediction and reality is where the learning lives.
 > and `+` glues text together. A crash — you cannot add words. Only
 > one reading is what Python does; the quotation marks decide it.
 
+> [!example]- Expressions and operator precedence (click to expand)
+> ```python
+> a = 10 + 4 * 2 ** 3
+> b = (10 + 4) * 2 ** 3
+> print(a, b)
+> ```
+> `42 112` — in `a`, exponentiation ($2^3 = 8$) and multiplication
+> ($4 \times 8 = 32$) happen before addition ($10 + 32 = 42$). In `b`,
+> parentheses force addition first ($14 \times 8 = 112$). Order of
+> operations decides every compound expression.
+
 ## One variation
 
 Reverse it: show only the *output*; pairs write a program that would
@@ -38,6 +49,10 @@ produce it. There is never just one answer — which is the point.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[C1.3]]
+
+![[C1.4]]
 
 ![[C2.6]]
 

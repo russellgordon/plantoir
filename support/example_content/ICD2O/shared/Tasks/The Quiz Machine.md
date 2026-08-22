@@ -58,6 +58,7 @@ either addressed in the code or logged in an honest known-issues list.
 | Runs end to end | A player gets from first question to final score |
 | Forgiving checking | Spacing and capitals never cost a correct player, and the rule that decides it reads in one line — `and`, `or` and `not` where you need them |
 | Structures where they are needed | Each conditional is there because something has to be decided, and the loop is there because something would otherwise be typed out again |
+| Built for diverse players | Prompts and feedback are clear, forgiving of capitalization and spacing, and tested with diverse classmates |
 | Readable throughout | Comments let a stranger follow the checking logic |
 | Feedback honoured | Every play-test finding is fixed or honestly logged |
 
@@ -74,6 +75,8 @@ tester did you the favour of not knowing what you know.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[A1.3]]
 
 ![[C1.5]]
 

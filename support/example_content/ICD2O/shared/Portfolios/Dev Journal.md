@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - portfolio
-enableToc: true
+enableToc: false
 ---
 > [!abstract] At a glance
 > Individual · ongoing all course · an entry every time a period ends
@@ -60,6 +60,8 @@ between classes is never the thing a mark is put on.
 
 %%curriculum-start%%
 ## Curriculum connection
+
+![[B2.1]]
 
 ![[C2.6]]
 %%curriculum-end%%

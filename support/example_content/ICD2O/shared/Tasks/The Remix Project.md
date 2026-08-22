@@ -22,9 +22,13 @@ folder and make it do something **meaningfully new**.
 Most people start from [[The Text Adventure]] because it begs to be
 extended, but [[Guess My Number]], [[Mad Libs]], [[The Dice Roller]],
 [[The Password Checker]], and [[The Chatbot]] are all fair game.
-"Meaningfully new" means new behaviour — a rule, a feature, an ability
-the original did not have. New strings and renamed variables are a coat
-of paint, not a remix.
+"Meaningfully new" means new behaviour — a rule, a feature, an external
+module or library incorporated (such as using `random`, `math`, or `time`
+as taught in [[Subprograms and Modules]]), or adapting the artifact to
+support diverse users and contexts. New strings and renamed variables are
+a coat of paint, not a remix. You also practice sound file management by
+keeping backup copies of the original starter code in your project directory
+([[Files and the Cloud]]).
 
 You hand in the remixed program and a **before-and-after write-up**:
 what the original did, what yours does, what you changed, and why.
@@ -63,6 +67,7 @@ write-up claims as yours, not against the file as a whole.
 | --- | --- |
 | The original understood | Your write-up explains what the base program did |
 | Meaningfully new | The remix does something the original could not do |
+| Modular and library extensions | Modularity, custom subprograms, or external modules extend functionality |
 | Change with a reason | The write-up says why this change, not just what |
 | Errors worked through | One error and its resolution appear in the story |
 | Still readable | A stranger could find your changes and follow them |
@@ -85,11 +90,17 @@ steal for your own programs from now on.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.3]]
+
+![[B2.1]]
+
+![[C2.6]]
+
 ![[C3.1]]
 
 ![[C3.2]]
 
-![[C2.6]]
+![[C3.4]]
 %%curriculum-end%%
 
 %%

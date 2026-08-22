@@ -19,6 +19,7 @@ later page can simply link here instead of re-explaining it.
 | [[Writing Good Comments]] | Documentation that explains *why* |
 | [[Getting Unstuck]] | Being stuck well instead of spinning |
 | [[Finding Answers Online]] | Searching, judging, and crediting |
+| [[Scavenger Hunt]] | Interactive tour of Markdown, links, and site features |
 
 Skim them all early; return to each when it becomes urgent. The
 debugging pair earns its keep the first time a program crashes —

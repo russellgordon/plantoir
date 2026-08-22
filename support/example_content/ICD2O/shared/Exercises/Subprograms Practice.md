@@ -35,6 +35,15 @@ recipe with a name — write it once, use it everywhere.
    rectangle's area, then one line using it for a 3 by 5 rectangle.
 6. **Challenge.** Write `is_teen(age)` returning `True` or `False`,
    then use it in an `if` to decide on a movie ticket price.
+7. **External modules.** Using Python's built-in `random` module, write
+   a function `roll_d20()` that imports `random`, generates a random
+   integer from 1 to 20 using `random.randint()`, and returns it. Then
+   write one line calling `roll_d20()` and printing the result.
+8. **Mathematical libraries.** Write a function `distance(x1, y1, x2, y2)`
+   that uses `import math` and `math.sqrt((x2 - x1)**2 + (y2 - y1)**2)`
+   to calculate and return the straight-line distance between two 2D
+   points. Explain why borrowing standard libraries makes your code
+   more reliable.
 
 ## Answers
 
@@ -63,8 +72,35 @@ recipe with a name — write it once, use it everywhere.
 > comparison already *is* `True` or `False`. Then `if is_teen(15):`
 > discount price, `else:` full price.
 
+> [!success]- Answer 7
+> ```python
+> import random
+> 
+> def roll_d20():
+>     return random.randint(1, 20)
+> 
+> print("Rolled:", roll_d20())
+> ```
+> Using an existing library module (`random`) provides robust, tested
+> pseudo-random number generation without having to implement complex
+> mathematical random generators from scratch.
+
+> [!success]- Answer 8
+> ```python
+> import math
+> 
+> def distance(x1, y1, x2, y2):
+>     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+> 
+> print("Distance:", distance(0, 0, 3, 4))
+> ```
+> Built-in modules like `math` are optimized in C, thoroughly tested,
+> and handle edge cases (like precision and domain errors) accurately.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[C3.3]]
+
+![[C3.4]]
 %%curriculum-end%%

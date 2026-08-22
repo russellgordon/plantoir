@@ -33,7 +33,7 @@ Add sub-sections, worked examples, step-by-step instructions, or callouts as nee
 
 ## Second Main Topic
 
-Organize further concepts, practice questions, or reflection prompts under additional headings.
+Organise further concepts, practice questions, or reflection prompts under additional headings.
 
 %%
 Link to the specific curriculum expectations this page substantively addresses.

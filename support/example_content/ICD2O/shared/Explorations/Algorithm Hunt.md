@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - explorations
-enableToc: true
+enableToc: false
 ---
 You ran a dozen algorithms before first period — you just did not
 call them that. A locker combination. The rule for when the
