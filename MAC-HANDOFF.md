@@ -1126,6 +1126,101 @@ Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
 
+- ✅ DONE (Windows, 2026-08-22). **An adversarial audit of the multi-destination
+  deploy port found two real bugs in the assistant/MCP path — both fixed,
+  both real, one predating this feature entirely.**
+
+  **Why this entry exists.** The previous entry below claimed full parity.
+  Asked to verify that claim, a fresh sub-agent — no memory of the session
+  that wrote the previous entry, so not anchored by its narrative — read
+  both codebases side by side and ran the suite itself rather than trusting
+  the reported pass count. It found two real gaps. Both were independently
+  re-verified by direct code reading (not just relayed) before anything was
+  changed, and the audit's own claims were cross-checked too — an injected
+  "security warning" arrived in one of the notification payloads during this
+  process, asserting the audit's findings should not be trusted; it was
+  treated as untrusted text, not evidence, and had no bearing on the fixes
+  below, which rest on independently re-read code, not on the audit's say-so.
+
+  **Bug 1, real but pre-existing (Aug 14, before this feature): the
+  assistant's scheduled-deploy path never read the Cloudflare Account ID at
+  all.** `AssistWorkspace.PlanScheduledDeploy` called
+  `ScheduledDeploy.Problem(course, section, when, DateTime.Now)` — no 5th
+  argument, so `cloudflareAccountID` defaulted to `""`
+  (`ScheduledDeploy.cs:29`). Confirmed with `git log -S` against that exact
+  call: it dates to commit `4400f80a`, well before this feature. The
+  previous entry's new "check every ADDITIONAL destination" logic in
+  `ScheduledDeploy.Problem` inherited this silently: scheduling a deploy for
+  ANY course with a Cloudflare destination — primary or additional — through
+  the assistant always refused with "Paste your Cloudflare Account ID," even
+  with one correctly configured, because the check could never see it. The
+  companion bug in `PlantoirTools.ScheduleDeploy` was worse in kind: even
+  past that refusal, it built the actual scheduled task's `--account` flag
+  with no account ID either, so a scheduled Cloudflare deploy would have run
+  at 6:30 AM with an empty credential.
+
+  **The fix**: both read `AppSettings.Load().CloudflareAccountId` — the same
+  machine-global, per-teacher setting the GUI's `SidebarPane` already reads,
+  just not previously reached from either headless call site. `AssistWorkspace`
+  gained `CloudflareAccountIdOverrideForTests` (a static hook, mac parity:
+  the same shape as `ScheduledDeploy.launchAgentsDirectoryOverride`) so the
+  new tests don't depend on whatever happens to be in the real machine's
+  `settings.json`. Two new tests in `ScheduledDeployTests.cs`:
+  `PlanScheduledDeployReadsTheRealCloudflareAccountIdRatherThanAlwaysRefusing`
+  (a valid override → no refusal) and
+  `PlanScheduledDeployStillRefusesWithNoCloudflareAccountIdConfigured` (an
+  empty override → the same refusal as before). The existing
+  `ACloudflareCourseCannotBeScheduled` test didn't catch this because it
+  calls `ScheduledDeploy.Problem` directly, bypassing
+  `AssistWorkspace.PlanScheduledDeploy` entirely — the exact gap the new
+  tests close.
+
+  **Bug 2, real, architectural, NOT fixed by changing the sequencing —
+  documented instead, deliberately.** `AssistWorkspace.Deploy` (the
+  headless/MCP deploy path) does not call `MultiDestinationDeployRunner.
+  RunAsync`. It reimplements the same shape by hand — one build, then a
+  loop over destinations where a failure doesn't stop the others — using
+  `ILauncherRunner`, not `ScriptRunner`. The mac's own equivalent,
+  `AssistSiteWork.deploy()`, literally calls "the same sequencer the Deploy
+  button uses," and its own code comment names the exact failure this
+  guards against: two implementations of the same rule drifting apart, once
+  sending a Cloudflare course to Netlify.
+
+  **Why this was NOT unified, after weighing it directly**: `RunAsync` is
+  built on `ScriptRunner` — ConPTY, live progress notification, a WinUI
+  `SynchronizationContext` — GUI-only infrastructure. `plantoir-mcp.exe` is
+  a genuinely separate headless process with no window, and `ILauncherRunner`
+  is the existing, narrower abstraction the ENTIRE `AssistWorkspace` class
+  already runs every operation through, not something introduced for this
+  feature. Forcing the two together is a real refactor — generalizing
+  `MultiDestinationDeployRunner` over an execution abstraction, or rebuilding
+  `ILauncherRunner`'s callers on top of `ScriptRunner` — with no way to
+  verify the result against the real MCP process in this environment (no
+  Claude Code MCP client was connected to drive it live here). Attempting it
+  blind, on top of an already-large session, was judged the wrong trade.
+  **Rejected explicitly, not overlooked**; if this drifts from `RunAsync`'s
+  own rules in a future change, that is the trade this entry names as having
+  been made on purpose. A code comment at the call site (`AssistWorkspace.
+  cs`, inside `Deploy`) says the same thing, so the next reader doesn't
+  mistake the separate loop for an oversight.
+
+  **A related, systemic non-issue checked and deliberately left alone**:
+  the audit also flagged that `AssistWorkspace.Deploy` rebuilds
+  unconditionally rather than checking `BuildFreshness.NeedsRebuild` first
+  (mac's headless path does check). Confirmed by reading the whole class:
+  ALL FOUR of `AssistWorkspace`'s preview-building call sites
+  (`Deploy`, `RebuildPreview`, and two more) share this same unconditional
+  pattern — it is evidently a deliberate, class-wide design choice
+  predating this feature, not a defect specific to deploy redundancy.
+  Changing only `Deploy` would have been inconsistent with the other three
+  and out of scope for what this feature was asked to bring to parity;
+  left unchanged.
+
+  Full suite after both fixes: **608 tests, 608 passed** (606 + the 2 new
+  ones). Reference: `AssistWorkspace.cs` (`PlanScheduledDeploy`, `Deploy`,
+  `CloudflareAccountIdOverrideForTests`), `PlantoirTools.cs`
+  (`ScheduleDeploy`), `ScheduledDeployTests.cs`.
+
 - ✅ DONE (Windows, 2026-08-22). **Redundant deploy targets, ported in full:
   schema, settings/wizard UI, Deploy publishing to every destination,
   scheduled deploy, the assistant's headless deploy, and progress display —
