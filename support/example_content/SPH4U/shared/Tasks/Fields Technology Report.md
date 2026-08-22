@@ -31,7 +31,12 @@ electron microscope · ion thruster.
    up, and why.
 4. **The societal question**: who benefits, who pays, and what the
    environmental cost is.
-5. **Your two best sources, weighed.** Not listed — weighed. For the two
+5. **Career and technical pathways**: name one professional or technical
+   career essential to the development, operation, or safety of this
+   technology (e.g. medical physicist, RF systems engineer, particle
+   accelerator technologist, geoscientist), and the education or training
+   required (see [[Where This Physics Leads]]).
+6. **Your two best sources, weighed.** Not listed — weighed. For the two
    you leaned on hardest: who produced it, what they had to gain from
    the number you took, and why you used it anyway. If the two disagree,
    say which you believed and what decided it.
@@ -53,26 +58,30 @@ writing. Read it against these rows before you hand it in, and use
 | Real numbers, from somewhere you name | Values taken from a source you cite, carried through with units, and an answer whose size you say something about |
 | The trade-off is specific | One thing that gets harder as the device is scaled up, tied to a quantity that appears in your own equation |
 | The societal question is answered, not gestured at | Who benefits, who pays, and what the environmental cost is — each with evidence behind it rather than an impression |
+| Career and professional pathways are identified | One related career identified with specific educational and credential pathways described |
 | The sources are judged, not just listed | For the two you leaned on hardest, a line each on who produced it, what they stood to gain, and what made you trust it — and, where two disagree, which you believed and why |
 | Sources somebody could check | An accepted form of documentation, and at least one source that is not a summary site |
 
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D1.1]]
-
-![[D1.2]]
-
-![[D2.2]]
-
-![[D2.1]]
-
 ![[A1.3]]
 
 ![[A1.7]]
 
 ![[A1.9]]
+
+![[A2.1]]
+
+![[D1.1]]
+
+![[D1.2]]
+
+![[D2.1]]
+
+![[D2.2]]
 %%curriculum-end%%
+
 
 %%
 Triangulation — the evidence you will not have unless you go and get it.

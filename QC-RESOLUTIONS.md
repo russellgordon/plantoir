@@ -389,5 +389,64 @@ An adversarial subagent was invoked to refute claims of resolution, audit curric
 
 ---
 
+### 1.1 Coverage depth: SPH4U once-only expectations (12 codes)
 
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across SPH4U (Grade 12 University Physics) by ensuring all 71 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (exercises, concept summaries, investigations, discussions, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding two-dimensional dynamics, momentum/energy conservation, fields, wave optics, and modern physics over time.
 
+#### Baseline Findings (SPH4U)
+- Total expectations: 71 specific expectations (`A1.1` to `F3.4`)
+- Addressed only once (12 codes): `A1.4, A2.1, B1.2, B2.1, B2.4, B2.5, C1.1, C3.5, E2.1, E3.3, E3.4, F2.4`
+- Unlinked class schedule tutorial: `shared/Tutorials/Analysing Video of Motion.md` (carried no direct class schedule link; linked on Day 10 air table video tracking).
+
+#### Actions Completed
+
+1. **Exercises Enhancement (`shared/Exercises/`)**:
+   - `Vectors and Projectiles Practice.md`: Added Question 5 (modified Atwood inclined-plane pulley system / "dumb waiter" calculating system acceleration and string tension with FBDs and algebraic systems) and Question 6 (crate on accelerating flatbed truck calculating maximum static friction acceleration, threshold slipping, and accelerations in ground inertial vs truck non-inertial frames). Added curriculum block for `B2.1, B2.2, B2.3, B2.4, B2.5, B3.2`.
+   - `Circular Motion Practice.md`: Added Question 5 (clinical centrifuge blood separation calculating $a_c$ in $g$'s and evaluating diagnostic healthcare vs industrial wastewater sludge treatment impacts) and Question 6 (high-rise traction elevator apparent weight FBD calculations across acceleration, constant velocity, and deceleration, assessing high-density urban land conservation vs suburban sprawl). Added curriculum block for `B1.2, B2.1, B2.5, B2.6, B2.7, B3.3`.
+   - `Momentum and Collisions Practice.md`: Added Question 5 (forensic crash reconstruction calculating pre-impact speeds from post-collision skid marks and 2D momentum conservation, proposing crush-box and highway barrier attenuator improvements), Question 6 (Tsiolkovsky rocket equation variable mass propulsion and multistage/aerospike nozzle improvements), and Question 7 (Pauli's neutrino prediction from continuous beta decay energy spectra and non-collinear recoil momentum conservation). Added curriculum block for `C1.1, C2.1, C2.5, C2.6, C2.7, C3.3, C3.4, C3.5`.
+   - `Wave Optics Practice.md`: Added Question 5 (defining wave optics terminology: polarization, dispersion, diffraction, and nodal lines $\Delta\phi = \pi$ proving transverse wave nature), Question 6 (soap bubble thin-film constructive interference phase shifts $2t = (m + 1/2)\lambda/n$ and minimum non-zero thickness $t = 100\ \text{nm}$ for green light), and Question 7 (qualitative mechanism of oscillating electric dipoles generating self-propagating EM radiation across radio, microwaves, bremsstrahlung X-rays, and atomic electron orbital transitions). Added curriculum block for `E2.1, E2.2, E2.3, E2.4, E3.1, E3.2, E3.3, E3.4`.
+   - `Relativity and Quanta Practice.md`: Added Question 5 (photoelectric effect inquiry data analysis plotting $eV_{\text{stop}} = hf - W$, calculating experimental Planck's constant $h = 6.62 \times 10^{-34}\ \text{J}\cdot\text{s}$, work function $W = 2.26\ \text{eV}$, and threshold frequency $f_0$) and Question 6 (relativistic proton momentum at TRIUMF cyclotron $p = \gamma mv$ vs classical $p = mv$ and magnetic deflection curvature confirming relativistic dynamics). Added curriculum block for `F2.2, F2.3, F2.4, F3.1, F3.2, F3.3`.
+
+2. **Concept Pages Alignment & Deepening (`shared/Concepts/`)**:
+   - `Uniform Circular Motion.md`: Added dynamics terminology covering period $T$, frequency $f = 1/T$, centripetal acceleration, and inertial vs non-inertial frame distinctions. Added transclusions `B2.1, B2.6, B3.3`.
+   - `Forces in Two Dimensions.md`: Added static vs kinetic friction models, coordinate resolution, and multi-body system dynamics with FBDs. Added transclusions `B2.1, B2.3, B2.5, B3.2`.
+   - `Elastic and Inelastic Collisions.md`: Added dedicated engineering applications section (automotive crumple zones, multi-density EPS helmets, highway water/sand crash attenuators, and controlled structural demolition). Added transclusions `C1.1, C2.6, C3.3`.
+   - `Polarization.md`: Added photoelastic stress analysis and birefringence in transparent polymers between crossed polarizing filters producing colour bands. Added transclusions `E1.2, E2.1, E3.2, E3.3`.
+   - `The Wave Model of Light.md`: Added oscillating electric dipole EM wave generation mechanism and speed of light in vacuum. Added transclusions `E2.1, E3.2, E3.4`.
+   - `The Photoelectric Effect.md`: Added photocell stopping potential $V_{\text{stop}}$ vs frequency inquiry analysis to extract Planck's constant. Added transclusions `F2.2, F2.4, F3.1`.
+
+3. **Investigations & Lab Protocols (`shared/Investigations/`)**:
+   - `Double Slit with a Laser.md`: Added `A1.4` to curriculum block matching explicit laser safety protocols.
+   - `Emission Spectra.md`: Added `A1.4` to curriculum block matching high-voltage power supply and thermal tube handling safety rules.
+   - `Deflecting a Charged Particle.md`: Added `A1.4` to curriculum block matching high-voltage demonstration tube safety rules.
+
+4. **Tasks, Summative Evaluations & Class Schedule (`shared/Tasks/`, `per_section/`)**:
+   - `Modern Physics Seminar.md`: Added Pauli's neutrino prediction to seminar topics, added career pathway and training requirements (e.g. photonics researcher, radiation physicist, quantum engineer) to brief and rubric. Added transclusions `A1.11, A2.1, A2.2, C3.5, F1.1, F1.2, F2.1, F2.4, F3.1, F3.3`.
+   - `Fields Technology Report.md`: Added career pathway requirement and rubric row for professional/technical careers (e.g. medical physicist, RF systems engineer, accelerator operator). Added transclusions `A1.3, A1.7, A1.9, A2.1, D1.1, D1.2, D2.1, D2.2`.
+   - `Final Examination.md`: Updated curriculum block to comprehensively reflect all five examined course units (`A1.12, A1.13, B2.1, B2.3, B2.5, B2.6, B3.3, C1.1, C2.1, C2.5, C2.7, C3.3, C3.5, D2.1, D2.2, D2.3, D3.1, E2.1, E2.3, E3.2, E3.3, E3.4, F2.1, F2.3, F2.4, F3.1, F3.3`).
+   - `per_section/All Classes/Unit 2, Day 10.md`: Linked `[[Analysing Video of Motion]]` directly on air table collision tracking day.
+
+---
+
+#### Adversarial Audit & Quality Control Review (SPH4U)
+
+An adversarial subagent was invoked to refute claims of resolution, audit curriculum alignment against primary Ministry documents in `shared/Curriculum/`, test KaTeX syntax, verify two-hop reachability, and check comment block constraints.
+
+**Audit Results:**
+- **Verdict:** **CERTIFIED CLEAN** (0 blocking defects, 0 minor observations).
+- Confirmed all 71 specific expectations (`A1.1` to `F3.4`) are authentically taught, exercised, or evaluated $\ge 2$ times.
+- Confirmed all 12 target expectations are thoroughly represented across multiple authentic destination files (ranging from 2 to 6 files each).
+- Confirmed zero transclusions or links inside comments, zero curriculum blocks on class pages, and 100% two-hop graph reachability.
+- Confirmed Canadian spelling and stylistic conventions maintained throughout.
+
+---
+
+#### Final Verification Metrics (SPH4U)
+
+- **Total Specific Expectations:** 71 (`A1.1` – `F3.4`)
+- **Expectations Addressed $\ge 2$ Times:** 71 / 71 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Linter Results (`lint_payload.py SPH4U`):** Clean (284 pages checked, 86 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.

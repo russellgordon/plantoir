@@ -44,9 +44,12 @@ Using the simulation:
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.4]]
+
 ![[D2.4]]
 
 ![[D2.5]]
 
 ![[D3.2]]
 %%curriculum-end%%
+

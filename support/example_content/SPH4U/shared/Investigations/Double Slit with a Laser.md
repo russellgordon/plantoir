@@ -41,9 +41,12 @@ tags:
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.4]]
+
 ![[E2.3]]
 
 ![[E2.4]]
 
 ![[E3.2]]
 %%curriculum-end%%
+
