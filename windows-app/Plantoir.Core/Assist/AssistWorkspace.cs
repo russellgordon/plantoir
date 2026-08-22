@@ -1,4 +1,5 @@
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Assist;
 
@@ -1057,22 +1058,41 @@ public sealed class AssistWorkspace
         int section = Section(course, sectionNumber);
         RefuseIfPlantoirIsBuilding(course);
 
-        // A Pages-scoped Cloudflare token cannot list its own account, so the
-        // account id lives in Plantoir's settings and only the app can pass it.
-        if (course.Configuration.DeploysToCloudflare)
+        var destinations = course.Configuration.AllDeployDestinations;
+
+        // A Pages-scoped Cloudflare token cannot list its own account, so
+        // the account id lives in Plantoir's settings and only the app —
+        // never this headless process — can pass it. Checked against EVERY
+        // configured destination, primary or additional: a redundancy
+        // target the assistant cannot reach is refused up front rather than
+        // silently skipped partway through a multi-destination deploy.
+        foreach (var destination in destinations)
+        {
+            if (destination.Type != "cloudflare_pages") continue;
+            bool isPrimary = destination.Type == course.Configuration.DeployTarget;
             throw new AssistRefusal(
-                $"{course.Code} deploys to Cloudflare Pages, which needs the account ID Plantoir stores. " +
-                "Deploy this section from Plantoir instead.");
+                $"{course.Code} {(isPrimary ? "deploys" : "also deploys")} to Cloudflare Pages, which needs " +
+                "the account ID Plantoir stores. Deploy this section from Plantoir instead.");
+        }
 
         // With no site marker, deploy.py asks what to call the website — a
         // prompt on stdin, which is closed here, so the launcher would die
-        // with an unhandled EOFError minutes into a build.
-        if (!course.Configuration.DeploysToLocalFolder &&
-            !File.Exists(Path.Combine(course.DirectoryPath, ".netlify_sites", $"section{section}.json")))
-            throw new AssistRefusal(
-                $"{course.Code} Section {section} has never been deployed, so deploying it asks what to call " +
-                "the website — and that can only be answered in Plantoir. Deploy it once from there, and I can " +
-                "do it after that.");
+        // with an unhandled EOFError minutes into a build. Checked for
+        // every destination up front, same reasoning as ScheduledDeploy.Problem.
+        foreach (var destination in destinations)
+        {
+            if (destination.Type == "local_folder") continue;
+            if (Models.DeployCommand.HasDeployedBefore(section, course, destination.Type)) continue;
+            bool isPrimary = destination.Type == course.Configuration.DeployTarget;
+            string destinationName = Models.DeployCommand.DestinationDescription(destination);
+            throw new AssistRefusal(isPrimary
+                ? $"{course.Code} Section {section} has never been deployed, so deploying it asks what to call " +
+                  "the website — and that can only be answered in Plantoir. Deploy it once from there, and I can " +
+                  "do it after that."
+                : $"{course.Code} Section {section} has never been deployed to {destinationName}, so deploying " +
+                  "it there asks what to call that site — and that can only be answered in Plantoir. Deploy it " +
+                  "there once from Plantoir, and I can do it after that.");
+        }
 
         progress?.Report($"Building Section {section} of {course.Code}…");
         using var claim = ClaimTheBuild(course);
@@ -1081,17 +1101,21 @@ public sealed class AssistWorkspace
         if (!build.Succeeded)
             return new AssistResult(false, $"The build failed, so nothing was deployed. {build.Message}", null);
 
-        var arguments = course.Configuration.DeploysToLocalFolder
-            ? new[] { course.Code, section.ToString(), "--to-folder", course.Configuration.DeployFolderPath }
-            : new[] { course.Code, section.ToString() };
+        // Every destination's own deploy — one FAILING does not stop the
+        // others, the whole point of a course having more than one.
+        var outcomeLegs = new List<(Models.CourseConfiguration.DeployDestination Destination, bool Succeeded)>();
+        foreach (var destination in destinations)
+        {
+            var arguments = Models.DeployCommand.Arguments(course.Code, section, destination);
+            progress?.Report($"Deploying to {Models.DeployCommand.DestinationDescription(destination)}…");
+            var deployed = await _launcher.Run("deploy", arguments, _folder, progress, cancellation);
+            outcomeLegs.Add((destination, deployed.Succeeded));
+        }
 
-        progress?.Report($"Deploying to {DestinationOf(course)}…");
-        var deployed = await _launcher.Run("deploy", arguments, _folder, progress, cancellation);
-        return deployed.Succeeded
-            ? new AssistResult(true,
-                $"Deployed {course.Code} Section {section} to {DestinationOf(course)}. Students can see it now.",
-                null)
-            : new AssistResult(false, $"Deploying failed. {deployed.Message}", null);
+        bool anySucceeded = outcomeLegs.Any(leg => leg.Succeeded);
+        var failedDestinations = outcomeLegs.Where(leg => !leg.Succeeded).Select(leg => leg.Destination).ToList();
+        var outcome = new MultiDestinationDeployRunner.Outcome(anySucceeded, failedDestinations);
+        return MultiDestinationDeployRunner.Result(course.Code, section.ToString(), destinations.Count, outcome);
     }
 
     public async Task<AssistResult> RebuildPreview(string courseCode, int sectionNumber,

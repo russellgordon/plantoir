@@ -35,8 +35,11 @@ public sealed class PublishingChoiceView
     private readonly Func<string> _getTarget;
     private readonly Func<string> _getPath;
     private readonly Func<string> _getAccount;
+    private readonly Func<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> _getAdditional;
+    private readonly Action<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> _setAdditional;
     private readonly StackPanel _folderArea;
     private readonly StackPanel _cloudflareArea;
+    private readonly StackPanel _additionalArea;
     private readonly TextBox _pathBox;
     private readonly TextBox _accountBox;
     private readonly TextBlock _problemText;
@@ -49,24 +52,50 @@ public sealed class PublishingChoiceView
 
     /// <summary>
     /// What is wrong with the current choice, or null when nothing is —
-    /// always null in Netlify mode, which needs no settings here.
+    /// always null in Netlify mode, which needs no settings here. Checks
+    /// every ADDITIONAL destination too, for the same reason the primary's
+    /// own check exists: a bad folder or missing Cloudflare Account ID
+    /// blocks Save/Create, rather than failing silently the first time a
+    /// deploy actually reaches it. Mirrors the mac's PublishingChoiceView.
     /// </summary>
-    public string? Problem => _getTarget() switch
+    public string? Problem
     {
-        "local_folder" => CourseConfiguration.DeployFolderProblem(_getPath()),
-        "cloudflare_pages" => CourseConfiguration.CloudflareAccountProblem(_getAccount()),
-        _ => null,
-    };
+        get
+        {
+            string? primaryProblem = _getTarget() switch
+            {
+                "local_folder" => CourseConfiguration.DeployFolderProblem(_getPath()),
+                "cloudflare_pages" => CourseConfiguration.CloudflareAccountProblem(_getAccount()),
+                _ => null,
+            };
+            if (primaryProblem is not null) return primaryProblem;
+            foreach (var target in _getAdditional())
+            {
+                string? problem = target.Type switch
+                {
+                    "local_folder" => CourseConfiguration.DeployFolderProblem(target.Path),
+                    "cloudflare_pages" => CourseConfiguration.CloudflareAccountProblem(_getAccount()),
+                    _ => null,
+                };
+                if (problem is not null) return problem;
+            }
+            return null;
+        }
+    }
 
     public PublishingChoiceView(Window pickerOwner,
                                 Func<string> getTarget, Action<string> setTarget,
                                 Func<string> getPath, Action<string> setPath,
-                                Func<string> getAccount, Action<string> setAccount)
+                                Func<string> getAccount, Action<string> setAccount,
+                                Func<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> getAdditional,
+                                Action<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> setAdditional)
     {
         _pickerOwner = pickerOwner;
         _getTarget = getTarget;
         _getPath = getPath;
         _getAccount = getAccount;
+        _getAdditional = getAdditional;
+        _setAdditional = setAdditional;
 
         Root = new StackPanel { Spacing = 6 };
 
@@ -158,6 +187,13 @@ public sealed class PublishingChoiceView
         _cloudflareArea.Children.Add(_cloudflareSizeNote);
         Root.Children.Add(_cloudflareArea);
 
+        // ---- Also publish to, for redundancy — real redundancy needs a
+        // second copy of the site ALREADY live, not a scramble to
+        // reconfigure a new destination after the fact. See
+        // WINDOWS-HANDOFF.md entry 304.
+        _additionalArea = new StackPanel { Spacing = 6, Margin = new Thickness(0, 12, 0, 0) };
+        Root.Children.Add(_additionalArea);
+
         targetBox.SelectionChanged += (_, _) =>
         {
             if (_updatingFromModel) return;
@@ -168,6 +204,7 @@ public sealed class PublishingChoiceView
                 _ => "netlify",
             });
             RefreshAreas();
+            RebuildAdditionalArea();
             Changed?.Invoke();
         };
         _pathBox.TextChanged += (_, _) =>
@@ -201,6 +238,122 @@ public sealed class PublishingChoiceView
         };
 
         RefreshAreas();
+        RebuildAdditionalArea();
+    }
+
+    private static string FriendlyName(string type) => type switch
+    {
+        "local_folder" => "A folder on this PC",
+        "cloudflare_pages" => "Cloudflare Pages",
+        _ => "Netlify",
+    };
+
+    /// <summary>
+    /// Rebuilt (not just re-shown) whenever the primary changes, because
+    /// the SET of available additional types changes with it — "one of
+    /// each type, and never the primary twice" (row 304).
+    /// </summary>
+    private void RebuildAdditionalArea()
+    {
+        _additionalArea.Children.Clear();
+        var availableTypes = CourseConfiguration.AvailableAdditionalDeployTargetTypes(_getTarget());
+        if (availableTypes.Count == 0) return;
+
+        _additionalArea.Children.Add(new TextBlock
+        {
+            Text = "Also publish to, for redundancy",
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+        });
+
+        foreach (string type in availableTypes)
+        {
+            var toggle = new ToggleSwitch
+            {
+                OnContent = "", OffContent = "",
+                IsOn = CourseConfiguration.HasAdditionalDeployTarget(_getAdditional(), type),
+            };
+            AutomationProperties.SetAutomationId(toggle, $"additionalDeployTarget-{type}");
+            var row = FormBuilders.LabeledRow(FriendlyName(type), toggle);
+            _additionalArea.Children.Add(row);
+
+            StackPanel? detailArea = null;
+            TextBox? folderBox = null;
+            TextBlock? folderProblemText = null;
+
+            if (type == "local_folder")
+            {
+                detailArea = new StackPanel { Spacing = 4, Margin = new Thickness(0, 0, 0, 4) };
+                var pathRow = new Grid { ColumnSpacing = 8 };
+                pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                folderBox = new TextBox
+                {
+                    Text = CourseConfiguration.AdditionalDeployTargetPath(_getAdditional(), type),
+                    PlaceholderText = "Folder",
+                };
+                AutomationProperties.SetAutomationId(folderBox, $"additionalDeployFolderField-{type}");
+                pathRow.Children.Add(folderBox);
+                var chooseAdditional = new Button { Content = "Choose…" };
+                Grid.SetColumn(chooseAdditional, 1);
+                pathRow.Children.Add(chooseAdditional);
+                detailArea.Children.Add(pathRow);
+
+                folderProblemText = CautionLine($"additionalDeployFolderProblem-{type}");
+                detailArea.Children.Add(folderProblemText);
+
+                chooseAdditional.Click += async (_, _) =>
+                {
+                    var picker = new Windows.Storage.Pickers.FolderPicker();
+                    WinRT.Interop.InitializeWithWindow.Initialize(picker,
+                        WinRT.Interop.WindowNative.GetWindowHandle(_pickerOwner));
+                    picker.FileTypeFilter.Add("*");
+                    var folder = await picker.PickSingleFolderAsync();
+                    if (folder is null) return;
+                    folderBox.Text = folder.Path;
+                    _setAdditional(CourseConfiguration.SettingAdditionalDeployTargetPath(_getAdditional(), folder.Path, type));
+                    RefreshAdditionalProblem(folderProblemText, type);
+                    Changed?.Invoke();
+                };
+                folderBox.TextChanged += (_, _) =>
+                {
+                    _setAdditional(CourseConfiguration.SettingAdditionalDeployTargetPath(_getAdditional(), folderBox.Text, type));
+                    RefreshAdditionalProblem(folderProblemText, type);
+                    Changed?.Invoke();
+                };
+                RefreshAdditionalProblem(folderProblemText, type);
+                _additionalArea.Children.Add(detailArea);
+            }
+            else if (type == "cloudflare_pages")
+            {
+                // Cloudflare's account ID is per-teacher, in app settings —
+                // NOT stored per destination — so an additional Cloudflare
+                // target needs no field of its own here, only the same
+                // account the primary picker's own block already asks for.
+                var note = FormBuilders.ExampleCaption(
+                    "Uses the same Cloudflare Account ID as above — enter it there if you haven't already.");
+                _additionalArea.Children.Add(note);
+            }
+
+            string capturedType = type;
+            StackPanel? capturedDetailArea = detailArea;
+            toggle.Toggled += (_, _) =>
+            {
+                _setAdditional(CourseConfiguration.SettingAdditionalDeployTarget(_getAdditional(), toggle.IsOn, capturedType));
+                if (capturedDetailArea is not null)
+                    capturedDetailArea.Visibility = toggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
+                Changed?.Invoke();
+            };
+            if (detailArea is not null)
+                detailArea.Visibility = toggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    private void RefreshAdditionalProblem(TextBlock problemText, string type)
+    {
+        string path = CourseConfiguration.AdditionalDeployTargetPath(_getAdditional(), type);
+        string? problem = CourseConfiguration.DeployFolderProblem(path);
+        problemText.Text = problem ?? "";
+        problemText.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private static TextBlock CautionLine(string automationId)

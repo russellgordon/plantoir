@@ -1126,6 +1126,187 @@ Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
 
+- ✅ DONE (Windows, 2026-08-22). **Redundant deploy targets, ported in full:
+  schema, settings/wizard UI, Deploy publishing to every destination,
+  scheduled deploy, the assistant's headless deploy, and progress display —
+  WINDOWS-HANDOFF.md entries 304, 305, 306, 308 (301–303 are shared Python,
+  inherited automatically; 307's data-safety half landed the day before,
+  see the entry below; 309/310 are mac-only layout fixes with no Windows
+  equivalent bug — see "What was deliberately NOT copied" below).**
+
+  **The schema (entry 304).** `CourseConfiguration` gained
+  `AdditionalDeployTarget` (a `Type`/`Path` record struct),
+  `DeployDestination`, `AllDeployDestinations`, `KnownDeployTargetTypes`,
+  and a set of plain STATIC functions —
+  `PruningAdditionalTargets`, `AvailableAdditionalDeployTargetTypes`,
+  `HasAdditionalDeployTarget`, `AdditionalDeployTargetPath`,
+  `SettingAdditionalDeployTarget`, `SettingAdditionalDeployTargetPath` —
+  mirroring the mac's choice to make pruning a plain function rather than
+  an instance method, for the identical reason: the wizard's `_deployTarget`
+  is a plain field with no `CourseConfiguration` to route through until
+  Create is clicked, so it calls the SAME static functions the instance
+  property wraps, rather than duplicating the pruning rule. `DeployTarget`'s
+  setter now prunes on every primary change, exactly as the mac's does. The
+  omit-when-empty write rule is the one the mac's own note flagged as easy
+  to get wrong — `AdditionalDeployTargetsTests.WritingAnEmptyAdditionalTargetsListOmitsTheKeyEntirely`
+  ported and passing.
+
+  **The settings/wizard UI.** `PublishingChoiceView.cs` — already shared by
+  Course Settings and the wizard, same as the mac's — gained a rebuilt
+  "Also publish to, for redundancy" section: one `ToggleSwitch` per known
+  type that is not the current primary, matching the mac's rule that this
+  list is REBUILT (not just re-shown) whenever the primary changes, since
+  the set of available types changes with it. Turning on `local_folder`
+  reveals a folder field + Choose… button + its own validation line;
+  turning on `cloudflare_pages` shows a plain note pointing at the SAME
+  Account ID field the primary picker already has, rather than a duplicate
+  field — the mac's own reasoning applies unchanged: Cloudflare's credential
+  is per-teacher, in app settings, never per-course, so an additional
+  Cloudflare target needs no field of its own. `Problem` (the property that
+  gates Save/Create) now checks every additional target with the same two
+  rules the primary already used.
+
+  **Deploy publishes to every destination (entry 305).**
+  `MultiDestinationDeployRunner` (new, `Plantoir.Core/Scripting/`) is the
+  direct C# translation of the mac's Swift type: `Leg` (one
+  `CourseConfiguration.DeployDestination` + its own `ScriptRunner` —
+  built this way from the start, since the mac's own history names "one
+  `ScriptRunner` per leg, never a shared one" as the single most important
+  decision here, the one that fails SILENTLY if gotten wrong), sequential
+  `RunAsync` (the shared build happens exactly once, on the first leg, via
+  the same `BuildAndDeployMilestones`/`DeployOnlyMilestones` split the mac
+  uses; a destination FAILING does not stop the others, a CANCEL or a
+  failed shared build stops the whole run), `RefusalReason` (checked up
+  front against every destination, not discovered mid-run), `JoinedWithAnd`,
+  and `Result(...)` — the one place that picks the teacher's sentence,
+  `destinationCount <= 1` always using the UNCHANGED single-destination
+  wording. `AssistWording` gained the three matching functions
+  (`DeployedToMultipleDestinations`, `DeployPartiallySucceeded`,
+  `DeployToMultipleDestinationsDidNotFinish`), word-for-word ports of the
+  mac's.
+
+  **One sequencer, three callers** (Windows has no wizard-preview caller
+  and no separate "assistant with no window" process the way the mac's
+  MCP-as-the-app-itself does, so this is 3 where the mac's is 4):
+  `SectionDetailView.Deploy_Click` (the toolbar button — rewritten around
+  `RunAsync`, which now also resolves per-leg milestones and per-leg custom
+  domain internally, so the button's own code is SHORTER than before, not
+  longer), `AssistWorkspace.Deploy` (the in-app assistant's headless path —
+  loops every destination, refuses up front if ANY of them is Cloudflare
+  since this process has no access to the stored Account ID either way, a
+  Windows-specific limit the mac does not share), and `ScheduledDeploy.
+  Problem` + `TaskScheduling.Schedule` (the overnight path). A genuine,
+  incidental bonus this produced, exactly like the mac's own entry 307:
+  `AssistWorkspace.Deploy`'s success sentence was a bespoke string that had
+  quietly drifted from the contract ("Deployed … Students can see it now."
+  vs. the contract's "… Students can reach it now.") — never caught because
+  nothing tested it against `assist-wording.json` directly. Routing through
+  `MultiDestinationDeployRunner.Result` fixed it for free;
+  `AssistTests.DeployingIsItsOwnAskAndNeverASideEffect` now asserts the
+  canonical wording instead of the drifted one.
+
+  **Scheduled deploy across destinations — a genuinely different mechanism
+  than the mac's, because Windows Task Scheduler has no "just this once"
+  self-removing agent shape to lean on.** The mac writes one un-chained
+  shell line per destination into a script launchd runs. `TaskScheduling.
+  Schedule` gained the identical shape for &gt;1 destination — a small
+  wrapper `.ps1`, one `& deploy.ps1 <args>` line per destination, none
+  joined with `-and`/`&&` so one destination failing cannot stop the
+  others — written to `%LOCALAPPDATA%\Plantoir\scheduled\`, NOT a temp
+  folder: the task may fire hours later, and a temp-folder sweep must never
+  be the reason an overnight deploy silently does nothing. A single
+  destination — the overwhelming majority — is completely unchanged: one
+  inline `schtasks /TR` command, no wrapper script at all. `Cancel` now also
+  deletes the wrapper script it wrote, so rescheduling does not accumulate
+  litter. `ScheduledDeploy.Problem` gained the same "every additional
+  destination gets the primary's own two checks, then the same
+  never-deployed check" shape as the mac's — this is also what the
+  previously-red `SharedRules_ScheduledDeployRefusals_MatchesContract`
+  contract test needed, and it is green now.
+
+  **Custom domain UI (the other half of entry 307 — the data-safety fix
+  landed the day before this, see the entry below).**
+  `CourseSettingsView`'s "Advanced" section now shows one field per
+  destination that can have a domain, labelled plainly "Custom domain" for
+  the single-destination case and "`<Service>` custom domain" once there is
+  more than one — mirroring `SectionSettingsView`'s own two rules.
+
+  **Progress display (entries 306, 308) — built correctly from the start,
+  rather than shipping the mac's original bug and fixing it after.**
+  `TaskProgressView` gained an optional `multiRunner` parameter to `Show()`;
+  when set and carrying more than one leg:
+  - a `DestinationChecklist` (one row per destination, ✓/✗/•/○) appears
+    above the progress bar, so a teacher watching sees which destinations
+    have finished and which are still to come, rather than a bar that looks
+    stuck between legs;
+  - the outcome badge is computed from `MultiDestinationDeployRunner.
+    CurrentOutcome` — every leg's own result — never from whichever leg's
+    `ScriptRunner` happens to be `ActiveRunner` when the run ends, which is
+    the exact bug the mac's row 306 found and fixed (a first-destination
+    failure with a second-destination success reading as plain "Done").
+    Windows never had this bug to begin with, because the badge was written
+    against the aggregate outcome from the start;
+  - `DestinationLinks` lists every SUCCEEDED leg's own link (or "Show in
+    File Explorer" button), in the SAME slot the single-destination link
+    already occupied — never appended after the whole panel, which is what
+    the mac's own row 309 had to fix after shipping it the other way;
+  - `CombinedTranscriptText()` concatenates every leg that has produced any
+    output so far, under a `"── <Service> ──"` heading, exactly the shape
+    the mac's row 308 arrived at — a leg the run never reached is filtered
+    out rather than shown as an empty section.
+
+  **What was deliberately NOT copied, and why.** The mac's rows 309/310 fix
+  a WinUI-inapplicable bug: SwiftUI's default `VStack` alignment is
+  `.center`, so the mac had to add an explicit `alignment: .leading`.
+  WinUI's `StackPanel` (used throughout `TaskProgressView.xaml`) has no
+  such default-centring behaviour — content is left-aligned unless told
+  otherwise — so there was never a centring bug here to fix. Named so a
+  future reader does not go looking for one.
+
+  **What was NOT verified, and why it is said plainly rather than
+  quietly assumed working.** This entire piece was built and unit-tested on
+  a machine with no display session available to drive the real WinUI app —
+  `dotnet build`/`dotnet test` only. The checklist glyphs, the console
+  combining, and the destination-links layout are UNTESTED AGAINST THE REAL
+  RENDERED APP. The mac's own history (rows 300, 305→306, and the note on
+  rule 9 generally) is that layout and finished-state bugs specifically are
+  the class of thing a unit suite stays green through while the real view
+  is broken — "driving the real app caught a real bug the design missed" is
+  a recurring sentence in this file for exactly that reason. **Before this
+  ships, drive a real multi-destination deploy (two destinations, one of
+  them made to fail on purpose — e.g. an invalid Cloudflare Account ID) and
+  look at what the panel actually shows.**
+
+  **What Windows still does NOT have, and does not need for this piece**:
+  the mac's local-assistant "no section window open" fix (entry 300, its
+  own row in WINDOWS-HANDOFF.md). Checked directly: Windows' `AssistWindow`
+  is constructed per-section already (`AssistWindow(workspacePath, course,
+  section, main)`, one call site, `SidebarPane.xaml.cs`), and its own
+  `StartDeployInAppAsync` calls `MainWindow.DeployForAsync`, which SELECTS
+  the right section in that same window before deploying — the window the
+  assistant was opened FROM always exists, by construction, so the mac's
+  "no window open at all" scenario is structurally impossible on this side
+  rather than a gap to close.
+
+  Reference: `Plantoir.Core/Scripting/MultiDestinationDeployRunner.cs`
+  (new), `Plantoir.Core/Models/CourseConfiguration.cs` (additional-targets
+  schema), `Plantoir.Core/Models/DeployCommand.cs` (destination-aware
+  overloads), `Plantoir.Core/Assist/AssistWording.cs` (the three new
+  functions), `Plantoir.Core/Assist/AssistWorkspace.cs` (`Deploy`),
+  `Plantoir.Core/Assist/ScheduledDeploy.cs` (`Problem`),
+  `Plantoir.Core/Assist/TaskScheduling.cs` (multi-destination `Schedule`),
+  `Plantoir/Views/PublishingChoiceView.cs`, `Plantoir/Views/
+  CourseSettingsView.xaml.cs`, `Plantoir/Views/NewCourseDialog.cs`,
+  `Plantoir/Views/SectionDetailView.xaml.cs` (`Deploy_Click`), `Plantoir/
+  Views/TaskProgressView.xaml`/`.xaml.cs`. Tests:
+  `AdditionalDeployTargetsTests.cs` (new, 10 cases),
+  `MultiDestinationDeployRunnerTests.cs` (new, 13 cases covering refusal
+  reasoning, milestone selection, wording selection, and outcome
+  bookkeeping — everything testable without spawning a real `deploy.ps1`),
+  plus the `ScheduledDeployRefusals` and `FileFormats_CourseConfigKeys`
+  contract tests, both previously red, now green. Full suite: 606 tests,
+  606 passed.
+
 - ✅ DONE (Windows, 2026-08-21). **Custom domain reads and writes are now
   per-destination-type on Windows too, closing a real data-loss risk from
   WINDOWS-HANDOFF.md entry 307.**

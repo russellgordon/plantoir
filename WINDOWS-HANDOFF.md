@@ -4193,6 +4193,14 @@ feature, and a Mac teacher's config edited on Windows (schema written, but
 never acted on there) is a real cross-platform inconsistency, not a
 hypothetical one.
 
+**Update (2026-08-22, Windows): implemented.** `CourseConfiguration.
+AdditionalDeployTargets` (plus `DeployDestination`, `AllDeployDestinations`,
+`PruningAdditionalTargets`, and the rest of the static helpers the mac's own
+instance methods delegate to) carries the identical omit-when-empty rule,
+and `PublishingChoiceView.cs` gained the "Also publish to, for redundancy"
+toggle section, shared by both Course Settings and the wizard exactly as on
+the mac. Full write-up: `MAC-HANDOFF.md`, "Done" ledger.
+
 ## Redundant deploy targets — piece 2: Deploy publishes to every
 configured destination (entry 305)
 
@@ -4372,6 +4380,15 @@ list every succeeded destination's own link once the whole run is done,
 and stop a title from naming one destination after the fact — not this
 Swift.
 
+**Update (2026-08-22, Windows): built correctly from the start, avoiding
+this bug rather than fixing it after the fact.** `TaskProgressView`'s outcome
+badge is computed from `MultiDestinationDeployRunner.CurrentOutcome` — every
+leg's own result — not from whichever leg's `ScriptRunner` happens to be
+`ActiveRunner` when the run ends, so a first-destination failure with a
+second-destination success can never read as plain "Done". `DestinationLinks`
+lists every succeeded leg's own link (or folder button), occupying the same
+slot the single-destination link already used. Full write-up: `MAC-HANDOFF.md`.
+
 ## Custom domain: per-destination, not per-section, or one host's domain leaks onto another's (entry 307)
 
 Row 306 (above) fixed the multi-destination deploy PANEL showing only the
@@ -4508,6 +4525,17 @@ custom domain are in play. There is no urgency purely from "Windows has no
 read/write asymmetry above is a real risk today, for any course a teacher
 happens to open on both platforms.
 
+**Update (2026-08-21, Windows): the read/write fix landed first, on its
+own** (`CustomDomain`/`SetCustomDomain` gained the `destinationType`
+overload, migrating an old bare string on write rather than clobbering the
+map), closing the data-loss risk before Windows had any multi-destination
+UI at all. **Update (2026-08-22, Windows): `MultiDestinationDeployRunner`
+now exists, and `CourseSettingsView`'s "Advanced" section shows one custom
+domain field per destination that can have one** (never `local_folder`),
+labelled plainly "Custom domain" for the overwhelming single-destination
+case and "`<Service>` custom domain" once there is more than one — mirroring
+`SectionSettingsView`. Full write-up: `MAC-HANDOFF.md`.
+
 ## The multi-destination console dropped the first destination's output (entry 308)
 
 Reported directly, right alongside row 307: "output to the faux terminal
@@ -4555,6 +4583,12 @@ output that exists so far, under its own heading, rather than showing only
 whichever one is current. Not this Swift; the decision that travels is
 "a multi-destination console must never let an earlier destination's
 output simply disappear."
+
+**Update (2026-08-22, Windows): implemented from the start, same shape.**
+`TaskProgressView.CombinedTranscriptText()` joins every leg that has
+produced any output — filtered the same way, a leg the run never reached is
+simply not shown — under a `"── <Service> ──"` heading, in deploy order.
+Full write-up: `MAC-HANDOFF.md`.
 
 ## A container's own network can wedge independently of everything else (entry 311)
 

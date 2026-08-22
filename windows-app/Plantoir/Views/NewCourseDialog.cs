@@ -70,6 +70,7 @@ public sealed class NewCourseDialog : ContentDialog
     // Publishing (rows 101–102): Netlify by default, or a folder on this PC.
     private string _deployTarget = "netlify";
     private string _deployFolderPath = "";
+    private List<CourseConfiguration.AdditionalDeployTarget> _additionalDeployTargets = new();
     private PublishingChoiceView? _publishingChoice;
     private readonly StackPanel _startingContentBody = new() { Spacing = 6 };
     private readonly TextBlock _structureCaption;
@@ -400,10 +401,22 @@ public sealed class NewCourseDialog : ContentDialog
         // -------- Publishing --------
         form.Children.Add(FormBuilders.SectionHeaderWithCaption("Deploying", null));
         _publishingChoice = new PublishingChoiceView(_window,
-            () => _deployTarget, v => _deployTarget = v,
+            () => _deployTarget,
+            v =>
+            {
+                _deployTarget = v;
+                // A destination can never be both primary and additional at
+                // once — the SAME guarantee CourseConfiguration.DeployTarget's
+                // own setter gives an existing course, given live here since
+                // this wizard's fields have no CourseConfiguration to route
+                // through until Create is actually clicked.
+                _additionalDeployTargets = CourseConfiguration.PruningAdditionalTargets(_additionalDeployTargets, v);
+            },
             () => _deployFolderPath, v => _deployFolderPath = v,
             () => _window.Workspace.Settings.CloudflareAccountId,
-            v => { _window.Workspace.Settings.CloudflareAccountId = v; _window.Workspace.Settings.Save(); });
+            v => { _window.Workspace.Settings.CloudflareAccountId = v; _window.Workspace.Settings.Save(); },
+            () => _additionalDeployTargets,
+            v => _additionalDeployTargets = v.ToList());
         _publishingChoice.Changed += RefreshCreateEnabled;
         form.Children.Add(_publishingChoice.Root);
 
@@ -781,7 +794,7 @@ public sealed class NewCourseDialog : ContentDialog
         bool hasContent = ExampleContentCatalog.HasContent(ExampleContentRoot, code);
         bool includesCurriculum = ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, code);
 
-        return new JObject
+        var result = new JObject
         {
             ["course_code"] = code,
             ["course_name"] = name,
@@ -815,5 +828,17 @@ public sealed class NewCourseDialog : ContentDialog
             ["show_section_marker"] = PerSection(_ => _showsMarker),
             ["color_schemes"] = flatSchemes,
         };
+
+        // Pruned once more, defensively, at the point this actually gets
+        // written — so the file on disk is correct even in a hypothetical
+        // future case where the picker's own pruning (in the setter above)
+        // did not run before Create was clicked. Uses CourseConfiguration's
+        // own encoding so the omit-when-empty rule stays in exactly one
+        // place. Mirrors NewCourseWizardView.buildConfigurationDictionary
+        // on the mac.
+        var withDeployTargets = CourseConfiguration.FromDictionary(result);
+        withDeployTargets.AdditionalDeployTargets =
+            CourseConfiguration.PruningAdditionalTargets(_additionalDeployTargets, _deployTarget);
+        return withDeployTargets.Values;
     }
 }

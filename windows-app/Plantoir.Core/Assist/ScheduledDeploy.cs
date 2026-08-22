@@ -31,6 +31,9 @@ public sealed class ScheduledDeploy
         if (when <= now)
             return $"{when:dddd d MMMM, h:mm tt} has already passed. Pick a time still to come.";
 
+        // The PRIMARY destination — unchanged wording and order from before
+        // a course could have more than one, so every existing check
+        // against this function still passes byte for byte.
         if (course.Configuration.DeployTarget == "local_folder")
         {
             if (Models.CourseConfiguration.DeployFolderProblem(course.Configuration.DeployFolderPath) is { } folderProblem)
@@ -43,10 +46,45 @@ public sealed class ScheduledDeploy
                 return $"{course.Code} deploys to Cloudflare Pages, which needs your Account ID. {accountProblem} Add it in this course’s settings, under Deploying, then schedule this again.";
         }
 
+        // Every ADDITIONAL destination gets the same two checks — a
+        // redundancy target with no valid folder or credential would
+        // otherwise sit silently broken until the scheduled moment, exactly
+        // the surprise asking everything up front exists to prevent.
+        foreach (var target in course.Configuration.AdditionalDeployTargets)
+        {
+            if (target.Type == "local_folder")
+            {
+                if (Models.CourseConfiguration.DeployFolderProblem(target.Path) is { } folderProblem)
+                    return $"{course.Code} also deploys to a folder, and that folder needs attention first: {folderProblem}";
+            }
+            if (target.Type == "cloudflare_pages")
+            {
+                if (Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID) is { } accountProblem)
+                    return $"{course.Code} also deploys to Cloudflare Pages, which needs your Account ID. {accountProblem} Add it in this course’s settings, under Deploying, then schedule this again.";
+            }
+        }
+
         if (!Models.DeployCommand.HasDeployedBefore(sectionNumber, course))
             return $"{course.Code} Section {sectionNumber} has never been deployed, so deploying it asks " +
                    "what to call the website. Nobody would be there to answer that at the scheduled time, " +
                    "and it would wait. Deploy it once from Plantoir, and after that it can be scheduled.";
+
+        // Same reasoning, for any additional destination that has never
+        // gone out — a brand-new Netlify or Cloudflare destination also
+        // asks what to call the site, and local_folder never does
+        // (HasDeployedBefore reports it as always ready).
+        foreach (var target in course.Configuration.AdditionalDeployTargets)
+        {
+            if (!Models.DeployCommand.HasDeployedBefore(sectionNumber, course, target.Type))
+            {
+                string destinationName = Models.DeployCommand.DestinationDescription(
+                    new Models.CourseConfiguration.DeployDestination(target.Type, target.Path));
+                return $"{course.Code} Section {sectionNumber} has never been deployed to {destinationName}, " +
+                       "so deploying it there asks what to call that site. Nobody would be there to answer " +
+                       "that at the scheduled time, and it would wait. Deploy it there once from Plantoir, " +
+                       "and after that it can be scheduled.";
+            }
+        }
 
         return null;
     }

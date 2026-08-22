@@ -24,7 +24,7 @@ public sealed partial class SectionDetailView : UserControl
     private readonly Course _course;
     private readonly int _sectionNumber;
     private readonly ScriptRunner _previewRunner = new(SynchronizationContext.Current);
-    private readonly ScriptRunner _deployRunner = new(SynchronizationContext.Current);
+    private readonly MultiDestinationDeployRunner _deployRunner = new(SynchronizationContext.Current);
     private PreviewLeases.Lease? _lease;
 
     // The on-disk half of the same claims. In-memory leases are invisible to
@@ -73,8 +73,12 @@ public sealed partial class SectionDetailView : UserControl
         // Each runner is bound to the progress view exactly once — its
         // question dialog and outcome states follow whichever runner the
         // view is currently showing, chosen in RefreshChrome via Show().
+        // _deployRunner's own leg runners are registered lazily, as each
+        // becomes active — see RefreshChrome's Progress.Show call, which
+        // registers idempotently. Only one leg is ever running at a time,
+        // so there is never a moment a question from an un-registered leg
+        // could be missed.
         Progress.Register(_previewRunner);
-        Progress.Register(_deployRunner);
         _previewRunner.PropertyChanged += (_, _) => RefreshChrome();
         _deployRunner.PropertyChanged += (_, _) => RefreshChrome();
         Preview.NavigationCompleted += (_, _) => RefreshChrome();
@@ -126,7 +130,15 @@ public sealed partial class SectionDetailView : UserControl
             (_deployRunner.IsRunning ||
              (_deployRunner.StartedAt ?? DateTime.MinValue) > (_previewRunner.StartedAt ?? DateTime.MinValue));
         if (showDeploy)
-            Progress.Show(_deployRunner, $"Deploying {TitleText}", onCancel: CancelDeploy);
+        {
+            // Multi-destination courses get a leg count in the title, so a
+            // teacher watching the progress bar knows it is running a
+            // sequence rather than a single deploy that is unusually slow.
+            string title = _deployRunner.Legs.Count > 1
+                ? $"Deploying {TitleText} — destination {Math.Min(_deployRunner.CurrentLegIndex + 1, _deployRunner.Legs.Count)} of {_deployRunner.Legs.Count}"
+                : $"Deploying {TitleText}";
+            Progress.Show(_deployRunner.ActiveRunner, title, onCancel: CancelDeploy, multiRunner: _deployRunner);
+        }
         else
             Progress.Show(_previewRunner,
                 _previewRunner.IsRunning || _isWaitingForServer
@@ -134,7 +146,7 @@ public sealed partial class SectionDetailView : UserControl
                     : $"Preview of {TitleText}",
                 onCancel: CancelPreview);
 
-        bool anyOutput = _previewRunner.Transcript.Lines.Count > 0 || _deployRunner.Transcript.Lines.Count > 0
+        bool anyOutput = _previewRunner.Transcript.Lines.Count > 0 || _deployRunner.HasAnyOutput
                          || _previewRunner.Transcript.CurrentLine.Length > 0;
         bool showConsole = _isWaitingForServer || IsBusy || anyOutput;
         Progress.Visibility = showConsole ? Visibility.Visible : Visibility.Collapsed;
@@ -444,7 +456,7 @@ public sealed partial class SectionDetailView : UserControl
     {
         if (_deployRunner.IsRunning && _window.Workspace.WorkspacePath is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
-        _deployRunner.CancelByUser();
+        _deployRunner.Cancel();
     }
 
     private void StopPreview()
@@ -531,37 +543,22 @@ public sealed partial class SectionDetailView : UserControl
             if (await TheAssistantIsBuilding()) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
 
-            // Folder publishing (rows 101–102): the save gate keeps the folder
-            // valid, but a hand-edited config could still slip a bad one in —
-            // decline plainly rather than let the launcher discover it.
-            bool toFolder = _course.Configuration.DeploysToLocalFolder;
-            string deployFolder = _course.Configuration.DeployFolderPath.Trim();
-            if (toFolder && CourseConfiguration.DeployFolderProblem(deployFolder) is { } folderProblem)
+            var destinations = _course.Configuration.AllDeployDestinations;
+            string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
+
+            // Refuses up front, against EVERY configured destination, rather
+            // than discovering a missing credential halfway through a
+            // redundancy run — exactly the surprise redundancy exists to
+            // prevent (row 305's RefusalReason).
+            if (MultiDestinationDeployRunner.RefusalReason(destinations, cloudflareAccount) is { } problem)
             {
                 var problemDialog = new ContentDialog
                 {
-                    Title = "The deploy folder needs attention",
-                    Content = folderProblem + " Fix it in this course's settings, then deploy again.",
+                    Title = "This section can't be deployed yet",
+                    Content = problem,
                     CloseButtonText = "OK",
                 };
                 await ShowDialogSafelyAsync(problemDialog);
-                return;
-            }
-
-            // Cloudflare needs the teacher's account, and the launcher's console
-            // prompt for it can never be answered from here — so decline plainly
-            // and point at the setting that fixes it.
-            bool toCloudflare = _course.Configuration.DeploysToCloudflare;
-            string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
-            if (toCloudflare && CourseConfiguration.CloudflareAccountProblem(cloudflareAccount) is { } accountProblem)
-            {
-                var accountDialog = new ContentDialog
-                {
-                    Title = "Cloudflare needs your Account ID",
-                    Content = accountProblem + " Add it in this course's settings, under Deploying, then deploy again.",
-                    CloseButtonText = "OK",
-                };
-                await ShowDialogSafelyAsync(accountDialog);
                 return;
             }
 
@@ -584,18 +581,10 @@ public sealed partial class SectionDetailView : UserControl
             if (await TheAssistantIsBuilding()) return;
 
             bool needsBuild = BuildFreshness.NeedsRebuild(_course, _sectionNumber);
-            _deployRunner.Milestones = toFolder
-                ? (needsBuild ? TaskMilestones.BuildAndDeployToFolder : TaskMilestones.DeployToFolder)
-                : toCloudflare
-                    ? (needsBuild ? TaskMilestones.BuildAndDeployToCloudflare : TaskMilestones.DeployToCloudflare)
-                    : (needsBuild ? TaskMilestones.BuildAndDeploy : TaskMilestones.Deploy);
-            string customDomain = CourseConfiguration.NormalizedCustomDomain(
-                _course.Configuration.CustomDomain(_sectionNumber));
-            _deployRunner.CustomDomainForLinks = customDomain.Length == 0 ? null : customDomain;
 
             // The publish is on the books for its WHOLE life — the quiet build
-            // included — and comes off them on every exit path: the two early
-            // returns below, the normal end, and the catch.
+            // included — and comes off them on every exit path: the normal
+            // end and the catch.
             _publishActivity?.Dispose();
             _publishActivity = CourseActivity.BeginPublish(workspacePath, _course.Code, _sectionNumber);
             _publishWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Publishing);
@@ -603,24 +592,14 @@ public sealed partial class SectionDetailView : UserControl
             // build claim can simply run its whole length.
             _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
 
-            if (needsBuild)
-            {
-                // Build quietly first; a failed build stops before publishing —
-                // the failure and its output are already on screen.
-                _deployRunner.Run("preview.ps1",
-                    new[] { _course.Code, _sectionNumber.ToString(), "--build-only" }, workspacePath);
-                RefreshChrome();
-                if (!await _deployRunner.WaitUntilFinished()) { EndPublishActivity(); return; }
-            }
-            var deployArguments = toFolder
-                ? new[] { _course.Code, _sectionNumber.ToString(), "--to-folder", deployFolder }
-                : toCloudflare
-                    ? new[] { _course.Code, _sectionNumber.ToString(), "--target", "cloudflare", "--account", cloudflareAccount }
-                    : new[] { _course.Code, _sectionNumber.ToString() };
-            _deployRunner.Run("deploy.ps1", deployArguments, workspacePath,
-                keepTranscript: needsBuild);
+            // The whole sequence — an optional shared build, then each
+            // destination's own deploy — happens inside RunAsync, which
+            // also resolves each leg's own milestones and custom domain.
+            // For the overwhelming majority of courses (one destination)
+            // this behaves exactly as a single deploy always did.
             RefreshChrome();
-            await _deployRunner.WaitUntilFinished();   // outcome already on screen
+            await _deployRunner.RunAsync(_course, _sectionNumber, destinations, cloudflareAccount,
+                workspacePath, needsBuild);
             EndPublishActivity();
         }
         catch (Exception ex)

@@ -26,6 +26,13 @@
                                AutomationProperties.AutomationId="taskPhaseLabel" />
                 </StackPanel>
             </Grid>
+            <!-- One row per configured destination, shown only for a
+                 multi-destination deploy (more than one leg) — so a teacher
+                 can see which destinations have finished and which are
+                 still to come, rather than a bar that looks stuck between
+                 legs. -->
+            <StackPanel x:Name="DestinationChecklist" Visibility="Collapsed" Spacing="2"
+                        AutomationProperties.AutomationId="destinationChecklist" />
             <ProgressBar x:Name="Bar" IsIndeterminate="True" />
             <TextBlock x:Name="MilestoneText" Opacity="0.7"
                        AutomationProperties.AutomationId="taskMilestoneLabel" />
@@ -36,6 +43,14 @@
                 <TextBlock Text="Your website is live." />
                 <HyperlinkButton x:Name="LiveLinkButton" Padding="0" />
             </StackPanel>
+            <!-- Every SUCCEEDED destination's own link, once a
+                 multi-destination run has finished — occupies the exact
+                 slot LiveLink/FolderResult would for a single destination,
+                 rather than being appended after the whole panel, so it
+                 never floats below "Show details" (see WINDOWS-HANDOFF.md
+                 entries 306, 309). -->
+            <StackPanel x:Name="DestinationLinks" Visibility="Collapsed" Spacing="10"
+                        AutomationProperties.AutomationId="destinationLinks" />
             <!-- Folder publishing's completion: the folder, not a live link
                  (rows 101-102) — with the quiet note that pages opened
                  straight from the folder will not look right. -->
