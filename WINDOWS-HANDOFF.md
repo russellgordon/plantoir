@@ -4002,6 +4002,78 @@ This is host/CI-side Python only — not part of either app — so it is an
 **awareness note, not something to port**: there is no C# equivalent to
 write here either, on either side of this update.
 
+## The Dockerfile never picked up netlify_badge.py (entry 301)
+
+Row 300's badge-suppression CSP scans the built site and hash-allows every
+inline `<script>` it finds, but the scanning logic itself lives in a
+sibling module, `scripts/netlify_badge.py`, that `deploy.py` imports by
+bare name. The Dockerfile's `COPY` list for `/opt/scripts` is explicit,
+one line per file — `toolchain_paths.py`, `setup_course.py`,
+`build_site.py`, `deploy.py`, `social_card.py` — and never gained a line
+for the new module. Every real deploy through the container (Netlify or
+the marketing site) failed outright with `ModuleNotFoundError: No module
+named 'netlify_badge'`.
+
+**Why the unit test never caught it**: `scripts/test_deploy_netlify_headers.py`
+and `scripts/test_netlify_badge.py` both import `deploy`/`netlify_badge`
+directly from the working tree, where the sibling file is right there on
+disk regardless of what the Dockerfile does — they exercise the SCANNING
+LOGIC, never the actual built image. Only a deploy through the real
+container hits the gap, which is exactly the class of bug `verify.sh`'s
+slow, Docker-dependent checks exist to catch and the fast host-side
+pre-checks structurally cannot.
+
+**The fix**: one `COPY scripts/netlify_badge.py /opt/scripts/netlify_badge.py`
+line in the Dockerfile, plus the matching `check_baked` line in
+`verify.sh` — which had the identical gap itself: it compares every other
+baked script against the working tree, but had never been taught about
+this one, so the image could go stale here again with the gate staying
+green throughout.
+
+**What Windows needs from this**: nothing to port directly (shared
+Dockerfile, shared `verify.sh`), but the LESSON is worth keeping in mind
+if Windows ever adds its own per-file bundling list for the native
+runtime's scripts (`Vendor/fetch-runtime.ps1` or similar) — an explicit
+per-file list is exactly the shape that silently misses a new file added
+elsewhere; a folder-reference or manifest-driven copy does not have this
+failure mode.
+
+## unsafe-eval had to join the Netlify CSP, or every sidebar goes empty (entry 302)
+
+Row 300's badge-suppression CSP — `script-src` with hash-only sources, no
+`'unsafe-inline'` — silently broke Quartz's own Explorer SIDEBAR on every
+page of every site deployed to Netlify. `patches/explorer.inline.ts`
+builds its sort/filter/map functions from `data-data-fns` JSON via
+`new Function("return " + source)()` — a capability `'unsafe-eval'`
+governs, not a script identity, so hash-allowing every actual inline
+script (which row 300 already did correctly) never touched it.
+
+**Found by A/B testing a real deploy** to both Netlify and Cloudflare
+Pages side by side: Netlify's sidebar rendered "Navigate this site" with
+an empty list underneath; Cloudflare (no CSP at all) showed the full
+tree. Reproduced in a fresh PRIVATE Safari window first, to rule out
+leftover `localStorage` from earlier testing on the same site name — the
+bug survived that, so it was real. Confirmed definitively via the
+browser's own console, reached with Safari's `do JavaScript`: "Refused to
+evaluate a string as JavaScript because 'unsafe-eval' ... is not an
+allowed source of script."
+
+**The fix**: add `'unsafe-eval'` to the policy in `netlify_badge.py`.
+`'unsafe-eval'` and `'unsafe-inline'` are INDEPENDENT CSP keywords —
+Netlify's own docs confirm the badge needs `'unsafe-inline'` specifically
+("the script runs in an inline frame"), so this does not let the badge
+back in. A new test pins both facts at once: `'unsafe-eval'` present,
+`'unsafe-inline'` still absent.
+
+**What Windows needs from this**: nothing to port (shared Python, inherited
+the moment `netlify_badge.py` is next synced), but the same TRAP is worth
+naming for whoever next writes a restrictive CSP anywhere in this project:
+hash-allowing every inline `<script>` proves the SCRIPTS are allowed to
+run, not that everything THOSE scripts try to do is still permitted —
+`eval`/`new Function`/`setTimeout(string)` are a separate capability
+(`'unsafe-eval'`) that a hash-only policy blocks by default, and nothing
+about "I scanned every inline script" catches that on its own.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have
