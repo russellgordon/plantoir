@@ -1126,6 +1126,64 @@ Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
 
+- ✅ DONE (mac, salvaging stranded Windows work, 2026-08-22). **A branch that
+  never got merged, `issue/mac-site-shots-unmerged`: mostly superseded, three
+  real fixes rescued into a fresh branch.**
+
+  Asked to "sort out screenshots" against that branch. It had 11 commits
+  ahead of `dev`, but its merge-base with `dev` was 229 commits stale
+  (last touched 2026-08-19, one day before `dev` independently re-solved the
+  same problems). Diffed every changed file against both the merge-base and
+  current `dev` before touching anything, rather than trusting the commit
+  messages:
+
+  - **Superseded, confirmed file-by-file, nothing worth keeping**: the mac
+    Safari-capture appearance/address-bar check (branch's
+    `require_matching_appearance` in `capture.py` vs. `dev`'s
+    `verify_appearance`/`verify_address_bar` in `safari.py`, landed
+    2026-08-20 — same problem, `dev`'s version is the one that shipped);
+    `mask_window_corners` (branch still called it; `dev` dropped it entirely
+    in favour of `screencapture -l`'s own transparent corners); the Windows
+    one-appearance-per-process capture in `capture_windows.py`/
+    `hero_windows.py` (`dev`'s version is character-for-character the same
+    idea, plus a later `-PassThru` exit-code fix the branch never got); the
+    `data-win-srcset` hero-image swap in `site/index.html` (`dev` already
+    has it); every `site/img/*.png`/`.webp` binary (`dev` has re-shot these
+    several times since). Merging the branch as-is would have produced 15
+    conflict markers and reintroduced the corner-masking approach `dev` had
+    already replaced.
+  - **Not superseded — three real C#/WinUI fixes, ported by hand into
+    `issue/windows-capture-dialog-fixes`** (branched from current `dev`,
+    not from the stale branch, so there was nothing else to drag along):
+    `NewCourseDialog.StageForCapture` now calls the same `Refresh*` methods
+    a teacher's own typing would trigger, since a `TextBox` that has not
+    been templated yet takes a programmatic `Text` without raising
+    `TextChanged` — the staged capture dialog previously showed an empty
+    course-name suggestion and no club row; the staged dialog card's
+    `MaxHeight` went 680 → 720 (was slicing the Language/region row through
+    its own control, with no scrollbar to explain why — Windows hides
+    scrollbars by default, so a still frame never shows one) plus a
+    `GiveTheFormRoomForCapture` pass capping the form's inner `ScrollViewer`
+    at 600 so the cut lands at a section boundary; the dialog's title now
+    reads `dialog.Title` ("New Course or Club") instead of a hardcoded
+    "New Course"; `AssistWindow` gained `ShowPromptShelfForCapture()`, since
+    the prompt shelf normally mounts once the local assistant finishes
+    starting, which a staged capture never triggers — the assistant-window
+    shot was missing its top third. Full row: `GUI-IMPROVEMENTS.md` #316;
+    the Windows side of what still needs doing is in `WINDOWS-HANDOFF.md`'s
+    "Salvaged capture fixes" section.
+
+  **Not built or tested — there is no .NET SDK on this Mac.** The port was
+  done by reading both the branch's diff and `dev`'s current file at each
+  call site and hand-verifying every method it calls
+  (`AutoFillCourseName`, `RefreshClubRow`, etc., and
+  `AssistPromptShelfView`'s constructor signature) still exists with the
+  same shape, rather than applying the patch blind — but a `dotnet build` +
+  `dotnet test` and an eyeballed real capture run are still owed before this
+  merges. The stale branch itself (`issue/mac-site-shots-unmerged`) was left
+  for Russell to delete rather than deleted here, since deleting a pushed
+  branch is his call.
+
 - ✅ DONE (Windows, 2026-08-22). **The Settings window's Download button did
   nothing at all — fixed by porting the mac's shared-store architecture, not
   just wiring the click.**

@@ -183,10 +183,36 @@ public sealed class NewCourseDialog : ContentDialog
         Opened += (_, _) => _ = StartCreation();
     }
 
+    /// <summary>
+    /// Fill the panel in for a marketing capture, as though a teacher had
+    /// typed it.
+    ///
+    /// The refreshes are called by hand rather than left to TextChanged. The
+    /// capturer stages this dialog before its content is ever in a live visual
+    /// tree, and a TextBox that has not been templated yet takes a programmatic
+    /// Text without raising the event — so the panel photographed with an empty
+    /// Course name and no suggested names beneath it, for a code the catalog
+    /// knows perfectly well. Nothing is wrong for a teacher, whose typing goes
+    /// into a loaded control; this hook simply cannot rely on that.
+    /// </summary>
     public void StageForCapture(string code, string? sections = null)
     {
         _codeBox.Text = code;
-        if (sections is not null) _sectionsBox.Text = sections;
+        AutoFillCourseName();
+        RefreshClubRow();
+        RefreshGradeWarning();
+        RefreshCodeValidation();
+        RefreshStartingContent();
+        RefreshStructureArea();
+
+        if (sections is not null)
+        {
+            _sectionsBox.Text = sections;
+            RefreshSectionsValidation();
+        }
+
+        RefreshFontSample();
+        RefreshCreateEnabled();
     }
 
     /// <summary>
