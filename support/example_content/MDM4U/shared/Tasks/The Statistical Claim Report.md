@@ -95,13 +95,17 @@ it comes in on Day 10.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C1.1]]
+
 ![[D1.5]]
 
 ![[D3.1]]
 
 ![[D3.2]]
 
-![[C1.1]]
+![[E1.5]]
+
+![[E2.4]]
 %%curriculum-end%%
 
 %%

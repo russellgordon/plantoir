@@ -35,6 +35,29 @@ run on statistics you did not see calculated. Knowing what to ask —
 who was counted, compared to what, how sure are you — is a form of
 self-defence, and it does not expire.
 
+## Pathways and professions
+
+Data management is the quantitative foundation for a wide range of
+university programs and careers:
+
+- **Actuarial Science and Financial Analytics** — pricing risk, pensions,
+  and insurance portfolios using probability distributions and compound
+  random variables.
+- **Biostatistics and Epidemiology** — tracking disease transmission,
+  evaluating clinical trials, and designing population health studies.
+- **Data Science and Machine Learning** — extracting actionable patterns
+  from high-dimensional datasets and training predictive algorithms.
+- **Urban Planning and Public Policy** — demographic forecasting, transit
+  optimisation, and census analysis.
+- **Psychology, Sociology, and Health Sciences** — designing controlled
+  experiments, measuring treatment effects, and ruling out confounding
+  variables.
+
+Whether you pursue a degree in mathematics, statistics, economics, health
+sciences, or social sciences, the capacity to clean messy data, fit
+defensible models, and communicate findings with honest limits is among
+the most transferable competencies you can build.
+
 Questions worth arguing about:
 
 1. "When will I use this?" is sometimes an honest question and
@@ -57,3 +80,9 @@ The test of today's talk is what you do at
 real world and find out, on the record, whether the data supports
 it — and at [[The Data Symposium]], where the mathematics is not
 dressed up as useful but pointed at something you already care about.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[D3.3]]
+%%curriculum-end%%

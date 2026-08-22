@@ -114,6 +114,10 @@ row can still be fixed.
 ![[C2.3]]
 
 ![[C2.4]]
+
+![[E1.5]]
+
+![[E2.4]]
 %%curriculum-end%%
 
 %%

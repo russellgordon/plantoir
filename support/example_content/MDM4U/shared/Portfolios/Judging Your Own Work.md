@@ -71,3 +71,9 @@ November is the cleanest evidence in the notebook.
 One last thing worth doing: read your judgement out loud to the person
 beside you. It catches the rows where you were being generous, and you
 will usually hear it yourself before they say anything.
+
+%%curriculum-start%%
+## Curriculum connection
+
+![[E2.4]]
+%%curriculum-end%%

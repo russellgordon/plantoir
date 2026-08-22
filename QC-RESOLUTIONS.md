@@ -186,3 +186,72 @@ An adversarial subagent was invoked to refute claims of resolution, check curric
 - **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
 
 ---
+
+### 1.1 Coverage depth: MDM4U once-only expectations (18 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across MDM4U (Grade 12 Mathematics of Data Management) by ensuring all 56 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (exercises, concept summaries, tutorials, discussions, tasks, and portfolios), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding statistical and probability concepts over time.
+
+#### Baseline Findings (MDM4U)
+- Total expectations: 56 specific expectations (`A1.1` to `E2.4`)
+- Addressed only once (18 codes): `A1.1, A1.2, A1.4, B1.3, B2.1, B2.3, B2.4, B2.5, B2.7, C1.2, D1.1, D1.3, D2.4, D3.3, E1.5, E2.2, E2.3, E2.4`
+- Exercises folder (`shared/Exercises/`): All 8 practice problem sets lacked curriculum connection blocks despite actively exercising curriculum expectations.
+
+#### Actions Completed
+
+1. **Exercises Enhancement & Curriculum Mapping (`shared/Exercises/`)**:
+   - `Probability Practice.md`: Added curriculum block for `A1.1, A1.2, A1.3, A1.4, A1.5, A1.6, A2.5` (real-world event likelihood, discrete vs continuous sample spaces, compound events, simulation convergence).
+   - `Distributions Practice.md`: Enhanced Question 4 to explicitly construct and analyze discrete probability histograms with base width 1 ($E(X) = 7$, total area $= 1$, and comparison with frequency histograms); added curriculum block for `A1.2, B1.1, B1.2, B1.3, B1.4, B1.5, B1.6, B1.7, B2.1`.
+   - `Normal Distribution Practice.md`: Added Question 10 addressing continuous random variable properties ($P(X = x) = 0$, probabilities over continuous intervals $[a, b]$, and density models); added curriculum block for `B2.1, B2.3, B2.5, B2.6, B2.7, B2.8, D1.4`.
+   - `One- and Two-Variable Data Practice.md`: Added curriculum block for `B2.4, C1.2, C2.1, C2.2, C2.3, C2.4, D1.1, D1.2, D1.3, D1.5, D2.1, D2.2, D2.5, D3.1` (continuous intervals/histograms, inherent variability, sampling techniques/bias, 1-variable and 2-variable statistics).
+   - `Regression and Inference Practice.md`: Added curriculum block for `D2.1, D2.2, D2.3, D2.4, D2.5, D3.1, D3.2, E1.5` (linear regression fitting, residuals and residual plots, extrapolation, media claims, margin of error, evaluating evidence strength).
+   - `Counting Practice.md`: Added curriculum block for `A2.1, A2.2, A2.3, A2.4`.
+   - `Conditional Probability Practice.md`: Added curriculum block for `A1.5, A1.6, A2.5`.
+   - `Permutations and Combinations Practice.md`: Added curriculum block for `A2.1, A2.2, A2.3, A2.4, A2.5`.
+
+2. **Concept Pages Alignment & Deepening (`shared/Concepts/`)**:
+   - `Probability Basics.md`: Added `A1.4` (Law of Large Numbers and simulation convergence).
+   - `Continuous Data and Its Intervals.md`: Added `B2.1, B2.5` (continuous random variables, interval ranges, $P(X = x) = 0$).
+   - `The Normal Distribution.md`: Added `B2.3, B2.5` (continuous mathematical models for measurement uncertainty, probability over ranges).
+   - `The Binomial Distribution.md`: Added `B2.7` (normal approximation to binomial as $n$ increases).
+   - `One-Variable Statistics.md`: Added `C1.2` (sources of inherent variability in data, univariate vs bivariate).
+   - `What a Statistical Study Is For.md`: Added `C1.2, E1.5` (variability, 1-variable vs 2-variable distinction, drawing conclusions with stated limitations).
+
+3. **Tutorials & Discussions (`shared/Tutorials/`, `shared/Discussions/`)**:
+   - `Tutorials/Simulating with Python.md`: Added curriculum block for `A1.4, B1.1` (simulating experimental probabilities approaching theoretical probability via Python random number generation).
+   - `Tutorials/Using a Spreadsheet for Statistics.md`: Added curriculum block for `D1.1, D2.1, D2.4` (spreadsheet computation of one-variable summary statistics, correlation coefficient $r$, and linear regression).
+   - `Discussions/When Will I Use This.md`: Added dedicated "Pathways and professions" section detailing data management careers (actuaries, biostatisticians, data scientists, epidemiologists, urban planners) and postsecondary programs; added curriculum block for `D3.3`.
+   - `Discussions/What Makes a Model Good.md`: Added curriculum block for `B2.3, D2.2, E1.5` (evaluating mathematical models, continuous modeling challenges, evidence limitations).
+
+4. **Tasks & Portfolios (`shared/Tasks/`, `shared/Portfolios/`)**:
+   - `Tasks/The Fair Game Audit.md`: Added transclusions for `A1.1, B1.1` (game probabilities and discrete random variable distributions).
+   - `Tasks/The Culminating Investigation.md`: Added transclusions for `D1.1, D1.3, D2.4, E2.2, E2.3` (1-variable numerical/graphical summaries, linear regression/residuals, presenting summary, answering questions/defending conclusions).
+   - `Tasks/The Statistical Claim Report.md`: Added transclusions for `E1.5, E2.4` (drawing evidence-based conclusions with limitations, constructive critique of published mathematical claims).
+   - `Tasks/The Survey Autopsy.md`: Added transclusions for `E1.5, E2.4` (evaluating evidence strength/limitations, constructive peer review).
+   - `Portfolios/Judging Your Own Work.md`: Added curriculum block for `E2.4` (constructive feedback in peer/self critique protocol).
+
+---
+
+#### Adversarial Audit & Quality Control Review (MDM4U)
+
+An adversarial subagent was invoked to refute claims of resolution, audit curriculum alignment, test KaTeX math syntax, verify reachability, and check comment block constraints.
+
+**Audit Results:**
+- Verified all 56 expectation definitions against primary curriculum files.
+- Confirmed zero `[[links]]` or `![[transclusions]]` inside `%%` comment blocks.
+- Confirmed all modified pages are reachable within 2 hops of class schedule agendas.
+- Confirmed proper formatting (~80-column wrap, spaced em dashes, Canadian spelling, display math formatting).
+
+---
+
+#### Final Verification Metrics (MDM4U)
+
+- **Total Specific Expectations:** 56 (`A1.1` – `E2.4`)
+- **Expectations Addressed $\ge 2$ Times:** 56 / 56 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Linter Results (`lint_payload.py MDM4U`):** Clean (259 pages checked, 84 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+---
+

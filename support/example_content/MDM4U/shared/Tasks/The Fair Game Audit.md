@@ -93,9 +93,13 @@ what you find there can still be fixed.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A1.1]]
+
 ![[A1.3]]
 
 ![[A2.5]]
+
+![[B1.1]]
 
 ![[B1.2]]
 %%curriculum-end%%
