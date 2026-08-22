@@ -31,12 +31,34 @@ struct SectionDetailView: View {
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
 
+    /// Whether this section's pages have changed since it last published
+    /// — the " — Edited" marker in the title bar.
+    ///
+    /// Held rather than computed on every redraw, and refreshed only at
+    /// the moments a teacher could be LOOKING at the title bar: the window
+    /// arriving, the app coming to the front, this window becoming the key
+    /// one, and a publish or preview finishing. A body that recomputed it
+    /// would walk the course folder every time a console line arrived.
+    @State var hasUnpublishedEdits: Bool = false
+
+    /// Which refresh is the current one. `NSWindow.didBecomeKeyNotification`
+    /// fires for EVERY window and panel in the app — the assistant, a
+    /// settings sheet, an alert — and app activation fires alongside it, so
+    /// several walks can be in flight at once. Without this counter their
+    /// results land in whatever order they finish, and a walk begun before
+    /// a publish can overwrite the answer from one begun after it: the
+    /// window says " — Edited" about a section that has just gone out.
+    @State var refreshGeneration: Int = 0
+
     @Environment(WorkspaceModel.self) var workspace
 
     // MARK: - Computed properties
 
     var titleText: String {
-        return "\(course.code)-S\(sectionNumber)"
+        return SectionPublishState.windowTitle(
+            base: "\(course.code)-S\(sectionNumber)",
+            hasUnpublishedEdits: hasUnpublishedEdits
+        )
     }
 
     var isBusy: Bool {
@@ -74,6 +96,22 @@ struct SectionDetailView: View {
             }
         }
         .navigationTitle(titleText)
+        .task {
+            refreshEditedMarker()
+        }
+        .onChange(of: isBusy) { _, nowBusy in
+            // A publish clears the marker; a preview leaves the content
+            // alone but is the other moment the folder has just been read.
+            if !nowBusy {
+                refreshEditedMarker()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshEditedMarker()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            refreshEditedMarker()
+        }
         .toolbar {
             // Every item is ALWAYS present (disabled when inapplicable):
             // conditionally inserting toolbar items makes macOS rebuild
@@ -341,6 +379,38 @@ struct SectionDetailView: View {
     }
 
     // MARK: - Functions
+
+    /// Works out whether the title bar should say " — Edited", off the
+    /// main thread: the check is a directory walk, and however brief, a
+    /// course on a slow network volume must not be able to stutter a
+    /// window that is being brought to the front.
+    func refreshEditedMarker() {
+        let courseDirectory: URL = course.directoryURL
+        let sectionNumber: Int = self.sectionNumber
+        // A course that publishes into a folder inside itself would
+        // otherwise feed its own marker: `deploy.py` writes the whole
+        // built site there, so every check after a publish would differ
+        // from the one before it and the window would say " — Edited"
+        // permanently.
+        let excluded: [String] = SectionPublishState.selfPublishingSubpaths(
+            courseDirectory: courseDirectory,
+            destinations: course.configuration.allDeployDestinations
+        )
+        refreshGeneration += 1
+        let generation: Int = refreshGeneration
+        Task.detached(priority: .utility) {
+            let edited: Bool = SectionPublishState.hasUnpublishedEdits(
+                courseDirectory: courseDirectory,
+                sectionNumber: sectionNumber,
+                excludingRelativePaths: excluded
+            )
+            await MainActor.run {
+                if generation == refreshGeneration {
+                    hasUnpublishedEdits = edited
+                }
+            }
+        }
+    }
 
     /// Names the preview panel for what it is at the moment.
     static func previewTaskTitle(isPreparing: Bool, sectionName: String) -> String {

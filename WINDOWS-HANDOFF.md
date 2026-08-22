@@ -4649,6 +4649,258 @@ equivalent question is whatever Windows' own native networking stack has
 to say for itself, not whether some container has gone stale — there is
 no container to check.
 
+## The " — Edited" marker: knowing a section has changed since it published (entry 310)
+
+Russell asked for the thing Pages does — `Untitled 3 — Edited` in the title
+bar — for a section window: if any page the section uses, or shares with
+other sections, has changed since the last publish, say so. And explicitly:
+without impacting performance.
+
+**The first finding was that nothing recorded when a section last
+published.** Not in `course_config.json`, not in the trail, nowhere on
+either platform. The `.netlify_sites` / `.cloudflare_sites` markers record
+that a section has EVER published, not when or with what. So the feature is
+half "compare two things" and half "start recording one of them".
+
+### The shared file — match this exactly
+
+`courses/<CODE>/.publish_state/section<N>.json`:
+
+```json
+{
+  "destinations" : [ "netlify" ],
+  "fingerprint" : "9f2c…",
+  "publishedAt" : "2026-08-22T13:46:32Z"
+}
+```
+
+Written by whichever app publishes, read by both.
+
+**Be careful about how far to push that.** The fingerprint embeds each
+file's size and modification date, so it holds up when both apps look at
+the SAME folder — a working folder on a shared drive, or a USB disk moved
+between two machines, where the dates are the file system's and do not
+change. It does NOT survive a course folder being copied between machines
+by a means that rewrites modification dates, and no algorithm that avoids
+reading file contents could. So implement it to match, expect a shared
+folder to agree, and do not promise a teacher that a course zipped up on
+one machine and unzipped on another keeps its marker: it will read as
+edited, and one publish puts it right.
+
+Matching matters, then, wherever the two apps can see the same folder, so
+treat the algorithm as a wire format rather than an implementation detail:
+
+1. Walk `courses/<CODE>/`, skipping hidden entries.
+2. Keep each regular file whose relative path passes the filter below.
+3. For each, one line: `relativePath|sizeInBytes|microsecondsSinceEpoch`,
+   where the path uses `/` separators and the microseconds are the
+   modification date times 1,000,000, TRUNCATED to an integer.
+4. Sort the lines as plain strings, join with `\n`, SHA-256, lowercase hex.
+
+`SectionPublishState.fingerprint` is the reference. Note step 3's separator
+and step 4's sort — a `List<string>` sorted with a culture-aware comparer
+will not agree with Swift's, so sort ordinally.
+
+### What counts, and why it is NOT read from the configuration
+
+The obvious implementation reads `shared_folders`, `shared_files`,
+`per_section_folders` and `per_section_files` out of `course_config.json`
+and fingerprints those. It is wrong, and the reason is easy to miss:
+`build_site.py` DISCOVERS new top-level folders during its preflight and
+appends them to those lists AFTERWARDS. A folder the teacher made this
+morning is a genuine input to the site and is not in the configuration
+yet — so a configuration-driven fingerprint would be blind to it until the
+next publish, which is the exact publish the marker exists to prompt.
+
+So the rule is derived from what is on disk: everything non-hidden under
+the course folder, minus
+
+- another section's `section<M>/` folder (`section3` yes, `sections` and
+  `section3b` no — those are folders a teacher is free to make),
+- `node_modules` and the legacy non-hidden `merged_output`,
+- `.DS_Store` / `Thumbs.db`,
+- `course_config.backup.json` and any `*.tmp`.
+
+`course_config.json` itself COUNTS — fonts, the sidebar and the coverage map
+are inputs to the built site as surely as a page is. `Media/` counts, because
+it is symlinked into the build. `hidden_explorer_components*` counts, because
+it decides what the sidebar shows.
+
+Two of those exclusions are load-bearing rather than tidy, and both were
+found by reading `build_site.py` rather than by testing:
+
+- **`.publish_state` is hidden on purpose.** The stamp is written into the
+  course folder at the end of a publish. Counted, every publish would end by
+  declaring the section edited — an indicator permanently stuck on.
+- **`course_config.backup.json` and `course_config.json.tmp`** are written
+  by `_atomic_write_json_with_backup` during the build's own preflight,
+  whenever discovery finds something new. Same failure, less often, and
+  therefore harder to diagnose.
+
+`contracts/app-rules.json` → `publishedFreshness.filesCounted` runs all
+sixteen of these as data. Wire that up before anything else here; it is the
+half most likely to drift.
+
+### Symlinks — the defect this shipped with, found by adversarial review
+
+`FileManager`'s directory enumerator neither follows a symlink nor reports
+it as a regular file. The first cut of this dropped every such entry, so a
+`Media` folder symlinked into the teacher's Obsidian vault — exactly the
+arrangement `build_site.py`'s own `_ensure_media_symlink` sets up —
+contributed nothing at all, and every change inside it read as "up to
+date". `.NET`'s `Directory.EnumerateFiles` has the same shape of trap
+(`FileSystemInfo.LinkTarget`, and `EnumerationOptions` does not recurse
+into a directory link by default), so do not assume you have escaped it.
+
+The rule now: resolve links by hand, ONE hop.
+
+- A link to a FILE contributes its target's size and date, recorded under
+  the LINK's own relative path.
+- A link to a FOLDER is walked, with each entry's path prefixed by the
+  link's path. Links inside that walk are not followed — one hop is what a
+  vault arrangement needs, and refusing the second is what stops a link
+  pointing at its own parent from walking forever.
+- A BROKEN link contributes where it points, so that repointing or
+  removing it is visible rather than silent.
+
+### A course that publishes into itself
+
+Nothing stops a teacher choosing `courses/ICS3U/site` as their "publish to
+a folder on this computer" destination — `deployFolderProblem` checks only
+that the folder exists and is writable. `deploy.py` then writes the entire
+built site there, INSIDE the folder being fingerprinted, so each publish
+would differ from the last and the window would say " — Edited"
+permanently. Exclude the configured local destination, and everything under
+it, whenever it resolves to a path inside the course folder. Contract cases
+in `publishedFreshness.selfPublishing`.
+
+### When the stamp is written
+
+In `MultiDestinationDeployRunner.run()`, and only when
+`outcome.allSucceeded`. A course publishing to two hosts, one of which
+failed, has NOT published, and its marker must stay up — that is the whole
+point of having redundant destinations mean something.
+
+**The fingerprint is taken when the FIRST upload begins, not when the last
+one ends.** A publish takes minutes; a page the teacher edits while it
+uploads did not go out, and stamping the finishing state would mark that
+edit as published. That is the one direction this feature must never fail
+in: an early marker costs a needless publish, a late one costs a class that
+never saw the page.
+
+**It is taken before the BUILD, not merely before the first upload** — the
+build is the longest part of a publish and the part that actually reads the
+content. The first cut took it after the build and was wrong; the review
+caught it against this document's own wording.
+
+The cost of taking it that early is real and was accepted: `build_site.py`'s
+preflight appends newly discovered folders to `course_config.json`, so a
+publish that discovers one ends with the section still marked edited. That
+is true rather than spurious — the teacher did add a folder — and it clears
+itself at the next publish, when there is nothing left to discover. The
+alternative hides a real edit, and this feature must not fail in that
+direction.
+
+### A scheduled deploy needs its own path to the same record
+
+The other half the review found. A scheduled deploy does not go through the
+deploy runner at all: launchd runs a generated shell script, so the flagship
+"publish tomorrow's class overnight" feature published perfectly and left
+the title bar saying " — Edited" until somebody published again by hand.
+
+On the mac the fix was cheap because the agent ALREADY launches the app
+binary rather than `/bin/bash` (for an unrelated and much sharper reason —
+a bare interpreter has no application identity, so macOS grants it no
+access to a working folder on the Desktop). So:
+
+1. The plist's arguments carry `--scheduled-section <workspace> <CODE> <N>`.
+2. The app fingerprints the section BEFORE running the script.
+3. The script tracks each destination's own result — `ALL_OK`, deliberately
+   not `&&`-chaining, since one destination failing must not stop the
+   others — and on total success writes a sentinel file naming where it
+   went.
+4. After the script exits, the app records the publish if the sentinel is
+   there, and consumes it either way so tonight's failure cannot read as
+   tomorrow's success.
+
+The sentinel exists because the script ends by booting its own launchd
+agent out, so the script's exit status belongs to `launchctl` and not to
+the deploy. Whatever Windows uses for scheduling (Task Scheduler) needs the
+equivalent: something the scheduled run can say "every destination
+succeeded" with, that is not its exit code.
+
+### One false negative, written down so it is not a surprise
+
+Restoring a page from a backup that preserves its modification date, where
+the length happens to be unchanged, reads as UP TO DATE. `cp -p`, `rsync
+-a`, unzipping and Time Machine all preserve modification dates. This is
+the price of never reading file contents, which is what makes the check
+cheap enough to run whenever a window comes to the front, and the cure —
+hashing every byte of every page — costs more than the marker is worth.
+Publishing is never blocked by the marker, so a teacher who suspects it can
+simply publish. It is a contract case (`whenShown`) so that nobody
+"discovers" it later and treats it as a bug.
+
+### What is shown
+
+`base` is the existing title (`ICS3U-S1`); the marker appends `" — Edited"`
+— em dash, spaces either side, capital E, all of it Pages'. Contract cases
+in `publishedFreshness.marker`.
+
+**A section that has never published shows NO marker.** Pages does the
+opposite (`Untitled 3 — Edited` on a document never saved), and it was
+rejected here on purpose: a marker that is on for every new course from the
+moment it is created is a marker teachers learn to ignore, which costs the
+one it is for. An unreadable or corrupt stamp is treated identically to no
+stamp, so a course predating this feature is quiet rather than shouting.
+
+### One accepted imprecision, so nobody "fixes" it
+
+A course-level page shared by every section marks EVERY section edited —
+even though editing only `publishForSection3` in fact changes only section
+3's site. Being exact means parsing the frontmatter of every shared page on
+every check, which is reading files, which is the cost the whole design
+avoids. The wording was chosen to stay true either way: a page this section
+uses, or shares, has changed. It is early, not wrong.
+
+### The refresh triggers, and the watcher NOT built
+
+The mac recomputes on four events: the window appearing, the app becoming
+active, this window becoming key, and a run finishing. Note that
+`NSWindow.didBecomeKeyNotification` fires for EVERY window and panel in the
+app — the assistant, a settings sheet, an alert — and app activation fires
+alongside it, so several walks really can be in flight at once. Each
+refresh therefore carries a generation number and a result is applied only
+if it is still the current one; without that, a walk begun before a publish
+can land after one begun afterwards and re-assert " — Edited" about a
+section that has just gone out. Whatever Windows uses for its own
+activation events needs the same guard.
+
+Never on a timer, and never from `body` — a view that recomputed it while rendering
+would walk the course folder every time a console line arrived during a
+publish. The walk runs off the main thread, so a course on a slow network
+volume cannot stutter a window coming to the front.
+
+An FSEvents stream over the course folder was considered and deliberately
+NOT built, on either platform. Neither app runs one today, the marker only
+matters at the instant somebody looks at the title bar, and a watcher is a
+cost paid continuously for an answer wanted occasionally. If the
+on-activate refresh ever feels stale in practice, that is the moment to add
+one — for the frontmost course only, coalesced — and not before.
+
+Windows owes its own equivalents of the two mac-specific pieces: setting
+the window title (WinUI does it on the window, not through a
+`navigationTitle` modifier) and the activation events.
+
+### The trail
+
+New event `section content marked published`, in `ActivityTrail.Event` and
+in `shared-rules.json` → `activityTrail.mustRecord`. It matters more than a
+routine line because the marker is DERIVED: its presence and its absence
+look identical on disk, so "it still says Edited after I published" has
+nothing to look at without it. The line also records that the publish
+succeeded at EVERY destination rather than merely at one.
+
 ## Testing
 
 - The **PowerShell launchers are tested on real Windows** — all three have

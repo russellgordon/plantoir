@@ -878,5 +878,198 @@
     "note" : "Several previews run at once, one per working folder, and they must not collide. These numbers are the toolchain's, not either app's: the container publishes fixed ports and the host side probes a block.",
     "websocketOffset" : 1000,
     "why" : "Quartz's live-reload websocket needs its own port (--wsPort = port + 1000). Without it, two previews collide on the websocket even when their site ports differ — which looks like one preview randomly failing to refresh rather than like a port clash."
+  },
+  "publishedFreshness" : {
+    "filesCounted" : {
+      "cases" : [
+        {
+          "counts" : true,
+          "path" : "course_config.json"
+        },
+        {
+          "counts" : true,
+          "path" : "Unit 1/Lesson.md",
+          "why" : "A shared, course-level folder."
+        },
+        {
+          "counts" : true,
+          "path" : "section1/Classes/Unit 1, Day 1.md"
+        },
+        {
+          "counts" : false,
+          "path" : "section2/Classes/Unit 1, Day 1.md",
+          "why" : "Another section's folder is another section's site."
+        },
+        {
+          "counts" : true,
+          "path" : "Media/diagram.png",
+          "why" : "Media is symlinked into the build, so its contents do reach the site."
+        },
+        {
+          "counts" : true,
+          "path" : "hidden_explorer_components.txt",
+          "why" : "Not a page, but it decides what the sidebar shows."
+        },
+        {
+          "counts" : false,
+          "path" : ".merged_output/section1/public/index.html",
+          "why" : "Output, not content — and hidden."
+        },
+        {
+          "counts" : false,
+          "path" : ".netlify_sites/section1.json"
+        },
+        {
+          "counts" : false,
+          "path" : ".publish_state/section1.json",
+          "why" : "LOAD-BEARING. The stamp lives in a hidden folder precisely so it is not itself content; counted, every publish would end by declaring the section edited."
+        },
+        {
+          "counts" : false,
+          "path" : ".obsidian/workspace.json"
+        },
+        {
+          "counts" : false,
+          "path" : ".DS_Store"
+        },
+        {
+          "counts" : false,
+          "path" : "Unit 1/.DS_Store"
+        },
+        {
+          "counts" : false,
+          "path" : "course_config.backup.json",
+          "why" : "Written by build_site.py's own preflight, at publish time. Counted, a publish that discovered a new folder would immediately mark the section edited."
+        },
+        {
+          "counts" : false,
+          "path" : "course_config.json.tmp"
+        },
+        {
+          "counts" : false,
+          "path" : "merged_output/index.html",
+          "why" : "The legacy, non-hidden spelling of the output folder."
+        },
+        {
+          "counts" : false,
+          "path" : "node_modules/thing/index.js"
+        },
+        {
+          "counts" : true,
+          "note" : "Unless `site` is where this course PUBLISHES to - see selfPublishing below, which excludes it by path rather than by name.",
+          "path" : "site/index.html"
+        }
+      ],
+      "note" : "Which files a section's fingerprint is taken over, as relative paths inside `courses/<CODE>/`, for section 1. Derived from what is on disk rather than from `shared_folders` / `per_section_folders`: `build_site.py` DISCOVERS new folders at publish time and appends them to those lists AFTERWARDS, so a folder made this morning is a real input the configuration does not know about yet."
+    },
+    "marker" : {
+      "cases" : [
+        {
+          "base" : "ICS3U-S1",
+          "expectTitle" : "ICS3U-S1",
+          "hasUnpublishedEdits" : false
+        },
+        {
+          "base" : "ICS3U-S1",
+          "expectTitle" : "ICS3U-S1 — Edited",
+          "hasUnpublishedEdits" : true
+        }
+      ],
+      "suffix" : " — Edited",
+      "why" : "The em dash and the capital E are Pages', deliberately — a teacher who has seen one save indicator has seen this one."
+    },
+    "note" : "Whether a section's window says \" — Edited\" — the Pages-style marker meaning the pages this section uses have changed since it was last published. Authored, not a readout: it must fail when the rule drifts.",
+    "selfPublishing" : {
+      "cases" : [
+        {
+          "courseDirectory" : "/w/courses/ICS3U",
+          "destinationPath" : "/w/courses/ICS3U/site",
+          "expectExcluded" : "site"
+        },
+        {
+          "courseDirectory" : "/w/courses/ICS3U",
+          "destinationPath" : "/Users/teacher/Sites/ICS3U",
+          "expectExcluded" : null
+        }
+      ],
+      "note" : "A course whose 'publish to a folder on this computer' destination points INSIDE its own course folder. deploy.py writes the whole built site there, so counting it would make every publish feed the next one and the window would say \" — Edited\" permanently.",
+      "rule" : "Exclude the configured local destination, and everything under it, when it resolves to a path inside the course folder. A destination anywhere else changes nothing."
+    },
+    "whenRecorded" : [
+      {
+        "expectRecorded" : true,
+        "when" : "every configured destination succeeded"
+      },
+      {
+        "expectRecorded" : false,
+        "when" : "one of two destinations failed",
+        "why" : "A course publishing to two hosts, one of which failed, has not published. Its marker must stay up."
+      },
+      {
+        "expectRecorded" : false,
+        "when" : "the publish was cancelled or stopped"
+      },
+      {
+        "expectRecorded" : false,
+        "when" : "the shared build failed"
+      },
+      {
+        "expectRecorded" : false,
+        "when" : "no destination ran at all"
+      },
+      {
+        "moment" : "before anything runs - before the BUILD, not merely before the first upload",
+        "why" : "CORRECTED AFTER REVIEW; the first version fingerprinted after the build and the contract described a behaviour the code did not have. A publish takes minutes and the build is the longest part of it, so a page edited while it runs may or may not have been read. An early fingerprint costs a needless publish; a late one costs a class that never saw the page. One visible consequence, accepted: build_site.py's preflight appends newly discovered folders to course_config.json, so a publish that discovers one ends with the section still marked edited - correct, since the teacher did add a folder, and it clears itself at the next publish."
+      },
+      {
+        "path" : "a deploy scheduled to run overnight records the same way",
+        "why" : "FOUND BY REVIEW. A scheduled deploy never goes through the app's deploy runner - launchd runs a generated shell script - so it published perfectly and left the window saying \" — Edited\" until somebody published again by hand, the flagship 'publish tomorrow's class' feature disagreeing with the title bar. The script now tracks every destination's own result and writes a sentinel naming where it went; the app fingerprints BEFORE running the script and records afterwards only if the sentinel is there."
+      }
+    ],
+    "whenShown" : [
+      {
+        "expectEdited" : false,
+        "when" : "the section has never been published",
+        "why" : "THE ONE THAT IS NOT OBVIOUS. There is nothing to have been edited since, and a marker that is always on for every new course is a marker nobody reads. A section earns the marker only after a first successful publish."
+      },
+      {
+        "expectEdited" : false,
+        "when" : "nothing has changed since the last publish"
+      },
+      {
+        "expectEdited" : true,
+        "when" : "a page this section alone uses has changed"
+      },
+      {
+        "expectEdited" : true,
+        "when" : "a page this section SHARES with other sections has changed",
+        "why" : "Shared pages are course-level and are copied into every section, so every section is marked. Editing only `publishForSection3` in fact changes only section 3's site, and the other sections are marked early rather than wrongly — being exact would mean parsing the frontmatter of every shared page on every check."
+      },
+      {
+        "expectEdited" : true,
+        "when" : "a page has been DELETED since the last publish",
+        "why" : "Why the check is a fingerprint of the file inventory rather than 'is anything newer than the publish date'. Modification dates cannot see a removal, and an unpublished deletion is the one a teacher would most want to know about."
+      },
+      {
+        "expectEdited" : true,
+        "when" : "course_config.json has changed",
+        "why" : "The configuration is an input to the built site — fonts, the sidebar, the coverage map. Changing it changes what students see as surely as editing a page does."
+      },
+      {
+        "expectEdited" : false,
+        "when" : "the stamp file cannot be read",
+        "why" : "Treated as never published. An unreadable stamp must not be able to CLAIM a section is up to date, and it must not shout at a teacher whose course predates the feature."
+      },
+      {
+        "expectEdited" : true,
+        "when" : "a SYMLINKED page, or a page inside a symlinked folder, has changed",
+        "why" : "FOUND BY REVIEW, and it had shipped wrong. A directory enumerator neither follows a symlink nor reports it as a regular file, so a `Media` folder symlinked into the teacher's Obsidian vault - the arrangement build_site.py's own _ensure_media_symlink exists for - contributed NOTHING and every change inside it read as up to date. Links are resolved by hand, one hop: a link to a file contributes its target's size and date under the link's own path, a link to a folder is walked, and a broken link contributes where it points so that repointing it is visible."
+      },
+      {
+        "expectEdited" : false,
+        "when" : "a page was restored from a backup that preserved its modification date and its size did not change",
+        "why" : "A KNOWN, ACCEPTED false negative, written down so it is not discovered as a surprise. The fingerprint is of file metadata, never of file contents, which is what makes it cheap enough to run whenever a window comes to the front. `cp -p`, `rsync -a`, unzipping a backup and Time Machine all preserve modification dates, so restoring yesterday's version of a page can leave the marker off. The cure - hashing every byte of every page - costs more than the marker is worth. Publishing is never blocked by the marker, so the teacher can always publish anyway."
+      }
+    ]
   }
 }
