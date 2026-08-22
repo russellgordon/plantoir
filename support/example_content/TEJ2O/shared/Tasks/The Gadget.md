@@ -100,19 +100,27 @@ now because of it? [[What a Strong Entry Looks Like]] shows the way.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[A3.3]]
+
+![[A3.4]]
+
 ![[B2.1]]
+
+![[B2.2]]
 
 ![[B2.3]]
 
 ![[B2.4]]
 
+![[B5.1]]
+
+![[B5.2]]
+
+![[B5.3]]
+
 ![[B5.4]]
 
-![[A3.3]]
-
 ![[D1.1]]
-
-![[B2.2]]
 %%curriculum-end%%
 
 %%

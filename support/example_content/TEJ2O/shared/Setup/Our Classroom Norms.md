@@ -52,4 +52,6 @@ early.
 ## Curriculum connection
 
 ![[D2.1]]
+
+![[D2.2]]
 %%curriculum-end%%

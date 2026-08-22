@@ -100,7 +100,7 @@ just a verdict arriving early.
 ## What is not in your mark
 
 How you work is reported separately, on the same report card, as **E,
-G, S or N** — six habits: responsibility, organization, independent
+G, S or N** — six habits: responsibility, organisation, independent
 work, collaboration, initiative, and self-regulation. They matter, we
 will talk about them all term, and they do not move your percentage.
 Your mark is about the work; that column is about the worker, and
@@ -108,23 +108,25 @@ mixing the two tells you less about both.
 
 > [!warning] The one exception, and it is a narrow one
 > A shop is the place where a habit really is curriculum. Expectation
-> [[D1.1|D1.1]] asks you to "use appropriate equipment, procedures, and
-> techniques… to protect health and ensure safety when working with
-> computers", and [[B2.2|B2.2]] to "use appropriate procedures to
-> prevent damage to computer hardware and electronic components".
-> Both are marked, because the curriculum names them — and only where
-> a task's criteria table says in words what they look like at a
-> bench. D1.1 has that row on [[The Network Job]], [[The Gadget]],
+> [[D1.1|health and safety procedures]] asks you to "use appropriate
+> equipment, procedures, and techniques… to protect health and ensure
+> safety when working with computers", and
+> [[B2.2|procedures to prevent hardware damage]] to "use appropriate
+> procedures to prevent damage to computer hardware and electronic
+> components". Both are marked, because the curriculum names them — and
+> only where a task's criteria table says in words what they look like
+> at a bench. D1.1 has that row on [[The Network Job]], [[The Gadget]],
 > [[The Refurb Report]] and [[The Shop Showcase]]; B2.2 has it on the
 > two where you handle bare boards and components, The Gadget and The
 > Refurb Report. Nowhere else.
 >
 > That is the whole exception. Being punctual, tidy, willing or
-> pleasant is not in it. Neither is [[D3.5|D3.5]], which asks you to
-> "demonstrate an understanding of the work habits that are important
-> for success in the computer industry" — you name two of them in your
-> growth statement and show what is behind them, and it is that naming
-> and that evidence which are marked, never whether you had them.
+> pleasant is not in it. Neither is
+> [[D3.5|work habits understanding]], which asks you to "demonstrate an
+> understanding of the work habits that are important for success in
+> the computer industry" — you name two of them in your growth statement
+> and show what is behind them, and it is that naming and that evidence
+> which are marked, never whether you had them.
 
 > [!important] Broken builds are never penalised as broken
 > Version one of everything fails to POST. The mark follows where your

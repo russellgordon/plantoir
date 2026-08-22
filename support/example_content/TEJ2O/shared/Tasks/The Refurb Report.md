@@ -87,19 +87,23 @@ about it? Noticing your own thumb on the scale is a trade skill.
 %%curriculum-start%%
 ## Curriculum connection
 
+![[B1.1]]
+
+![[B2.2]]
+
+![[B4.1]]
+
+![[B4.4]]
+
 ![[C1.1]]
 
 ![[C1.2]]
 
-![[B1.1]]
-
 ![[C2.1]]
 
+![[C2.2]]
+
 ![[D1.1]]
-
-![[B4.4]]
-
-![[B2.2]]
 %%curriculum-end%%
 
 %%

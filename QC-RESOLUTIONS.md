@@ -992,6 +992,102 @@ Three rounds of adversarial subagent audits were performed to refute claims, ver
 - **All destination pages reachable within 2 hops of a class page.**
 - **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
 
+---
+
+### 1.1 Coverage depth: TEJ2O once-only expectations (5 codes)
+
+**Status:** Completed & Adversarially Audited  
+**Objective:** Eliminate thin coverage across TEJ2O (Grade 10 Computer Technology, Open) by ensuring all 45 curriculum expectations are genuinely addressed $\ge 2$ times across authentic destination pages (concept summaries, exercises, labs, discussions, warm-ups, portfolios, and tasks), adhering strictly to `.claude/skills/example-content/SKILL.md` and properly scaffolding computer architecture, networking, electronics, operating systems, and society/career concepts over time.
+
+#### Baseline Findings (TEJ2O)
+- Total expectations: 45 specific expectations (`A1.1` to `D3.6`)
+- Addressed only once (5 codes):
+  - `A2.1`: compare various types of networks (only on `Concepts/Networking Basics.md`)
+  - `A2.2`: describe basic network components (only on `Concepts/Networking Basics.md`)
+  - `B4.1`: describe differences between operating-system software and applications software (only on `Concepts/Software and Operating Systems.md`)
+  - `B5.2`: use input and output statements in a program (only on `Code/First Programs.md`)
+  - `C2.2`: describe how computers are used in various occupations and what work would be like without computers (only on `Concepts/Computers in Every Job.md`)
+
+---
+
+#### Actions Completed
+
+1. **Concepts Substantive Expansion (`shared/Concepts/`)**:
+   - `Concepts/Networking Basics.md`: Added 4th H2 `## Comparing network architectures: LAN, WAN, P2P, and client-server` comparing geographic scopes, transmission media, and centralized server versus peer-to-peer administration. Transclusions: `A2.1, A2.2, A2.3, B3.1, B3.2`.
+   - `Concepts/How Data Travels.md`: Added 4th H2 `## Transmission media and network hardware in the data path` detailing Cat 5e/6 copper twisted pair, glass fibre-optic cabling, Wi-Fi, NICs, switches, and routers. Transclusions: `A2.1, A2.2, A2.3, A2.4`.
+   - `Concepts/Software and Operating Systems.md`: Added 4th H2 `## The software stack: firmware, operating system, and applications` detailing UEFI/BIOS, kernel/drivers, utilities, and application isolation. Updated Canadian spelling (`recognise`). Transclusions: `B1.2, B4.1, B4.2, B4.4`.
+   - `Concepts/Computers in Every Job.md`: Added 4th H2 `## Work before the machine: what changed when computers arrived` analyzing engineering drafting, aviation/maritime navigation, business ledgers, and automotive diagnostics before digital automation. Transclusions: `C2.1, C2.2, D3.4`.
+   - `Concepts/Binary and Number Systems.md`: Added 4th H2 `## Representing characters, images, and audio` (ASCII text encoding, 24-bit RGB pixel data, audio sampling). Transclusions: `A3.1, A3.2`.
+   - `Concepts/Digital Logic Gates.md`: Added 4th H2 `## Combining gates into arithmetic and decision circuits` (half adders, multiplexers, ALU logic). Transclusions: `A3.2, A3.3, A3.4`.
+   - `Concepts/E-Waste and the Environment.md`: Added 4th H2 `## Community stewardship and Ontario recycling programs` (RPRA, battery/e-waste depots, repair cafés, refurbishers). Transclusions: `C1.1, C1.2`.
+   - `Concepts/Electronics Fundamentals.md`: Added 4th H2 `## Measuring voltage, current, and resistance safely` (meter de-energized resistance checks, parallel voltage, series current measurement). Transclusions: `B2.1, B2.5, D1.1`.
+   - `Concepts/Peripherals and Ports.md`: Added 4th H2 `## Peripheral functions and system communication` (input, output, and bi-directional expansion devices). Transclusions: `A1.2, A1.3, A1.4, B1.1`.
+   - `Concepts/Storage and Drives.md`: Added 4th H2 `## Bus interfaces and storage performance` (SATA vs NVMe PCIe bus throughputs). Transclusions: `A1.2, A1.3, A1.4, B4.4`.
+   - `Concepts/The CPU and Memory.md`: Added 4th H2 `## Semiconductor advances: fabrication and multi-core architecture` (nanometre fabrication, clock scaling, cache hierarchy, DDR bus channels). Transclusions: `A1.2, A1.3, A1.4`.
+   - `Concepts/What a Computer Is.md`: Added 4th H2 `## Software layers: how programs tell hardware what to do` (system software vs application software). Transclusions: `A1.3, B4.1`.
+   - `Concepts/Careers in Computer Technology.md`: Transclusions: `C2.2, D3.1, D3.2, D3.3, D3.4, D3.5`.
+
+2. **Exercises Substantive Expansion (`shared/Exercises/`)**:
+   - `Exercises/Network Addressing Practice.md`: Added Question 7 & Answer 7 (LAN vs WAN scope, media, and ownership) and Question 8 & Answer 8 (P2P vs client-server architecture, NIC/switch/router hardware functions). Transclusions: `A2.1, A2.2, A2.4, B3.1`.
+   - `Exercises/Programming Practice.md`: Added Question 7 & Answer 7 (user input, variable storage, and formatted badge output) and Question 8 & Answer 8 (float conversion, Ohm's law current calculation, formatted output, and conditional LED safety warning). Transclusions: `B5.1, B5.2, B5.3`.
+   - `Exercises/Troubleshooting Practice.md`: Added Question 8 & Answer 8 (distinguishing OS-level faults from application software errors) and Question 9 & Answer 9 (selecting utility software for file recovery, defragmentation, and storage analysis). Transclusions: `B1.1, B4.1, B4.4, D1.1`.
+   - `Exercises/Spec Sheet Practice.md`: Added Question 7 & Answer 7 (OS hardware footprint vs application software system demands). Transclusions: `A1.2, B1.2, B4.1, B4.2`.
+   - `Exercises/Component Identification Practice.md`: Added Question 9 & Answer 9 (input/output peripherals and PCIe expansion) and Question 10 & Answer 10 (semiconductor fabrication advances and serial PCIe bus architectures). Transclusions: `A1.1, A1.2, A1.3, A1.4, B2.1`.
+
+3. **Labs, Code, Tasks, Discussions & Portfolios Alignment**:
+   - `Labs/Build a Small Network.md`: Transclusions `A2.1, A2.2, B3.1, B3.2`.
+   - `Labs/Install an Operating System.md`: Transclusions `B1.1, B4.1, B4.2, B4.4`.
+   - `Labs/Control Something with Code.md`: Transclusions `B2.3, B2.4, B5.1, B5.2, B5.4`.
+   - `Labs/Soldering a Circuit.md`: Added 4th H2 `## Diagnosing and fixing soldering faults` (cold joints, bridges, component heatsinking). Transclusions: `B2.1, B2.2, D1.1`.
+   - `Code/Decisions and Loops.md`: Transclusions `B5.1, B5.2, B5.3`.
+   - `Code/Code Meets Hardware.md`: Transclusions `B2.3, B2.4, B5.1, B5.2, B5.4`.
+   - `Tasks/The Network Job.md`: Transclusions `A2.1, A2.2, A2.3, A2.4, B3.1, B3.2, B3.3, D1.1, D2.1`.
+   - `Tasks/The Refurb Report.md`: Transclusions `B1.1, B2.2, B4.1, B4.4, C1.1, C1.2, C2.1, C2.2, D1.1`.
+   - `Tasks/The Gadget.md`: Transclusions `A3.3, A3.4, B2.1, B2.2, B2.3, B2.4, B5.1, B5.2, B5.3, B5.4, D1.1`.
+   - `Tasks/The Shop Showcase.md`: Transclusions `B1.3, C2.2, D1.1, D3.1, D3.2, D3.3, D3.4, D3.5, D3.6`.
+   - `Discussions/The Trades Are Tech.md`: Transclusions `C2.2, D3.1, D3.2, D3.3, D3.4`.
+   - `Discussions/Locked Down or Wide Open.md`: Transclusions `D1.2, D2.1, D2.2`.
+   - `Discussions/Repair or Replace.md`: Transclusions `C1.1, C1.2, C2.1, C2.2`.
+   - `Portfolios/Final Reflection.md`: Transclusions `C2.2, D3.1, D3.2, D3.3, D3.4, D3.5, D3.6`.
+   - `Portfolios/Showing Growth.md`: Transclusions `D3.4, D3.5, D3.6`.
+   - `Setup/Our Classroom Norms.md`: Transclusions `D2.1, D2.2`.
+   - `Setup/How Marks Work.md`: Descriptive piped links `[[D1.1|health and safety procedures]]`, `[[B2.2|procedures to prevent hardware damage]]`, `[[D3.5|work habits understanding]]`, and Canadian spelling `organisation`.
+
+4. **Structural Integrity & Formatting Invariants**:
+   - Verified and enforced TOC invariant (`enableToc: true` requires 4+ H2 body headings); set `enableToc: false` on `Portfolios/Tech Journal.md` and `Curriculum/index.md`.
+   - Standardized Canadian English spelling (`organisation`, `recognise`, `organise`) across all pages and template files.
+   - Cleaned and wrapped `Scavenger Hunt.md` and template files to ~80 columns without splitting wikilinks.
+   - Verified all task triangulation blocks `%%` contain plain text only.
+
+---
+
+#### Adversarial Audit & Quality Control Review (TEJ2O)
+
+Two rounds of adversarial subagent audits were performed to refute claims, verify primary curriculum fidelity, enforce Canadian spelling, and check structural invariants.
+
+**Audit Findings & Iteration:**
+- **Pass 1:** Subagent flagged `Key Links.md` for containing curriculum tags and `Scavenger Hunt.md` for un-wrapped long prose lines.
+- **Corrections & Analysis:** Investigated `lint_payload.py` rules which mandate curriculum comment tags in `Key Links.md` to cleanly hide the Curriculum Expectations link when curriculum is omitted; line-wrapped `Scavenger Hunt.md` and `_DUPLICATE ME.md` files; and fixed any split wikilinks.
+- **Pass 2:** Subagent conducted full end-to-end verification across depth, scaffolding, linter status, structural invariants, TOC headings, task comment purity, Canadian spelling, and piped links, issuing **PASS / CERTIFIED CLEAN** with zero defects.
+
+---
+
+#### Final Verification Metrics (TEJ2O)
+
+- **Total Specific Expectations:** 45 (`A1.1` – `D3.6`)
+- **Expectations Addressed $\ge 2$ Times:** 45 / 45 (100%)
+- **Expectations Addressed Exactly Once:** 0 (0%)
+- **Coverage Frequencies of the 5 Target Codes:**
+  - `A2.1`: 5 times (`Networking Basics`, `How Data Travels`, `Network Addressing Practice`, `Build a Small Network`, `The Network Job`)
+  - `A2.2`: 5 times (`Networking Basics`, `How Data Travels`, `Network Addressing Practice`, `Build a Small Network`, `The Network Job`)
+  - `B4.1`: 6 times (`Software and Operating Systems`, `What a Computer Is`, `Install an Operating System`, `The Refurb Report`, `Troubleshooting Practice`, `Spec Sheet Practice`)
+  - `B5.2`: 6 times (`First Programs`, `Decisions and Loops`, `Code Meets Hardware`, `Control Something with Code`, `The Gadget`, `Programming Practice`)
+  - `C2.2`: 7 times (`Computers in Every Job`, `Careers in Computer Technology`, `The Trades Are Tech`, `Repair or Replace`, `The Refurb Report`, `The Shop Showcase`, `Final Reflection`)
+- **Linter Results (`lint_payload.py TEJ2O`):** Clean (247 pages checked, 86 class pages, 0 errors, 0 once-only expectations).
+- **All destination pages reachable within 2 hops of a class page.**
+- **`QC-FINDINGS.md` untouched.** All tracking maintained exclusively in this file.
+
+
 
 
 

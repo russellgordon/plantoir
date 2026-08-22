@@ -49,8 +49,29 @@ the claim actually being made: *there is a computer in here.* And
 once you can see the shape, you can ask the first useful repair
 question — which of the four jobs has failed?
 
+## Software layers: how programs tell hardware what to do
+
+Hardware needs instructions to perform these four jobs. Software splits
+into two fundamental categories:
+
+- **System software (operating systems and drivers):** Manages the
+  physical hardware, allocates memory, handles file systems, and runs
+  background maintenance utilities. Without an OS, the CPU has no
+  instructions to execute after POST.
+- **Application software:** Programs designed for end users to accomplish
+  specific tasks — typing documents, designing circuits, editing audio,
+  or browsing the web. Applications rely on the OS to interact with
+  hardware safely.
+
+Understanding the difference between the operating system layer and the
+application layer is essential when diagnosing whether a computer fault
+is caused by physical hardware, corrupt system files, or a misbehaving
+app.
+
 %%curriculum-start%%
 ## Curriculum connection
 
 ![[A1.3]]
+
+![[B4.1]]
 %%curriculum-end%%

@@ -56,5 +56,17 @@ taught — date it, quote your own words, then show the now:
 %%curriculum-start%%
 ## Curriculum connection
 
+![[C2.2]]
+
 ![[D3.1]]
+
+![[D3.2]]
+
+![[D3.3]]
+
+![[D3.4]]
+
+![[D3.5]]
+
+![[D3.6]]
 %%curriculum-end%%

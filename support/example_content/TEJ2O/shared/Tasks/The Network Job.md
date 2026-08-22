@@ -97,19 +97,23 @@ of learning than one that worked first.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[B3.1]]
+![[A2.1]]
 
-![[B3.2]]
+![[A2.2]]
 
 ![[A2.3]]
 
 ![[A2.4]]
 
-![[D2.1]]
+![[B3.1]]
+
+![[B3.2]]
 
 ![[B3.3]]
 
 ![[D1.1]]
+
+![[D2.1]]
 %%curriculum-end%%
 
 %%

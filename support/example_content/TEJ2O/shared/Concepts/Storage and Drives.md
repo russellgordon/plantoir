@@ -43,6 +43,24 @@ the OS counted in powers of two.[^1] [[Reading a Spec Sheet]] covers
 the other numbers on a drive's label, and [[Spec Sheet Practice]]
 puts real ones in front of you.
 
+## Bus interfaces and storage performance
+
+How storage connects to the mainboard dictates its maximum transfer
+speed:
+
+- **SATA (Serial ATA):** Uses a ribbon data cable and separate power
+  connector. SATA III tops out at $6\ \text{Gbps}$ (about
+  $600\ \text{MB/s}$ practical throughput) — adequate for mechanical
+  hard drives and entry-level 2.5-inch SSDs.
+- **NVMe over PCIe (M.2 slots):** Mounts a tiny circuit card directly
+  into the motherboard. Communicates over 4 PCIe lanes, reaching
+  $3500\ \text{MB/s}$ on PCIe Gen 3 and exceeding $7000\ \text{MB/s}$ on
+  PCIe Gen 4.
+
+Utility software like disk defragmenters (for spinning HDDs) and TRIM
+optimizers (for SSDs) maintains performance over time, as practiced in
+[[Maintenance Utilities]].
+
 [^1]: Drive makers define $1\ \text{TB} = 10^{12}$ bytes. Operating
     systems often count in units of $2^{40}$ bytes, and
     $10^{12} / 2^{40} \approx 0.909$ — so the same drive honestly
@@ -52,4 +70,10 @@ puts real ones in front of you.
 ## Curriculum connection
 
 ![[A1.2]]
+
+![[A1.3]]
+
+![[A1.4]]
+
+![[B4.4]]
 %%curriculum-end%%

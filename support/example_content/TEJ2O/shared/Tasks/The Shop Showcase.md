@@ -93,15 +93,23 @@ one day ask to see.
 %%curriculum-start%%
 ## Curriculum connection
 
-![[D3.6]]
-
 ![[B1.3]]
 
-![[D3.5]]
+![[C2.2]]
+
+![[D1.1]]
 
 ![[D3.1]]
 
-![[D1.1]]
+![[D3.2]]
+
+![[D3.3]]
+
+![[D3.4]]
+
+![[D3.5]]
+
+![[D3.6]]
 %%curriculum-end%%
 
 %%

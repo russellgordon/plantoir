@@ -4,7 +4,7 @@ publish: true
 created: __CREATED__
 tags:
   - portfolio
-enableToc: true
+enableToc: false
 ---
 > [!abstract] At a glance
 > Individual · all course · one entry per bench day, written in class ·

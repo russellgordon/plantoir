@@ -63,7 +63,8 @@ flows across both surfaces to create a clean, low-resistance metallic bond.
 8. **Inspect and test.** Examine the joint with a magnifier:
    - **Good joint:** Shiny, smooth, concave cone wrapping both lead and pad.
    - **Cold joint:** Dull, grey, grainy surface — re-heat with a touch of fresh solder.
-   - **Solder bridge:** Solder spanning across to an adjacent pad — clear it with desoldering braid.
+   - **Solder bridge:** Solder spanning across to an adjacent pad —
+     clear it with desoldering braid.
 9. **Prove continuity with a multimeter.** Set the meter to continuity/diode
    mode. Probe across the soldered joints to verify low resistance and confirm
    there are no accidental shorts between adjacent tracks before applying power.
@@ -73,6 +74,25 @@ flows across both surfaces to create a clean, low-resistance metallic bond.
 Solder the complete current-limiting resistor and LED circuit onto the board,
 connect the $5\ \text{V}$ supply to the designated power rails, and verify that
 the circuit operates reliably under bench vibration.
+
+## Diagnosing and fixing soldering faults
+
+Technicians diagnose and correct soldering defects using specific
+remedies:
+
+- **Cold solder joint (disturbed joint):** The solder surface appears
+  dull, crystallized, or pitted. Remedy: Apply flux and reheat with a
+  clean, tinned iron tip until the solder reflows into a shiny concave
+  fillet.
+- **Solder bridge (accidental short):** Excess solder spans adjacent
+  copper tracks. Remedy: Lay copper desoldering braid over the bridge,
+  press with the iron tip to draw out excess solder by capillary
+  action, and re-test continuity.
+- **Overheating solid-state components:** Diodes, LEDs, transistors,
+  and integrated circuits can be permanently damaged by prolonged heat.
+  Remedy: Attach a clip-on thermal heat sink or aluminium tweezers to
+  the component lead between the board and the component body while
+  soldering, and limit heat contact to under three seconds.
 
 %%curriculum-start%%
 ## Curriculum connection
