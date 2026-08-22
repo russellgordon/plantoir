@@ -294,9 +294,7 @@ public sealed class AssistantSettingsDialog : ContentDialog
 
         string? removalReason = store.ReasonItCannotBeRemoved();
         string statusText = sizeOnDisk.HasValue && sizeOnDisk.Value >= tier.DownloadBytes()
-            ? removalReason is not null
-                ? $"Downloaded · {FormatBytes(sizeOnDisk.Value)} on this PC · {removalReason}"
-                : $"Downloaded · {FormatBytes(sizeOnDisk.Value)} on this PC"
+            ? $"Downloaded · {FormatBytes(sizeOnDisk.Value)} on this PC"
             : sizeOnDisk.HasValue
                 ? "A part-finished download · downloading again replaces it"
                 : $"Not downloaded · {tier.DownloadDescription()}";
@@ -305,7 +303,8 @@ public sealed class AssistantSettingsDialog : ContentDialog
         {
             Text = statusText,
             FontSize = 12,
-            Opacity = 0.7
+            Opacity = 0.7,
+            TextWrapping = TextWrapping.Wrap
         };
         AutomationProperties.SetAutomationId(statusBlock, $"assistantStatus{tier}");
         info.Children.Add(statusBlock);
@@ -377,6 +376,26 @@ public sealed class AssistantSettingsDialog : ContentDialog
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"],
             });
+        }
+
+        if (removalReason is not null)
+        {
+            // Its own wrapped line below the row, not squeezed into the
+            // status text next to the button — a Grid column sized to share
+            // space with the button has no room to wrap a sentence, so it
+            // was clipping mid-word instead. Mirrors the mac's own separate
+            // `reasonItCannotBeRemoved` Text, `.secondary` rather than the
+            // caution colour above: this is why a button is disabled, not a
+            // problem to fix.
+            var removalReasonBlock = new TextBlock
+            {
+                Text = removalReason,
+                FontSize = 12,
+                Opacity = 0.7,
+                TextWrapping = TextWrapping.Wrap,
+            };
+            AutomationProperties.SetAutomationId(removalReasonBlock, $"assistantRemovalBlocked{tier}");
+            rowPanel.Children.Add(removalReasonBlock);
         }
 
         return rowPanel;
