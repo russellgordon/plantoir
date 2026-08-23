@@ -278,6 +278,29 @@ an item when it ships (finished behaviour is recorded in
   course-level pages, but for a "sample course" it does not name — a
   different measurement from the 32 above, not a contradiction of it.)
 
+## Docker build cache is never cleared (deliberately, for now)
+
+`docker system df` on the dev mac, 2026-08-23: 1301 build-cache entries,
+14.30 GB, 14.25 GB reclaimable — a bigger number than the images that were
+leaking beside it (fixed 2026-08-23, `GUI-IMPROVEMENTS.md` 352).
+
+**Not fixed on purpose, and this is the record of why so it does not get
+re-proposed:** `docker builder prune` is GLOBAL. There is no per-project or
+per-tag filter, so a launcher calling it would throw away the build cache of
+every other project sharing this Colima VM (Supabase, among others) — the same
+constraint that shaped the image cleanup, but with no narrow form available.
+Clearing it stays a by-hand developer job:
+
+```bash
+docker builder prune          # global — read the size it offers first
+```
+
+A teacher's cache is also a fraction of this: the 14 GB here came from twelve
+days of toolchain edits, where a teacher builds on install and then not again.
+If this is ever revisited, the thing to find out first is whether BuildKit can
+be given a scoped cache per build context — a filtered prune, not a bigger
+hammer.
+
 ## Assistant replies "deployed" before the deploy finishes (Windows)
 
 Found 2026-08-19 during the deploy-during-preview adversarial review.

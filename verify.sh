@@ -233,6 +233,76 @@ else
 fi
 rm -rf "$EXPORT_TMP"
 
+# ---------- 3c. Superseded builder images are removed, and ONLY those ----------
+# The launchers mint a new 'teaching-quartz:src-<hash>' tag on every recipe
+# change, so without this the orphans accumulate forever. The danger is the
+# opposite one: Docker here is SHARED with other projects, so a cleanup that
+# reached past its own tags would delete somebody else's images. This drives
+# the launcher's REAL function (extracted from preview.sh, not retyped) against
+# four throwaway images that stand in for each case.
+echo ""
+echo "🔎 Checking that a new build removes superseded builder images…"
+PRUNE_SRC="$(mktemp "${TMPDIR:-/tmp}/verify_prune.XXXXXX.sh")"
+awk '/^prune_superseded_images\(\) \{/,/^\}/' preview.sh > "$PRUNE_SRC"
+if [[ ! -s "$PRUNE_SRC" ]]; then
+  fail "Could not extract prune_superseded_images() from preview.sh"
+else
+  # shellcheck source=/dev/null
+  source "$PRUNE_SRC"
+
+  PRUNE_KEEP="teaching-quartz:src-verifykeep"
+  PRUNE_OLD="teaching-quartz:src-verifyold"
+  PRUNE_INUSE="teaching-quartz:src-verifyinuse"
+  PRUNE_OTHER="verify-other-project:latest"
+  PRUNE_CONTAINER="verify-prune-inuse"
+
+  # Distinct image IDs matter: tags sharing one ID cannot tell these cases
+  # apart, because 'docker rmi <tag>' on a shared ID only untags.
+  prune_fixture_image() {
+    printf 'FROM scratch\nLABEL ca.russellgordon.verify=%s\n' "$2" \
+      | docker buildx build --load -q -t "$1" - >/dev/null 2>&1
+  }
+  docker rm -f "$PRUNE_CONTAINER" >/dev/null 2>&1 || true
+  prune_fixture_image "$PRUNE_KEEP"  keep
+  prune_fixture_image "$PRUNE_OLD"   old
+  prune_fixture_image "$PRUNE_INUSE" inuse
+  prune_fixture_image "$PRUNE_OTHER" other
+  # An explicit command is required even though this container never runs:
+  # 'docker create' refuses an image with no entrypoint, and a container that
+  # was never created would make the in-use case pass vacuously.
+  if ! docker create --name "$PRUNE_CONTAINER" "$PRUNE_INUSE" /noop >/dev/null 2>&1; then
+    fail "prune: could not create the fixture container — the in-use case was not exercised"
+  fi
+
+  prune_superseded_images "$PRUNE_KEEP"
+
+  prune_image_exists() { docker image inspect "$1" >/dev/null 2>&1; }
+  PRUNE_OK="true"
+  if prune_image_exists "$PRUNE_OLD"; then
+    fail "prune: superseded tag $PRUNE_OLD was NOT removed"
+    PRUNE_OK="false"
+  fi
+  if ! prune_image_exists "$PRUNE_KEEP"; then
+    fail "prune: the tag just built ($PRUNE_KEEP) was removed"
+    PRUNE_OK="false"
+  fi
+  if ! prune_image_exists "$PRUNE_INUSE"; then
+    fail "prune: $PRUNE_INUSE was removed while a container still referenced it"
+    PRUNE_OK="false"
+  fi
+  if ! prune_image_exists "$PRUNE_OTHER"; then
+    fail "prune: removed $PRUNE_OTHER — another project's image is not ours to delete"
+    PRUNE_OK="false"
+  fi
+  [[ "$PRUNE_OK" == "true" ]] && pass "Superseded builder images are removed; the current tag, an in-use tag and another project's image are left alone"
+
+  docker rm -f "$PRUNE_CONTAINER" >/dev/null 2>&1 || true
+  for t in "$PRUNE_KEEP" "$PRUNE_OLD" "$PRUNE_INUSE" "$PRUNE_OTHER"; do
+    docker rmi -f "$t" >/dev/null 2>&1 || true
+  done
+fi
+rm -f "$PRUNE_SRC"
+
 # -------------------- 4. Baked files match the working tree --------------------
 echo ""
 echo "🔬 Comparing files baked into the image against the working tree…"

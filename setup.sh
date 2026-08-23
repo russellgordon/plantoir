@@ -362,6 +362,37 @@ chmod -R -N courses 2>/dev/null || true
 HOST_COURSES="$(pwd)/courses"
 
 # -------------------- Build the image when it is missing --------------------
+# ---------------- Remove superseded website-builder images ----------------
+# The image tag is a hash of the build recipe, so every recipe change mints a
+# new tag and orphans the previous one. Nothing used to remove them, and an
+# orphan never comes back on its own: a school year of Plantoir updates would
+# leave a teacher a pile of images they have never heard of, and no way to
+# connect "my disk is full" to this app.
+#
+# Deliberately narrow, because Docker here is SHARED with other projects: only
+# 'teaching-quartz:src-*' tags are ever considered, never a blanket prune, and
+# any tag a container still references is left alone. Removing one of these
+# costs a rebuild and not data — the recipe is bundled — so the only real risk
+# is touching somebody else's image, which is what the filters are for.
+#
+# The build cache is deliberately NOT touched: 'docker builder prune' is global
+# with no per-project filter, so it would throw away other projects' cache too.
+# Clearing that stays a by-hand job.
+prune_superseded_images() {
+  local keep_tag="$1"
+  local tag
+  while read -r tag; do
+    [[ -z "$tag" ]] && continue
+    [[ "$tag" == teaching-quartz:src-* ]] || continue
+    [[ "$tag" == "$keep_tag" ]] && continue
+    if [[ -n "$(docker ps -aq --filter "ancestor=$tag" 2>/dev/null || true)" ]]; then
+      continue
+    fi
+    docker rmi "$tag" >/dev/null 2>&1 || true
+  done < <(docker images --filter 'reference=teaching-quartz:src-*' \
+             --format '{{.Repository}}:{{.Tag}}' 2>/dev/null || true)
+}
+
 build_image_if_missing() {
   if docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "✅ Website builder is ready."
@@ -381,6 +412,7 @@ build_image_if_missing() {
   fi
   if "${build_cmd[@]}" --progress=plain -t "$IMAGE" "$BUILD_CONTEXT"; then
     echo "✅ Website builder built."
+    prune_superseded_images "$IMAGE"
   else
     echo "❌ Could not build the website builder."
     echo "   The first build needs an internet connection — try again once online."
