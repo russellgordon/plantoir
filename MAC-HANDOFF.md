@@ -515,6 +515,57 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Windows closed its own version of the launchd scheduled-deploy bug row
+  314 already fixed on the mac** (Windows + shared, 2026-08-22,
+  `GUI-IMPROVEMENTS.md` row 323). `WINDOWS-HANDOFF.md`'s "What is still
+  genuinely outstanding" list had item 2's carve-out: a scheduled ("publish
+  tomorrow's class overnight") deploy on Windows succeeded perfectly but
+  left the title bar saying "— Edited" forever, because Task Scheduler runs
+  `powershell.exe` directly — no app process is alive at the moment the
+  deploy actually happens, so nothing could fingerprint the section or
+  write `.publish_state`. **The mac needs to change nothing** — its own
+  launchd agent launches the app binary, so it always could fingerprint
+  in-process, and this row is purely Windows catching up to what row 314
+  already described as the mac's fix for the identical bug. Recording here
+  for two reasons worth knowing about:
+  - **A third, Python copy of the fingerprint algorithm now exists**, in
+    the SHARED `scripts/` folder: `scripts/section_fingerprint.py`. Nothing
+    on the mac calls it — only Windows' scheduled-deploy wrapper script
+    does, since it needs to fingerprint from inside a plain PowerShell
+    process with no C# or Swift available. If the fingerprint algorithm's
+    rules ever change on the mac (which files count, the symlink one-hop
+    resolution, the sort order, the hash), **this Python file needs the
+    identical edit or a Windows scheduled deploy will silently disagree
+    with the mac about whether a section has unpublished edits.** Proven to
+    currently match, byte for byte, by
+    `windows-app/Plantoir.Tests/SectionFingerprintPythonParityTests.cs`,
+    which runs both the C# and the Python implementations against the same
+    temp course tree and asserts equal output — there is no equivalent
+    check on the mac side, since the mac never runs this file.
+  - **Rejected: fingerprinting at schedule time instead of run time** —
+    would have been cheap (no Python needed, just C# at the moment the
+    teacher clicks Schedule), but wrong in the direction that lies to the
+    teacher: an edit made between scheduling and the overnight run still
+    goes out correctly, but a schedule-time fingerprint would stamp the
+    STALE pre-edit fingerprint, so the marker would say "— Edited" about
+    content that had, in fact, just published. Fingerprinting at RUN time,
+    right before the deploy — the wrapper script's own Python call, timed
+    to match the mac's in-process fingerprint-before-running-the-script
+    order — is the only version that is correct either way. Worth knowing
+    if a similar "the app isn't alive at the moment this needs to happen"
+    problem comes up on the mac side (a future launchd variant, say): the
+    fix that is cheap and the fix that is correct were not the same fix
+    here, and the difference only shows up in a case (edit-after-schedule)
+    that is easy to not think to test.
+  - Reference: `windows-app/Plantoir.Core/Assist/TaskScheduling.cs`
+    (`WriteWrapperScript`), `windows-app/Plantoir.Core/Assist/ScheduledDeployCompletion.cs`
+    (new), `scripts/section_fingerprint.py` (new),
+    `windows-app/Plantoir.Tests/SectionFingerprintPythonParityTests.cs`
+    (new), `windows-app/Plantoir.Tests/ScheduledDeployCompletionTests.cs`
+    (new). Full write-up, including what the wrapper script's generated
+    PowerShell actually looks like, in `WINDOWS-HANDOFF.md`, "A scheduled
+    deploy needs its own path to the same record".
+
 - **The Windows hero pair had three separate bugs, found by actually looking
   at it next to the mac's** (Windows, 2026-08-21, commit "Fix Windows hero
   image: stray border pixels, tiny windows, and an empty Obsidian sidebar").
