@@ -3532,8 +3532,25 @@ def _quartz_slug(relative: Path) -> str:
     return "/".join(part.replace(" ", "-") for part in parts)
 
 
-def _find_curriculum_folder(content_root: Path):
-    """The folder holding expectation pages, whatever the course calls it."""
+def _find_curriculum_folder(content_root: Path, named: str = None):
+    """
+    The folder holding expectation pages, whatever the course calls it.
+
+    `named` is the course's own `curriculum_folder` — declared by every payload
+    and skeleton manifest and carried into `course_config.json`. It is tried
+    FIRST, which matters for a course whose folder does not contain the word
+    "curriculum" at all: the scan below would never find one, and the map would
+    quietly not be built.
+
+    The scan remains the fallback, and remains the real path for the majority:
+    a course made from scratch has no manifest to declare anything.
+    """
+    if named:
+        candidate = content_root / named
+        if candidate.is_dir():
+            for page in candidate.glob("*.md"):
+                if SPECIFIC_CODE.match(page.stem):
+                    return candidate
     for candidate in sorted(content_root.iterdir()):
         if not candidate.is_dir():
             continue
@@ -3933,6 +3950,7 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
                              include_notes: bool = True,
                              class_folders: list = None,
                              graded_folders: list = None,
+                             curriculum_folder_name: str = None,
                              graded_was_configured: bool = False,
                              first_class_stamp: str | None = None) -> bool:
     """
@@ -3944,7 +3962,7 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
     already had that conversation can switch them off and keep the map,
     the legend, and the standings table.
     """
-    curriculum_dir = _find_curriculum_folder(content_root)
+    curriculum_dir = _find_curriculum_folder(content_root, curriculum_folder_name)
     if not curriculum_dir:
         return False
     specific, overall = _collect_expectations(curriculum_dir)
@@ -4443,7 +4461,8 @@ def build_section_site(
     class_folders_here = class_folder_names(config)
     graded_folders_here, graded_was_configured_here = graded_folder_names(config)
     coverage_wanted = resolve_include_curriculum_coverage(config, section_number)
-    curriculum_dir_here = _find_curriculum_folder(content_root)
+    curriculum_folder_name_here = config.get("curriculum_folder") or None
+    curriculum_dir_here = _find_curriculum_folder(content_root, curriculum_folder_name_here)
 
     # Worked out once and reused by the coverage builder below: this crawl
     # rglobs every page and reads every class page and every first-hop page,
@@ -4479,6 +4498,7 @@ def build_section_site(
                 class_folders=class_folders_here,
                 graded_folders=graded_folders_here,
                 graded_was_configured=graded_was_configured_here,
+                curriculum_folder_name=curriculum_folder_name_here,
                 include_notes=bool(config.get("include_coverage_notes", True)),
                 first_class_stamp=first_class_stamp):
             link_coverage_from_key_links(content_root)

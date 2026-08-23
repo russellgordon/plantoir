@@ -356,6 +356,25 @@ class CourseConfiguration {
         set { values["per_section_files"] = newValue }
     }
 
+    /// What this course calls the folder holding one page per curriculum
+    /// expectation.
+    ///
+    /// Declared by every payload and skeleton manifest and carried into the
+    /// config at creation. The build tries it FIRST and only then falls back to
+    /// scanning for a top-level folder whose name contains "curriculum" — which
+    /// is still the real path for a course made from scratch, but would never
+    /// have found a folder called something else entirely.
+    var curriculumFolder: String? {
+        get { return values["curriculum_folder"] as? String }
+        set {
+            if let newValue {
+                values["curriculum_folder"] = newValue
+            } else {
+                values.removeValue(forKey: "curriculum_folder")
+            }
+        }
+    }
+
     /// The folders whose contents count for marks — what makes an expectation
     /// "assessed" on the Curriculum Coverage map.
     ///

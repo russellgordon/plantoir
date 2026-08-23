@@ -2,6 +2,11 @@
   "courseConfigKeys": {
     "keys": [
       {
+        "key": "curriculum_folder",
+        "type": "string or null",
+        "why": "What this course calls the folder holding one page per curriculum expectation. Declared by every payload and skeleton manifest and carried here at creation; the build tries it FIRST and only then falls back to scanning for a top-level folder whose name contains 'curriculum'. The fallback is still the real path for a course made from scratch, which has no manifest to declare anything \u2014 but a course whose folder is called something else entirely would otherwise never have its map built at all."
+      },
+      {
         "key": "graded_folders",
         "type": "array of strings",
         "why": "Folder names whose contents count for marks \u2014 what makes an expectation 'assessed' on the Curriculum Coverage map. ABSENT (not `[]`) for every course that has not been asked, and that distinction is load-bearing: absent means the historical rule applies (any folder whose name contains 'task'), while `[]` means the teacher deliberately cleared the list. Seeding an existing course with [\"Tasks\"] would silently drop folders the old substring rule counted, such as the skeletons' \"Thinking Tasks\". See shared-rules.json -> gradedFolders."

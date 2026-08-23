@@ -98,9 +98,14 @@ struct StringListEditorView: View {
         if trimmed.isEmpty {
             return nil
         }
-        if trimmed == "Media" {
-            // The toolchain manages the Media folder automatically; the
-            // wizard refuses this name too.
+        if trimmed.lowercased() == "media" {
+            // Plantoir manages the Media folder itself; the wizard refuses this
+            // name too.
+            //
+            // Case-INSENSITIVELY, because the filesystem is: "media" typed here
+            // was accepted, then collided with the folder Plantoir links in,
+            // and the two were the same directory on disk with different names
+            // in the config.
             return nil
         }
         if appendingMarkdownExtension && !trimmed.hasSuffix(".md") {

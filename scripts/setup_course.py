@@ -2266,6 +2266,15 @@ def setup_course(no_backup: bool = False):
         "per_section_files": per_section_files,
         "hidden": hidden_items,
         "expandable": expandable_items,
+        # What this course calls its curriculum folder. Declared by every
+        # payload and skeleton manifest, and until now read only at install
+        # time — so the build fell back to scanning for the word "curriculum"
+        # and would never have found a folder that does not contain it.
+        "curriculum_folder": (
+            (example_manifest or {}).get("curriculum_folder")
+            if prepopulate_example
+            else (skeleton_manifest or {}).get("curriculum_folder")
+        ),
         # Which folders hold work that counts for marks. Written explicitly for
         # a NEW course because there are no marks to lose; an EXISTING course
         # deliberately has no such key, which is what tells the build to keep

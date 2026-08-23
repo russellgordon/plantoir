@@ -1069,7 +1069,7 @@ struct NewCourseWizardView: View {
                     || chosenSharedFiles.contains(item)
                     || chosenPerSectionFolders.contains(item)
                     || chosenPerSectionFiles.contains(item)
-                    || item == "Media"
+                    || item.lowercased() == "media"
                 if isKnown {
                     hiddenItems.append(item)
                 }
