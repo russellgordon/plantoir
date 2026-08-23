@@ -32,6 +32,7 @@ public static class ActivityTrail
         AssistantModelDownloadStopped,
         AssistantConfirmationChanged,
         SectionContentMarkedPublished,
+        AssistantEngineSaid,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -61,6 +62,7 @@ public static class ActivityTrail
         Event.AssistantModelDownloadStopped => "assistant model download stopped",
         Event.AssistantConfirmationChanged => "assistant confirmation changed",
         Event.SectionContentMarkedPublished => "section content marked published",
+        Event.AssistantEngineSaid => "assistant engine said",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

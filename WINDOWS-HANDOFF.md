@@ -128,14 +128,26 @@ this side is expected to say so when the contract is wrong.
    schedule time) was deliberate — see "A scheduled deploy needs its own
    path to the same record" below, which this closes.
 
-3. **Sampling the local engine's own stderr/stdout into the activity trail**
-   (the tail end of "What the engine says now reaches a problem report"
-   below). `LocalModel.NoteServerLine` / `RecentServerLog` already keep the
-   ring buffer Windows needs; what was still missing as of the mac's
-   2026-08-20 write-up is putting any of it on the trail as its own event
-   (`assistant engine said` in `shared-rules.json` → `activityTrail.mustRecord`).
-   Verify against current `ActivityTrail.cs` / `AssistServerHost`-equivalent
-   code rather than assuming either way.
+3. ~~Sampling the local engine's own stderr/stdout into the activity trail~~
+   — ✅ Done 2026-08-23 (`GUI-IMPROVEMENTS.md` row 327). New
+   `Plantoir.Core.Assist.AssistEngineLog` ports mac's filter/cap
+   (`readsLikeATrouble`, `engineLinesWorthRecording`, the 12-line cap) as
+   pure, tested functions checked against the same real llama.cpp fixture
+   lines the mac test uses. `LocalModel.LinesSinceLastLook` reads new lines
+   out of the existing 60-line ring buffer rather than a file offset — no
+   file-backed log was needed because Windows already drains the engine's
+   output via `Process` events rather than a blocking pipe, so it never had
+   the wedge that made the mac move to a file in the first place.
+   `AssistWindow.xaml.cs` wires it at the same points mac's `AssistSession`
+   does (both engine-start-failure paths keeping everything, a 15s
+   background poll once ready, one last look in `Shutdown()`). New
+   `ActivityTrail.Event.AssistantEngineSaid` / `"assistant engine said"`,
+   already pinned by the existing generic `ContractTests.cs` check against
+   `shared-rules.json`. An adversarial review caught a genuine data race
+   Windows has and mac does not — mac's version runs on one actor, Windows
+   deliberately moved the watch loop to a background thread — fixed with a
+   lock around the shared mark/count state. See `MAC-HANDOFF.md`'s "for
+   awareness" section for the full write-up. Full suite: 655/655.
 
 4. **The salvaged capture-dialog fixes on `issue/windows-capture-dialog-fixes`
    have not been built or tested on a real Windows machine** — see "Salvaged
