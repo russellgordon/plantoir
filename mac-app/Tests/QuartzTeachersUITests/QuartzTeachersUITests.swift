@@ -357,6 +357,88 @@ final class QuartzTeachersUITests: XCTestCase {
         closeButton5.click()
     }
 
+    /// A British Columbia course code — dashes and all — is accepted, and is
+    /// NOT mistaken for a club (Russell, 2026-08-23). Both halves matter:
+    /// the character rule refused the dash, and the club heuristic ("the
+    /// fourth character is the grade digit") called every one of BC's 117
+    /// courses a club, which put the club-only short-label field on screen
+    /// for a real course.
+    func testBritishColumbiaCourseCodeIsAcceptedAndIsNotAClub() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10))
+        codeField.click()
+        codeField.typeText("MTEL-12")
+
+        // No complaint about the dash.
+        let warning: XCUIElement = application.staticTexts["courseCodeWarning"]
+        XCTAssertFalse(
+            warning.waitForExistence(timeout: 2),
+            "A BC course code's dash should be accepted — warning said: \(warning.exists ? "\(warning.label)" : "")"
+        )
+
+        // And the club-only short-label field stays away, because the
+        // catalog knows MTEL-12 is a course.
+        let shortLabel: XCUIElement = application.textFields["wizardCustomShortNameField"]
+        XCTAssertFalse(shortLabel.exists, "MTEL-12 is a real BC course, not a club — the short-label field should not appear")
+
+        let closeButton: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton.click()
+    }
+
+    /// A teacher-invented club code still gets the short-label field — the
+    /// catalog check above must not have switched it off for everyone.
+    func testAClubCodeStillOffersTheShortLabelField() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10))
+        codeField.click()
+        codeField.typeText("ROBOTICS")
+
+        let shortLabel: XCUIElement = application.textFields["wizardCustomShortNameField"]
+        XCTAssertTrue(shortLabel.waitForExistence(timeout: 5), "A club code should still offer a short label")
+
+        // And it wears the same chrome as its neighbours: a label in the
+        // leading column, and a field starting where Course Name's does.
+        let nameField: XCUIElement = application.textFields["wizardCourseNameField"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            shortLabel.frame.minX, nameField.frame.minX, accuracy: 4.0,
+            "The short-label field should start where Course Name's does — short: \(shortLabel.frame.minX), name: \(nameField.frame.minX)"
+        )
+        let shortLabelText: XCUIElement = wizardLabel(named: "Short label", near: shortLabel, in: application)
+        XCTAssertTrue(shortLabelText.exists, "\"Short label\" should be a label beside the field, not placeholder text inside it")
+
+        // Move focus out of the code field before the screenshot: the
+        // suggestion popup floats over the rows below it, so a shot taken
+        // with it open shows the popup rather than the thing under test.
+        // Waiting on the popup's own disappearance rather than sleeping —
+        // it fades over 0.12s, and a shot timed by a guess catches it
+        // half-faded (which is exactly what the first attempt did).
+        // Escape rather than clicking elsewhere: the popup COVERS the rows
+        // below, so clicking Course Name fails outright with "Not
+        // hittable" (it did). Escape closes the popup without moving
+        // focus, which is what it is for.
+        codeField.typeKey(.escape, modifierFlags: [])
+        let suggestions: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "courseCodeSuggestionsList").firstMatch
+        XCTAssertTrue(suggestions.waitForNonExistence(timeout: 5))
+        saveScreenshot(named: "08-club-short-label-field", of: application.windows.firstMatch)
+
+        let closeButton: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton.click()
+    }
+
     /// The chevron TOGGLES, the way a real `NSComboBox`'s arrow does:
     /// a second press puts the popup away rather than doing nothing
     /// (Russell, 2026-08-23).
