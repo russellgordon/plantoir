@@ -2772,6 +2772,105 @@ the failure the mac hit: a disk filling with something the teacher has never
 heard of and cannot connect to this app. Nobody here can see a Windows
 machine to answer it, so it is a question rather than a finding.
 
+## Folder problems: the checks, and the four places they have to surface (2026-08-23)
+
+Certain folder and file names carry behaviour — the curriculum folder, the folder
+holding class pages, `Media`, a section's `index.md` — and nothing stopped a
+teacher deleting or renaming one in Obsidian. The features then failed SILENTLY,
+the Curriculum Coverage map worst of all: it still rendered, still looked
+healthy, and was wrong.
+
+**The checks are shared Python and you inherit them unchanged.**
+`scripts/site_health.py` runs inside `build_site.py`, after the content merge and
+before Quartz builds. You run the same file, so there is nothing to reimplement.
+What you owe is the front end.
+
+### Where they run, and where they honestly do not
+
+They run in the toolchain rather than in the app because the GUI button is one of
+five ways a build starts — the assistant, the MCP server, the launchers and the
+scheduled task all bypass it, and the scheduled one runs with the app closed.
+
+**Be careful repeating the "before anything is published" claim**, because an
+earlier version of this section overstated it and it was corrected: `deploy.py`
+publishes an EXISTING `public/` and only rebuilds when a live preview is
+attached, and `deploy.sh --to-folder` never enters the Python at all. So a deploy
+of a build made in an earlier session carries no health output of its own. The
+findings are recorded when the BUILD happens. That is acceptable; claiming
+otherwise is not.
+
+### The sentence is not yours to write
+
+Each finding is printed twice: once as a human sentence, and once as
+`PLANTOIR_HEALTH: {json}` carrying `name`, `sentence`, `detail`, `fixable`,
+`course`, `section`. **Display the `sentence` and `detail` the line carries.**
+Do not compose your own from the `name` — the whole reason the wording travels in
+the payload is so that the same problem cannot be worded differently on the two
+platforms, and the sentences have one home in
+`contracts/shared-rules.json` → `siteHealth.checks`.
+
+A progress marker would not have done: those are matched loosely and getting one
+wrong is silent (see `app-rules.json` → `markerOrigins`). A prefixed JSON line is
+unambiguous and carries structure a sentence cannot.
+
+### Three traps, all met here
+
+- **Do not read the findings from a tail.** Every other structured-line reader in
+  the mac's `ScriptRunner` works from `recentText(maximumCharacters: 8000)`, and
+  the health lines print in the MIDDLE of a build. On any real build they are
+  long past that window by the end. Collect them as output arrives. The mac test
+  floods 400 lines after the finding to prove the point.
+- **Hide the marker line from the console a teacher reads.** A raw JSON blob is
+  machinery (rule 1). The human sentence is printed separately, so nothing is
+  lost. The mac drops it in `TranscriptBuilder`, and reads findings from the raw
+  text BEFORE handing it there.
+- **Show it once.** The mac holds findings in view state rather than reading them
+  off the runner at render time, so a teacher who dismisses the dialog and
+  carries on editing does not meet it again on the next redraw. A healthy course
+  must see nothing at all — the failure mode for this whole feature is nagging,
+  and a warning dismissed by habit is dismissed when it matters.
+
+### The scheduled task NEVER refuses
+
+Russell's call, and the reasoning travels: *"a slightly inaccurate curriculum map
+is a paper cut, an unpublished site update a teacher was counting on is a broken
+nose."* Pinned as `siteHealth.scheduledDeployPublishesAnyway` and asserted by a
+mac test so it cannot be quietly softened later.
+
+So: publish, then stash what was found for the next time somebody is there. You
+already have the shape — `ScheduledDeployCompletion.cs` stashes a completion
+sentinel exactly this way. Two properties the mac's version has that yours should
+too: the record is CONSUMED when read, so a problem is reported once rather than
+every time the app opens; and a CLEAN run clears it, so a problem the teacher has
+put right stops being reported.
+
+One platform difference worth knowing: the mac reads the findings back out of the
+scheduled run's LOG FILE rather than from a pipe, because `runScheduled`
+deliberately does not capture the child's output — launchd points stdout at that
+log and the process inherits it, and an unread pipe is what wedged your own
+assistant server. If your task runner already captures output, use what you have;
+the log-scrape is a workaround for a constraint you may not share.
+
+### Deploys with several destinations
+
+Take the findings from the FIRST leg only. Every destination publishes the same
+built site, so a second leg repeats them.
+
+### Trail event
+
+`FolderProblemFound` is in `ActivityTrail.cs` and in
+`contracts/shared-rules.json` → `activityTrail.mustRecord`. The line reads
+`found a problem with this course's folders (curriculumCoverageFoundNothing)` —
+a sentence a teacher would recognise, carrying the stable check NAME in brackets.
+Both halves earn their place: rule 5 wants a line that reads as something that
+happened, and the name is what somebody searching the trail months later can
+match against the contract, since the product wording will have been reworded by
+then.
+
+**The mac suite fails a declared trail event that has no call site** — which is
+what forced the front end to be written rather than promised. Worth checking
+whether your suite does the same; if not, it is a cheap test to add.
+
 ## "Where do the class pages live?" had four answers — and yours was the worst (2026-08-23)
 
 **Action required on your side: build and test. The C# below was written on the
