@@ -71,6 +71,12 @@ public sealed partial class MainWindow : Window
         };
         Closed += (_, _) => Workspace.UnregisterWindow();
 
+        // The Preview menu tracks whichever section is currently shown —
+        // one callback registered once, rather than a refresh call threaded
+        // through every place DetailHost.Content is assigned.
+        DetailHost.RegisterPropertyChangedCallback(ContentPresenter.ContentProperty, (_, _) => TrackDetailForPreviewMenu());
+        RefreshPreviewMenu();
+
         Workspace.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(WorkspaceViewModel.State)
@@ -692,6 +698,68 @@ public sealed partial class MainWindow : Window
     {
         Workspace.Reload();
         ApplyState();
+        args.Handled = true;
+    }
+
+    // ---- Preview menu ------------------------------------------------
+    //
+    // Mirrors mac's PreviewCommands (mac-app/QuartzTeachers/App/PreviewCommands.swift):
+    // a top-level Back/Forward/Reload menu that tracks whichever section's
+    // preview is currently shown, discoverable even though the same actions
+    // already have working keyboard shortcuts scoped to SectionDetailView.
+
+    private SectionDetailView? _previewMenuTrackedDetail;
+
+    private void TrackDetailForPreviewMenu()
+    {
+        if (_previewMenuTrackedDetail is { } previous)
+            previous.PreviewChromeChanged -= PreviewChromeChanged_RefreshMenu;
+
+        _previewMenuTrackedDetail = DetailHost.Content as SectionDetailView;
+
+        if (_previewMenuTrackedDetail is { } current)
+            current.PreviewChromeChanged += PreviewChromeChanged_RefreshMenu;
+
+        RefreshPreviewMenu();
+    }
+
+    private void PreviewChromeChanged_RefreshMenu(object? sender, EventArgs e) => RefreshPreviewMenu();
+
+    private void RefreshPreviewMenu()
+    {
+        var detail = DetailHost.Content as SectionDetailView;
+        PreviewBackItem.IsEnabled = detail?.CanGoBack == true;
+        PreviewForwardItem.IsEnabled = detail?.CanGoForward == true;
+        PreviewReloadItem.IsEnabled = detail?.HasPreview == true;
+    }
+
+    private void PreviewBack_Click(object sender, RoutedEventArgs e) =>
+        (DetailHost.Content as SectionDetailView)?.PreviewGoBack();
+
+    private void PreviewForward_Click(object sender, RoutedEventArgs e) =>
+        (DetailHost.Content as SectionDetailView)?.PreviewGoForward();
+
+    private void PreviewReload_Click(object sender, RoutedEventArgs e) =>
+        (DetailHost.Content as SectionDetailView)?.PreviewReload();
+
+    // Global counterparts to SectionDetailView's own scoped BackAccelerator/
+    // ForwardAccelerator/ReloadAccelerator — see the comment on Root's
+    // KeyboardAccelerators in MainWindow.xaml for why both scopes exist.
+    private void PreviewBackAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        (DetailHost.Content as SectionDetailView)?.PreviewGoBack();
+        args.Handled = true;
+    }
+
+    private void PreviewForwardAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        (DetailHost.Content as SectionDetailView)?.PreviewGoForward();
+        args.Handled = true;
+    }
+
+    private void PreviewReloadAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        (DetailHost.Content as SectionDetailView)?.PreviewReload();
         args.Handled = true;
     }
 }

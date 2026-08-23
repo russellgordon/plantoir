@@ -47,6 +47,26 @@ public sealed partial class SectionDetailView : UserControl
 
     public string CourseCode => _course.Code;
     public int SectionNumber => _sectionNumber;
+
+    /// <summary>
+    /// Raised whenever the browser-chrome state (back/forward/reload
+    /// availability) may have changed, so the app's Preview menu — which
+    /// tracks whichever section is currently shown — can refresh without
+    /// polling. Mirrors mac's PreviewCommands, which reads the same state
+    /// via @FocusedValue instead of an event.
+    /// </summary>
+    public event EventHandler? PreviewChromeChanged;
+
+    /// <summary>Whether a preview is loaded at all — mirrors mac's disabling Reload when there is no controller.</summary>
+    public bool HasPreview => _previewUrl is not null;
+    public bool CanGoBack => HasPreview && Preview.CanGoBack;
+    public bool CanGoForward => HasPreview && Preview.CanGoForward;
+
+    /// <summary>Menu-bar equivalents of Back_Click/Forward_Click/Reload_Click, for the Preview menu.</summary>
+    public void PreviewGoBack() { if (Preview.CanGoBack) Preview.GoBack(); }
+    public void PreviewGoForward() { if (Preview.CanGoForward) Preview.GoForward(); }
+    public void PreviewReload() { if (HasPreview) Preview.Reload(); }
+
     internal bool IsBusy => _previewRunner.IsRunning || _deployRunner.IsRunning;
     // What "busy" means to a DEPLOY since the deploy-during-preview port: a
     // running preview no longer stands in the way (Deploy stops it itself),
@@ -152,6 +172,8 @@ public sealed partial class SectionDetailView : UserControl
         Progress.Visibility = showConsole ? Visibility.Visible : Visibility.Collapsed;
         NoPreviewState.Visibility = showConsole ? Visibility.Collapsed : Visibility.Visible;
         Preview.Visibility = previewShown ? Visibility.Visible : Visibility.Collapsed;
+
+        PreviewChromeChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private XamlRoot? EffectiveXamlRoot => XamlRoot ?? _window.Content?.XamlRoot;
