@@ -149,9 +149,72 @@ this side is expected to say so when the contract is wrong.
    lock around the shared mark/count state. See `MAC-HANDOFF.md`'s "for
    awareness" section for the full write-up. Full suite: 655/655.
 
-4. **The salvaged capture-dialog fixes on `issue/windows-capture-dialog-fixes`
-   have not been built or tested on a real Windows machine** — see "Salvaged
-   capture fixes from a stranded branch…" at the end of this file.
+4. ~~The salvaged capture-dialog fixes on `issue/windows-capture-dialog-fixes`
+   have not been built or tested on a real Windows machine~~ — ✅ Verified
+   2026-08-23, correctly this time. That branch no longer exists — it merged
+   as `a5979770` and was deleted per this repo's own convention, and commit
+   `15ddf271` (the salvage itself) is on `dev`. `dotnet build` (0 warnings, 0
+   errors) and `dotnet test Plantoir.Tests/Plantoir.Tests.csproj` (655/655)
+   both pass. All three fixes are confirmed working: populated course-name
+   suggestions and a club row, the uncut Language/region row (`MaxHeight`
+   680→720), and the real "New Course or Club" title on the New Course
+   dialog; the prompt shelf instead of a blank top third on the assistant
+   window.
+
+   **A verification detour worth recording, because it nearly produced a bad
+   fix.** A first pass captured screenshots by invoking
+   `Plantoir.exe --capture-marketing-shots ... --theme light`/`dark` directly,
+   without switching the real OS appearance first. That produced a
+   new-course-windows-light.png with a Dark dialog card inside an otherwise
+   Light window — caught by Russell eyeballing the image, missed by both an
+   in-conversation check and an independent adversarial-agent review, because
+   both only checked the three claimed content fixes and not the card's
+   theme. The instinct was to read that as a fresh product bug and patch
+   `MarketingShotCapturer.CaptureNewCourseWindow`'s brush lookups
+   (`Application.Current.Resources["SolidBackgroundFillColorBaseBrush"]` etc.)
+   to resolve against `Application.Current.Resources.ThemeDictionaries["Light"
+   /"Dark"]` explicitly — **that fix was wrong and was reverted**: the app's
+   `ThemeDictionaries` isn't keyed that way at the top level, and the "fix"
+   crashed the whole capture with a `COMException: Cannot find a resource
+   with the given key: Light`.
+
+   The class's own doc comment (`MarketingShotCapturer.cs:45-61`) already
+   explains the real mechanism and already-chosen fix: brushes fetched via
+   `Application.Current.Resources["..."]` resolve against the theme the APP
+   PROCESS LAUNCHED IN, not against `RequestedTheme` set on any element —
+   which is why the architecture is one process per REAL OS appearance,
+   switched before launch, restored after. `website/shots/capture_windows.py`
+   already does exactly this (`hero_windows.write_theme`, switching the
+   `HKCU\...\Themes\Personalize` registry keys and broadcasting
+   `WM_SETTINGCHANGE` before each themed launch). **The bug was in how the
+   verification was run, not in the product** — re-running the exact same
+   build with the OS genuinely switched to Light, then genuinely switched to
+   Dark (registry flipped, captured, flipped back to the machine's original
+   Dark setting afterward, mirroring rule 9's "leave the machine as you found
+   it"), produced correctly-themed dialogs in both cases, no code changes
+   needed. Lesson for next time: **capture verification must switch the real
+   OS theme first, exactly like `capture_windows.py` does — invoking the exe
+   directly with just `--theme` is not equivalent and will misreport this
+   class of bug.**
+
+   **A second trap, hit the same day, worth its own warning: a plain
+   `dotnet publish Plantoir\Plantoir.csproj -c Release -r win-x64` is NOT a
+   substitute for `windows-app\publish.ps1`, even for local testing.**
+   `publish.ps1` has a manual step bare `dotnet publish` skips: copying
+   `Plantoir\bin\Release\...\Plantoir.pri` over BOTH `resources.pri` and
+   `Plantoir.pri` in the publish folder. Skip it and the unpackaged Release
+   exe crashes on startup — inconsistently, which is what made this
+   confusing: one run threw `InvalidCastException` trying to connect a
+   `KeyboardAccelerator` in `MainWindow.g.cs` (which briefly looked like a
+   real regression in the recent Preview-menu accelerator work, item 1
+   above), another threw `XamlParseException: Cannot locate resource from
+   'ms-appx:///MainWindow.xaml'` — different symptoms of the same missing
+   resource package, not two different bugs, and not a real regression at
+   all. Confirmed by elimination: same source, same clean `obj`/`bin`, exe
+   published via `publish.ps1` instead — plain launch and the full capture
+   flow both work, exit code 0. **Always use `publish.ps1` for a Release
+   exe, never a bare `dotnet publish`, even to build a quick throwaway copy
+   for a local test.**
 
 5. **Two things to measure, not copy, on real Windows hardware** (see "Two
    things to MEASURE on Windows rather than copy from the mac" below):
@@ -2415,11 +2478,17 @@ control) and now reads `dialog.Title` instead of hardcoding "New Course";
 the prompt shelf instead of a blank top third. Full row: `GUI-IMPROVEMENTS.md`
 #316.
 
-**This has not been built or tested — there is no .NET SDK on the macOS
-machine that ported it.** Before merging: `dotnet build` +
-`dotnet test Plantoir.Tests/Plantoir.Tests.csproj`, then a real
-`--capture-marketing-shots` run to look at the New Course dialog and assistant
-window shots by eye. If either the New Course dialog's field layout or the
-assistant window's ready-state layout has changed since 2026-08-19, these
-three edits may no longer apply cleanly or may need adjusting to match.
+**✅ Verified 2026-08-23, on a real Windows machine, with the OS appearance
+actually switched to match each capture** (the way `capture_windows.py`
+itself does it — see item 4 in "What is still genuinely outstanding" above
+for the full detour: a first verification pass skipped that step, misread
+the result as a product bug, and nearly shipped an unnecessary and broken
+code change before the real cause was found). `dotnet build` (0 warnings, 0
+errors) and `dotnet test Plantoir.Tests/Plantoir.Tests.csproj` (655/655)
+both pass, and `--capture-marketing-shots` — run once with the real OS theme
+set to Light and once set to Dark — confirms all three edits visually in
+both: the New Course dialog shows populated suggestions, an uncut
+Language/region row, and the real "New Course or Club" title, with its card
+correctly matching the surrounding window's theme; the assistant window
+shows the prompt shelf instead of a blank top third.
 
