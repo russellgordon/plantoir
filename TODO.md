@@ -4,6 +4,106 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **Let a teacher rename a special folder from inside Plantoir** — deferred
+  2026-08-23, while planning the hardening of the special folder and file names.
+  Not `CourseRenamer`, which renames the course CODE and deliberately nothing
+  else: this is renaming `Ontario Curriculum`, `Tasks` or `All Classes` in the
+  app, so the app is the one performing the rename.
+
+  **What exists today is thinner than it looks.** `StringListEditorView` edits
+  the config LIST only — `addNewItem` appends a string, `removeItem` filters one
+  out, and neither touches disk (there is no `createDirectory`, `moveItem` or
+  `removeItem(at:)` anywhere under `Views/CourseSettings/`). So adding `Tests`
+  to shared folders creates a config entry pointing at no folder; removing
+  `Tasks` leaves the folder on disk, still full of the teacher's work, now
+  unreferenced. Renaming is only possible in Obsidian or Finder — and then
+  `preflight_update_course_config` in `scripts/build_site.py` discovers the new
+  name and APPENDS it, with no removal path, so the config ends up listing both.
+
+  **Why it was deferred rather than built.** The hardening work originally
+  rested on recording each special folder's name in `course_config.json` so a
+  check could tell DELETED from RENAMED. It cannot: the app never witnesses a
+  rename, and the build's auto-discovery converts one into a duplicate. Rather
+  than build the rename affordance as a dependency, the checks were rebased onto
+  the FEATURE'S OUTPUT ("the coverage map found no expectations") instead of a
+  folder's existence — which needs no recorded name, cannot be satisfied by an
+  empty folder, and does not fire on a legitimate Obsidian rename. That made
+  this a feature in its own right rather than a prerequisite, and bundling it
+  would roughly have doubled the piece.
+
+  **What it would still be worth.** It fixes the two foot-guns above (add
+  creates nothing; remove orphans a folder), and it is the one place a rename
+  could be observed. It needs its own design pass for what happens to wikilinks
+  pointing into a renamed folder, and its own undo.
+
+- **Let a teacher rename the `Unit` keyword** — deferred 2026-08-23, while
+  planning the hardening of Plantoir's special folder and file names. Some
+  teachers organise by "Module" or "Thread" rather than "Unit", and today the
+  word is not a preference but a structural assumption: `_is_class_page` in
+  `scripts/build_site.py:1402` matches `^Unit\s+\d+,\s*Day\s+\d+$`, and
+  roughly 290 places in the Swift and 208 in the C# name it.
+
+  **It is deferred because of the migration, not the parsing.** The parsing side
+  is mechanical — one configured term threaded through the regexes and the
+  title generators. The measurements that decided it (taken 2026-08-23):
+
+  - **3,088 files** named `Unit N, Day N` under `support/example_content/`, and
+    **3,143 files** containing a `Unit N, Day N` wikilink;
+  - **600** skeleton files, which are generated and therefore cheap;
+  - `contracts/class-planning.json` is authored end to end in Unit/Day;
+  - the local assistant's routing was measured against sentences like "publish
+    Unit 4" — a teacher who renamed to Thread will type "publish thread 4".
+
+  **The split that makes it tractable.** Payloads are copied fresh at course
+  creation, so a NEW course can pick its term at setup and one rewrite pass
+  during the copy handles all 3,000-odd files and their wikilinks at once. That
+  is cheap, contained, and delivers most of the value. Renaming an EXISTING
+  course is the dangerous half: it means rewriting every wikilink pointing at
+  every renamed page, across every shared folder and every section, and a
+  half-finished rename leaves a broken site with no obvious way back.
+  `WikiLinkRewriter` could do it, but it deserves its own design pass and its
+  own undo — not a checkbox in settings.
+
+  **Hold "Day" fixed.** A teacher who says "Thread" almost certainly still says
+  "Day 3"; only the first term looks worth making configurable.
+
+  Rejected: a display-only rename (the page would be titled "Thread 2, Day 3"
+  while the file stayed `Unit 2, Day 3.md`), because Obsidian is the teacher's
+  editor and they would see the old word every time they opened the vault —
+  which is the place the rename was supposed to help.
+
+- **The assistant's first turn does not wait for its warm-up** — measured
+  2026-08-20, while qualifying the mac for v1.1.0. `AssistSession` sets
+  `readiness = .ready` (which is all `canSend` checks) and only THEN awaits
+  `warmUp`, so a teacher who types straight away queues behind the
+  ~3,400-token priming request on the server's single slot. Same question,
+  same model, same Mac: **1.7 s** warm against **3.1 s** racing the warm-up.
+
+  It is an optimisation, not a fix — deliberately left out of 1.1.0 because
+  changing it would have made an unchanged mac binary a behaviour change,
+  and the failure Windows repaired (a first question ending in silence)
+  cannot happen here: the timeout is 180 s, `AssistAgent.think()`'s catch
+  surfaces every error as a message and a trail line, and the engine's
+  output goes to `nullDevice` so no pipe can wedge. Windows already awaits
+  its warm-up; see `MAC-HANDOFF.md` and GUI-IMPROVEMENTS row 295.
+
+  The fix is small: hold `.ready` until the warm-up returns, or gate
+  `canSend` on a separate `hasFinishedWarmUp`. **Pin it with a test** that
+  a turn cannot start before the warm-up's request has come back — the
+  measurement above is the evidence it is worth doing, not a substitute
+  for one.
+
+- **A mac problem report can carry nothing the engine said** — found the
+  same day. `AssistServerHost` sends `llama-server`'s stdout and stderr to
+  `FileHandle.nullDevice`. That is load-bearing (an unread pipe is what
+  wedged the Windows server mid-request, and this is why the mac never
+  had that bug) but it also means model-load errors, slot warnings and
+  timing lines reach nobody — the one place they could matter is a report
+  from a teacher whose assistant is misbehaving. Windows added
+  `NoteServerLine` for this. Sample a BOUNDED tail into the trail rather
+  than piping the firehose, and keep the no-blocking-read property that
+  makes the current arrangement safe.
+
 - **A preview's progress bar sits at 100% saying "Opening the preview…"
   for the entire build** — found 2026-08-19, while re-shooting the
   marketing screenshots; the "Building your site…" step is unreachable.

@@ -85,6 +85,13 @@ fi
 # Fast, dependency-free checks that don't need the image — run first so a
 # broken script.py change fails in milliseconds instead of after a full
 # Docker build.
+if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
+  pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
+else
+  fail "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
+  cat /tmp/verify_contracts_test.log
+fi
+
 if (cd scripts && python3 test_deploy_netlify_headers.py) >/tmp/verify_deploy_headers_test.log 2>&1; then
   pass "deploy.py: Netlify ad-badge suppression (scripts/test_deploy_netlify_headers.py)"
 else

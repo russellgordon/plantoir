@@ -69,6 +69,7 @@
     <Content Include="..\..\patches\**" Link="Toolchain\patches\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\scripts\**" Link="Toolchain\scripts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\support\**" Link="Toolchain\support\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\contracts\**" Link="Toolchain\contracts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- The native llama engine runs on the host for GPU-accelerated local assistant inference -->

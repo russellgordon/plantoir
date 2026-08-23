@@ -48,6 +48,7 @@ RUN cp -r /opt/quartz /opt/quartz-site
 # apply untouched; the Windows-native runtime points it elsewhere via
 # PLANTOIR_* environment variables.
 COPY scripts/toolchain_paths.py /opt/scripts/toolchain_paths.py
+COPY scripts/contracts.py /opt/scripts/contracts.py
 COPY scripts/setup_course.py /opt/scripts/setup_course.py
 COPY scripts/build_site.py /opt/scripts/build_site.py
 COPY scripts/deploy.py /opt/scripts/deploy.py
@@ -79,6 +80,14 @@ RUN python3 -c "import sys; sys.path.insert(0, '/opt/scripts');     import setup
 
 # Copy course metadata lookup & other support files into container
 COPY support/ /opt/support/
+
+# The Plantoir contract, read by the scripts themselves (scripts/contracts.py).
+# It must be baked in: the container's only bind mount is `courses`, so neither
+# the working folder's .toolchain/ nor the app bundle is reachable from in
+# here. A contract edit therefore changes the image hash and forces a rebuild —
+# accepted deliberately, because the alternative is a shared rule the container
+# cannot read.
+COPY contracts/ /opt/contracts/
 
 # --- Bake launcher scripts for export ---
 RUN mkdir -p /opt/export

@@ -65,6 +65,11 @@ targets:
       - path: ../support
         type: folder
         buildPhase: resources
+      # Read by the scripts themselves (scripts/contracts.py), so it travels
+      # with them into .toolchain/ and into the image's build context.
+      - path: ../contracts
+        type: folder
+        buildPhase: resources
       - path: ../setup.bat
         buildPhase: resources
       - path: ../preview.bat

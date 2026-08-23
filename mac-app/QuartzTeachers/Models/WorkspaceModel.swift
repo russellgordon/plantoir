@@ -524,7 +524,7 @@ class WorkspaceModel {
         }
         // Whole folders, mirrored (extraneous files removed — they would
         // change the hash and force rebuilds for nothing).
-        for folderName in ["patches", "scripts", "support"] {
+        for folderName in ["patches", "scripts", "support", "contracts"] {
             if let sourceURL = Bundle.main.url(forResource: folderName, withExtension: nil) {
                 changed += WorkspaceModel.syncDirectory(from: sourceURL, to: toolchainURL.appendingPathComponent(folderName))
             }
