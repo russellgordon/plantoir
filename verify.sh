@@ -85,6 +85,13 @@ fi
 # Fast, dependency-free checks that don't need the image — run first so a
 # broken script.py change fails in milliseconds instead of after a full
 # Docker build.
+if (cd scripts && python3 test_recipe_folders.py) >/tmp/verify_recipe_folders_test.log 2>&1; then
+  pass "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
+else
+  fail "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
+  cat /tmp/verify_recipe_folders_test.log
+fi
+
 if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
   pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
 else
@@ -392,6 +399,11 @@ check_baked() {
     fail "Image file $image_path differs from repo $repo_path"
   fi
 }
+check_baked scripts/contracts.py          /opt/scripts/contracts.py
+# The contract itself must be IN the image: the container's only bind mount is
+# `courses`, so a rule the scripts read has nowhere else to come from. One file
+# stands for the directory — the Dockerfile copies it wholesale.
+check_baked contracts/class-planning.json /opt/contracts/class-planning.json
 check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py

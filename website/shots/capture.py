@@ -324,6 +324,30 @@ def app_bundle_resources() -> Path:
     return candidates[-1]
 
 
+def _recipe_folders() -> list:
+    """
+    The toolchain recipe's folders, from the contract rather than a fourth copy.
+
+    Raises rather than guessing: a wrong answer here stages a demo workspace
+    whose Dockerfile COPYs a folder that is not present, which fails the build
+    outright and cannot produce preview.sh's friendly "missing the build recipe"
+    message, because the Dockerfile IS there.
+    """
+    import json
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "contracts" / "toolchain.json"
+        if candidate.is_file():
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+            folders = data.get("recipeFolders", {}).get("folders")
+            if folders:
+                return list(folders)
+            break
+    raise RuntimeError(
+        "Cannot read contracts/toolchain.json -> recipeFolders, which is the "
+        "one home for the toolchain recipe's folder list."
+    )
+
+
 def mirror_toolchain(workspace: Path) -> None:
     """Put the app's build recipe into the demo folder's `.toolchain/`.
 
@@ -334,8 +358,13 @@ def mirror_toolchain(workspace: Path) -> None:
     a course fails with "this folder is missing the toolchain's build recipe",
     and the test then waits half an hour for a course that will never appear.
 
-    The file list is the one `WorkspaceModel.refreshToolchain` uses. Keep them
-    in step: a file missing here is a recipe the demo folder builds without.
+    The FOLDER list is not held here: it is read from
+    `contracts/toolchain.json` -> recipeFolders, the same data
+    `WorkspaceModel.refreshToolchain` and Windows' `ToolchainMirror` are pinned
+    against. This used to be a fourth hand-maintained copy, with a comment
+    telling the next person to keep it in step, and it was the one that did
+    not — a `.toolchain/` holding the new Dockerfile without the folder that
+    Dockerfile COPYs is not stale, it is UNBUILDABLE.
     """
     resources = app_bundle_resources()
     toolchain = workspace / ".toolchain"
@@ -352,7 +381,7 @@ def mirror_toolchain(workspace: Path) -> None:
         if source.exists():
             shutil.copy2(source, toolchain / name)
 
-    for folder in ["patches", "scripts", "support"]:
+    for folder in _recipe_folders():
         source = resources / folder
         if not source.exists():
             continue

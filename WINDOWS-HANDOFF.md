@@ -2772,6 +2772,80 @@ the failure the mac hit: a disk filling with something the teacher has never
 heard of and cannot connect to this app. Nobody here can see a Windows
 machine to answer it, so it is a question rather than a finding.
 
+## The scripts can now read the contract — and it travels differently on Windows (2026-08-23)
+
+`contracts/` used to be readable only by the two test suites. It is now readable
+from `scripts/*.py` as well, through `scripts/contracts.py`. This is the spine of
+a larger piece (hardening the folder and file names that carry hidden meaning —
+`Tasks`, the curriculum folder, `All Classes`, `Media`, `index.md`,
+`Key Links.md`), and it matters to you because the rules being hardened live in
+`build_site.py`, which is the thing that actually decides what ships. A rule that
+lives there and nowhere a test can reach is a third implementation with no gate
+on it — the drift the contract exists to prevent, arriving by the back door.
+
+**Why it had to be baked into the image, and what that costs.** The container's
+ONLY bind mount is `courses` (see `preview.sh`, `deploy.sh`). The working
+folder's `.toolchain/` sits beside `courses/` and is NOT mounted; the app bundle
+is on the host. So neither of the two obvious routes can be read from inside the
+container, and the contract has to be `COPY`d in by the Dockerfile. The
+consequence is deliberate: `contracts/` is not in `toolchain_hash`'s prune list,
+so every contract edit mints a new `teaching-quartz:src-<hash>` tag and forces an
+image rebuild and container recreate. That is development-time cost on the mac,
+paid on every case added, and it was accepted because the alternative was a
+shared rule the build cannot see.
+
+**None of that applies to you, and that is the point of this section.** Windows
+runs these scripts NATIVELY — no container, no image, no hash. The contract
+reaches Python through `PLANTOIR_CONTRACTS_DIR`, exactly the way
+`PLANTOIR_SUPPORT_DIR` already reaches `support/`. Five things carry it:
+
+- `ToolchainMirror.RecipeFolders` gained `contracts`, so a working folder's
+  `.toolchain/` gets it;
+- `Plantoir.csproj` ships `Toolchain\contracts\`;
+- `setup.ps1`, `preview.ps1` and `deploy.ps1` set `PLANTOIR_CONTRACTS_DIR`;
+- `Vendor/fetch-runtime.ps1` sets it too — a SIXTH env-setting site the first
+  pass missed, and the kind that is latent until it is not: it runs
+  `setup_course.py` while provisioning the runtime, so the first time a script
+  reads a required contract there, it throws `ContractMissing` naming
+  `/opt/contracts` on a Windows host. That error names a container path on a
+  machine that has no container, which is about as confusing as a message gets.
+
+**If you add another place that runs a `scripts/*.py`, it needs the variable.**
+There is no way to make this fail loudly at build time; it fails at run time, in
+whatever feature happened to read a contract first.
+
+**A trap that cost real time here, and travels to you unchanged.** The recipe's
+folder list existed as FOUR hand-maintained copies: the mac's
+`WorkspaceModel.refreshToolchain`, your `ToolchainMirror.RecipeFolders`, the
+marketing screenshot harness (`website/shots/capture.py`), and the Dockerfile's
+own `COPY` lines. They drifted the moment a fifth folder was added, and the one
+that drifted was the harness — whose docstring said, in so many words, "keep them
+in step".
+
+The failure mode is worth understanding because it is not the one you would
+guess. `capture.py` copies the *Dockerfile* too. So the demo workspace got a
+Dockerfile containing `COPY contracts/ /opt/contracts/` with no `contracts/`
+beside it. That workspace is not STALE, it is **unbuildable**: `docker buildx
+build` fails on the missing `COPY`, and `preview.sh`'s friendly "this folder is
+missing the toolchain's build recipe" message cannot fire, because
+`resolve_build_context` only checks that the Dockerfile EXISTS — and it does.
+A folder list that is merely incomplete produces a hard build failure with a
+misleading diagnosis.
+
+The fix, and the pattern worth copying: the list became DATA
+(`contracts/toolchain.json` → `recipeFolders`), and `scripts/test_recipe_folders.py`
+pins every carrier against it — including your `ToolchainMirror.cs` and
+`Plantoir.csproj`, which it reads as TEXT. That is deliberate: one Python test
+can pin a Swift list and a C# list, where a C#-only test could only ever check
+its own half. The test was verified to actually fail when a copy drifts, which
+is the check people skip. **If you add a recipe folder on your side, add it to
+`recipeFolders` and let the test tell the mac.**
+
+**Rejected:** leaving the list in code and adding a comment (that is exactly what
+was there, and it is what failed); and having each platform's own suite check
+only its own copy (two green suites, still drifted).
+
+
 ## The course-code picker is a hand-built combo box — and you probably should NOT build one (2026-08-23)
 
 `GUI-IMPROVEMENTS.md` rows 333–338 describe the new-course wizard's course-code

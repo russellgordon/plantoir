@@ -36,8 +36,15 @@ class ContractMissing(Exception):
     """The contract file is not where the toolchain expects it."""
 
 
-# Parsed files, by name. These are read many times per build (every check
-# consults one) and never change while a build runs.
+# Parsed files, keyed by (directory, file name). These are read many times per
+# build (every check consults one) and never change while a build runs.
+#
+# The DIRECTORY is part of the key deliberately. contracts_dir() re-reads
+# toolchain_paths.CONTRACTS_DIR at call time, so the directory is mutable — and
+# a cache keyed on the bare file name would survive a change of directory and
+# hand back the previous directory's answer. That is a footgun whose only
+# mitigation would be remembering to call reset_cache(), which is a convention
+# rather than a guarantee.
 _cache: dict = {}
 
 
@@ -56,10 +63,12 @@ def load(name: str, optional: bool = False):
     own code that it can carry on without it.
     """
     file_name = name if name.endswith(".json") else name + ".json"
-    if file_name in _cache:
-        return _cache[file_name]
+    directory = contracts_dir()
+    key = (str(directory), file_name)
+    if key in _cache:
+        return _cache[key]
 
-    path = contracts_dir() / file_name
+    path = directory / file_name
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as error:
@@ -81,7 +90,7 @@ def load(name: str, optional: bool = False):
             f"The contract file '{file_name}' at {path} is not valid JSON: {error}"
         ) from error
 
-    _cache[file_name] = parsed
+    _cache[key] = parsed
     return parsed
 
 

@@ -11,7 +11,7 @@ description: "Plantoir project rules, part 5 of 6 - Testing — what gates what"
 
 | Change | Gate |
 |---|---|
-| Toolchain (launchers, `scripts/`, Dockerfile, patches) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
+| Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
 | macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests` |
 | Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` |
 | Assistant routing | **Nothing.** Measured by hand — see below. |

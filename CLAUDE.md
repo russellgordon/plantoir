@@ -437,7 +437,7 @@ old `ca.russellgordon.QuartzTeachers` domain.
 ## How the toolchain ships
 
 There is no Docker Hub. The full build recipe (Dockerfile, `patches/`,
-`scripts/`, `support/`, launchers) is bundled inside the app and mirrored into
+`scripts/`, `support/`, `contracts/`, launchers) is bundled inside the app and mirrored into
 each working folder's `.toolchain/`. The launchers:
 
 - tag the image `teaching-quartz:src-<hash>`, where the hash covers every file
@@ -470,7 +470,8 @@ lives inside the Colima VM's disk (`~/.colima`).
 
 ### Editing the toolchain: two traps that cost real time
 
-A change to `scripts/`, `support/`, `patches/` or a launcher does **not** reach
+A change to `scripts/`, `support/`, `patches/`, `contracts/` or a launcher does
+**not** reach
 a working folder until it has travelled through the app bundle. The app mirrors
 its bundled copy into `.toolchain/` whenever it touches a folder, and the
 launchers hash that folder to name the image. The chain is: edit → **rebuild the
@@ -603,7 +604,7 @@ mistake there is a mistake in nineteen hundred courses.
 
 | Change | Gate |
 |---|---|
-| Toolchain (launchers, `scripts/`, Dockerfile, patches) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
+| Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
 | macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests` |
 | Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` |
 | Assistant routing | **Nothing.** Measured by hand — see below. |

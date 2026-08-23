@@ -72,7 +72,7 @@
   ],
   "rules": [
     {
-      "detail": "Every file in `Dockerfile`, `patches/`, `scripts/`, `support/` and the launchers.",
+      "detail": "Every file in `Dockerfile`, `patches/`, `scripts/`, `support/`, `contracts/` and the launchers. `contracts/` joined the context when the scripts themselves began reading the contract: the container's only bind mount is `courses`, so a shared rule it cannot see is no rule at all. The cost is accepted deliberately — a contract edit changes the hash and forces a rebuild.",
       "rule": "The image tag is a HASH of the whole build context",
       "why": "A changed recipe means a new tag, a rebuild and a recreated container — with no update checks anywhere, and no way for a teacher to be running a mismatched image."
     },
@@ -85,5 +85,15 @@
       "why": "The order is the whole point of the wrangler pin."
     }
   ],
-  "whyWranglerAtAll": "Cloudflare's upload protocol — BLAKE3 hashing, short-lived JWT, batched uploads — is undocumented enough that reimplementing it would break teachers' publishing whenever Cloudflare changed it. So the image carries their CLI instead."
+  "whyWranglerAtAll": "Cloudflare's upload protocol — BLAKE3 hashing, short-lived JWT, batched uploads — is undocumented enough that reimplementing it would break teachers' publishing whenever Cloudflare changed it. So the image carries their CLI instead.",
+  "recipeFolders": {
+    "folders": [
+      "patches",
+      "scripts",
+      "support",
+      "contracts"
+    ],
+    "note": "The recipe's FOLDERS, as data, because there are four hand-maintained copies of this list and they drifted the moment a fifth folder was added: the mac's WorkspaceModel.refreshToolchain, Windows' ToolchainMirror.RecipeFolders, the marketing screenshot harness (website/shots/capture.py), and the Dockerfile. capture.py's own docstring said 'keep them in step' and it was the one that did not — which broke the demo workspace outright rather than subtly, because it copies the Dockerfile that expects the folder it did not copy.",
+    "why": "A .toolchain/ holding the new Dockerfile without the new folder is not stale, it is UNBUILDABLE: `docker buildx build` fails on the missing COPY, and preview.sh's friendly 'missing the build recipe' message cannot fire because the Dockerfile is present."
+  }
 }

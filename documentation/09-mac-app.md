@@ -31,7 +31,7 @@ interfaces automatically.
 Beyond the actions, the app owns delivery and resources:
 
 - **It carries the toolchain.** The full image recipe (Dockerfile,
-  `patches/`, `scripts/`, `support/`, launchers) is bundled inside the app
+  `patches/`, `scripts/`, `support/`, `contracts/`, launchers) is bundled inside the app
   and mirrored into each working folder's `.toolchain/`; stale launchers
   in a folder are refreshed from the bundle. An app update is therefore a
   toolchain update — the recipe hash changes, the image rebuilds locally,

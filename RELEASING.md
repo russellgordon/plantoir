@@ -138,7 +138,8 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    a hand smoke of create → preview → publish on a real course.
 
    > The hand smoke is **not optional, and not a formality**. The bundle carries
-   > the whole toolchain recipe (Dockerfile, `scripts/`, `patches/`, launchers)
+   > the whole toolchain recipe (Dockerfile, `scripts/`, `patches/`, `contracts/`,
+   > launchers)
    > inside the app, and the xUnit suite deliberately never touches Docker — so
    > a green test run says nothing about the thing teachers actually run.
    > `verify.sh`, the real toolchain gate, is bash and expects `docker` on

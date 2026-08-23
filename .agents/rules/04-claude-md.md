@@ -10,7 +10,7 @@ description: "Plantoir project rules, part 4 of 6 - How the toolchain ships"
 ## How the toolchain ships
 
 There is no Docker Hub. The full build recipe (Dockerfile, `patches/`,
-`scripts/`, `support/`, launchers) is bundled inside the app and mirrored into
+`scripts/`, `support/`, `contracts/`, launchers) is bundled inside the app and mirrored into
 each working folder's `.toolchain/`. The launchers:
 
 - tag the image `teaching-quartz:src-<hash>`, where the hash covers every file
@@ -43,7 +43,8 @@ lives inside the Colima VM's disk (`~/.colima`).
 
 ### Editing the toolchain: two traps that cost real time
 
-A change to `scripts/`, `support/`, `patches/` or a launcher does **not** reach
+A change to `scripts/`, `support/`, `patches/`, `contracts/` or a launcher does
+**not** reach
 a working folder until it has travelled through the app bundle. The app mirrors
 its bundled copy into `.toolchain/` whenever it touches a folder, and the
 launchers hash that folder to name the image. The chain is: edit → **rebuild the
