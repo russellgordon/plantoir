@@ -169,6 +169,20 @@ final class CourseManagementContractTests: XCTestCase {
                 "typed “\(typed)”, short form"
             )
         }
+
+        // Whether a code names a club. Contract-run rather than checked in
+        // the wizard, because the wizard is not the only thing that asks —
+        // Windows asks the identical question, and had the identical bug
+        // (its one-line fallback read every BC course as a club).
+        let clubDetection: [String: Any] = try XCTUnwrap(section["clubDetection"] as? [String: Any])
+        for testCase in try XCTUnwrap(clubDetection["cases"] as? [[String: Any]]) {
+            let code: String = try XCTUnwrap(testCase["code"] as? String)
+            XCTAssertEqual(
+                ClubCodeRule.isClub(code),
+                try XCTUnwrap(testCase["expectClub"] as? Bool),
+                "code “\(code)”"
+            )
+        }
     }
 
     // MARK: - What renaming touches, and what it leaves alone

@@ -204,6 +204,40 @@ this side is expected to say so when the contract is wrong.
      completion detection is polled (same latency-window risk) and whether
      its progress view can tell the two states apart.
 
+9. **Course codes with DASHES, and the club heuristic that misreads them
+   (2026-08-23).** Two changed rules, both already in
+   `contracts/course-management.json`, and the Windows suite is expected to
+   go RED on both until it implements them — that is the contract working,
+   not damage.
+
+   - **`courseCode.problems`** — a dash is now ALLOWED in a course code, and
+     both teacher-facing sentences changed with it ("…letters, numbers,
+     spaces and dashes" in the wizard, "Letters, numbers, dashes" in the
+     sidebar). The old contract case expecting `CS-CLUB` to be refused is
+     reversed in place, with its original reasoning kept so the change reads
+     as a decision rather than a slip. The reason: 55 of the 117 codes in
+     `support/british_columbia_secondary_courses.json` contain a dash
+     (MTEL-12, MFMP-10, MMA--09), so the rule was refusing more than half of
+     one province's real courses. Deserialise the sentences; do not retype
+     them.
+   - **`courseCode.clubDetection`** — new section, 11 cases.
+     `NewCourseDialog.IsClubCode` (`NewCourseDialog.cs:641`) is
+     `code.Length >= 4 && !char.IsDigit(code[3])`, which was the mac's line
+     too and carries the identical bug: BC codes put a letter or a dash in
+     fourth place, so **every one of BC's 117 courses currently reads as a
+     club on Windows**. The visible cost is a club-only "short label" row
+     appearing on a real course, and `custom_short_name` being written for
+     it at `NewCourseDialog.cs:827`. The fix the mac made is in
+     `ClubCodeRule`: ask the course-name CATALOG first and take its answer
+     as final; fall back to the fourth-character guess only for a code the
+     catalog has never heard of, which is what that guess was always for
+     (CODING, ROBOTICS).
+
+   The lesson is worth more than either fix: **a heuristic that reads a
+   code's SHAPE encodes one jurisdiction's conventions**, and it stops being
+   true the moment a second jurisdiction arrives. Ask the data you already
+   have before guessing from the characters.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,

@@ -277,13 +277,13 @@ struct NewCourseWizardView: View {
         return nil
     }
 
+    /// Whether this code names a club rather than a course — which is what
+    /// puts the "Short label" field on screen and what decides whether
+    /// `custom_short_name` is written into `course_config.json`. The rule
+    /// itself lives in `ClubCodeRule`, and is a contract case, because
+    /// Windows asks the same question and had the same bug.
     var isClubCode: Bool {
-        let code: String = courseCode.trimmingCharacters(in: .whitespaces)
-        if code.count < 4 {
-            return false
-        }
-        let characters: [Character] = Array(code)
-        return !characters[3].isNumber
+        return ClubCodeRule.isClub(courseCode)
     }
 
     // MARK: - Body
@@ -565,14 +565,27 @@ struct NewCourseWizardView: View {
                         }
                     }
                     if isClubCode {
-                        // Same chrome as its neighbours — see Course
-                        // Name's note.
-                        TextField("Short label beside emoji (≤ 12 characters)", text: $customShortName)
-                            .focused($customShortNameFieldHasFocus)
-                            .modifier(WizardFieldChrome(
-                                isFocused: customShortNameFieldHasFocus,
-                                trailingInset: CourseCodePickerView.textLeadingInset
-                            ))
+                    // The same shape as Course Name and Timetable Section
+                    // Numbers: an explicit `LabeledContent` so the label
+                    // sits in the leading column and the typed text reads
+                    // leading, plus `WizardFieldChrome` so the box is the
+                    // same 24pt. It had neither — its label was still
+                    // placeholder text inside the field and its value was
+                    // pushed to the trailing edge, which is exactly the
+                    // pre-`LabeledContent` look every other row was moved
+                    // off (Russell, 2026-08-23, spotting the odd one out).
+                    VStack(alignment: .leading, spacing: 4) {
+                        LabeledContent("Short label") {
+                            TextField("", text: $customShortName)
+                                .focused($customShortNameFieldHasFocus)
+                                .accessibilityIdentifier("wizardCustomShortNameField")
+                                .modifier(WizardFieldChrome(
+                                    isFocused: customShortNameFieldHasFocus,
+                                    trailingInset: CourseCodePickerView.textLeadingInset
+                                ))
+                        }
+                        ExampleCaption("Shown beside the emoji — 12 characters at most")
+                    }
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         // See the note beside Course Name's own
