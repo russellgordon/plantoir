@@ -49,6 +49,7 @@ RUN cp -r /opt/quartz /opt/quartz-site
 # PLANTOIR_* environment variables.
 COPY scripts/toolchain_paths.py /opt/scripts/toolchain_paths.py
 COPY scripts/contracts.py /opt/scripts/contracts.py
+COPY scripts/site_health.py /opt/scripts/site_health.py
 COPY scripts/setup_course.py /opt/scripts/setup_course.py
 COPY scripts/build_site.py /opt/scripts/build_site.py
 COPY scripts/deploy.py /opt/scripts/deploy.py

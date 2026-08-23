@@ -85,6 +85,13 @@ fi
 # Fast, dependency-free checks that don't need the image — run first so a
 # broken script.py change fails in milliseconds instead of after a full
 # Docker build.
+if (cd scripts && python3 test_site_health.py) >/tmp/verify_site_health_test.log 2>&1; then
+  pass "site_health.py: the checks, and the words they say (scripts/test_site_health.py)"
+else
+  fail "site_health.py: the checks, and the words they say (scripts/test_site_health.py)"
+  cat /tmp/verify_site_health_test.log
+fi
+
 if (cd scripts && python3 test_recipe_folders.py) >/tmp/verify_recipe_folders_test.log 2>&1; then
   pass "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
 else
@@ -417,6 +424,7 @@ check_baked() {
   fi
 }
 check_baked scripts/contracts.py          /opt/scripts/contracts.py
+check_baked scripts/site_health.py        /opt/scripts/site_health.py
 # The contract itself must be IN the image: the container's only bind mount is
 # `courses`, so a rule the scripts read has nowhere else to come from. One file
 # stands for the directory — the Dockerfile copies it wholesale.

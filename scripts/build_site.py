@@ -15,6 +15,7 @@ from pathlib import Path
 # be added by hand before sibling imports. Harmless everywhere else.
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
+import site_health
 import toolchain_paths
 from datetime import datetime, timezone
 import threading
@@ -4283,6 +4284,33 @@ def build_section_site(
             rewrite_section_wikilinks(dest)
             print(f"  📄 Copied per-section file: {file_name}")
 
+
+    # === Health of the folders this course depends on =========================
+    # Here, and not earlier, because every check is defined over the MERGED
+    # tree, which only exists once the copying above has finished — and not
+    # later, because this must run BEFORE Quartz builds and before deploy.py
+    # uploads anything. A check that only guarded the GUI button would be
+    # bypassed by the assistant, by `Plantoir --mcp-stdio`, by the launchers,
+    # and by the scheduled deploy, which runs with the app closed.
+    coverage_wanted = bool(config.get("include_curriculum_coverage", True))
+    health_facts = {
+        "coverage_wanted": coverage_wanted,
+        "curriculum_found": _find_curriculum_folder(content_root) is not None,
+        "class_pages_found": _pages_the_course_teaches(
+            content_root, class_folder_names(config)) is not None,
+        # The COURSE-level folder, not content/Media: that one is recreated on
+        # every build a few hundred lines above, so checking it always passes.
+        # What actually breaks is the folder it points AT.
+        "media_target_exists": (course_dir / "Media").is_dir(),
+        "section_index_exists": (content_root / "index.md").exists(),
+        # Anything by this name at this moment came from the teacher's own
+        # notes: the build writes its own copy further down, so a page here now
+        # is one that is about to be overwritten.
+        "hand_written_coverage_page": (
+            content_root / f"{COVERAGE_PAGE_TITLE}.md").exists(),
+    }
+    site_health.announce(
+        site_health.findings(health_facts, course_code, section_number))
 
     # === Curriculum coverage heat map =========================================
     first_class_dt = _find_first_class_created(content_root)
