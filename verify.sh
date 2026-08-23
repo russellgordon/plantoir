@@ -99,6 +99,13 @@ else
   cat /tmp/verify_netlify_badge_test.log
 fi
 
+if (cd scripts && python3 test_deploy_course_dir_resolution.py) >/tmp/verify_deploy_course_dir_test.log 2>&1; then
+  pass "deploy.py: course directory resolution under a native build root (scripts/test_deploy_course_dir_resolution.py)"
+else
+  fail "deploy.py: course directory resolution under a native build root (scripts/test_deploy_course_dir_resolution.py)"
+  cat /tmp/verify_deploy_course_dir_test.log
+fi
+
 # -------------------- 1. Container runtime (shared Colima) --------------------
 # Maintainer variant: assumes Colima and the Docker CLI are installed (the
 # teacher-facing launchers handle installation). Never stops a running VM.

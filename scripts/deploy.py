@@ -1016,8 +1016,20 @@ def main():
         print(" Preview build detected (live-reload client) — rebuilding for production…")
         rebuild_for_production(args.course, str(args.section), _HOST_OS)
 
-    # Determine course dir (for stable marker)
-    course_dir = section_dir.parent.parent  # .../<COURSE>/.merged_output/section#
+    # Determine course dir (for stable marker). NOT derived from section_dir's
+    # ancestry (".../<COURSE>/.merged_output/section#", climbing two levels) —
+    # that assumption breaks under Windows' native PLANTOIR_BUILD_ROOT layout,
+    # where merged_output_root() moves the build tree OUT of the working
+    # folder entirely and does not nest a ".merged_output" level, so section_dir
+    # is only one level below the build root rather than two. Climbing two
+    # levels there landed on the build root's OWN parent, not the course —
+    # found because it silently wrote (and looked for) the Netlify/Cloudflare
+    # site marker in the wrong place, so every Windows deploy created a brand
+    # new site instead of reusing the one from last time, and "has this
+    # section ever been deployed" always read false (blocking Schedule a
+    # deploy on a section that plainly just deployed). COURSES_ROOT / course
+    # code is unambiguous regardless of where the build output lives.
+    course_dir = COURSES_ROOT / args.course
 
     # The surname exists ONLY to name a NEW site, so it is merely LOADED
     # here — never prompted for. A deploy to a section that already has its

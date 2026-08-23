@@ -515,6 +515,37 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **A shared `scripts/deploy.py` bug, found on Windows but fixed in the file
+  the mac runs too** (Windows + shared, 2026-08-23, `GUI-IMPROVEMENTS.md`
+  row 324). Reported directly, with a screenshot: a teacher deployed a
+  section for the first time (Netlify, succeeded, live URL shown), then
+  tried Schedule a deploy and was refused with "has never been deployed" —
+  about a section that plainly just had been. `main()`'s `course_dir =
+  section_dir.parent.parent`, used to read and write the Netlify/Cloudflare
+  site marker (`.netlify_sites/`/`.cloudflare_sites/`), assumed the shape
+  `.../<COURSE>/.merged_output/section#` — true on the mac and in the old
+  container, but Windows' native `PLANTOIR_BUILD_ROOT` (row 290) makes
+  `toolchain_paths.merged_output_root()` skip the `.merged_output` nesting
+  entirely, so climbing two levels overshot onto the build root's own
+  parent instead of the course. **This was not a cosmetic bug**: the marker
+  was never found at READ time either, so every deploy — not just the
+  first — silently created a brand-new Netlify site instead of reusing the
+  one from last time, confirmed live on Russell's own machine (a real site
+  marker sitting under `%LOCALAPPDATA%\Plantoir\builds\<id>\` instead of
+  under `courses\ICD2O\`). **The mac itself was never affected** —
+  `PLANTOIR_BUILD_ROOT` is a Windows-only environment variable, so
+  `merged_output_root()` has always kept the `.merged_output` nesting there
+  and `section_dir.parent.parent` has always landed correctly — but the fix
+  (`course_dir = COURSES_ROOT / args.course`, unambiguous regardless of
+  where the build output lives) is in the ONE shared `deploy.py` both
+  platforms run, so **the mac's copy carries the identical change with
+  nothing further to do.** Two new pure-stdlib tests,
+  `scripts/test_deploy_course_dir_resolution.py`, wired into `verify.sh` —
+  worth running there once, since they exercise `merged_output_root()`
+  directly and `verify.sh` is the gate that would have caught this had it
+  existed sooner. Reference: `scripts/deploy.py` (`main()`'s `course_dir`
+  line), `scripts/toolchain_paths.py` (`merged_output_root`).
+
 - **Windows closed its own version of the launchd scheduled-deploy bug row
   314 already fixed on the mac** (Windows + shared, 2026-08-22,
   `GUI-IMPROVEMENTS.md` row 323). `WINDOWS-HANDOFF.md`'s "What is still
