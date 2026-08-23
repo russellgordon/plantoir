@@ -346,13 +346,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // deploy with an empty --account, even once the refusal check
             // above had already confirmed a real one was configured.
             string cloudflareAccountId = AppSettings.Load().CloudflareAccountId;
-            // One argument list per configured destination — same order
-            // AllDeployDestinations deploys in.
-            var deployArgumentsList = workspace.Course(plan.CourseCode).Configuration.AllDeployDestinations
-                .Select(destination => DeployCommand.Arguments(plan.CourseCode, plan.SectionNumber, destination, cloudflareAccountId))
-                .ToList();
+            var scheduledCourse = workspace.Course(plan.CourseCode);
             if (TaskScheduling.Schedule(plan.TaskName, workspace.FolderPath,
-                                        plan.CourseCode, plan.SectionNumber, moment, deployArgumentsList) is { } problem)
+                                        plan.CourseCode, plan.SectionNumber, moment, scheduledCourse.DirectoryPath,
+                                        scheduledCourse.Configuration.AllDeployDestinations, cloudflareAccountId) is { } problem)
                 throw new AssistRefusal($"Nothing was scheduled. {problem}");
 
             // The caution about the computer being awake is on the card the

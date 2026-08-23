@@ -107,25 +107,26 @@ this side is expected to say so when the contract is wrong.
    and a self-publishing course could read "— Edited" permanently; now
    `OrdinalIgnoreCase`, with a regression test.
 
-   **Still genuinely outstanding, and NOT done**: a scheduled ("publish
-   tomorrow's class overnight") deploy never writes the stamp. Confirmed by
-   the second review pass — `ScheduledDeploy.cs`/`TaskScheduling.cs` hand
-   the deploy straight to `schtasks.exe`, which runs `deploy.ps1` (or a
-   generated wrapper) directly; neither file references
-   `SectionPublishState` at all, so a scheduled deploy that succeeds
-   perfectly still leaves the window saying "— Edited" until somebody
-   publishes again by hand — reproducing, on Windows, the exact bug the mac
-   review already found and fixed for launchd (see "A scheduled deploy
-   needs its own path to the same record" below). The mac's fix — fingerprint
-   before invoking the script, have the script write a sentinel naming every
-   destination that succeeded, consume the sentinel from the app on next
-   launch — is the shape to port; the difference is that the mac's scheduled
-   process launches the APP binary (so `runScheduled` can fingerprint from
-   inside it), while Windows schedules `powershell.exe` directly, so the
-   fingerprint-before-running step needs a different home. Not attempted in
-   this pass since it touches shared launcher mechanics rather than app
-   code; flagging rather than guessing at a fix under time pressure was the
-   judgement call.
+   ~~Still genuinely outstanding, and NOT done: a scheduled deploy never
+   writes the stamp.~~ ✅ Done 2026-08-22 (`GUI-IMPROVEMENTS.md` row 323).
+   `TaskScheduling.Schedule` now always writes a wrapper `.ps1` (previously
+   only for 2+ destinations), which fingerprints the section — via the
+   bundled Python, `scripts/section_fingerprint.py`, since no app process is
+   alive at the moment a scheduled deploy actually runs — right before
+   running any destination's `deploy.ps1`, then writes a sentinel under
+   `%LOCALAPPDATA%\Plantoir\scheduled\pending\` only if every destination
+   succeeded. **A day later, a real overnight schedule for this still never
+   fired at all — see `GUI-IMPROVEMENTS.md` row 325.** Unrelated to the
+   fingerprinting work above: the stored `/TR` command had a doubled-
+   backslash quoting bug (`\\\"` instead of a real `\"`) that predates this
+   row entirely and had broken every scheduled deploy on Windows since the
+   feature first shipped — fixed in `TaskScheduling.TaskRunCommand`. Confirm
+   against row 325 before assuming a scheduled deploy actually runs;
+   `ScheduledDeployCompletion.ConsumePending()`, wired into
+   `MainWindow`'s `Activated` handler, applies and deletes any pending
+   sentinel the next time the app runs. Fingerprinting at RUN time (not at
+   schedule time) was deliberate — see "A scheduled deploy needs its own
+   path to the same record" below, which this closes.
 
 3. **Sampling the local engine's own stderr/stdout into the activity trail**
    (the tail end of "What the engine says now reaches a problem report"
@@ -1780,6 +1781,54 @@ agent out, so the script's exit status belongs to `launchctl` and not to
 the deploy. Whatever Windows uses for scheduling (Task Scheduler) needs the
 equivalent: something the scheduled run can say "every destination
 succeeded" with, that is not its exit code.
+
+**Done on Windows, 2026-08-22** (`GUI-IMPROVEMENTS.md` row 323). Windows'
+version of the same shape, adjusted for the one real difference: Task
+Scheduler runs `powershell.exe` directly rather than the app binary, so
+there is no in-process C# alive at the moment the deploy actually happens
+to fingerprint the section from.
+
+1. `TaskScheduling.Schedule` always writes a wrapper `.ps1` now (previously
+   only for 2+ destinations) — the wrapper is where all of this lives.
+2. The wrapper fingerprints the section itself, before running any
+   destination's `deploy.ps1`, via the app's own bundled Python
+   (`scripts/section_fingerprint.py` — see that file for why this is a
+   THIRD copy of the algorithm rather than reusing the C#). Fingerprinting
+   happens at RUN time, not at schedule time, on purpose — see the rejected
+   alternative below.
+3. Each destination's `deploy.ps1` line is run un-chained (same "redundancy"
+   rule as the mac), tracking `$allSucceeded` in the wrapper's own
+   PowerShell state rather than an `ALL_OK` file convention — there is no
+   equivalent of launchd booting its own agent out here, so the wrapper's
+   own exit code would actually be trustworthy, but the sentinel is written
+   regardless, to keep the two platforms' shapes matching and because the
+   app still needs SOMETHING durable to read on next launch.
+4. Only if every destination succeeded, the wrapper writes a JSON sentinel
+   under `%LOCALAPPDATA%\Plantoir\scheduled\pending\` — course code, section,
+   course directory, fingerprint, destination types/names, and a UTC
+   timestamp.
+5. `ScheduledDeployCompletion.ConsumePending()` — called from `MainWindow`'s
+   `Activated` handler, subscribed before any `SectionDetailView` exists so
+   it runs before that view's own marker refresh on the SAME activation —
+   applies every pending sentinel (`SectionPublishState.RecordPublish` +
+   the `SectionContentMarkedPublished` trail event, reusing the existing
+   event rather than adding a new one) and deletes it either way, so a
+   sentinel that failed to apply cleanly cannot sit there being reread
+   forever, or be mistaken later for a deploy that never happened.
+
+**Rejected: fingerprinting at SCHEDULE time instead of RUN time.** Far
+cheaper — the app already has everything it needs in C# the moment the
+teacher clicks Schedule, so this could have been a small addition to
+`TaskScheduling.Schedule` with no Python involved at all. Rejected because
+it is wrong in the direction that lies to the teacher: an edit made to the
+section between scheduling it and the overnight run still goes out
+correctly (the deploy publishes whatever is on disk at run time), but a
+schedule-time fingerprint would stamp the STALE, pre-edit fingerprint —
+so the marker would say "— Edited" about content that had, in fact, just
+published. Fingerprinting at run time, in the wrapper, right before the
+deploy — the same moment the mac's launchd path fingerprints — is the only
+version that is correct either way, hence the third Python copy of the
+algorithm rather than a cheaper C#-only shortcut.
 
 ### One false negative, written down so it is not a surprise
 

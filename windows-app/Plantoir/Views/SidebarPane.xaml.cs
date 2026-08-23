@@ -14,28 +14,76 @@ using Plantoir.ViewModels;
 
 namespace Plantoir.Views;
 
-/// <summary>One row of the sidebar tree: a course, a section, the Archived group, or an archive.</summary>
-public sealed class SidebarRow
+/// <summary>
+/// One row of the sidebar tree: a course, a section, the Archived group, or
+/// an archive.
+///
+/// Rows are RECONCILED, not recreated — <see cref="SidebarPane.Refresh"/>
+/// reuses the same row object across passes so WinUI's `TreeView` never
+/// tears down and rebuilds a container, which is what silently collapsed
+/// "Courses & Clubs" after the create-course dialog closed (row 172's own
+/// comment). That means a value changed on an EXISTING row's object after
+/// its container was already created and bound — <see cref="ScheduledDeploy"/>
+/// and <see cref="Menu"/>, both of which change without the row itself being
+/// re-created — must raise <see cref="INotifyPropertyChanged"/>, and the XAML
+/// binding it, `Mode=OneWay`. `x:Bind` defaults to `OneTime`: without both of
+/// these, scheduling a deploy on an already-open window would still be true
+/// in this object the instant it happened, and invisible in the window until
+/// the app restarted and rebuilt the row fresh — found 2026-08-23, reported
+/// directly ("There is no clock next to the section name once a deploy is
+/// scheduled... There is no way to modify or cancel").
+/// </summary>
+public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private void Raise(string propertyName) =>
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
+
     public required string Title { get; init; }
     public required string Glyph { get; init; }
     public string? Tooltip { get; init; }
     public bool IsExpanded { get; set; }   // mutable: user toggles are recorded (row 99)
     public string AutomationId { get; init; } = "";
     public ObservableCollection<SidebarRow> Children { get; init; } = new();
-    public MenuFlyout? Menu { get; set; }
     public SidebarSelection? Selection { get; init; }
     public ArchivedItem? Archived { get; init; }
 
+    private MenuFlyout? _menu;
+    /// <summary>
+    /// Rebuilt every `Refresh()` pass (its closures must always hold the
+    /// freshly loaded course/section, never a stale one) — so this has to be
+    /// a real property that raises change notification, not `init`-only,
+    /// or `ContextFlyout`'s `Mode=OneWay` binding has nothing to react to.
+    /// </summary>
+    public MenuFlyout? Menu
+    {
+        get => _menu;
+        set { if (!ReferenceEquals(_menu, value)) { _menu = value; Raise(nameof(Menu)); } }
+    }
+
+    private DateTime? _scheduledDeploy;
     /// <summary>
     /// When a deploy is waiting to fire for this section, null otherwise.
     ///
     /// A scheduled deploy is the one thing Plantoir does while nobody is
     /// looking, and until now nothing said so — a teacher who set one on
     /// Friday had no way to be reminded on Monday except by remembering. The
-    /// row it belongs to is the row that says it.
+    /// row it belongs to is the row that says it. Raises change notification
+    /// for the two DERIVED properties the badge actually binds to, not just
+    /// this one, since `x:Bind` subscribes to the property path it names.
     /// </summary>
-    public DateTime? ScheduledDeploy { get; set; }
+    public DateTime? ScheduledDeploy
+    {
+        get => _scheduledDeploy;
+        set
+        {
+            if (_scheduledDeploy == value) return;
+            _scheduledDeploy = value;
+            Raise(nameof(ScheduledDeploy));
+            Raise(nameof(BadgeVisibility));
+            Raise(nameof(BadgeTooltip));
+        }
+    }
 
     public string BadgeGlyph => Glyphs.Clock;
     public Visibility BadgeVisibility =>
@@ -276,12 +324,16 @@ public sealed partial class SidebarPane : UserControl
                     Glyph = DocumentGlyph,
                     Selection = new SidebarSelection.SectionItem(course.Code, number),
                     AutomationId = $"sidebar-{course.Code}-section{number}",
-                    // Windows is asked, not a note of our own: the teacher can
-                    // delete the task themselves, and a badge promising a
-                    // deploy that will not happen is worse than no badge.
-                    ScheduledDeploy = TaskScheduling.NextRun(course.Code, number),
                 };
             row.Menu = SectionMenu(course, number);
+            // Re-read on EVERY pass, not only when the row is first created —
+            // rows are reconciled, not recreated, so an existing row's clock
+            // badge would otherwise stay stuck at whatever was true the
+            // moment this section was first shown, forever. Windows is asked
+            // rather than anything of ours being written down: the teacher
+            // can delete the task themselves, and a badge promising a deploy
+            // that will not happen is worse than no badge.
+            row.ScheduledDeploy = TaskScheduling.NextRun(course.Code, number);
             desired.Add(row);
         }
         ApplyDesiredOrder(courseRow.Children, desired);
@@ -499,11 +551,18 @@ public sealed partial class SidebarPane : UserControl
         // most teachers setting a 6:30 deploy know exactly what they want and
         // should not have to describe it in a sentence first.
         var scheduled = TaskScheduling.NextRun(course.Code, number);
-        menu.Items.Add(scheduled is { } when
-            ? MenuItem($"Cancel Deploy at {when:h:mm tt}…", Glyphs.Clock,
-                       () => ConfirmCancelScheduledDeploy(course, number, when))
-            : MenuItem("Schedule Deploy…", Glyphs.Clock,
-                       () => AskWhenToDeploy(course, number)));
+        if (scheduled is { } when)
+        {
+            menu.Items.Add(MenuItem($"Change Deploy Time ({when:h:mm tt})…", Glyphs.Clock,
+                                     () => AskWhenToDeploy(course, number, existing: when)));
+            menu.Items.Add(MenuItem("Cancel Scheduled Deploy…", Glyphs.Remove,
+                                     () => ConfirmCancelScheduledDeploy(course, number, when)));
+        }
+        else
+        {
+            menu.Items.Add(MenuItem("Schedule Deploy…", Glyphs.Clock,
+                                     () => AskWhenToDeploy(course, number, existing: null)));
+        }
 
         menu.Items.Add(new MenuFlyoutSeparator());
 
@@ -525,27 +584,37 @@ public sealed partial class SidebarPane : UserControl
     }
 
     /// <summary>
-    /// Ask when to deploy, and set it.
+    /// Ask when to deploy, and set it — both for a brand-new schedule and
+    /// for changing an existing one, since <see cref="TaskScheduling.Schedule"/>
+    /// already replaces by name (there is at most one per section by
+    /// construction, see <see cref="TaskScheduling.NameFor"/>), so "modify"
+    /// needs no backend of its own: it is this same dialog, pre-filled with
+    /// the time already set, calling the same Schedule.
     ///
-    /// Defaults to half past six tomorrow morning, because that is the case
-    /// this exists for — the site live before the students are, without the
-    /// teacher being at their desk. Everything the computer must be doing at
-    /// that moment is stated in the dialog rather than discovered at 6:31.
+    /// Defaults to half past six tomorrow morning for a brand-new schedule
+    /// (<paramref name="existing"/> is null) — the site live before the
+    /// students are, without the teacher being at their desk. When
+    /// <paramref name="existing"/> is given, the pickers open on that time
+    /// instead, so changing a 6:30 deploy to 7:00 does not mean re-entering
+    /// tomorrow's date from scratch. Everything the computer must be doing
+    /// at that moment is stated in the dialog rather than discovered at
+    /// 6:31, either way.
     /// </summary>
-    private async void AskWhenToDeploy(Course course, int number)
+    private async void AskWhenToDeploy(Course course, int number, DateTime? existing)
     {
-        var tomorrow = DateTime.Today.AddDays(1).AddHours(6).AddMinutes(30);
+        var initial = existing ?? DateTime.Today.AddDays(1).AddHours(6).AddMinutes(30);
+        bool isChange = existing is not null;
 
         var day = new CalendarDatePicker
         {
-            Date = tomorrow,
+            Date = initial,
             MinDate = DateTimeOffset.Now.Date,
             PlaceholderText = "Pick a day",
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
         var time = new TimePicker
         {
-            Time = tomorrow.TimeOfDay,
+            Time = initial.TimeOfDay,
             ClockIdentifier = "12HourClock",
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
@@ -571,9 +640,9 @@ public sealed partial class SidebarPane : UserControl
 
         var dialog = new ContentDialog
         {
-            Title = "Schedule a deploy",
+            Title = isChange ? "Change the scheduled deploy" : "Schedule a deploy",
             Content = body,
-            PrimaryButtonText = "Schedule",
+            PrimaryButtonText = isChange ? "Save" : "Schedule",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
         };
@@ -603,14 +672,10 @@ public sealed partial class SidebarPane : UserControl
         if (Chosen() is not { } when) return;
 
         if (Workspace.WorkspacePath is not { } folder) return;
-        // One argument list per configured destination, in the same order
-        // AllDeployDestinations deploys in — the primary first, then each
-        // additional destination.
-        var deployArgumentsList = course.Configuration.AllDeployDestinations
-            .Select(destination => DeployCommand.Arguments(course.Code, number, destination, Workspace.Settings.CloudflareAccountId))
-            .ToList();
         if (TaskScheduling.Schedule(TaskScheduling.NameFor(course.Code, number),
-                                    folder, course.Code, number, when, deployArgumentsList) is { } failure)
+                                    folder, course.Code, number, when, course.DirectoryPath,
+                                    course.Configuration.AllDeployDestinations,
+                                    Workspace.Settings.CloudflareAccountId) is { } failure)
         {
             await ShowError("That couldn't be scheduled", failure);
             return;

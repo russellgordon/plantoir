@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Assist;
 
@@ -30,48 +31,50 @@ public static class TaskScheduling
     /// destination" keeps working unchanged.
     /// </summary>
     public static string? Schedule(string taskName, string workingFolder, string courseCode,
-                                   int section, DateTime when, IReadOnlyList<string>? deployArguments = null) =>
-        Schedule(taskName, workingFolder, courseCode, section, when,
-            new List<IReadOnlyList<string>> { deployArguments ?? new List<string> { courseCode, section.ToString() } });
+                                   int section, DateTime when, string courseDirectory,
+                                   CourseConfiguration.DeployDestination destination, string cloudflareAccountID = "") =>
+        Schedule(taskName, workingFolder, courseCode, section, when, courseDirectory,
+            new List<CourseConfiguration.DeployDestination> { destination }, cloudflareAccountID);
 
     /// <summary>
     /// Create (or replace) a scheduled deploy across one or more
     /// destinations. Returns null on success, or the reason it could not be
     /// scheduled.
     ///
-    /// A single destination — the overwhelming majority of courses —
-    /// behaves EXACTLY as before: one inline command, no wrapper script.
-    /// Two or more write a small wrapper .ps1 that runs each destination's
-    /// deploy.ps1 invocation in turn, deliberately NOT chained with
-    /// `-and`/`&amp;&amp;` — a destination failing must not stop the others
-    /// from running, the same "redundancy" rule the mac's `oneShotCommand`
-    /// encodes as un-chained shell lines. Mirrors
-    /// `ScheduledDeploy.oneShotCommand`.
+    /// Always writes a small wrapper .ps1 — even for a course's ordinary
+    /// single destination — because the wrapper is also where the " — Edited"
+    /// marker's own record gets made. See "A scheduled deploy needs its own
+    /// path to the same record" in WINDOWS-HANDOFF.md: unlike the mac, whose
+    /// launchd agent launches the APP binary (so it can fingerprint the
+    /// section in-process before running the deploy script), Windows'
+    /// scheduled task runs `powershell.exe` directly — there is no app code
+    /// alive at the moment the deploy actually happens. So the wrapper itself
+    /// fingerprints the section (via the bundled Python, `section_fingerprint.py`
+    /// — see that file for why this is a third copy of the algorithm) right
+    /// before running any destination's `deploy.ps1`, then — only if every
+    /// destination succeeds — writes a sentinel file the app picks up and
+    /// applies the next time it starts or comes to the front
+    /// (<see cref="ScheduledDeployCompletion.ConsumePending"/>). One
+    /// destination failing must not stop the others from running, the same
+    /// "redundancy" rule the mac's `oneShotCommand` encodes as un-chained
+    /// shell lines — so lines are deliberately NOT chained with `-and`.
+    /// Mirrors `ScheduledDeploy.oneShotCommand`.
     /// </summary>
     public static string? Schedule(string taskName, string workingFolder, string courseCode,
-                                   int section, DateTime when, IReadOnlyList<IReadOnlyList<string>> deployArgumentsList)
+                                   int section, DateTime when, string courseDirectory,
+                                   IReadOnlyList<CourseConfiguration.DeployDestination> destinations,
+                                   string cloudflareAccountID = "")
     {
-        // The launcher does the deploy, exactly as the app does it. Quoted for
-        // schtasks, which takes the whole command as one argument and would
-        // otherwise stop at the first space in a teacher's folder name.
+        // The launcher does the deploy, exactly as the app does it.
         string launcher = Path.Combine(workingFolder, "deploy.ps1");
         if (!File.Exists(launcher))
             return $"There is no deploy.ps1 in {workingFolder}, so there is nothing to schedule.";
 
-        string command;
-        if (deployArgumentsList.Count <= 1)
-        {
-            string argString = deployArgumentsList.Count == 1 && deployArgumentsList[0].Count > 0
-                ? string.Join(" ", deployArgumentsList[0])
-                : $"{courseCode} {section}";
-            command = $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\\"{launcher}\\\" " + argString;
-        }
-        else
-        {
-            if (WriteWrapperScript(taskName, launcher, deployArgumentsList) is not { } scriptPath)
-                return "The scheduled deploy's wrapper script could not be written.";
-            command = $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\\"{scriptPath}\\\"";
-        }
+        var excluded = SectionPublishState.SelfPublishingSubpaths(courseDirectory, destinations);
+        if (WriteWrapperScript(taskName, workingFolder, launcher, courseCode, section, courseDirectory,
+                               excluded, destinations, cloudflareAccountID) is not { } scriptPath)
+            return "The scheduled deploy's wrapper script could not be written.";
+        string command = TaskRunCommand(scriptPath);
 
         // schtasks accepts the date in the format the MACHINE's locale uses,
         // and rejects every other one outright — "Invalid Start Date (Date
@@ -111,35 +114,123 @@ public static class TaskScheduling
     public static string ScheduledScriptsDirectory() =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "scheduled");
 
-    private static string WrapperScriptPath(string taskName)
-    {
-        string safeName = new string(taskName.Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
-        return Path.Combine(ScheduledScriptsDirectory(), safeName + ".ps1");
-    }
+    private static string WrapperScriptPath(string taskName) =>
+        Path.Combine(ScheduledScriptsDirectory(), SafeName(taskName) + ".ps1");
+
+    /// <summary>Single-quotes a value for PowerShell, escaping any embedded quote.</summary>
+    private static string PsQuote(string value) => "'" + value.Replace("'", "''") + "'";
 
     /// <summary>
-    /// Writes a small PowerShell wrapper: one un-chained invocation of
-    /// deploy.ps1 per destination, so one destination failing does not stop
-    /// the others' lines from running. Returns the script's path, or null if
-    /// it could not be written.
+    /// The `/TR` value schtasks stores for the wrapper: `powershell.exe`
+    /// invoking the wrapper script by path, in double quotes so a working
+    /// folder with spaces in it (any Desktop folder, most OneDrive paths)
+    /// still resolves.
+    ///
+    /// A REAL embedded quote (`\"` in C# source = one `"` character) — NOT
+    /// `\\\"` (backslash + quote, TWO characters), which is what this used
+    /// to say. Found 2026-08-23 as the reason a scheduled deploy never fired
+    /// at all: `Run()` hands the whole command to `schtasks.exe` as ONE
+    /// argument via <see cref="ProcessStartInfo.ArgumentList"/>, which
+    /// already quotes and escapes the value correctly for schtasks because
+    /// it contains spaces — there is no reason for this method to also
+    /// escape the quotes itself, and doing so put a LITERAL backslash-quote
+    /// pair into the stored command instead of a quote character. Confirmed
+    /// via `schtasks /Query ... /XML`, which showed `&lt;Arguments&gt;`
+    /// holding `\"C:\...\script.ps1\"` verbatim (with a stray newline
+    /// besides) — a path PowerShell's `-File` could never resolve, so the
+    /// task ran, found nothing to run, and failed silently every time.
+    /// Internal (not private) so the test that pins this can reach it
+    /// without spinning up a real scheduled task.
     /// </summary>
-    private static string? WriteWrapperScript(string taskName, string launcherPath,
-                                              IReadOnlyList<IReadOnlyList<string>> deployArgumentsList)
+    internal static string TaskRunCommand(string scriptPath) =>
+        $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\"";
+
+    /// <summary>
+    /// Writes the wrapper: fingerprint the section first (via the bundled
+    /// Python — see <c>scripts/section_fingerprint.py</c>), then one
+    /// un-chained invocation of deploy.ps1 per destination (one destination
+    /// failing must not stop the others from being tried), then — only if
+    /// every destination succeeded, and only if the fingerprint could be
+    /// taken — a sentinel file for <see cref="ScheduledDeployCompletion"/> to
+    /// pick up and apply the next time the app runs. Returns the script's
+    /// path, or null if it could not be written.
+    /// </summary>
+    private static string? WriteWrapperScript(
+        string taskName, string workingFolder, string launcherPath, string courseCode, int section,
+        string courseDirectory, IReadOnlyList<string> excludedSelfPublishingSubpaths,
+        IReadOnlyList<CourseConfiguration.DeployDestination> destinations, string cloudflareAccountID)
     {
         try
         {
             Directory.CreateDirectory(ScheduledScriptsDirectory());
+
+            string excludedArray = string.Join(", ", excludedSelfPublishingSubpaths.Select(PsQuote));
+            string destinationTypesArray = string.Join(", ", destinations.Select(d => PsQuote(d.Type)));
+            string destinationNamesArray = string.Join(", ", destinations.Select(d => PsQuote(DeployCommand.DestinationDescription(d))));
+
             var lines = new List<string>
             {
-                "# Generated by Plantoir for a scheduled multi-destination deploy.",
-                "# Each line below runs on its own — one destination failing must",
-                "# not stop the others from being tried.",
+                "# Generated by Plantoir for a scheduled deploy.",
+                "# See TaskScheduling.WriteWrapperScript and WINDOWS-HANDOFF.md,",
+                "# \"A scheduled deploy needs its own path to the same record\".",
+                "",
+                "# ---- Fingerprint the section BEFORE anything runs -----------------------",
+                "# Matches the mac's launchd path: the fingerprint is taken right before the",
+                "# deploy actually happens, not when the teacher scheduled it, so an edit made",
+                "# in between still shows up correctly either way.",
+                "$fingerprint = $null",
+                "try {",
+                $"  $nativeRuntime = $env:PLANTOIR_RUNTIME",
+                "  if (-not $nativeRuntime) {",
+                "    $appRuntime = Join-Path $env:LOCALAPPDATA 'Programs\\Plantoir\\runtime'",
+                "    if (Test-Path (Join-Path $appRuntime 'manifest.json')) { $nativeRuntime = $appRuntime }",
+                "  }",
+                "  if ($nativeRuntime) {",
+                "    $pythonExe = Join-Path $nativeRuntime 'python\\python.exe'",
+                $"    $toolchainScripts = Join-Path {PsQuote(workingFolder)} '.toolchain\\scripts'",
+                $"    $scriptsDir = if (Test-Path $toolchainScripts) {{ $toolchainScripts }} else {{ Join-Path {PsQuote(workingFolder)} 'scripts' }}",
+                "    $fpScript = Join-Path $scriptsDir 'section_fingerprint.py'",
+                "    if ((Test-Path $pythonExe) -and (Test-Path $fpScript)) {",
+                $"      $fpArgs = @({PsQuote(courseDirectory)}, {section}{(excludedArray.Length > 0 ? ", " + excludedArray : "")})",
+                "      $fpOutput = & $pythonExe $fpScript @fpArgs 2>$null",
+                "      if ($LASTEXITCODE -eq 0 -and $fpOutput) { $fingerprint = ([string]$fpOutput).Trim() }",
+                "    }",
+                "  }",
+                "} catch { $fingerprint = $null }",
+                "",
+                "# ---- Deploy to every destination — un-chained, on purpose ---------------",
+                "$allSucceeded = $true",
             };
-            foreach (var arguments in deployArgumentsList)
+
+            foreach (var destination in destinations)
             {
-                string quoted = string.Join(" ", arguments.Select(a => "'" + a.Replace("'", "''") + "'"));
-                lines.Add($"& '{launcherPath}' {quoted}");
+                var arguments = DeployCommand.Arguments(courseCode, section, destination, cloudflareAccountID);
+                string quotedArgs = string.Join(" ", arguments.Select(PsQuote));
+                lines.Add($"& {PsQuote(launcherPath)} {quotedArgs}");
+                lines.Add("if ($LASTEXITCODE -ne 0) { $allSucceeded = $false }");
             }
+
+            lines.AddRange(new[]
+            {
+                "",
+                "# ---- Record what went out, for the app to pick up ------------------------",
+                "if ($allSucceeded -and $fingerprint) {",
+                $"  $pendingDir = Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", "scheduled", "pending"))}",
+                "  New-Item -ItemType Directory -Force -Path $pendingDir | Out-Null",
+                "  $sentinel = [ordered]@{",
+                $"    courseCode = {PsQuote(courseCode)}",
+                $"    sectionNumber = {section}",
+                $"    courseDirectory = {PsQuote(courseDirectory)}",
+                "    fingerprint = $fingerprint",
+                $"    destinationTypes = @({destinationTypesArray})",
+                $"    destinationNames = @({destinationNamesArray})",
+                "    completedAtUtc = (Get-Date).ToUniversalTime().ToString('o')",
+                "  } | ConvertTo-Json",
+                $"  $sentinelPath = Join-Path $pendingDir ({PsQuote(SafeName(taskName))} + '-' + [Guid]::NewGuid().ToString('N') + '.json')",
+                "  Set-Content -LiteralPath $sentinelPath -Value $sentinel -Encoding utf8",
+                "}",
+            });
+
             string scriptPath = WrapperScriptPath(taskName);
             File.WriteAllLines(scriptPath, lines);
             return scriptPath;
@@ -150,9 +241,12 @@ public static class TaskScheduling
         }
     }
 
+    private static string SafeName(string taskName) =>
+        new string(taskName.Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
+
     /// <summary>
-    /// Remove a scheduled deploy. Returns null on success. Also removes any
-    /// multi-destination wrapper script left by <see cref="Schedule(string,string,string,int,DateTime,IReadOnlyList{IReadOnlyList{string}})"/> —
+    /// Remove a scheduled deploy. Returns null on success. Also removes the
+    /// wrapper script written by <see cref="WriteWrapperScript"/> —
     /// schtasks deleting the task does not delete a script it merely pointed
     /// at, and a leftover one is not runnable on its own so it is simply
     /// litter, but it should not accumulate every time a teacher reschedules.

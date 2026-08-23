@@ -5,6 +5,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 using Plantoir.Services;
@@ -67,8 +68,28 @@ public sealed partial class MainWindow : Window
         Activated += (_, args) =>
         {
             if (args.WindowActivationState != WindowActivationState.Deactivated)
+            {
                 Workspace.NoteBecameKey();
+                // Subscribed before any SectionDetailView exists, so this runs
+                // before that view's own OnWindowActivated on the SAME
+                // activation — a scheduled deploy that finished overnight is
+                // reflected in the " — Edited" marker the first time the
+                // teacher looks, not one activation later. See
+                // ScheduledDeployCompletion and WINDOWS-HANDOFF.md, "A
+                // scheduled deploy needs its own path to the same record".
+                _ = System.Threading.Tasks.Task.Run(ScheduledDeployCompletion.ConsumePending);
+                // The sidebar's own clock badge (SidebarRow.ScheduledDeploy)
+                // is read from schtasks, not stored anywhere of ours — a
+                // deploy scheduled through the assistant, or in another
+                // window on the same section, would otherwise sit invisible
+                // here until something else happened to reload the tree.
+                if (Workspace.State == WorkspaceState.Ready) Sidebar.Refresh();
+            }
         };
+        // Covers app launch itself, in case the window's first Activated
+        // fires before this runs (or does not fire at all on some launch
+        // paths) — cheap and idempotent when there is nothing pending.
+        _ = System.Threading.Tasks.Task.Run(ScheduledDeployCompletion.ConsumePending);
         Closed += (_, _) => Workspace.UnregisterWindow();
 
         // The Preview menu tracks whichever section is currently shown —

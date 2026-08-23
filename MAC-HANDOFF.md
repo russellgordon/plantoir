@@ -515,6 +515,162 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **A general WinUI `x:Bind` trap, found in the sidebar's scheduled-deploy
+  badge but worth watching for anywhere a row object is reconciled rather
+  than recreated** (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 326).
+  Reported directly, right after row 325 shipped: no clock badge appeared
+  after scheduling a deploy in an already-open window, and the right-click
+  menu never offered Cancel/Change either. Two compounding bugs, not one.
+  (1) `ReconcileSections` only read the current schedule into
+  `SidebarRow.ScheduledDeploy` when CREATING a row — an existing row (the
+  normal case, since the window was already open) kept whatever was true
+  the moment it was first shown, forever. (2) Even fixed, the UI would not
+  have shown it: `x:Bind` — unlike classic `Binding` — defaults to
+  `Mode=OneTime`, evaluating once at container creation and never again.
+  `SidebarRow` had no change notification and none of the affected
+  bindings specified `Mode=OneWay`, so `Visibility`/`ContextFlyout` were
+  frozen at whatever was true when the row's TreeView container was first
+  built. **No equivalent trap on the mac** — SwiftUI's `@Observable`
+  re-renders any view that reads a changed property, full stop, so there
+  is no "silently stale until the container happens to be recreated"
+  failure mode to reproduce there. Worth knowing as a general lesson for
+  ANY future WinUI work here: a reconciled (not recreated) row/item object
+  needs BOTH `Mode=OneWay` in the XAML on every binding whose value can
+  change post-creation AND `INotifyPropertyChanged` raised for that exact
+  property name — including for any DERIVED property XAML binds to
+  directly (here, `ScheduledDeploy` changing had to also raise
+  `BadgeVisibility` and `BadgeTooltip`, since `x:Bind` subscribes to the
+  literal property path named in the binding, not to whatever the bound
+  property is computed from). Also added, same pass: `MainWindow`'s
+  `Activated` handler now calls `Sidebar.Refresh()`, so a deploy scheduled
+  through the assistant or from a different window is picked up the next
+  time this window comes to the front — the same "refresh on activation"
+  shape the " — Edited" marker already uses. Reference:
+  `windows-app/Plantoir/Views/SidebarPane.xaml.cs` (`SidebarRow`,
+  `ReconcileSections`), `windows-app/Plantoir/Views/SidebarPane.xaml`
+  (the three `Mode=OneWay` bindings), `windows-app/Plantoir/MainWindow.xaml.cs`.
+
+- **Scheduled deploys never actually fired on Windows, ever — a doubled
+  backslash in a shell-quoted string** (Windows, 2026-08-23,
+  `GUI-IMPROVEMENTS.md` row 325). Reported directly, after a real overnight
+  scheduled deploy for ICD2O never went out. `TaskScheduling`'s stored `/TR`
+  command built the PowerShell `-File` argument with `\\\"` in C#
+  source — a literal backslash followed by a quote, TWO characters — where
+  it needed a real embedded quote character (`\"` in C# source, which the
+  compiler turns into one `"` character). `schtasks /Query ... /XML` showed
+  the stored `<Arguments>` holding `\"C:\...\script.ps1\"` verbatim, both
+  characters literal, so PowerShell's `-File` was handed a path it could
+  never resolve. **This predates row 323's fingerprinting work entirely** —
+  it would have broken every scheduled deploy on Windows since the feature
+  first shipped, for any course, silently, because Task Scheduler still
+  records a "Last Run Time" for a task that ran and immediately failed to
+  parse its own argument, so nothing about SCHEDULING ever looked broken.
+  Confirmed live: the real failing task's Last Result was `0xFFFD0000`.
+  **Nothing for the mac to do or check** — `launchd`'s command is an
+  ARGUMENTS ARRAY in a plist, never a shell command string assembled with
+  manual quote-escaping, so this exact bug class (two escaping passes
+  compounding instead of cancelling — `ProcessStartInfo.ArgumentList`
+  already quotes a value containing spaces once, so hand-escaping quotes
+  INSIDE that value doubles up) has no equivalent surface there. Worth
+  knowing as a general lesson if the mac ever DOES build a shell command
+  string by hand somewhere (rather than an arguments array): don't
+  hand-escape a quote that a launching API is about to quote again on your
+  behalf — verify by reading back what actually got stored/registered, the
+  way `schtasks /Query ... /XML` made this one obvious in about thirty
+  seconds once looked at directly, rather than trusting that a plausible-
+  looking C# string literal did what it appeared to say. Also fixed on the
+  same pass: right-click on a section with a deploy already scheduled now
+  offers "Change Deploy Time…" alongside Cancel, reusing the existing
+  schedule dialog pre-filled with the current time rather than requiring a
+  cancel-then-reschedule round trip — no backend change needed, since
+  `TaskScheduling.Schedule` already replaces by task name. Reference:
+  `windows-app/Plantoir.Core/Assist/TaskScheduling.cs`
+  (`TaskRunCommand`), `windows-app/Plantoir.Tests/TaskSchedulingTests.cs`
+  (new), `windows-app/Plantoir/Views/SidebarPane.xaml.cs`
+  (`AskWhenToDeploy`'s new `existing` parameter).
+
+- **A shared `scripts/deploy.py` bug, found on Windows but fixed in the file
+  the mac runs too** (Windows + shared, 2026-08-23, `GUI-IMPROVEMENTS.md`
+  row 324). Reported directly, with a screenshot: a teacher deployed a
+  section for the first time (Netlify, succeeded, live URL shown), then
+  tried Schedule a deploy and was refused with "has never been deployed" —
+  about a section that plainly just had been. `main()`'s `course_dir =
+  section_dir.parent.parent`, used to read and write the Netlify/Cloudflare
+  site marker (`.netlify_sites/`/`.cloudflare_sites/`), assumed the shape
+  `.../<COURSE>/.merged_output/section#` — true on the mac and in the old
+  container, but Windows' native `PLANTOIR_BUILD_ROOT` (row 290) makes
+  `toolchain_paths.merged_output_root()` skip the `.merged_output` nesting
+  entirely, so climbing two levels overshot onto the build root's own
+  parent instead of the course. **This was not a cosmetic bug**: the marker
+  was never found at READ time either, so every deploy — not just the
+  first — silently created a brand-new Netlify site instead of reusing the
+  one from last time, confirmed live on Russell's own machine (a real site
+  marker sitting under `%LOCALAPPDATA%\Plantoir\builds\<id>\` instead of
+  under `courses\ICD2O\`). **The mac itself was never affected** —
+  `PLANTOIR_BUILD_ROOT` is a Windows-only environment variable, so
+  `merged_output_root()` has always kept the `.merged_output` nesting there
+  and `section_dir.parent.parent` has always landed correctly — but the fix
+  (`course_dir = COURSES_ROOT / args.course`, unambiguous regardless of
+  where the build output lives) is in the ONE shared `deploy.py` both
+  platforms run, so **the mac's copy carries the identical change with
+  nothing further to do.** Two new pure-stdlib tests,
+  `scripts/test_deploy_course_dir_resolution.py`, wired into `verify.sh` —
+  worth running there once, since they exercise `merged_output_root()`
+  directly and `verify.sh` is the gate that would have caught this had it
+  existed sooner. Reference: `scripts/deploy.py` (`main()`'s `course_dir`
+  line), `scripts/toolchain_paths.py` (`merged_output_root`).
+
+- **Windows closed its own version of the launchd scheduled-deploy bug row
+  314 already fixed on the mac** (Windows + shared, 2026-08-22,
+  `GUI-IMPROVEMENTS.md` row 323). `WINDOWS-HANDOFF.md`'s "What is still
+  genuinely outstanding" list had item 2's carve-out: a scheduled ("publish
+  tomorrow's class overnight") deploy on Windows succeeded perfectly but
+  left the title bar saying "— Edited" forever, because Task Scheduler runs
+  `powershell.exe` directly — no app process is alive at the moment the
+  deploy actually happens, so nothing could fingerprint the section or
+  write `.publish_state`. **The mac needs to change nothing** — its own
+  launchd agent launches the app binary, so it always could fingerprint
+  in-process, and this row is purely Windows catching up to what row 314
+  already described as the mac's fix for the identical bug. Recording here
+  for two reasons worth knowing about:
+  - **A third, Python copy of the fingerprint algorithm now exists**, in
+    the SHARED `scripts/` folder: `scripts/section_fingerprint.py`. Nothing
+    on the mac calls it — only Windows' scheduled-deploy wrapper script
+    does, since it needs to fingerprint from inside a plain PowerShell
+    process with no C# or Swift available. If the fingerprint algorithm's
+    rules ever change on the mac (which files count, the symlink one-hop
+    resolution, the sort order, the hash), **this Python file needs the
+    identical edit or a Windows scheduled deploy will silently disagree
+    with the mac about whether a section has unpublished edits.** Proven to
+    currently match, byte for byte, by
+    `windows-app/Plantoir.Tests/SectionFingerprintPythonParityTests.cs`,
+    which runs both the C# and the Python implementations against the same
+    temp course tree and asserts equal output — there is no equivalent
+    check on the mac side, since the mac never runs this file.
+  - **Rejected: fingerprinting at schedule time instead of run time** —
+    would have been cheap (no Python needed, just C# at the moment the
+    teacher clicks Schedule), but wrong in the direction that lies to the
+    teacher: an edit made between scheduling and the overnight run still
+    goes out correctly, but a schedule-time fingerprint would stamp the
+    STALE pre-edit fingerprint, so the marker would say "— Edited" about
+    content that had, in fact, just published. Fingerprinting at RUN time,
+    right before the deploy — the wrapper script's own Python call, timed
+    to match the mac's in-process fingerprint-before-running-the-script
+    order — is the only version that is correct either way. Worth knowing
+    if a similar "the app isn't alive at the moment this needs to happen"
+    problem comes up on the mac side (a future launchd variant, say): the
+    fix that is cheap and the fix that is correct were not the same fix
+    here, and the difference only shows up in a case (edit-after-schedule)
+    that is easy to not think to test.
+  - Reference: `windows-app/Plantoir.Core/Assist/TaskScheduling.cs`
+    (`WriteWrapperScript`), `windows-app/Plantoir.Core/Assist/ScheduledDeployCompletion.cs`
+    (new), `scripts/section_fingerprint.py` (new),
+    `windows-app/Plantoir.Tests/SectionFingerprintPythonParityTests.cs`
+    (new), `windows-app/Plantoir.Tests/ScheduledDeployCompletionTests.cs`
+    (new). Full write-up, including what the wrapper script's generated
+    PowerShell actually looks like, in `WINDOWS-HANDOFF.md`, "A scheduled
+    deploy needs its own path to the same record".
+
 - **The Windows hero pair had three separate bugs, found by actually looking
   at it next to the mac's** (Windows, 2026-08-21, commit "Fix Windows hero
   image: stray border pixels, tiny windows, and an empty Obsidian sidebar").
