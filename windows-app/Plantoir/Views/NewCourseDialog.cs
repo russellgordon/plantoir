@@ -5,6 +5,7 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Markup;
 using Microsoft.UI.Xaml.Media;
 using Newtonsoft.Json.Linq;
 using Plantoir.Core.Catalogs;
@@ -29,7 +30,25 @@ public sealed class NewCourseDialog : ContentDialog
     private readonly NewCourseCreator _creator;
     private readonly TaskProgressView _progress = new();
 
-    private readonly TextBox _codeBox = new();
+    // A searchable picker, not a plain field: matches the mac wizard's own
+    // course-code combo box (contracts don't cover this — it's visual, see
+    // WINDOWS-HANDOFF.md "The course-code picker is a hand-built combo box").
+    // WinUI's AutoSuggestBox draws a rich per-row template natively, which is
+    // exactly the thing the mac had to hand-build NSComboBox's replacement
+    // for — so the real control is used here rather than a custom flyout.
+    private readonly AutoSuggestBox _codeBox = new()
+    {
+        PlaceholderText = "e.g. ICS3U",
+        TextMemberPath = "Code",
+    };
+
+    // Which province's catalog the picker searches — narrows the SUGGESTION
+    // list only, the same way the mac's segmented Province picker does; it
+    // never gates typing a code straight through, since a club code or a
+    // code from neither list is still perfectly valid.
+    private readonly ComboBox _provinceBox = new() { MinWidth = 220 };
+    private string _province = "ON";
+
     private readonly TextBlock _codeWarning;
     private readonly TextBox _nameBox = new();
     private readonly TextBox _shortBox = new() { MaxLength = 12 };
@@ -121,7 +140,19 @@ public sealed class NewCourseDialog : ContentDialog
     {
         _window = window;
         _creator = new NewCourseCreator(new ScriptRunner(System.Threading.SynchronizationContext.Current));
-        _nameCatalog = CourseNameCatalog.Load(BundledToolchain.SupportPath("ontario_secondary_courses.json"));
+        _nameCatalog = CourseNameCatalogs.Shared;
+        _codeBox.ItemTemplate = BuildCodeSuggestionTemplate();
+        // AutoSuggestBox does NOT write the chosen row's text into Text by
+        // itself once a custom ItemTemplate is in play — TextMemberPath only
+        // controls the box's own (unused, since we template it) default
+        // rendering. Without this, clicking or arrowing-to-and-pressing-Enter
+        // on a suggestion does nothing: the typed search text stays put and
+        // none of the downstream refreshes (name auto-fill, club row, grade
+        // warning...) ever see the picked code.
+        _codeBox.SuggestionChosen += (sender, args) =>
+        {
+            if (args.SelectedItem is CourseCodeSuggestion chosen) sender.Text = chosen.Code;
+        };
 
         Title = "New Course or Club";
         PrimaryButtonText = "Create Course";
@@ -229,19 +260,15 @@ public sealed class NewCourseDialog : ContentDialog
     }
 
     /// <summary>
-    /// Why a non-empty code can't be used — a space or a clash with an
-    /// existing course. Null means the code is fine (or still empty, which is
-    /// simply not-ready-yet, not an error worth showing).
+    /// Why the typed code can't be used — invalid characters, too long, or a
+    /// clash with an existing course. Null means the code is fine (or still
+    /// empty, which is simply not-ready-yet, not an error worth showing).
+    /// Delegates to CourseCodeValidator, the shared rule both the wizard and
+    /// course renaming must agree on (contracts/course-management.json ->
+    /// courseCode.problems).
     /// </summary>
-    private string? CourseCodeProblem()
-    {
-        string code = _codeBox.Text.Trim().ToUpperInvariant();
-        if (code.Length == 0) return null;
-        if (code.Contains(' ')) return "A course code cannot contain spaces.";
-        if (_window.Workspace.Courses.Any(c => c.Code == code))
-            return $"A course named {code} already exists — choose a different code.";
-        return null;
-    }
+    private string? CourseCodeProblem() =>
+        CourseCodeValidator.Problem(_codeBox.Text, _window.Workspace.Courses.Select(c => c.Code));
 
     /// <summary>
     /// Explain the blocker next to the field, so a greyed-out Create button is
@@ -284,12 +311,27 @@ public sealed class NewCourseDialog : ContentDialog
 
         // -------- Basics --------
         form.Children.Add(FormBuilders.SectionHeaderWithCaption("Basics", null));
+
+        _provinceBox.Items.Add("Ontario");
+        _provinceBox.Items.Add("British Columbia");
+        _provinceBox.SelectedIndex = 0;   // Ontario — the more common case, so nothing is disabled before a teacher has touched the form
+        _provinceBox.SelectionChanged += (_, _) =>
+        {
+            _province = _provinceBox.SelectedIndex == 1 ? "BC" : "ON";
+            RefreshCodeSuggestions();
+        };
+        var provinceRow = FormBuilders.LabeledRow("Province", _provinceBox);
+        provinceRow.Children.Add(FormBuilders.ExampleCaption("Narrows the course-code search below — typing a code straight through still works either way"));
+        form.Children.Add(provinceRow);
+
         var codeRow = FormBuilders.LabeledRow("Course code", _codeBox);
-        codeRow.Children.Add(FormBuilders.ExampleCaption("e.g. ICS3U — or a club name like CODING"));
+        codeRow.Children.Add(FormBuilders.ExampleCaption(
+            "e.g. ICS3U — or a club name like CODING. Start typing to search known course codes and names."));
         codeRow.Children.Add(_codeWarning);
         form.Children.Add(codeRow);
-        _codeBox.TextChanged += (_, _) =>
+        _codeBox.TextChanged += (_, args) =>
         {
+            if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput) RefreshCodeSuggestions();
             AutoFillCourseName(); RefreshClubRow(); RefreshGradeWarning(); RefreshCodeValidation(); RefreshCreateEnabled();
             RefreshStartingContent(); RefreshStructureArea(); RefreshFontSample();
         };
@@ -638,7 +680,84 @@ public sealed class NewCourseDialog : ContentDialog
 
     // ---- Validation and auto-fill ---------------------------------------
 
-    private bool IsClubCode(string code) => code.Length >= 4 && !char.IsDigit(code[3]);
+    /// <summary>
+    /// Rows shown in the course-code picker's dropdown: a known code, its
+    /// short name, and whether it carries a ready-made example course —
+    /// enough for a teacher to find a code by typing part of its NAME rather
+    /// than having to already know the code, the way the mac's flyout works.
+    /// </summary>
+    private sealed class CourseCodeSuggestion
+    {
+        public string Code { get; init; } = "";
+        public string DisplayName { get; init; } = "";
+
+        // A Visibility, not a bool: {Binding} needs no converter when the
+        // source property already carries the target property's own type.
+        public Visibility BadgeVisibility { get; init; } = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// A two-line row per suggestion — code bold on top, short name beneath,
+    /// with an "Example content" badge when a ready-made course exists for
+    /// it. Built from a XAML fragment via XamlReader rather than x:Bind,
+    /// since this dialog has no .xaml file of its own to declare a
+    /// DataTemplate in (WinUI's DataTemplate has no Func&lt;object&gt;
+    /// factory constructor to build one purely in code).
+    /// </summary>
+    private static DataTemplate BuildCodeSuggestionTemplate()
+    {
+        const string xaml = """
+            <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                          xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+              <Grid Padding="4" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Spacing="0">
+                  <TextBlock Text="{Binding Code}" FontWeight="SemiBold"/>
+                  <TextBlock Text="{Binding DisplayName}" FontSize="12" Opacity="0.7" TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}"
+                        CornerRadius="8" Padding="6,1,6,1" VerticalAlignment="Center"
+                        Visibility="{Binding BadgeVisibility}">
+                  <TextBlock Text="Example content" FontSize="10" Foreground="White"/>
+                </Border>
+              </Grid>
+            </DataTemplate>
+            """;
+        return (DataTemplate)XamlReader.Load(xaml);
+    }
+
+    /// <summary>
+    /// Filters the CURRENTLY SELECTED province's catalog by whatever has
+    /// been typed so far, matching against the code AND its names — so a
+    /// teacher can find "ICS3U" by typing "computer science" just as easily
+    /// as by typing the code itself. The province picker narrows this list
+    /// only; it never gates typing a code straight through (CourseCodeValidator
+    /// and ClubCodeRule below always consult the FULL merged catalog,
+    /// regardless of which province is selected here) — matching the mac's
+    /// own picker, whose province Picker "narrows its suggestion list, never
+    /// gates typing a code straight through" (NewCourseWizardView.swift).
+    /// </summary>
+    private void RefreshCodeSuggestions()
+    {
+        string typed = _codeBox.Text.Trim();
+        if (typed.Length == 0) { _codeBox.ItemsSource = null; return; }
+
+        var province = CourseNameCatalogs.ForProvince(_province);
+        _codeBox.ItemsSource = CourseCatalog.Matching(province, typed, CourseCatalog.SearchResultLimit)
+            .Select(e => new CourseCodeSuggestion
+            {
+                Code = e.Code,
+                DisplayName = e.ShortName,
+                BadgeVisibility = ExampleContentCatalog.HasContent(ExampleContentRoot, e.Code)
+                    ? Visibility.Visible : Visibility.Collapsed,
+            })
+            .ToList();
+    }
+
+    private bool IsClubCode(string code) => ClubCodeRule.IsClub(code, _nameCatalog);
 
     private void RefreshClubRow() =>
         _shortRow.Visibility = IsClubCode(_codeBox.Text.Trim().ToUpperInvariant())
@@ -725,11 +844,10 @@ public sealed class NewCourseDialog : ContentDialog
 
     private async System.Threading.Tasks.Task StartCreation()
     {
-        string code = _codeBox.Text.Trim().ToUpperInvariant();
-        if (code.Length == 0 || code.Contains(' ')) { ShowValidation("Enter a course code without spaces."); return; }
+        string code = CourseCodeValidator.Normalize(_codeBox.Text);
+        if (code.Length == 0) { ShowValidation("Enter a course code."); return; }
+        if (CourseCodeProblem() is { } codeProblem) { ShowValidation(codeProblem); return; }
         if (SectionNumbersProblem(_sectionsBox.Text) is { } problem) { ShowValidation(problem); return; }
-        if (_window.Workspace.Courses.Any(c => c.Code == code))
-        { ShowValidation($"A course named {code} already exists."); return; }
         if (_window.Workspace.WorkspacePath is not { } workspacePath)
         { ShowValidation("No working folder is selected."); return; }
 

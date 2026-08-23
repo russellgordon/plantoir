@@ -80,7 +80,7 @@ public sealed partial class CourseSettingsView : UserControl
         nameBox.TextChanged += (_, _) => { Config.CourseName = nameBox.Text; MarkChanged(); RebuildGradeWarnings(); };
         Form.Children.Add(FormBuilders.LabeledRow("Course name", nameBox));
 
-        if (Config.IsClub)
+        if (Config.IsClub(CourseNameCatalogs.Shared))
         {
             var shortBox = new TextBox { Text = Config.CustomShortName, MaxLength = 12 };
             shortBox.TextChanged += (_, _) => { Config.CustomShortName = shortBox.Text; MarkChanged(); };

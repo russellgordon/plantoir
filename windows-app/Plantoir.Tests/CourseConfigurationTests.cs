@@ -1,5 +1,6 @@
 using System.Text;
 using Newtonsoft.Json.Linq;
+using Plantoir.Core.Catalogs;
 using Plantoir.Core.Models;
 using Xunit;
 
@@ -320,9 +321,18 @@ public class CourseConfigurationTests
     [Fact]
     public void IsClubByCodeShape()
     {
-        Assert.False(FromJson("""{"course_code":"ICS3U"}""").IsClub);
-        Assert.True(FromJson("""{"course_code":"CODING"}""").IsClub);
-        Assert.True(FromJson("""{"course_code":"ART"}""").IsClub);
+        // ClubCodeRule.IsClub is exercised directly against the contract in
+        // ContractTests.CourseManagement_ClubDetection_MatchesContract; this
+        // just confirms CourseConfiguration.IsClub(catalog) wires to it. An
+        // empty catalog means every case falls through to the fourth-
+        // character fallback, which is what these three are chosen to probe.
+        var emptyCatalog = CourseNameCatalog.Load();
+        Assert.False(FromJson("""{"course_code":"ICS3U"}""").IsClub(emptyCatalog));
+        Assert.True(FromJson("""{"course_code":"CODING"}""").IsClub(emptyCatalog));
+        // "ART" is only 3 characters — too short to judge, so the fallback
+        // declines rather than guessing (contracts/course-management.json ->
+        // courseCode.clubDetection, the "AP1" case).
+        Assert.False(FromJson("""{"course_code":"ART"}""").IsClub(emptyCatalog));
     }
 
     [Fact]
