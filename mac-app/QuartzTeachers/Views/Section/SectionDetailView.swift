@@ -364,6 +364,12 @@ struct SectionDetailView: View {
         guard let runner, !runner.healthFindings.isEmpty else {
             return
         }
+        // Never swap the contents of a dialog that is already up: the title
+        // and the message would change under the teacher's cursor, and the
+        // findings they were reading would vanish unacknowledged.
+        guard !isShowingHealthFindings else {
+            return
+        }
         healthFindings = runner.healthFindings
         isShowingHealthFindings = true
     }
@@ -886,6 +892,12 @@ struct SectionDetailView: View {
         // reached, so the wording says "could not be built", not "did
         // not finish", which would wrongly suggest the upload failed.
         if deployRunner.legs.first?.buildFailed == true {
+            // Show the folder problems HERE too. A build that failed because
+            // the curriculum folder or Media is missing is the case where the
+            // finding is most likely to be the cause, and moving the call
+            // below the early return had quietly dropped it altogether —
+            // de-headlining it was the intent, discarding it was not.
+            showHealthFindings(from: deployRunner.legs.first?.runner)
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.couldNotBuildBeforeDeploying(

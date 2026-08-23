@@ -151,11 +151,14 @@ class ScriptRunner {
         // window and is reused for every preview in it, so keeping findings
         // across runs meant a teacher who fixed the problem in Obsidian and
         // previewed again was shown the SAME dialog — the nagging this whole
-        // feature is supposed to avoid, produced by the feature itself. It
-        // also made a genuinely repeated finding indistinguishable from a
-        // stale one.
-        healthFindings = []
-        pendingHealthLine = ""
+        // feature is supposed to avoid, produced by the feature itself.
+        //
+        // Guarded exactly as the transcript above is, and for the same reason:
+        // a deploy runs `preview.sh --build-only` and then `deploy.sh` on THIS
+        // runner with `keepingTranscript: true`, and only the build phase
+        // announces health. Clearing unconditionally emptied the array between
+        // the two, so a deploy threw away the findings it had just collected.
+        resetHealthFindings(keepingTranscript: keepingTranscript)
         wasCancelled = false
         wasStoppedByUser = false
         isBetweenPhases = false
@@ -536,22 +539,43 @@ class ScriptRunner {
     /// finding never reached the dialog, the assistant, or the trail.
     private var pendingHealthLine: String = ""
 
-    private func collectHealthFindings(in text: String) {
-        let combined: String = pendingHealthLine + text
-        var completeLines: [String] = []
-        var carried: String = ""
-        var isFirst: Bool = true
-        for piece in combined.components(separatedBy: "\n") {
-            if !isFirst {
-                completeLines.append(carried)
-            }
-            carried = piece
-            isFirst = false
+    /// Reads whatever is left in the carry-over buffer as a finished line.
+    /// Seams for the tests, which cannot start a real script but must be able
+    /// to prove that a finding survives the END of a run and the SECOND phase
+    /// of a deploy — the two places findings were being silently dropped.
+    func simulateFinishForTesting(exitCode: Int32) {
+        flushPendingHealthLine()
+        lastExitCode = exitCode
+        isRunning = false
+    }
+
+    func prepareForContinuationForTesting(keepingTranscript: Bool) {
+        resetHealthFindings(keepingTranscript: keepingTranscript)
+    }
+
+    /// The one implementation, so the test seam above exercises what `run()`
+    /// actually does rather than a copy of it. A duplicated reset would pass
+    /// while the real path regressed — which is precisely how the scheduled
+    /// log's append bug got through its own test.
+    private func resetHealthFindings(keepingTranscript: Bool) {
+        if keepingTranscript {
+            return
         }
-        // `carried` is now whatever followed the final newline — an unfinished
-        // line, unless the chunk happened to end on one.
-        pendingHealthLine = carried
-        for finding in SiteHealthFinding.findings(in: completeLines.joined(separator: "\n")) {
+        healthFindings = []
+        pendingHealthLine = ""
+    }
+
+    private func flushPendingHealthLine() {
+        let leftover: String = pendingHealthLine
+        pendingHealthLine = ""
+        if leftover.isEmpty {
+            return
+        }
+        rememberHealthFindings(in: leftover)
+    }
+
+    private func rememberHealthFindings(in text: String) {
+        for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue
             }
@@ -568,6 +592,24 @@ class ScriptRunner {
                 course: finding.course, section: finding.section
             )
         }
+    }
+
+    private func collectHealthFindings(in text: String) {
+        let combined: String = pendingHealthLine + text
+        var completeLines: [String] = []
+        var carried: String = ""
+        var isFirst: Bool = true
+        for piece in combined.components(separatedBy: "\n") {
+            if !isFirst {
+                completeLines.append(carried)
+            }
+            carried = piece
+            isFirst = false
+        }
+        // `carried` is now whatever followed the final newline — an unfinished
+        // line, unless the chunk happened to end on one.
+        pendingHealthLine = carried
+        rememberHealthFindings(in: completeLines.joined(separator: "\n"))
     }
 
     /// The folder a local-folder deploy published into, if the output
@@ -1073,6 +1115,12 @@ class ScriptRunner {
         isAwaitingInput = false
         // Show anything still buffered when the script ended.
         flushBufferedOutput()
+        // And read the last line even if it never got a newline. The carry-over
+        // buffer is only drained by a LATER chunk containing one, so a finding
+        // printed as the very last output would otherwise be lost — the exact
+        // failure the buffer was added to prevent, surviving at the end of the
+        // run instead of in the middle of it.
+        flushPendingHealthLine()
         AppLog.output.info("Finished with exit code \(exitCode), transcript \(self.transcript.lines.count) lines")
         lastExitCode = exitCode
         isRunning = false

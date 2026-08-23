@@ -71,6 +71,57 @@ final class SiteHealthFindingTests: XCTestCase {
         XCTAssertEqual(runner.healthFindings.first?.name, "curriculumCoverageFoundNothing")
     }
 
+    /// A marker line split across two PTY reads.
+    ///
+    /// Output arrives in chunks, not lines, and the health payload is the
+    /// LONGEST line a build prints, so it is the likeliest of all to straddle a
+    /// read boundary. Before the carry-over buffer, the two halves failed both
+    /// the prefix test and the JSON parse and the finding vanished — no dialog,
+    /// no answer, no trail line.
+    func testAFindingSplitAcrossTwoReadsIsStillFound() {
+        let whole: String = curriculumLine + "\n"
+        let cut: String.Index = whole.index(whole.startIndex, offsetBy: whole.count / 2)
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput(String(whole[whole.startIndex..<cut]))
+        XCTAssertTrue(runner.healthFindings.isEmpty, "half a line is not a finding yet")
+        runner.receiveOutput(String(whole[cut...]))
+        XCTAssertEqual(runner.healthFindings.count, 1,
+                       "the two halves must be read as one line")
+    }
+
+    /// And one printed as the very LAST output, with no trailing newline.
+    ///
+    /// The carry-over buffer is only drained by a later chunk containing a
+    /// newline, so without a flush at the end of the run this finding was still
+    /// lost — the same failure, moved to the end of the build.
+    func testAFindingOnTheFinalUnterminatedLineIsStillFound() {
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput("Copying shared folders\n")
+        runner.receiveOutput(curriculumLine)   // no trailing newline
+        XCTAssertTrue(runner.healthFindings.isEmpty)
+        runner.simulateFinishForTesting(exitCode: 0)
+        XCTAssertEqual(runner.healthFindings.count, 1,
+                       "a finding printed last must survive the end of the run")
+    }
+
+    /// A deploy runs `preview.sh --build-only` and then `deploy.sh` on the SAME
+    /// runner, keeping the transcript — and only the build phase announces
+    /// health. Clearing findings unconditionally emptied the array between the
+    /// two, so a deploy threw away the findings it had just collected.
+    func testADeploysSecondPhaseKeepsTheBuildsFindings() {
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput(curriculumLine + "\n")
+        XCTAssertEqual(runner.healthFindings.count, 1)
+
+        runner.prepareForContinuationForTesting(keepingTranscript: true)
+        XCTAssertEqual(runner.healthFindings.count, 1,
+                       "the deploy phase must not discard what the build found")
+
+        runner.prepareForContinuationForTesting(keepingTranscript: false)
+        XCTAssertTrue(runner.healthFindings.isEmpty,
+                      "a genuinely new run starts clean")
+    }
+
     func testTheSameFindingTwiceIsRememberedOnce() {
         let runner: ScriptRunner = ScriptRunner()
         runner.receiveOutput(curriculumLine + "\n")

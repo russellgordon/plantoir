@@ -446,7 +446,9 @@
       { "name": "configured: the teacher removed Tasks", "configured": true, "graded": ["Tests"], "path": "Tasks/Old Assignment.md", "expect": false,
         "why": "Removing a folder from the pool is the point of the feature." },
       { "name": "configured: cleared deliberately", "configured": true, "graded": [], "path": "Tasks/Culminating.md", "expect": false },
-      { "name": "the file name never counts", "configured": true, "graded": ["Tasks"], "path": "Concepts/Tasks.md", "expect": false }
+      { "name": "the file name never counts", "configured": true, "graded": ["Tasks"], "path": "Concepts/Tasks.md", "expect": false },
+      { "name": "an explicit null is a CLEARED list, not an unset one", "configured": true, "graded": [], "path": "Tasks/Culminating.md", "expect": false,
+        "why": "`{\"graded_folders\": null}` reads as configured-and-empty on both platforms rather than as absent: the key is PRESENT, and the absent case is reserved for a course that has never been asked. Pinned because the two implementations agreed by accident and nothing said which answer was intended." }
     ]
   },
   "problemReportDialog": {

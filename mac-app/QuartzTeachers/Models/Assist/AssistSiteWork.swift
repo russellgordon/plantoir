@@ -177,12 +177,16 @@ final class AssistToolchainWork: AssistSiteWork {
         )
 
         if deployRunner.legs.first?.buildFailed == true {
-            return AssistSiteWorkResult(
-                succeeded: false,
-                message: AssistWording.couldNotBuildBeforeDeploying(
-                    course: course.code, section: String(sectionNumber)
-                )
+            // The findings travel even when the build failed: a missing
+            // curriculum or Media folder is a likely CAUSE of the failure, and
+            // over stdio there is no other way to mention it.
+            var message: String = AssistWording.couldNotBuildBeforeDeploying(
+                course: course.code, section: String(sectionNumber)
             )
+            if let runner = deployRunner.legs.first?.runner {
+                message = SiteHealthFinding.appending(to: message, from: runner)
+            }
+            return AssistSiteWorkResult(succeeded: false, message: message)
         }
 
         let outcome: AssistSiteWorkResult = MultiDestinationDeployRunner.result(

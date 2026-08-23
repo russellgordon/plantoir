@@ -3499,10 +3499,12 @@ the site yet, so it cannot have addressed anything — next week's lesson,
 written early, leaves the map exactly where it was until the day it is
 published.
 
-An expectation counts as **assessed** when one of those pages is in the
-Tasks folder. Ontario asks that every overall expectation be evaluated for
-marks at least once; the chips under each strand letter answer that, and
-the ring on a cell shows which specific expectations carry assessed work.
+An expectation counts as **assessed** when one of those pages is in a
+folder that counts for marks — {graded_folders} for this course, which you
+can change in Settings. Ontario asks that every overall expectation be
+evaluated for marks at least once; the chips under each strand letter
+answer that, and the ring on a cell shows which specific expectations carry
+assessed work.
 
 ## Reading it honestly
 
@@ -3652,10 +3654,14 @@ def graded_folder_names(config: dict):
     substring one. `support/skeletons` ships a family whose folder is called
     "Thinking Tasks", which the old rule counted and a pool of ["Tasks"] would
     not — so seeding every course with ["Tasks"] would have silently taken the
-    assessed marks off that course's map. Nothing is written back to the config
-    here either: the apps serialise `course_config.json` wholesale from their
-    own in-memory copy, so a key written by a build is dropped the next time a
-    teacher saves anything in Settings.
+    assessed marks off that course's map.
+
+    Nothing is written back to the config here either. Both apps DO preserve
+    keys they do not know about, so the general claim that a build's write would
+    be dropped is too strong; the real risk is narrower and quite enough — an
+    app holding a copy of the file it loaded BEFORE the build wrote the key will
+    overwrite it on the next save, and a teacher with Settings open during a
+    preview is an ordinary thing rather than a corner case.
 
     Pinned by contracts/shared-rules.json -> gradedFolders.
     """
@@ -3666,6 +3672,25 @@ def graded_folder_names(config: dict):
         if folder:
             names.append(str(folder))
     return names, True
+
+
+def _graded_folders_in_words(graded_folders, was_configured: bool) -> str:
+    """
+    How to name this course's graded folders on the page itself.
+
+    A course that has never been asked is described by what it actually does
+    rather than by a list it does not have — saying "Tasks" there would be a
+    guess, and the historical rule is a substring.
+    """
+    if not was_configured:
+        return "any folder whose name mentions tasks"
+    names = [str(name) for name in graded_folders if name]
+    if not names:
+        return "no folder at present"
+    if len(names) == 1:
+        return f"**{names[0]}**"
+    quoted = [f"**{name}**" for name in names]
+    return ", ".join(quoted[:-1]) + " and " + quoted[-1]
 
 
 def _is_graded_path(relative_path, graded_folders, was_configured: bool) -> bool:
@@ -3988,7 +4013,13 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
             unevaluated.append(overall_code)
 
     # The explanatory sections, which the teacher can switch off.
-    notes = COVERAGE_NOTES if include_notes else ""
+    # The page must describe THIS course's rule. It used to say "the Tasks
+    # folder" whatever the teacher had chosen, so a course graded on "Tests"
+    # got a page whose own explanation was wrong — and a teacher reading it
+    # would reasonably conclude the map was broken.
+    notes = COVERAGE_NOTES.replace(
+        "{graded_folders}", _graded_folders_in_words(graded_folders, graded_was_configured)
+    ) if include_notes else ""
     created_line = f"created: {first_class_stamp}\n" if first_class_stamp else ""
 
     body = f"""---

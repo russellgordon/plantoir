@@ -71,6 +71,17 @@ class AbsentIsNotEmpty(unittest.TestCase):
         self.assertTrue(build_site._is_graded_path("Tests/quiz.md", names, configured))
         self.assertFalse(build_site._is_graded_path("Thinking Tasks/x.md", names, configured))
 
+    def test_an_explicit_null_reads_as_cleared_not_unset(self):
+        """
+        The key is PRESENT, so the teacher has been asked. Absent is reserved
+        for a course that never was. Both platforms agreed on this by accident
+        and nothing said which answer was intended.
+        """
+        names, configured = build_site.graded_folder_names({"graded_folders": None})
+        self.assertEqual(names, [])
+        self.assertTrue(configured)
+        self.assertFalse(build_site._is_graded_path("Tasks/x.md", names, configured))
+
     def test_blank_entries_are_ignored_rather_than_matching_everything(self):
         names, configured = build_site.graded_folder_names(
             {"graded_folders": ["", "Tasks", None]})

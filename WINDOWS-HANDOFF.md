@@ -2811,10 +2811,19 @@ repository proves it rather than the reasoning alone. All 38 payloads use
 substring rule counted it, an exact pool of `["Tasks"]` does not. Seeding would
 have quietly stripped that course's assessed marks.
 
-Nothing is written back from a BUILD either, for a reason worth remembering when
-you are tempted to have Python fix something up: both apps serialise
-`course_config.json` wholesale from their own in-memory copy, so a key a build
-writes is dropped the next time a teacher saves anything in Settings.
+Nothing is written back from a BUILD either. Be precise about why, because the
+first version of this paragraph overstated it: both apps DO preserve keys they
+do not recognise, so a build's write is not dropped in general. The real risk is
+narrower and quite sufficient — an app holding a copy of the file it loaded
+BEFORE the build wrote the key overwrites it at the next save, and a teacher
+with Settings open while a preview runs is ordinary, not a corner case.
+
+**One thing you will notice immediately: `FileFormats_CourseConfigKeys_MatchesContract`
+is RED on your side, deliberately.** `contracts/file-formats.json` now documents
+`graded_folders` and `CourseConfiguration.cs` does not read it yet. That is the
+contract working as designed (CLAUDE.md rule 4) — a request, not damage. It goes
+green when you add the property, and the absent-vs-empty note above is the whole
+of what it has to get right.
 
 ### What the Settings control does, and why
 

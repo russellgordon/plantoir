@@ -247,8 +247,15 @@ struct CourseSettingsView: View {
 
     // MARK: - Computed properties
 
-    /// Every folder that could hold work counting for marks — shared and
-    /// per-section alike, because assessed work lives in both.
+    /// Every folder that could hold work counting for marks.
+    ///
+    /// Not just the top-level lists. The build matches a graded folder at ANY
+    /// DEPTH, so a course with `Portfolios/Tasks` has assessed work that the
+    /// declared lists never mention — and a control that showed only the
+    /// top-level folders would have let a teacher's first tick freeze a pool
+    /// that silently dropped it. That is the same silent mark-loss that made
+    /// seeding every course with ["Tasks"] unsafe, arriving through the
+    /// interface instead.
     var gradedFolderChoices: [String] {
         var choices: [String] = []
         for folder in course.configuration.sharedFolders {
@@ -261,7 +268,51 @@ struct CourseSettingsView: View {
                 choices.append(folder)
             }
         }
+        for folder in CourseSettingsView.nestedFolderNames(in: course) {
+            if !choices.contains(folder) {
+                choices.append(folder)
+            }
+        }
         return choices
+    }
+
+    /// Folder names below the top level of a course, so the marks list can
+    /// offer what the build can actually count.
+    ///
+    /// Deliberately shallow and cheap: build outputs, the toolchain's own
+    /// bookkeeping and `Media` are skipped, and it does not recurse forever —
+    /// this runs while a settings pane is drawing.
+    static func nestedFolderNames(in course: Course) -> [String] {
+        let skipped: Set<String> = [
+            ".merged_output", "merged_output", ".internal", ".obsidian",
+            "node_modules", "Media", ".git",
+        ]
+        var names: [String] = []
+        let manager: FileManager = FileManager.default
+        guard let walker = manager.enumerator(
+            at: course.directoryURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return names
+        }
+        for case let url as URL in walker {
+            if walker.level > 4 {
+                walker.skipDescendants()
+                continue
+            }
+            let name: String = url.lastPathComponent
+            if skipped.contains(name) {
+                walker.skipDescendants()
+                continue
+            }
+            let isDirectory: Bool = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?
+                .isDirectory ?? false
+            if isDirectory && !names.contains(name) {
+                names.append(name)
+            }
+        }
+        return names
     }
 
     /// The pool, shown as ticks.
@@ -272,6 +323,10 @@ struct CourseSettingsView: View {
     /// what is actually happening rather than a blank list. Nothing is written
     /// until they change something, and the moment they do, the answer becomes
     /// explicit and the historical rule stops applying to this course.
+    ///
+    /// Which is why the derived list must be COMPLETE: the first tick freezes
+    /// it, so anything the build counts today and this list omits would lose
+    /// its marks without a word.
     var gradedFoldersBinding: Binding<[String]> {
         return Binding(
             get: {
