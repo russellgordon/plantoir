@@ -89,5 +89,35 @@ class AbsentIsNotEmpty(unittest.TestCase):
         self.assertFalse(build_site._is_graded_path("Concepts/x.md", names, configured))
 
 
+class HowThePageDescribesTheRule(unittest.TestCase):
+    """
+    The Curriculum Coverage page explains itself in prose, and that prose is
+    read by a teacher deciding whether the map is right. It said "the Tasks
+    folder" whatever they had chosen, which reads as a broken map.
+    """
+
+    def test_a_course_never_asked_is_described_by_what_actually_happens(self):
+        words = build_site._graded_folders_in_words([], False)
+        self.assertIn("task", words)
+        # NOT "mentions tasks": the rule is the substring "task", so a folder
+        # called "Task 1" counts and that wording would say it did not.
+        self.assertNotIn("mentions tasks", words)
+
+    def test_the_course_s_own_folders_are_named(self):
+        self.assertEqual(build_site._graded_folders_in_words(["Tests"], True), "**Tests**")
+        self.assertEqual(
+            build_site._graded_folders_in_words(["Thinking Tasks", "Tasks"], True),
+            "**Thinking Tasks** and **Tasks**")
+
+    def test_a_cleared_pool_says_so(self):
+        self.assertEqual(build_site._graded_folders_in_words([], True), "no folder at present")
+
+    def test_a_folder_name_cannot_break_the_page(self):
+        """These names are the teacher's own, and Markdown is not inert."""
+        words = build_site._graded_folders_in_words(["Tasks*", "[[Quizzes]]"], True)
+        self.assertNotIn("**Tasks***", words)
+        self.assertNotIn("[[Quizzes]]", words)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

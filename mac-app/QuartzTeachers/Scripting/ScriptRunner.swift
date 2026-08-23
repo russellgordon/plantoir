@@ -544,9 +544,7 @@ class ScriptRunner {
     /// to prove that a finding survives the END of a run and the SECOND phase
     /// of a deploy — the two places findings were being silently dropped.
     func simulateFinishForTesting(exitCode: Int32) {
-        flushPendingHealthLine()
-        lastExitCode = exitCode
-        isRunning = false
+        finishRun(exitCode: exitCode)
     }
 
     func prepareForContinuationForTesting(keepingTranscript: Bool) {

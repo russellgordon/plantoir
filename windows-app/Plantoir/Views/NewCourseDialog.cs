@@ -810,7 +810,10 @@ public sealed class NewCourseDialog : ContentDialog
             : WizardDefaults.DefaultLocale;
 
         var allItems = _sharedFolders.Concat(_sharedFiles).Concat(_perSectionFolders).Concat(_perSectionFiles).ToHashSet();
-        var hidden = WizardDefaults.HiddenItems.Where(i => allItems.Contains(i) || i == "Media").ToList();
+        var hidden = WizardDefaults.HiddenItems
+            .Where(i => allItems.Contains(i)
+                        || string.Equals(i, "Media", StringComparison.OrdinalIgnoreCase))
+            .ToList();
         var expandableSource = _sharedFolders.Concat(_perSectionFolders).ToHashSet();
         var expandable = WizardDefaults.ExpandableItems.Where(expandableSource.Contains).ToList();
 

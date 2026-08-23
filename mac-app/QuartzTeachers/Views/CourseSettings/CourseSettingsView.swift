@@ -287,14 +287,28 @@ struct CourseSettingsView: View {
     /// Folder names below the top level of a course, so the marks list can
     /// offer what the build can actually count.
     ///
-    /// Deliberately shallow and cheap: build outputs, the toolchain's own
-    /// bookkeeping and `Media` are skipped, and it does not recurse forever —
-    /// this runs while a settings pane is drawing.
+    /// Deliberately shallow and cheap: build outputs, Plantoir's own
+    /// bookkeeping and `Media` are skipped, and it stops at four levels deep.
+    ///
+    /// That cap means the list is not exhaustive, and the earlier claim that it
+    /// was "complete before it can be frozen" was too strong — a graded folder
+    /// buried five levels down is still absent. It is far more complete than
+    /// the top-level lists alone, which is what the case that mattered needed,
+    /// and the cap is what keeps this affordable on a course of a few thousand
+    /// pages.
     static func nestedFolderNames(in course: Course) -> [String] {
         let skipped: Set<String> = [
             ".merged_output", "merged_output", ".internal", ".obsidian",
             "node_modules", "Media", ".git",
         ]
+        // A section folder is not somewhere work lives — its CONTENTS are
+        // merged into the site and its own name never appears in a page's path
+        // there, so ticking it would count nothing. Its children are still
+        // walked, because a graded folder inside a section certainly does count.
+        let isSectionFolder: (String) -> Bool = { name in
+            return name.lowercased().hasPrefix("section")
+                && Int(name.dropFirst("section".count)) != nil
+        }
         var names: [String] = []
         let manager: FileManager = FileManager.default
         guard let walker = manager.enumerator(
@@ -316,7 +330,7 @@ struct CourseSettingsView: View {
             }
             let isDirectory: Bool = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?
                 .isDirectory ?? false
-            if isDirectory && !names.contains(name) {
+            if isDirectory && !isSectionFolder(name) && !names.contains(name) {
                 names.append(name)
             }
         }
@@ -332,9 +346,9 @@ struct CourseSettingsView: View {
     /// until they change something, and the moment they do, the answer becomes
     /// explicit and the historical rule stops applying to this course.
     ///
-    /// Which is why the derived list must be COMPLETE: the first tick freezes
-    /// it, so anything the build counts today and this list omits would lose
-    /// its marks without a word.
+    /// Which is why the derived list must be as complete as it can afford to
+    /// be: the first tick freezes it, so anything the build counts today and
+    /// this list omits loses its marks without a word.
     var gradedFoldersBinding: Binding<[String]> {
         return Binding(
             get: {

@@ -400,8 +400,11 @@ def prompt_type_list(prompt_text, default_list=None, add_md_extension=False, for
     # Remove forbidden names from provided list and warn
     cleaned = []
     removed = []
+    lowered_forbidden = {str(item).strip().lower() for item in forbidden_names}
     for name in raw:
-        if name in forbidden_names:
+        # Case-insensitively: the filesystem is, so "media" typed here used to
+        # be accepted and then collided with the folder Plantoir manages.
+        if name.strip().lower() in lowered_forbidden:
             removed.append(name)
             continue
         cleaned.append(name + ".md" if add_md_extension and not name.endswith(".md") else name)

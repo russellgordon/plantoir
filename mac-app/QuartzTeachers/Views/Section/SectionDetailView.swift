@@ -50,6 +50,9 @@ struct SectionDetailView: View {
     /// is not recomputed from an array that the dismissal is clearing.
     @State var isShowingHealthFindings: Bool = false
 
+    /// Findings that arrived while a dialog was already up, waiting their turn.
+    @State var heldHealthFindings: [SiteHealthFinding] = []
+
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
 
@@ -326,6 +329,13 @@ struct SectionDetailView: View {
             // "0 things need your attention" string reachable.
             if !isShowing {
                 healthFindings = []
+                // Anything that arrived while this one was up gets its turn now
+                // rather than being lost.
+                if !heldHealthFindings.isEmpty {
+                    healthFindings = heldHealthFindings
+                    heldHealthFindings = []
+                    isShowingHealthFindings = true
+                }
             }
         }
     }
@@ -367,7 +377,12 @@ struct SectionDetailView: View {
         // Never swap the contents of a dialog that is already up: the title
         // and the message would change under the teacher's cursor, and the
         // findings they were reading would vanish unacknowledged.
-        guard !isShowingHealthFindings else {
+        //
+        // But HELD, not dropped. Returning early discarded them — and the
+        // failed-deploy path can arrive while the overnight findings are
+        // already on screen, so this is reachable rather than theoretical.
+        if isShowingHealthFindings {
+            heldHealthFindings = runner.healthFindings
             return
         }
         healthFindings = runner.healthFindings

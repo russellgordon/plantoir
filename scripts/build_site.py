@@ -3197,9 +3197,23 @@ def _start_public_sync_watcher(output_dir: Path, host_output_dir: Path) -> threa
     t.start()
     return t
 
+def _is_media_name(name) -> bool:
+    """
+    Whether a configured name refers to the Media folder, in ANY spelling.
+
+    Case-insensitively, because the filesystem is. Both apps used to accept
+    "media" typed into Settings, so configs in the field already carry it — and
+    closing the input gate does nothing for a course that already has one.
+    Left as "media" in the config on purpose: rewriting a teacher's file behind
+    their back to change its capitalisation would be a surprise for no gain,
+    and every reader now recognises it either way.
+    """
+    return str(name).strip().lower() == "media"
+
+
 def _filter_out_media(items: list[str]) -> list[str]:
-    """Return a copy of items with 'Media' removed (case-sensitive)."""
-    return [x for x in (items or []) if x != "Media"]
+    """Return a copy of items with the Media folder removed, in any spelling."""
+    return [x for x in (items or []) if not _is_media_name(x)]
 # -----------------------------------------------------------------------------
 
 # === NEW: Discovery + preflight config update ================================
@@ -3237,7 +3251,8 @@ def discover_shared_items(course_dir: Path) -> tuple[list[str], list[str]]:
             if _is_hidden(name):
                 continue
             if item.is_dir():
-                if name in _IGNORED_SHARED_FOLDERS or _is_section_folder(name):
+                if (name in _IGNORED_SHARED_FOLDERS or _is_media_name(name)
+                        or _is_section_folder(name)):
                     continue
                 found_folders.append(name)
             elif item.is_file():
@@ -3258,7 +3273,7 @@ def discover_section_items(section_dir: Path) -> tuple[list[str], list[str]]:
             if _is_hidden(name):
                 continue
             if item.is_dir():
-                if name == "Media":
+                if _is_media_name(name):
                     continue
                 found_folders.append(name)
             elif item.is_file():
@@ -3532,6 +3547,25 @@ def _quartz_slug(relative: Path) -> str:
     return "/".join(part.replace(" ", "-") for part in parts)
 
 
+def _is_single_folder_name(name: str) -> bool:
+    """
+    Whether a configured folder name is just that — a name, not a path.
+
+    `curriculum_folder` comes from `course_config.json`, and the value is used
+    to build a path. "../Other Course/Curriculum" or an absolute path would
+    quietly build somebody else's expectations into this site, and a value like
+    "shared/Curriculum" would work here while disagreeing with every other
+    reader. A name with a separator in it is a mistake either way, so it is
+    refused and the scan takes over.
+    """
+    text = str(name)
+    if not text or text in (".", ".."):
+        return False
+    if "/" in text or "\\" in text:
+        return False
+    return True
+
+
 def _find_curriculum_folder(content_root: Path, named: str = None):
     """
     The folder holding expectation pages, whatever the course calls it.
@@ -3545,7 +3579,7 @@ def _find_curriculum_folder(content_root: Path, named: str = None):
     The scan remains the fallback, and remains the real path for the majority:
     a course made from scratch has no manifest to declare anything.
     """
-    if named:
+    if named and _is_single_folder_name(named):
         candidate = content_root / named
         if candidate.is_dir():
             for page in candidate.glob("*.md"):
@@ -3691,6 +3725,20 @@ def graded_folder_names(config: dict):
     return names, True
 
 
+def _escaped_for_markdown(text: str) -> str:
+    """
+    A folder's name, safe to drop into the page's prose.
+
+    These names are the teacher's own, and a folder called `Tasks*` or one
+    containing `[[` would otherwise close the bold early or inject a wikilink
+    into a page Plantoir wrote.
+    """
+    escaped = text
+    for character in ("\\", "*", "_", "[", "]", "<", ">", "`"):
+        escaped = escaped.replace(character, "\\" + character)
+    return escaped
+
+
 def _graded_folders_in_words(graded_folders, was_configured: bool) -> str:
     """
     How to name this course's graded folders on the page itself.
@@ -3700,8 +3748,11 @@ def _graded_folders_in_words(graded_folders, was_configured: bool) -> str:
     guess, and the historical rule is a substring.
     """
     if not was_configured:
-        return "any folder whose name mentions tasks"
-    names = [str(name) for name in graded_folders if name]
+        # "mentions tasks" would be a near-miss: the rule is the substring
+        # "task", so a folder called "Task 1" counts and a teacher reading
+        # "tasks" would conclude it did not.
+        return "any folder with \u201ctask\u201d in its name"
+    names = [_escaped_for_markdown(str(name)) for name in graded_folders if name]
     if not names:
         return "no folder at present"
     if len(names) == 1:
@@ -4082,7 +4133,8 @@ assessed work addresses them, red when nothing marked does.
     return True
 
 
-def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path):
+def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
+                                   curriculum_folder_name: str = None):
     """
     Tell the backlinks panel which pages reference everything by design.
 
@@ -4096,7 +4148,7 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path)
     """
     if not backlinks_tsx_path.exists():
         return
-    curriculum_dir = _find_curriculum_folder(content_root)
+    curriculum_dir = _find_curriculum_folder(content_root, curriculum_folder_name)
     # Both forms: the folder is matched by name, but a page is matched by
     # its SLUG, and Quartz slugs replace spaces with hyphens. Writing only
     # the title left the coverage map in the panel it was meant to leave.
@@ -4123,7 +4175,7 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path)
         print(f"✅ Backlinks panel will skip: {', '.join(names)}")
 
 
-def link_coverage_from_key_links(content_root: Path):
+def link_coverage_from_key_links(content_root: Path, curriculum_folder_name: str = None):
     """
     Put the coverage page in Key Links, directly under the curriculum entry.
 
@@ -4144,7 +4196,7 @@ def link_coverage_from_key_links(content_root: Path):
     if f"[[{COVERAGE_PAGE_TITLE}]]" in text:
         return
 
-    curriculum_dir = _find_curriculum_folder(content_root)
+    curriculum_dir = _find_curriculum_folder(content_root, curriculum_folder_name)
     folder = curriculum_dir.name if curriculum_dir else None
     lines = text.split("\n")
     target_index = None
@@ -4236,7 +4288,7 @@ def build_section_site(
     show_marker = resolve_show_section_marker(config, section_number)
 
     # Exclude 'Media' from shared folder processing (we symlink it)
-    if "Media" in shared_folders:
+    if any(_is_media_name(name) for name in shared_folders):
         print("ℹ️ Skipping 'Media' in shared folders (handled via symlink).")
     shared_paths = [course_dir / folder for folder in _filter_out_media(shared_folders)]
 
@@ -4501,11 +4553,12 @@ def build_section_site(
                 curriculum_folder_name=curriculum_folder_name_here,
                 include_notes=bool(config.get("include_coverage_notes", True)),
                 first_class_stamp=first_class_stamp):
-            link_coverage_from_key_links(content_root)
+            link_coverage_from_key_links(content_root, curriculum_folder_name_here)
     else:
         print("ℹ️ Curriculum Coverage page is switched off for this course.")
     set_backlinks_structural_pages(
-        output_dir / "quartz" / "components" / "Backlinks.tsx", content_root)
+        output_dir / "quartz" / "components" / "Backlinks.tsx", content_root,
+        curriculum_folder_name_here)
     # ==========================================================================
 
     # === Post-pass — sync 'created' timestamps for non-class pages =============
@@ -4534,8 +4587,10 @@ def build_section_site(
         print("   your site. Run setup.sh for this course to restore it.")
         sys.exit(1)
 
-    # ensure 'Media' is always hidden in Explorer omit set
-    if "Media" not in hidden_list:
+    # ensure 'Media' is always hidden in Explorer omit set — checked in any
+    # spelling, or a config that already says "media" would gain a SECOND entry
+    # for the same directory every build.
+    if not any(_is_media_name(name) for name in hidden_list):
         hidden_list.append("Media")
 
     # The Curriculum Coverage page is reached from Key Links, deliberately.

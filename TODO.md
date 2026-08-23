@@ -4,6 +4,31 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **`CourseRenameInterfaceTests` crashes the whole unit run, intermittently** —
+  seen twice on 2026-08-23 while building the special-folders work, and NOT
+  explained. It is the failure mode the `mac-app` skill already warns about (a
+  test that hosts real SwiftUI views, on a machine that is busy), and both
+  crashes happened while adversarial-review agents were running builds and
+  greps concurrently. But it is worth pinning down rather than assuming:
+
+  - it takes the RUN down, not just itself — the log says "Restarting after
+    unexpected exit, crash, or test timeout", and the summary then reports
+    however many tests had finished (440 in one case, so the count alone reads
+    like a much bigger failure than it is);
+  - `xcodebuild` exits 65 with **zero** failed test CASES, which is the tell:
+    grep for `^Failing tests:` rather than believing an exit code;
+  - run alone it passed 3 times out of 3; the full suite passed 4 times out of
+    6 in the same session;
+  - one baseline run on a clean tree exited 0, which is not enough evidence to
+    exonerate the changes that were in flight — a fair comparison needs several
+    runs on each side of the same commit, on an otherwise idle machine.
+
+  If it turns up again, the thing to capture is the crash log from
+  `~/Library/Logs/DiagnosticReports` for the test host at that moment. What
+  would make it a non-issue: hosting that row view inside an `NSHostingView`
+  the test owns and tears down explicitly, the way `RemovalButtonTests` avoids
+  the problem next door.
+
 - **Let a teacher rename a special folder from inside Plantoir** — deferred
   2026-08-23, while planning the hardening of the special folder and file names.
   Not `CourseRenamer`, which renames the course CODE and deliberately nothing
