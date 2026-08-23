@@ -13,8 +13,7 @@ public static class TaskMilestones
 {
     public static readonly IReadOnlyList<TaskMilestone> CourseCreation = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
+        new TaskMilestone("Getting things ready…", "Detected host timezone offset"),
         new TaskMilestone("Getting ready…", "Welcome to the Course Setup Script"),
         new TaskMilestone("Preparing your course folder…", "'Media' folder"),
         new TaskMilestone("Choosing appearance…", "Quartz Locale"),
@@ -25,18 +24,14 @@ public static class TaskMilestones
 
     public static readonly IReadOnlyList<TaskMilestone> ExampleCourse = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Getting things ready…", "Ensuring container is running"),
+        new TaskMilestone("Getting things ready…", "Detected host timezone offset"),
         new TaskMilestone("Copying the example course…", "Example Course installed to"),
         new TaskMilestone("Finishing up…", "EXAMPLE_COURSE_CODE="),
     };
 
     public static readonly IReadOnlyList<TaskMilestone> Preview = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Starting container if needed"),
+        new TaskMilestone("Getting things ready…", "Running the website builder on this PC"),
         new TaskMilestone("Gathering your content…", "Copying shared folders"),
         new TaskMilestone("Applying your settings…", "Updated pageTitle"),
         new TaskMilestone("Preparing components…", "Installing dependencies"),
@@ -46,9 +41,8 @@ public static class TaskMilestones
 
     public static readonly IReadOnlyList<TaskMilestone> Deploy = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Ensuring container is running"),
+        new TaskMilestone("Getting things ready…", "Host timezone offset"),
+        new TaskMilestone("Starting up…", "from this PC"),
         new TaskMilestone("Checking your site…", "Deploying from local build"),
         new TaskMilestone("Connecting to Netlify…", "Netlify site"),
         new TaskMilestone("Comparing what changed…", "delta deploy manifest"),
@@ -59,9 +53,7 @@ public static class TaskMilestones
     /// <summary>Rebuild + publish presented as ONE task with one bar.</summary>
     public static readonly IReadOnlyList<TaskMilestone> BuildAndDeploy = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Starting container if needed"),
+        new TaskMilestone("Getting things ready…", "Running the website builder on this PC"),
         new TaskMilestone("Gathering your content…", "Copying shared folders"),
         new TaskMilestone("Building your site…", "Quartz v4"),
         new TaskMilestone("Connecting to Netlify…", "Netlify site"),
@@ -84,9 +76,7 @@ public static class TaskMilestones
     /// <summary>Rebuild + folder publish presented as ONE task with one bar.</summary>
     public static readonly IReadOnlyList<TaskMilestone> BuildAndDeployToFolder = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Starting container if needed"),
+        new TaskMilestone("Getting things ready…", "Running the website builder on this PC"),
         new TaskMilestone("Gathering your content…", "Copying shared folders"),
         new TaskMilestone("Building your site…", "Quartz v4"),
         new TaskMilestone("Copying your files…", "to a folder"),
@@ -99,9 +89,8 @@ public static class TaskMilestones
     /// </summary>
     public static readonly IReadOnlyList<TaskMilestone> DeployToCloudflare = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Ensuring container is running"),
+        new TaskMilestone("Getting things ready…", "Host timezone offset"),
+        new TaskMilestone("Starting up…", "from this PC"),
         new TaskMilestone("Checking your site…", "Deploying from local build"),
         new TaskMilestone("Connecting to Cloudflare…", "Cloudflare project"),
         new TaskMilestone("Uploading your pages…", "Uploading the built site"),
@@ -111,9 +100,7 @@ public static class TaskMilestones
     /// <summary>Rebuild + Cloudflare publish presented as ONE task with one bar.</summary>
     public static readonly IReadOnlyList<TaskMilestone> BuildAndDeployToCloudflare = new[]
     {
-        new TaskMilestone("Getting this PC ready…", "Setting up this PC"),
-        new TaskMilestone("Building your website builder…", "Building your website builder"),
-        new TaskMilestone("Starting up…", "Starting container if needed"),
+        new TaskMilestone("Getting things ready…", "Running the website builder on this PC"),
         new TaskMilestone("Gathering your content…", "Copying shared folders"),
         new TaskMilestone("Building your site…", "Quartz v4"),
         new TaskMilestone("Connecting to Cloudflare…", "Cloudflare project"),

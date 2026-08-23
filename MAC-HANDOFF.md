@@ -570,6 +570,47 @@ rather than being deleted.
   in-flight background iteration, which could race on the shared mark/count
   state — fixed with a lock (`AssistWindow._engineLogGate`).
 
+- **Windows' progress-bar markers had drifted out of sync with its own
+  launchers for four days, and nothing caught it** (Windows, 2026-08-23,
+  `GUI-IMPROVEMENTS.md` row 352, closing `WINDOWS-HANDOFF.md` item 5's
+  second half). No mac change needed — `TaskMilestones.swift` was never
+  wrong, since it was written against `setup.sh`/`preview.sh`/`deploy.sh`,
+  which still print the lines it watches for. But the WAY this broke is
+  worth knowing, because it's a shape of bug that can recur on either side.
+  `TaskMilestones.cs` used four markers copied verbatim from the mac's
+  `.sh` scripts (`Setting up this PC`, `Building your website builder`,
+  `Ensuring container is running`, `Starting container if needed`).
+  `setup.ps1` gained a "Native toolchain (no container)" rewrite — no
+  WSL2, no Docker, no one-time machine setup, no container start at all —
+  the very next day (`b356a1f`, 2026-08-19), which silently stopped
+  printing all four. Nobody updated the C# markers, and nothing failed:
+  the existing `TaskMilestoneTests` only checked label WORDING (ellipsis
+  suffix, no "Docker"/"script" text) against hand-typed synthetic
+  transcripts, never against real captured launcher output. The visible
+  cost: the first two-to-three stages of most progress bars (course
+  creation, example course, preview, deploy) could never be reached by
+  marker match, so the bar sat at 0% until a later, still-real marker (e.g.
+  "Quartz v4") jumped it forward several steps at once — no crash, reads
+  as a slow build. Found by re-investigating `WINDOWS-HANDOFF.md` item 5,
+  confirmed against two real captured transcripts (`preview.ps1
+  --build-only`, `deploy.ps1 --to-folder`) run on this machine, and
+  confirmed twice more by independent adversarial review before and after
+  the fix (the second pass caught a genuine miss: `MarketingShotCapturer.cs`'s
+  mock transcripts, whose own doc comments claim to be coupled to
+  `TaskMilestones` — "change one there and this stops advancing" — still
+  carried the four dead strings and needed the same fix). **The lesson
+  worth carrying to the mac side, in case `.sh` output is ever
+  restructured similarly:** a progress-marker list is a claim about what a
+  SPECIFIC script prints RIGHT NOW, and it rots silently the moment that
+  script changes underneath it unless something actually reads the
+  script's own text. Windows' fix — `TaskMilestoneLauncherMarkerTests`
+  (`ParsingTests.cs`), which greps the real `.ps1` files for every
+  launcher-origin marker rather than trusting a synthetic transcript — is
+  the general pattern; `TaskMilestoneTests.swift` has no equivalent check
+  against `.sh` today. Reference:
+  `windows-app/Plantoir.Core/Scripting/TaskMilestones.cs`,
+  `windows-app/Plantoir.Tests/ParsingTests.cs`.
+
 - **A general WinUI `x:Bind` trap, found in the sidebar's scheduled-deploy
   badge but worth watching for anywhere a row object is reconciled rather
   than recreated** (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 326).

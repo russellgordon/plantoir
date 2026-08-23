@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using Plantoir.Core.Scripting;
 using Xunit;
 
@@ -337,7 +340,7 @@ public class TaskMilestoneTests
     {
         var runner = new ScriptRunner(uiContext: null) { Milestones = TaskMilestones.Preview };
         runner.ReceiveOutput("Quartz v4 building...\n");
-        Assert.Equal(7, runner.MilestonesReached);
+        Assert.Equal(5, runner.MilestonesReached);
         Assert.Equal("Opening the preview…", runner.CurrentMilestoneLabel);
     }
 
@@ -347,7 +350,7 @@ public class TaskMilestoneTests
         var runner = new ScriptRunner(uiContext: null) { Milestones = TaskMilestones.Preview };
         runner.ReceiveOutput("Copying shared fol");
         runner.ReceiveOutput("ders into place\n");
-        Assert.Equal(4, runner.MilestonesReached);
+        Assert.Equal(2, runner.MilestonesReached);
     }
 
     [Fact]
@@ -359,5 +362,84 @@ public class TaskMilestoneTests
         Assert.Equal("125 of 234", runner.StepDetail);
         runner.ReceiveOutput("Deploy complete\n");
         Assert.Equal("", runner.StepDetail);
+    }
+}
+
+/// <summary>
+/// Every "launcher"-origin marker in <see cref="TaskMilestones"/> (per
+/// contracts/app-rules.json → markerOrigins) is Windows' own text — printed
+/// by setup.ps1/preview.ps1/deploy.ps1, never by the shared Python. Nothing
+/// caught it when those four went stale on 2026-08-19: the native-toolchain
+/// rewrite (setup.ps1's "Native toolchain (no container)" block) dropped
+/// "Setting up this PC"/"Building your website builder"/"Ensuring container
+/// is running"/"Starting container if needed" from every real launcher run,
+/// but TaskMilestones.cs — last touched the day before — kept matching
+/// against them, so those progress stages could never be reached: the bar
+/// sat at 0% until a later, still-real marker jumped it forward several
+/// steps at once (see WINDOWS-HANDOFF.md item 5). This reads the ACTUAL
+/// .ps1 files rather than a hand-typed transcript, so a future launcher
+/// rewrite that drops a line these markers depend on fails here instead of
+/// silently stalling a teacher's progress bar again.
+/// </summary>
+public class TaskMilestoneLauncherMarkerTests
+{
+    private static string RepoRoot
+    {
+        get
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (int i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "Dockerfile")))
+                    return dir.FullName;
+            }
+            throw new DirectoryNotFoundException("Could not find repository root containing Dockerfile.");
+        }
+    }
+
+    /// <summary>Marker text → the launcher that must actually print it.</summary>
+    private static readonly IReadOnlyDictionary<string, string> LauncherOnlyMarkers = new Dictionary<string, string>
+    {
+        ["Detected host timezone offset"] = "setup.ps1",
+        ["Running the website builder on this PC"] = "preview.ps1",
+        ["Host timezone offset"] = "deploy.ps1",
+        ["from this PC"] = "deploy.ps1",
+        ["to a folder"] = "deploy.ps1",
+        ["PUBLISHED_FOLDER="] = "deploy.ps1",
+    };
+
+    [Fact]
+    public void EveryLauncherOnlyMarkerAppearsInItsOwnScript()
+    {
+        foreach (var (marker, script) in LauncherOnlyMarkers)
+        {
+            string text = File.ReadAllText(Path.Combine(RepoRoot, script));
+            Assert.True(text.Contains(marker, StringComparison.Ordinal),
+                $"Expected \"{marker}\" to appear in {script}, but it does not — " +
+                "TaskMilestones.cs is matching against text the launcher no longer prints.");
+        }
+    }
+
+    /// <summary>
+    /// The four mac-only strings this class exists to keep out of
+    /// TaskMilestones.cs — a plain guard so a future edit that reaches for
+    /// the mac's phrasing (the exact mistake that shipped 2026-08-18) fails
+    /// immediately rather than waiting for a teacher's progress bar to stall.
+    /// </summary>
+    [Fact]
+    public void NoMilestoneMatchesAMacOnlyLauncherString()
+    {
+        string[] macOnly =
+        {
+            "Setting up this Mac",
+            "Setting up this PC",
+            "Building your website builder",
+            "Ensuring container is running",
+            "Starting container if needed",
+        };
+        foreach (var list in TaskMilestones.AllLists)
+            foreach (var milestone in list)
+                foreach (var mac in macOnly)
+                    Assert.DoesNotContain(mac, milestone.Marker, StringComparison.Ordinal);
     }
 }
