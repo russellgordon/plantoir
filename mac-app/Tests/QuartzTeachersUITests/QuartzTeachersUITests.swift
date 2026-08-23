@@ -5,6 +5,27 @@ import XCTest
 /// UITEST_WORKSPACE environment variable.
 final class QuartzTeachersUITests: XCTestCase {
 
+    // NOTE — do NOT add `Process`-based cleanup here. An earlier
+    // attempt put `pkill -f "http.server 8081"` in `setUp`/`tearDown`
+    // to reap the stub preview server that
+    // `testRestartingAPreviewReturnsToTheProgressView` leaks (that
+    // test hands the app a fake `preview.sh` ending in `exec python3
+    // -m http.server 8081`, and the server is a child of the APP, so
+    // it outlives an interrupted run and holds the port — a leftover
+    // from one day's run was still holding 8081 the next morning and
+    // made a real preview fail with `OSError: [Errno 48] Address
+    // already in use`, which reads like a broken toolchain rather than
+    // like test litter).
+    //
+    // It looked right and did nothing: the UI-test runner is
+    // sandboxed and cannot spawn a child process at all. Verified
+    // 2026-08-23 by having the helper write a marker file after
+    // `process.waitUntilExit()` — the marker was never written, and
+    // the `try?` had been swallowing the failure silently. Anything
+    // that needs to kill that server has to do it WITHOUT spawning a
+    // process (`Darwin.kill()` on a pid the stub script records would
+    // work), or from outside the test run.
+
     // MARK: - Functions
 
     /// Launches the app pointed at a fixture workspace: the one supplied
@@ -23,8 +44,12 @@ final class QuartzTeachersUITests: XCTestCase {
         return application
     }
 
-    func saveScreenshot(named name: String, of application: XCUIApplication) {
-        let screenshot: XCUIScreenshot = application.screenshot()
+    /// Takes an `XCUIScreenshotProviding` rather than the application so
+    /// a caller can attach ONE WINDOW. `XCUIApplication.screenshot()` on
+    /// macOS captures the entire display, which put another app's window
+    /// over the thing under test more than once (2026-08-23).
+    func saveScreenshot(named name: String, of provider: XCUIScreenshotProviding) {
+        let screenshot: XCUIScreenshot = provider.screenshot()
         let attachment: XCTAttachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name
         attachment.lifetime = .keepAlways
@@ -169,20 +194,20 @@ final class QuartzTeachersUITests: XCTestCase {
         XCTAssertTrue(firstRow.waitForExistence(timeout: 5), "The full catalog should be browsable from the chevron")
 
         // The reveal button must actually sit INSIDE the field's visual
-        // background — Russell caught the first attempt rendering it
+        // bounds — Russell caught the first attempt rendering it
         // detached, with no fill to show it was even a button. Checked
         // by geometry rather than a screenshot: this machine's screen
         // capture has been unreliable mid-session (grabbing an unrelated
         // window), so frame containment is the trustworthy check here.
-        // Against the BACKGROUND container's frame, not the plain
-        // `TextField`'s own — that reports its own smaller natural text
-        // height (~18pt), not the field's full visual bounds (24pt), so
-        // checking against it would fail even when the button is
-        // correctly inset inside the actual field.
-        // Queried type-agnostically — `.contain` keeps this container
-        // from being merged into the `TextField`'s own accessibility
-        // element, but which `XCUIElementType` it then reports as is not
-        // something to guess (it did not turn out to be `.other`).
+        // Against the background SHAPE's own frame, not `codeField`'s —
+        // an `NSTextField`'s reported AX frame reflects the underlying
+        // control's own intrinsic content bounds (~18pt tall) regardless
+        // of a later `.frame(height:)` giving it more room to sit inside
+        // (confirmed identical across two different modifier orderings,
+        // 2026-08-23), so it under-reports this field's real 30pt visual
+        // height. The `RoundedRectangle` used as the field's
+        // `.background` doesn't have that limitation — its own
+        // accessibility frame matches its actual laid-out size.
         let fieldBackground: XCUIElement = application.descendants(matching: .any).matching(identifier: "wizardCourseCodeFieldBackground").firstMatch
         XCTAssertTrue(fieldBackground.waitForExistence(timeout: 5))
         let fieldFrame: CGRect = fieldBackground.frame
@@ -205,6 +230,209 @@ final class QuartzTeachersUITests: XCTestCase {
 
         let closeButton3: XCUIElement = application.buttons["wizardCloseButton"]
         closeButton3.click()
+    }
+
+
+    /// The copy of a `Form` row's label that belongs to the row holding
+    /// `field` — the one whose vertical centre is closest to the
+    /// field's. Needed because the window behind the wizard sheet can
+    /// carry a label with the identical text; see the note in
+    /// `testCourseCodeFieldMatchesCourseNameFieldsLeadingEdgeAndLabel`.
+    func wizardLabel(named text: String, near field: XCUIElement, in application: XCUIApplication) -> XCUIElement {
+        let candidates: [XCUIElement] = application.staticTexts.matching(identifier: text).allElementsBoundByIndex
+        var closest: XCUIElement = application.staticTexts[text]
+        var smallestDistance: CGFloat = .greatestFiniteMagnitude
+        for candidate in candidates {
+            let distance: CGFloat = abs(candidate.frame.midY - field.frame.midY)
+            if distance < smallestDistance {
+                smallestDistance = distance
+                closest = candidate
+            }
+        }
+        return closest
+    }
+
+    /// Course code's field should look and sit like every other field
+    /// in the Basics section: a "Course code" label OUTSIDE the field,
+    /// in the same leading column as "Course name", with its own field
+    /// starting at the same leading edge as Course name's — and typed
+    /// text reading from that leading edge rather than pushed against
+    /// the trailing one (Russell, 2026-08-23, comparing a screenshot of
+    /// the two rows).
+    func testCourseCodeFieldMatchesCourseNameFieldsLeadingEdgeAndLabel() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10), "The wizard sheet should appear")
+
+        // "Course code" is a real label OUTSIDE the field, in the same
+        // leading column as "Course name" — not placeholder text inside
+        // it, which is what a `Form` row gives a view of ours that
+        // isn't a bare `TextField` (Russell, 2026-08-23, comparing the
+        // two rows). `NewCourseWizardView` writes it as an explicit
+        // `LabeledContent`; if this stops finding a match, that wrapper
+        // was removed or renamed.
+        // Both labels are found by their VISIBLE TEXT, then narrowed
+        // to the wizard's own copies. Two things forced that shape.
+        // First, the course settings pane BEHIND this sheet has a
+        // "Course name" label of its own, so an unscoped query matched
+        // two elements and the frame comparison below died with
+        // "Multiple matching elements found" — but only when an earlier
+        // test in the same run had left a course selected, which is why
+        // it passed in isolation (2026-08-23). Second, the two obvious
+        // fixes both failed: `application.sheets` finds nothing (this
+        // sheet isn't reported as one), and giving the labels their own
+        // `.accessibilityIdentifier` in `NewCourseWizardView` made the
+        // whole `LabeledContent` row merge into a single element, so
+        // `wizardCourseCodeField` stopped existing as a `TextField` at
+        // all and every later click failed. So: pick the copy that
+        // belongs to this sheet by its geometry instead.
+        let label: XCUIElement = wizardLabel(named: "Course code", near: codeField, in: application)
+        XCTAssertTrue(label.exists, "\"Course code\" should be a label beside the field, the same way \"Course name\" is")
+        let nameLabel: XCUIElement = wizardLabel(named: "Course name", near: application.textFields["wizardCourseNameField"], in: application)
+        XCTAssertTrue(nameLabel.exists)
+        XCTAssertEqual(label.frame.minX, nameLabel.frame.minX, accuracy: 2.0, "The two labels should share a leading edge — code: \(label.frame.minX), name: \(nameLabel.frame.minX)")
+
+        let codeFieldBackground: XCUIElement = application.descendants(matching: .any).matching(identifier: "wizardCourseCodeFieldBackground").firstMatch
+        XCTAssertTrue(codeFieldBackground.waitForExistence(timeout: 5))
+        let nameField: XCUIElement = application.textFields["wizardCourseNameField"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+
+        // The label sits to the LEFT of both fields now, so a field
+        // that still started where the label does would mean the
+        // two-column row never formed.
+        XCTAssertGreaterThan(nameField.frame.minX, nameLabel.frame.maxX, "Course name's field should sit in the row's trailing column, past its label")
+
+        // Not `codeFieldBackground.frame` — that identifier is bound to
+        // a `Shape` used only as decoration, and SwiftUI's
+        // accessibility tree hoists a decorative element's identifier
+        // onto the nearest "real" ancestor container it merges into,
+        // which turns out to be the whole Form ROW (both columns
+        // together): confirmed directly, it reported x=1951, width=620
+        // — the same leading edge as the row's own label and far wider
+        // than the field itself (2026-08-23). The `TextField` elements
+        // themselves are the reliable comparison.
+        let codeLeadingX: CGFloat = codeField.frame.minX
+        let nameLeadingX: CGFloat = nameField.frame.minX
+        // 8pt, not a tight match: an `NSTextField`'s AX frame is its
+        // TEXT area, and `.roundedBorder` keeps its own inset inside
+        // that frame while this field's `.plain` style draws none — so
+        // the course-code field spends `textLeadingInset` (4pt,
+        // AppKit's own `titleRect` answer) to put its text where Course
+        // name's already is, and that shows up here as a difference in
+        // reported origin even when the two BOXES line up exactly
+        // (measured 2234.0 vs 2229.0, 2026-08-23, with the boxes
+        // visually flush in a screenshot).
+        XCTAssertEqual(codeLeadingX, nameLeadingX, accuracy: 8.0, "Course code's field should start at the same leading edge as Course name's — code: \(codeLeadingX), name: \(nameLeadingX)")
+
+        // Typed text reads LEADING in all three fields. `Form`'s own
+        // label extraction would have made each field's contents the
+        // row's trailing-aligned VALUE — Russell saw Timetable section
+        // numbers' "1" against the field's right edge (2026-08-23) —
+        // and `.multilineTextAlignment(.leading)` alone did not
+        // override that; the explicit `LabeledContent` wrappers are
+        // what fixed it. Compared by where each field's own text
+        // element STARTS relative to its field: near the leading edge,
+        // nowhere near the trailing one.
+        codeField.click()
+        codeField.typeText("SCH3U")
+        nameField.click()
+        nameField.typeText("Chemistry")
+
+        for (fieldName, field) in [("course code", codeField), ("course name", nameField)] {
+            let text: XCUIElement = field.staticTexts.firstMatch
+            if text.exists {
+                let offsetFromLeading: CGFloat = text.frame.minX - field.frame.minX
+                XCTAssertLessThan(offsetFromLeading, 20.0, "The \(fieldName) field's text should start at its leading edge, not float to the right of it — offset: \(offsetFromLeading)")
+            }
+        }
+
+        saveScreenshot(named: "06-course-code-vs-name-alignment", of: application.windows.firstMatch)
+
+        let closeButton5: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton5.click()
+    }
+
+    /// The chevron TOGGLES, the way a real `NSComboBox`'s arrow does:
+    /// a second press puts the popup away rather than doing nothing
+    /// (Russell, 2026-08-23).
+    func testCourseCodeRevealButtonAlsoClosesThePopup() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let revealButton: XCUIElement = application.buttons["courseCodeRevealButton"]
+        XCTAssertTrue(revealButton.waitForExistence(timeout: 10))
+
+        revealButton.click()
+        let suggestions: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "courseCodeSuggestionsList").firstMatch
+        XCTAssertTrue(suggestions.waitForExistence(timeout: 5), "The first press should open the popup")
+
+        revealButton.click()
+        // `waitForNonExistence` rather than a bare `exists`: the popup
+        // fades out over 0.12s, so an immediate read can still see it.
+        XCTAssertTrue(suggestions.waitForNonExistence(timeout: 5), "A second press should close it again")
+
+        revealButton.click()
+        XCTAssertTrue(suggestions.waitForExistence(timeout: 5), "A third press should reopen it")
+
+        let closeButton: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton.click()
+    }
+
+    /// Down-arrow walks the popup and Return takes the highlighted row,
+    /// the way a real `NSComboBox` does (Russell, 2026-08-23).
+    func testArrowKeysAndReturnChooseACourseCode() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10))
+        codeField.click()
+        codeField.typeText("SCH")
+
+        let sch3uRow: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "courseCodeSuggestion-SCH3U").firstMatch
+        XCTAssertTrue(sch3uRow.waitForExistence(timeout: 5), "SCH3U should be among the suggestions for \"SCH\"")
+
+        // What the FIRST row is depends on the catalog's ordering, so
+        // read it out of the row's own identifier rather than hard-coding
+        // a code — the behaviour under test is "down highlights the
+        // first row, Return takes it", not which course happens to sort
+        // first for "SCH".
+        let rows: [XCUIElement] = application.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "courseCodeSuggestion-"))
+            .allElementsBoundByIndex
+        XCTAssertFalse(rows.isEmpty, "There should be suggestions to walk")
+        let firstRowCode: String = String(rows[0].identifier.dropFirst("courseCodeSuggestion-".count))
+        XCTAssertFalse(firstRowCode.isEmpty)
+
+        codeField.typeKey(.downArrow, modifierFlags: [])
+        saveScreenshot(named: "07-course-code-keyboard-highlight", of: application.windows.firstMatch)
+        codeField.typeKey(.return, modifierFlags: [])
+        XCTAssertEqual(
+            "\(codeField.value ?? "")".uppercased(),
+            firstRowCode.uppercased(),
+            "One down-arrow should highlight the first suggestion and Return should take it"
+        )
+
+        // And the popup closes on commit, the same as clicking a row.
+        let suggestions: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: "courseCodeSuggestionsList").firstMatch
+        XCTAssertTrue(suggestions.waitForNonExistence(timeout: 5), "Committing with Return should close the popup")
+
+        let closeButton: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton.click()
     }
 
     /// The reveal button's actual reason for existing: reopening the
