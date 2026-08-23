@@ -33,7 +33,7 @@ public sealed partial class TaskProgressView : UserControl
         // Re-renders once a second while a task runs, so the "still working…"
         // timer keeps moving even when the script itself is momentarily quiet.
         _tick = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _tick.Tick += (_, _) => { if (_runner is { IsRunning: true }) Render(); };
+        _tick.Tick += (_, _) => { if (_runner is { } r && (r.IsRunning || r.IsBetweenPhases)) Render(); };
         Unloaded += (_, _) => _tick.Stop();
     }
 
@@ -81,6 +81,49 @@ public sealed partial class TaskProgressView : UserControl
     /// <summary>Single-runner callers (the wizard) register-and-show in one call.</summary>
     public void Bind(ScriptRunner runner, string title, Action? onCancel = null) => Show(runner, title, onCancel);
 
+    /// <summary>
+    /// A dedicated placeholder for the span between a deploy being clicked
+    /// and <c>MultiDestinationDeployRunner.RunAsync</c> actually taking
+    /// over — there is no runner to bind to yet that is not either blank
+    /// (a brand-new <see cref="ScriptRunner"/> renders neither the running
+    /// branch nor the outcome branch of <see cref="Render"/>) or stale (the
+    /// PREVIOUS deploy's finished leg, still sitting in
+    /// <c>MultiDestinationDeployRunner.ActiveRunner</c> until <c>RunAsync</c>
+    /// replaces <c>Legs</c> with fresh ones) — neither is what is actually
+    /// happening right now. Mirrors the mac's
+    /// `preparingToDeployPlaceholder` (WINDOWS-HANDOFF.md item 8, row 318a).
+    /// Sets the currently-shown runner to null (not unregistered — a
+    /// runner, once <see cref="Register"/>ed, stays registered for its own
+    /// question dialog for the life of this view) so a stray notification
+    /// from a leftover leg runner cannot re-render over the placeholder:
+    /// <see cref="RunnerChanged"/> only calls <see cref="Render"/> when the
+    /// notifying runner is reference-equal to the one currently shown.
+    /// </summary>
+    public void ShowPreparing(string title)
+    {
+        _runner = null;
+        _multiRunner = null;
+        OnCancel = null;
+        EnsureTicking(false);
+
+        TitleText.Text = title;
+        DestinationChecklist.Visibility = Visibility.Collapsed;
+        OutcomeIcon.Visibility = Visibility.Collapsed;
+        PhaseText.Text = "Preparing to deploy…";
+        PhaseText.Foreground = Secondary();
+        Bar.IsIndeterminate = true;
+        Bar.Visibility = Visibility.Visible;
+        MilestoneText.Visibility = Visibility.Collapsed;
+        OutcomeDetail.Visibility = Visibility.Collapsed;
+        LiveLink.Visibility = Visibility.Collapsed;
+        FolderResult.Visibility = Visibility.Collapsed;
+        DestinationLinks.Visibility = Visibility.Collapsed;
+        RunningActionsRow.Visibility = Visibility.Collapsed;
+        AwaitingNotice.Visibility = Visibility.Collapsed;
+        LaunchProblemText.Visibility = Visibility.Collapsed;
+        ConsoleInputRow.Visibility = Visibility.Collapsed;
+    }
+
     private void RunnerChanged(ScriptRunner runner, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ScriptRunner.IsAwaitingInput) && runner.IsAwaitingInput)
@@ -98,7 +141,13 @@ public sealed partial class TaskProgressView : UserControl
         RenderDestinationChecklist();
 
         bool hasMilestones = _runner.Milestones.Count > 0;
-        if (_runner.IsRunning)
+        // IsBetweenPhases: this runner has already finished the build half
+        // of a build-then-deploy leg (IsRunning is false) but the deploy
+        // half is about to start on it — rendering the outcome branch here
+        // would flash "Done"/a failure for the gap the caller's polling
+        // wait takes to notice the deploy is still queued up on it. See
+        // ScriptRunner.IsBetweenPhases (row 318b).
+        if (_runner.IsRunning || _runner.IsBetweenPhases)
         {
             OutcomeIcon.Visibility = Visibility.Collapsed;
             PhaseText.Text = hasMilestones ? _runner.StepDescription : "Working…";

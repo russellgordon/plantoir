@@ -318,44 +318,79 @@ this side is expected to say so when the contract is wrong.
    pre-existing, unrelated item 9 course-code-dashes case). `contracts/
    file-formats.json`'s `firstDeployMarkers.knownDivergence` field, and the
    "One divergence found by sweeping" section below, are corrected to match.
-8. **Three deploy-after-preview console races fixed on mac 2026-08-22, not
-   yet checked on Windows** — `GUI-IMPROVEMENTS.md` rows 317–318, all SwiftUI
-   state races rather than shared code, so nothing ports mechanically, but the
-   same shape of bug is worth checking for in whatever Windows equivalent of
-   `MultiDestinationDeployRunner`/`ScriptRunner`/the deploy console view
-   exists there:
-   - **Row 317** — deploying right after a preview flashed "Stopped" first.
-     Deploying stops any running preview as an internal step, which on mac
-     set the same `wasStoppedByUser` flag the teacher-facing Stop Preview
-     button sets, and the panel-choosing logic compared `startedAt`
-     timestamps that hadn't been updated for the new deploy yet. Fix: claim
-     the console for the deploy panel (fresh `startedAt`, reset run state)
-     *before* stopping the preview, not after. Check whether Windows' own
-     "which panel is showing" logic has the same ordering dependency, and
-     whether its internal preview-stop (if any) is distinguishable from a
-     teacher pressing Stop.
-   - **Row 318a** — right after clicking Deploy, the console went blank for
-     about half a second, because a freshly-reset-but-never-run process
-     wrapper is a state the progress view had no rendering for (neither its
-     running branch nor its finished branch fired). Mac's fix was a
-     `isPreparingDeploy` flag showing a plain "Preparing to deploy…"
-     placeholder for that span — check what WinUI's deploy panel draws for a
-     brand-new process object with nothing to say yet. The Deploy button
-     also stayed clickable through this same window on mac (a re-entrancy
-     bug in its own right, allowing a second overlapping deploy); confirm
-     Windows' Deploy button disables for the full click-to-real-work span,
-     not just while the underlying process reports running.
-   - **Row 318b** — mid-deploy, the panel falsely flashed "Done" for up to
-     300ms between the build script exiting and the deploy script starting,
-     because mac's `MultiDestinationDeployRunner` ran both scripts on one
-     `ScriptRunner` and polled `isRunning` every 300ms to detect completion
-     — indistinguishable from the whole leg finishing. Fixed by making
-     completion event-driven and adding an `isBetweenPhases` flag so the
-     view knows "this script exited, but another is about to start" is not
-     the same as "actually done." If Windows' build-then-deploy path reuses
-     one process wrapper for two scripts back to back, check whether its own
-     completion detection is polled (same latency-window risk) and whether
-     its progress view can tell the two states apart.
+8. ~~Three deploy-after-preview console races fixed on mac 2026-08-22, not
+   yet checked on Windows~~ — ✅ Done 2026-08-23 (`GUI-IMPROVEMENTS.md` row
+   354). All three were confirmed present by an investigation agent, fixed,
+   and independently checked by a second, adversarial agent before this was
+   marked done. None ported mechanically (SwiftUI state races, not shared
+   code) — each got its own C# shape:
+   - **Row 317** (stale-timestamp panel flash) — `SectionDetailView`'s own
+     `showsDeployProgress`-equivalent (`RefreshChrome`'s `showDeploy`) had
+     the identical ordering bug: `Deploy_Click` called `StopPreviewAsync()`
+     before `_deployRunner.StartedAt` was set (only `RunAsync` set it, deep
+     inside the click handler), so the panel-choosing timestamp comparison
+     kept favouring the just-stopped preview for a beat. Fixed with
+     `MultiDestinationDeployRunner.ClaimConsole()`, called before touching
+     the preview runner at all, mirroring the mac's
+     `deployRunner.startedAt = Date()` pre-claim in `deployAndWait()`.
+   - **Row 318a** (blank console + Deploy re-entrancy) — present, and with a
+     LARGER exposure window than mac's ~0.5s: nothing disabled the Deploy
+     button for the whole `StopPreviewAsync()` span (up to ~20s on Windows,
+     since a stopped preview's container-side sweep takes longer here than
+     mac's). Fixed with `_isPreparingDeploy`, a private field on
+     `SectionDetailView` (view-local state, like mac's `@State
+     isPreparingDeploy` — not a property on the runner), set immediately
+     after the refusal-reason check and cleared in a `finally` block so no
+     early return or exception can strand it true. `TaskProgressView`
+     gained a dedicated `ShowPreparing(title)` placeholder — a plain
+     indeterminate bar and "Preparing to deploy…" text with `_runner` set
+     to `null` — rather than binding early to either a blank fresh runner
+     or the previous deploy's stale outcome, mirroring the mac's own
+     `preparingToDeployPlaceholder` view (a dedicated placeholder, not a
+     runner-state hack, was the mac's actual choice and is the one that
+     ported cleanly).
+   - **Row 318b** (false "Done" flash between build and deploy) — present:
+     `MultiDestinationDeployRunner.RunAsync` reuses one `ScriptRunner` for
+     the build-only run and the leg's own deploy run, and completion
+     detection is a 100ms poll (`ScriptRunner.WaitUntilFinished`), so the
+     gap between the build's `IsRunning` flipping false and the deploy
+     script actually launching on the same runner read to
+     `TaskProgressView` as the whole leg finishing. Fixed with
+     `ScriptRunner.IsBetweenPhases`, set `true` synchronously right after
+     the build launches (long before it can finish) and cleared only by the
+     next `Run()` call's own reset (or the cancel/stop/build-failure early
+     exits) — `TaskProgressView.Render()` and its tick timer now check
+     `IsRunning || IsBetweenPhases` everywhere they previously checked
+     `IsRunning` alone, mirroring mac's identical `isBetweenPhases` flag and
+     `runner.isRunning || runner.isBetweenPhases` check.
+
+   **One thing the adversarial review caught that is worth naming rather
+   than silently having fixed:** an explicit `RefreshChrome()` call
+   originally sat between clearing `_isPreparingDeploy` and `await
+   _deployRunner.RunAsync(...)`. It was almost certainly never visible
+   (everything up to `RunAsync`'s own `Notify(IsRunning)` runs synchronously
+   on the UI thread, and WinUI does not paint an intermediate frame
+   mid-callstack) but it re-derived the exact stale-`Legs` race the fix
+   exists to close, one future `await` inserted in that gap away from
+   becoming a real, visible bug. Removed — `RunAsync`'s own synchronous
+   prefix (reassign `Legs`, set `IsRunning`, `Notify`) already triggers
+   `RefreshChrome` through the constructor's `_deployRunner.PropertyChanged`
+   subscription, so no manual call belongs there at all. The general lesson:
+   a fix that works only because of synchronous-batching timing is fragile
+   even when it currently renders correctly — remove the redundant call
+   rather than leave a race that "doesn't fire yet."
+
+   Full suite: 657/658 both before and after this item (the one failure is
+   the pre-existing, unrelated item 9 course-code-dashes case, unaffected).
+   A pre-existing, UNCHANGED-by-this-fix re-entrancy gap was noted along the
+   way and left open rather than folded in here: `Deploy_Click`'s first
+   guard runs before `await TheAssistantIsBuilding()`, so a second click
+   between that await yielding and `_isPreparingDeploy` being set (several
+   lines later, after the refusal-reason check) is not caught — this
+   predates the fix (the original single `IsRunning` guard had the
+   identical gap, just later in the method) and is narrower now, not wider,
+   but was not the shape row 318a described, so it was left rather than
+   silently expanded into this item's scope.
 
 9. **Course codes with DASHES, and the club heuristic that misreads them
    (2026-08-23).** Two changed rules, both already in

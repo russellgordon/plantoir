@@ -42,6 +42,27 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     public string PendingCancelToken { get; private set; } = "";
     public bool WasCancelled { get; private set; }
     public bool WasStoppedByUser { get; private set; }
+
+    /// <summary>
+    /// True for the span between one script on this runner exiting and the
+    /// NEXT one being launched on it — set only by
+    /// <see cref="MultiDestinationDeployRunner"/>'s build-then-deploy leg,
+    /// which reuses one runner for both scripts. Without this,
+    /// <see cref="IsRunning"/> goes false the instant the build exits and
+    /// stays false until <c>Run</c> is called again for the deploy, and
+    /// <c>TaskProgressView</c> — which only ever checks <c>IsRunning</c> —
+    /// reads that gap as "finished" and flashes the outcome badge for the
+    /// span the 100ms poll in <see cref="WaitUntilFinished"/> takes to
+    /// notice. Mirrors the mac's `ScriptRunner.isBetweenPhases` (row 318b).
+    /// Reset to false at the top of every <see cref="Run"/>, the same as
+    /// <see cref="WasCancelled"/> and <see cref="WasStoppedByUser"/>.
+    /// </summary>
+    private bool _isBetweenPhases;
+    public bool IsBetweenPhases
+    {
+        get => _isBetweenPhases;
+        set { _isBetweenPhases = value; Notify(); }
+    }
     public string StepDetail { get; private set; } = "";
     public string? CustomDomainForLinks { get; set; }
 
@@ -84,6 +105,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         LaunchProblem = null;
         WasCancelled = false;
         WasStoppedByUser = false;
+        IsBetweenPhases = false;
         StepDetail = "";
         if (!keepTranscript) _announcedPreviewAddress = null;
         NotifyRunState();

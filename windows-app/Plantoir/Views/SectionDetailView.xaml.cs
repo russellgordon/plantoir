@@ -46,6 +46,19 @@ public sealed partial class SectionDetailView : UserControl
     private CancellationTokenSource? _serverWait;
 
     /// <summary>
+    /// True for the span between Deploy being clicked and
+    /// <see cref="MultiDestinationDeployRunner.RunAsync"/> actually taking
+    /// over — <c>_deployRunner.IsRunning</c> alone stays false through that
+    /// whole prep phase (stopping a running preview can take ~20s), which
+    /// left the Deploy button clickable again the instant the phase
+    /// started and let a second click race the first's own
+    /// stop-preview-then-deploy sequence. Mirrors the mac's
+    /// `SectionDetailView.isPreparingDeploy` (WINDOWS-HANDOFF.md item 8,
+    /// row 318a).
+    /// </summary>
+    private bool _isPreparingDeploy;
+
+    /// <summary>
     /// Guards <see cref="RefreshPublishedMarker"/> against an out-of-order
     /// result: several triggers (window activation, a run finishing) can
     /// fire in quick succession, and a walk started before a publish must
@@ -192,7 +205,7 @@ public sealed partial class SectionDetailView : UserControl
         // publishing"): Deploy_Click stops the preview itself and waits for
         // the stop — sweep included — before building. Only a deploy already
         // running disables the button.
-        DeployButton.IsEnabled = !_deployRunner.IsRunning && !building;
+        DeployButton.IsEnabled = !_deployRunner.IsRunning && !_isPreparingDeploy && !building;
         if (building)
             ToolTipService.SetToolTip(DeployButton, $"Available in a moment — {_course.Code} is being built");
 
@@ -211,17 +224,28 @@ public sealed partial class SectionDetailView : UserControl
         // shown here — re-subscribing on every event could swallow the
         // IsAwaitingInput transition that raises the question dialog.
         bool showDeploy = !_previewRunner.IsRunning &&
-            (_deployRunner.IsRunning ||
+            (_deployRunner.IsRunning || _isPreparingDeploy ||
              (_deployRunner.StartedAt ?? DateTime.MinValue) > (_previewRunner.StartedAt ?? DateTime.MinValue));
         if (showDeploy)
         {
-            // Multi-destination courses get a leg count in the title, so a
-            // teacher watching the progress bar knows it is running a
-            // sequence rather than a single deploy that is unusually slow.
-            string title = _deployRunner.Legs.Count > 1
-                ? $"Deploying {TitleText} — destination {Math.Min(_deployRunner.CurrentLegIndex + 1, _deployRunner.Legs.Count)} of {_deployRunner.Legs.Count}"
-                : $"Deploying {TitleText}";
-            Progress.Show(_deployRunner.ActiveRunner, title, onCancel: CancelDeploy, multiRunner: _deployRunner);
+            // _isPreparingDeploy: nothing is running on _deployRunner yet —
+            // ActiveRunner would either be blank (a fresh leg has never
+            // rendered) or the PREVIOUS deploy's stale outcome. Neither is
+            // what is actually happening right now (row 318a).
+            if (_isPreparingDeploy && !_deployRunner.IsRunning)
+            {
+                Progress.ShowPreparing($"Deploying {TitleText}");
+            }
+            else
+            {
+                // Multi-destination courses get a leg count in the title, so a
+                // teacher watching the progress bar knows it is running a
+                // sequence rather than a single deploy that is unusually slow.
+                string title = _deployRunner.Legs.Count > 1
+                    ? $"Deploying {TitleText} — destination {Math.Min(_deployRunner.CurrentLegIndex + 1, _deployRunner.Legs.Count)} of {_deployRunner.Legs.Count}"
+                    : $"Deploying {TitleText}";
+                Progress.Show(_deployRunner.ActiveRunner, title, onCancel: CancelDeploy, multiRunner: _deployRunner);
+            }
         }
         else
             Progress.Show(_previewRunner,
@@ -232,7 +256,7 @@ public sealed partial class SectionDetailView : UserControl
 
         bool anyOutput = _previewRunner.Transcript.Lines.Count > 0 || _deployRunner.HasAnyOutput
                          || _previewRunner.Transcript.CurrentLine.Length > 0;
-        bool showConsole = _isWaitingForServer || IsBusy || anyOutput;
+        bool showConsole = _isWaitingForServer || IsBusy || _isPreparingDeploy || anyOutput;
         Progress.Visibility = showConsole ? Visibility.Visible : Visibility.Collapsed;
         NoPreviewState.Visibility = showConsole ? Visibility.Collapsed : Visibility.Visible;
         Preview.Visibility = previewShown ? Visibility.Visible : Visibility.Collapsed;
@@ -625,7 +649,13 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
-            if (_deployRunner.IsRunning) return;
+            // _isPreparingDeploy closes a real window, not just a display
+            // one: _deployRunner.IsRunning alone stays false through this
+            // whole prep phase (stopping any preview, waiting for the stop
+            // sweep) — a second click there would race its own
+            // stop-preview-then-deploy sequence against the first's
+            // (row 318a).
+            if (_deployRunner.IsRunning || _isPreparingDeploy) return;
             if (await TheAssistantIsBuilding()) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
 
@@ -647,6 +677,20 @@ public sealed partial class SectionDetailView : UserControl
                 await ShowDialogSafelyAsync(problemDialog);
                 return;
             }
+
+            // Claim the console for the deploy panel BEFORE touching the
+            // preview runner below. Stopping a running preview sets its own
+            // WasStoppedByUser and flips IsRunning false without touching
+            // _deployRunner.StartedAt — until ClaimConsole() gives it a real
+            // timestamp, RefreshChrome's showDeploy comparison kept picking
+            // the just-stopped preview panel, flashing "Stopped" for a beat
+            // before the deploy panel took over (row 317). _isPreparingDeploy
+            // covers what the timestamp alone does not: _deployRunner.Legs
+            // still holds the PREVIOUS deploy's runners until RunAsync
+            // replaces them with fresh ones a little further down.
+            _deployRunner.ClaimConsole();
+            _isPreparingDeploy = true;
+            RefreshChrome();
 
             // Stop any running or building preview before deploying, and
             // wait for the container-side stop sweep to finish so it cannot
@@ -678,12 +722,24 @@ public sealed partial class SectionDetailView : UserControl
             // build claim can simply run its whole length.
             _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
 
+            // The real progress panel takes over from here — RunAsync is
+            // about to give _deployRunner.Legs fresh runners of its own and
+            // start reporting real progress on them. No RefreshChrome() call
+            // belongs between this line and RunAsync: _deployRunner.Legs
+            // still holds the PREVIOUS deploy's (finished, stale-outcome)
+            // runners until RunAsync's own synchronous prefix replaces them,
+            // so a refresh sandwiched here would repaint that stale outcome
+            // for exactly the beat this whole fix exists to close — RunAsync
+            // sets IsRunning and notifies synchronously, before its first
+            // await, and that notification is what calls RefreshChrome (see
+            // the constructor's _deployRunner.PropertyChanged subscription).
+            _isPreparingDeploy = false;
+
             // The whole sequence — an optional shared build, then each
             // destination's own deploy — happens inside RunAsync, which
             // also resolves each leg's own milestones and custom domain.
             // For the overwhelming majority of courses (one destination)
             // this behaves exactly as a single deploy always did.
-            RefreshChrome();
             await _deployRunner.RunAsync(_course, _sectionNumber, destinations, cloudflareAccount,
                 workspacePath, needsBuild);
             EndPublishActivity();
@@ -695,6 +751,19 @@ public sealed partial class SectionDetailView : UserControl
             // otherwise leave the course registered as publishing — holding
             // the publish and build claims — until the view is torn down.
             EndPublishActivity();
+        }
+        finally
+        {
+            // A safety net for every early-return path above (the refusal
+            // dialog, "already deploying", "the assistant is building",
+            // an exception before the flag was cleared): _isPreparingDeploy
+            // must never survive past this method, or the Deploy button and
+            // the console stay stuck showing "Preparing to deploy…" forever.
+            if (_isPreparingDeploy)
+            {
+                _isPreparingDeploy = false;
+                RefreshChrome();
+            }
         }
     }
 
