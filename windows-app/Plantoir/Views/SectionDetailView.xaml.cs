@@ -45,6 +45,15 @@ public sealed partial class SectionDetailView : UserControl
     private bool _isWaitingForServer;
     private CancellationTokenSource? _serverWait;
 
+    /// <summary>
+    /// Guards <see cref="RefreshPublishedMarker"/> against an out-of-order
+    /// result: several triggers (window activation, a run finishing) can
+    /// fire in quick succession, and a walk started before a publish must
+    /// not overwrite one started after it. Mirrors the mac's generation
+    /// counter — see "The refresh triggers" in WINDOWS-HANDOFF.md.
+    /// </summary>
+    private int _publishMarkerGeneration;
+
     public string CourseCode => _course.Code;
     public int SectionNumber => _sectionNumber;
 
@@ -99,11 +108,66 @@ public sealed partial class SectionDetailView : UserControl
         // so there is never a moment a question from an un-registered leg
         // could be missed.
         Progress.Register(_previewRunner);
-        _previewRunner.PropertyChanged += (_, _) => RefreshChrome();
-        _deployRunner.PropertyChanged += (_, _) => RefreshChrome();
+        _previewRunner.PropertyChanged += (_, args) =>
+        {
+            RefreshChrome();
+            if (args.PropertyName == nameof(_previewRunner.IsRunning) && !_previewRunner.IsRunning)
+                _ = RefreshPublishedMarker();
+        };
+        _deployRunner.PropertyChanged += (_, args) =>
+        {
+            RefreshChrome();
+            if (args.PropertyName == nameof(_deployRunner.IsRunning) && !_deployRunner.IsRunning)
+                _ = RefreshPublishedMarker();
+        };
         Preview.NavigationCompleted += (_, _) => RefreshChrome();
-        Unloaded += (_, _) => StopPreview();
+        _window.Activated += OnWindowActivated;
+        Unloaded += (_, _) => { StopPreview(); _window.Activated -= OnWindowActivated; };
         RefreshChrome();
+        _ = RefreshPublishedMarker();
+    }
+
+    // ---- The " — Edited" marker -------------------------------------------
+
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState != WindowActivationState.Deactivated)
+            _ = RefreshPublishedMarker();
+    }
+
+    /// <summary>
+    /// Recomputes whether this section has unpublished edits and, if so,
+    /// appends " — Edited" to the in-pane section header — the closest
+    /// Windows equivalent of the mac's per-section window title bar, since
+    /// this app shows one section at a time inside a single MainWindow
+    /// rather than one OS window per section. Never touches
+    /// <see cref="TitleText"/> itself: that bare name is used everywhere a
+    /// sentence NAMES the section (deploy progress, dialogs), and the marker
+    /// must never leak into one of those — a real report read "Deploying
+    /// ICS3U-S1 — Edited" as though "Edited" were being published.
+    ///
+    /// Runs the file walk off the UI thread so a course on a slow network
+    /// volume cannot stutter the window coming to the front, and applies the
+    /// result only if this is still the most recent request.
+    /// </summary>
+    private async Task RefreshPublishedMarker()
+    {
+        int generation = ++_publishMarkerGeneration;
+        string courseDirectory = _course.DirectoryPath;
+        int sectionNumber = _sectionNumber;
+        var excluded = SectionPublishState.SelfPublishingSubpaths(
+            courseDirectory, _course.Configuration.AllDeployDestinations);
+
+        bool edited;
+        try
+        {
+            edited = await Task.Run(() =>
+                SectionPublishState.HasUnpublishedEdits(courseDirectory, sectionNumber, excluded));
+        }
+        catch { return; } // never let this stand in for a real failure elsewhere
+
+        if (generation != _publishMarkerGeneration) return; // superseded by a newer refresh
+        SectionTitle.Text = SectionPublishState.WindowTitle(TitleText, edited);
     }
 
     // ---- Chrome state ----------------------------------------------------
