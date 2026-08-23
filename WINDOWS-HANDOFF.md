@@ -221,10 +221,28 @@ this side is expected to say so when the contract is wrong.
    whether the browser needs `127.0.0.1` instead of `localhost` for a preview
    address, and which of the 25 progress markers your own `.ps1`/native
    runtime output actually prints.
-6. **The working-folder path bar's fuller gesture set** (double-click to open,
-   right-click for a Show/Open menu, hover tooltip, folder icon per crumb) —
-   see "The working-folder path bar" below; verify what `BreadcrumbBar`
-   currently does against that table before assuming the gap is still open.
+6. ~~The working-folder path bar's fuller gesture set~~ — ✅ Done 2026-08-23
+   (`ff4d9ee9`, `GUI-IMPROVEMENTS.md` row 328). Double-click-to-open, the
+   right-click Show-in-Explorer/Open-Folder menu, and the hover tooltip were
+   already in place from an earlier pass; this closed the rest — a plain
+   click now does nothing (it had been a redundant reveal-in-Explorer,
+   duplicating the right-click menu's own item, matching the mac's own path
+   bar per `contracts/shared-rules.json` → `workingFolderPathBar`), and each
+   crumb shows its real shell folder icon (new `PathBarCrumb`/`FolderIcons`,
+   async-loaded via `StorageFolder.GetThumbnailAsync`, cached, graceful null
+   on failure, icon vertical alignment nudged to sit on the text baseline
+   rather than its bounding-box center, matching macOS). Found and fixed
+   while verifying: the existing `DataTemplate` nested a second
+   `BreadcrumbBarItem` inside `BreadcrumbBar.ItemTemplate`, which is
+   invalid — `BreadcrumbBar` already generates its own container per
+   crumb. That built clean and passed the full suite but broke at runtime,
+   silently falling back to the bound object's `ToString()` so every crumb
+   showed the literal text "Plantoir.Views.PathBarCrumb"; fixed by having
+   the template supply only the container's content, with a defensive
+   `ToString()` override on `PathBarCrumb` as a second line of defence. A
+   `MAC-HANDOFF.md` awareness entry records the WinUI nesting trap for
+   anywhere else an `ItemTemplate` wraps a control-specific item-container
+   type. Full suite: 655/655.
 7. **The first-deploy marker's destination-scoping** (`AssistWorkspace.cs`
    accepting either folder rather than only the CURRENT destination) — see
    "One divergence found by sweeping" below; verify against current code.
