@@ -99,6 +99,50 @@ final class QuartzTeachersUITests: XCTestCase {
         closeButton.click()
     }
 
+    /// The course-code field's popup: typing narrows a floating list of
+    /// rich rows (code, example-content badge, formal name), and picking
+    /// one sets both the code and — via the existing auto-fill — the
+    /// course name in one action.
+    func testCourseCodePopupShowsRichSuggestionsAndSelectionFillsBothFields() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10), "The wizard sheet should appear")
+        codeField.click()
+        codeField.typeText("SCH")
+
+        let suggestionsList: XCUIElement = application.scrollViews["courseCodeSuggestionsList"]
+        XCTAssertTrue(suggestionsList.waitForExistence(timeout: 5), "The popup should appear while typing")
+
+        let sch3uRow: XCUIElement = application.buttons["courseCodeSuggestion-SCH3U"]
+        XCTAssertTrue(sch3uRow.waitForExistence(timeout: 5), "SCH3U should be a suggestion for \"SCH\"")
+
+        saveScreenshot(named: "06-course-code-popup", of: application)
+
+        sch3uRow.click()
+
+        // Selecting a row sets the code…
+        let codeSettled: NSPredicate = NSPredicate(format: "value == %@", "SCH3U")
+        let codeExpectation: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: codeSettled, object: codeField)
+        XCTAssertEqual(XCTWaiter().wait(for: [codeExpectation], timeout: 5), .completed, "Selecting the row should set the code field to SCH3U")
+
+        // …and the popup should close (the field now holds an exact code).
+        XCTAssertFalse(suggestionsList.exists, "The popup should close once a code is chosen")
+
+        // …and auto-fills the course name.
+        let nameField: XCUIElement = application.textFields["wizardCourseNameField"]
+        let nameSettled: NSPredicate = NSPredicate(format: "value == %@", "Chem")
+        let nameExpectation: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: nameSettled, object: nameField)
+        XCTAssertEqual(XCTWaiter().wait(for: [nameExpectation], timeout: 5), .completed, "Selecting a suggestion should auto-fill the course name; value was: \(String(describing: nameField.value))")
+
+        let closeButton2: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton2.click()
+    }
+
     func testSidebarContextMenuOffersFolderActions() throws {
         let application: XCUIApplication = try launchApp()
 
