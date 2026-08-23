@@ -138,7 +138,12 @@ enum ClassPages {
     /// lesson would let a reshuffle move the way in to the folder.
     static func list(forSection sectionNumber: Int, in course: Course) -> [ClassPageSummary] {
         var summaries: [ClassPageSummary] = []
-        for folderName in course.configuration.perSectionFolders {
+        // The MEMBERSHIP rule, not every per-section folder the course has.
+        // This iterated the raw list, so "Handouts" and "Media" counted as
+        // holding class pages — and this feeds class numbering, re-dating,
+        // insertion and the section index pointer, which makes it the biggest
+        // consumer of the question `ClassFolder` exists to answer.
+        for folderName in ClassFolder.names(for: course) {
             let root: URL = course.sectionDirectoryURL(forSection: sectionNumber)
                 .appendingPathComponent(folderName)
             for pageURL in markdownPages(under: root) {

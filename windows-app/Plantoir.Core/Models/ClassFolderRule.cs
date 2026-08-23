@@ -84,12 +84,15 @@ public static class ClassFolderRule
     ///
     /// <para>Two things this is deliberately careful about, both real bugs:</para>
     /// <list type="bullet">
-    /// <item><description><b>Folder segments only, never the file name.</b> The
-    /// build's rule ran over every segment including the file name, so
-    /// "How This Class Works.md" — which ships in about twenty payloads — and
-    /// ADA1O's curriculum page "B3. Connections Beyond the Classroom.md"
-    /// counted as lessons, inflating what the course was judged to
-    /// teach.</description></item>
+    /// <item><description><b>Folder segments only, never the file name.</b>
+    /// Defence in depth, NOT a bug that was observed — an earlier draft of this
+    /// comment claimed the build had been counting pages such as
+    /// "How This Class Works.md" by name, and that was wrong: the old rule was
+    /// equality too, so it never fired. Under segment EQUALITY a file name
+    /// cannot collide with a folder name, and this exclusion changes no answer
+    /// today. It is kept so a future move to prefix or substring matching
+    /// cannot silently start counting a page for what it is
+    /// CALLED.</description></item>
     /// <item><description><b>Relative, never absolute.</b> This app tested the
     /// whole directory string, so a teacher whose working folder was
     /// <c>C:\Users\x\Classroom\</c> made every page in every course a class

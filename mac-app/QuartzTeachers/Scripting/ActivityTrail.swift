@@ -62,6 +62,15 @@ nonisolated enum ActivityTrail {
         /// leaves nothing to look at: the marker is derived, so its
         /// absence and its presence look identical on disk.
         case sectionContentMarkedPublished = "section content marked published"
+        /// A folder a feature depends on was missing, renamed or emptied.
+        /// Carries the check's NAME, never its wording: the sentence is
+        /// product wording and will be reworded, while the name is what
+        /// somebody reading the trail months later can match against the
+        /// contract. The finding itself is printed into a build console that
+        /// is long gone by the time it is reported, and the condition is
+        /// invisible on disk — a renamed folder looks exactly like a folder
+        /// that was always called that.
+        case folderProblemFound = "folder problem found"
     }
 
     // MARK: - Stored properties

@@ -410,6 +410,11 @@ class ScriptRunner {
     /// records it and folds it into the milestone count. (Tests feed
     /// simulated output through here too, so both paths behave alike.)
     func receiveOutput(_ text: String) {
+        // Findings are read from the RAW text first: the transcript drops the
+        // machine-readable lines on the way in (they are machinery, and a
+        // teacher reads that console), so anything that wants them must take
+        // them before they are filtered out.
+        collectHealthFindings(in: text)
         transcript.append(rawText: text)
         advanceMilestones(with: text)
         lastOutputAt = Date()
@@ -498,6 +503,37 @@ class ScriptRunner {
             return nil
         }
         return ScriptRunner.applyingCustomDomain(customDomainForLinks, to: parsed)
+    }
+
+    /// What the build said was wrong with this course's folders.
+    ///
+    /// Collected as output ARRIVES rather than read back off the transcript,
+    /// which is the one thing about this that is easy to get wrong: every
+    /// other structured-line reader here works from
+    /// `transcript.recentText(maximumCharacters: 8000)`, and that is a TAIL.
+    /// The health lines are printed in the middle of a build — before Quartz
+    /// runs — so on any real build they have scrolled well past the end of an
+    /// 8,000-character window by the time anybody asks.
+    private(set) var healthFindings: [SiteHealthFinding] = []
+
+    private func collectHealthFindings(in text: String) {
+        for finding in SiteHealthFinding.findings(in: text) {
+            if healthFindings.contains(finding) {
+                continue
+            }
+            healthFindings.append(finding)
+            // A sentence a teacher would recognise, carrying the stable check
+            // NAME in brackets. Both halves earn their place: rule 5 says a
+            // trail line must read as something that happened rather than as a
+            // function name, while the name is what somebody reading the trail
+            // months later can match against the contract — the product
+            // wording will have been reworded by then.
+            ActivityTrail.note(
+                .folderProblemFound,
+                "found a problem with this course's folders (\(finding.name))",
+                course: finding.course, section: finding.section
+            )
+        }
     }
 
     /// The folder a local-folder deploy published into, if the output

@@ -93,7 +93,7 @@
       "support",
       "contracts"
     ],
-    "note": "The recipe's FOLDERS, as data, because there are four hand-maintained copies of this list and they drifted the moment a fifth folder was added: the mac's WorkspaceModel.refreshToolchain, Windows' ToolchainMirror.RecipeFolders, the marketing screenshot harness (website/shots/capture.py), and the Dockerfile. capture.py's own docstring said 'keep them in step' and it was the one that did not — which broke the demo workspace outright rather than subtly, because it copies the Dockerfile that expects the folder it did not copy.",
+    "note": "The recipe's FOLDERS, as data, because there were four hand-maintained copies of this list and they drifted the moment a fifth folder was added: the mac's WorkspaceModel.refreshToolchain, Windows' ToolchainMirror.RecipeFolders, the marketing screenshot harness (website/shots/capture.py), and the Dockerfile. Six carriers are pinned against this list in total, the other two being mac-app/project.yml and windows-app/Plantoir/Plantoir.csproj, which bundle and ship the folders; the Dockerfile is pinned in BOTH directions, since a COPY the contract does not list reproduces the original failure exactly. capture.py's own docstring said 'keep them in step' and it was the one that did not — which broke the demo workspace outright rather than subtly, because it copies the Dockerfile that expects the folder it did not copy.",
     "why": "A .toolchain/ holding the new Dockerfile without the new folder is not stale, it is UNBUILDABLE: `docker buildx build` fails on the missing COPY, and preview.sh's friendly 'missing the build recipe' message cannot fire because the Dockerfile is present."
   }
 }

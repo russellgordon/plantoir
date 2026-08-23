@@ -73,9 +73,11 @@ def finding(name: str, course: str, section, checks: dict = None) -> Finding:
     """
     One finding, worded from the contract.
 
-    `{course}` and `{section}` are filled in; nothing else is substituted, so a
-    sentence can contain ordinary braces without becoming a format string by
-    accident.
+    `{course}` and `{section}` are filled in by plain replacement rather than
+    `str.format`, so a sentence containing ordinary braces cannot become a
+    format string by accident. The replacements are applied in a fixed order
+    and are not re-scanned, so a value that itself contained a placeholder
+    would not be expanded twice.
     """
     table = checks if checks is not None else _checks_by_name()
     entry = table[name]
@@ -116,13 +118,26 @@ def findings(facts: dict, course: str, section) -> list:
     table = _checks_by_name()
     found = []
 
-    if facts.get("coverage_wanted") and not facts.get("curriculum_found"):
+    # Each of the two coverage checks needs the OTHER half of the map to be
+    # present before it means anything. A brand-new course has an empty
+    # curriculum folder and an empty class folder on day one — the wizard
+    # creates both and switches the map on — so an unconditional pair of
+    # warnings would fire on every build of a course nobody has broken. That
+    # is the nagging this feature must not do: a warning a teacher cannot act
+    # on is one they learn to dismiss, and they will dismiss it when it counts.
+    #
+    # So: complain that the expectations are missing only once there are
+    # lessons, and complain that the lessons are missing only once there are
+    # expectations. A course with neither has not been written yet and is told
+    # nothing.
+    coverage_wanted = facts.get("coverage_wanted")
+    curriculum_found = facts.get("curriculum_found")
+    class_pages_found = facts.get("class_pages_found")
+
+    if coverage_wanted and not curriculum_found and class_pages_found:
         found.append(finding("curriculumCoverageFoundNothing", course, section, table))
 
-    # Only worth saying when the map is on: with the map off, nothing depends
-    # on knowing which pages the course teaches, and a warning about it would
-    # be noise a teacher cannot act on.
-    if facts.get("coverage_wanted") and not facts.get("class_pages_found"):
+    if coverage_wanted and not class_pages_found and curriculum_found:
         found.append(finding("courseTeachesNothing", course, section, table))
 
     if not facts.get("media_target_exists"):
@@ -135,6 +150,28 @@ def findings(facts: dict, course: str, section) -> list:
         found.append(finding("handWrittenCoveragePage", course, section, table))
 
     return found
+
+
+def announce_or_stay_quiet(facts: dict, course: str, section, printer=print) -> None:
+    """
+    The whole feature, wrapped so it can never break a build.
+
+    This is the first code in a build that MUST read a contract at run time,
+    and `contracts.load` deliberately raises rather than falling back to a
+    hidden default. Raising is right for a test; it is wrong here. A stale
+    `PLANTOIR_CONTRACTS_DIR` on a native Windows run, or an older image pinned
+    with `--image`, would otherwise kill a build that used to succeed —
+    AFTER the content merge, with a traceback. A health check that destroys
+    the build it was checking is worse than the silent failure it replaces.
+
+    So the checks are advisory in the strongest sense: if they cannot run, the
+    build carries on and says so in one plain line.
+    """
+    try:
+        announce(findings(facts, course, section), printer=printer)
+    except Exception as error:
+        printer(f"\u2139\ufe0f  Skipped the folder checks for {course} "
+                f"Section {section}: {error}")
 
 
 def announce(found: list, printer=print) -> None:

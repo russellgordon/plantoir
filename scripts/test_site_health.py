@@ -70,6 +70,59 @@ class SiteHealthTests(unittest.TestCase):
         self.assertEqual(wired, in_contract,
                          "a check in the contract is not wired up, or vice versa")
 
+    def test_a_brand_new_course_is_not_nagged(self):
+        """
+        The failure mode this feature must not have.
+
+        The wizard creates an empty curriculum folder AND an empty class folder
+        and switches the map on, so on day one a perfectly healthy new course
+        has neither expectations nor lessons. An unconditional pair of checks
+        fired two non-fixable warnings on every build of a course nobody had
+        broken, with no way to silence them short of turning off a feature the
+        teacher had just enabled.
+        """
+        fresh = dict(HEALTHY)
+        fresh["curriculum_found"] = False
+        fresh["class_pages_found"] = False
+        self.assertEqual(site_health.findings(fresh, "ICS3U", 1), [])
+
+    def test_each_half_of_the_map_complains_only_when_the_other_exists(self):
+        """
+        Complain that the expectations are missing once there are lessons, and
+        that the lessons are missing once there are expectations. Either way
+        round, the teacher is told about something they can act on.
+        """
+        lost_curriculum = dict(HEALTHY)
+        lost_curriculum["curriculum_found"] = False
+        self.assertEqual(_names(site_health.findings(lost_curriculum, "ICS3U", 1)),
+                         ["curriculumCoverageFoundNothing"])
+
+        lost_classes = dict(HEALTHY)
+        lost_classes["class_pages_found"] = False
+        self.assertEqual(_names(site_health.findings(lost_classes, "ICS3U", 1)),
+                         ["courseTeachesNothing"])
+
+    def test_the_checks_can_never_break_the_build_they_are_checking(self):
+        """
+        This is the first code in a build that MUST read a contract at run
+        time, and contracts.load deliberately raises rather than guessing. A
+        stale PLANTOIR_CONTRACTS_DIR or an older pinned image would otherwise
+        kill a build that used to succeed, AFTER the content merge. A health
+        check that destroys the build it was checking is worse than the silent
+        failure it replaces.
+        """
+        original = toolchain_paths.CONTRACTS_DIR
+        toolchain_paths.CONTRACTS_DIR = Path("/nowhere/at/all")
+        contracts.reset_cache()
+        try:
+            lines = []
+            site_health.announce_or_stay_quiet(dict(HEALTHY), "ICS3U", 1, printer=lines.append)
+            self.assertEqual(len(lines), 1)
+            self.assertIn("Skipped the folder checks", lines[0])
+        finally:
+            toolchain_paths.CONTRACTS_DIR = original
+            contracts.reset_cache()
+
     def test_the_curriculum_check_is_silent_when_the_map_is_switched_off(self):
         facts = dict(HEALTHY)
         facts["coverage_wanted"] = False

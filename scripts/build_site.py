@@ -3666,6 +3666,36 @@ def _is_class_page_path(relative_path, class_folders) -> bool:
     return False
 
 
+def resolve_include_curriculum_coverage(config: dict, section_number: int) -> bool:
+    """
+    Whether this SECTION wants the Curriculum Coverage map.
+
+    `include_curriculum_coverage` is a per-section map of booleans
+    (contracts/file-formats.json), and Windows writes it that way —
+    `NewCourseDialog.cs` calls `PerSection(...)`, which produces an object. A
+    plain `bool(config.get(...))` therefore reads EVERY Windows-made course as
+    "coverage on", including one where the teacher said no, because a non-empty
+    dict is truthy; and `{"sections": {}}` gets it wrong the other way.
+
+    Follows resolve_show_section_marker's shape, which has been reading this
+    kind of key correctly for a long time.
+    """
+    value = config.get("include_curriculum_coverage", True)
+    if isinstance(value, dict):
+        sec_key = f"section{section_number}"
+        sections = value.get("sections")
+        if isinstance(sections, dict) and sec_key in sections:
+            return bool(sections[sec_key])
+        if sec_key in value:
+            return bool(value[sec_key])
+        if "default" in value:
+            return bool(value["default"])
+        # A map that says nothing about this section: the feature is on by
+        # default, the same answer a course with no key at all gets.
+        return True
+    return bool(value)
+
+
 def _pages_the_course_teaches(content_root: Path, class_folders: list) -> set | None:
     """
     The pages a student actually reaches by following the schedule.
@@ -3809,8 +3839,8 @@ def _coverage_cell(code: str, page: Path, content_root: Path, count: int, assess
 
 def build_curriculum_coverage(content_root: Path, course_code: str,
                              include_notes: bool = True,
-                             first_class_stamp: str | None = None,
-                             class_folders: list | None = None) -> bool:
+                             class_folders: list = None,
+                             first_class_stamp: str | None = None) -> bool:
     """
     Write the Curriculum Coverage page. Returns True when one was written.
 
@@ -3827,8 +3857,20 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
     if not specific:
         return False
 
+    if not class_folders:
+        # Not a defaultable argument. An empty list matches no page, so
+        # `_pages_the_course_teaches` returns None and the caller counts EVERY
+        # published page — the "wrong map that reports success" this work
+        # exists to close, reintroduced by a forgotten argument. The previous
+        # hardcoded "All Classes" default was wrong-but-harmless for the 38
+        # shipped payloads; this would be silently wrong for all of them.
+        raise ValueError(
+            "build_curriculum_coverage needs the course's class folders — "
+            "pass class_folder_names(config). There is no safe default: the "
+            "name is the teacher's to choose."
+        )
     covered_by, assessed_by = _coverage_counts(content_root, curriculum_dir, specific,
-                                               class_folders or [])
+                                               class_folders)
     folder = curriculum_dir.name
 
     strands = {}
@@ -4287,17 +4329,29 @@ def build_section_site(
 
     # === Health of the folders this course depends on =========================
     # Here, and not earlier, because every check is defined over the MERGED
-    # tree, which only exists once the copying above has finished — and not
-    # later, because this must run BEFORE Quartz builds and before deploy.py
-    # uploads anything. A check that only guarded the GUI button would be
-    # bypassed by the assistant, by `Plantoir --mcp-stdio`, by the launchers,
-    # and by the scheduled deploy, which runs with the app closed.
-    coverage_wanted = bool(config.get("include_curriculum_coverage", True))
+    # tree, which only exists once the copying above has finished — and before
+    # Quartz builds, so a teacher is told before a site is produced from it.
+    #
+    # NOT a complete guard on publishing: `deploy.py` uploads an EXISTING
+    # `public/` and only rebuilds when a live preview is attached, and
+    # `deploy.sh --to-folder` rsyncs on the host without entering the Python at
+    # all. So a deploy of a build made in an earlier session carries no health
+    # output of its own. What makes that acceptable is that the findings are
+    # recorded when the build happens; what would NOT be acceptable is claiming
+    # otherwise, which an earlier version of this comment did.
+    class_folders_here = class_folder_names(config)
+    coverage_wanted = resolve_include_curriculum_coverage(config, section_number)
+    curriculum_dir_here = _find_curriculum_folder(content_root)
+
+    # Worked out once and reused by the coverage builder below: this crawl
+    # rglobs every page and reads every class page and every first-hop page,
+    # and running it twice per build was pure waste.
+    taught_here = _pages_the_course_teaches(content_root, class_folders_here)
+
     health_facts = {
         "coverage_wanted": coverage_wanted,
-        "curriculum_found": _find_curriculum_folder(content_root) is not None,
-        "class_pages_found": _pages_the_course_teaches(
-            content_root, class_folder_names(config)) is not None,
+        "curriculum_found": curriculum_dir_here is not None,
+        "class_pages_found": taught_here is not None,
         # The COURSE-level folder, not content/Media: that one is recreated on
         # every build a few hundred lines above, so checking it always passes.
         # What actually breaks is the folder it points AT.
@@ -4309,21 +4363,20 @@ def build_section_site(
         "hand_written_coverage_page": (
             content_root / f"{COVERAGE_PAGE_TITLE}.md").exists(),
     }
-    site_health.announce(
-        site_health.findings(health_facts, course_code, section_number))
+    site_health.announce_or_stay_quiet(health_facts, course_code, section_number)
 
     # === Curriculum coverage heat map =========================================
     first_class_dt = _find_first_class_created(content_root)
     first_class_stamp = _format_created_timestamp_from_dt(first_class_dt) if first_class_dt else None
 
-    if bool(config.get("include_curriculum_coverage", True)):
+    if coverage_wanted:
         # The explanatory sections are a separate choice, and one that only
         # exists while the map does.
         if build_curriculum_coverage(
                 content_root, course_code,
+                class_folders=class_folders_here,
                 include_notes=bool(config.get("include_coverage_notes", True)),
-                first_class_stamp=first_class_stamp,
-                class_folders=class_folder_names(config)):
+                first_class_stamp=first_class_stamp):
             link_coverage_from_key_links(content_root)
     else:
         print("ℹ️ Curriculum Coverage page is switched off for this course.")

@@ -384,7 +384,20 @@ def mirror_toolchain(workspace: Path) -> None:
     for folder in _recipe_folders():
         source = resources / folder
         if not source.exists():
-            continue
+            # Skipping is what made the ORIGINAL failure possible: the
+            # Dockerfile is copied unconditionally above, so a recipe folder
+            # missing here stages a workspace whose Dockerfile COPYs something
+            # that is not there — an unbuildable folder, not a stale one, and
+            # preview.sh cannot say so because the Dockerfile IS present.
+            # app_bundle_resources() takes the NEWEST DerivedData bundle, so
+            # this fires when the app was last built before the folder existed.
+            raise RuntimeError(
+                f"The app bundle has no '{folder}' folder, which "
+                f"contracts/toolchain.json lists as part of the toolchain "
+                f"recipe. Rebuild the mac app before capturing: staging a "
+                f".toolchain/ without it produces a workspace that cannot "
+                f"build at all."
+            )
         subprocess.run(
             ["rsync", "-a", "--delete", f"{source}/", str(toolchain / folder) + "/"],
             check=True,

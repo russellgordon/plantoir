@@ -32,6 +32,11 @@ public static class ActivityTrail
         AssistantModelDownloadStopped,
         AssistantConfirmationChanged,
         SectionContentMarkedPublished,
+        /// <summary>
+        /// A folder a feature depends on was missing, renamed or emptied.
+        /// Carries the check's NAME, never its wording.
+        /// </summary>
+        FolderProblemFound,
         AssistantEngineSaid,
     }
 
@@ -62,6 +67,7 @@ public static class ActivityTrail
         Event.AssistantModelDownloadStopped => "assistant model download stopped",
         Event.AssistantConfirmationChanged => "assistant confirmation changed",
         Event.SectionContentMarkedPublished => "section content marked published",
+        Event.FolderProblemFound => "folder problem found",
         Event.AssistantEngineSaid => "assistant engine said",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };

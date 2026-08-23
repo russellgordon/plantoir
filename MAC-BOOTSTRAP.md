@@ -81,7 +81,7 @@ Two things worth knowing:
   scheme sets `parallelizable = "NO"`; `PreviewLeaseTests` and
   `CourseActivityTests` reset process-wide statics around individual methods.
 
-Toolchain changes (`scripts/`, `support/`, `patches/`, the launchers, the
+Toolchain changes (`scripts/`, `support/`, `patches/`, `contracts/`, the launchers, the
 Dockerfile) are gated by `./verify.sh` instead — from a non-interactive shell,
 `script -q /dev/null ./verify.sh`.
 

@@ -131,6 +131,11 @@
         "why": "Turning off the confirmation step changes what every later request DOES - it goes straight through instead of stopping for a button. A report that says 'it just did it without asking' is explained entirely by this line, and without it the behaviour looks like a bug in the gate rather than a setting somebody chose."
       },
       {
+        "carries": "which course and section, and a sentence naming what happened with the stable check NAME in brackets \u2014 'found a problem with this course\u2019s folders (curriculumCoverageFoundNothing)'. Never the product wording, which changes, and never anything written on a page",
+        "event": "folder problem found",
+        "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk \u2014 a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract."
+      },
+      {
         "carries": "which section, and which destinations it was published to",
         "event": "section content marked published",
         "why": "Why a section stopped saying \" \u2014 Edited\". The marker is DERIVED - its presence and its absence look identical on disk - so a teacher reporting 'it still says Edited after I published' leaves nothing to look at without this line. It is also the only record that a publish succeeded at EVERY destination rather than merely at one."

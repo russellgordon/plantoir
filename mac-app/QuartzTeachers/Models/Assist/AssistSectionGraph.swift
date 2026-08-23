@@ -387,10 +387,18 @@ struct AssistSectionGraph {
         if full.hasPrefix(root) {
             return String(full.dropFirst(root.count))
         }
-        let components: [String] = url.standardizedFileURL.pathComponents
-        if components.count >= 2 {
-            return components.suffix(2).joined(separator: "/")
-        }
+        // A page OUTSIDE the section folder — every course-level shared page,
+        // which `ClassPages.pagesOfSection` deliberately includes, and any
+        // section reached through a symlink, since `standardizedFileURL` does
+        // not resolve those.
+        //
+        // The first version of this returned the last two components, which
+        // put the immediate parent's name back in front of the rule — exactly
+        // the discredited "does the parent mention classes" sniff, and a false
+        // POSITIVE waiting to happen: a course-level folder whose name matched
+        // a configured per-section folder would have made its shared pages
+        // lessons. A shared page is not a class page, so say so plainly rather
+        // than guessing from a fragment of path.
         return url.lastPathComponent
     }
 

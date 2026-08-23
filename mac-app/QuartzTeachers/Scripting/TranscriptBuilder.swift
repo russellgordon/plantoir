@@ -110,7 +110,15 @@ struct TranscriptBuilder {
                 currentLine = ""
             }
             if scalar == newlineScalar {
-                lines.append(currentLine)
+                // The machine-readable health lines are dropped here rather
+                // than shown. Rule 1: the interface never names the machinery,
+                // and a raw JSON blob is machinery. Nothing is lost — the
+                // toolchain prints the teacher-facing sentence separately, and
+                // `ScriptRunner.receiveOutput` reads the raw text for findings
+                // BEFORE handing it here, precisely so this can drop them.
+                if !SiteHealthFinding.isMarkerLine(currentLine) {
+                    lines.append(currentLine)
+                }
                 currentLine = ""
                 if lines.count > TranscriptBuilder.maximumRetainedLines {
                     lines.removeFirst(lines.count - TranscriptBuilder.maximumRetainedLines)
