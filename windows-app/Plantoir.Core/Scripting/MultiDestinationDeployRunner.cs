@@ -108,6 +108,25 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// Claims the console for the deploy panel before anything else touches
+    /// the preview runner. Stopping a running preview sets the preview
+    /// runner's own <see cref="ScriptRunner.WasStoppedByUser"/> flag and
+    /// flips its <see cref="ScriptRunner.IsRunning"/> false — without this,
+    /// the panel-choosing comparison in <c>SectionDetailView.RefreshChrome</c>
+    /// (which panel is "current" by comparing each runner's
+    /// <see cref="StartedAt"/>) would still favour the just-stopped preview
+    /// for the beat before <see cref="RunAsync"/> gives this runner a real
+    /// timestamp, flashing "Stopped" before the deploy panel takes over.
+    /// Mirrors the mac's `deployRunner.startedAt = Date()` pre-claim in
+    /// `deployAndWait()` (row 317).
+    /// </summary>
+    public void ClaimConsole()
+    {
+        StartedAt = DateTime.UtcNow;
+        Notify(nameof(StartedAt));
+    }
+
+    /// <summary>
     /// Cancels whichever leg is currently running. The remaining,
     /// not-yet-started legs are simply never reached — <see cref="RunAsync"/>'s
     /// own loop checks <see cref="WasCancelled"/> after every wait and stops.
@@ -230,9 +249,19 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                         leg.BuildFailed = true;
                         break;
                     }
+                    // Set BEFORE the build finishes, not after — the deploy
+                    // script starts on this SAME runner the moment the build
+                    // succeeds, a few lines down. Without this, the gap
+                    // between the build's own IsRunning flipping false and
+                    // this loop noticing reads to TaskProgressView as the
+                    // whole leg being "Done", because that IS what a
+                    // finished runner with a clean exit code normally means
+                    // (row 318b).
+                    runner.IsBetweenPhases = true;
                     bool built = await runner.WaitUntilFinished();
                     if (runner.WasCancelled || runner.WasStoppedByUser)
                     {
+                        runner.IsBetweenPhases = false;
                         WasCancelled = WasCancelled || runner.WasCancelled;
                         WasStoppedByUser = WasStoppedByUser || runner.WasStoppedByUser;
                         leg.IsFinished = true;
@@ -240,10 +269,13 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                     }
                     if (!built)
                     {
+                        runner.IsBetweenPhases = false;
                         leg.IsFinished = true;
                         leg.BuildFailed = true;
                         break;
                     }
+                    // Still true here on the success path — cleared by the
+                    // deploy Run() call below, as part of its normal reset.
                 }
                 else
                 {

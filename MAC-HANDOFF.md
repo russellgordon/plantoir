@@ -515,6 +515,47 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Windows caught up to the mac's three deploy-after-preview console-race
+  fixes** (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 354, closing
+  `WINDOWS-HANDOFF.md` item 8; mac originals rows 317–318, 2026-08-22). No mac
+  change — this is Windows implementing races the mac already fixed — but the
+  investigation confirmed all three were genuinely present, one had a wider
+  exposure window on Windows than on the mac, and the adversarial review that
+  checked the fix found a trap worth watching for on this side too. **Race 317
+  (stale-timestamp panel flash):** `SectionDetailView.RefreshChrome`'s
+  `showDeploy` had the identical ordering bug `showsDeployProgress` did —
+  fixed with `MultiDestinationDeployRunner.ClaimConsole()`, a direct mirror of
+  `deployRunner.startedAt = Date()` in `deployAndWait()`. **Race 318a (blank
+  console + Deploy re-entrancy):** present with a LARGER window than mac's
+  ~0.5s — Windows' preview-stop sweep can run to ~20s, and nothing disabled
+  Deploy for that whole span. Fixed with a view-local `_isPreparingDeploy`
+  field (mirroring mac's `@State`, not a runner property) and a dedicated
+  `TaskProgressView.ShowPreparing(title)` placeholder, matching the mac's
+  choice of a real placeholder view (`preparingToDeployPlaceholder`) over any
+  runner-state workaround — that was the one part of the mac's shape worth
+  porting exactly rather than reinventing. **Race 318b (false "Done" flash):**
+  present — `MultiDestinationDeployRunner.RunAsync` reuses one `ScriptRunner`
+  for build-then-deploy and polls for completion (100ms on Windows vs mac's
+  300ms), so the same-shape gap existed at a smaller scale. Fixed with
+  `ScriptRunner.IsBetweenPhases`, a direct mirror of `isBetweenPhases`.
+  **Worth a glance on this side:** the adversarial review caught an explicit
+  `RefreshChrome()` call that had been sitting between clearing
+  `_isPreparingDeploy` and `await RunAsync(...)` — harmless today only because
+  everything up to `RunAsync`'s own `Notify` runs synchronously before any
+  frame paints, but it re-derived the exact stale-`Legs` race the whole fix
+  exists to close, one future `await` inserted in that gap away from becoming
+  real. Removed on Windows; a quick read of `deployAndWait()` around the
+  `isPreparingDeploy = false` / `await deployRunner.run(...)` boundary
+  (`SectionDetailView.swift:780-793`) found no exact equivalent there, but the
+  general shape — a fix that only works because of synchronous-batching
+  timing is fragile even when it currently renders correctly — is worth
+  keeping in mind if that span is ever touched again. Reference:
+  `Plantoir.Core/Scripting/ScriptRunner.cs` (`IsBetweenPhases`),
+  `Plantoir.Core/Scripting/MultiDestinationDeployRunner.cs`
+  (`ClaimConsole()`), `Plantoir/Views/TaskProgressView.xaml.cs`
+  (`ShowPreparing`), `Plantoir/Views/SectionDetailView.xaml.cs`
+  (`_isPreparingDeploy`, `Deploy_Click`).
+
 - **Measured: Edge does not need the `127.0.0.1` rewrite for a preview URL**
   (Windows, 2026-08-23, closing `WINDOWS-HANDOFF.md` item 5's first half, the
   Edge `127.0.0.1` question). The rewrite itself (`OutputParsers.cs`,
