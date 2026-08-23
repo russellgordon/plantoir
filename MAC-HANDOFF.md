@@ -1158,6 +1158,53 @@ Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
 
+- ✅ DONE (Windows, 2026-08-22). **Toggling on "Also publish to Cloudflare" as
+  a redundancy target, with Netlify (or a local folder) as the primary
+  destination, permanently disabled Save with no way to fix it — fixed by
+  giving the additional-Cloudflare row its own real Account ID field instead
+  of a note pointing at a field that was hidden.**
+
+  **The report.** Russell, setting a course up to deploy to multiple targets:
+  "I just clicked 'Also deploy to Cloudflare' but could not save that change."
+
+  **Root cause.** `PublishingChoiceView.Problem` (`windows-app/Plantoir/Views/
+  PublishingChoiceView.cs`), which gates `SaveButton.IsEnabled`, correctly
+  requires a valid Cloudflare Account ID before Save can enable — for an
+  ADDITIONAL Cloudflare target exactly as much as for a primary one. But the
+  only Account ID field that existed anywhere in the view was inside the
+  primary Cloudflare block, and that block's `Visibility` is `Collapsed`
+  whenever the primary destination isn't Cloudflare itself. The additional-
+  target row, for Cloudflare, rendered nothing but a caption: "Uses the same
+  Cloudflare Account ID as above — enter it there if you haven't already." With
+  Netlify as primary, "above" was invisible, so there was no field on screen a
+  teacher could use to satisfy the requirement Save was blocking on — a
+  permanently-disabled Save button with no visible cause.
+
+  **Fix.** The additional-Cloudflare row now renders its own real Account ID
+  `TextBox` and caution line (`additionalCloudflareAccountField` /
+  `additionalCloudflareAccountProblem`), reading and writing the same shared
+  per-course value the primary field does. A new `SyncAccountBoxes` helper
+  keeps both text boxes showing the same text regardless of which one the
+  teacher typed into, so switching the primary destination later doesn't show
+  a stale value from construction time.
+
+  **Mac never had this bug and needs no change** —
+  `mac-app/QuartzTeachers/Views/CourseSettings/PublishingChoiceView.swift`'s
+  `additionalTargetRow(forType:)` already renders a full `CloudflareDetailFields`
+  block (account field, help button, caution line) inline in the additional-
+  target row whenever Cloudflare is the additional type — it never relied on
+  the primary block being on screen. This entry exists for awareness only;
+  Windows now matches the mac's existing design rather than the mac needing to
+  match Windows.
+
+  **Reference implementation.** `windows-app/Plantoir/Views/
+  PublishingChoiceView.cs` (`RebuildAdditionalArea`'s `cloudflare_pages`
+  branch, `SyncAccountBoxes`, `RefreshAdditionalCloudflareProblem`).
+  `GUI-IMPROVEMENTS.md` row 322. Full Windows suite green apart from one
+  pre-existing, unrelated failure (`SharedRules_ActivityTrailEvents_Exist`,
+  confirmed failing identically before this change by stashing it and
+  re-running).
+
 - ✅ DONE (Windows, 2026-08-22). **A "Publish" that followed a running
   preview could spew the whole build log into the assistant's chat reply —
   fixed by making `AssistWorkspace.Apply` actually honor the `preview: false`

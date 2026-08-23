@@ -35,6 +35,7 @@ public sealed class PublishingChoiceView
     private readonly Func<string> _getTarget;
     private readonly Func<string> _getPath;
     private readonly Func<string> _getAccount;
+    private readonly Action<string> _setAccount;
     private readonly Func<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> _getAdditional;
     private readonly Action<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> _setAdditional;
     private readonly StackPanel _folderArea;
@@ -49,6 +50,22 @@ public sealed class PublishingChoiceView
     private readonly TextBlock _cloudflareSizeNote;
     private readonly Window _pickerOwner;
     private bool _updatingFromModel;
+
+    /// <summary>
+    /// The Account ID field shown inside the "Also publish to" row when
+    /// Cloudflare is the ADDITIONAL destination and the primary is something
+    /// else — the primary's own Cloudflare block (<see cref="_accountBox"/>)
+    /// is collapsed in that case, so without this field there would be
+    /// nowhere on screen to satisfy <see cref="Problem"/>'s requirement for
+    /// one, and Save would stay disabled with no way to fix it (found by
+    /// Russell 2026-08-22: toggling on "Also deploy to Cloudflare" with
+    /// Netlify as the primary target). Kept in sync with <see cref="_accountBox"/>
+    /// by <see cref="SyncAccountBoxes"/> since both write the same shared
+    /// value — mirrors the mac's <c>CloudflareDetailFields</c> reused inside
+    /// its additional-target row.
+    /// </summary>
+    private TextBox? _additionalCloudflareAccountBox;
+    private TextBlock? _additionalCloudflareProblemText;
 
     /// <summary>
     /// What is wrong with the current choice, or null when nothing is —
@@ -94,6 +111,7 @@ public sealed class PublishingChoiceView
         _getTarget = getTarget;
         _getPath = getPath;
         _getAccount = getAccount;
+        _setAccount = setAccount;
         _getAdditional = getAdditional;
         _setAdditional = setAdditional;
 
@@ -218,6 +236,7 @@ public sealed class PublishingChoiceView
         {
             if (_updatingFromModel) return;
             setAccount(_accountBox.Text.Trim());
+            SyncAccountBoxes(_accountBox);
             RefreshAreas();
             Changed?.Invoke();
         };
@@ -256,6 +275,8 @@ public sealed class PublishingChoiceView
     private void RebuildAdditionalArea()
     {
         _additionalArea.Children.Clear();
+        _additionalCloudflareAccountBox = null;
+        _additionalCloudflareProblemText = null;
         var availableTypes = CourseConfiguration.AvailableAdditionalDeployTargetTypes(_getTarget());
         if (availableTypes.Count == 0) return;
 
@@ -326,12 +347,38 @@ public sealed class PublishingChoiceView
             else if (type == "cloudflare_pages")
             {
                 // Cloudflare's account ID is per-teacher, in app settings —
-                // NOT stored per destination — so an additional Cloudflare
-                // target needs no field of its own here, only the same
-                // account the primary picker's own block already asks for.
-                var note = FormBuilders.ExampleCaption(
-                    "Uses the same Cloudflare Account ID as above — enter it there if you haven't already.");
-                _additionalArea.Children.Add(note);
+                // NOT stored per destination — so this reuses the exact same
+                // value the primary picker's own block asks for. But that
+                // block is only ON SCREEN when the primary destination IS
+                // Cloudflare; when it isn't (e.g. primary is Netlify), a
+                // note pointing at it points at nothing the teacher can see,
+                // and Problem still requires an account ID before Save can
+                // enable — so a real field belongs here too, kept in sync
+                // with the primary one by SyncAccountBoxes.
+                detailArea = new StackPanel { Spacing = 4, Margin = new Thickness(0, 0, 0, 4) };
+                var accountBox = new TextBox
+                {
+                    Text = _getAccount(),
+                    PlaceholderText = "Account ID",
+                };
+                AutomationProperties.SetAutomationId(accountBox, "additionalCloudflareAccountField");
+                detailArea.Children.Add(FormBuilders.LabeledRow("Cloudflare Account ID", accountBox));
+
+                var problemText = CautionLine("additionalCloudflareAccountProblem");
+                detailArea.Children.Add(problemText);
+                _additionalCloudflareAccountBox = accountBox;
+                _additionalCloudflareProblemText = problemText;
+                RefreshAdditionalCloudflareProblem();
+
+                accountBox.TextChanged += (_, _) =>
+                {
+                    if (_updatingFromModel) return;
+                    _setAccount(accountBox.Text.Trim());
+                    SyncAccountBoxes(accountBox);
+                    RefreshAreas();
+                    Changed?.Invoke();
+                };
+                _additionalArea.Children.Add(detailArea);
             }
 
             string capturedType = type;
@@ -354,6 +401,32 @@ public sealed class PublishingChoiceView
         string? problem = CourseConfiguration.DeployFolderProblem(path);
         problemText.Text = problem ?? "";
         problemText.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>
+    /// The Account ID is one shared value, but it can be typed into either
+    /// of two text boxes (the primary Cloudflare block, or the additional-
+    /// target row's own field) depending on which is on screen — keeps
+    /// whichever box the teacher did NOT just type into showing the same
+    /// text, so switching the primary destination later shows what was
+    /// actually saved rather than a stale value from construction time.
+    /// </summary>
+    private void SyncAccountBoxes(TextBox editedBox)
+    {
+        _updatingFromModel = true;
+        string value = _getAccount();
+        if (!ReferenceEquals(editedBox, _accountBox)) _accountBox.Text = value;
+        if (_additionalCloudflareAccountBox is not null && !ReferenceEquals(editedBox, _additionalCloudflareAccountBox))
+            _additionalCloudflareAccountBox.Text = value;
+        _updatingFromModel = false;
+    }
+
+    private void RefreshAdditionalCloudflareProblem()
+    {
+        if (_additionalCloudflareProblemText is null) return;
+        string? problem = CourseConfiguration.CloudflareAccountProblem(_getAccount());
+        _additionalCloudflareProblemText.Text = problem ?? "";
+        _additionalCloudflareProblemText.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private static TextBlock CautionLine(string automationId)
@@ -382,6 +455,7 @@ public sealed class PublishingChoiceView
         string? problem = Problem;
         ShowProblem(_problemText, _caption, folderMode ? problem : null);
         ShowProblem(_cloudflareProblemText, _cloudflareCaption, cloudflareMode ? problem : null);
+        RefreshAdditionalCloudflareProblem();
     }
 
     private static void ShowProblem(TextBlock line, TextBlock caption, string? problem)
