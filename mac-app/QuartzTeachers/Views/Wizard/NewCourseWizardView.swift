@@ -397,6 +397,9 @@ struct NewCourseWizardView: View {
                         isFocused: $courseCodeFieldIsFocused,
                         onEscape: {
                             courseCodeSuggestionsManuallyDismissed = true
+                        },
+                        onRevealRequested: {
+                            courseCodeSuggestionsManuallyDismissed = false
                         }
                     )
                         .onChange(of: courseCode) {

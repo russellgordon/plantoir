@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Marks the course-code field's bounds as an ANCHOR, for the wizard to
@@ -70,7 +71,43 @@ struct CourseCodePickerView: View {
     /// dismissing the list, same as a native combo box's popup.
     var onEscape: () -> Void = {}
 
+    /// The trailing chevron button, pressed — the wizard uses this to
+    /// re-open the popup even when the field is ALREADY focused (e.g.
+    /// Escape had just closed it), which a plain focus change wouldn't
+    /// trigger on its own since nothing about focus is changing.
+    var onRevealRequested: () -> Void = {}
+
     @FocusState var codeFieldHasFocus: Bool
+
+    /// The whole field's height — a touch taller than a bare
+    /// `.roundedBorder` `TextField` (~22pt) so the reveal button has
+    /// genuine room inside it, per the reference proportions.
+    static let fieldHeight: CGFloat = 24
+    static let fieldCornerRadius: CGFloat = 6
+
+    /// Sized and inset to match the reference screenshot's proportions:
+    /// close to square, most of the field's height (leaving a small
+    /// margin top and bottom), a small margin in from the field's own
+    /// trailing edge.
+    static let revealButtonWidth: CGFloat = 22
+    static let revealButtonHeight: CGFloat = 20
+    static let revealButtonCornerRadius: CGFloat = 5
+    static let revealButtonTrailingInset: CGFloat = 2
+
+    /// White or black, chosen by the SYSTEM accent colour's own
+    /// luminance — never hard-coded, since `Color.accentColor` can be a
+    /// pale colour (Graphite, or a light custom choice in System
+    /// Settings), and a fixed white glyph on a pale pill would fail
+    /// contrast for exactly those users. Standard relative-luminance
+    /// weighting (ITU-R BT.601); 0.6 is a deliberately generous
+    /// threshold — the pill is small, so erring toward black on
+    /// medium-brightness accents reads more reliably than erring toward
+    /// white.
+    static var revealButtonGlyphColor: Color {
+        let accent: NSColor = (NSColor.controlAccentColor.usingColorSpace(.deviceRGB)) ?? NSColor.controlAccentColor
+        let luminance: CGFloat = 0.299 * accent.redComponent + 0.587 * accent.greenComponent + 0.114 * accent.blueComponent
+        return luminance > 0.6 ? .black : .white
+    }
 
     // MARK: - Body
 
@@ -84,22 +121,121 @@ struct CourseCodePickerView: View {
             .accessibilityIdentifier("wizardProvincePicker")
             .padding(.bottom, 6)
 
-            TextField("Course code", text: $courseCode)
-                .textFieldStyle(.roundedBorder)
-                .focused($codeFieldHasFocus)
-                .accessibilityIdentifier("wizardCourseCodeField")
-                .anchorPreference(key: CourseCodeFieldAnchorKey.self, value: .bounds) { anchor in
-                    anchor
+            // The trailing chevron sits ON its own filled pill, inset
+            // inside the field with room to spare on every side — not a
+            // bare glyph floating over the field's own background. This
+            // is drawn as one composite control rather than an overlay
+            // on top of `.textFieldStyle(.roundedBorder)`: that style's
+            // exact internal geometry (how much of its own trailing edge
+            // is padding versus the visible rounded pill) isn't
+            // something SwiftUI exposes, and overlaying a plain glyph on
+            // it — tried first, same day — rendered detached from the
+            // field rather than contained inside it. Drawing the field's
+            // own background and border here removes the guesswork:
+            // the chevron's pill is inset from bounds THIS view
+            // controls completely.
+            //
+            // Proportions match the reference Russell gave (2026-08-22,
+            // an HIG combo-box illustration): the pill is most of the
+            // field's height (leaving a small margin top and bottom),
+            // close to square, sitting a small margin in from the
+            // field's own trailing edge.
+            ZStack(alignment: .trailing) {
+                RoundedRectangle(cornerRadius: CourseCodePickerView.fieldCornerRadius)
+                    .fill(Color(nsColor: .textBackgroundColor))
+                RoundedRectangle(cornerRadius: CourseCodePickerView.fieldCornerRadius)
+                    .strokeBorder(
+                        codeFieldHasFocus ? Color.accentColor : Color(nsColor: .separatorColor),
+                        lineWidth: codeFieldHasFocus ? 2 : 1
+                    )
+
+                TextField("Course code", text: $courseCode)
+                    .textFieldStyle(.plain)
+                    .focused($codeFieldHasFocus)
+                    .padding(.leading, 8)
+                    // Room for the chevron pill so typed text and the
+                    // cursor never run underneath it.
+                    .padding(.trailing, CourseCodePickerView.revealButtonWidth + CourseCodePickerView.revealButtonTrailingInset + 6)
+                    .accessibilityIdentifier("wizardCourseCodeField")
+                    .anchorPreference(key: CourseCodeFieldAnchorKey.self, value: .bounds) { anchor in
+                        anchor
+                    }
+                    // Consumes Escape whenever this field has focus, so it
+                    // closes the popup rather than falling through to the
+                    // sheet's own Escape-dismisses-the-wizard handling
+                    // (Russell, 2026-08-22: "hitting the escape key … should
+                    // close the list below, not dismiss the form").
+                    .onKeyPress(.escape) {
+                        onEscape()
+                        return .handled
+                    }
+
+                // The visual cue a Mac user already knows: a trailing
+                // chevron reads as "this field also has a menu behind
+                // it" the way `NSComboBox` itself always shows one
+                // (Russell, 2026-08-22, pointing at Apple's own HIG
+                // combo-box illustration). Tapping it opens the popup
+                // and puts the cursor in the field, same as clicking the
+                // field itself would — it's a second way in, not a
+                // different control.
+                Button {
+                    codeFieldHasFocus = true
+                    onRevealRequested()
+                } label: {
+                    RoundedRectangle(cornerRadius: CourseCodePickerView.revealButtonCornerRadius)
+                        // Filled with the accent colour specifically so
+                        // there's always strong contrast against the
+                        // field's own background, in both light and dark
+                        // appearance — Russell's explicit requirement,
+                        // and the one thing missing from the very first
+                        // attempt at this same day.
+                        .fill(Color.accentColor)
+                        .overlay(
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 11, weight: .bold))
+                                // NOT hard-coded white: `Color.accentColor`
+                                // tracks the user's chosen SYSTEM accent
+                                // colour, which includes pale ones
+                                // (Graphite, or a light custom colour) —
+                                // a white glyph on a pale pill can fail
+                                // Russell's "sufficient contrast" rule
+                                // for exactly those users. Picked from the
+                                // accent colour's own luminance instead,
+                                // so the pill stays high-contrast whatever
+                                // colour it ends up being.
+                                .foregroundStyle(CourseCodePickerView.revealButtonGlyphColor)
+                        )
+                        .frame(
+                            width: CourseCodePickerView.revealButtonWidth,
+                            height: CourseCodePickerView.revealButtonHeight
+                        )
                 }
-                // Consumes Escape whenever this field has focus, so it
-                // closes the popup rather than falling through to the
-                // sheet's own Escape-dismisses-the-wizard handling
-                // (Russell, 2026-08-22: "hitting the escape key … should
-                // close the list below, not dismiss the form").
-                .onKeyPress(.escape) {
-                    onEscape()
-                    return .handled
-                }
+                .buttonStyle(.plain)
+                .padding(.trailing, CourseCodePickerView.revealButtonTrailingInset)
+                .accessibilityIdentifier("courseCodeRevealButton")
+                .accessibilityLabel("Browse course codes")
+            }
+            .frame(height: CourseCodePickerView.fieldHeight)
+            // `.accessibilityElement(children: .contain)` FIRST, before
+            // the identifier — without it, SwiftUI's default behaviour
+            // merges a container that has one dominant interactive child
+            // into a SINGLE accessibility element, and the identifier
+            // set here would silently overwrite the `TextField`'s own
+            // "wizardCourseCodeField" rather than existing alongside it
+            // as a second, separate element. That's exactly what
+            // happened the first time this was written: EVERY existing
+            // UI test that looks up `textFields["wizardCourseCodeField"]`
+            // — none of them about the reveal button — started failing,
+            // because the identifier had been silently overwritten, not
+            // because the wizard sheet stopped opening (confirmed via
+            // the unified log's own accessibility-snapshot dump, which
+            // still showed the wizard's title and other fields present,
+            // just with `wizardCourseCodeFieldBackground` sitting where
+            // `wizardCourseCodeField` used to be). `.contain` keeps this
+            // ZStack a real container so the `TextField`'s own identifier
+            // survives untouched.
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("wizardCourseCodeFieldBackground")
         }
         .onChange(of: codeFieldHasFocus) {
             isFocused = codeFieldHasFocus

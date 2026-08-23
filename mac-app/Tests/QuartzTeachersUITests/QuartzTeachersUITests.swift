@@ -143,6 +143,108 @@ final class QuartzTeachersUITests: XCTestCase {
         closeButton2.click()
     }
 
+    /// The trailing chevron — the visual cue that this field is really a
+    /// combo box, per the HIG — opens the popup and browses the whole
+    /// catalog without the teacher needing to type anything first.
+    func testCourseCodeRevealButtonOpensThePopup() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10), "The wizard sheet should appear")
+
+        let revealButton: XCUIElement = application.buttons["courseCodeRevealButton"]
+        XCTAssertTrue(revealButton.waitForExistence(timeout: 5))
+        revealButton.click()
+
+        let suggestionsList: XCUIElement = application.scrollViews["courseCodeSuggestionsList"]
+        XCTAssertTrue(suggestionsList.waitForExistence(timeout: 5), "Clicking the chevron should open the popup without typing anything")
+
+        // Browsing (an empty query) lists the whole province catalog
+        // alphabetically — ADA1O leads the Ontario list.
+        let firstRow: XCUIElement = application.buttons["courseCodeSuggestion-ADA1O"]
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 5), "The full catalog should be browsable from the chevron")
+
+        // The reveal button must actually sit INSIDE the field's visual
+        // background — Russell caught the first attempt rendering it
+        // detached, with no fill to show it was even a button. Checked
+        // by geometry rather than a screenshot: this machine's screen
+        // capture has been unreliable mid-session (grabbing an unrelated
+        // window), so frame containment is the trustworthy check here.
+        // Against the BACKGROUND container's frame, not the plain
+        // `TextField`'s own — that reports its own smaller natural text
+        // height (~18pt), not the field's full visual bounds (24pt), so
+        // checking against it would fail even when the button is
+        // correctly inset inside the actual field.
+        // Queried type-agnostically — `.contain` keeps this container
+        // from being merged into the `TextField`'s own accessibility
+        // element, but which `XCUIElementType` it then reports as is not
+        // something to guess (it did not turn out to be `.other`).
+        let fieldBackground: XCUIElement = application.descendants(matching: .any).matching(identifier: "wizardCourseCodeFieldBackground").firstMatch
+        XCTAssertTrue(fieldBackground.waitForExistence(timeout: 5))
+        let fieldFrame: CGRect = fieldBackground.frame
+        let buttonFrame: CGRect = revealButton.frame
+        XCTAssertTrue(fieldFrame.contains(buttonFrame), "The reveal button should be fully contained within the field's own visual bounds — field: \(fieldFrame), button: \(buttonFrame)")
+        XCTAssertGreaterThan(buttonFrame.midX, fieldFrame.midX, "The reveal button should sit on the trailing half of the field")
+        XCTAssertLessThan(buttonFrame.height, fieldFrame.height, "The reveal button should leave a visible margin top and bottom, not fill the whole field")
+        // An upper bound too, not just containment — a regression that
+        // grew the field far beyond the wizard sheet itself would still
+        // "contain" the button and still put it on the "trailing half",
+        // so containment alone can't catch that. The field legitimately
+        // spans the Form row's full width here (measured ~620pt), the
+        // same as every sibling field (Course Name, etc.) in this same
+        // `Form` — an EARLIER version of this bound (400pt, assuming a
+        // compact code-sized box) was wrong about that and failed on
+        // correct, unchanged behaviour; this one only catches the field
+        // growing past what the 680pt wizard sheet itself could hold.
+        XCTAssertLessThan(fieldFrame.width, 700, "The field shouldn't grow past what the wizard sheet itself could hold — frame: \(fieldFrame)")
+        XCTAssertLessThan(fieldFrame.height, 40, "The field itself should stay a single compact row — frame: \(fieldFrame)")
+
+        let closeButton3: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton3.click()
+    }
+
+    /// The reveal button's actual reason for existing: reopening the
+    /// popup when the field is ALREADY focused but Escape just closed
+    /// the list — a plain focus change wouldn't trigger that popup again
+    /// on its own, since nothing about focus is changing.
+    func testCourseCodeRevealButtonReopensAfterEscape() throws {
+        let application: XCUIApplication = try launchApp()
+
+        let newCourseButton: XCUIElement = application.buttons["addCourseButton"]
+        XCTAssertTrue(newCourseButton.waitForExistence(timeout: 10))
+        newCourseButton.click()
+
+        let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
+        XCTAssertTrue(codeField.waitForExistence(timeout: 10), "The wizard sheet should appear")
+        codeField.click()
+
+        let suggestionsList: XCUIElement = application.scrollViews["courseCodeSuggestionsList"]
+        XCTAssertTrue(suggestionsList.waitForExistence(timeout: 5), "Clicking into the field should open the popup")
+
+        codeField.typeKey(.escape, modifierFlags: [])
+        let closedExpectation: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: suggestionsList
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [closedExpectation], timeout: 5), .completed, "Escape should close the popup")
+
+        // The field still has focus — Escape doesn't blur it — so a
+        // plain focus change wouldn't reopen anything on its own; this
+        // is what `onRevealRequested` exists for.
+        let revealButton: XCUIElement = application.buttons["courseCodeRevealButton"]
+        XCTAssertTrue(revealButton.waitForExistence(timeout: 5))
+        revealButton.click()
+
+        XCTAssertTrue(suggestionsList.waitForExistence(timeout: 5), "The reveal button should reopen the popup even though the field never lost focus")
+
+        let closeButton4: XCUIElement = application.buttons["wizardCloseButton"]
+        closeButton4.click()
+    }
+
     func testSidebarContextMenuOffersFolderActions() throws {
         let application: XCUIApplication = try launchApp()
 
