@@ -2643,6 +2643,69 @@ correctly matching the surrounding window's theme; the assistant window
 shows the prompt shelf instead of a blank top third.
 
 
+## Docker images used to leak forever on the mac — and why you inherit nothing (2026-08-23)
+
+Recorded here because the finding sounds like it must apply to both sides, and
+it does not. On the mac, the builder image is tagged
+`teaching-quartz:src-<hash of the build recipe>`, so every recipe change mints
+a new tag and orphans the previous one. Nothing in the repository had ever
+removed one: 139 images and 50 GB on this dev machine, ~115 of them
+`teaching-quartz` tags. Containers were never the problem — each launcher
+already removes its own container by name before recreating it, and the name
+is a hash of the working folder, so it is one container per folder replaced in
+place.
+
+The mac fix is `prune_superseded_images()` in `setup.sh`, `preview.sh` and
+`deploy.sh`: after a build SUCCEEDS, remove every `teaching-quartz:src-*` tag
+except the one just built, skipping any a container still references. It keeps
+exactly one tag; the "keep the previous one for a cheap downgrade" idea was
+rejected because an older Plantoir carries its own bundled recipe and rebuilds
+its tag regardless. `docker builder prune` was rejected outright: it is global
+with no per-project filter, and this machine's Docker is shared with other
+projects.
+
+Three guards on it, each of which an adversarial review found MISSING in the
+first version — worth having in writing, because all three look like
+over-caution until you see the case:
+
+- **Do nothing unless the tag just built is one of ours.** `--image` lets a
+  caller point the image at anything, and "remove everything except the tag I
+  was given" then means "remove every real tag on the machine, including every
+  other working folder's current one".
+- **Do nothing to an image younger than about a day.** The container check is
+  a point-in-time read, and a folder that is mid-recreate — container removed,
+  replacement not yet started — references nothing for a second or two. A
+  build finishing in another folder inside that window would delete the image
+  it is about to run, and the teacher would see a registry-pull failure for an
+  image that exists on no registry. The same guard stops two folders on
+  different recipes from deleting each other's image on every switch.
+- **Ask Docker for the age, never compute it.** `docker image inspect
+  '{{.Created}}'` returns LOCAL time with an offset, not the UTC `Z` it
+  resembles, so comparing it against a UTC cutoff is silently wrong by the
+  machine's offset. `{{.CreatedSince}}` from `docker images` is Docker's own
+  human age string and has no timezone in it at all.
+
+One correction to the paragraph above, for honesty: **containers are cleaned
+up per working folder, but nothing cleans up a DELETED working folder's
+container.** That orphan now permanently pins its image against this cleanup —
+the one image that can never be reclaimed is the one nobody will ever use
+again. Small (an orphan per deleted folder, and a teacher deletes none), noted
+so the write-up is not read as "container hygiene is solved".
+
+**Windows has nothing to port.** You dropped Docker on 2026-08-19 for the
+native runtime — no image, no tag, no container, nothing to accumulate. (An
+earlier `TODO-TODAY.md` note on the mac claimed "their launchers have the same
+gap"; that was written without checking the `.ps1` files and is wrong.) Do not
+add a cleanup for images that do not exist.
+
+**The question worth asking on that side is the analogous one, not the same
+one:** when a teacher installs a new Plantoir, is a superseded
+`Vendor/runtime/` — or an old model download under `%LOCALAPPDATA%` — left
+behind anywhere it can accumulate across a school year? That is the shape of
+the failure the mac hit: a disk filling with something the teacher has never
+heard of and cannot connect to this app. Nobody here can see a Windows
+machine to answer it, so it is a question rather than a finding.
+
 ## The course-code picker is a hand-built combo box — and you probably should NOT build one (2026-08-23)
 
 `GUI-IMPROVEMENTS.md` rows 333–338 describe the new-course wizard's course-code

@@ -64,4 +64,17 @@ Two more things worth deciding rather than assuming:
 ### Gate
 
 This is a toolchain change, so it needs `verify.sh` behind it, and per
-CLAUDE.md rule 3 a note for Windows — their launchers have the same gap.
+CLAUDE.md rule 3 a note for Windows.
+
+~~their launchers have the same gap~~ — **WRONG, corrected 2026-08-23.**
+Windows dropped Docker entirely on 2026-08-19 for the native runtime, so there
+is no image, no tag and no container on that side to leak. Nobody should port
+a cleanup for images that do not exist. Left visible rather than deleted
+because this file was read as the brief for the work.
+
+### ✅ DONE — 2026-08-23
+
+Fixed on `issue/prune-old-toolchain-images`: `prune_superseded_images()` in all
+three bash launchers, gated by `verify.sh` §3c. Written up in
+`GUI-IMPROVEMENTS.md` row 352 and `WINDOWS-HANDOFF.md`; the build-cache
+decision (deliberately NOT addressed, and why) is in `TODO.md`.

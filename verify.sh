@@ -233,6 +233,147 @@ else
 fi
 rm -rf "$EXPORT_TMP"
 
+# ---------- 3c. Superseded builder images are removed, and ONLY those ----------
+# The launchers mint a new 'teaching-quartz:src-<hash>' tag on every recipe
+# change, so without this the orphans accumulate forever. The danger is the
+# opposite one: Docker here is SHARED with other projects, so a cleanup that
+# reached past its own tags would delete somebody else's images. This drives
+# the launcher's REAL function (extracted from preview.sh, not retyped) against
+# throwaway fixtures standing in for each case.
+echo ""
+echo "🔎 Checking that a new build removes superseded builder images…"
+PRUNE_SRC="$(mktemp "${TMPDIR:-/tmp}/verify_prune.XXXXXX.sh")"
+awk '/^prune_superseded_images\(\) \{/,/^\}/' preview.sh > "$PRUNE_SRC"
+# The three launchers are standalone scripts sharing hand-copied helper blocks,
+# and the cross-check above only proves each NAME is defined — not that the
+# three bodies still say the same thing. Testing preview.sh's copy while
+# setup.sh's has drifted would be a green suite over a real difference.
+PRUNE_COPIES_MATCH="true"
+for f in setup.sh deploy.sh; do
+  if ! awk '/^prune_superseded_images\(\) \{/,/^\}/' "$f" | cmp -s - "$PRUNE_SRC"; then
+    fail "prune_superseded_images() in $f differs from the copy in preview.sh"
+    PRUNE_COPIES_MATCH="false"
+  fi
+done
+[[ "$PRUNE_COPIES_MATCH" == "true" ]] && pass "prune_superseded_images() is identical in all three launchers"
+
+if [[ ! -s "$PRUNE_SRC" ]]; then
+  fail "Could not extract prune_superseded_images() from preview.sh"
+else
+  # shellcheck source=/dev/null
+  source "$PRUNE_SRC"
+
+  PRUNE_KEEP="teaching-quartz:src-verifykeep"
+  PRUNE_OLD="teaching-quartz:src-verifyold"
+  PRUNE_INUSE="teaching-quartz:src-verifyinuse"
+  PRUNE_OTHER="verify-other-project:latest"
+  PRUNE_CONTAINER="verify-prune-inuse"
+
+  # Distinct image IDs matter: tags sharing one ID cannot tell these cases
+  # apart, because 'docker rmi <tag>' on a shared ID only untags.
+  prune_fixture_image() {
+    printf 'FROM scratch\nLABEL ca.russellgordon.verify=%s\n' "$2" \
+      | command docker buildx build --load -q -t "$1" - >/dev/null 2>&1
+  }
+  prune_image_exists() { command docker image inspect "$1" >/dev/null 2>&1; }
+
+  command docker rm -f "$PRUNE_CONTAINER" >/dev/null 2>&1 || true
+  prune_fixture_image "$PRUNE_KEEP"  keep
+  prune_fixture_image "$PRUNE_OLD"   old
+  prune_fixture_image "$PRUNE_INUSE" inuse
+  prune_fixture_image "$PRUNE_OTHER" other
+  # An explicit command is required even though this container never runs:
+  # 'docker create' refuses an image with no entrypoint, and a container that
+  # was never created would make the in-use case pass vacuously.
+  if ! command docker create --name "$PRUNE_CONTAINER" "$PRUNE_INUSE" /noop >/dev/null 2>&1; then
+    fail "prune: could not create the fixture container — the in-use case was not exercised"
+  fi
+  # The cases below that assert an image SURVIVED cannot pass vacuously — a
+  # fixture that failed to build fails them. The case that proves pruning
+  # HAPPENS is an absence, so it can; prove the fixture exists first.
+  if ! prune_image_exists "$PRUNE_OLD"; then
+    fail "prune: fixture $PRUNE_OLD was never built — the removal case proves nothing"
+  fi
+
+  # Two stubs, in place only while the real function runs.
+  #
+  # 'docker' scopes the IMAGE LISTING to this test's own fixtures. Without it,
+  # sourcing the real function and calling it for effect would delete the
+  # maintainer's genuine 'teaching-quartz:src-*' images as a side effect of
+  # running verify.sh — a multi-minute, network-dependent rebuild in every
+  # working folder, from a command whose banner promises only to check things.
+  # The trade-off, stated plainly: '--filter reference=' is stubbed out and so
+  # is not itself covered. 'verify-other-project:latest' sits in the listing
+  # precisely so the second filter — the in-function prefix test, which runs on
+  # this machine's own data — still has to do its job. The ancestor check, the
+  # age check and the rmi all run unmodified against the real daemon.
+  #
+  # It also rewrites the AGE column, which is otherwise untestable: every
+  # fixture is seconds old, so the real guard would spare all of them and the
+  # removal case could never fire. Setting the age at either extreme tests the
+  # rule in both directions instead of neutralising it.
+  prune_stub_docker() {
+    docker() {
+      if [[ "${1:-}" == "images" ]]; then
+        command docker "$@" \
+          | grep -E "^(teaching-quartz:src-verify|verify-other-project:)" \
+          | sed -E "s/^([^ ]+) .*/\\1 $PRUNE_STUB_AGE/" || true
+      else
+        command docker "$@"
+      fi
+    }
+  }
+  prune_unstub() { unset -f docker; }
+
+  PRUNE_OK="true"
+
+  # (a) Everything is too NEW — the age guard must spare it all.
+  PRUNE_STUB_AGE="2 hours ago"
+  prune_stub_docker; prune_superseded_images "$PRUNE_KEEP"; prune_unstub
+  if ! prune_image_exists "$PRUNE_OLD"; then
+    fail "prune: $PRUNE_OLD was removed despite being only hours old — the age guard is not working, and it is what protects a folder that is mid-recreate"
+    PRUNE_OK="false"
+  fi
+
+  # (b) The tag just built is not one of ours (--image override) — refuse
+  #     to touch anything, rather than treating every real tag as superseded.
+  PRUNE_STUB_AGE="3 weeks ago"
+  prune_stub_docker; prune_superseded_images "quartz-teacher:dev-test"; prune_unstub
+  if ! prune_image_exists "$PRUNE_OLD"; then
+    fail "prune: an --image override deleted $PRUNE_OLD — with a foreign keep-tag the function must do nothing at all"
+    PRUNE_OK="false"
+  fi
+
+  # (c) The real case: superseded, old enough, unreferenced.
+  PRUNE_STUB_AGE="3 weeks ago"
+  prune_stub_docker; prune_superseded_images "$PRUNE_KEEP"; prune_unstub
+  if prune_image_exists "$PRUNE_OLD"; then
+    fail "prune: superseded tag $PRUNE_OLD was NOT removed"
+    PRUNE_OK="false"
+  fi
+  if ! prune_image_exists "$PRUNE_KEEP"; then
+    fail "prune: the tag just built ($PRUNE_KEEP) was removed"
+    PRUNE_OK="false"
+  fi
+  if ! prune_image_exists "$PRUNE_INUSE"; then
+    fail "prune: $PRUNE_INUSE was removed while a container still referenced it"
+    PRUNE_OK="false"
+  fi
+  if ! prune_image_exists "$PRUNE_OTHER"; then
+    fail "prune: removed $PRUNE_OTHER — another project's image is not ours to delete"
+    PRUNE_OK="false"
+  fi
+  [[ "$PRUNE_OK" == "true" ]] && pass "Superseded builder images are removed; the current tag, an in-use tag, a recently-built tag, another project's image, and everything under an --image override are left alone"
+
+  command docker rm -f "$PRUNE_CONTAINER" >/dev/null 2>&1 || true
+  for t in "$PRUNE_KEEP" "$PRUNE_OLD" "$PRUNE_INUSE" "$PRUNE_OTHER"; do
+    command docker rmi -f "$t" >/dev/null 2>&1 || true
+  done
+  unset -f prune_superseded_images prune_fixture_image prune_image_exists \
+           prune_stub_docker prune_unstub
+fi
+rm -f "$PRUNE_SRC"
+
 # -------------------- 4. Baked files match the working tree --------------------
 echo ""
 echo "🔬 Comparing files baked into the image against the working tree…"
