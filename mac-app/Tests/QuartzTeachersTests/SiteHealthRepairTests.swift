@@ -57,10 +57,10 @@ final class SiteHealthRepairTests: XCTestCase {
         let media: URL = course.directoryURL.appendingPathComponent("Media")
         XCTAssertFalse(FileManager.default.fileExists(atPath: media.path))
 
-        let repaired: [String] = SiteHealthRepair.repair(
+        let repaired = SiteHealthRepair.repair(
             [finding("mediaFolderMissing", fixable: true)], in: course
         )
-        XCTAssertEqual(repaired, ["mediaFolderMissing"])
+        XCTAssertEqual(repaired["mediaFolderMissing"], .restored)
         XCTAssertTrue(FileManager.default.fileExists(atPath: media.path))
     }
 
@@ -104,6 +104,49 @@ final class SiteHealthRepairTests: XCTestCase {
         for word in ["container", "script", "toolchain", "quartz", "config", "rebuild the toolchain"] {
             XCTAssertFalse(said.lowercased().contains(word), "says \"\(word)\" to a teacher")
         }
+    }
+
+    /// Pressing Fix twice — or pressing it after putting the folder back in
+    /// Obsidian — must not be reported as a permissions problem. Both restores
+    /// return "already there", which folding into "failed" turned into
+    /// "Plantoir could not put that back… check the folder isn't locked".
+    func testNothingToDoIsNotReportedAsAFailure() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try FileManager.default.createDirectory(
+            at: course.directoryURL.appendingPathComponent("Media"),
+            withIntermediateDirectories: true
+        )
+        let outcome = SiteHealthRepair.outcome(
+            ofRepairing: [finding("mediaFolderMissing", fixable: true)], in: course
+        )
+        XCTAssertEqual(outcome?.headline, "That is already put right.")
+        XCTAssertFalse(outcome?.detail.lowercased().contains("read-only") ?? true,
+                       "a no-op must not read as a permissions failure")
+    }
+
+    /// A PARTIAL failure said nothing about the half that did not come back —
+    /// silence whenever anything else succeeded, in the type added so failure
+    /// would not be silent.
+    func testAPartialFailureNamesWhatDidNotComeBack() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // Media can be restored; the front page cannot, because section 9 is
+        // not one this course has.
+        let outcome = SiteHealthRepair.outcome(
+            ofRepairing: [
+                finding("mediaFolderMissing", fixable: true),
+                finding("sectionIndexMissing", fixable: true, section: 9),
+            ],
+            in: course
+        )
+        XCTAssertEqual(outcome?.headline, "Put the Media folder back.")
+        XCTAssertTrue(outcome?.detail.contains("Could not put the front page back") ?? false,
+                      outcome?.detail ?? "")
+        XCTAssertEqual(outcome?.canRebuild, false,
+                       "something is still wrong, so do not send them to look at it")
     }
 
     /// A repair that FAILED must say so. Both restore functions can return
@@ -177,10 +220,11 @@ final class SiteHealthRepairTests: XCTestCase {
         try "---\ntitle: My own front page\n---\nWelcome!\n"
             .write(to: index, atomically: true, encoding: .utf8)
 
-        let repaired: [String] = SiteHealthRepair.repair(
+        let repaired = SiteHealthRepair.repair(
             [finding("sectionIndexMissing", fixable: true)], in: course
         )
-        XCTAssertTrue(repaired.isEmpty, "there was nothing to repair")
+        XCTAssertEqual(repaired["sectionIndexMissing"], .alreadyFine,
+                       "already there is not a failure")
         XCTAssertTrue(
             try String(contentsOf: index, encoding: .utf8).contains("Welcome!"),
             "the teacher's own page must survive"

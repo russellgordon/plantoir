@@ -94,22 +94,72 @@ enum SiteHealthRepair {
         if wanted.isEmpty {
             return nil
         }
-        let repaired: [String] = repair(wanted, in: course)
-        if let putBack = whatWasPutBack(repaired) {
-            switch occasion {
-            case .building:
-                return Outcome(headline: putBack, detail: notOnTheSiteYet, canRebuild: true)
-            case .publishing:
-                return Outcome(headline: putBack, detail: notPublishedYet, canRebuild: false)
+        let results: [String: Result] = repair(wanted, in: course)
+
+        var restored: [String] = []
+        var failed: [String] = []
+        for (name, result) in results {
+            switch result {
+            case .restored:
+                restored.append(name)
+            case .failed:
+                failed.append(name)
+            case .alreadyFine:
+                break
             }
         }
-        return Outcome(
-            headline: "Plantoir could not put that back.",
-            detail: "Nothing was changed. You can make the folder yourself in "
-                  + "Obsidian, or check that the folder holding this course "
-                  + "isn't locked or read-only.",
-            canRebuild: false
-        )
+        restored.sort()
+        failed.sort()
+
+        // Nothing to do: every one of them was already there. Pressing Fix
+        // twice must not read as a permissions problem.
+        if restored.isEmpty && failed.isEmpty {
+            return Outcome(
+                headline: "That is already put right.",
+                detail: "Nothing needed changing.",
+                canRebuild: false
+            )
+        }
+
+        if restored.isEmpty {
+            return Outcome(
+                headline: "Plantoir could not put that back.",
+                detail: couldNotExplanation,
+                canRebuild: false
+            )
+        }
+
+        let putBack: String = whatWasPutBack(restored) ?? ""
+
+        // A PARTIAL failure said nothing about the half that did not come
+        // back — silence whenever anything else succeeded, in the type added
+        // so that failure would not be silent.
+        if let alsoFailed = whatCouldNotBePutBack(failed) {
+            return Outcome(
+                headline: putBack,
+                detail: alsoFailed + " " + couldNotExplanation,
+                canRebuild: false
+            )
+        }
+
+        switch occasion {
+        case .building:
+            return Outcome(headline: putBack, detail: notOnTheSiteYet, canRebuild: true)
+        case .publishing:
+            return Outcome(headline: putBack, detail: notPublishedYet, canRebuild: false)
+        }
+    }
+
+    static let couldNotExplanation: String =
+        "You can make it yourself in Obsidian, or check that the folder holding "
+        + "this course isn't locked or read-only."
+
+    static func whatCouldNotBePutBack(_ names: [String]) -> String? {
+        guard let described = whatWasPutBack(names) else {
+            return nil
+        }
+        // "Put the front page back." -> "Could not put the front page back."
+        return "Could not " + described.prefix(1).lowercased() + described.dropFirst()
     }
 
     /// What was put back, in words a teacher can check against their folder.
@@ -166,26 +216,60 @@ enum SiteHealthRepair {
     /// Never overwrites: every repair checks first, so pressing the button
     /// twice, or pressing it after fixing the problem in Obsidian, changes
     /// nothing.
+    /// How one repair went.
+    ///
+    /// `alreadyFine` is a THIRD answer, and leaving it out was a bug: both
+    /// restores return false when the folder is already there, which is the
+    /// documented idempotent path — pressing Fix twice, or pressing it after
+    /// putting the folder back in Obsidian. Folding that into "failed" told a
+    /// teacher "Plantoir could not put that back… check the folder isn't
+    /// locked or read-only" about a course that was perfectly all right.
+    enum Result: Equatable {
+        case restored
+        case alreadyFine
+        case failed
+    }
+
     @discardableResult
     static func repair(
         _ findings: [SiteHealthFinding], in course: Course
-    ) -> [String] {
-        var repaired: [String] = []
+    ) -> [String: Result] {
+        var results: [String: Result] = [:]
         for finding in findings where canRepair(finding) {
             switch finding.name {
             case "mediaFolderMissing":
-                if restoreMediaFolder(in: course) {
-                    repaired.append(finding.name)
-                }
+                results[finding.name] = restoreMedia(in: course)
             case "sectionIndexMissing":
-                if restoreSectionIndex(forSection: finding.section, in: course) {
-                    repaired.append(finding.name)
-                }
+                results[finding.name] = restoreIndex(
+                    forSection: finding.section, in: course
+                )
             default:
                 break
             }
         }
-        return repaired
+        return results
+    }
+
+    static func restoreMedia(in course: Course) -> Result {
+        let url: URL = course.directoryURL.appendingPathComponent("Media")
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) {
+            // A FILE where the folder belongs is not "already fine".
+            return isDirectory.boolValue ? .alreadyFine : .failed
+        }
+        return restoreMediaFolder(in: course) ? .restored : .failed
+    }
+
+    static func restoreIndex(forSection sectionNumber: Int, in course: Course) -> Result {
+        guard course.configuration.sectionNumbers.contains(sectionNumber) else {
+            return .failed
+        }
+        let index: URL = course.sectionDirectoryURL(forSection: sectionNumber)
+            .appendingPathComponent("index.md")
+        if FileManager.default.fileExists(atPath: index.path) {
+            return .alreadyFine
+        }
+        return restoreSectionIndex(forSection: sectionNumber, in: course) ? .restored : .failed
     }
 
     /// An empty `Media` folder beside the course, which is exactly what a new

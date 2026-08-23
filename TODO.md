@@ -4,40 +4,42 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
-- **`CourseRenameInterfaceTests` crashes the whole unit run, intermittently** —
-  seen on 2026-08-23 while building the special-folders work. **PARTLY
-  EXPLAINED, and the explanation was not the one assumed here.** When it turned
-  consistent rather than intermittent, the crash report
-  (`~/Library/Logs/DiagnosticReports/Plantoir-*.ips`) showed `EXC_BAD_ACCESS` in
-  `SwiftUI.AppKitDialogBridge.updateExistingAlert` while an `NSAlert` sheet was
-  closing — a SwiftUI alert-bridge fault, reached because `SectionDetailView`
-  had grown to FOUR `.alert` modifiers. Folding two of them into one fixed it,
-  and three consecutive full runs went green. So the earlier intermittent
-  failures were most likely the same fault at a lower rate, NOT the busy-machine
-  flakiness this entry originally blamed. If it returns, read the crash report
-  first — it named the cause immediately, and the guesswork below cost an hour
-  it need not have. It is the failure mode the `mac-app` skill already warns about (a
-  test that hosts real SwiftUI views, on a machine that is busy), and both
-  crashes happened while adversarial-review agents were running builds and
-  greps concurrently. But it is worth pinning down rather than assuming:
+- **`CourseRenameInterfaceTests` crashes the whole unit run, intermittently —
+  and it is PRE-EXISTING, not caused by the special-folders work.** Measured
+  2026-08-23 on a clean `origin/dev` worktree with none of that branch's
+  changes: **one crash in four full runs**, aborting the run partway
+  (`Executed 419 tests` and an exit code of 65 with ZERO failed test CASES).
+  The branch's own rate was about the same, one in three.
 
-  - it takes the RUN down, not just itself — the log says "Restarting after
-    unexpected exit, crash, or test timeout", and the summary then reports
-    however many tests had finished (440 in one case, so the count alone reads
-    like a much bigger failure than it is);
-  - `xcodebuild` exits 65 with **zero** failed test CASES, which is the tell:
-    grep for `^Failing tests:` rather than believing an exit code;
-  - run alone it passed 3 times out of 3; the full suite passed 4 times out of
-    6 in the same session;
-  - one baseline run on a clean tree exited 0, which is not enough evidence to
-    exonerate the changes that were in flight — a fair comparison needs several
-    runs on each side of the same commit, on an otherwise idle machine.
+  **Two wrong diagnoses were recorded here before the right one**, and both are
+  worth remembering because each looked convincing:
 
-  If it turns up again, the thing to capture is the crash log from
-  `~/Library/Logs/DiagnosticReports` for the test host at that moment. What
-  would make it a non-issue: hosting that row view inside an `NSHostingView`
-  the test owns and tears down explicitly, the way `RemovalButtonTests` avoids
-  the problem next door.
+  1. *Busy-machine flakiness* — plausible because the interface tests host real
+     SwiftUI views and adversarial-review agents were running builds at the
+     time. Wrong.
+  2. *An alert I had just added* — plausible because the crash report names
+     `SwiftUI.AppKitDialogBridge.updateExistingAlert` during an `NSAlert` sheet
+     close, and `SectionDetailView` had just grown to four `.alert` modifiers.
+     Consolidating them to one made three consecutive runs pass, which read as
+     confirmation. It was not: the crash came back afterwards, and then
+     reproduced on `origin/dev`, which has none of it.
+
+  The lesson is the measurement, not the guess: **a baseline needs SEVERAL runs
+  on an unmodified tree, in a separate worktree.** One clean baseline run was
+  taken early on and treated as exoneration; it was a coin toss landing the
+  other way. And `git checkout <ref> -- path/` does NOT make a baseline — it
+  leaves files the ref does not have, which is how the first attempt at this
+  produced a build error instead of a measurement.
+
+  What is actually known: `EXC_BAD_ACCESS` / SIGSEGV inside
+  `AppKitDialogBridge.updateExistingAlert` → `NSSheetMoveHelper closeSheet`, in
+  a suite where `SectionDetailView` and the `TaskProgressView` it embeds carry
+  several alerts and a sheet between them. Both crashes named a
+  `CourseRenameInterfaceTests` case, but that test hosts a sidebar ROW and is
+  most likely the bystander that happened to be running.
+
+  Where to start: `RemovalButtonTests` next door hosts its view differently and
+  does not provoke it — the difference between the two is the cheapest lead.
 
 - **Let a teacher rename a special folder from inside Plantoir** — deferred
   2026-08-23, while planning the hardening of the special folder and file names.

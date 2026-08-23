@@ -48,8 +48,16 @@ struct SectionDetailView: View {
 
     /// Drives the dialog separately from the findings themselves, so the title
     /// is not recomputed from an array that the dismissal is clearing.
-    /// Findings that arrived while a dialog was already up, waiting their turn.
-    @State var heldHealthFindings: [SiteHealthFinding] = []
+    /// Findings that arrived while a dialog was already up, waiting their turn
+    /// — each batch with the occasion it arrived on.
+    ///
+    /// The occasion travels WITH them because it decides what is offered next.
+    /// Held findings used to be shown with whatever the flag happened to be
+    /// from the previous batch, so a preview's findings held behind an
+    /// overnight publish were treated as a publish and denied "Build Again" —
+    /// and the reverse offered a rebuild after publishing, the exact thing the
+    /// occasion exists to prevent.
+    @State var heldHealthFindings: [(findings: [SiteHealthFinding], cameFromPublishing: Bool)] = []
 
     /// What a repair just did, while that is being shown.
     @State var repairOutcome: SiteHealthRepair.Outcome?
@@ -398,6 +406,13 @@ struct SectionDetailView: View {
         if healthFindings.count == 1 {
             return healthFindings[0].sentence
         }
+        if healthFindings.isEmpty {
+            // Reached only while the alert is being torn down, after the
+            // findings have been cleared. Saying "0 things need your attention"
+            // there is the unreachable-by-design string made reachable, which
+            // this view has now met twice.
+            return ""
+        }
         return "\(healthFindings.count) things need your attention"
     }
 
@@ -442,8 +457,9 @@ struct SectionDetailView: View {
             return
         }
         if !heldHealthFindings.isEmpty {
-            healthFindings = heldHealthFindings
-            heldHealthFindings = []
+            let next = heldHealthFindings.removeFirst()
+            healthFindings = next.findings
+            healthFindingsCameFromPublishing = next.cameFromPublishing
             healthDialog = .findings
         }
     }
@@ -460,6 +476,17 @@ struct SectionDetailView: View {
             // runs. This was the one path with neither, so it could start a
             // build in the same working folder as a running deploy.
             if deployRunner.isRunning || isPreparingDeploy {
+                // Say so. Every other gated control here disables itself or
+                // shows a refusal; swallowing the press is the silence this
+                // whole feature exists to remove, arriving in the button meant
+                // to end it.
+                pendingRepairOutcome = SiteHealthRepair.Outcome(
+                    headline: "Plantoir is publishing this section just now.",
+                    detail: "Build it again once that has finished, and the "
+                          + "change will be there.",
+                    canRebuild: false
+                )
+                showAnythingWaiting()
                 return
             }
             // The LEASE decides, not the window's appearance. A preview whose
@@ -491,7 +518,11 @@ struct SectionDetailView: View {
         // failed-deploy path can arrive while the overnight findings are
         // already on screen, so this is reachable rather than theoretical.
         if healthDialog != nil {
-            heldHealthFindings = runner.healthFindings
+            // Appended, not assigned: three arrivals during one dialog used to
+            // lose the middle batch.
+            heldHealthFindings.append(
+                (findings: runner.healthFindings, cameFromPublishing: cameFromPublishing)
+            )
             return
         }
         healthFindings = runner.healthFindings

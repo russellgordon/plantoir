@@ -92,6 +92,58 @@ final class SiteHealthContractTests: XCTestCase {
         }
     }
 
+    /// The repair lists in the contract must match what the app will actually
+    /// offer.
+    ///
+    /// Nothing read `siteHealth.repair` when it was added, so the lists could
+    /// have drifted from `canRepair` silently — a contract section that is
+    /// documentation rather than a gate. The `neverOffered` half is the one
+    /// that matters: those are the checks a fix would SATISFY without fixing.
+    func testTheRepairListsMatchWhatTheAppWillOffer() throws {
+        let repair: [String: Any] = try XCTUnwrap(siteHealth["repair"] as? [String: Any])
+
+        let offered: [String] = try XCTUnwrap(
+            (repair["offered"] as? [String: Any])?["checks"] as? [String]
+        )
+        let neverOffered: [String] = try XCTUnwrap(
+            (repair["neverOffered"] as? [String: Any])?["checks"] as? [String]
+        )
+
+        for name in offered {
+            XCTAssertTrue(
+                SiteHealthRepair.canRepair(sample(named: name, fixable: true)),
+                "\(name) is listed as repairable and the app will not offer it"
+            )
+        }
+        for name in neverOffered {
+            XCTAssertFalse(
+                SiteHealthRepair.canRepair(sample(named: name, fixable: true)),
+                "\(name) must never be offered a fix, even when the toolchain "
+                + "marks it fixable — a fix that satisfies the check without "
+                + "restoring the feature is worse than none"
+            )
+        }
+
+        // And between them they must account for every check, or a new one
+        // silently belongs to neither list.
+        let checks: [[String: Any]] = try XCTUnwrap(siteHealth["checks"] as? [[String: Any]])
+        var everyName: [String] = []
+        for check in checks {
+            everyName.append(try XCTUnwrap(check["name"] as? String))
+        }
+        XCTAssertEqual(
+            Set(offered).union(Set(neverOffered)), Set(everyName),
+            "every check must be in exactly one of the repair lists"
+        )
+    }
+
+    private func sample(named name: String, fixable: Bool) -> SiteHealthFinding {
+        return SiteHealthFinding(
+            name: name, sentence: "s", detail: "d",
+            fixable: fixable, course: "ICS3U", section: 1
+        )
+    }
+
     /// Rule 1: the interface never names the machinery. These sentences are
     /// shown to a teacher verbatim — in a dialog, and in the assistant's
     /// answer — so a stray "container" or "script" would reach them directly.
