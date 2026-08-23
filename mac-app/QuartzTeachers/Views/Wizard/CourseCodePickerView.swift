@@ -79,20 +79,25 @@ struct CourseCodePickerView: View {
 
     @FocusState var codeFieldHasFocus: Bool
 
-    /// The whole field's height — a touch taller than a bare
-    /// `.roundedBorder` `TextField` (~22pt) so the reveal button has
-    /// genuine room inside it, per the reference proportions.
-    static let fieldHeight: CGFloat = 24
+    /// The whole field's height. Measured against the plain
+    /// `.roundedBorder` `TextField` below it (Course Name) at 46pt —
+    /// this field was a visibly shorter 40pt, so it's 6pt taller here
+    /// (3pt top, 3pt bottom around the text) to close that gap
+    /// (Russell, 2026-08-23). The `TextField` inside is centred
+    /// vertically by the `ZStack`'s default alignment, so growing this
+    /// value alone is what adds that 3pt top/bottom — no separate
+    /// padding on the `TextField` itself is needed.
+    static let fieldHeight: CGFloat = 30
     static let fieldCornerRadius: CGFloat = 6
 
-    /// Sized and inset to match the reference screenshot's proportions:
-    /// close to square, most of the field's height (leaving a small
-    /// margin top and bottom), a small margin in from the field's own
-    /// trailing edge.
+    /// Sized and inset for an explicit 3pt margin on every side that
+    /// touches the field: 3pt above and below (so `revealButtonHeight`
+    /// is `fieldHeight` minus 6), and 3pt in from the field's own
+    /// trailing edge (Russell, 2026-08-23).
     static let revealButtonWidth: CGFloat = 22
-    static let revealButtonHeight: CGFloat = 20
+    static let revealButtonHeight: CGFloat = fieldHeight - 6
     static let revealButtonCornerRadius: CGFloat = 5
-    static let revealButtonTrailingInset: CGFloat = 2
+    static let revealButtonTrailingInset: CGFloat = 3
 
     /// White or black, chosen by the SYSTEM accent colour's own
     /// luminance — never hard-coded, since `Color.accentColor` can be a
