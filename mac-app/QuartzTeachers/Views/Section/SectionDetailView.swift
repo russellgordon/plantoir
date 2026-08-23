@@ -318,6 +318,15 @@ struct SectionDetailView: View {
             Text(deployRefusal ?? "")
         }
         .alert(healthAlertTitle, isPresented: $isShowingHealthFindings) {
+            // Offered only for the problems this app can genuinely put right.
+            // A button that satisfies a check without restoring the feature —
+            // an empty curriculum folder, say — would be worse than none, since
+            // the teacher would then believe it was dealt with.
+            if let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
+                Button(title) {
+                    SiteHealthRepair.repair(healthFindings, in: course)
+                }
+            }
             Button("OK") { }
         } message: {
             Text(healthAlertMessage)
