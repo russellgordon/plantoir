@@ -9,6 +9,7 @@ struct CourseSettingsView: View {
 
     let course: Course
 
+    @State var isShowingFoldersHelp: Bool = false
     @State var saveProblem: String?
     @State var didJustSave: Bool = false
 
@@ -111,6 +112,10 @@ struct CourseSettingsView: View {
                     Text("The curriculum map uses this to show which expectations you have actually evaluated. Most courses keep “Tasks”; add “Tests” or anything else you mark, and remove what you don’t.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                    Button("What else does Plantoir use my folders for?") {
+                        isShowingFoldersHelp = true
+                    }
+                    .buttonStyle(.link)
                 } header: {
                     FormSectionHeader("Marks")
                 }
@@ -183,6 +188,9 @@ struct CourseSettingsView: View {
                 }
                 .disabled(!FolderActions.obsidianIsInstalled)
                 .help("Edit this course's pages in Obsidian")
+                .sheet(isPresented: $isShowingFoldersHelp) {
+                    SpecialFoldersHelpView(course: course)
+                }
                 .accessibilityIdentifier("openCourseInObsidianButton")
             }
         }
