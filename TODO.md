@@ -8,6 +8,15 @@ an item when it ships (finished behaviour is recorded in
   for the entire build** — found 2026-08-19, while re-shooting the
   marketing screenshots; the "Building your site…" step is unreachable.
 
+  **✅ Fixed on Windows, 2026-08-23** (`TaskMilestones.cs`, built and tested,
+  664/664 green) — see `MAC-HANDOFF.md`'s "Open — what the mac still owes"
+  for the full write-up. **Not yet fixed on the mac**: the matching Swift
+  edit (`TaskMilestones.swift`) was made on Windows and has not been built,
+  tested, or run through `Plantoir --write-contracts` on an actual mac —
+  `contracts/app-rules.json`'s `milestones.preview` is still the stale,
+  pre-fix readout until that happens. Leave this item here until the mac
+  side is verified.
+
   Two facts combine. First, `build_site.py` prints "🚀 Launching Quartz
   preview on…" (the FINAL preview milestone's marker) *before* it runs
   `npx quartz build --serve`, because build and serve are one command.
@@ -115,71 +124,6 @@ an item when it ships (finished behaviour is recorded in
   YouTube or Vimeo (what most teachers do anyway) sidesteps it entirely.
   The in-app orange note says the short version; the site should say the
   rest. Screenshots of the Publishing section would help.
-
-- **Hosting options for teachers who can't use Cloudflare or Netlify** —
-  researched 2026-08-12, for the documentation above. **The most useful
-  finding reframes the question: the "a folder on this PC" destination is
-  already the universal answer.** Any teacher with web space of any kind —
-  board-provided, a university account, cPanel shared hosting, a NAS —
-  can publish to a folder and upload it however they like. No new
-  integration is needed for the "my board gives me space" case, and the
-  documentation should say so prominently rather than implying Netlify or
-  Cloudflare are the only ways.
-
-  That leaves two narrower cases. *Can't create an account with a US
-  service* (board policy, privacy rules): the honest answer is that most
-  alternatives are also US-hosted, so the realistic options are the folder
-  route or a jurisdiction-specific host — **Codeberg Pages** (run by a
-  German non-profit) is the notable non-US free option, though it is
-  git-based like GitHub Pages. *Wants something free and simpler*:
-  **Neocities** is the interesting one — free tier, ad-free, explicitly
-  education-friendly, a privacy pledge including no AI training on user
-  content, and, unusually for a small host, a documented HTTP API plus a
-  CLI with a recursive directory push, which is exactly the shape
-  Plantoir needs. Its free tier is small (~1 GB, no custom domain
-  without paying) and its branding is hobbyist, so it suits a class site
-  more than a department site.
-
-  Ranked for *integration* effort, ignoring what is already built:
-  Cloudflare (done), GitHub Pages (deferred above, subpath question
-  open), Neocities (small, API-shaped, needs verification), Codeberg
-  (git-based, EU). **Vercel stays ruled out** — its Hobby plan forbids
-  commercial use in terms broad enough to cover a salaried teacher's
-  work; see the earlier assessment. Low-cost rather than free, if a
-  teacher will pay a little: Bunny.net storage plus CDN is about a dollar
-  a month, and any cPanel host at a few dollars a month already works
-  today through the folder route.
-
-  **Caveat on the numbers:** much of the comparison material online is
-  affiliate SEO content of low reliability. The Cloudflare, Netlify and
-  GitHub figures cited elsewhere in this file were verified directly
-  against the vendors; the Neocities and Codeberg specifics were not, and
-  need checking before either is documented as a recommendation, let
-  alone integrated.
-
-- **GitHub Pages as a third publishing destination** — deferred 2026-08-12.
-  Requested by CLI-era users (summer 2025). Feasible and well-bounded, but
-  not now. What's known: the Quartz-docs GitHub-template route (build stock
-  Quartz in Actions CI) does NOT fit — Plantoir builds patched Quartz
-  v4.5.0 locally, so the right route is push-the-built-output to a branch
-  Pages serves, written once in the shared `deploy.py` (git is already in
-  the container). Videos are fine: GitHub Pages serves 206 Partial Content
-  with proper Content-Range (verified empirically 2026-08-12), which is
-  what Safari's `<video>` needs; limits are 100 MB/file (hard), ~1 GB/site,
-  100 GB/month soft bandwidth — same soft cap as Netlify free. Token story
-  parallels Netlify: fine-grained PAT (`contents: read/write`, one repo);
-  repo creation + Pages enablement automatable via API. The UI seam already
-  exists from rows 101–102 (`deploy_target` picker, milestones, launcher
-  flag). Open questions, answerable with a one-session hand-run spike
-  (push a built Test 3 section to a throwaway repo) BEFORE any UI work:
-  (1) subpath hosting — each section would live at
-  `username.github.io/<repo>`, and our patched build has never carried a
-  path component in `baseUrl`; (2) Quartz's trailing-slash caveat on Pages
-  (`file.html`, no redirect — mostly bites hand-written external links);
-  (3) deploy latency (~a minute to go live — milestone wording should say
-  "on its way", and the output needs a `.nojekyll`). Shared work: deploy.py
-  plus both GUIs — write a proposal note for the mac side (like
-  research/ai-assist/HISTORY.md, part 3) when picking this up.
 
 - **Publish stops an active preview itself** — deferred 2026-08-11. The
   idea: the Publish button stays enabled while a preview runs; clicking it
