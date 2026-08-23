@@ -53,6 +53,11 @@ struct SectionDetailView: View {
     /// Findings that arrived while a dialog was already up, waiting their turn.
     @State var heldHealthFindings: [SiteHealthFinding] = []
 
+    /// What a repair just put back, while that is being shown.
+    @State var repairOutcome: String?
+
+    @State var isShowingRepairOutcome: Bool = false
+
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
 
@@ -324,12 +329,28 @@ struct SectionDetailView: View {
             // the teacher would then believe it was dealt with.
             if let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
                 Button(title) {
-                    SiteHealthRepair.repair(healthFindings, in: course)
+                    let repaired: [String] = SiteHealthRepair.repair(healthFindings, in: course)
+                    repairOutcome = SiteHealthRepair.whatWasPutBack(repaired)
+                    isShowingRepairOutcome = repairOutcome != nil
                 }
             }
             Button("OK") { }
         } message: {
             Text(healthAlertMessage)
+        }
+        // Say what the repair did, and offer to act on it. Without this the
+        // button's whole effect is invisible: the folder is back on disk, the
+        // built site still shows how things were, and nothing says either.
+        .alert(repairOutcome ?? "", isPresented: $isShowingRepairOutcome) {
+            Button("Build Again") {
+                repairOutcome = nil
+                rebuildAfterRepair()
+            }
+            Button("Later") {
+                repairOutcome = nil
+            }
+        } message: {
+            Text(SiteHealthRepair.notOnTheSiteYet)
         }
         .onChange(of: isShowingHealthFindings) { _, isShowing in
             // Cleared only once the alert is actually gone. Clearing inside the
@@ -372,6 +393,20 @@ struct SectionDetailView: View {
             }
         }
         return paragraphs.joined(separator: "\n\n")
+    }
+
+    /// Builds the site again after a repair, so the teacher can see it.
+    ///
+    /// A preview that is already up is stopped first and started again, which
+    /// is the same order the Deploy button uses — starting a second one behind
+    /// the first would take a port it then could not have.
+    func rebuildAfterRepair() {
+        Task { @MainActor in
+            if previewURL != nil || isWaitingForServer {
+                await stopPreviewAndWait()
+            }
+            startPreview()
+        }
     }
 
     /// Puts a finished run's folder problems in front of the teacher.

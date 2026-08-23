@@ -76,6 +76,36 @@ final class SiteHealthRepairTests: XCTestCase {
         XCTAssertTrue(written.contains("title: Introduction to Computer Science"), written)
     }
 
+    /// A repair whose outcome is invisible is one nobody trusts the second
+    /// time — and the Media folder is somewhere a teacher cannot see from this
+    /// app, so silence after pressing the button is indistinguishable from
+    /// nothing having happened.
+    func testARepairSaysWhatItPutBack() {
+        XCTAssertEqual(
+            SiteHealthRepair.whatWasPutBack(["mediaFolderMissing"]),
+            "Put the Media folder back."
+        )
+        XCTAssertEqual(
+            SiteHealthRepair.whatWasPutBack(["mediaFolderMissing", "sectionIndexMissing"]),
+            "Put the Media folder and the front page back."
+        )
+        XCTAssertNil(SiteHealthRepair.whatWasPutBack([]),
+                     "nothing repaired means nothing to announce")
+        XCTAssertNil(SiteHealthRepair.whatWasPutBack(["curriculumCoverageFoundNothing"]),
+                     "a finding with no repair has nothing to report")
+    }
+
+    /// The site still shows how things were until it is built again, and saying
+    /// so is the difference between a button that fixed the folder and one a
+    /// teacher believes fixed their site.
+    func testTheTeacherIsToldTheSiteHasNotChangedYet() {
+        let said: String = SiteHealthRepair.notOnTheSiteYet
+        XCTAssertTrue(said.lowercased().contains("build"), said)
+        for word in ["container", "script", "toolchain", "quartz", "config", "rebuild the toolchain"] {
+            XCTAssertFalse(said.lowercased().contains(word), "says \"\(word)\" to a teacher")
+        }
+    }
+
     /// Pressing it twice, or pressing it after fixing the problem in Obsidian,
     /// must change nothing — a repair that overwrote would destroy the very
     /// page the teacher had just written.

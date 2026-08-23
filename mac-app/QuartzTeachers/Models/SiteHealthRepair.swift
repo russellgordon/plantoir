@@ -50,6 +50,44 @@ enum SiteHealthRepair {
         return "Put them back"
     }
 
+    /// What was put back, in words a teacher can check against their folder.
+    ///
+    /// A repair whose outcome is invisible is a repair nobody trusts the second
+    /// time — and the Media folder in particular is somewhere a teacher cannot
+    /// see from this app, so silence after pressing the button is
+    /// indistinguishable from nothing having happened.
+    static func whatWasPutBack(_ repairedNames: [String]) -> String? {
+        var parts: [String] = []
+        for name in repairedNames {
+            switch name {
+            case "mediaFolderMissing":
+                parts.append("the Media folder")
+            case "sectionIndexMissing":
+                parts.append("the front page")
+            default:
+                break
+            }
+        }
+        if parts.isEmpty {
+            return nil
+        }
+        if parts.count == 1 {
+            return "Put \(parts[0]) back."
+        }
+        return "Put " + parts.dropLast().joined(separator: ", ")
+            + " and " + (parts.last ?? "") + " back."
+    }
+
+    /// Why the site does not show the repair yet.
+    ///
+    /// The folder is back on disk, and the built site still reflects how things
+    /// were when it was made. Left unsaid, "Put the Media folder back" reads as
+    /// though the site is fixed — which is the same silent gap as a warning
+    /// nobody sees.
+    static let notOnTheSiteYet: String =
+        "Your site still shows how things were when it was last built. "
+        + "Build it again to see the difference."
+
     /// Repairs what can be repaired, and reports what it did.
     ///
     /// Never overwrites: every repair checks first, so pressing the button
