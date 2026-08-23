@@ -1184,7 +1184,7 @@ public sealed partial class SidebarPane : UserControl
             {
                 new TextBlock
                 {
-                    Text = $"Choose a new course code for {course.Code}. Letters, numbers, and single spaces up to 12 characters are allowed.",
+                    Text = $"Choose a new course code for {course.Code}. Letters, numbers, spaces and dashes up to 12 characters are allowed.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 codeBox,

@@ -44,4 +44,8 @@ public sealed class CourseNameCatalog
     public string? DefaultName(string code) => Names(code)?.Short;
 
     public int Count => _entries.Count;
+
+    /// <summary>Every known code and its names, for a picker to search over.</summary>
+    public IEnumerable<(string Code, CourseNames Names)> AllEntries() =>
+        _entries.Select(e => (e.Key, e.Value));
 }

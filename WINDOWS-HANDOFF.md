@@ -392,11 +392,34 @@ this side is expected to say so when the contract is wrong.
    but was not the shape row 318a described, so it was left rather than
    silently expanded into this item's scope.
 
-9. **Course codes with DASHES, and the club heuristic that misreads them
-   (2026-08-23).** Two changed rules, both already in
-   `contracts/course-management.json`, and the Windows suite is expected to
-   go RED on both until it implements them — that is the contract working,
-   not damage.
+9. ~~Course codes with DASHES, and the club heuristic that misreads them~~
+   — ✅ Done 2026-08-23 (`GUI-IMPROVEMENTS.md` row 355). Both contract-driven
+   fixes below are implemented, plus the picker itself was rebuilt as a real
+   WinUI `AutoSuggestBox` (see the cross-linked section below), which the
+   dashes/club work otherwise had no reason to touch. Two adversarial review
+   passes caught and fixed two real bugs before this was called done: the
+   `AutoSuggestBox`'s `SuggestionChosen` event was never wired, so clicking
+   or Enter-selecting a dropdown row silently did nothing (WinUI does not
+   auto-commit a templated item's text on selection — `TextMemberPath` alone
+   only governs the box's own default, non-templated rendering); and
+   `CourseConfiguration.IsClub` (used by Course Settings' "Short label"
+   field) still carried the old uncatalogued heuristic even after the
+   wizard itself was fixed, which would have made a BC course created
+   correctly as a non-club read as a club again the moment its Settings
+   page opened — both are now `Plantoir.Core.Models.ClubCodeRule`, behind
+   one shared `Plantoir.Services.CourseNameCatalogs.Shared` catalog (which
+   also now loads British Columbia's names alongside Ontario's — it only
+   loaded Ontario before). New `ContractTests.
+   CourseManagement_ClubDetection_MatchesContract` runs all 11
+   `courseCode.clubDetection` cases. **Follow-up the same day:** a Province
+   `ComboBox` ("Ontario" / "British Columbia") was added ahead of the
+   course-code row, mirroring the mac's segmented Province picker
+   (`GUI-IMPROVEMENTS.md` row 355's addendum) — new `CourseCatalog` (ported
+   from the mac's `CourseCatalog.swift`) and `CourseNameCatalogs.
+   ForProvince`, narrowing the picker's suggestion list to one province
+   without gating typed codes through either catalog. Full suite: 659/659,
+   later 664/664 with the province addition's own tests. Two changed rules,
+   both already in `contracts/course-management.json`:
 
    - **`courseCode.problems`** — a dash is now ALLOWED in a course code, and
      both teacher-facing sentences changed with it ("…letters, numbers,
@@ -425,6 +448,21 @@ this side is expected to say so when the contract is wrong.
    code's SHAPE encodes one jurisdiction's conventions**, and it stops being
    true the moment a second jurisdiction arrives. Ask the data you already
    have before guessing from the characters.
+
+   **Before touching this field, read "The course-code picker is a hand-built
+   combo box — and you probably should NOT build one" below.** Both fixes
+   above land in the same New Course wizard field the mac rebuilt into a
+   searchable two-line flyout with an "Example content" badge
+   (`GUI-IMPROVEMENTS.md` rows 333–338); that section explains why the mac
+   hand-built its version (a real `NSComboBox` can only draw plain strings)
+   and says plainly that the reason likely does NOT apply to WinUI, whose
+   `ComboBox`/`AutoSuggestBox` can take an `ItemTemplate` — try the real
+   control first rather than porting the hand-built one. If a dash-containing
+   code or a corrected club/non-club badge needs to render correctly in that
+   dropdown, the four hard-won lessons there (single state for flyout
+   visibility, decline-not-swallow key handling, highlight rows by CODE not
+   index, and re-check badge contrast on a highlighted row) apply whether you
+   end up hand-building or wiring the real control's template.
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity

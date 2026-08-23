@@ -113,6 +113,24 @@ public class ContractTests
     }
 
     [Fact]
+    public void CourseManagement_ClubDetection_MatchesContract()
+    {
+        string onFile = ContractLoader.GetSupportPath("ontario_secondary_courses.json");
+        string bcFile = ContractLoader.GetSupportPath("british_columbia_secondary_courses.json");
+        var catalog = CourseNameCatalog.Load(onFile, bcFile);
+
+        var doc = ContractLoader.LoadJson("course-management.json");
+        var cases = doc["courseCode"]!["clubDetection"]!["cases"]!.AsArray();
+
+        foreach (var c in cases)
+        {
+            string code = c!["code"]!.ToString();
+            bool expectClub = c["expectClub"]!.GetValue<bool>();
+            Assert.Equal(expectClub, ClubCodeRule.IsClub(code, catalog));
+        }
+    }
+
+    [Fact]
     public void CourseManagement_DefaultCourseName_MatchesContract()
     {
         string onFile = ContractLoader.GetSupportPath("ontario_secondary_courses.json");

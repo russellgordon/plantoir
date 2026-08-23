@@ -365,16 +365,15 @@ public sealed class CourseConfiguration
     public List<string> AllSidebarItems =>
         SharedFolders.Concat(SharedFiles).Concat(PerSectionFolders).Concat(PerSectionFiles).ToList();
 
-    /// <summary>A club has a short code, or a non-digit where a course carries its grade.</summary>
-    public bool IsClub
-    {
-        get
-        {
-            string code = CourseCode;
-            if (code.Length < 4) return true;
-            return !char.IsDigit(code[3]);
-        }
-    }
+    /// <summary>
+    /// Whether this course's code names a club rather than a course —
+    /// delegates to ClubCodeRule, the shared rule both apps ask
+    /// (contracts/course-management.json -> courseCode.clubDetection): the
+    /// catalog is asked first and its answer is final, and only a code the
+    /// catalog has never heard of falls back to the fourth-character guess.
+    /// </summary>
+    public bool IsClub(Plantoir.Core.Catalogs.CourseNameCatalog catalog) =>
+        ClubCodeRule.IsClub(CourseCode, catalog);
 
     // ---- Section numbers (matching the mac app's three tiers) -----------
 
