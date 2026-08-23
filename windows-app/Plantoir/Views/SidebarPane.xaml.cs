@@ -14,28 +14,76 @@ using Plantoir.ViewModels;
 
 namespace Plantoir.Views;
 
-/// <summary>One row of the sidebar tree: a course, a section, the Archived group, or an archive.</summary>
-public sealed class SidebarRow
+/// <summary>
+/// One row of the sidebar tree: a course, a section, the Archived group, or
+/// an archive.
+///
+/// Rows are RECONCILED, not recreated — <see cref="SidebarPane.Refresh"/>
+/// reuses the same row object across passes so WinUI's `TreeView` never
+/// tears down and rebuilds a container, which is what silently collapsed
+/// "Courses & Clubs" after the create-course dialog closed (row 172's own
+/// comment). That means a value changed on an EXISTING row's object after
+/// its container was already created and bound — <see cref="ScheduledDeploy"/>
+/// and <see cref="Menu"/>, both of which change without the row itself being
+/// re-created — must raise <see cref="INotifyPropertyChanged"/>, and the XAML
+/// binding it, `Mode=OneWay`. `x:Bind` defaults to `OneTime`: without both of
+/// these, scheduling a deploy on an already-open window would still be true
+/// in this object the instant it happened, and invisible in the window until
+/// the app restarted and rebuilt the row fresh — found 2026-08-23, reported
+/// directly ("There is no clock next to the section name once a deploy is
+/// scheduled... There is no way to modify or cancel").
+/// </summary>
+public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private void Raise(string propertyName) =>
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
+
     public required string Title { get; init; }
     public required string Glyph { get; init; }
     public string? Tooltip { get; init; }
     public bool IsExpanded { get; set; }   // mutable: user toggles are recorded (row 99)
     public string AutomationId { get; init; } = "";
     public ObservableCollection<SidebarRow> Children { get; init; } = new();
-    public MenuFlyout? Menu { get; set; }
     public SidebarSelection? Selection { get; init; }
     public ArchivedItem? Archived { get; init; }
 
+    private MenuFlyout? _menu;
+    /// <summary>
+    /// Rebuilt every `Refresh()` pass (its closures must always hold the
+    /// freshly loaded course/section, never a stale one) — so this has to be
+    /// a real property that raises change notification, not `init`-only,
+    /// or `ContextFlyout`'s `Mode=OneWay` binding has nothing to react to.
+    /// </summary>
+    public MenuFlyout? Menu
+    {
+        get => _menu;
+        set { if (!ReferenceEquals(_menu, value)) { _menu = value; Raise(nameof(Menu)); } }
+    }
+
+    private DateTime? _scheduledDeploy;
     /// <summary>
     /// When a deploy is waiting to fire for this section, null otherwise.
     ///
     /// A scheduled deploy is the one thing Plantoir does while nobody is
     /// looking, and until now nothing said so — a teacher who set one on
     /// Friday had no way to be reminded on Monday except by remembering. The
-    /// row it belongs to is the row that says it.
+    /// row it belongs to is the row that says it. Raises change notification
+    /// for the two DERIVED properties the badge actually binds to, not just
+    /// this one, since `x:Bind` subscribes to the property path it names.
     /// </summary>
-    public DateTime? ScheduledDeploy { get; set; }
+    public DateTime? ScheduledDeploy
+    {
+        get => _scheduledDeploy;
+        set
+        {
+            if (_scheduledDeploy == value) return;
+            _scheduledDeploy = value;
+            Raise(nameof(ScheduledDeploy));
+            Raise(nameof(BadgeVisibility));
+            Raise(nameof(BadgeTooltip));
+        }
+    }
 
     public string BadgeGlyph => Glyphs.Clock;
     public Visibility BadgeVisibility =>
@@ -276,12 +324,16 @@ public sealed partial class SidebarPane : UserControl
                     Glyph = DocumentGlyph,
                     Selection = new SidebarSelection.SectionItem(course.Code, number),
                     AutomationId = $"sidebar-{course.Code}-section{number}",
-                    // Windows is asked, not a note of our own: the teacher can
-                    // delete the task themselves, and a badge promising a
-                    // deploy that will not happen is worse than no badge.
-                    ScheduledDeploy = TaskScheduling.NextRun(course.Code, number),
                 };
             row.Menu = SectionMenu(course, number);
+            // Re-read on EVERY pass, not only when the row is first created —
+            // rows are reconciled, not recreated, so an existing row's clock
+            // badge would otherwise stay stuck at whatever was true the
+            // moment this section was first shown, forever. Windows is asked
+            // rather than anything of ours being written down: the teacher
+            // can delete the task themselves, and a badge promising a deploy
+            // that will not happen is worse than no badge.
+            row.ScheduledDeploy = TaskScheduling.NextRun(course.Code, number);
             desired.Add(row);
         }
         ApplyDesiredOrder(courseRow.Children, desired);

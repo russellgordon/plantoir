@@ -515,6 +515,41 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **A general WinUI `x:Bind` trap, found in the sidebar's scheduled-deploy
+  badge but worth watching for anywhere a row object is reconciled rather
+  than recreated** (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 326).
+  Reported directly, right after row 325 shipped: no clock badge appeared
+  after scheduling a deploy in an already-open window, and the right-click
+  menu never offered Cancel/Change either. Two compounding bugs, not one.
+  (1) `ReconcileSections` only read the current schedule into
+  `SidebarRow.ScheduledDeploy` when CREATING a row — an existing row (the
+  normal case, since the window was already open) kept whatever was true
+  the moment it was first shown, forever. (2) Even fixed, the UI would not
+  have shown it: `x:Bind` — unlike classic `Binding` — defaults to
+  `Mode=OneTime`, evaluating once at container creation and never again.
+  `SidebarRow` had no change notification and none of the affected
+  bindings specified `Mode=OneWay`, so `Visibility`/`ContextFlyout` were
+  frozen at whatever was true when the row's TreeView container was first
+  built. **No equivalent trap on the mac** — SwiftUI's `@Observable`
+  re-renders any view that reads a changed property, full stop, so there
+  is no "silently stale until the container happens to be recreated"
+  failure mode to reproduce there. Worth knowing as a general lesson for
+  ANY future WinUI work here: a reconciled (not recreated) row/item object
+  needs BOTH `Mode=OneWay` in the XAML on every binding whose value can
+  change post-creation AND `INotifyPropertyChanged` raised for that exact
+  property name — including for any DERIVED property XAML binds to
+  directly (here, `ScheduledDeploy` changing had to also raise
+  `BadgeVisibility` and `BadgeTooltip`, since `x:Bind` subscribes to the
+  literal property path named in the binding, not to whatever the bound
+  property is computed from). Also added, same pass: `MainWindow`'s
+  `Activated` handler now calls `Sidebar.Refresh()`, so a deploy scheduled
+  through the assistant or from a different window is picked up the next
+  time this window comes to the front — the same "refresh on activation"
+  shape the " — Edited" marker already uses. Reference:
+  `windows-app/Plantoir/Views/SidebarPane.xaml.cs` (`SidebarRow`,
+  `ReconcileSections`), `windows-app/Plantoir/Views/SidebarPane.xaml`
+  (the three `Mode=OneWay` bindings), `windows-app/Plantoir/MainWindow.xaml.cs`.
+
 - **Scheduled deploys never actually fired on Windows, ever — a doubled
   backslash in a shell-quoted string** (Windows, 2026-08-23,
   `GUI-IMPROVEMENTS.md` row 325). Reported directly, after a real overnight

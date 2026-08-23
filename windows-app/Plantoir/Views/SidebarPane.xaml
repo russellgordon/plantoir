@@ -16,8 +16,16 @@
                       AutomationProperties.AutomationId="coursesSidebar">
                 <TreeView.ItemTemplate>
                     <DataTemplate x:DataType="views:SidebarRow">
+                        <!-- Menu and the clock badge both need Mode=OneWay: rows are
+                             RECONCILED, not recreated (row 172's own comment), so
+                             Menu is reassigned and ScheduledDeploy re-read on every
+                             Refresh() pass without this row's container ever being
+                             torn down. x:Bind defaults to OneTime — without OneWay
+                             here (and SidebarRow implementing INotifyPropertyChanged
+                             for both), a deploy scheduled after this row was first
+                             shown would be invisible until the app restarted. -->
                         <TreeViewItem ItemsSource="{x:Bind Children}" IsExpanded="{x:Bind IsExpanded}"
-                                      ContextFlyout="{x:Bind Menu}"
+                                      ContextFlyout="{x:Bind Menu, Mode=OneWay}"
                                       AutomationProperties.AutomationId="{x:Bind AutomationId}">
                             <StackPanel Orientation="Horizontal" Spacing="8" ToolTipService.ToolTip="{x:Bind Tooltip}">
                                 <FontIcon Glyph="{x:Bind Glyph}" FontSize="14" />
@@ -26,8 +34,8 @@
                                      Its own tooltip says when: the row's tooltip is about the
                                      section, and "at 6:30 tomorrow" belongs to the clock. -->
                                 <FontIcon Glyph="{x:Bind BadgeGlyph}" FontSize="12" Opacity="0.75"
-                                          Visibility="{x:Bind BadgeVisibility}"
-                                          ToolTipService.ToolTip="{x:Bind BadgeTooltip}" />
+                                          Visibility="{x:Bind BadgeVisibility, Mode=OneWay}"
+                                          ToolTipService.ToolTip="{x:Bind BadgeTooltip, Mode=OneWay}" />
                             </StackPanel>
                         </TreeViewItem>
                     </DataTemplate>

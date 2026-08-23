@@ -78,6 +78,12 @@ public sealed partial class MainWindow : Window
                 // ScheduledDeployCompletion and WINDOWS-HANDOFF.md, "A
                 // scheduled deploy needs its own path to the same record".
                 _ = System.Threading.Tasks.Task.Run(ScheduledDeployCompletion.ConsumePending);
+                // The sidebar's own clock badge (SidebarRow.ScheduledDeploy)
+                // is read from schtasks, not stored anywhere of ours — a
+                // deploy scheduled through the assistant, or in another
+                // window on the same section, would otherwise sit invisible
+                // here until something else happened to reload the tree.
+                if (Workspace.State == WorkspaceState.Ready) Sidebar.Refresh();
             }
         };
         // Covers app launch itself, in case the window's first Activated
