@@ -5,28 +5,206 @@ import XCTest
 /// UITEST_WORKSPACE environment variable.
 final class QuartzTeachersUITests: XCTestCase {
 
-    // NOTE — do NOT add `Process`-based cleanup here. An earlier
-    // attempt put `pkill -f "http.server 8081"` in `setUp`/`tearDown`
-    // to reap the stub preview server that
-    // `testRestartingAPreviewReturnsToTheProgressView` leaks (that
-    // test hands the app a fake `preview.sh` ending in `exec python3
-    // -m http.server 8081`, and the server is a child of the APP, so
-    // it outlives an interrupted run and holds the port — a leftover
-    // from one day's run was still holding 8081 the next morning and
-    // made a real preview fail with `OSError: [Errno 48] Address
-    // already in use`, which reads like a broken toolchain rather than
-    // like test litter).
+    // The stub preview server these tests start (see
+    // `writeStubPreviewScript(in:serving:)`) is a child of the APP, not
+    // of this runner, so it outlives an interrupted run. `tearDown`
+    // reaps it — `reapStubPreviewServer()`.
     //
-    // It looked right and did nothing: the UI-test runner is
-    // sandboxed and cannot spawn a child process at all. Verified
-    // 2026-08-23 by having the helper write a marker file after
-    // `process.waitUntilExit()` — the marker was never written, and
-    // the `try?` had been swallowing the failure silently. Anything
-    // that needs to kill that server has to do it WITHOUT spawning a
-    // process (`Darwin.kill()` on a pid the stub script records would
-    // work), or from outside the test run.
+    // Do NOT reach for `Process` here, however obvious it looks. An
+    // earlier attempt put `pkill -f "http.server 8081"` in
+    // `setUp`/`tearDown`; it looked right and did nothing, because the
+    // UI-test runner is sandboxed and cannot spawn a child process at
+    // all. Verified 2026-08-23 by having the helper write a marker file
+    // after `process.waitUntilExit()` — the marker was never written,
+    // and the `try?` had been swallowing the failure silently. Whatever
+    // reaps that server has to do it WITHOUT spawning anything, which is
+    // why the reaper is a raw `kill()` on a pid the stub records.
+    //
+    // The stub also no longer asks for port 8081, or any fixed port. It
+    // binds port 0, lets the kernel choose a free one, and announces the
+    // result on the line `ScriptRunner.previewAddress` already scrapes,
+    // so the app follows it wherever it lands. A fixed port made this
+    // suite fail whenever ANYTHING else on the machine held 8081 — an
+    // orphan from an interrupted run one morning, an unrelated `ssh -L`
+    // tunnel another — and that failure reads like a broken toolchain
+    // rather than like a busy port.
+
+    // MARK: - Stored properties
+
+    /// Where a running stub preview server recorded its process id, so
+    /// `tearDown` can reap a server the app would otherwise leave
+    /// behind. Nil when the current test started no stub server.
+    var stubPreviewPIDFileURL: URL?
 
     // MARK: - Functions
+
+    /// Reaps a stub preview server before the next test runs.
+    override func tearDown() {
+        reapStubPreviewServer()
+        super.tearDown()
+    }
+
+    /// Kills the stub preview server started by the current test, if it
+    /// is still running.
+    ///
+    /// The server is a child of the APP rather than of this runner, so
+    /// nothing else reaps it: when a run is interrupted the app dies and
+    /// the server is reparented and keeps holding its port. This uses a
+    /// bare `kill()` because the runner is sandboxed and cannot spawn a
+    /// helper process — see the note at the top of this class.
+    func reapStubPreviewServer() {
+        guard let pidFileURL = stubPreviewPIDFileURL else {
+            return
+        }
+        stubPreviewPIDFileURL = nil
+
+        guard let recordedText = try? String(contentsOf: pidFileURL, encoding: .utf8) else {
+            return
+        }
+        try? FileManager.default.removeItem(at: pidFileURL)
+
+        let trimmedText: String = recordedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let processID = Int32(trimmedText), processID > 1 else {
+            return
+        }
+
+        // A process id is reused once its original owner is reaped, so
+        // "something answers to this number" is NOT enough to justify a
+        // SIGKILL — that is how a test murders an unrelated program of
+        // the teacher's. Check the name first: only a Python process can
+        // be the stub server this class started.
+        guard let runningName = nameOfRunningProcess(processID) else {
+            return
+        }
+        // Lowercased deliberately, and it matters. Homebrew's `python3`
+        // runs through a `Python.app` framework stub, so the kernel
+        // reports `Python` with a capital P, while the `/usr/bin/python3`
+        // that ships with the developer tools reports `python3`. A
+        // case-sensitive test passes on one machine and silently reaps
+        // nothing on the other — the same shape of quiet no-op this
+        // class was already caught by once.
+        guard runningName.lowercased().hasPrefix("python") else {
+            return
+        }
+        _ = kill(processID, SIGKILL)
+    }
+
+    /// The short name of a running process, or nil when no process holds
+    /// that id.
+    ///
+    /// Asks the kernel directly (`sysctl`) rather than running `ps`,
+    /// because this runner cannot spawn a process at all.
+    func nameOfRunningProcess(_ processID: Int32) -> String? {
+        var selector: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, processID]
+        var processInfo: kinfo_proc = kinfo_proc()
+        var infoSize: Int = MemoryLayout<kinfo_proc>.stride
+
+        let outcome: Int32 = sysctl(&selector, 4, &processInfo, &infoSize, nil, 0)
+        if outcome != 0 || infoSize == 0 {
+            return nil
+        }
+
+        // Copied to a local first: reading the tuple's size inside a
+        // pointer closure over the same property is an overlapping
+        // access, and the compiler rejects it.
+        var commandName = processInfo.kp_proc.p_comm
+        let commandNameSize: Int = MemoryLayout.size(ofValue: commandName)
+        return withUnsafePointer(to: &commandName) { commandPointer in
+            return commandPointer.withMemoryRebound(
+                to: CChar.self,
+                capacity: commandNameSize
+            ) { characterPointer in
+                return String(cString: characterPointer)
+            }
+        }
+    }
+
+    /// Writes a fake `preview.sh` into a fixture workspace: it reports
+    /// the same milestones a real preview does, builds a one-page site
+    /// where a real build would put it, and serves that folder over HTTP
+    /// for the app to embed.
+    ///
+    /// Two details are load-bearing, and the test cannot pass without
+    /// either of them.
+    ///
+    /// It BUILDS INTO the folder the app watches. `waitForPreviewServer`
+    /// will not show a preview until this section's built `index.html`
+    /// has CHANGED — that is how a teacher is stopped from being shown
+    /// the previous build — and it waits two minutes before giving up on
+    /// that. A stub that serves a site from somewhere else never trips
+    /// the check, so the preview arrives two minutes late and the test
+    /// times out first.
+    ///
+    /// And it takes whatever port the kernel hands it, announcing that
+    /// port on the line the app scrapes, so this suite cannot collide
+    /// with a second run, a teacher's own preview, or any unrelated
+    /// program that happens to hold a port. It records its process id
+    /// before `exec`, which preserves that id, so what is written is the
+    /// server's own and `tearDown` can reap it.
+    func writeStubPreviewScript(in fixtureURL: URL, buildingInto publicURL: URL) throws {
+        let pidFileURL: URL = fixtureURL.appendingPathComponent("stub-preview.pid")
+        try? FileManager.default.removeItem(at: pidFileURL)
+
+        let stubScript: String = """
+        #!/bin/bash
+        # Stop mode. The app runs `preview.sh <course> <section> --stop`
+        # whenever a preview ends, and WAITS for it before starting the
+        # next one, so a stub that ignores the flag and starts a server
+        # instead never exits and wedges the restart.
+        for argument in "$@"; do
+            if [ "$argument" = "--stop" ]; then
+                if [ -f "\(pidFileURL.path)" ]; then
+                    kill "$(cat "\(pidFileURL.path)")" 2>/dev/null
+                    rm -f "\(pidFileURL.path)"
+                fi
+                exit 0
+            fi
+        done
+
+        echo "Starting container if needed"
+        sleep 1
+        echo "Copying shared folders"
+        sleep 1
+        mkdir -p "\(publicURL.path)"
+        printf '%s' '<html><body><h1>Stub site</h1></body></html>' > "\(publicURL.path)/index.html"
+        echo $$ > "\(pidFileURL.path)"
+        cd "\(publicURL.path)" && exec python3 -u -c '
+        import http.server
+        import socketserver
+        import sys
+
+        class ReusableServer(socketserver.TCPServer):
+            allow_reuse_address = True
+
+        # Bind BEFORE announcing: the port is real by the time the app
+        # reads about it, so there is no window in which something else
+        # could take it.
+        server = ReusableServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler)
+        port = server.server_address[1]
+        print("Preview will be available at: http://localhost:%d/" % port)
+        print("Launching Quartz preview on http://localhost:%d" % port)
+        sys.stdout.flush()
+        server.serve_forever()
+        '
+        """
+
+        let stubURL: URL = fixtureURL.appendingPathComponent("preview.sh")
+        try stubScript.write(to: stubURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stubURL.path)
+        stubPreviewPIDFileURL = pidFileURL
+    }
+
+    /// Where a build for `sectionNumber` of the fixture's EXC2O course
+    /// puts the pages it serves — the folder the app watches to decide a
+    /// preview is ready.
+    func builtSiteURL(in fixtureURL: URL, sectionNumber: Int) -> URL {
+        return fixtureURL
+            .appendingPathComponent("courses")
+            .appendingPathComponent("EXC2O")
+            .appendingPathComponent(".merged_output")
+            .appendingPathComponent("section\(sectionNumber)")
+            .appendingPathComponent("public")
+    }
 
     /// Launches the app pointed at a fixture workspace: the one supplied
     /// via UITEST_WORKSPACE, or a fresh disposable one built from the test
@@ -584,26 +762,8 @@ final class QuartzTeachersUITests: XCTestCase {
     func testRestartingAPreviewReturnsToTheProgressView() throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
 
-        let siteURL: URL = fixtureURL.appendingPathComponent("stub-site")
-        try FileManager.default.createDirectory(at: siteURL, withIntermediateDirectories: true)
-        try "<html><body><h1>Stub site</h1></body></html>".write(
-            to: siteURL.appendingPathComponent("index.html"),
-            atomically: true,
-            encoding: .utf8
-        )
-
-        let stubScript: String = """
-        #!/bin/bash
-        echo "Starting container if needed"
-        sleep 1
-        echo "Copying shared folders"
-        sleep 1
-        echo "Launching Quartz preview on http://localhost:8081"
-        cd "\(siteURL.path)" && exec python3 -m http.server 8081 --bind 127.0.0.1
-        """
-        let stubURL: URL = fixtureURL.appendingPathComponent("preview.sh")
-        try stubScript.write(to: stubURL, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stubURL.path)
+        let publicURL: URL = builtSiteURL(in: fixtureURL, sectionNumber: 1)
+        try writeStubPreviewScript(in: fixtureURL, buildingInto: publicURL)
 
         let application: XCUIApplication = XCUIApplication()
         application.launchEnvironment["UITEST_WORKSPACE"] = fixtureURL.path

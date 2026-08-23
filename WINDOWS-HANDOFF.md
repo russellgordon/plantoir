@@ -2121,6 +2121,72 @@ should mirror it:
   under test. Verified on the mac empirically: `activity.txt` byte-identical
   (same SHA-1) before and after a full suite run.
 
+### A stub launcher must answer every mode the app calls, and must not name a port (mac, 2026-08-23)
+
+The mac's one end-to-end preview test drives the real app against a fake
+`preview.sh` that serves a one-page site. It had been failing for days with
+`OSError: [Errno 48] Address already in use`, and it leaked an orphan server
+that held port 8081 overnight — a leftover once made a REAL preview fail, which
+reads like a broken toolchain rather than like test litter. Three separate
+faults, and the interesting part is that only the third was the actual cause.
+Windows has the same shape of test to write (`preview.ps1` driven by the app),
+so all three are worth having before you write it.
+
+- **The stub never implemented `--stop`, and that was the real bug.** Ending a
+  preview runs `preview.sh <course> <section> --stop` and the app WAITS for
+  that to finish before the next preview starts (mac: `PreviewStopper`). The
+  stub ignored its arguments, so `--stop` fell through to "start a server" —
+  which never exits. The restart then waited forever on a stop that could not
+  complete, and the second server's attempt to bind the port the first one
+  still held produced the `Address already in use` line everybody was chasing.
+  **The error message named the symptom and hid the cause.** A stub stands in
+  for a launcher, so it owes every mode the app invokes; answering only the
+  happy path buys a failure that looks like a port problem.
+- **A hard-coded port is a test that asserts ownership of a shared machine.**
+  The stub asked for 8081. Anything else holding it fails the run for reasons
+  that look like a product bug — and on this Mac something did: an unrelated
+  `ssh -L` tunnel of Russell's, listening on 8081 all along. The fix costs
+  nothing, because the app already scrapes the port out of the launcher's own
+  output (`Preview will be available at: http://localhost:<port>/`). The stub
+  now binds port 0, lets the kernel choose, and announces what it got — bind
+  BEFORE announcing, so there is no window in which the announced port is not
+  yet taken. Two runs can now overlap, and a teacher's real preview can be up
+  at the same time. **Windows: do not let a stub name 8081**; read the port
+  back from the announcement the same way.
+- **A sandboxed UI-test runner cannot spawn a process, and fails silently at
+  it.** The mac's first attempt at cleanup put `pkill` in `tearDown` behind a
+  `try?`. It never ran — XCUITest's runner has no permission to spawn a child
+  at all — and the swallowed error made dead code look like working cleanup
+  for days. Proved by having it write a marker file that never appeared. The
+  reaper is now a raw `kill()` on a pid the stub records before `exec` (which
+  preserves the id). Check whether your Windows UI-test host has the same
+  restriction before trusting a `Process.Start`-based teardown, and prefer
+  `Process.GetProcessById` + `Kill()` on a recorded id, which needs no spawn.
+- **Never reap by process NAME alone.** A pid is reused once its owner is
+  reaped, so "something answers to this number" does not justify a kill — that
+  is how a test murders an unrelated program of the teacher's. The mac scopes
+  the kill to a pid the stub itself wrote, and additionally checks the running
+  process's name before signalling. That check has one trap worth stealing:
+  Homebrew's `python3` runs through a `Python.app` framework stub, so the
+  kernel reports `Python` with a capital P, while `/usr/bin/python3` reports
+  `python3` — a case-SENSITIVE test passes on one machine and silently reaps
+  nothing on the other. Compare lowercased.
+- **What was rejected.** Cleaning up from outside the test run (a wrapper
+  script, or a `verify.sh` step) was rejected: it fixes the litter but leaves
+  the test itself failing on any busy machine, and it puts the cleanup
+  somewhere nobody reads when the test breaks. Keeping a fixed port and simply
+  killing whatever holds it first was rejected outright — on a developer's own
+  machine that is someone else's process.
+
+One more thing the mac learned here that is NOT about stubs. The app will not
+show a preview until the section's built `index.html` has CHANGED, and it
+waits up to 120 seconds for that (mac: `waitForPreviewServer` phase 2). A stub
+that serves a site from anywhere other than the folder a real build writes into
+never trips the check, so the preview arrives two minutes late and the test
+times out first — which looks like the server never came up. The stub must
+BUILD INTO the watched folder. Whatever Windows' equivalent staleness check
+is, its stub owes it the same honesty.
+
 ## Documentation map
 
 - [`WINDOWS-HANDOFF-COMPLETED.md`](WINDOWS-HANDOFF-COMPLETED.md) — write-ups
