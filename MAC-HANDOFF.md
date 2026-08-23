@@ -515,6 +515,20 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Measured: Edge does not need the `127.0.0.1` rewrite for a preview URL**
+  (Windows, 2026-08-23, closing `WINDOWS-HANDOFF.md` item 5's first half, the
+  Edge `127.0.0.1` question). The rewrite itself (`OutputParsers.cs`,
+  `SectionDetailView.xaml.cs`) was applied earlier on the mac's "browsers try
+  IPv6 first" rationale, without a Windows-side test to back it. Tested by
+  hand against a real running preview (port 8081, confirmed via `netstat`):
+  loading `http://localhost:8081` directly in Edge was indistinguishable from
+  loading `http://127.0.0.1:8081` — both rendered immediately, no perceptible
+  delay, repeated more than once. No IPv6-first stall observed. Conclusion:
+  the rewrite is a harmless no-op on Windows as currently shipped, not a fix
+  for an observed Edge problem — kept in place rather than removed, since it
+  costs nothing and matches the mac's own defensive posture, but it should no
+  longer be treated as an open question. No mac change; nothing to port.
+
 - **Windows caught up to the mac's working-folder path bar gestures**
   (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 328, closing
   `WINDOWS-HANDOFF.md` item 6). No mac change — the mac's own path bar is
