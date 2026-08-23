@@ -40,7 +40,7 @@ struct SiteHealthFinding: Equatable, Identifiable {
 
     /// The marker the toolchain prints. Pinned by
     /// `contracts/shared-rules.json` → `siteHealth.marker.prefix`.
-    static let markerPrefix: String = "PLANTOIR_HEALTH:"
+    nonisolated static let markerPrefix: String = "PLANTOIR_HEALTH:"
 
     /// Every finding announced in a stretch of output.
     ///
@@ -49,7 +49,7 @@ struct SiteHealthFinding: Equatable, Identifiable {
     /// other structured-line readers work from
     /// `transcript.recentText(maximumCharacters: 8000)` — a TAIL, which on a
     /// real build has long since scrolled past them.
-    static func findings(in text: String) -> [SiteHealthFinding] {
+    nonisolated static func findings(in text: String) -> [SiteHealthFinding] {
         var found: [SiteHealthFinding] = []
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let line: String = String(rawLine).trimmingCharacters(in: .whitespaces)
@@ -76,13 +76,32 @@ struct SiteHealthFinding: Equatable, Identifiable {
         return found
     }
 
+    /// A run's findings, appended to whatever a caller is about to be told.
+    ///
+    /// **For callers with no window to put a dialog in** — the assistant, and
+    /// `Plantoir --mcp-stdio`. A finding that only produced an alert would
+    /// reach nobody there, so the sentence has to travel in the answer itself.
+    /// The wording is the toolchain's own, carried in the marker line, which is
+    /// what stops the assistant describing the same problem in different words
+    /// from the section window.
+    static func appending(to message: String, from runner: ScriptRunner) -> String {
+        if runner.healthFindings.isEmpty {
+            return message
+        }
+        var parts: [String] = [message]
+        for finding in runner.healthFindings {
+            parts.append(finding.sentence + " " + finding.detail)
+        }
+        return parts.joined(separator: "\n\n")
+    }
+
     /// Whether a line is one of the machine-readable ones, so the console can
     /// keep it out of what a teacher reads.
     ///
     /// Rule 1: the interface never names the machinery, and a raw JSON blob in
     /// the console is machinery. The human-readable sentence is printed
     /// separately by the toolchain, so hiding this line loses nothing.
-    static func isMarkerLine(_ line: String) -> Bool {
+    nonisolated static func isMarkerLine(_ line: String) -> Bool {
         return line.trimmingCharacters(in: .whitespaces).hasPrefix(markerPrefix)
     }
 }

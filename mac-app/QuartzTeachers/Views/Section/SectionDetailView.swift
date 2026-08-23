@@ -39,6 +39,13 @@ struct SectionDetailView: View {
     /// Why a preview could not start, shown as an alert.
     @State var previewRefusal: String?
 
+    /// Folder problems the last build reported, shown once when it finishes.
+    ///
+    /// Held here rather than read from the runner at render time so that the
+    /// dialog appears ONCE per run: a teacher who dismisses it and carries on
+    /// editing must not have it thrown at them again on every redraw.
+    @State var healthFindings: [SiteHealthFinding] = []
+
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
 
@@ -260,6 +267,18 @@ struct SectionDetailView: View {
                 )
             )
         }
+        .task {
+            // Anything the overnight publish found. It ran with the app
+            // closed, so this is the first moment there is anywhere to say it
+            // — and `takeFolderProblems` consumes the record, so it is
+            // reported once rather than every time this window opens.
+            let waiting: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
+                courseCode: course.code, sectionNumber: sectionNumber
+            )
+            if !waiting.isEmpty && healthFindings.isEmpty {
+                healthFindings = waiting
+            }
+        }
         .onDisappear {
             if let folder = workspace.workspaceURL {
                 SectionWindowControllers.shared.unregister(
@@ -284,6 +303,61 @@ struct SectionDetailView: View {
         } message: {
             Text(deployRefusal ?? "")
         }
+        .alert(healthAlertTitle, isPresented: healthFindingsBinding) {
+            Button("OK") {
+                healthFindings = []
+            }
+        } message: {
+            Text(healthAlertMessage)
+        }
+    }
+
+    /// The title of the folder-problem dialog.
+    ///
+    /// Plain words, and never the machinery: a teacher is told what is wrong
+    /// with THEIR course, not that a check failed. One problem names itself;
+    /// several are counted, because a title listing three sentences is not a
+    /// title.
+    var healthAlertTitle: String {
+        if healthFindings.count == 1 {
+            return healthFindings[0].sentence
+        }
+        return "\(healthFindings.count) things need your attention"
+    }
+
+    var healthAlertMessage: String {
+        var paragraphs: [String] = []
+        for finding in healthFindings {
+            if healthFindings.count == 1 {
+                paragraphs.append(finding.detail)
+            } else {
+                paragraphs.append(finding.sentence + "\n" + finding.detail)
+            }
+        }
+        return paragraphs.joined(separator: "\n\n")
+    }
+
+    /// Puts a finished run's folder problems in front of the teacher.
+    ///
+    /// Only when the run actually produced some — a healthy course must never
+    /// see a dialog, which is the difference between a warning that gets read
+    /// and one that gets dismissed by habit.
+    func showHealthFindings(from runner: ScriptRunner?) {
+        guard let runner, !runner.healthFindings.isEmpty else {
+            return
+        }
+        healthFindings = runner.healthFindings
+    }
+
+    var healthFindingsBinding: Binding<Bool> {
+        return Binding(
+            get: { !healthFindings.isEmpty },
+            set: { isPresented in
+                if !isPresented {
+                    healthFindings = []
+                }
+            }
+        )
     }
 
     /// Why this section's deploy would not get anywhere, or nil when it
@@ -572,6 +646,13 @@ struct SectionDetailView: View {
                 workingDirectory: workspaceURL
             )
             await waitForPreviewServer(port: lease.port, siteAsItWas: siteAsItWas)
+
+            // Here rather than when the run "finishes": a preview does not
+            // finish, it keeps serving. The folder checks print early, well
+            // before Quartz starts, so by the time the server answers the
+            // findings are already collected — and this is the moment the
+            // teacher is actually looking at the preview.
+            showHealthFindings(from: previewRunner)
         }
     }
 
@@ -791,6 +872,11 @@ struct SectionDetailView: View {
             workingDirectory: workspaceURL,
             needsBuild: needsBuild
         )
+
+        // What the build said about this course's folders. Taken from the
+        // FIRST leg: every destination publishes the same built site, so a
+        // second leg would only repeat the same findings.
+        showHealthFindings(from: deployRunner.legs.first?.runner)
 
         // A failed shared build is reported the same way regardless of
         // how many destinations were configured — none of them were ever

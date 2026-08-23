@@ -120,3 +120,85 @@ final class SiteHealthFindingTests: XCTestCase {
         XCTAssertFalse(trail.contains("could not be built"), trail)
     }
 }
+
+/// The overnight path: a scheduled deploy publishes anyway and leaves what it
+/// found for somebody to read when they are next at the machine.
+@MainActor
+final class ScheduledDeployFolderProblemTests: XCTestCase {
+
+    // MARK: - Functions
+
+    private func markerLine(_ name: String) -> String {
+        return """
+        PLANTOIR_HEALTH: {"name": "\(name)", "sentence": "Something is wrong.", \
+        "detail": "More about it.", "fixable": false, "course": "ICS3U", "section": 1}
+        """
+    }
+
+    override func tearDown() {
+        _ = ScheduledDeploy.takeFolderProblems(courseCode: "ICS3U", sectionNumber: 1)
+        super.tearDown()
+    }
+
+    func testFindingsAreReadOutOfTheLogAndReportedOnce() throws {
+        let log: URL = ScheduledDeploy.logURL(courseCode: "ICS3U", sectionNumber: 1)
+        try FileManager.default.createDirectory(
+            at: log.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        let previousLog: String? = try? String(contentsOf: log, encoding: .utf8)
+        defer {
+            if let previousLog {
+                try? previousLog.write(to: log, atomically: true, encoding: .utf8)
+            } else {
+                try? FileManager.default.removeItem(at: log)
+            }
+        }
+        try("Deploying ICS3U…\n" + markerLine("mediaFolderMissing") + "\nDeploy complete\n")
+            .write(to: log, atomically: true, encoding: .utf8)
+
+        ScheduledDeploy.recordFolderProblems(section: (
+            courseDirectory: URL(fileURLWithPath: "/tmp"), courseCode: "ICS3U", sectionNumber: 1
+        ))
+
+        let first: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
+            courseCode: "ICS3U", sectionNumber: 1
+        )
+        XCTAssertEqual(first.count, 1)
+        XCTAssertEqual(first.first?.name, "mediaFolderMissing")
+
+        // Consumed: reported once, not every time the app opens.
+        XCTAssertTrue(ScheduledDeploy.takeFolderProblems(
+            courseCode: "ICS3U", sectionNumber: 1
+        ).isEmpty)
+    }
+
+    func testAProblemPutRightStopsBeingReported() throws {
+        let log: URL = ScheduledDeploy.logURL(courseCode: "ICS3U", sectionNumber: 1)
+        try FileManager.default.createDirectory(
+            at: log.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        let previousLog: String? = try? String(contentsOf: log, encoding: .utf8)
+        defer {
+            if let previousLog {
+                try? previousLog.write(to: log, atomically: true, encoding: .utf8)
+            } else {
+                try? FileManager.default.removeItem(at: log)
+            }
+        }
+        let section = (courseDirectory: URL(fileURLWithPath: "/tmp"),
+                       courseCode: "ICS3U", sectionNumber: 1)
+
+        try (markerLine("mediaFolderMissing") + "\n")
+            .write(to: log, atomically: true, encoding: .utf8)
+        ScheduledDeploy.recordFolderProblems(section: section)
+
+        // The next night's run is clean.
+        try "Deploy complete\n".write(to: log, atomically: true, encoding: .utf8)
+        ScheduledDeploy.recordFolderProblems(section: section)
+
+        XCTAssertTrue(
+            ScheduledDeploy.takeFolderProblems(courseCode: "ICS3U", sectionNumber: 1).isEmpty,
+            "a problem that has been put right must stop being reported"
+        )
+    }
+}
