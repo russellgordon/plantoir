@@ -2772,6 +2772,75 @@ the failure the mac hit: a disk filling with something the teacher has never
 heard of and cannot connect to this app. Nobody here can see a Windows
 machine to answer it, so it is a question rather than a finding.
 
+## Which folders count for marks: absent is not empty (2026-08-23)
+
+The Curriculum Coverage map shows an expectation as ASSESSED — the ring on a
+cell, and Ontario's ask that every overall expectation be evaluated at least
+once — when a page addressing it lives in a folder that counts for marks. That
+used to be hardcoded in `build_site.py` as *any folder whose name contains
+"task"*, and a teacher who called theirs "Tests", or renamed "Tasks", silently
+lost every assessed mark on the map with nothing said.
+
+It is now `graded_folders` in `course_config.json`, matched by EXACT
+folder-segment name at any depth (so `Tasks/Unit 1/Quiz.md` still counts, and a
+page is never assessed because of what it is CALLED).
+
+### The one mistake that matters on your side
+
+**`GradedFolders` must distinguish ABSENT from EMPTY.** A plain
+`List<string>` that defaults to empty when the key is missing would tell the
+build "this teacher has no graded folders", and every course made before this
+key existed would lose every assessed mark on its map — silently, because a map
+with no rings still renders and still looks finished.
+
+- ABSENT means the teacher has never been asked. The build applies the
+  historical substring rule, and the course keeps exactly the marks it had.
+- EMPTY (`[]`) means they were asked and cleared it. That is a real answer and
+  is honoured.
+
+The mac models it as `[String]?` and REMOVES the key when set to nil
+(`CourseConfiguration.swift`). Whatever you use, make the round trip preserve
+"no key at all" — and check your serialiser, because both apps write this file
+wholesale from an in-memory copy.
+
+### Do not seed existing courses
+
+The obvious migration — write `["Tasks"]` into every course — is wrong, and the
+repository proves it rather than the reasoning alone. All 38 payloads use
+"Tasks", but the mathematics skeleton family ships **"Thinking Tasks"**: the
+substring rule counted it, an exact pool of `["Tasks"]` does not. Seeding would
+have quietly stripped that course's assessed marks.
+
+Nothing is written back from a BUILD either, for a reason worth remembering when
+you are tempted to have Python fix something up: both apps serialise
+`course_config.json` wholesale from their own in-memory copy, so a key a build
+writes is dropped the next time a teacher saves anything in Settings.
+
+### What the Settings control does, and why
+
+The mac's is a checklist of the course's folders, under a "Marks" heading. When
+the course has never been asked, it shows the folders the build CURRENTLY counts
+already ticked, so a teacher sees what is actually happening rather than a blank
+list. Nothing is written until they change something — and the moment they do,
+the answer is explicit and the historical rule stops applying to that course.
+
+### Content declares its own pool
+
+All 38 payload manifests and all 50 skeleton families now carry
+`graded_folders`, and both linters refuse a manifest without one or one naming a
+folder the course does not have. `setup_course.py` writes it at creation from
+the manifest — shared Python, so you inherit that unchanged.
+
+Declared rather than inferred deliberately: inference is a substring while the
+build matches exactly, and those two agree for 88 of the 89 courses here and
+disagree for the one that would have been broken by it.
+
+### Where the rules live
+
+`contracts/shared-rules.json` → `gradedFolders` (9 cases, run by
+`scripts/test_graded_folders.py` in the image) and `contracts/file-formats.json`
+for the key itself.
+
 ## Folder problems: the checks, and the four places they have to surface (2026-08-23)
 
 Certain folder and file names carry behaviour — the curriculum folder, the folder
