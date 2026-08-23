@@ -2426,7 +2426,7 @@ three edits may no longer apply cleanly or may need adjusting to match.
 
 ## The course-code picker is a hand-built combo box — and you probably should NOT build one (2026-08-23)
 
-`GUI-IMPROVEMENTS.md` rows 332–337 describe the new-course wizard's course-code
+`GUI-IMPROVEMENTS.md` rows 333–338 describe the new-course wizard's course-code
 field being rebuilt over two days: a searchable field with a rich two-line
 flyout, a chevron that toggles it, arrow-key navigation, and geometry matched
 to a real `NSComboBox` to the pixel. **Read this section before you copy any of

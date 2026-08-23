@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -437,17 +439,34 @@ public sealed partial class MainWindow : Window
     private void RefreshPathBar()
     {
         if (Workspace.WorkspacePath is null) return;
-        FolderCrumbs.ItemsSource = FolderCrumb.ForPath(Workspace.WorkspacePath);
+        var crumbs = FolderCrumb.ForPath(Workspace.WorkspacePath).ConvertAll(c => new PathBarCrumb(c));
+        FolderCrumbs.ItemsSource = crumbs;
+        _ = LoadCrumbIconsAsync(crumbs);
     }
 
+    /// <summary>Populates each crumb's shell icon after the bar is already
+    /// showing names — a slow shell lookup should never delay the bar
+    /// itself, only fill in the icon once it arrives.</summary>
+    private static async Task LoadCrumbIconsAsync(List<PathBarCrumb> crumbs)
+    {
+        foreach (var crumb in crumbs)
+        {
+            crumb.Icon = await FolderIcons.ForPathAsync(crumb.Path);
+        }
+    }
+
+    /// <summary>Matches the mac's own path bar: a plain click selects
+    /// nothing. Revealing and opening are deliberately gated behind the
+    /// gestures a teacher already knows from their file manager — double-
+    /// click to open, right-click to reveal — not a bare click
+    /// (contracts/shared-rules.json -> workingFolderPathBar).</summary>
     private void FolderCrumbs_ItemClicked(BreadcrumbBar sender, BreadcrumbBarItemClickedEventArgs args)
     {
-        if (args.Item is FolderCrumb crumb) FolderActions.ShowInFileExplorer(crumb.Path);
     }
 
     private void CrumbShowInExplorer_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: FolderCrumb crumb })
+        if (sender is FrameworkElement { DataContext: PathBarCrumb crumb })
         {
             FolderActions.ShowInFileExplorer(crumb.Path);
         }
@@ -455,7 +474,7 @@ public sealed partial class MainWindow : Window
 
     private void CrumbOpenFolder_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: FolderCrumb crumb })
+        if (sender is FrameworkElement { DataContext: PathBarCrumb crumb })
         {
             FolderActions.OpenFolder(crumb.Path);
         }
@@ -463,7 +482,7 @@ public sealed partial class MainWindow : Window
 
     private void Crumb_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: FolderCrumb crumb })
+        if (sender is FrameworkElement { DataContext: PathBarCrumb crumb })
         {
             FolderActions.OpenFolder(crumb.Path);
         }
