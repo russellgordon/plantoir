@@ -361,7 +361,6 @@ chmod -R -N courses 2>/dev/null || true
 # Compute the desired host mount path for this run
 HOST_COURSES="$(pwd)/courses"
 
-# -------------------- Build the image when it is missing --------------------
 # ---------------- Remove superseded website-builder images ----------------
 # The image tag is a hash of the build recipe, so every recipe change mints a
 # new tag and orphans the previous one. Nothing used to remove them, and an
@@ -381,18 +380,49 @@ HOST_COURSES="$(pwd)/courses"
 prune_superseded_images() {
   local keep_tag="$1"
   local tag
-  while read -r tag; do
+  # Refuse to run unless the tag just built is itself one of ours. With
+  # --image the caller can point $IMAGE at anything (verify.sh advertises
+  # exactly that), and then "keep everything except $keep_tag" would mean
+  # "delete every teaching-quartz tag on the machine", including the current
+  # one of every other working folder.
+  [[ "$keep_tag" == teaching-quartz:src-* ]] || return 0
+  local age_text
+  while read -r tag age_text; do
     [[ -z "$tag" ]] && continue
     [[ "$tag" == teaching-quartz:src-* ]] || continue
     [[ "$tag" == "$keep_tag" ]] && continue
     if [[ -n "$(docker ps -aq --filter "ancestor=$tag" 2>/dev/null || true)" ]]; then
       continue
     fi
+    # Leave anything built in the last day alone. The container check above is
+    # a point-in-time read, and a folder that is mid-recreate (container
+    # removed, replacement not yet run) references nothing for a second or
+    # two — long enough for a build finishing in ANOTHER folder to delete the
+    # image it is about to start. It also stops two folders on different
+    # recipes from deleting each other's image on every switch, which would
+    # cost a multi-minute, network-dependent rebuild each time.
+    # Docker's own age column decides this, and deliberately so. The obvious
+    # alternative — inspect '{{.Created}}' and compare timestamps — is a trap:
+    # that field comes back in LOCAL time WITH an offset ("...T14:17:14-04:00"),
+    # not the UTC "...Z" it looks like, so comparing it against a UTC cutoff is
+    # silently wrong by the offset, in whichever direction the machine sits
+    # from Greenwich. ('docker images --filter since=' is no help either — it
+    # takes an image NAME, not a duration; the duration filters belong to
+    # 'docker image prune', the blanket command this must never use.)
+    #
+    # Anything still measured in hours or minutes is left alone. Docker says
+    # "N hours ago" up to 48 hours, so the guard is at least one day and in
+    # practice up to two — erring long, which is the safe direction.
+    case "$age_text" in
+      *day*|*week*|*month*|*year*) ;;
+      *) continue ;;
+    esac
     docker rmi "$tag" >/dev/null 2>&1 || true
   done < <(docker images --filter 'reference=teaching-quartz:src-*' \
-             --format '{{.Repository}}:{{.Tag}}' 2>/dev/null || true)
+             --format '{{.Repository}}:{{.Tag}} {{.CreatedSince}}' 2>/dev/null || true)
 }
 
+# -------------------- Build the image when it is missing --------------------
 build_image_if_missing() {
   if docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "✅ Website builder is ready."
