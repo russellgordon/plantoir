@@ -46,6 +46,11 @@ public sealed partial class AssistWindow : Window
     private readonly CancellationTokenSource _closing = new();
     private AssistPromptHistory _history;
     private string? _lastRecalled;
+
+    // ---- What the engine itself has said, sampled onto the trail ---------
+    private long _engineLogMark;
+    private int _engineLinesRecorded;
+    private Task? _engineWatch;
     private string HistoryKey => $"AssistPromptHistory-{_course.Code}-{_section}";
 
     public AssistWindow(string workspacePath, Course course, int section, MainWindow? main = null)
@@ -83,6 +88,90 @@ public sealed partial class AssistWindow : Window
     {
         Root.Loaded -= OnceLoaded;
         _ = Begin();
+    }
+
+    // ---- What the engine itself said --------------------------------------
+
+    /// <summary>How often to look in on the engine while the window is open.</summary>
+    private static readonly TimeSpan EngineWatchInterval = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// Guards <see cref="_engineLogMark"/> and <see cref="_engineLinesRecorded"/>.
+    ///
+    /// On mac, <c>recordWhatTheEngineSaid</c> is always called on the same
+    /// actor, so the equivalent Swift properties need no lock of their own.
+    /// Here the periodic watch deliberately runs on a background thread (see
+    /// <see cref="WatchWhatTheEngineSays"/>) while <see cref="Shutdown"/>'s
+    /// own last look runs on the UI thread and does not wait for an
+    /// in-flight background iteration to finish — cancelling <c>_closing</c>
+    /// only stops the loop's *next* iteration. Without this lock the two
+    /// could race on the ref-parameter mark and the non-atomic increment,
+    /// losing or double-recording lines right at teardown.
+    /// </summary>
+    private readonly object _engineLogGate = new();
+
+    /// <summary>
+    /// Put what the engine has said since the last look onto the trail.
+    ///
+    /// <paramref name="keepingEverything"/> is for the one case where the
+    /// ordinary filter is wrong: an engine that never became ready. There,
+    /// every line is the diagnosis, including the perfectly ordinary ones it
+    /// got through before it stopped. Mirrors mac's
+    /// <c>AssistSession.recordWhatTheEngineSaid</c>.
+    /// </summary>
+    private void RecordWhatTheEngineSaid(bool keepingEverything)
+    {
+        lock (_engineLogGate)
+        {
+            var since = _model.LinesSinceLastLook(ref _engineLogMark);
+            var toRecord = AssistEngineLog.LinesWorthRecording(
+                since, keepingEverything, _engineLinesRecorded);
+            foreach (var line in toRecord)
+            {
+                _engineLinesRecorded++;
+                ActivityTrail.Note(ActivityTrail.Event.AssistantEngineSaid,
+                    $"the assistant's engine said: {line}", _course.Code, _section);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Look in on the engine every so often, so a report made while the
+    /// window is still open carries what it said.
+    ///
+    /// Sampling only at teardown would miss the case this exists for: a
+    /// teacher whose assistant is misbehaving RIGHT NOW, filing a report
+    /// without closing anything. The loop ends itself once the cap is
+    /// reached, so a badly behaved engine costs a fixed amount of work
+    /// rather than a permanent one. Mirrors mac's
+    /// <c>AssistSession.watchWhatTheEngineSays</c>.
+    /// </summary>
+    private void WatchWhatTheEngineSays()
+    {
+        _engineWatch = Task.Run(async () =>
+        {
+            while (!_closing.IsCancellationRequested)
+            {
+                // Touches only ActivityTrail (its own lock) and _model's
+                // server-log buffer (its own lock) — no XAML element is
+                // read or written here, so this runs on the background
+                // thread rather than being marshalled through the
+                // dispatcher.
+                RecordWhatTheEngineSaid(keepingEverything: false);
+                if (_engineLinesRecorded >= AssistEngineLog.MostEngineLinesOnTheTrail)
+                {
+                    return;
+                }
+                try
+                {
+                    await Task.Delay(EngineWatchInterval, _closing.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+            }
+        });
     }
 
     // ---- Starting up -----------------------------------------------------
@@ -218,6 +307,10 @@ public sealed partial class AssistWindow : Window
         {
             ActivityTrail.Note(ActivityTrail.Event.AssistantWouldNotStart,
                 "the assistant’s engine would not start", _course.Code, _section);
+            // The engine never became ready, so every line it managed to
+            // write before giving up is the diagnosis — the ordinary filter
+            // would be wrong here.
+            RecordWhatTheEngineSaid(keepingEverything: true);
             Say("Assistant", "The assistant wouldn’t start. Restarting Plantoir usually settles it.");
             return;
         }
@@ -227,6 +320,7 @@ public sealed partial class AssistWindow : Window
         {
             ActivityTrail.Note(ActivityTrail.Event.AssistantWouldNotStart,
                 "the assistant’s tools did not answer", _course.Code, _section);
+            RecordWhatTheEngineSaid(keepingEverything: true);
             Say("Assistant", "The assistant started, but Plantoir’s tools didn’t answer. Try opening this window again.");
             return;
         }
@@ -288,6 +382,7 @@ public sealed partial class AssistWindow : Window
         ActivityTrail.Note(ActivityTrail.Event.AssistantReady,
             $"the assistant was ready after {(DateTime.UtcNow - startingAt).TotalSeconds:F1}s",
             _course.Code, _section);
+        WatchWhatTheEngineSays();
         // Typing is available from here.
         Input.IsEnabled = true;
         SendButton.IsEnabled = true;
@@ -835,6 +930,10 @@ public sealed partial class AssistWindow : Window
     private void Shutdown()
     {
         try { _closing.Cancel(); } catch { }
+
+        // The last look comes before the model is stopped and its log
+        // buffer goes with it — same order as mac's `finish()`.
+        RecordWhatTheEngineSaid(keepingEverything: false);
 
         // WAITED ON, not fired and forgotten. The old version started this on
         // a background task and returned, so closing the window — or closing

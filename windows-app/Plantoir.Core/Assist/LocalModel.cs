@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
@@ -386,13 +387,17 @@ public sealed class LocalModel : IChatModel, IDisposable
 
     private readonly object _serverLogGate = new();
     private readonly Queue<string> _serverLog = new();
+    private long _serverLogTotal;
 
-    private void NoteServerLine(string? line)
+    /// <summary>internal rather than private so a test can drive the ring
+    /// buffer without spawning a real engine process.</summary>
+    internal void NoteServerLine(string? line)
     {
         if (string.IsNullOrEmpty(line)) return;
         lock (_serverLogGate)
         {
             _serverLog.Enqueue(line);
+            _serverLogTotal++;
             while (_serverLog.Count > 60) _serverLog.Dequeue();
         }
     }
@@ -401,6 +406,31 @@ public sealed class LocalModel : IChatModel, IDisposable
     public IReadOnlyList<string> RecentServerLog
     {
         get { lock (_serverLogGate) { return _serverLog.ToList(); } }
+    }
+
+    /// <summary>
+    /// Lines the engine has written since <paramref name="mark"/> was last
+    /// taken, oldest first — advancing <paramref name="mark"/> to the
+    /// current position as it goes.
+    ///
+    /// Mirrors the mac's <c>engineLinesSinceLastLook</c>: a caller that
+    /// samples every so often wants the new lines, not the whole buffer
+    /// again. The buffer itself is bounded to the most recent 60 lines (see
+    /// <see cref="NoteServerLine"/>), so an engine chattier than that between
+    /// two looks has its oldest lines skipped rather than read — the recent
+    /// end is the diagnostic one.
+    /// </summary>
+    public IReadOnlyList<string> LinesSinceLastLook(ref long mark)
+    {
+        lock (_serverLogGate)
+        {
+            long oldestAvailableIndex = _serverLogTotal - _serverLog.Count;
+            long start = Math.Max(mark, oldestAvailableIndex);
+            mark = _serverLogTotal;
+            int skip = (int)(start - oldestAvailableIndex);
+            if (skip >= _serverLog.Count) return Array.Empty<string>();
+            return _serverLog.Skip(skip).ToList();
+        }
     }
 
     private async Task<bool> CheckHealthAsync(CancellationToken cancellation)

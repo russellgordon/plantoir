@@ -515,6 +515,32 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Windows caught up to the mac's "assistant engine said" trail event**
+  (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 327, closing
+  `WINDOWS-HANDOFF.md` item 2). No mac change — this is Windows implementing
+  a feature the mac already had, so nothing to port back — but worth knowing
+  the two platforms differ in HOW the engine's output is captured, in case a
+  future engine integration on either side needs the same lesson. The mac
+  writes `llama-server`'s stdout/stderr to a FILE and samples its tail,
+  because an unread `Pipe` fills up and blocks the engine mid-request — the
+  bug that originally wedged the Windows server. Windows' `LocalModel`
+  already avoided that same wedge a different way, by draining via
+  `Process.OutputDataReceived`/`ErrorDataReceived` EVENTS (always read,
+  never blocking) into an in-memory 60-line ring buffer, so no file-backed
+  log was needed to port this feature — `LocalModel.LinesSinceLastLook`
+  reads the ring buffer instead of a file offset. The filter and cap
+  (`Plantoir.Core.Assist.AssistEngineLog`) are checked in
+  `AssistEngineLogTests.cs` against the identical real llama.cpp (b10435)
+  fixture lines the mac's `AssistEngineLogTests.swift` uses, so a change to
+  what counts as "trouble" can be cross-checked against the same evidence on
+  both platforms. One Windows-specific bug an adversarial review caught and
+  fixed, not present on mac: mac's `recordWhatTheEngineSaid` always runs on
+  one actor, so its non-atomic Swift properties need no lock; Windows
+  deliberately runs its periodic watch on a background thread while
+  `Shutdown()`'s own last look runs on the UI thread without waiting for an
+  in-flight background iteration, which could race on the shared mark/count
+  state — fixed with a lock (`AssistWindow._engineLogGate`).
+
 - **A general WinUI `x:Bind` trap, found in the sidebar's scheduled-deploy
   badge but worth watching for anywhere a row object is reconciled rather
   than recreated** (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 326).
