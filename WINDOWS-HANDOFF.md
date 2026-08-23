@@ -288,9 +288,36 @@ this side is expected to say so when the contract is wrong.
    `MAC-HANDOFF.md` awareness entry records the WinUI nesting trap for
    anywhere else an `ItemTemplate` wraps a control-specific item-container
    type. Full suite: 655/655.
-7. **The first-deploy marker's destination-scoping** (`AssistWorkspace.cs`
-   accepting either folder rather than only the CURRENT destination) — see
-   "One divergence found by sweeping" below; verify against current code.
+7. ~~The first-deploy marker's destination-scoping~~ — ✅ Verified already
+   correct 2026-08-23. The divergence this item warned about — `AssistWorkspace.cs`
+   accepting either destination's marker rather than only the CURRENT one —
+   is not present in the code as it stands: `DeployCommand.HasDeployedBefore`/
+   `FirstDeployMarkerPath` (`Plantoir.Core/Models/DeployCommand.cs:99-125`) are
+   strictly keyed by `destinationType`, and both callers —
+   `ScheduledDeploy.Problem` (`ScheduledDeploy.cs:67,78`) and
+   `AssistWorkspace.Deploy` (`AssistWorkspace.cs:1097`) — pass the specific
+   destination type for every configured destination, primary and additional,
+   never "either folder." `AssistWorkspace.ReleaseSite`
+   (`AssistWorkspace.cs:1851-1875`) does loop over both `.netlify_sites` and
+   `.cloudflare_sites`, but that is a genuinely different operation — moving
+   whatever marker exists aside during a section rollover, independent of the
+   CURRENT `deploy_target` — not the "has this destination been deployed"
+   question, so it is not this bug in disguise. Checked for other instances:
+   none in `Plantoir.Mcp`'s `check_section`/`list_courses`, and mac's own
+   `DeployCommand.swift:99-151` uses the identical destinationType-keyed
+   design, so there is no platform divergence to close. New regression test,
+   `ASwitchedDestinationIsNotConsideredDeployedJustBecauseTheOldOneWas`
+   (`Plantoir.Tests/ScheduledDeployTests.cs`), pins the exact scenario this
+   item described — a leftover `.netlify_sites` marker on a course now
+   configured for Cloudflare must still refuse as "never deployed," not read
+   the stale marker as proof — and an independent adversarial review
+   confirmed the test reaches the marker check rather than short-circuiting
+   on an earlier refusal (the Cloudflare account ID passed is a valid
+   32-hex-char value, so `CourseConfiguration.CloudflareAccountProblem`
+   passes cleanly first). Full suite: 657/658 (the one failure is the
+   pre-existing, unrelated item 9 course-code-dashes case). `contracts/
+   file-formats.json`'s `firstDeployMarkers.knownDivergence` field, and the
+   "One divergence found by sweeping" section below, are corrected to match.
 8. **Three deploy-after-preview console races fixed on mac 2026-08-22, not
    yet checked on Windows** — `GUI-IMPROVEMENTS.md` rows 317–318, all SwiftUI
    state races rather than shared code, so nothing ports mechanically, but the
@@ -1056,7 +1083,7 @@ The mac writes each of these as `capabilityExists && teacherSaidYes` —
 `hasSkeleton(code) && startsFromSkeleton` — so a stale `true` in an old config
 can never mean anything.
 
-### One divergence found by sweeping, 2026-08-16: the first-deploy marker
+### A divergence flagged by sweeping, 2026-08-16 — checked again 2026-08-23, not present
 
 `deploy.py` writes a marker the first time a section goes out —
 `.netlify_sites/section<N>.json` or `.cloudflare_sites/section<N>.json` — and
@@ -1064,16 +1091,23 @@ both apps read it to answer "has this ever been deployed?". That answer decides
 whether a scheduled deploy is allowed, because a FIRST deploy asks what to call
 the website and nobody is awake at 06:30 to answer.
 
-**The mac reads the marker for the destination the course is configured for
-NOW. `AssistWorkspace.cs` accepts EITHER folder.** So a course deployed to
-Netlify and later switched to Cloudflare reads as "already deployed" on
-Windows, and a teacher there can schedule the one deploy guaranteed to stop at
-a prompt in the dark.
+The mac reads the marker for the destination the course is configured for NOW.
+This section originally warned that `AssistWorkspace.cs` accepted EITHER
+folder — so a course deployed to Netlify and later switched to Cloudflare
+would read as "already deployed" on Windows, letting a teacher schedule the
+one deploy guaranteed to stop at a prompt in the dark. **Re-checked 2026-08-23
+(item 7 above): that is not how the current code behaves.**
+`DeployCommand.HasDeployedBefore`/`FirstDeployMarkerPath` are keyed by the
+specific destination type, and every caller passes the CURRENT destination's
+type — never both. A regression test
+(`ScheduledDeployTests.ASwitchedDestinationIsNotConsideredDeployedJustBecauseTheOldOneWas`)
+now pins exactly the switched-destination scenario this section described.
 
-Narrow it to the current destination. The rule and the paths are in
-`contracts/file-formats.json` → `firstDeployMarkers`, including the third case:
-a folder deploy keeps no marker at all and counts as always-deployed, because
-it asks nothing.
+The rule and the paths are in `contracts/file-formats.json` →
+`firstDeployMarkers`, including the third case: a folder deploy keeps no
+marker at all and counts as always-deployed, because it asks nothing. That
+file's `knownDivergence` field, which used to describe this Windows bug, is
+now removed.
 
 Worth knowing how this was found: not by a failing test, but by walking
 `documentation/07-deployment.md` and asking which of its facts anything
