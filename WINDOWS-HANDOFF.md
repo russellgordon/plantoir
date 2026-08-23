@@ -2162,6 +2162,30 @@ so all three are worth having before you write it.
   preserves the id). Check whether your Windows UI-test host has the same
   restriction before trusting a `Process.Start`-based teardown, and prefer
   `Process.GetProcessById` + `Kill()` on a recorded id, which needs no spawn.
+- **Do not oversell the teardown reaper — it does NOT cover an interrupted
+  run**, which is the case that actually hurt. An adversarial review caught
+  this claim being made here in its first draft. Teardown does not execute
+  when a run is killed, and the mac's recorded pid is stranded in a
+  per-run `cq4t-fixture-<UUID>` folder that is never handed out again, so no
+  later run can find it. **The port change is what makes an interrupted run
+  harmless**, because the orphan then holds a kernel-assigned port nobody is
+  waiting for rather than the one a real preview needs. The reaper earns its
+  place on a narrower case: a server that outlived the test BODY, because the
+  test failed before it could stop the preview. If Windows wants genuine
+  interrupted-run cleanup, it has to come from outside the run — a known
+  fixed pid-file location, or a verify step — not from teardown.
+- **Record the pid BEFORE anything slow.** The mac's stub first wrote its pid
+  after two `sleep 1` calls, which left a two-second window where a test that
+  finished quickly tore down, found no pid file, and leaked the orphan anyway
+  — the same review found it. The shell's `$$` is the same value at the top of
+  the script as at the bottom, and `exec` preserves it, so there is no reason
+  to wait.
+- **If the stub kills by pid in more than one place, name-check in ALL of
+  them.** The mac's Swift reaper checked the process name and its own shell
+  `--stop` path did not, which is the stated invariant broken in one of the
+  two places that needed it. Note the two need different matching: the kernel
+  reports the short name (`Python`) while `ps -o comm=` reports a full path,
+  so one wants a prefix test and the other a substring test.
 - **Never reap by process NAME alone.** A pid is reused once its owner is
   reaped, so "something answers to this number" does not justify a kill — that
   is how a test murders an unrelated program of the teacher's. The mac scopes
@@ -2186,6 +2210,14 @@ never trips the check, so the preview arrives two minutes late and the test
 times out first — which looks like the server never came up. The stub must
 BUILD INTO the watched folder. Whatever Windows' equivalent staleness check
 is, its stub owes it the same honesty.
+
+One consequence to know rather than fix: the app still takes a lease from
+8081–8084 and still passes `--port <n>`, and the stub now ignores that flag in
+favour of what the kernel gives it. That is deliberate — the announcement line
+is the contract, and a launcher that could not honour `--port` would still
+work — but it does mean this test no longer proves anything about a launcher
+HONOURING `--port`, and nothing else covers it on either platform. Do not read
+the flag as dead; read it as untested.
 
 ## Documentation map
 

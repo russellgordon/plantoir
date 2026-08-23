@@ -6,9 +6,21 @@ import XCTest
 final class QuartzTeachersUITests: XCTestCase {
 
     // The stub preview server these tests start (see
-    // `writeStubPreviewScript(in:serving:)`) is a child of the APP, not
-    // of this runner, so it outlives an interrupted run. `tearDown`
-    // reaps it — `reapStubPreviewServer()`.
+    // `writeStubPreviewScript(in:buildingInto:)`) is a child of the APP,
+    // not of this runner, so nothing reaps it on the way out.
+    // `tearDown` does — `reapStubPreviewServer()`.
+    //
+    // Be precise about what that covers, because the obvious reading is
+    // wrong: it catches a server that outlived the TEST BODY (the test
+    // failed before it could stop the preview, or stop mode did not
+    // fire). It does NOT catch an INTERRUPTED run — Cmd-period, or
+    // `xcodebuild` killed — because `tearDown` never executes, and the
+    // recorded pid is stranded in a `cq4t-fixture-<UUID>` folder that
+    // `FixtureWorkspace.materialize()` will never hand out again, so no
+    // later run can even find it. What makes an interrupted run harmless
+    // is the port, not the reaper: the orphan holds a kernel-assigned
+    // port nobody is waiting for, instead of the 8081 a real preview
+    // needs.
     //
     // Do NOT reach for `Process` here, however obvious it looks. An
     // earlier attempt put `pkill -f "http.server 8081"` in
@@ -48,10 +60,11 @@ final class QuartzTeachersUITests: XCTestCase {
     /// is still running.
     ///
     /// The server is a child of the APP rather than of this runner, so
-    /// nothing else reaps it: when a run is interrupted the app dies and
-    /// the server is reparented and keeps holding its port. This uses a
+    /// nothing else reaps one that outlived the test body. This uses a
     /// bare `kill()` because the runner is sandboxed and cannot spawn a
-    /// helper process — see the note at the top of this class.
+    /// helper process. It does NOT rescue an interrupted run, which
+    /// never reaches `tearDown` at all — see the note at the top of this
+    /// class for why that case is handled by the port instead.
     func reapStubPreviewServer() {
         guard let pidFileURL = stubPreviewPIDFileURL else {
             return
@@ -154,12 +167,29 @@ final class QuartzTeachersUITests: XCTestCase {
         for argument in "$@"; do
             if [ "$argument" = "--stop" ]; then
                 if [ -f "\(pidFileURL.path)" ]; then
-                    kill "$(cat "\(pidFileURL.path)")" 2>/dev/null
+                    # Name-checked, for the same reason the Swift reaper
+                    # checks: a recorded pid may have died and been
+                    # recycled, and signalling it blind is how a test
+                    # kills an unrelated program. Substring rather than
+                    # prefix because `ps` reports a full path here.
+                    stub_pid="$(cat "\(pidFileURL.path)")"
+                    stub_name="$(ps -p "$stub_pid" -o comm= 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+                    case "$stub_name" in
+                        *python*) kill "$stub_pid" 2>/dev/null ;;
+                    esac
                     rm -f "\(pidFileURL.path)"
                 fi
                 exit 0
             fi
         done
+
+        # Recorded FIRST, before anything slow. `$$` is this shell, and
+        # `exec` below keeps that id, so the value is right this early —
+        # and writing it here closes a window that would otherwise leak
+        # the very orphan this file exists to prevent: a test can finish
+        # and tear down within a second of starting a preview, and a pid
+        # written after the sleeps would not exist yet to be reaped.
+        echo $$ > "\(pidFileURL.path)"
 
         echo "Starting container if needed"
         sleep 1
@@ -167,7 +197,6 @@ final class QuartzTeachersUITests: XCTestCase {
         sleep 1
         mkdir -p "\(publicURL.path)"
         printf '%s' '<html><body><h1>Stub site</h1></body></html>' > "\(publicURL.path)/index.html"
-        echo $$ > "\(pidFileURL.path)"
         cd "\(publicURL.path)" && exec python3 -u -c '
         import http.server
         import socketserver
