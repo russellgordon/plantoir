@@ -267,6 +267,40 @@ this side is expected to say so when the contract is wrong.
      completion detection is polled (same latency-window risk) and whether
      its progress view can tell the two states apart.
 
+9. **Course codes with DASHES, and the club heuristic that misreads them
+   (2026-08-23).** Two changed rules, both already in
+   `contracts/course-management.json`, and the Windows suite is expected to
+   go RED on both until it implements them — that is the contract working,
+   not damage.
+
+   - **`courseCode.problems`** — a dash is now ALLOWED in a course code, and
+     both teacher-facing sentences changed with it ("…letters, numbers,
+     spaces and dashes" in the wizard, "Letters, numbers, dashes" in the
+     sidebar). The old contract case expecting `CS-CLUB` to be refused is
+     reversed in place, with its original reasoning kept so the change reads
+     as a decision rather than a slip. The reason: 55 of the 117 codes in
+     `support/british_columbia_secondary_courses.json` contain a dash
+     (MTEL-12, MFMP-10, MMA--09), so the rule was refusing more than half of
+     one province's real courses. Deserialise the sentences; do not retype
+     them.
+   - **`courseCode.clubDetection`** — new section, 11 cases.
+     `NewCourseDialog.IsClubCode` (`NewCourseDialog.cs:641`) is
+     `code.Length >= 4 && !char.IsDigit(code[3])`, which was the mac's line
+     too and carries the identical bug: BC codes put a letter or a dash in
+     fourth place, so **every one of BC's 117 courses currently reads as a
+     club on Windows**. The visible cost is a club-only "short label" row
+     appearing on a real course, and `custom_short_name` being written for
+     it at `NewCourseDialog.cs:827`. The fix the mac made is in
+     `ClubCodeRule`: ask the course-name CATALOG first and take its answer
+     as final; fall back to the fourth-character guess only for a code the
+     catalog has never heard of, which is what that guess was always for
+     (CODING, ROBOTICS).
+
+   The lesson is worth more than either fix: **a heuristic that reads a
+   code's SHAPE encodes one jurisdiction's conventions**, and it stops being
+   true the moment a second jurisdiction arrives. Ask the data you already
+   have before guessing from the characters.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,
@@ -2492,3 +2526,107 @@ Language/region row, and the real "New Course or Club" title, with its card
 correctly matching the surrounding window's theme; the assistant window
 shows the prompt shelf instead of a blank top third.
 
+
+## The course-code picker is a hand-built combo box — and you probably should NOT build one (2026-08-23)
+
+`GUI-IMPROVEMENTS.md` rows 333–338 describe the new-course wizard's course-code
+field being rebuilt over two days: a searchable field with a rich two-line
+flyout, a chevron that toggles it, arrow-key navigation, and geometry matched
+to a real `NSComboBox` to the pixel. **Read this section before you copy any of
+it**, because the central decision does not transfer and following the rows
+alone would have you re-derive a lot of behaviour you can get for free.
+
+Nothing here is a contract case. Every part of it is either visual, measured,
+or built out of platform focus-and-key mechanics — the categories rule 2 sends
+to a handoff rather than to `contracts/`.
+
+### Why the mac hand-built it, and why that reason is probably yours to ignore
+
+A real `NSComboBox` was tried first and reverted twice in one session
+(2026-08-22). The blocking reason was **its popup can only display plain
+strings**. The flyout has to show, per row, the course code, its formal name on
+a second line, and an "Example content" badge for codes that ship with a
+ready-made course — and `NSComboBox` simply cannot draw that. A secondary
+reason: correcting its auto-widened popup frame proved unreliable two different
+ways (deferred a runloop turn it flashed the wrong frame first; made
+synchronous it missed the "click the arrow with an empty field" case, because
+the popup's child window does not exist yet when `comboBoxWillPopUp` fires).
+
+**WinUI does not have that limitation.** An editable `ComboBox`, or an
+`AutoSuggestBox`, takes an `ItemTemplate` and will happily render a two-line
+row with a badge in it. If that holds up when you try it — check before
+committing, this is written by somebody who cannot run WinUI — then use the
+real control and you inherit, at no cost, everything the rows below describe
+the mac writing by hand: the dropdown affordance and its toggle, up/down
+navigation, Return to commit, Escape to dismiss, scroll-into-view for the
+highlighted row, the focus ring, and correct metrics. Do not hand-build a
+control to solve a problem you do not have.
+
+The rest of this section is what to know **if** the real control turns out not
+to work for you.
+
+### Metrics: measure the platform's control, do not match it by eye
+
+The mac's numbers came from rendering a real `NSComboBox` offscreen at 2x in
+both appearances and reading the PNG back pixel by pixel. The harness and the
+full findings table are in `research/native-control-metrics/`. The numbers
+themselves are Apple's and are useless to you; the **method** is the part worth
+copying, and three findings generalise:
+
+- **A framework's "native-style" control is not the native control's
+  metrics.** SwiftUI's `.textFieldStyle(.roundedBorder)` renders **26pt** tall
+  where the `NSTextField` it stands in for reports **24**. Check what your
+  `TextBox` actually measures against the WinUI control it imitates before
+  assuming they agree.
+- **Constraining the frame does not change what a control draws.**
+  `.frame(height: 24)` left the field measuring 26 and merely overflowing its
+  box. Getting 24 meant drawing the bezel ourselves.
+- **A cell's text rect is not where glyphs land.** `titleRect` reported x=4,
+  actual glyphs started at ~5.7pt; the text system adds its own padding inside.
+  Measure rendered glyphs, not the API's rectangle, when matching text
+  position.
+
+There is also a **corner-radius trap that cost real time**: the radius was
+already correct and only *read* wrong because the field was 30pt tall instead of
+24. The same radius on a taller box looks squarer. Check the box before you
+change the radius.
+
+### If you do hand-build one: four things learned the hard way
+
+1. **One piece of state for "is the flyout showing."** The toggle, the drawing,
+   and the animation must all read the same value. Three separate conditions
+   let the toggle disagree with what is on screen, and the arrow then needs
+   pressing twice.
+2. **Key handlers must DECLINE, not swallow.** Up/down/Return are handled only
+   when there is a flyout to act on; otherwise they fall through. Swallow them
+   unconditionally and you break the arrow keys for someone editing text and the
+   default button for someone who typed a code and just wants to press Enter.
+3. **Store the highlighted row by its CODE, not its index.** The list re-filters
+   on every keystroke, so an index quietly comes to mean a different course.
+   Clamp movement at the ends rather than wrapping — a wrap turns one key too
+   many into a jump from the bottom of a 40-row list back to the top, which
+   reads as the list having moved somewhere else entirely. And make Down with
+   the flyout CLOSED reopen it on the first row, or Escape strands a keyboard
+   user at the mouse.
+4. **Re-check every badge and secondary colour that can land on a highlighted
+   row.** The "Example content" badge is an accent-coloured capsule; on an
+   accent-filled highlighted row it vanished completely the moment keyboard
+   highlighting existed. It now inverts to a white capsule with accent text.
+   A passing test did not catch this — looking at a screenshot did.
+
+### The chrome is shared, and that was a trade
+
+All three fields in the wizard's Basics section (course code, course name,
+timetable section numbers) now wear one `WizardFieldChrome` modifier, so they
+cannot drift apart. The cost, stated rather than buried: two fields that wore a
+real AppKit bezel now wear an imitation of one, because that was the only way to
+get them to the native 24pt. The imitation is measured against the real control
+rather than eyeballed. The alternative — wrapping a real `NSTextField` in an
+`NSViewRepresentable` for all three — buys genuine native chrome at the price of
+hand-managing first responder and binding updates, and remains open if the
+imitation ever starts costing more than it saves.
+
+**If WinUI's own field is already the right height, none of this applies to you
+— keep the real control.** The mac ended up here because it had already been
+forced off the native control for the flyout's sake; do not inherit that
+position by accident.

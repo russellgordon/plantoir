@@ -11,6 +11,15 @@ was measured rather than reasoned. Two rules keep them useful:
    earlier one is the most valuable thing in here, and it only reads that way
    if both are present.
 
+## `native-control-metrics/` — what a real AppKit control measures
+
+The numbers behind `CourseCodePickerView`, the SwiftUI imitation of an
+`NSComboBox` in the macOS wizard. A script renders the REAL control offscreen
+and reads it back pixel by pixel, so the imitation is matched against AppKit's
+own artwork rather than against screenshots of our own app — which is how the
+field once ended up 30pt tall beside a native 24pt one. Cited from
+`CourseCodePickerView.swift`.
+
 ## `ai-assist/` — the local assistant
 
 Why the assistant is built the way it is: which models were tried, which were

@@ -1164,7 +1164,7 @@ rather than being deleted.
   preview of ICS3U Section 1"; and every plan ended with "Show this to the
   teacher and ask before going ahead" — a sentence addressed to the model,
   directly above the two buttons that ARE the asking. Two earlier attempts at
-  this (log rows 263 and 264) shortened individual sentences and fixed the
+  this (log rows 344 and 345) shortened individual sentences and fixed the
   turn-taking, and neither touched the split, so the chattiness survived both.
 
   The mac's teacher-facing lines are now Windows' too, word for word:
@@ -2930,4 +2930,4 @@ where.
   3. Set `temperature: 0` in `LocalModel.Ask()` for deterministic tool routing.
   4. Updated tool approval line in `AssistAgent.Run()` to use `AssistWording.DeployApproval` / `AssistWording.DeployQuestion`.
   
-  **✅ DONE (Windows, 2026-08-17).** Recorded in GUI improvement log row 263. All 479 tests passing.
+  **✅ DONE (Windows, 2026-08-17).** Recorded in GUI improvement log row 344. All 479 tests passing.

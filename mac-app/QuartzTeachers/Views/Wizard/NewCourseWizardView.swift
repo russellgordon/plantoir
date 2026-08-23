@@ -15,6 +15,55 @@ struct NewCourseWizardView: View {
     @State var courseCode: String = ""
     @State var courseName: String = ""
 
+    /// The province the course-code picker is currently browsing —
+    /// narrows its suggestion list, never gates typing a code straight
+    /// through. Defaults to Ontario, the more common case, so nothing is
+    /// disabled before a teacher has touched the form.
+    @State var province: String = "ON"
+
+    /// The course-code field's own focus state, published up by
+    /// `CourseCodePickerView`. The field's on-screen position is read
+    /// separately, via an anchor preference resolved at the top of
+    /// `body` — see `CourseCodeFieldAnchorKey`. The popup stays open for
+    /// as long as this is true — including once the typed text is
+    /// already an exact code. An earlier version closed the popup the
+    /// instant the text matched exactly, which Russell found
+    /// disorienting in practice: finish typing "ICS3U" and the whole
+    /// list vanishes, right when a teacher would expect to SEE the row
+    /// they just typed confirming it's the right one (2026-08-22). It
+    /// closes only when the field loses focus — a selection sets this to
+    /// false itself (see `selectCourseCodeSuggestion`), and clicking
+    /// elsewhere does the same the ordinary way SwiftUI focus works.
+    @State var courseCodeFieldIsFocused: Bool = false
+
+    /// True once Escape has closed the popup without moving focus out of
+    /// the field — reset the moment the code changes (typing should
+    /// reopen it) or the field regains focus. Kept separate from
+    /// `courseCodeFieldIsFocused` because Escape should NOT blur the
+    /// field, only hide the list — a teacher can keep typing right after,
+    /// same as dismissing a native combo box's popup. Also what makes
+    /// Escape here NOT fall through to dismissing the whole wizard sheet
+    /// — see the `.onKeyPress(.escape)` on `CourseCodePickerView`'s field
+    /// (Russell, 2026-08-22).
+    @State var courseCodeSuggestionsManuallyDismissed: Bool = false
+
+    /// Which suggestion the arrow keys are sitting on, or `nil` when the
+    /// teacher has not walked the list — the state behind Russell's
+    /// 2026-08-23 ask that up/down/Return work here the way they do in a
+    /// real `NSComboBox`. Held as a CODE rather than an index because
+    /// the list re-filters on every keystroke: an index would silently
+    /// come to mean a different course, while a code that is no longer
+    /// in the list resolves to no highlight at all, which is the honest
+    /// answer.
+    @State var highlightedCourseCode: String?
+
+    /// Focus for the two plain fields, so `WizardFieldChrome` can draw
+    /// their accent ring — a `ViewModifier` can't own focus for the view
+    /// it decorates, so it has to be told.
+    @FocusState var courseNameFieldHasFocus: Bool
+    @FocusState var sectionNumbersFieldHasFocus: Bool
+    @FocusState var customShortNameFieldHasFocus: Bool
+
     /// The last name this view filled in automatically. Auto-fill only
     /// ever replaces its own suggestion, never a name the teacher typed.
     @State var lastAutoFilledName: String = ""
@@ -185,18 +234,127 @@ struct NewCourseWizardView: View {
         return result
     }
 
-    var isClubCode: Bool {
-        let code: String = courseCode.trimmingCharacters(in: .whitespaces)
-        if code.count < 4 {
-            return false
+    /// Whether a specific course — or club — has been identified. Nothing
+    /// else in the form means anything before this: the name, the
+    /// timetable, the appearance, even the folder structure all take
+    /// their defaults from the code, so every other field and section
+    /// stays disabled until it is true. True the moment the code field
+    /// holds anything at all, typed by hand or chosen from its
+    /// suggestions — a club code with no catalog entry counts too.
+    var hasChosenCourse: Bool {
+        return !courseCode.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// How many rows the popup offers at once when searching — an empty
+    /// query instead browses the WHOLE province catalog (`Int.max`,
+    /// effectively uncapped), since the popup scrolls a long list fine.
+    static let courseCodeSearchResultLimit: Int = 40
+
+    var courseCodeSuggestions: [CourseCatalogEntry] {
+        let trimmed: String = courseCode.trimmingCharacters(in: .whitespaces)
+        let limit: Int = trimmed.isEmpty ? Int.max : NewCourseWizardView.courseCodeSearchResultLimit
+        return CourseCatalog.matching(courseCode, inProvince: province, limit: limit)
+    }
+
+
+    /// Whether the suggestion popup is on screen right now. One place
+    /// rather than three: the overlay draws on it, its animation keys
+    /// off it, and the chevron button TOGGLES on it — and a toggle that
+    /// disagreed with what is drawn would need pressing twice.
+    var courseCodeSuggestionsAreShown: Bool {
+        !hasStarted && courseCodeFieldIsFocused && !courseCodeSuggestionsManuallyDismissed
+    }
+
+    /// The highlighted entry, resolved against the CURRENT list — `nil`
+    /// if the highlight's code has been filtered away by further typing.
+    var highlightedCourseCodeEntry: CourseCatalogEntry? {
+        guard let highlightedCourseCode else {
+            return nil
         }
-        let characters: [Character] = Array(code)
-        return !characters[3].isNumber
+        for entry in courseCodeSuggestions where entry.code == highlightedCourseCode {
+            return entry
+        }
+        return nil
+    }
+
+    /// Whether this code names a club rather than a course — which is what
+    /// puts the "Short label" field on screen and what decides whether
+    /// `custom_short_name` is written into `course_config.json`. The rule
+    /// itself lives in `ClubCodeRule`, and is a contract case, because
+    /// Windows asks the same question and had the same bug.
+    var isClubCode: Bool {
+        return ClubCodeRule.isClub(courseCode)
     }
 
     // MARK: - Body
 
     var body: some View {
+        wizardContent
+            .frame(width: 680, height: 620)
+            // Resolves the anchor `CourseCodePickerView` published for the
+            // code field into an actual rect via THIS outer
+            // `GeometryReader`'s proxy, then draws the popup as a sibling
+            // layer over the whole sheet — floating over the form rather
+            // than living inside it. See the note on
+            // `CourseCodeFieldAnchorKey` for why an anchor, not a
+            // `GeometryReader`-computed `CGRect` preference straight from
+            // the field: the field sits inside a `Form`'s `Section`,
+            // which the anchor approach reads through reliably and the
+            // plain preference approach (tried first, same day) did not.
+            .onChange(of: courseCodeFieldIsFocused) { _, isFocused in
+                if isFocused {
+                    // Regaining focus always reopens the popup, even if
+                    // Escape most recently closed it.
+                    courseCodeSuggestionsManuallyDismissed = false
+                }
+            }
+            .onChange(of: courseCode) {
+                // Typing invalidates an Escape-driven dismissal — a
+                // teacher who closed the popup and kept typing should
+                // see it reopen against what they're typing now.
+                courseCodeSuggestionsManuallyDismissed = false
+                // …and starts the walk over. Keeping a highlight across
+                // a re-filter would leave it pointing at a row that has
+                // moved or gone, so Return would take something the
+                // teacher never looked at.
+                highlightedCourseCode = nil
+            }
+            .overlayPreferenceValue(CourseCodeFieldAnchorKey.self) { anchor in
+                GeometryReader { proxy in
+                    if courseCodeSuggestionsAreShown, let anchor {
+                        CourseCodeSuggestionsOverlay(
+                            fieldFrame: proxy[anchor],
+                            province: province,
+                            entries: courseCodeSuggestions,
+                            onSelect: selectCourseCodeSuggestion,
+                            highlightedID: highlightedCourseCodeEntry?.id
+                        )
+                        // A quick fade + a short drop from the field,
+                        // rather than snapping into place — the same
+                        // motion a native popup's own appear animation
+                        // uses, just gentler than its default speed.
+                        .transition(
+                            .opacity.combined(with: .offset(y: -6))
+                        )
+                    }
+                }
+                // Two things drive this animation: the popup appearing or
+                // disappearing, and its ROWS changing as typing narrows
+                // the list — both should move gently rather than snap,
+                // so both are folded into one comparable value rather
+                // than the boolean alone.
+                .animation(
+                    .easeOut(duration: 0.12),
+                    value: CourseCodeSuggestionsAnimationKey(
+                        isShown: courseCodeSuggestionsAreShown,
+                        rowIDs: courseCodeSuggestions.map { $0.id }
+                    )
+                )
+            }
+            .interactiveDismissDisabled(creator.isCreating)
+    }
+
+    var wizardContent: some View {
         VStack(spacing: 0) {
             HStack {
                 Text("New Course or Club")
@@ -270,21 +428,67 @@ struct NewCourseWizardView: View {
             }
             .padding(12)
         }
-        .frame(width: 680, height: 620)
-        .interactiveDismissDisabled(creator.isCreating)
     }
 
     var wizardForm: some View {
         Form {
             Section {
+                // Its own `Form` row, a sibling of the course-code row
+                // below rather than bundled into the same one — a bare
+                // `Picker` used as a row's whole content already gets
+                // `Form`'s native side-by-side "label left, control
+                // right" treatment (this looks unchanged from before),
+                // and splitting it out is what lets `Form` give the
+                // course-code row BELOW its own native styling too,
+                // including the `Divider` between the two rows that
+                // every other pair of rows in this dialog already has
+                // (Russell, 2026-08-23: "There should also be a divider
+                // between Province and Course Code, following the
+                // example set by the rest of this dialog").
+                Picker("Province", selection: $province) {
+                    Text("Ontario").tag("ON")
+                    Text("British Columbia").tag("BC")
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("wizardProvincePicker")
+
                 VStack(alignment: .leading, spacing: 4) {
-                    TextField("Course code", text: $courseCode)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityIdentifier("wizardCourseCodeField")
+                    // An EXPLICIT `LabeledContent`, not `Form`'s own
+                    // automatic labelling. `Form` only extracts a row
+                    // label from a bare `TextField(title:, text:)` used
+                    // as the row's content; `CourseCodePickerView` is a
+                    // view of ours, so `Form` had nothing to extract and
+                    // "Course code" stayed INSIDE the field as
+                    // placeholder text, unlike every other row here
+                    // (Russell, 2026-08-23, comparing it to Course
+                    // name). Writing the label ourselves puts it in the
+                    // same leading column as Course name's, and hands
+                    // the field the trailing column at the same width.
+                    LabeledContent("Course code") {
+                        CourseCodePickerView(
+                            courseCode: $courseCode,
+                            isFocused: $courseCodeFieldIsFocused,
+                            onEscape: {
+                                courseCodeSuggestionsManuallyDismissed = true
+                                highlightedCourseCode = nil
+                            },
+                            // A TOGGLE, not an open: pressing a real
+                            // combo box's arrow a second time puts the
+                            // popup away again (Russell, 2026-08-23).
+                            onRevealRequested: {
+                                courseCodeSuggestionsManuallyDismissed = courseCodeSuggestionsAreShown
+                                if courseCodeSuggestionsManuallyDismissed {
+                                    highlightedCourseCode = nil
+                                }
+                            },
+                            onMoveHighlight: moveCourseCodeHighlight,
+                            onCommitHighlight: commitCourseCodeHighlight
+                        )
                         .onChange(of: courseCode) {
                             autoFillCourseName()
                             adoptSkeletonStructure()
                         }
+                    }
                     if let problem = courseCodeProblem {
                         // The same orange every other inline warning
                         // wears — a duplicate code is the usual reason a
@@ -295,62 +499,120 @@ struct NewCourseWizardView: View {
                             .foregroundStyle(.orange)
                             .accessibilityIdentifier("courseCodeWarning")
                     } else {
-                        ExampleCaption("e.g. ICS3U — or a club name like CODING")
+                        ExampleCaption("Type a code, or type what the course is called — e.g. “chem” finds SCH3U. Or type a club name like CODING.")
                     }
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    TextField("Course name", text: $courseName)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityIdentifier("wizardCourseNameField")
-                    ExampleCaption("e.g. Introduction to Computer Science")
-                }
-
-                // For known Ontario course codes, offer the same short and
-                // formal names the command-line wizard suggests — the short
-                // one first, because it is the one already filled in.
-                if let knownNames = CourseNameCatalog.names(forCode: courseCode) {
+                .padding(.bottom, 8)
+                // Nothing below here means anything until a course (or
+                // club) has actually been identified — see
+                // `hasChosenCourse`.
+                Group {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Suggested names for \(courseCode.trimmingCharacters(in: .whitespaces).uppercased()):")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        HStack {
-                            Button(knownNames.short) {
-                                courseName = knownNames.short
-                                lastAutoFilledName = knownNames.short
-                            }
-                            .accessibilityIdentifier("suggestedShortNameButton")
-                            Button(knownNames.formal) {
-                                courseName = knownNames.formal
-                                lastAutoFilledName = knownNames.formal
-                            }
-                            .accessibilityIdentifier("suggestedFormalNameButton")
+                        // The label is written out here rather than
+                        // passed as the `TextField`'s own title, and
+                        // that is what makes the typed text read
+                        // LEADING. A title `Form` extracts for itself
+                        // turns the row into a label/VALUE pair, and a
+                        // value is trailing-aligned — Russell saw
+                        // Timetable section numbers' "1" sitting
+                        // against the field's right edge (2026-08-23),
+                        // and `.multilineTextAlignment(.leading)` alone
+                        // did NOT override it. Given an explicit
+                        // `LabeledContent` the field is ordinary
+                        // content again, and its text starts at the
+                        // leading edge like any other text field's.
+                        LabeledContent("Course name") {
+                            // `WizardFieldChrome`, not
+                            // `.roundedBorder`: every AppKit control
+                            // this stands in for is 24pt tall and
+                            // SwiftUI's own bezel is 26, which left
+                            // this row 2pt out from the course-code
+                            // field beside it (Russell, 2026-08-23).
+                            // `.frame(height:)` does not fix that — see
+                            // the note on `WizardFieldChrome`.
+                            TextField("", text: $courseName)
+                                .focused($courseNameFieldHasFocus)
+                                .accessibilityIdentifier("wizardCourseNameField")
+                                .modifier(WizardFieldChrome(
+                                    isFocused: courseNameFieldHasFocus,
+                                    trailingInset: CourseCodePickerView.textLeadingInset
+                                ))
                         }
-                        .font(.callout)
+                        ExampleCaption("e.g. Chemistry")
+                    }
+
+                    // For known Ontario course codes, offer the same short and
+                    // formal names the command-line wizard suggests — the short
+                    // one first, because it is the one already filled in.
+                    if let knownNames = CourseNameCatalog.names(forCode: courseCode) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Suggested names for \(courseCode.trimmingCharacters(in: .whitespaces).uppercased()):")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                Button(knownNames.short) {
+                                    courseName = knownNames.short
+                                    lastAutoFilledName = knownNames.short
+                                }
+                                .accessibilityIdentifier("suggestedShortNameButton")
+                                Button(knownNames.formal) {
+                                    courseName = knownNames.formal
+                                    lastAutoFilledName = knownNames.formal
+                                }
+                                .accessibilityIdentifier("suggestedFormalNameButton")
+                            }
+                            .font(.callout)
+                        }
+                    }
+                    if isClubCode {
+                    // The same shape as Course Name and Timetable Section
+                    // Numbers: an explicit `LabeledContent` so the label
+                    // sits in the leading column and the typed text reads
+                    // leading, plus `WizardFieldChrome` so the box is the
+                    // same 24pt. It had neither — its label was still
+                    // placeholder text inside the field and its value was
+                    // pushed to the trailing edge, which is exactly the
+                    // pre-`LabeledContent` look every other row was moved
+                    // off (Russell, 2026-08-23, spotting the odd one out).
+                    VStack(alignment: .leading, spacing: 4) {
+                        LabeledContent("Short label") {
+                            TextField("", text: $customShortName)
+                                .focused($customShortNameFieldHasFocus)
+                                .accessibilityIdentifier("wizardCustomShortNameField")
+                                .modifier(WizardFieldChrome(
+                                    isFocused: customShortNameFieldHasFocus,
+                                    trailingInset: CourseCodePickerView.textLeadingInset
+                                ))
+                        }
+                        ExampleCaption("Shown beside the emoji — 12 characters at most")
+                    }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        // See the note beside Course Name's own
+                        // `LabeledContent` for why the label is written
+                        // out rather than passed as the field's title.
+                        LabeledContent("Timetable section numbers") {
+                            // See Course Name's own note.
+                            TextField("", text: $sectionNumbersText)
+                                .focused($sectionNumbersFieldHasFocus)
+                                .accessibilityIdentifier("wizardSectionNumbersField")
+                                .modifier(WizardFieldChrome(
+                                    isFocused: sectionNumbersFieldHasFocus,
+                                    trailingInset: CourseCodePickerView.textLeadingInset
+                                ))
+                        }
+                        if let problem = sectionNumbersProblem {
+                            // The same orange every other warning wears.
+                            Text(problem)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .accessibilityIdentifier("sectionNumbersWarning")
+                        } else {
+                            ExampleCaption("e.g. 1,3 — comma-separated")
+                        }
                     }
                 }
-                if isClubCode {
-                    TextField("Short label beside emoji (≤ 12 characters)", text: $customShortName)
-                        .textFieldStyle(.roundedBorder)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    TextField("Timetable section numbers", text: $sectionNumbersText)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityIdentifier("wizardSectionNumbersField")
-                    if let problem = sectionNumbersProblem {
-                        // The same orange every other warning wears.
-                        Text(problem)
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                            .accessibilityIdentifier("sectionNumbersWarning")
-                    } else {
-                        ExampleCaption("e.g. 1,3 — comma-separated")
-                    }
-                }
-                Picker("Language / region", selection: $locale) {
-                    ForEach(LocaleCatalog.codes, id: \.self) { code in
-                        Text(LocaleCatalog.displayName(forCode: code)).tag(code)
-                    }
-                }
+                .disabled(!hasChosenCourse)
             } header: {
                 FormSectionHeader("Basics")
             }
@@ -405,6 +667,7 @@ struct NewCourseWizardView: View {
             } header: {
                 FormSectionHeader("Starting Content")
             }
+            .disabled(!hasChosenCourse)
 
             Section {
                 EmojiChoiceField(label: "Header emoji", emoji: $emoji)
@@ -447,6 +710,7 @@ struct NewCourseWizardView: View {
             } header: {
                 FormSectionHeader("Appearance", caption: "Applied to every section — fine-tune later in Settings")
             }
+            .disabled(!hasChosenCourse)
 
             Section {
                 Picker("Sidebar folders expand when clicking", selection: $expandOnFolderClick) {
@@ -457,6 +721,7 @@ struct NewCourseWizardView: View {
             } header: {
                 FormSectionHeader("Behaviour")
             }
+            .disabled(!hasChosenCourse)
 
             Section {
                 PublishingChoiceView(
@@ -468,6 +733,7 @@ struct NewCourseWizardView: View {
             } header: {
                 FormSectionHeader("Deploying", caption: "Netlify is the usual choice — change any time in Settings")
             }
+            .disabled(!hasChosenCourse)
 
             Section {
                 if structureComesFromExampleContent {
@@ -510,17 +776,98 @@ struct NewCourseWizardView: View {
                     FormSectionHeader("Structure", caption: "Defaults are fine for most courses")
                 }
             }
+            .disabled(!hasChosenCourse)
 
             Section {
                 FooterEditorView(footerHTML: $footerHTML)
             } header: {
                 FormSectionHeader("Footer")
             }
+            .disabled(!hasChosenCourse)
+
+            // Settings a teacher rarely needs to touch, tucked behind a
+            // disclosure triangle at the very end rather than competing
+            // with the ones almost everyone sets.
+            Section {
+                DisclosureGroup("Advanced") {
+                    Picker("Language / region", selection: $locale) {
+                        ForEach(LocaleCatalog.codes, id: \.self) { code in
+                            Text(LocaleCatalog.displayName(forCode: code)).tag(code)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+                .accessibilityIdentifier("advancedDisclosure")
+            }
+            .disabled(!hasChosenCourse)
         }
         .formStyle(.grouped)
     }
 
     // MARK: - Functions
+
+    /// A row picked from `CourseCodeSuggestionsOverlay` — sets the code
+    /// exactly like finishing typing one by hand, then drops focus so
+    /// the popup closes.
+    func selectCourseCodeSuggestion(_ entry: CourseCatalogEntry) {
+        courseCode = entry.code
+        courseCodeFieldIsFocused = false
+        highlightedCourseCode = nil
+    }
+
+    /// Up or down pressed in the field: walks the popup's rows the way a
+    /// real `NSComboBox` does. Returns whether the key was used, so the
+    /// arrows keep moving the insertion point whenever there is no list
+    /// to walk.
+    ///
+    /// Pressing down with the popup CLOSED opens it and takes the first
+    /// row, which is what a combo box does and what makes the keyboard a
+    /// complete path — otherwise a teacher who dismissed the list with
+    /// Escape would have to reach for the mouse to get it back.
+    func moveCourseCodeHighlight(by step: Int) -> Bool {
+        let entries: [CourseCatalogEntry] = courseCodeSuggestions
+        if entries.isEmpty {
+            return false
+        }
+        if !courseCodeSuggestionsAreShown {
+            if step < 0 {
+                return false
+            }
+            courseCodeSuggestionsManuallyDismissed = false
+            highlightedCourseCode = entries[0].code
+            return true
+        }
+
+        var currentIndex: Int = -1
+        for index in entries.indices where entries[index].code == highlightedCourseCode {
+            currentIndex = index
+        }
+        // Deliberately CLAMPED rather than wrapping. A wrap turns one
+        // key too many into a jump from the bottom of a 40-row list back
+        // to the top, which reads as the list having jumped somewhere
+        // else entirely; a native popup stops at the ends.
+        var nextIndex: Int = currentIndex + step
+        if nextIndex < 0 {
+            nextIndex = 0
+        }
+        if nextIndex > entries.count - 1 {
+            nextIndex = entries.count - 1
+        }
+        highlightedCourseCode = entries[nextIndex].code
+        return true
+    }
+
+    /// Return pressed in the field: takes the highlighted row if the
+    /// teacher has walked to one. Returns false otherwise, so Return
+    /// still reaches the sheet's default button for someone who typed a
+    /// code and never touched the arrows.
+    func commitCourseCodeHighlight() -> Bool {
+        guard courseCodeSuggestionsAreShown, let entry = highlightedCourseCodeEntry else {
+            return false
+        }
+        selectCourseCodeSuggestion(entry)
+        return true
+    }
 
     /// When a course code with no example content is entered, offer the
     /// folders its SUBJECT wants rather than the school-neutral factory

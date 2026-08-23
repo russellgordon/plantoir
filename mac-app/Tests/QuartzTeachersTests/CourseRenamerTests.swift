@@ -83,18 +83,25 @@ final class CourseRenamerTests: XCTestCase {
     /// A code the rule refuses never reaches the file system, and the reason
     /// a teacher reads is the rule's own sentence rather than a second one
     /// written here.
+    ///
+    /// The refused example is `ICS4U!` rather than the `ICS-4U` it used to
+    /// be: dashes became legal on 2026-08-23, because British Columbia's
+    /// course codes contain them. What this test is actually about is that
+    /// the reason a teacher reads comes off `CourseCodeRule` rather than
+    /// being written a second time here, so any still-refused character
+    /// serves.
     func testAnUnusableCodeIsRefusedInTheRulesOwnWords() throws {
         let course: Course = try makeCourse(code: "ICS3U")
 
         XCTAssertThrowsError(
             try CourseRenamer.rename(
-                course, to: "ICS-4U", coursesDirectoryURL: coursesURL, existingCodes: ["ICS3U"],
+                course, to: "ICS4U!", coursesDirectoryURL: coursesURL, existingCodes: ["ICS3U"],
                 runner: SilentLaunchControl()
             )
         ) { error in
             XCTAssertEqual(
                 (error as? CourseRenamer.Problem)?.errorDescription,
-                CourseCodeRule.problem("ICS-4U", existingCodes: ["ICS3U"])
+                CourseCodeRule.problem("ICS4U!", existingCodes: ["ICS3U"])
             )
         }
     }
