@@ -534,6 +534,7 @@
       "Delta deploy created": "shared-python",
       "Deploy complete": "shared-python",
       "Deploying from local build": "shared-python",
+      "Done processing": "elsewhere",
       "Ensuring container is running": "launcher",
       "Host timezone offset": "launcher",
       "Installing dependencies": "shared-python",

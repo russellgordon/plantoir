@@ -50,7 +50,16 @@ enum TaskMilestones {
         TaskMilestone(label: "Applying your settings…", marker: "Updated pageTitle"),
         TaskMilestone(label: "Preparing components…", marker: "Installing dependencies"),
         TaskMilestone(label: "Building your site…", marker: "Quartz v4"),
-        TaskMilestone(label: "Opening the preview…", marker: "Launching Quartz preview"),
+        // "Launching Quartz preview" — build_site.py's own print — fires BEFORE
+        // `quartz build --serve` even starts, so it used to complete every
+        // milestone at once and pin the bar on this step for the whole real
+        // build (TODO.md item 1, found 2026-08-19). "Done processing" is
+        // patches/build.ts's own line, printed once the fresh site is actually
+        // written to disk — verified against a real `preview.ps1 --build-only`
+        // transcript on Windows 2026-08-23 ("Quartz v4.5.0" then "Done
+        // processing N files in Ns"). **This edit was authored on Windows and
+        // has NOT been built or tested on a mac — see MAC-HANDOFF.md.**
+        TaskMilestone(label: "Opening the preview…", marker: "Done processing"),
     ]
 
     /// Publishing a section to Netlify.

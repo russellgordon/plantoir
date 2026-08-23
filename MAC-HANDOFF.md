@@ -97,6 +97,88 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+- ⚠️ **NEEDS A MAC BUILD/TEST/REGEN — authored on Windows, unverified there.**
+  TODO.md item 1: *"A preview's progress bar sits at 100% saying 'Opening the
+  preview…' for the entire build."* `scripts/build_site.py` prints the final
+  preview milestone's marker ("🚀 Launching Quartz preview on…") *before* it
+  runs `npx quartz build --serve`, and `ScriptRunner.advanceMilestones`/
+  `AdvanceMilestones` jumps to the highest milestone whose marker has appeared
+  anywhere in output, so that one early line completes every remaining
+  milestone at once — the bar reads 100% for the whole real build, and
+  "Building your site…"/"Preparing components…" never display.
+
+  **Fix**: `TaskMilestones.preview`'s last entry now matches `"Done
+  processing"` instead of `"Launching Quartz preview"` — the literal text
+  `patches/build.ts:99` prints (`console.log(chalk.green(\`Done processing
+  ${n} files in ...\`))`), which fires only once `emitContent()` has actually
+  returned inside `buildQuartz()`, i.e. after the fresh site is truly on disk.
+  Quartz's own "Started a Quartz server listening…" line was ruled out —
+  `WINDOWS-HANDOFF.md`'s "Quartz serves the OLD site before it builds the new
+  one" section already documents that IT ALSO prints before the build
+  (`server.listen(); console.log(listening); await build()`), so it has the
+  identical defect.
+
+  **Verified against a real transcript, 2026-08-23** (`preview.ps1 --build-only
+  EXC2O 1`, native Windows toolchain, no container): the raw output shows
+  `Quartz v4.5.0` then `Done processing 199 files in 6s`, in that order — the
+  marker is unique (grepped across `scripts/`, `patches/`, and a baked
+  container copy — one hit), it's the file Docker actually copies in
+  (`Dockerfile:41` → `patches/build.ts`), and chalk wraps the whole literal in
+  ANSI, not interleaved inside it, so color is not a matching risk.
+
+  **A related, out-of-scope defect, found but NOT fixed here, worth knowing
+  before anyone "improves" this further**: the "Building your site…" milestone
+  (marker `"Quartz v4"`) has the same shape — Quartz prints that banner
+  (`cli/handlers.js`, `chalk.bgGreen.black(' Quartz v${version} ')`) at the
+  very top of its build handler, before any real work, not when the build
+  finishes. It doesn't produce the reported symptom here (it's mid-list, not
+  the last milestone, so the bar just advances a step early rather than
+  sticking at 100%) — after this fix, once "Quartz v4" prints the bar jumps
+  straight to 7/8 with the label already reading "Opening the preview…" for
+  the whole real build (an imprecise label, not a stuck-at-100%-forever bug).
+  Left alone deliberately, scoped out by an adversarial review before this
+  landed — a genuine fix would need a real "content actually processed"
+  signal for that step too, and isn't a one-line marker swap.
+
+  **What's changed, and what still needs mac attention:**
+  - `windows-app/Plantoir.Core/Scripting/TaskMilestones.cs` — done, built,
+    `dotnet test Plantoir.Tests/Plantoir.Tests.csproj` 664/664 green.
+  - `mac-app/QuartzTeachers/Scripting/TaskMilestones.swift` — same one-line
+    marker edit made, **but this Windows session has no Xcode and could not
+    build or run it.** Please `xcodegen generate` + build + run
+    `QuartzTeachersTests` before trusting it.
+  - `mac-app/Tests/QuartzTeachersTests/TaskMilestoneTests.swift` —
+    `testPreviewProgressAdvancesThroughItsMilestones` updated to assert the
+    new intermediate state (7/8 after `"Quartz v4.5.0\n"`, label still
+    "Opening the preview…") and only reaching 8/8 after a `"Done processing
+    199 files in 6s\n"` line — **also unverified on a mac.**
+  - `contracts/app-rules.json` → `markerOrigins.origins` — added `"Done
+    processing": "elsewhere"` (authored/preserved key, safe to hand-edit).
+  - **`contracts/app-rules.json` → `milestones.preview` was deliberately LEFT
+    UNCHANGED.** `contracts/README.md` names `milestones` explicitly as a
+    generated readout of `TaskMilestones`, regenerated only by `Plantoir
+    --write-contracts` on a mac, and says in so many words not to hand-edit
+    it. No Windows test currently reads `milestones` back out of the JSON, so
+    leaving it stale doesn't fail `dotnet test` — but it IS stale until a mac
+    session runs `Plantoir --write-contracts contracts` (after building the
+    Swift change above) to regenerate it for real.
+  - **`mac-app/Tests/QuartzTeachersUITests/MarketingScreenshotTests.swift`
+    `test4Progress`** photographs the CURRENT broken behaviour on purpose (its
+    own comment explains why: "the only state a capture can dependably
+    reach"). Once this fix is built and verified on a mac, that shot should
+    change (the bar will genuinely be mid-progress, not parked at 100%) and
+    this test's comment/expectations will need revisiting — not done here,
+    since it needs a real mac screenshot to know what the new dependable state
+    looks like.
+  - `GUI-IMPROVEMENTS.md` — not yet given a row; add one once the mac side is
+    verified, since a teacher-visible change isn't confirmed shipped until
+    both platforms show it.
+
+  Branch: `issue/preview-progress-bar-marker` off `dev`, pushed. An
+  adversarial subagent reviewed the plan before any file was touched — it
+  caught the `milestones`-hand-edit mistake above before it happened and
+  flagged the "Quartz v4" sibling defect; see this entry for both.
+
 - ✅ DONE (mac, 2026-08-20). **The assistant warm-up race: it EXISTS here,
   it is measurable, and it cannot produce the Windows symptom.** Answering
   GUI-IMPROVEMENTS row 293's two questions with the real app rather than
