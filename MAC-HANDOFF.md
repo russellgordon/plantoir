@@ -515,6 +515,35 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Windows caught up to the mac's working-folder path bar gestures**
+  (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 328, closing
+  `WINDOWS-HANDOFF.md` item 6). No mac change — the mac's own path bar is
+  unaffected — but two things are worth knowing. **First, a WinUI trap that
+  cost real time and is worth watching for anywhere else in `windows-app/`:**
+  `MainWindow.xaml`'s `BreadcrumbBar.ItemTemplate` had, since the crumb
+  feature first shipped (commit 4282b839), wrapped its content in a second
+  `BreadcrumbBarItem` — invalid, since `BreadcrumbBar` already generates its
+  own container per item, the same relationship `ListViewItem` has to
+  `ListView`. This built cleanly and passed the full test suite every time
+  (a `DataTemplate`'s structure isn't something a unit test reaches), and
+  only failed at RUNTIME — by silently falling back to the bound object's
+  `ToString()` rather than throwing, so every crumb displayed the literal
+  text "Plantoir.Views.PathBarCrumb" instead of a folder name. It shipped
+  invisibly for over a week because nobody had actually run the real app
+  against this code path before. Fixed by having the template supply only
+  the container's CONTENT (a `StackPanel`) and never another
+  `BreadcrumbBarItem`; `PathBarCrumb` also gained a defensive
+  `ToString() => DisplayName` override as a second line of defence, since
+  the overflow dropdown and narrator can fall back to it independently of
+  the item template — mirroring why `FolderCrumb` already had one. **Second,
+  the folder icon per crumb** — mac renders the real Finder icon; Windows'
+  new `Plantoir.Views.FolderIcons` uses `StorageFolder.GetThumbnailAsync`
+  (cached by path, `null` on any failure so the crumb falls back to
+  name-only) rather than P/Invoking `SHGetFileInfo`, avoiding manual HICON
+  lifetime management for a decoration the contract already says is
+  optional. Reference: `Plantoir/MainWindow.xaml` (`BreadcrumbBar.ItemTemplate`),
+  `Plantoir/Views/PathBarCrumb.cs`, `Plantoir/Views/FolderIcons.cs`.
+
 - **Windows caught up to the mac's "assistant engine said" trail event**
   (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 327, closing
   `WINDOWS-HANDOFF.md` item 2). No mac change — this is Windows implementing

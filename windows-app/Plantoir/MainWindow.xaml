@@ -89,15 +89,25 @@
                            ItemClicked="FolderCrumbs_ItemClicked" AutomationProperties.AutomationId="windowPathBar">
                 <BreadcrumbBar.ItemTemplate>
                     <DataTemplate>
-                        <BreadcrumbBarItem ToolTipService.ToolTip="{Binding Path}">
-                            <BreadcrumbBarItem.ContextFlyout>
+                        <!-- BreadcrumbBar generates its own BreadcrumbBarItem
+                             container per entry — this template supplies only
+                             that container's CONTENT, never another
+                             BreadcrumbBarItem (nesting one broke rendering
+                             entirely: every crumb fell back to the bound
+                             object's ToString()). Tooltip, context menu and
+                             double-click attach to this root panel instead. -->
+                        <StackPanel Orientation="Horizontal" Spacing="6"
+                                    ToolTipService.ToolTip="{Binding Path}"
+                                    DoubleTapped="Crumb_DoubleTapped">
+                            <StackPanel.ContextFlyout>
                                 <MenuFlyout>
                                     <MenuFlyoutItem Text="Show in File Explorer" Click="CrumbShowInExplorer_Click" />
                                     <MenuFlyoutItem Text="Open Folder" Click="CrumbOpenFolder_Click" />
                                 </MenuFlyout>
-                            </BreadcrumbBarItem.ContextFlyout>
-                            <TextBlock Text="{Binding DisplayName}" DoubleTapped="Crumb_DoubleTapped" />
-                        </BreadcrumbBarItem>
+                            </StackPanel.ContextFlyout>
+                            <Image Source="{Binding Icon}" Width="16" Height="16" VerticalAlignment="Center" Margin="0,2,0,0" />
+                            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                        </StackPanel>
                     </DataTemplate>
                 </BreadcrumbBar.ItemTemplate>
             </BreadcrumbBar>
