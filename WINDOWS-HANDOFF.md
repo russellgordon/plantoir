@@ -258,13 +258,14 @@ this side is expected to say so when the contract is wrong.
    lands the screenshot on its intended stage. Full suite: 656/657 (the one
    failure is the pre-existing, unrelated item 9 course-code-dashes case).
 
-   **The first half — the Edge `127.0.0.1` question — remains genuinely
-   unmeasured.** The rewrite is already applied
-   (`OutputParsers.cs`, `SectionDetailView.xaml.cs`) with the mac's generic
-   "browsers try IPv6 first" rationale in the comment, not a recorded Edge
-   test. Low-risk to leave in place (a no-op if Edge doesn't need it), but
-   still open: open a preview, try `http://localhost:<port>` in Edge by
-   hand, and record the finding either way in `MAC-HANDOFF.md`.
+   ~~The first half — the Edge `127.0.0.1` question — remains genuinely
+   unmeasured.~~ — ✅ Measured 2026-08-23 (see `MAC-HANDOFF.md`'s "for
+   awareness" entry). Tested by hand against a real preview (port 8081):
+   `http://localhost:8081` and `http://127.0.0.1:8081` both loaded instantly
+   in Edge, repeated more than once, no IPv6-first stall observed. The
+   rewrite in `OutputParsers.cs`/`SectionDetailView.xaml.cs` is a harmless
+   no-op on Windows as currently shipped — kept in place, not removed, but
+   no longer an open question.
 6. ~~The working-folder path bar's fuller gesture set~~ — ✅ Done 2026-08-23
    (`ff4d9ee9`, `GUI-IMPROVEMENTS.md` row 328). Double-click-to-open, the
    right-click Show-in-Explorer/Open-Folder menu, and the hover tooltip were
