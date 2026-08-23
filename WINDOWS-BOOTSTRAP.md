@@ -35,10 +35,10 @@ go, without stopping to ask permission for each step.
 1. **`CLAUDE.md`** — the rules that override default behaviour. Rules 2 and 4
    bind you as much as the mac side.
 2. **`WINDOWS-HANDOFF.md`** — and inside it, **"Where Windows actually
-   stands"** is the section to read FIRST. It is the ordered work list,
-   refreshed 2026-08-17 by reading this app's own source, and it exists so
-   the plan you write in § 0 starts from evidence rather than from 3,700
-   lines of reference. The rest of the file is architecture, the config
+   stands"** is the section to read FIRST. It was pruned on 2026-08-22 once a
+   code-level pass confirmed most of the old work list had shipped; those
+   write-ups moved verbatim to `WINDOWS-HANDOFF-COMPLETED.md`, so this file now
+   holds only what is genuinely still open, plus architecture, the config
    contract, the WSL2 background and the reasoning behind past decisions:
    long, and the section headings are enough to navigate.
 3. **`contracts/README.md`**, then the eight JSON files. The coverage table
