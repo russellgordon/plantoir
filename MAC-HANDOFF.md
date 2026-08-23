@@ -515,6 +515,45 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Scheduled deploys never actually fired on Windows, ever — a doubled
+  backslash in a shell-quoted string** (Windows, 2026-08-23,
+  `GUI-IMPROVEMENTS.md` row 325). Reported directly, after a real overnight
+  scheduled deploy for ICD2O never went out. `TaskScheduling`'s stored `/TR`
+  command built the PowerShell `-File` argument with `\\\"` in C#
+  source — a literal backslash followed by a quote, TWO characters — where
+  it needed a real embedded quote character (`\"` in C# source, which the
+  compiler turns into one `"` character). `schtasks /Query ... /XML` showed
+  the stored `<Arguments>` holding `\"C:\...\script.ps1\"` verbatim, both
+  characters literal, so PowerShell's `-File` was handed a path it could
+  never resolve. **This predates row 323's fingerprinting work entirely** —
+  it would have broken every scheduled deploy on Windows since the feature
+  first shipped, for any course, silently, because Task Scheduler still
+  records a "Last Run Time" for a task that ran and immediately failed to
+  parse its own argument, so nothing about SCHEDULING ever looked broken.
+  Confirmed live: the real failing task's Last Result was `0xFFFD0000`.
+  **Nothing for the mac to do or check** — `launchd`'s command is an
+  ARGUMENTS ARRAY in a plist, never a shell command string assembled with
+  manual quote-escaping, so this exact bug class (two escaping passes
+  compounding instead of cancelling — `ProcessStartInfo.ArgumentList`
+  already quotes a value containing spaces once, so hand-escaping quotes
+  INSIDE that value doubles up) has no equivalent surface there. Worth
+  knowing as a general lesson if the mac ever DOES build a shell command
+  string by hand somewhere (rather than an arguments array): don't
+  hand-escape a quote that a launching API is about to quote again on your
+  behalf — verify by reading back what actually got stored/registered, the
+  way `schtasks /Query ... /XML` made this one obvious in about thirty
+  seconds once looked at directly, rather than trusting that a plausible-
+  looking C# string literal did what it appeared to say. Also fixed on the
+  same pass: right-click on a section with a deploy already scheduled now
+  offers "Change Deploy Time…" alongside Cancel, reusing the existing
+  schedule dialog pre-filled with the current time rather than requiring a
+  cancel-then-reschedule round trip — no backend change needed, since
+  `TaskScheduling.Schedule` already replaces by task name. Reference:
+  `windows-app/Plantoir.Core/Assist/TaskScheduling.cs`
+  (`TaskRunCommand`), `windows-app/Plantoir.Tests/TaskSchedulingTests.cs`
+  (new), `windows-app/Plantoir/Views/SidebarPane.xaml.cs`
+  (`AskWhenToDeploy`'s new `existing` parameter).
+
 - **A shared `scripts/deploy.py` bug, found on Windows but fixed in the file
   the mac runs too** (Windows + shared, 2026-08-23, `GUI-IMPROVEMENTS.md`
   row 324). Reported directly, with a screenshot: a teacher deployed a

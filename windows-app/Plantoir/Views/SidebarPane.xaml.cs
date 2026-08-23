@@ -499,11 +499,18 @@ public sealed partial class SidebarPane : UserControl
         // most teachers setting a 6:30 deploy know exactly what they want and
         // should not have to describe it in a sentence first.
         var scheduled = TaskScheduling.NextRun(course.Code, number);
-        menu.Items.Add(scheduled is { } when
-            ? MenuItem($"Cancel Deploy at {when:h:mm tt}…", Glyphs.Clock,
-                       () => ConfirmCancelScheduledDeploy(course, number, when))
-            : MenuItem("Schedule Deploy…", Glyphs.Clock,
-                       () => AskWhenToDeploy(course, number)));
+        if (scheduled is { } when)
+        {
+            menu.Items.Add(MenuItem($"Change Deploy Time ({when:h:mm tt})…", Glyphs.Clock,
+                                     () => AskWhenToDeploy(course, number, existing: when)));
+            menu.Items.Add(MenuItem("Cancel Scheduled Deploy…", Glyphs.Remove,
+                                     () => ConfirmCancelScheduledDeploy(course, number, when)));
+        }
+        else
+        {
+            menu.Items.Add(MenuItem("Schedule Deploy…", Glyphs.Clock,
+                                     () => AskWhenToDeploy(course, number, existing: null)));
+        }
 
         menu.Items.Add(new MenuFlyoutSeparator());
 
@@ -525,27 +532,37 @@ public sealed partial class SidebarPane : UserControl
     }
 
     /// <summary>
-    /// Ask when to deploy, and set it.
+    /// Ask when to deploy, and set it — both for a brand-new schedule and
+    /// for changing an existing one, since <see cref="TaskScheduling.Schedule"/>
+    /// already replaces by name (there is at most one per section by
+    /// construction, see <see cref="TaskScheduling.NameFor"/>), so "modify"
+    /// needs no backend of its own: it is this same dialog, pre-filled with
+    /// the time already set, calling the same Schedule.
     ///
-    /// Defaults to half past six tomorrow morning, because that is the case
-    /// this exists for — the site live before the students are, without the
-    /// teacher being at their desk. Everything the computer must be doing at
-    /// that moment is stated in the dialog rather than discovered at 6:31.
+    /// Defaults to half past six tomorrow morning for a brand-new schedule
+    /// (<paramref name="existing"/> is null) — the site live before the
+    /// students are, without the teacher being at their desk. When
+    /// <paramref name="existing"/> is given, the pickers open on that time
+    /// instead, so changing a 6:30 deploy to 7:00 does not mean re-entering
+    /// tomorrow's date from scratch. Everything the computer must be doing
+    /// at that moment is stated in the dialog rather than discovered at
+    /// 6:31, either way.
     /// </summary>
-    private async void AskWhenToDeploy(Course course, int number)
+    private async void AskWhenToDeploy(Course course, int number, DateTime? existing)
     {
-        var tomorrow = DateTime.Today.AddDays(1).AddHours(6).AddMinutes(30);
+        var initial = existing ?? DateTime.Today.AddDays(1).AddHours(6).AddMinutes(30);
+        bool isChange = existing is not null;
 
         var day = new CalendarDatePicker
         {
-            Date = tomorrow,
+            Date = initial,
             MinDate = DateTimeOffset.Now.Date,
             PlaceholderText = "Pick a day",
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
         var time = new TimePicker
         {
-            Time = tomorrow.TimeOfDay,
+            Time = initial.TimeOfDay,
             ClockIdentifier = "12HourClock",
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
@@ -571,9 +588,9 @@ public sealed partial class SidebarPane : UserControl
 
         var dialog = new ContentDialog
         {
-            Title = "Schedule a deploy",
+            Title = isChange ? "Change the scheduled deploy" : "Schedule a deploy",
             Content = body,
-            PrimaryButtonText = "Schedule",
+            PrimaryButtonText = isChange ? "Save" : "Schedule",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
         };

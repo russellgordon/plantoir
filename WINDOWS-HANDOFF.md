@@ -115,7 +115,14 @@ this side is expected to say so when the contract is wrong.
    alive at the moment a scheduled deploy actually runs — right before
    running any destination's `deploy.ps1`, then writes a sentinel under
    `%LOCALAPPDATA%\Plantoir\scheduled\pending\` only if every destination
-   succeeded. `ScheduledDeployCompletion.ConsumePending()`, wired into
+   succeeded. **A day later, a real overnight schedule for this still never
+   fired at all — see `GUI-IMPROVEMENTS.md` row 325.** Unrelated to the
+   fingerprinting work above: the stored `/TR` command had a doubled-
+   backslash quoting bug (`\\\"` instead of a real `\"`) that predates this
+   row entirely and had broken every scheduled deploy on Windows since the
+   feature first shipped — fixed in `TaskScheduling.TaskRunCommand`. Confirm
+   against row 325 before assuming a scheduled deploy actually runs;
+   `ScheduledDeployCompletion.ConsumePending()`, wired into
    `MainWindow`'s `Activated` handler, applies and deletes any pending
    sentinel the next time the app runs. Fingerprinting at RUN time (not at
    schedule time) was deliberate — see "A scheduled deploy needs its own

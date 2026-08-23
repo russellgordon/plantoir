@@ -74,7 +74,7 @@ public static class TaskScheduling
         if (WriteWrapperScript(taskName, workingFolder, launcher, courseCode, section, courseDirectory,
                                excluded, destinations, cloudflareAccountID) is not { } scriptPath)
             return "The scheduled deploy's wrapper script could not be written.";
-        string command = $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\\"{scriptPath}\\\"";
+        string command = TaskRunCommand(scriptPath);
 
         // schtasks accepts the date in the format the MACHINE's locale uses,
         // and rejects every other one outright — "Invalid Start Date (Date
@@ -119,6 +119,31 @@ public static class TaskScheduling
 
     /// <summary>Single-quotes a value for PowerShell, escaping any embedded quote.</summary>
     private static string PsQuote(string value) => "'" + value.Replace("'", "''") + "'";
+
+    /// <summary>
+    /// The `/TR` value schtasks stores for the wrapper: `powershell.exe`
+    /// invoking the wrapper script by path, in double quotes so a working
+    /// folder with spaces in it (any Desktop folder, most OneDrive paths)
+    /// still resolves.
+    ///
+    /// A REAL embedded quote (`\"` in C# source = one `"` character) — NOT
+    /// `\\\"` (backslash + quote, TWO characters), which is what this used
+    /// to say. Found 2026-08-23 as the reason a scheduled deploy never fired
+    /// at all: `Run()` hands the whole command to `schtasks.exe` as ONE
+    /// argument via <see cref="ProcessStartInfo.ArgumentList"/>, which
+    /// already quotes and escapes the value correctly for schtasks because
+    /// it contains spaces — there is no reason for this method to also
+    /// escape the quotes itself, and doing so put a LITERAL backslash-quote
+    /// pair into the stored command instead of a quote character. Confirmed
+    /// via `schtasks /Query ... /XML`, which showed `&lt;Arguments&gt;`
+    /// holding `\"C:\...\script.ps1\"` verbatim (with a stray newline
+    /// besides) — a path PowerShell's `-File` could never resolve, so the
+    /// task ran, found nothing to run, and failed silently every time.
+    /// Internal (not private) so the test that pins this can reach it
+    /// without spinning up a real scheduled task.
+    /// </summary>
+    internal static string TaskRunCommand(string scriptPath) =>
+        $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\"";
 
     /// <summary>
     /// Writes the wrapper: fingerprint the section first (via the bundled
