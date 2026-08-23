@@ -221,6 +221,50 @@ this side is expected to say so when the contract is wrong.
    whether the browser needs `127.0.0.1` instead of `localhost` for a preview
    address, and which of the 25 progress markers your own `.ps1`/native
    runtime output actually prints.
+
+   ~~The second half~~ — ✅ Done 2026-08-23 (`GUI-IMPROVEMENTS.md` row 353).
+   It was not an unmeasured gap, it was a live bug: `TaskMilestones.cs`'s
+   `CourseCreation`/`ExampleCourse`/`Preview`/`Deploy`/`BuildAndDeploy*`
+   lists used four markers copy-pasted verbatim from the mac's `.sh`
+   scripts — `Setting up this PC`, `Building your website builder`,
+   `Ensuring container is running`, `Starting container if needed` — none
+   of which have ever appeared in `setup.ps1`/`preview.ps1`/`deploy.ps1`'s
+   real output. Root cause, nailed by git history: `setup.ps1` gained its
+   "Native toolchain (no container)" rewrite (no WSL2, no Docker, no
+   container start at all) the day AFTER `TaskMilestones.cs` was last
+   edited, silently orphaning the four markers describing events — a
+   one-time machine setup, a container starting — that no longer happen on
+   Windows. Confirmed empirically against real `preview.ps1 --build-only`
+   and `deploy.ps1 --to-folder` transcripts: neither string appears.
+   Practical effect: the first two-to-three stages of most progress bars
+   could never be reached by marker match — the bar sat at 0% until a
+   later, still-real marker jumped it forward several steps at once,
+   exactly the silent failure this section warns about. Fixed by tracing
+   each launcher's real early output and substituting real markers:
+   `Detected host timezone offset` (setup.ps1), `Running the website
+   builder on this PC` (preview.ps1), and `Host timezone offset` + `from
+   this PC` (deploy.ps1) — collapsing two-or-three dead stages into one or
+   two real ones per list, since the native toolchain genuinely has fewer
+   distinct phases than the container one did. New
+   `TaskMilestoneLauncherMarkerTests` (`ParsingTests.cs`) reads the actual
+   `.ps1` files rather than a hand-typed transcript, so a future launcher
+   rewrite that drops one of these lines fails the suite instead of
+   silently stalling a teacher's bar again. Caught by adversarial review
+   along the way: `MarketingShotCapturer.cs`'s `PreviewTranscript`/
+   `DeployTranscript` mock transcripts, whose own doc comments claim to be
+   coupled to `TaskMilestones` ("change one there and this stops
+   advancing"), still carried the four dead strings — fixed to match, and
+   hand-verified against `ScriptRunner.AdvanceMilestones` that each still
+   lands the screenshot on its intended stage. Full suite: 656/657 (the one
+   failure is the pre-existing, unrelated item 9 course-code-dashes case).
+
+   **The first half — the Edge `127.0.0.1` question — remains genuinely
+   unmeasured.** The rewrite is already applied
+   (`OutputParsers.cs`, `SectionDetailView.xaml.cs`) with the mac's generic
+   "browsers try IPv6 first" rationale in the comment, not a recorded Edge
+   test. Low-risk to leave in place (a no-op if Edge doesn't need it), but
+   still open: open a preview, try `http://localhost:<port>` in Edge by
+   hand, and record the finding either way in `MAC-HANDOFF.md`.
 6. ~~The working-folder path bar's fuller gesture set~~ — ✅ Done 2026-08-23
    (`ff4d9ee9`, `GUI-IMPROVEMENTS.md` row 328). Double-click-to-open, the
    right-click Show-in-Explorer/Open-Folder menu, and the hover tooltip were
@@ -1051,15 +1095,37 @@ before deciding you need the same rewrite. Open a preview, then try
 `http://localhost:<port>` in Edge by hand. If it connects first time, drop the
 rewrite and say so in `MAC-HANDOFF.md` — that is a finding, not an omission,
 and the contract should then note that the rule is mac-only. If Edge behaves
-the same way, keep it and the contract stays as it is.
+the same way, keep it and the contract stays as it is. **Still open as of
+2026-08-23** — Windows already applies the rewrite (`OutputParsers.cs`,
+`SectionDetailView.xaml.cs`), but with the mac's generic rationale copied into
+the comment rather than a recorded Edge test. Low-risk to leave as-is; still
+worth doing the hand test and recording the result either way.
 
 **2. Which progress markers you must match, and which are yours to write.**
 `app-rules.json` → `markerOrigins` classifies all twenty-five. Seventeen come
 from `scripts/*.py`, which both platforms run, and must match to the
 character. Seven come from the launchers, which exist separately as `.sh` and
-`.ps1` — those you write, and they already differ: the mac watches for
-"Setting up this Mac" where `setup.ps1` prints "Setting up this PC". One is
-"elsewhere" (`Quartz v4`, from the Docker build) and wants a human to look.
+`.ps1` — those you write, and they already differ. One is "elsewhere"
+(`Quartz v4`, from the build) and wants a human to look.
+
+**This example is now WRONG and is kept only as a warning: an earlier version
+of this section said "the mac watches for 'Setting up this Mac' where
+`setup.ps1` prints 'Setting up this PC'."** `setup.ps1` printed that once, but
+stopped the day Windows moved to a fully native toolchain (`b356a1f`,
+2026-08-19, "Native toolchain (no container)" in `setup.ps1`) — no WSL2, no
+Docker, no one-time machine setup, no container to start at all. Nobody
+updated `TaskMilestones.cs`'s launcher markers to match, and nothing caught
+it for four days: `Setting up this PC`, `Building your website builder`,
+`Ensuring container is running`, and `Starting container if needed` all sat
+in the milestone lists matching text that could never appear again, so the
+first two-to-three stages of most progress bars silently could never be
+reached — fixed 2026-08-23, see item 5 above and `GUI-IMPROVEMENTS.md` row
+352. **The lesson: "read your own `.ps1` files" is not a one-time
+measurement, it is a claim that rots the moment those files are rewritten.**
+`TaskMilestoneLauncherMarkerTests` (`ParsingTests.cs`) now reads the actual
+`.ps1` files rather than trusting a milestone list frozen in C#, specifically
+so the next launcher rewrite fails a test instead of silently stalling a
+teacher's progress bar again.
 
 **Do NOT copy the mac's seven launcher markers into your milestone lists.**
 Read your own `.ps1` files and match what they actually print. This fails

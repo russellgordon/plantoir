@@ -459,7 +459,7 @@ public static class MarketingShotCapturer
     /// coupling.
     /// </summary>
     private const string PreviewTranscript =
-        "Setting up this PC\nBuilding your website builder\nStarting container if needed\n"
+        "Running the website builder on this PC\n"
         + "Copying shared folders\nUpdated pageTitle\nInstalling dependencies\n";
 
     /// <summary>
@@ -468,7 +468,7 @@ public static class MarketingShotCapturer
     /// "publishing" rather than "building".
     /// </summary>
     private const string DeployTranscript =
-        "Setting up this PC\nBuilding your website builder\nEnsuring container is running\n"
+        "Host timezone offset: -0400\nDeploying EXC2O S1 from this PC ...\n"
         + "Deploying from local build\n";
 
     /// <summary>
