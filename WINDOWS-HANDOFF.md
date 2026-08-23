@@ -152,6 +152,44 @@ this side is expected to say so when the contract is wrong.
 7. **The first-deploy marker's destination-scoping** (`AssistWorkspace.cs`
    accepting either folder rather than only the CURRENT destination) — see
    "One divergence found by sweeping" below; verify against current code.
+8. **Three deploy-after-preview console races fixed on mac 2026-08-22, not
+   yet checked on Windows** — `GUI-IMPROVEMENTS.md` rows 317–318, all SwiftUI
+   state races rather than shared code, so nothing ports mechanically, but the
+   same shape of bug is worth checking for in whatever Windows equivalent of
+   `MultiDestinationDeployRunner`/`ScriptRunner`/the deploy console view
+   exists there:
+   - **Row 317** — deploying right after a preview flashed "Stopped" first.
+     Deploying stops any running preview as an internal step, which on mac
+     set the same `wasStoppedByUser` flag the teacher-facing Stop Preview
+     button sets, and the panel-choosing logic compared `startedAt`
+     timestamps that hadn't been updated for the new deploy yet. Fix: claim
+     the console for the deploy panel (fresh `startedAt`, reset run state)
+     *before* stopping the preview, not after. Check whether Windows' own
+     "which panel is showing" logic has the same ordering dependency, and
+     whether its internal preview-stop (if any) is distinguishable from a
+     teacher pressing Stop.
+   - **Row 318a** — right after clicking Deploy, the console went blank for
+     about half a second, because a freshly-reset-but-never-run process
+     wrapper is a state the progress view had no rendering for (neither its
+     running branch nor its finished branch fired). Mac's fix was a
+     `isPreparingDeploy` flag showing a plain "Preparing to deploy…"
+     placeholder for that span — check what WinUI's deploy panel draws for a
+     brand-new process object with nothing to say yet. The Deploy button
+     also stayed clickable through this same window on mac (a re-entrancy
+     bug in its own right, allowing a second overlapping deploy); confirm
+     Windows' Deploy button disables for the full click-to-real-work span,
+     not just while the underlying process reports running.
+   - **Row 318b** — mid-deploy, the panel falsely flashed "Done" for up to
+     300ms between the build script exiting and the deploy script starting,
+     because mac's `MultiDestinationDeployRunner` ran both scripts on one
+     `ScriptRunner` and polled `isRunning` every 300ms to detect completion
+     — indistinguishable from the whole leg finishing. Fixed by making
+     completion event-driven and adding an `isBetweenPhases` flag so the
+     view knows "this script exited, but another is about to start" is not
+     the same as "actually done." If Windows' build-then-deploy path reuses
+     one process wrapper for two scripts back to back, check whether its own
+     completion detection is polled (same latency-window risk) and whether
+     its progress view can tell the two states apart.
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
