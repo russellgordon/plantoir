@@ -46,6 +46,10 @@ struct SectionDetailView: View {
     /// editing must not have it thrown at them again on every redraw.
     @State var healthFindings: [SiteHealthFinding] = []
 
+    /// Drives the dialog separately from the findings themselves, so the title
+    /// is not recomputed from an array that the dismissal is clearing.
+    @State var isShowingHealthFindings: Bool = false
+
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
 
@@ -272,11 +276,18 @@ struct SectionDetailView: View {
             // closed, so this is the first moment there is anywhere to say it
             // — and `takeFolderProblems` consumes the record, so it is
             // reported once rather than every time this window opens.
+            // Guard BEFORE consuming: `takeFolderProblems` deletes the record
+            // as it reads it, so taking it while a dialog is already up threw
+            // the overnight findings away permanently.
+            guard healthFindings.isEmpty else {
+                return
+            }
             let waiting: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
                 courseCode: course.code, sectionNumber: sectionNumber
             )
-            if !waiting.isEmpty && healthFindings.isEmpty {
+            if !waiting.isEmpty {
                 healthFindings = waiting
+                isShowingHealthFindings = true
             }
         }
         .onDisappear {
@@ -303,12 +314,19 @@ struct SectionDetailView: View {
         } message: {
             Text(deployRefusal ?? "")
         }
-        .alert(healthAlertTitle, isPresented: healthFindingsBinding) {
-            Button("OK") {
-                healthFindings = []
-            }
+        .alert(healthAlertTitle, isPresented: $isShowingHealthFindings) {
+            Button("OK") { }
         } message: {
             Text(healthAlertMessage)
+        }
+        .onChange(of: isShowingHealthFindings) { _, isShowing in
+            // Cleared only once the alert is actually gone. Clearing inside the
+            // button's action re-evaluated the title in the same update as the
+            // dismissal, which made the unreachable-by-design
+            // "0 things need your attention" string reachable.
+            if !isShowing {
+                healthFindings = []
+            }
         }
     }
 
@@ -347,17 +365,7 @@ struct SectionDetailView: View {
             return
         }
         healthFindings = runner.healthFindings
-    }
-
-    var healthFindingsBinding: Binding<Bool> {
-        return Binding(
-            get: { !healthFindings.isEmpty },
-            set: { isPresented in
-                if !isPresented {
-                    healthFindings = []
-                }
-            }
-        )
+        isShowingHealthFindings = true
     }
 
     /// Why this section's deploy would not get anywhere, or nil when it
@@ -873,11 +881,6 @@ struct SectionDetailView: View {
             needsBuild: needsBuild
         )
 
-        // What the build said about this course's folders. Taken from the
-        // FIRST leg: every destination publishes the same built site, so a
-        // second leg would only repeat the same findings.
-        showHealthFindings(from: deployRunner.legs.first?.runner)
-
         // A failed shared build is reported the same way regardless of
         // how many destinations were configured — none of them were ever
         // reached, so the wording says "could not be built", not "did
@@ -890,6 +893,12 @@ struct SectionDetailView: View {
                 )
             )
         }
+
+        // What the build said about this course's folders — AFTER the failure
+        // paths above, so a deploy that did not publish is not headlined by a
+        // folder warning. Taken from the FIRST leg: every destination publishes
+        // the same built site, so a second leg only repeats the findings.
+        showHealthFindings(from: deployRunner.legs.first?.runner)
 
         return MultiDestinationDeployRunner.result(
             course: course.code,

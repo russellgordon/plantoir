@@ -104,6 +104,19 @@ struct CourseSettingsView: View {
 
                 Section {
                     MembershipToggleListView(
+                        title: "Folders whose work counts for marks",
+                        allItems: gradedFolderChoices,
+                        members: gradedFoldersBinding
+                    )
+                    Text("The curriculum map uses this to show which expectations you have actually evaluated. Most courses keep “Tasks”; add “Tests” or anything else you mark, and remove what you don’t.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    FormSectionHeader("Marks")
+                }
+
+                Section {
+                    MembershipToggleListView(
                         title: "Hide from the site's sidebar",
                         allItems: configuration.allSidebarItems,
                         members: $configuration.hiddenItems
@@ -230,5 +243,52 @@ struct CourseSettingsView: View {
             saveProblem = "Could not save: \(error.localizedDescription)"
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
         }
+    }
+
+    // MARK: - Computed properties
+
+    /// Every folder that could hold work counting for marks — shared and
+    /// per-section alike, because assessed work lives in both.
+    var gradedFolderChoices: [String] {
+        var choices: [String] = []
+        for folder in course.configuration.sharedFolders {
+            if !choices.contains(folder) {
+                choices.append(folder)
+            }
+        }
+        for folder in course.configuration.perSectionFolders {
+            if !choices.contains(folder) {
+                choices.append(folder)
+            }
+        }
+        return choices
+    }
+
+    /// The pool, shown as ticks.
+    ///
+    /// When the course has never been asked (`gradedFolders` is nil), the
+    /// folders the build currently counts are shown ticked — the historical
+    /// rule, any folder whose name mentions tasks — so what a teacher sees is
+    /// what is actually happening rather than a blank list. Nothing is written
+    /// until they change something, and the moment they do, the answer becomes
+    /// explicit and the historical rule stops applying to this course.
+    var gradedFoldersBinding: Binding<[String]> {
+        return Binding(
+            get: {
+                if let chosen = course.configuration.gradedFolders {
+                    return chosen
+                }
+                var counted: [String] = []
+                for folder in gradedFolderChoices {
+                    if folder.lowercased().contains("task") {
+                        counted.append(folder)
+                    }
+                }
+                return counted
+            },
+            set: { newValue in
+                course.configuration.gradedFolders = newValue
+            }
+        )
     }
 }

@@ -356,6 +356,35 @@ class CourseConfiguration {
         set { values["per_section_files"] = newValue }
     }
 
+    /// The folders whose contents count for marks — what makes an expectation
+    /// "assessed" on the Curriculum Coverage map.
+    ///
+    /// **Nil is not empty**, and that distinction is the whole migration.
+    /// Nil means the teacher has never been asked, so the build applies the
+    /// historical rule (any folder whose name contains "task") and every course
+    /// made before this existed keeps exactly the marks it had. `[]` means they
+    /// were asked and cleared it, which is a real answer.
+    ///
+    /// Seeding an existing course with ["Tasks"] would NOT have been safe: the
+    /// exact-name rule is narrower than the substring one, and the skeletons
+    /// ship a family whose folder is "Thinking Tasks" — counted by the old rule,
+    /// not by that pool. See `contracts/shared-rules.json` → `gradedFolders`.
+    var gradedFolders: [String]? {
+        get {
+            guard values["graded_folders"] != nil else {
+                return nil
+            }
+            return stringListValue(forKey: "graded_folders")
+        }
+        set {
+            if let newValue {
+                values["graded_folders"] = newValue
+            } else {
+                values.removeValue(forKey: "graded_folders")
+            }
+        }
+    }
+
     var hiddenItems: [String] {
         get { return stringListValue(forKey: "hidden") }
         set { values["hidden"] = newValue }

@@ -147,6 +147,15 @@ class ScriptRunner {
         }
         lastExitCode = nil
         launchProblem = nil
+        // Every run answers for itself. This runner is `@State` on the section
+        // window and is reused for every preview in it, so keeping findings
+        // across runs meant a teacher who fixed the problem in Obsidian and
+        // previewed again was shown the SAME dialog — the nagging this whole
+        // feature is supposed to avoid, produced by the feature itself. It
+        // also made a genuinely repeated finding indistinguishable from a
+        // stale one.
+        healthFindings = []
+        pendingHealthLine = ""
         wasCancelled = false
         wasStoppedByUser = false
         isBetweenPhases = false
@@ -516,8 +525,33 @@ class ScriptRunner {
     /// 8,000-character window by the time anybody asks.
     private(set) var healthFindings: [SiteHealthFinding] = []
 
+    /// Whatever arrived after the last newline, kept until the rest of the
+    /// line turns up.
+    ///
+    /// Output arrives in PTY-sized chunks, not lines — which is why
+    /// `TranscriptBuilder` keeps a `currentLine` at all. The health payload is
+    /// the LONGEST line a build prints, so it is the likeliest of all to
+    /// straddle a read boundary; without this, a split marker line failed both
+    /// the prefix test and the JSON parse and was dropped silently, and the
+    /// finding never reached the dialog, the assistant, or the trail.
+    private var pendingHealthLine: String = ""
+
     private func collectHealthFindings(in text: String) {
-        for finding in SiteHealthFinding.findings(in: text) {
+        let combined: String = pendingHealthLine + text
+        var completeLines: [String] = []
+        var carried: String = ""
+        var isFirst: Bool = true
+        for piece in combined.components(separatedBy: "\n") {
+            if !isFirst {
+                completeLines.append(carried)
+            }
+            carried = piece
+            isFirst = false
+        }
+        // `carried` is now whatever followed the final newline — an unfinished
+        // line, unless the chunk happened to end on one.
+        pendingHealthLine = carried
+        for finding in SiteHealthFinding.findings(in: completeLines.joined(separator: "\n")) {
             if healthFindings.contains(finding) {
                 continue
             }

@@ -158,7 +158,7 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
 
         ScheduledDeploy.recordFolderProblems(section: (
             courseDirectory: URL(fileURLWithPath: "/tmp"), courseCode: "ICS3U", sectionNumber: 1
-        ))
+        ), fromByteOffset: 0)
 
         let first: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
             courseCode: "ICS3U", sectionNumber: 1
@@ -188,13 +188,21 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
         let section = (courseDirectory: URL(fileURLWithPath: "/tmp"),
                        courseCode: "ICS3U", sectionNumber: 1)
 
-        try (markerLine("mediaFolderMissing") + "\n")
-            .write(to: log, atomically: true, encoding: .utf8)
-        ScheduledDeploy.recordFolderProblems(section: section)
+        let firstNight: String = markerLine("mediaFolderMissing") + "\n"
+        try firstNight.write(to: log, atomically: true, encoding: .utf8)
+        ScheduledDeploy.recordFolderProblems(section: section, fromByteOffset: 0)
 
-        // The next night's run is clean.
-        try "Deploy complete\n".write(to: log, atomically: true, encoding: .utf8)
-        ScheduledDeploy.recordFolderProblems(section: section)
+        // The next night's run is clean — and launchd APPENDS to this log, it
+        // never truncates it, so the first night's marker line is still in the
+        // file. An earlier version of this test wrote the file fresh, which is
+        // not what happens on a real machine, and it hid the bug completely:
+        // the whole log was being re-read every night, so a problem the teacher
+        // had fixed went on being reported forever.
+        let sizeBeforeSecondRun: UInt64 = UInt64(firstNight.utf8.count)
+        try (firstNight + "Deploy complete\n").write(to: log, atomically: true, encoding: .utf8)
+        ScheduledDeploy.recordFolderProblems(
+            section: section, fromByteOffset: sizeBeforeSecondRun
+        )
 
         XCTAssertTrue(
             ScheduledDeploy.takeFolderProblems(courseCode: "ICS3U", sectionNumber: 1).isEmpty,

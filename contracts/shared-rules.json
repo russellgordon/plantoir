@@ -424,6 +424,31 @@
       }
     ]
   },
+  "gradedFolders": {
+    "note": "Which folders hold work that COUNTS FOR MARKS. An expectation is \"assessed\" \u2014 the ring on a cell in the Curriculum Coverage map, and Ontario's requirement that every overall expectation be evaluated at least once \u2014 when a page addressing it lives in one of these. It used to be hardcoded: any folder whose name CONTAINED \"task\". A teacher who called theirs \"Tests\", or renamed \"Tasks\", silently lost every assessed mark on the map with nothing said.",
+    "absentIsNotEmpty": {
+      "rule": "An ABSENT `graded_folders` key means the teacher has never been asked, and the HISTORICAL rule applies: any folder segment containing \"task\", case-insensitive. An EMPTY list means they were asked and cleared it, which is a real answer and is honoured.",
+      "why": "This is the whole migration, and conflating the two breaks courses both ways. The exact-name rule is NARROWER than the substring one \u2014 `support/skeletons` ships a family whose folder is \"Thinking Tasks\", which the old rule counted and a pool of [\"Tasks\"] does not \u2014 so seeding every existing course with [\"Tasks\"] would have quietly taken the assessed marks off that course's map. Nothing is written back from a build either: the apps serialise course_config.json wholesale from their own in-memory copy, so a key a build wrote is dropped the next time a teacher saves anything in Settings."
+    },
+    "matching": {
+      "rule": "A FOLDER segment \u2014 never the file name \u2014 equals a pooled name, case-insensitively, at ANY depth.",
+      "why": "At any depth so a teacher who files by unit inside `Tasks` does not lose credit. Never the file name, because a page is not assessed work on account of what it is called."
+    },
+    "cases": [
+      { "name": "not configured: the historical substring rule", "configured": false, "graded": [], "path": "Tasks/Culminating.md", "expect": true },
+      { "name": "not configured: a folder that merely contains the word", "configured": false, "graded": [], "path": "Thinking Tasks/Problem 3.md", "expect": true,
+        "why": "Ships in a skeleton family. The old rule counted it, so an existing course must keep counting it." },
+      { "name": "not configured: nothing task-ish", "configured": false, "graded": [], "path": "Concepts/Loops.md", "expect": false },
+      { "name": "configured: an exact pooled name", "configured": true, "graded": ["Tasks", "Tests"], "path": "Tests/Unit 1 Quiz.md", "expect": true },
+      { "name": "configured: nested inside a pooled folder", "configured": true, "graded": ["Tasks"], "path": "Tasks/Unit 1/Quiz.md", "expect": true },
+      { "name": "configured: a near miss is NOT a member", "configured": true, "graded": ["Tasks"], "path": "Thinking Tasks/Problem 3.md", "expect": false,
+        "why": "Once a teacher has chosen the list, it means what it says. This is the case that makes seeding an existing course with [\"Tasks\"] unsafe." },
+      { "name": "configured: the teacher removed Tasks", "configured": true, "graded": ["Tests"], "path": "Tasks/Old Assignment.md", "expect": false,
+        "why": "Removing a folder from the pool is the point of the feature." },
+      { "name": "configured: cleared deliberately", "configured": true, "graded": [], "path": "Tasks/Culminating.md", "expect": false },
+      { "name": "the file name never counts", "configured": true, "graded": ["Tasks"], "path": "Concepts/Tasks.md", "expect": false }
+    ]
+  },
   "problemReportDialog": {
     "askAboutPromptsWhen": [
       {
@@ -714,6 +739,7 @@
     "scheduledDeployPublishesAnyway": "A scheduled deploy NEVER refuses on a health finding. A slightly inaccurate curriculum map is a paper cut; a site update a teacher was counting on that silently did not happen is not. The finding is recorded and surfaced afterwards instead.",
     "marker": {
       "prefix": "PLANTOIR_HEALTH:",
+      "examples": ["PLANTOIR_HEALTH: {\"name\": \"curriculumCoverageFoundNothing\", \"sentence\": \"The curriculum map for ICS3U Section 1 could not be built.\", \"detail\": \"Plantoir looks for a folder whose name mentions the curriculum, holding one page per expectation. It could not find one, so the Curriculum Coverage page has been left out of this build. If you renamed or moved that folder, the map will come back as soon as it can find it again.\", \"fixable\": false, \"course\": \"ICS3U\", \"section\": 1}", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}"],
       "rule": "One line per finding on stdout, the prefix followed by a single-line JSON object carrying name, sentence, detail, fixable, course and section. The apps parse these lines out of the console transcript they are already reading; the teacher-facing SENTENCE travels in the line rather than being re-authored on each platform, so the two apps cannot word the same problem differently.",
       "why": "A progress marker is matched loosely and getting one wrong is silent (see app-rules.json markerOrigins). A prefixed JSON line is unambiguous, survives being interleaved with ordinary build output, and carries structure a sentence cannot."
     },

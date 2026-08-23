@@ -66,6 +66,32 @@ final class SiteHealthContractTests: XCTestCase {
         }
     }
 
+    /// Parses lines the TOOLCHAIN actually printed.
+    ///
+    /// The round-trip test above builds its own JSON, so it proves the app can
+    /// read the app — it would not catch `section` emitted as a string, a
+    /// renamed key, or a changed separator. These examples are captured from
+    /// `site_health.announce` and re-checked against it by
+    /// `scripts/test_site_health.py`, so the two halves cannot drift apart
+    /// without one of the two suites failing.
+    func testRealToolchainOutputIsUnderstood() throws {
+        let marker: [String: Any] = try XCTUnwrap(siteHealth["marker"] as? [String: Any])
+        let examples: [String] = try XCTUnwrap(marker["examples"] as? [String])
+        XCTAssertFalse(examples.isEmpty, "the contract carries no example output")
+
+        for example in examples {
+            let found: [SiteHealthFinding] = SiteHealthFinding.findings(in: example)
+            XCTAssertEqual(found.count, 1, example)
+            let finding: SiteHealthFinding = try XCTUnwrap(found.first)
+            XCTAssertFalse(finding.name.isEmpty)
+            XCTAssertFalse(finding.sentence.isEmpty)
+            XCTAssertFalse(finding.detail.isEmpty, "the dialog shows the detail too")
+            XCTAssertEqual(finding.course, "ICS3U")
+            XCTAssertEqual(finding.section, 1,
+                           "section must arrive as a number, not fall back to 0")
+        }
+    }
+
     /// Rule 1: the interface never names the machinery. These sentences are
     /// shown to a teacher verbatim — in a dialog, and in the assistant's
     /// answer — so a stray "container" or "script" would reach them directly.

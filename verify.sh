@@ -181,6 +181,18 @@ else
   fi
 fi
 
+# ---- build_site.py: which folders count for marks ----
+echo ""
+echo "🔎 Checking build_site.py's graded-folder rule against the shared contract…"
+if docker run --rm \
+  -v "$(pwd)/scripts/test_graded_folders.py:/opt/scripts/test_graded_folders.py:ro" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_graded_folders.py >/tmp/verify_graded_test.log 2>&1; then
+  pass "build_site.py: graded-folder rule matches contracts/shared-rules.json (scripts/test_graded_folders.py)"
+else
+  fail "build_site.py: graded-folder rule matches contracts/shared-rules.json (scripts/test_graded_folders.py)"
+  cat /tmp/verify_graded_test.log
+fi
+
 # ---- build_site.py: the class-folder rule, against the SHARED contract ----
 # Same reason as the domain test below: build_site.py imports `frontmatter`,
 # which lives only inside the container. This one ALSO needs the contract, and

@@ -158,6 +158,54 @@ class SiteHealthTests(unittest.TestCase):
             self.assertTrue(item.fixable, item.name)
 
 
+class TheContractsExampleLinesAreRealOutput(unittest.TestCase):
+    """
+    The contract carries EXAMPLE marker lines, and the apps parse those to prove
+    they can read what this module writes.
+
+    That only means anything if the examples are what the module still produces.
+    An adversarial review pointed out that the Swift test was round-tripping a
+    dictionary Swift had built ITSELF — so a change here (section emitted as a
+    string, a renamed key, a different separator) would have gone unnoticed on
+    both platforms while findings silently stopped being read.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        repo_contracts = Path(__file__).resolve().parent.parent / "contracts"
+        if repo_contracts.is_dir():
+            toolchain_paths.CONTRACTS_DIR = repo_contracts
+        contracts.reset_cache()
+
+    def test_the_examples_match_what_this_module_emits(self):
+        facts = {"coverage_wanted": True, "curriculum_found": False,
+                 "class_pages_found": True, "media_target_exists": False,
+                 "section_index_exists": True, "hand_written_coverage_page": False}
+        lines = []
+        site_health.announce(site_health.findings(facts, "ICS3U", 1), printer=lines.append)
+        emitted = [line for line in lines if line.startswith(site_health.marker_prefix())]
+
+        examples = contracts.section("shared-rules", "siteHealth", "marker", "examples")
+        self.assertEqual(
+            emitted, examples,
+            "the marker lines this module writes no longer match the examples in "
+            "the contract that the apps are tested against. Regenerate the "
+            "examples deliberately — the apps parse them to prove they can read "
+            "real output."
+        )
+
+    def test_an_example_carries_the_types_the_apps_expect(self):
+        """`section` in particular: the apps read it as a number."""
+        for line in contracts.section("shared-rules", "siteHealth", "marker", "examples"):
+            payload = json.loads(line[len(site_health.marker_prefix()):].strip())
+            self.assertIsInstance(payload["name"], str)
+            self.assertIsInstance(payload["sentence"], str)
+            self.assertIsInstance(payload["detail"], str)
+            self.assertIsInstance(payload["fixable"], bool)
+            self.assertIsInstance(payload["course"], str)
+            self.assertIsInstance(payload["section"], int)
+
+
 class MarkerLineTests(unittest.TestCase):
 
     @classmethod

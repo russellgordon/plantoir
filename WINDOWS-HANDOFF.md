@@ -2844,6 +2844,20 @@ too: the record is CONSUMED when read, so a problem is reported once rather than
 every time the app opens; and a CLEAN run clears it, so a problem the teacher has
 put right stops being reported.
 
+**That second property is harder than it looks, and this section claimed it
+before it was true.** launchd opens the scheduled log with O_APPEND and nothing
+rotates or truncates it, so reading the whole file re-finds LAST week's marker
+lines every night: the sentinel is rewritten with stale findings forever, and the
+"nothing wrong this time" branch becomes unreachable the moment a single problem
+has ever been logged. A teacher who fixed the folder would have been told about
+it every morning until somebody deleted the log.
+
+The mac now records the log's SIZE before the run and reads only from that offset
+afterwards. If your task runner captures output per run you may not have this
+problem at all — but check rather than assume. And note how it got through: the
+test that was supposed to cover it faked the append by rewriting the file, so it
+passed against broken code.
+
 One platform difference worth knowing: the mac reads the findings back out of the
 scheduled run's LOG FILE rather than from a pipe, because `runScheduled`
 deliberately does not capture the child's output — launchd points stdout at that

@@ -627,10 +627,16 @@ enum ScheduledDeploy {
         // overnight publish is running did not go out, and stamping the
         // finishing state would mark it published.
         var fingerprintBeforeRunning: String?
+        var logSizeBeforeRunning: UInt64 = 0
         if let section {
             fingerprintBeforeRunning = SectionPublishState.fingerprint(
                 courseDirectory: section.courseDirectory,
                 sectionNumber: section.sectionNumber
+            )
+            // launchd APPENDS to this log and nothing truncates it, so where it
+            // ends now is where this run's own output begins.
+            logSizeBeforeRunning = logSize(
+                courseCode: section.courseCode, sectionNumber: section.sectionNumber
             )
         }
 
@@ -643,7 +649,7 @@ enum ScheduledDeploy {
             recordScheduledPublish(section: section, fingerprint: fingerprintBeforeRunning)
             // Publishes regardless; the findings are kept for somebody to read
             // when they are next at the machine.
-            recordFolderProblems(section: section)
+            recordFolderProblems(section: section, fromByteOffset: logSizeBeforeRunning)
             exit(process.terminationStatus)
         } catch {
             FileHandle.standardError.write(Data(
@@ -693,7 +699,8 @@ enum ScheduledDeploy {
     /// inherits them — and an unread pipe is exactly what wedged the Windows
     /// assistant's server, so this reads the file launchd already wrote.
     nonisolated static func recordFolderProblems(
-        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
+        fromByteOffset offset: UInt64
     ) {
         guard let section else {
             return
@@ -701,7 +708,7 @@ enum ScheduledDeploy {
         let log: URL = logURL(
             courseCode: section.courseCode, sectionNumber: section.sectionNumber
         )
-        guard let text = try? String(contentsOf: log, encoding: .utf8) else {
+        guard let text = textOfLog(at: log, fromByteOffset: offset) else {
             return
         }
         var markerLines: [String] = []
@@ -724,6 +731,35 @@ enum ScheduledDeploy {
             at: sentinel.deletingLastPathComponent(), withIntermediateDirectories: true
         )
         try? markerLines.joined(separator: "\n").write(to: sentinel, atomically: true, encoding: .utf8)
+    }
+
+    /// How big the log is right now.
+    ///
+    /// Taken BEFORE the run so that afterwards only THIS run's output is read.
+    /// launchd opens `StandardOutPath` with O_APPEND and nothing rotates or
+    /// truncates it, so the file still holds every previous night's output —
+    /// reading the whole thing meant last week's findings were rewritten into
+    /// the sentinel every night, and the "nothing wrong this time" branch
+    /// became unreachable the moment a single problem had ever been logged. A
+    /// teacher who fixed the folder would have gone on being told about it
+    /// forever.
+    nonisolated static func logSize(courseCode: String, sectionNumber: Int) -> UInt64 {
+        let log: URL = logURL(courseCode: courseCode, sectionNumber: sectionNumber)
+        let attributes = try? FileManager.default.attributesOfItem(atPath: log.path)
+        return (attributes?[.size] as? UInt64) ?? 0
+    }
+
+    /// The log from `offset` onward, or the whole file when it is SHORTER than
+    /// the offset — which means somebody rotated or deleted it mid-run, and
+    /// reading from a stale offset would return nothing at all.
+    nonisolated static func textOfLog(at log: URL, fromByteOffset offset: UInt64) -> String? {
+        guard let data = try? Data(contentsOf: log) else {
+            return nil
+        }
+        if offset == 0 || UInt64(data.count) < offset {
+            return String(data: data, encoding: .utf8)
+        }
+        return String(data: data.suffix(from: Int(offset)), encoding: .utf8)
     }
 
     /// What the last scheduled run found, if anything, consuming the record so

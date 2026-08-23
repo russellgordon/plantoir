@@ -3628,6 +3628,72 @@ def class_folder_names(config: dict) -> list:
     return [class_folder_name(config)]
 
 
+GRADED_FOLDERS_KEY = "graded_folders"
+
+
+def graded_folder_names(config: dict):
+    """
+    Which folders hold work that COUNTS FOR MARKS, and whether the teacher has
+    said so explicitly.
+
+    Returns `(names, was_configured)`. An expectation is "assessed" — the ring
+    on a cell in the Curriculum Coverage map, and Ontario's requirement that
+    every overall expectation be evaluated at least once — when a page that
+    addresses it lives in one of these.
+
+    **An ABSENT key is not an empty list, and the difference is the whole
+    migration.** Absent means the teacher has never been asked, so the historical
+    rule applies: any folder whose name CONTAINS "task". Every course made
+    before this key existed keeps exactly the marks it had. An empty list means
+    the teacher was asked and cleared it, which is a real answer and is left
+    alone.
+
+    Why that matters concretely: the exact-name rule is NARROWER than the
+    substring one. `support/skeletons` ships a family whose folder is called
+    "Thinking Tasks", which the old rule counted and a pool of ["Tasks"] would
+    not — so seeding every course with ["Tasks"] would have silently taken the
+    assessed marks off that course's map. Nothing is written back to the config
+    here either: the apps serialise `course_config.json` wholesale from their
+    own in-memory copy, so a key written by a build is dropped the next time a
+    teacher saves anything in Settings.
+
+    Pinned by contracts/shared-rules.json -> gradedFolders.
+    """
+    if GRADED_FOLDERS_KEY not in config:
+        return [], False
+    names = []
+    for folder in config.get(GRADED_FOLDERS_KEY) or []:
+        if folder:
+            names.append(str(folder))
+    return names, True
+
+
+def _is_graded_path(relative_path, graded_folders, was_configured: bool) -> bool:
+    """
+    Whether a page — given RELATIVE to the content root — is work that counts
+    for marks.
+
+    Configured: one of its FOLDER segments equals a pooled name, case
+    insensitively, at any depth, so `Tasks/Unit 1/Quiz.md` counts.
+    Not configured: the historical rule, any folder segment CONTAINING "task".
+
+    Folder segments only, never the file name — a page is not assessed work
+    because of what it is called.
+    """
+    segments = [piece for piece in re.split(r"[\\/]", str(relative_path)) if piece]
+    folders = segments[:-1]
+    if not was_configured:
+        for segment in folders:
+            if "task" in segment.lower():
+                return True
+        return False
+    wanted = {str(name).lower() for name in graded_folders}
+    for segment in folders:
+        if segment.lower() in wanted:
+            return True
+    return False
+
+
 def _is_class_page_path(relative_path, class_folders) -> bool:
     """
     Whether a page — given by its path RELATIVE to the content root — is one of
@@ -3740,7 +3806,8 @@ def _pages_the_course_teaches(content_root: Path, class_folders: list) -> set | 
 
 
 def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
-                     class_folders: list):
+                     class_folders: list, graded_folders: list,
+                     graded_was_configured: bool):
     """
     How many pages address each expectation, and which of those are assessed.
 
@@ -3789,7 +3856,7 @@ def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
         relative = page.relative_to(content_root)
         # A page in a Tasks folder is assessed work — that is what makes an
         # overall expectation "evaluated" rather than merely "addressed".
-        is_assessed = any("task" in part.lower() for part in relative.parts[:-1])
+        is_assessed = _is_graded_path(relative, graded_folders, graded_was_configured)
 
         targets = set()
         for link in TRANSCLUSION.finditer(text):
@@ -3840,6 +3907,8 @@ def _coverage_cell(code: str, page: Path, content_root: Path, count: int, assess
 def build_curriculum_coverage(content_root: Path, course_code: str,
                              include_notes: bool = True,
                              class_folders: list = None,
+                             graded_folders: list = None,
+                             graded_was_configured: bool = False,
                              first_class_stamp: str | None = None) -> bool:
     """
     Write the Curriculum Coverage page. Returns True when one was written.
@@ -3870,7 +3939,8 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
             "name is the teacher's to choose."
         )
     covered_by, assessed_by = _coverage_counts(content_root, curriculum_dir, specific,
-                                               class_folders)
+                                               class_folders, graded_folders or [],
+                                               graded_was_configured)
     folder = curriculum_dir.name
 
     strands = {}
@@ -4340,6 +4410,7 @@ def build_section_site(
     # recorded when the build happens; what would NOT be acceptable is claiming
     # otherwise, which an earlier version of this comment did.
     class_folders_here = class_folder_names(config)
+    graded_folders_here, graded_was_configured_here = graded_folder_names(config)
     coverage_wanted = resolve_include_curriculum_coverage(config, section_number)
     curriculum_dir_here = _find_curriculum_folder(content_root)
 
@@ -4375,6 +4446,8 @@ def build_section_site(
         if build_curriculum_coverage(
                 content_root, course_code,
                 class_folders=class_folders_here,
+                graded_folders=graded_folders_here,
+                graded_was_configured=graded_was_configured_here,
                 include_notes=bool(config.get("include_coverage_notes", True)),
                 first_class_stamp=first_class_stamp):
             link_coverage_from_key_links(content_root)
