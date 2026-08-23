@@ -380,6 +380,18 @@ public sealed partial class SectionDetailView : UserControl
     public void StartDeployForAutomation() => Deploy_Click(this, new RoutedEventArgs());
 
     /// <summary>
+    /// The assistant's entry point: the same path as the Deploy button, but
+    /// AWAITS the real outcome instead of returning the moment the click was
+    /// dispatched. Returns <see cref="DeployAsync"/>'s own return value
+    /// directly — deliberately NOT correlated through a shared field, so a
+    /// second call in flight at the same time (the busy branch in
+    /// <c>AssistAgent.RunTool</c> fires one of these even while a deploy is
+    /// already running, to nudge the app forward) gets its OWN outcome and
+    /// can never steal or orphan another caller's pending await.
+    /// </summary>
+    public Task<string?> StartDeployForAutomationAsync() => DeployAsync();
+
+    /// <summary>
     /// Refuse to start a build while the assistant is running one.
     ///
     /// Checked at the CLICK, not just when the buttons were last drawn: a
@@ -645,8 +657,26 @@ public sealed partial class SectionDetailView : UserControl
 
     // ---- Deploy ----------------------------------------------------------
 
-    private async void Deploy_Click(object sender, RoutedEventArgs e)
+    private async void Deploy_Click(object sender, RoutedEventArgs e) => await DeployAsync();
+
+    /// <summary>
+    /// The whole Deploy flow, returning the sentence that describes what
+    /// actually happened. Every CALL gets its own return value — nothing is
+    /// shared across concurrent invocations — so <see cref="Deploy_Click"/>
+    /// (fire-and-forget, for the button and for the assistant's mere
+    /// "bring it forward" nudge) and
+    /// <see cref="StartDeployForAutomationAsync"/> (awaited for the real
+    /// outcome) can safely both be in flight at once without one starving
+    /// or stealing the other's answer.
+    /// </summary>
+    private async Task<string?> DeployAsync()
     {
+        // Overwritten only on the path that actually calls RunAsync and
+        // gets a real outcome back — every early return and the catch block
+        // below leave this as "did not finish", which is true of all of
+        // them: refused, already deploying, the assistant is building, or
+        // an exception before the deploy started.
+        string? outcomeMessage = AssistWording.DeployDidNotFinish(_course.Code, _sectionNumber.ToString());
         try
         {
             // _isPreparingDeploy closes a real window, not just a display
@@ -655,9 +685,9 @@ public sealed partial class SectionDetailView : UserControl
             // sweep) — a second click there would race its own
             // stop-preview-then-deploy sequence against the first's
             // (row 318a).
-            if (_deployRunner.IsRunning || _isPreparingDeploy) return;
-            if (await TheAssistantIsBuilding()) return;
-            if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+            if (_deployRunner.IsRunning || _isPreparingDeploy) return outcomeMessage;
+            if (await TheAssistantIsBuilding()) return outcomeMessage;
+            if (_window.Workspace.WorkspacePath is not { } workspacePath) return outcomeMessage;
 
             var destinations = _course.Configuration.AllDeployDestinations;
             string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
@@ -675,7 +705,7 @@ public sealed partial class SectionDetailView : UserControl
                     CloseButtonText = "OK",
                 };
                 await ShowDialogSafelyAsync(problemDialog);
-                return;
+                return outcomeMessage;
             }
 
             // Claim the console for the deploy panel BEFORE touching the
@@ -704,11 +734,11 @@ public sealed partial class SectionDetailView : UserControl
 
             // Said AFTER the stop, as on the mac: a deploy that began while
             // we were waiting is the one thing that still stands in the way.
-            if (_deployRunner.IsRunning) return;
+            if (_deployRunner.IsRunning) return outcomeMessage;
             // The stop can take up to ~20 s, and the leases came off with the
             // preview — long enough for the assistant to begin a build of its
             // own. The click-time answer is stale; ask again.
-            if (await TheAssistantIsBuilding()) return;
+            if (await TheAssistantIsBuilding()) return outcomeMessage;
 
             bool needsBuild = BuildFreshness.NeedsRebuild(_course, _sectionNumber);
 
@@ -742,6 +772,12 @@ public sealed partial class SectionDetailView : UserControl
             // this behaves exactly as a single deploy always did.
             await _deployRunner.RunAsync(_course, _sectionNumber, destinations, cloudflareAccount,
                 workspacePath, needsBuild);
+            // The single place that decides which sentence a teacher (or the
+            // assistant, relaying it) hears — success, all-destinations,
+            // partial, or every-destination-failed — from what actually
+            // happened, not from having reached this line.
+            outcomeMessage = MultiDestinationDeployRunner.Result(
+                _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome).Message;
             EndPublishActivity();
         }
         catch (Exception ex)
@@ -765,6 +801,7 @@ public sealed partial class SectionDetailView : UserControl
                 RefreshChrome();
             }
         }
+        return outcomeMessage;
     }
 
     private void EndPublishActivity()

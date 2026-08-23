@@ -341,7 +341,8 @@ public sealed partial class AssistWindow : Window
             StartDeployInApp = () => _main?.DeployFor(_course.Code, _section),
             StartDeployInAppAsync = async () =>
             {
-                if (_main is not null) await _main.DeployForAsync(_course.Code, _section);
+                if (_main is null) return null;
+                return await _main.DeployForAsync(_course.Code, _section);
             },
             StopPreviewInApp = () => _main?.StopPreviewFor(_course.Code, _section),
             StopPreviewInAppAsync = async () =>

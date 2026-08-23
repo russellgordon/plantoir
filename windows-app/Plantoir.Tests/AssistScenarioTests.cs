@@ -176,6 +176,84 @@ public class AssistScenarioTests
         }
     }
 
+    // ---- StartDeployInAppAsync: the assistant must say the REAL outcome ---
+    //
+    // WINDOWS-HANDOFF.md / TODO.md item: DeployForAsync used to resolve the
+    // instant the click was dispatched, so RunTool always answered with the
+    // unconditional AssistWording.Deployed — success or not. These wire the
+    // production seam itself (StartDeployInAppAsync), not a stand-in for it,
+    // the gap AssistScenarioTests.cs:80 left: that fixture only ever sets
+    // the SYNC StartDeployInApp, so it never exercised this delegate at all.
+
+    [Fact]
+    public async Task DeploySection_SucceedsWhenAsyncSeamReportsSuccess()
+    {
+        var events = new List<string>();
+        var agent = new AssistAgent(new ScriptedModel(), new RecordingTools(events), new JsonArray(), "VVH2O", 1)
+        {
+            SectionIsBusy = () => false,
+            PreviewIsShowing = () => false,
+            StartDeployInAppAsync = () => Task.FromResult<string?>(AssistWording.Deployed("VVH2O", "1")),
+        };
+
+        var call = new JsonObject
+        {
+            ["id"] = "call-1",
+            ["function"] = new JsonObject { ["name"] = "deploy_section", ["arguments"] = "{}" },
+        };
+        var answer = await agent.RunTool(call, new List<AssistAgent.Line>(), CancellationToken.None);
+
+        Assert.Equal(AssistWording.Deployed("VVH2O", "1"), answer.Summary);
+    }
+
+    [Fact]
+    public async Task DeploySection_ReportsFailureWhenAsyncSeamReportsFailure()
+    {
+        var events = new List<string>();
+        var agent = new AssistAgent(new ScriptedModel(), new RecordingTools(events), new JsonArray(), "VVH2O", 1)
+        {
+            SectionIsBusy = () => false,
+            PreviewIsShowing = () => false,
+            // The deploy actually ran and failed — the outcome the old,
+            // unconditional wording could never produce.
+            StartDeployInAppAsync = () => Task.FromResult<string?>(AssistWording.DeployDidNotFinish("VVH2O", "1")),
+        };
+
+        var call = new JsonObject
+        {
+            ["id"] = "call-1",
+            ["function"] = new JsonObject { ["name"] = "deploy_section", ["arguments"] = "{}" },
+        };
+        var answer = await agent.RunTool(call, new List<AssistAgent.Line>(), CancellationToken.None);
+
+        Assert.Equal(AssistWording.DeployDidNotFinish("VVH2O", "1"), answer.Summary);
+        Assert.DoesNotContain("is deployed", answer.Summary);
+    }
+
+    [Fact]
+    public async Task DeploySection_FallsBackToDidNotFinishWhenAsyncSeamReturnsNull()
+    {
+        // Null means "the deploy never actually ran" (refused, already
+        // busy, an exception before it started) — the fallback must never
+        // be the success wording, which is exactly the bug being closed.
+        var events = new List<string>();
+        var agent = new AssistAgent(new ScriptedModel(), new RecordingTools(events), new JsonArray(), "VVH2O", 1)
+        {
+            SectionIsBusy = () => false,
+            PreviewIsShowing = () => false,
+            StartDeployInAppAsync = () => Task.FromResult<string?>(null),
+        };
+
+        var call = new JsonObject
+        {
+            ["id"] = "call-1",
+            ["function"] = new JsonObject { ["name"] = "deploy_section", ["arguments"] = "{}" },
+        };
+        var answer = await agent.RunTool(call, new List<AssistAgent.Line>(), CancellationToken.None);
+
+        Assert.Equal(AssistWording.DeployDidNotFinish("VVH2O", "1"), answer.Summary);
+    }
+
     private static string ResolveWordingKey(string key, string course, int section)
     {
         return key switch
