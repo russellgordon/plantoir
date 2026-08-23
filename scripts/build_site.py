@@ -3584,7 +3584,7 @@ def _is_draft(text: str) -> bool:
 
 def class_folder_name(config: dict) -> str:
     """
-    Which folder holds a section's class pages.
+    WHERE A NEW CLASS PAGE IS WRITTEN.
 
     Read from the course's own configured `per_section_folders`, never guessed
     from what is on disk: the first entry whose name contains "class"
@@ -3593,50 +3593,79 @@ def class_folder_name(config: dict) -> str:
     teacher chose — it is NOT safe against arbitrary paths, which is what
     `_is_class_page_path` below is careful about.
 
-    Pinned by contracts/class-planning.json -> classFolder.naming, which the
-    two apps run against their own implementations of the same rule. This used
-    to be four rules that disagreed; see that contract's note.
+    Pinned by contracts/class-planning.json -> classFolder.naming.
     """
     folders = config.get("per_section_folders") or []
     for folder in folders:
-        if "class" in str(folder).lower():
+        if folder and "class" in str(folder).lower():
             return str(folder)
-    if folders:
+    if folders and folders[0]:
         return str(folders[0])
     return "All Classes"
 
 
-def _is_class_page_path(relative_path: Path, class_folder: str) -> bool:
+def class_folder_names(config: dict) -> list:
+    """
+    WHICH FOLDERS COUNT as holding class pages — every configured
+    per-section folder whose name mentions classes, and failing that the single
+    name `class_folder_name` chose.
+
+    Naming and membership are the same question only when a course has ONE such
+    folder. A course configured ["Class Resources", "All Classes"] would
+    otherwise resolve to "Class Resources" for both, match zero pages, and drop
+    the coverage map back to "every published page" — reintroducing the exact
+    silent failure this rule was written to close.
+
+    Pinned by contracts/class-planning.json -> classFolder.membership.
+    """
+    names = []
+    for folder in config.get("per_section_folders") or []:
+        if folder and "class" in str(folder).lower():
+            names.append(str(folder))
+    if names:
+        return names
+    return [class_folder_name(config)]
+
+
+def _is_class_page_path(relative_path, class_folders) -> bool:
     """
     Whether a page — given by its path RELATIVE to the content root — is one of
     the section's class pages.
 
-    A class page is not an `index.md`, and one of its FOLDER segments equals the
-    class folder's name, case-insensitively.
+    Not an `index.md`, and one of its FOLDER segments equals any of
+    `class_folders`, case-insensitively. Either path separator is understood,
+    because the same relative path arrives spelled either way depending on the
+    platform that produced it.
 
-    Two things this is deliberately careful about, both of which were real bugs:
+    **Relative, never absolute.** This walked `page.parts` of an ABSOLUTE path
+    — `content_root.rglob` yields absolute paths — so a teacher whose working
+    folder was `~/Documents/All Classes` made every page in every course a
+    class page. Where a teacher keeps their files is not a fact about their
+    lessons.
 
-    * **Folder segments only, never the file name.** This test used to run over
-      every segment including the file name, so "How This Class Works.md" (about
-      twenty payloads) and ADA1O's curriculum page "B3. Connections Beyond the
-      Classroom.md" counted as lessons, inflating what the course was judged to
-      teach.
-    * **Relative to the content root.** Windows tested the whole directory
-      string, so a teacher whose working folder was ``C:\\Users\\x\\Classroom``
-      made every page in every course a class page.
+    The file name is excluded as defence in depth rather than to fix an
+    observed bug: under segment EQUALITY a file name cannot collide with a
+    folder name, but a future change to prefix or substring matching must not
+    silently start counting a page because of what it is CALLED.
 
     Pinned by contracts/class-planning.json -> classFolder.isClassPage.
     """
-    if relative_path.name.lower() == "index.md":
+    if isinstance(class_folders, str):
+        class_folders = [class_folders]
+    text = str(relative_path)
+    segments = [piece for piece in re.split(r"[\\/]", text) if piece]
+    if not segments:
         return False
-    wanted = class_folder.lower()
-    for segment in relative_path.parts[:-1]:
-        if segment.lower() == wanted:
+    if segments[-1].lower() == "index.md":
+        return False
+    wanted = {str(name).lower() for name in class_folders}
+    for segment in segments[:-1]:
+        if segment.lower() in wanted:
             return True
     return False
 
 
-def _pages_the_course_teaches(content_root: Path, class_folder: str) -> set | None:
+def _pages_the_course_teaches(content_root: Path, class_folders: list) -> set | None:
     """
     The pages a student actually reaches by following the schedule.
 
@@ -3653,7 +3682,7 @@ def _pages_the_course_teaches(content_root: Path, class_folder: str) -> set | No
     """
     class_pages = {}
     for page in content_root.rglob("*.md"):
-        if _is_class_page_path(page.relative_to(content_root), class_folder):
+        if _is_class_page_path(page.relative_to(content_root), class_folders):
             class_pages[page.stem] = page
     if not class_pages:
         return None
@@ -3680,7 +3709,7 @@ def _pages_the_course_teaches(content_root: Path, class_folder: str) -> set | No
 
 
 def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
-                     class_folder: str):
+                     class_folders: list):
     """
     How many pages address each expectation, and which of those are assessed.
 
@@ -3712,7 +3741,7 @@ def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
     """
     covered_by = {code: set() for code in specific}
     assessed_by = {code: set() for code in specific}
-    taught = _pages_the_course_teaches(content_root, class_folder)
+    taught = _pages_the_course_teaches(content_root, class_folders)
     for page in sorted(content_root.rglob("*.md")):
         if taught is not None and page.stem not in taught:
             continue
@@ -3780,7 +3809,7 @@ def _coverage_cell(code: str, page: Path, content_root: Path, count: int, assess
 def build_curriculum_coverage(content_root: Path, course_code: str,
                              include_notes: bool = True,
                              first_class_stamp: str | None = None,
-                             class_folder: str = "All Classes") -> bool:
+                             class_folders: list | None = None) -> bool:
     """
     Write the Curriculum Coverage page. Returns True when one was written.
 
@@ -3798,7 +3827,7 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
         return False
 
     covered_by, assessed_by = _coverage_counts(content_root, curriculum_dir, specific,
-                                               class_folder)
+                                               class_folders or [])
     folder = curriculum_dir.name
 
     strands = {}
@@ -4266,7 +4295,7 @@ def build_section_site(
                 content_root, course_code,
                 include_notes=bool(config.get("include_coverage_notes", True)),
                 first_class_stamp=first_class_stamp,
-                class_folder=class_folder_name(config)):
+                class_folders=class_folder_names(config)):
             link_coverage_from_key_links(content_root)
     else:
         print("ℹ️ Curriculum Coverage page is switched off for this course.")

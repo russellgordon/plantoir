@@ -45,10 +45,37 @@ public static class ClassFolderRule
     /// </summary>
     public static string Name(IEnumerable<string>? perSectionFolders)
     {
-        var folders = perSectionFolders?.ToList() ?? new List<string>();
+        // A null ELEMENT is reachable: these lists come from JSON, including
+        // the contract's own case data. Swift and Python coerce; unguarded
+        // LINQ would throw a NullReferenceException here instead.
+        var folders = (perSectionFolders ?? Enumerable.Empty<string>())
+            .Where(f => !string.IsNullOrEmpty(f)).ToList();
         return folders.FirstOrDefault(f => f.Contains("class", StringComparison.OrdinalIgnoreCase))
                ?? folders.FirstOrDefault()
                ?? FallbackName;
+    }
+
+    /// <summary>
+    /// WHICH FOLDERS COUNT as holding class pages — every configured
+    /// per-section folder whose name mentions classes, and failing that the
+    /// single name <see cref="Name"/> chose.
+    ///
+    /// <para>Naming and membership are the same question only when a course has
+    /// ONE such folder. A course configured ["Class Resources", "All Classes"]
+    /// would otherwise resolve to "Class Resources" for both, match zero pages,
+    /// and drop the coverage map back to "every published page" —
+    /// reintroducing the exact silent failure this rule was written to close.
+    /// Writing goes to one folder; counting looks at all of them.</para>
+    /// </summary>
+    public static IReadOnlyList<string> Names(IEnumerable<string>? perSectionFolders)
+    {
+        var folders = (perSectionFolders ?? Enumerable.Empty<string>())
+            .Where(f => !string.IsNullOrEmpty(f)).ToList();
+        var mentioningClasses = folders
+            .Where(f => f.Contains("class", StringComparison.OrdinalIgnoreCase)).ToList();
+        return mentioningClasses.Count > 0
+            ? mentioningClasses
+            : new List<string> { Name(folders) };
     }
 
     /// <summary>
@@ -70,20 +97,25 @@ public static class ClassFolderRule
     /// lessons.</description></item>
     /// </list>
     /// </summary>
-    public static bool IsClassPage(string relativePath, string classFolder)
+    public static bool IsClassPage(string relativePath, IEnumerable<string> classFolders)
     {
         if (string.IsNullOrWhiteSpace(relativePath)) return false;
 
         var segments = relativePath.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length == 0) return false;
 
-        if (Path.GetFileName(segments[^1]).Equals("index.md", StringComparison.OrdinalIgnoreCase))
+        // The last segment is the file name — already split, so no path
+        // handling is needed or wanted here.
+        if (segments[^1].Equals("index.md", StringComparison.OrdinalIgnoreCase))
             return false;
+
+        var wanted = new HashSet<string>(
+            (classFolders ?? Enumerable.Empty<string>()).Where(f => !string.IsNullOrEmpty(f)),
+            StringComparer.OrdinalIgnoreCase);
 
         for (int i = 0; i < segments.Length - 1; i++)
         {
-            if (segments[i].Equals(classFolder, StringComparison.OrdinalIgnoreCase))
-                return true;
+            if (wanted.Contains(segments[i])) return true;
         }
         return false;
     }

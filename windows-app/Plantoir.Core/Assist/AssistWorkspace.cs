@@ -1002,7 +1002,7 @@ public sealed class AssistWorkspace
         // C:\Users\x\Classroom\ made every page in every course a class page.
         bool isClassPage = ClassFolderRule.IsClassPage(
             Relative(pagePath),
-            ClassFolderRule.Name(course.Configuration.PerSectionFolders));
+            ClassFolderRule.Names(course.Configuration.PerSectionFolders));
         return new PlannedPage(
             Title: Path.GetFileNameWithoutExtension(pagePath),
             RelativePath: Relative(pagePath),

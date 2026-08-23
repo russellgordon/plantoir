@@ -36,51 +36,90 @@ public class ClassFolderContractTests
     }
 
     [Fact]
+    public void ClassFolderMembership_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("class-planning.json");
+        var cases = doc["classFolder"]!["membership"]!["cases"]!.AsArray();
+        Assert.True(cases.Count >= 4, "the contract lost membership cases");
+
+        foreach (var c in cases)
+        {
+            if (c is null) continue;
+            var folders = c["perSectionFolders"]!.AsArray().Select(x => x!.ToString()).ToList();
+            var expected = c["expect"]!.AsArray().Select(x => x!.ToString()).ToList();
+            string name = c["name"]?.ToString() ?? "unnamed";
+
+            Assert.True(ClassFolderRule.Names(folders).SequenceEqual(expected),
+                $"{name}: expected [{string.Join(", ", expected)}], got " +
+                $"[{string.Join(", ", ClassFolderRule.Names(folders))}]");
+        }
+    }
+
+    [Fact]
     public void IsClassPage_MatchesContract()
     {
         var doc = ContractLoader.LoadJson("class-planning.json");
         var cases = doc["classFolder"]!["isClassPage"]!["cases"]!.AsArray();
-        Assert.True(cases.Count >= 9, "the contract lost isClassPage cases");
+        Assert.True(cases.Count >= 12, "the contract lost isClassPage cases");
 
         foreach (var c in cases)
         {
             if (c is null) continue;
             string path = c["path"]!.ToString();
-            string folder = c["classFolder"]!.ToString();
+            var folders = c["classFolders"]!.AsArray().Select(x => x!.ToString()).ToList();
             bool expected = c["expect"]!.GetValue<bool>();
             string name = c["name"]?.ToString() ?? "unnamed";
 
-            Assert.True(ClassFolderRule.IsClassPage(path, folder) == expected,
-                $"{name}: {path} against '{folder}' should be {expected}");
+            Assert.True(ClassFolderRule.IsClassPage(path, folders) == expected,
+                $"{name}: {path} against [{string.Join(", ", folders)}] should be {expected}");
         }
     }
 
     /// <summary>
-    /// The two bugs the rule was written to close, asserted directly as well as
-    /// through the case list — so deleting a contract case cannot quietly
-    /// delete the protection with it.
+    /// Defence in depth, and labelled as such: under segment EQUALITY these
+    /// could not match anyway. The test exists so a future change to prefix or
+    /// substring matching fails here rather than quietly reclassifying content
+    /// that ships in the example payloads.
     /// </summary>
     [Fact]
-    public void AShippedPageNamedForAClassIsNotALesson()
+    public void APageIsNeverALessonBecauseOfItsName()
     {
+        var folders = new[] { "All Classes" };
         foreach (var page in new[]
                  {
                      "Setup/How This Class Works.md",
                      "Setup/Our Classroom Norms.md",
                      "Curriculum/B3. Connections Beyond the Classroom.md",
+                     "All Classes.md",
                  })
         {
-            Assert.False(ClassFolderRule.IsClassPage(page, "All Classes"), page);
+            Assert.False(ClassFolderRule.IsClassPage(page, folders), page);
         }
     }
 
+    /// <summary>
+    /// The regression that matters most on THIS platform: Plan() used to test
+    /// the whole ABSOLUTE directory string, so a working folder called
+    /// C:\Users\x\Classroom made every page in every course a class page.
+    /// The rule is a pure segment matcher, so what protects it is Plan()
+    /// passing Relative(pagePath) — asserted here as the shape the rule expects.
+    /// </summary>
     [Fact]
-    public void AWorkingFolderNamedClassroomCannotMakeEveryPageALesson()
+    public void OnlyARelativePathIsEverAskedAbout()
     {
-        // The path handed to the rule is RELATIVE, which is what makes the
-        // teacher's own filing unable to reach it. This is the regression that
-        // matters most on this platform.
-        Assert.False(ClassFolderRule.IsClassPage(@"Concepts\Loops.md", "All Classes"));
-        Assert.True(ClassFolderRule.IsClassPage(@"All Classes\Unit 1, Day 1.md", "All Classes"));
+        var folders = new[] { "All Classes" };
+        Assert.False(ClassFolderRule.IsClassPage(@"Concepts\Loops.md", folders));
+        Assert.True(ClassFolderRule.IsClassPage(@"All Classes\Unit 1, Day 1.md", folders));
+        // A page whose ancestors mention classes, once made relative, is not a
+        // lesson — which is the whole point of passing Relative(pagePath).
+        Assert.False(ClassFolderRule.IsClassPage(@"Concepts\Recursion.md", folders));
+    }
+
+    [Fact]
+    public void ANullFolderEntryDoesNotThrow()
+    {
+        // These lists come from JSON, including the contract's own case data.
+        Assert.Equal("All Classes", ClassFolderRule.Name(new string?[] { null }!));
+        Assert.False(ClassFolderRule.IsClassPage("All Classes/x.md", new string?[] { null }!));
     }
 }

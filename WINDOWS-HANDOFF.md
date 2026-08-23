@@ -2784,7 +2784,7 @@ used to get a different answer from each of four places:
 |---|---|
 | mac `ClassPages.folderURL` | the course's CONFIGURED per-section folders, first containing "class" |
 | mac `AssistSectionGraph.isClassPage` | the page's IMMEDIATE parent contains "class" |
-| `build_site.py` | any path segment EQUALS "all classes" or "classes" — including the FILE NAME |
+| `build_site.py` | any segment of the ABSOLUTE path EQUALS "all classes" or "classes" |
 | your `AssistWorkspace.Plan` | the whole ABSOLUTE directory string contains "class" |
 
 Three of those are wrong in ways worth knowing:
@@ -2794,10 +2794,18 @@ Three of those are wrong in ways worth knowing:
   Curriculum Coverage map falls back from "pages the course teaches" to "every
   published page". The map still renders, still looks healthy, and is wrong —
   the failure this whole piece exists to close.
-- **The build's, again.** It tested the file name too. Under any substring rule
-  that makes "How This Class Works.md" a lesson — it ships in about twenty
-  payloads — along with "Our Classroom Norms.md" and ADA1O's curriculum
-  expectation page "B3. Connections Beyond the Classroom.md".
+- **The build's, again — and this is a CORRECTION to what this section said
+  first.** An earlier draft claimed the build had been counting pages by their
+  file NAME, and named "How This Class Works.md" and ADA1O's "B3. Connections
+  Beyond the Classroom.md" as pages it had miscounted. That was wrong. The old
+  rule was `part.lower() in ("all classes", "classes")` — membership in a
+  tuple, i.e. EQUALITY — so no page was ever counted for its name. The real
+  defect in the same line was different and worse: `content_root.rglob` yields
+  ABSOLUTE paths, so it walked every segment above the content root too. A
+  teacher whose working folder was `~/Documents/All Classes` made every page in
+  every course a lesson — the same bug as yours, on the other platform. The
+  file-name exclusion is kept as defence in depth for a future change to
+  substring matching, and is labelled as such rather than as a fix.
 - **Yours.** `Path.GetDirectoryName(pagePath)` is the absolute directory, so a
   teacher whose working folder is `C:\Users\x\Classroom\` makes **every page
   in every course** a class page. Where somebody keeps their files is not a fact
@@ -2806,9 +2814,17 @@ Three of those are wrong in ways worth knowing:
 
 **The one rule**, in `contracts/class-planning.json` → `classFolder`:
 
-- *naming*: the first configured per-section folder whose name CONTAINS "class"
-  (case-insensitive), else the first entry, else the literal "All Classes".
-  Substring is safe here — it is a short list the teacher chose.
+- *naming* (where a NEW page is written): the first configured per-section
+  folder whose name CONTAINS "class" (case-insensitive), else the first entry,
+  else the literal "All Classes". Substring is safe here — it is a short list
+  the teacher chose.
+- *membership* (which folders COUNT): EVERY configured per-section folder whose
+  name contains "class", falling back to the single name naming chose. Added
+  after review: naming and membership are the same question only when a course
+  has one such folder, and a course configured
+  `["Class Resources", "All Classes"]` would otherwise resolve to the first for
+  both, match zero pages, and drop the coverage map back to "every published
+  page" — reintroducing the exact silent failure the rule closes.
 - *isClassPage*: not an `index.md`, and one FOLDER segment — never the file
   name — EQUALS that folder's name, case-insensitively, with the path taken
   RELATIVE to the content root.
@@ -2826,8 +2842,17 @@ folder must not be mistaken for where its lessons live.
   method that returns a PATH, and two things with one name returning different
   kinds of answer is how the next bug gets written;
 - `AssistWorkspace.Plan` now calls
-  `ClassFolderRule.IsClassPage(Relative(pagePath), ClassFolderRule.Name(course.Configuration.PerSectionFolders))`
-  — note `Relative(...)`, which is the fix for the `Classroom` bug;
+  `ClassFolderRule.IsClassPage(Relative(pagePath), ClassFolderRule.Names(...))`
+  — note `Relative(...)`, which is the fix for the `Classroom` bug. **The rule
+  is a pure segment matcher and cannot tell an absolute path from a relative
+  one**, so `Relative(...)` is the whole protection: if you ever call
+  `IsClassPage` from somewhere else, pass a relative path or you reintroduce
+  the bug. The mac learned this the same way — its own `AssistSectionPage` had
+  to gain a `pathWithinSection` because `relativePath` is the FULL ABSOLUTE
+  PATH whenever `workspaceURL` is nil;
+- `ClassFolderRule.Name`/`Names` skip null and empty entries: these lists come
+  from JSON, including the contract's own case data, and unguarded LINQ threw
+  where Swift and Python coerce;
 - `AssistWorkspace.ClassFolder(course, section)` delegates its naming half;
 - new `Plantoir.Tests/ClassFolderContractTests.cs`, deserialising the same 5 + 9
   cases the mac suite and `scripts/test_class_folder.py` run.

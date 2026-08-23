@@ -297,7 +297,8 @@ final class SharedRulesContractTests: XCTestCase {
             isVisibleToStudents: true,
             date: nil,
             linkedTitles: ["journal checklist"],
-            classFolderName: "All Classes"
+            classFolderNames: ["All Classes"],
+            pathWithinSection: "Portfolios/index.md"
         )
         let graph: AssistSectionGraph = AssistSectionGraph(
             courseCode: "ADA1O", sectionNumber: 1, pages: [page]

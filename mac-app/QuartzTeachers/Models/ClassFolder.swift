@@ -50,31 +50,62 @@ enum ClassFolder {
         return name(inPerSectionFolders: course.configuration.perSectionFolders)
     }
 
+    /// WHICH FOLDERS COUNT as holding class pages — every configured
+    /// per-section folder whose name mentions classes, and failing that the
+    /// single name `name(inPerSectionFolders:)` chose.
+    ///
+    /// Naming and membership are the same question only when a course has ONE
+    /// such folder. A course configured `["Class Resources", "All Classes"]`
+    /// would otherwise resolve to "Class Resources" for both, match zero
+    /// pages, and drop the coverage map back to "every published page" —
+    /// reintroducing the exact silent failure this rule was written to close.
+    /// Writing goes to one folder; counting looks at all of them.
+    static func names(inPerSectionFolders folders: [String]) -> [String] {
+        var mentioningClasses: [String] = []
+        for folder in folders {
+            if folder.lowercased().contains("class") {
+                mentioningClasses.append(folder)
+            }
+        }
+        if !mentioningClasses.isEmpty {
+            return mentioningClasses
+        }
+        return [name(inPerSectionFolders: folders)]
+    }
+
+    static func names(for course: Course) -> [String] {
+        return names(inPerSectionFolders: course.configuration.perSectionFolders)
+    }
+
     /// Whether a page is one of the section's class pages, given its path
-    /// components RELATIVE to the content root (or the working folder).
+    /// components RELATIVE to the content root (or the section folder).
     ///
-    /// Two things this is deliberately careful about, both of which were real
-    /// bugs:
+    /// **Relative, never absolute.** Every implementation had this wrong
+    /// somewhere: `build_site.py` walked the segments of an ABSOLUTE path,
+    /// Windows tested the whole directory string, and this app's own
+    /// `AssistSectionPage.relativePath` returns the FULL ABSOLUTE PATH when
+    /// `workspaceURL` is nil — which `SectionIndexPointer.repointIndex`
+    /// passes. A teacher whose working folder was `~/Documents/All Classes`
+    /// made every page in every course a class page. Where a teacher keeps
+    /// their files is not a fact about their lessons.
     ///
-    /// * **Folder segments only, never the file name.** The build's rule ran
-    ///   over every component including the file name, so "How This Class
-    ///   Works.md" — which ships in about twenty payloads — and ADA1O's
-    ///   curriculum page "B3. Connections Beyond the Classroom.md" counted as
-    ///   lessons, inflating what the course was judged to teach.
-    /// * **Relative, never absolute.** Windows tested the whole directory
-    ///   string, so a teacher whose working folder was `C:\Users\x\Classroom\`
-    ///   made every page in every course a class page. Where a teacher keeps
-    ///   their files is not a fact about their lessons.
-    static func isClassPage(relativePathComponents components: [String], classFolder: String) -> Bool {
+    /// The file name is excluded as defence in depth rather than to fix an
+    /// observed bug: under segment EQUALITY a file name cannot collide with a
+    /// folder name, but a future change to prefix or substring matching must
+    /// not silently start counting a page because of what it is CALLED.
+    static func isClassPage(relativePathComponents components: [String], classFolders: [String]) -> Bool {
         guard let fileName = components.last else {
             return false
         }
         if fileName.lowercased() == "index.md" {
             return false
         }
-        let wanted: String = classFolder.lowercased()
+        var wanted: Set<String> = []
+        for folder in classFolders {
+            wanted.insert(folder.lowercased())
+        }
         for component in components.dropLast() {
-            if component.lowercased() == wanted {
+            if wanted.contains(component.lowercased()) {
                 return true
             }
         }
@@ -82,14 +113,15 @@ enum ClassFolder {
     }
 
     /// The same question asked of a relative path written as one string, with
-    /// either separator — what the contract's cases carry.
-    static func isClassPage(relativePath path: String, classFolder: String) -> Bool {
+    /// either separator — what the contract's cases carry, and what arrives
+    /// from a platform that spells paths the other way.
+    static func isClassPage(relativePath path: String, classFolders: [String]) -> Bool {
         var components: [String] = []
         for piece in path.split(whereSeparator: { character in
             return character == "/" || character == "\\"
         }) {
             components.append(String(piece))
         }
-        return isClassPage(relativePathComponents: components, classFolder: classFolder)
+        return isClassPage(relativePathComponents: components, classFolders: classFolders)
     }
 }

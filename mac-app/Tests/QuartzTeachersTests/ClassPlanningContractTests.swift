@@ -252,7 +252,8 @@ final class ClassPlanningContractTests: XCTestCase {
                 isVisibleToStudents: visible,
                 date: day,
                 linkedTitles: links.map { $0.lowercased() },
-                classFolderName: "All Classes"
+                classFolderNames: ["All Classes"],
+                pathWithinSection: "\(folder)/\(title).md"
             )
         }
 

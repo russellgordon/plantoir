@@ -42,11 +42,21 @@ struct AssistSectionPage {
     /// The pages this one links to, lowercased, as wikilink targets.
     let linkedTitles: [String]
 
-    /// What THIS course calls the folder its class pages live in — "All
-    /// Classes" by convention, and not always. Carried on the page rather than
-    /// worked out from the path, because the answer comes from the course's
-    /// own configured per-section folders and a path cannot know it.
-    let classFolderName: String
+    /// What THIS course calls the folders its class pages live in — "All
+    /// Classes" by convention, and not always, and not necessarily one.
+    /// Carried on the page rather than worked out from the path, because the
+    /// answer comes from the course's own configured per-section folders and a
+    /// path cannot know it.
+    let classFolderNames: [String]
+
+    /// The page's path relative to its SECTION folder.
+    ///
+    /// Separate from `relativePath`, which is relative to the working folder —
+    /// and which is the FULL ABSOLUTE PATH whenever `workspaceURL` is nil, as
+    /// `SectionIndexPointer.repointIndex` passes it. Asking the class-page
+    /// question of that string meant a teacher whose working folder was
+    /// `~/Documents/All Classes` made every page in every course a class page.
+    let pathWithinSection: String
 
     // MARK: - Computed properties
 
@@ -78,7 +88,9 @@ struct AssistSectionPage {
         if isFolderIndex {
             return false
         }
-        return ClassFolder.isClassPage(relativePath: relativePath, classFolder: classFolderName)
+        return ClassFolder.isClassPage(
+            relativePath: pathWithinSection, classFolders: classFolderNames
+        )
     }
 
     var lowercasedTitle: String {
@@ -169,7 +181,8 @@ struct AssistSectionGraph {
                 ),
                 date: PageFrontmatter.createdDay(in: text, key: dateKey),
                 linkedTitles: linkTargets(in: text),
-                classFolderName: ClassFolder.name(for: course)
+                classFolderNames: ClassFolder.names(for: course),
+                pathWithinSection: pathWithinSection(of: pageURL, forSection: sectionNumber, in: course)
             ))
         }
         return AssistSectionGraph(courseCode: course.code, sectionNumber: sectionNumber, pages: pages)
@@ -359,6 +372,26 @@ struct AssistSectionGraph {
 
     private func normalized(_ name: String) -> String {
         return AssistSectionGraph.normalized(name)
+    }
+
+    /// A page's path relative to its SECTION folder, which is the form the
+    /// class-page rule needs: nothing above the section can reach it, so what
+    /// a teacher called their working folder cannot change what counts as a
+    /// lesson. Shared pages live outside the section folder and fall back to
+    /// their own last two components, which is enough for the rule to see the
+    /// folder they sit in.
+    static func pathWithinSection(of url: URL, forSection sectionNumber: Int, in course: Course) -> String {
+        let full: String = url.standardizedFileURL.path
+        let root: String = course.sectionDirectoryURL(forSection: sectionNumber)
+            .standardizedFileURL.path + "/"
+        if full.hasPrefix(root) {
+            return String(full.dropFirst(root.count))
+        }
+        let components: [String] = url.standardizedFileURL.pathComponents
+        if components.count >= 2 {
+            return components.suffix(2).joined(separator: "/")
+        }
+        return url.lastPathComponent
     }
 
     /// Where a page sits, said the way a teacher would say it.
