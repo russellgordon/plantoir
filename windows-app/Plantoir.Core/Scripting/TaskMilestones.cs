@@ -36,7 +36,16 @@ public static class TaskMilestones
         new TaskMilestone("Applying your settings…", "Updated pageTitle"),
         new TaskMilestone("Preparing components…", "Installing dependencies"),
         new TaskMilestone("Building your site…", "Quartz v4"),
-        new TaskMilestone("Opening the preview…", "Launching Quartz preview"),
+        // "Launching Quartz preview" — build_site.py's own print — fires BEFORE
+        // `quartz build --serve` even starts, so it used to complete every
+        // milestone at once and pin the bar on this step for the whole real
+        // build (TODO.md item 1, found 2026-08-19). "Done processing" is
+        // patches/build.ts's own line, printed once the fresh site is actually
+        // written to disk — verified against a real `preview.ps1 --build-only`
+        // transcript 2026-08-23 ("Quartz v4.5.0" then "Done processing N files
+        // in Ns"). markerOrigins.origins in contracts/app-rules.json calls
+        // this "elsewhere" (Quartz's own output, not shared Python).
+        new TaskMilestone("Opening the preview…", "Done processing"),
     };
 
     public static readonly IReadOnlyList<TaskMilestone> Deploy = new[]
