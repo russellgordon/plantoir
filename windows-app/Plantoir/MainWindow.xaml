@@ -11,6 +11,17 @@
             <KeyboardAccelerator Modifiers="Control" Key="O" Invoked="OpenWorkingFolderAccelerator" />
             <KeyboardAccelerator Modifiers="Control" Key="N" Invoked="NewWindowAccelerator" />
             <KeyboardAccelerator Modifiers="Control,Shift" Key="R" Invoked="ReloadCoursesAccelerator" />
+            <!-- Global Preview shortcuts, mirroring mac's ⌘[/⌘]/⌘R: WinUI
+                 resolves a key combo declared at more than one scope by
+                 preferring the one nearest the focused element, so these
+                 fire everywhere EXCEPT while focus is inside a
+                 SectionDetailView's own Grid — there its identical,
+                 more-local accelerators win instead and act on that view
+                 directly. Together the two scopes give the same "always
+                 works" behaviour mac gets from a single menu-bar shortcut. -->
+            <KeyboardAccelerator Modifiers="Control" Key="R" Invoked="PreviewReloadAccelerator" />
+            <KeyboardAccelerator Modifiers="Menu" Key="Left" Invoked="PreviewBackAccelerator" />
+            <KeyboardAccelerator Modifiers="Menu" Key="Right" Invoked="PreviewForwardAccelerator" />
         </Grid.KeyboardAccelerators>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -28,6 +39,19 @@
                 <MenuFlyoutItem x:Name="ReloadCoursesItem" Text="Reload Courses" Click="ReloadCourses_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+R" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="SettingsItem" Text="Settings…" Click="Settings_Click" KeyboardAcceleratorTextOverride="Ctrl+," />
+            </MenuBarItem>
+            <!-- Acts on whichever section's preview is currently shown in
+                 DetailHost, matching mac's Preview menu; the accelerator
+                 text shown here is backed by real, globally-scoped
+                 KeyboardAccelerators on Root above. -->
+            <MenuBarItem Title="Preview">
+                <MenuFlyoutItem x:Name="PreviewBackItem" Text="Back" Click="PreviewBack_Click"
+                                 IsEnabled="False" KeyboardAcceleratorTextOverride="Alt+Left" />
+                <MenuFlyoutItem x:Name="PreviewForwardItem" Text="Forward" Click="PreviewForward_Click"
+                                 IsEnabled="False" KeyboardAcceleratorTextOverride="Alt+Right" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem x:Name="PreviewReloadItem" Text="Reload Page" Click="PreviewReload_Click"
+                                 IsEnabled="False" KeyboardAcceleratorTextOverride="Ctrl+R" />
             </MenuBarItem>
             <MenuBarItem Title="Help">
                 <MenuFlyoutItem Text="Report a Problem…" Click="ReportProblem_Click" />
