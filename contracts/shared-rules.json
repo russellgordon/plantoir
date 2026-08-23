@@ -702,6 +702,54 @@
     ],
     "note": "What the sidebar's filter field shows. Case-insensitive, matched against the course CODE and the course NAME, and mid-word - a teacher typing 'comp' should find Introduction to Computer Science without knowing it starts with ICS. Matching is CONTAINS rather than prefix, deliberately: a teacher who knows their course as 'Calculus' should not have to know it is filed under MCV4U."
   },
+  "siteHealth": {
+    "note": "What the toolchain checks about a course's folders before it builds, and the WORDS a teacher reads when one of them is wrong. Certain folder and file names carry behaviour — the curriculum folder, the folder holding class pages, Media, a section's index — and nothing stopped a teacher deleting or renaming one in Obsidian. The features then failed SILENTLY: the Curriculum Coverage map in particular still rendered, still looked healthy, and was wrong.",
+    "whereItRuns": "Inside build_site.py, after the shared and per-section folders have been merged into content/ and BEFORE Quartz builds or anything is uploaded. It has to run there rather than in the apps: every check is defined over the MERGED tree, which does not exist until the build makes it, and a check that only guarded the GUI button would be bypassed by the assistant, by `Plantoir --mcp-stdio`, by the launchers, and by the scheduled deploy — which runs from launchd or Task Scheduler with the app CLOSED, and is the case that matters most.",
+    "checksTheFeatureNotTheFolder": "Every check asks whether the FEATURE produced anything, never whether a folder exists. Recreating an empty `Ontario Curriculum` folder does not restore a teacher's expectation pages, and `_find_curriculum_folder` requires a page named for an expectation code — so an existence check plus a Fix button would have silenced the warning AND left the map missing. A check that can be satisfied without fixing the problem is worse than no check.",
+    "scheduledDeployPublishesAnyway": "A scheduled deploy NEVER refuses on a health finding. A slightly inaccurate curriculum map is a paper cut; a site update a teacher was counting on that silently did not happen is not. The finding is recorded and surfaced afterwards instead.",
+    "marker": {
+      "prefix": "PLANTOIR_HEALTH:",
+      "rule": "One line per finding on stdout, the prefix followed by a single-line JSON object carrying name, sentence, detail, fixable, course and section. The apps parse these lines out of the console transcript they are already reading; the teacher-facing SENTENCE travels in the line rather than being re-authored on each platform, so the two apps cannot word the same problem differently.",
+      "why": "A progress marker is matched loosely and getting one wrong is silent (see app-rules.json markerOrigins). A prefixed JSON line is unambiguous, survives being interleaved with ordinary build output, and carries structure a sentence cannot."
+    },
+    "checks": [
+      {
+        "name": "curriculumCoverageFoundNothing",
+        "sentence": "The curriculum map for {course} Section {section} could not be built.",
+        "detail": "Plantoir looks for a folder whose name mentions the curriculum, holding one page per expectation. It could not find one, so the Curriculum Coverage page has been left out of this build. If you renamed or moved that folder, the map will come back as soon as it can find it again.",
+        "fixable": false,
+        "why": "The headline case. The map used to vanish with nothing said, and the page it would have linked from says nothing either — a teacher discovers it in May."
+      },
+      {
+        "name": "courseTeachesNothing",
+        "sentence": "Plantoir could not find any class pages in {course} Section {section}.",
+        "detail": "The curriculum map counts an expectation as addressed when a page that a class links to mentions it. With no class pages to start from, it has counted every published page instead, so the map is more generous than it should be.",
+        "fixable": false,
+        "why": "This is the fallback that made a wrong map look healthy. Saying so is the entire fix: the fallback itself is deliberate, because a map that hid everything would be worse."
+      },
+      {
+        "name": "mediaFolderMissing",
+        "sentence": "The Media folder for {course} is not there.",
+        "detail": "Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.",
+        "fixable": true,
+        "why": "Checks the TARGET, not the link: content/Media is recreated on every build, so checking the link itself always passes. What breaks is the course-level folder it points AT."
+      },
+      {
+        "name": "sectionIndexMissing",
+        "sentence": "{course} Section {section} has no front page.",
+        "detail": "Every section has a page called index.md that students land on first. This section's is missing, so the site will open on whatever page happens to come first.",
+        "fixable": true,
+        "why": "Restorable safely, unlike the curriculum folder — which is why this one may offer to fix itself and that one may not."
+      },
+      {
+        "name": "handWrittenCoveragePage",
+        "sentence": "A page called Curriculum Coverage will be overwritten each time you build.",
+        "detail": "Plantoir writes the Curriculum Coverage page itself, every build. There is a page by that name in your own notes, and it is not the one being published — rename yours to keep it.",
+        "fixable": false,
+        "why": "The inverse of the other checks: not something missing, something PRESENT that gets clobbered. A name refusal in Settings cannot see this, because a teacher makes this page in Obsidian."
+      }
+    ]
+  },
   "transcriptStripping": {
     "cases": [
       {
