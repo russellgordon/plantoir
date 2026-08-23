@@ -157,7 +157,6 @@
     }
   },
   "firstDeployMarkers": {
-    "knownDivergence": "Checked 2026-08-16: the mac picks the folder from the configured target, while `AssistWorkspace.cs` on Windows checks BOTH folders and accepts either. Windows should narrow to the current destination.",
     "note": "How each app knows whether a section has EVER been deployed to where it is going now. `deploy.py` writes a marker the first time a section goes out, and the apps read it to decide whether a deploy would ask a question — which is what makes a scheduled deploy safe or a 06:30 failure.",
     "paths": [
       {
