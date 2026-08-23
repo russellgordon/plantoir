@@ -76,12 +76,56 @@ this side is expected to say so when the contract is wrong.
    actually inside the preview's page, not just its surrounding chrome) once
    at the machine.
 
-2. **The " — Edited" title-bar marker** (entry 310) — see "The ` — Edited`
-   marker" section below in full. The shared `.publish_state/section<N>.json`
-   file format and fingerprinting algorithm are specified there; Windows still
-   owes setting the window title and hooking window-activation events to
-   trigger a recompute. Not found anywhere in `windows-app/` as of 2026-08-22
-   (no `SectionPublishState`, no `.publish_state` reference).
+2. ~~The " — Edited" title-bar marker~~ — ✅ Done 2026-08-22 for the
+   INTERACTIVE deploy path. `Plantoir.Core/Models/SectionPublishState.cs`
+   ports the mac's fingerprinting algorithm (exclusion filter, one-hop
+   symlink resolution, self-publishing exclusion — case-insensitively, see
+   below) and the `.publish_state/section<N>.json` stamp read/write.
+   `MultiDestinationDeployRunner.RunAsync` fingerprints before the build and
+   records the stamp (and the `section content marked published` trail
+   event, newly added to `ActivityTrail.Event`) only when every configured
+   destination succeeded, written before `IsRunning` flips to false so a
+   listener refreshing on "run finished" never sees a stale stamp.
+   `SectionDetailView` has no per-section OS window — one `MainWindow` shows
+   one section at a time — so the marker is applied to the in-pane
+   `SectionTitle` header instead, which is this app's equivalent of the
+   mac's per-section title bar; `TitleText` (bare, no marker) is untouched
+   and still used everywhere a sentence NAMES the section. Refreshes on the
+   pane being constructed, `MainWindow.Activated`, and either runner's
+   `IsRunning` going false, each off the UI thread and guarded by an
+   incrementing generation counter so a stale walk can't overwrite a fresh
+   one. Contract-driven tests in `SectionPublishStateTests.cs` (15, all
+   green) run the same `contracts/app-rules.json` → `publishedFreshness`
+   case list the mac suite runs. Two adversarial-review passes: the first
+   caught nothing new (ordering, generation guard, exclusion filter, symlink
+   one-hop, atomic stamp write all checked out); a second, narrower pass
+   found and fixed a genuinely Windows-specific bug the mac's own filesystem
+   never surfaces — `SectionPublishState.IsExcluded` compared the
+   self-publishing exclusion path case-SENSITIVELY, so a destination folder
+   whose on-disk casing differs from what a teacher typed (NTFS is
+   case-insensitive but case-preserving) would silently fail to exclude,
+   and a self-publishing course could read "— Edited" permanently; now
+   `OrdinalIgnoreCase`, with a regression test.
+
+   **Still genuinely outstanding, and NOT done**: a scheduled ("publish
+   tomorrow's class overnight") deploy never writes the stamp. Confirmed by
+   the second review pass — `ScheduledDeploy.cs`/`TaskScheduling.cs` hand
+   the deploy straight to `schtasks.exe`, which runs `deploy.ps1` (or a
+   generated wrapper) directly; neither file references
+   `SectionPublishState` at all, so a scheduled deploy that succeeds
+   perfectly still leaves the window saying "— Edited" until somebody
+   publishes again by hand — reproducing, on Windows, the exact bug the mac
+   review already found and fixed for launchd (see "A scheduled deploy
+   needs its own path to the same record" below). The mac's fix — fingerprint
+   before invoking the script, have the script write a sentinel naming every
+   destination that succeeded, consume the sentinel from the app on next
+   launch — is the shape to port; the difference is that the mac's scheduled
+   process launches the APP binary (so `runScheduled` can fingerprint from
+   inside it), while Windows schedules `powershell.exe` directly, so the
+   fingerprint-before-running step needs a different home. Not attempted in
+   this pass since it touches shared launcher mechanics rather than app
+   code; flagging rather than guessing at a fix under time pressure was the
+   judgement call.
 
 3. **Sampling the local engine's own stderr/stdout into the activity trail**
    (the tail end of "What the engine says now reaches a problem report"

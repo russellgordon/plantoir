@@ -184,6 +184,23 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         WasCancelled = false;
         WasStoppedByUser = false;
         Notify(nameof(IsRunning));
+
+        // The fingerprint for the " — Edited" marker is taken NOW, before
+        // anything runs — before the build, not merely before the first
+        // upload. A publish takes minutes; a page edited while it uploads
+        // did not go out, and stamping the finishing state would wrongly
+        // mark that edit as published. See "When the stamp is written" in
+        // WINDOWS-HANDOFF.md. Excludes any destination that publishes into
+        // the course's own folder, so a course cannot fingerprint its own
+        // output and stay "Edited" forever.
+        string? publishedFingerprint = null;
+        try
+        {
+            var excluded = SectionPublishState.SelfPublishingSubpaths(course.DirectoryPath, destinations);
+            publishedFingerprint = SectionPublishState.Fingerprint(course.DirectoryPath, sectionNumber, excluded);
+        }
+        catch { /* a fingerprinting failure must never stop the deploy itself */ }
+
         try
         {
             for (int index = 0; index < Legs.Count; index++)
@@ -253,9 +270,47 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         }
         finally
         {
+            // The stamp is written BEFORE IsRunning flips to false and
+            // notifies — a listener that refreshes the " — Edited" marker on
+            // "a run finishing" must see the new stamp already on disk, or
+            // it reads the stale one and the marker stays up until the next
+            // unrelated refresh.
+            RecordWhatWentOut(course, sectionNumber, publishedFingerprint);
             IsRunning = false;
             Notify(nameof(IsRunning));
         }
+    }
+
+    /// <summary>
+    /// Stamps <c>.publish_state/section&lt;N&gt;.json</c> and notes it on the
+    /// activity trail — but only when EVERY configured destination
+    /// succeeded. A course publishing to two hosts, one of which failed, has
+    /// not published, and its marker must stay up: that is the whole point
+    /// of redundant destinations meaning something. Mirrors the mac's
+    /// `recordWhatWentOut`.
+    /// </summary>
+    private void RecordWhatWentOut(Course course, int sectionNumber, string? fingerprint)
+    {
+        if (fingerprint is null) return;
+        if (!CurrentOutcome.AllSucceeded) return;
+
+        var destinationTypes = new List<string>();
+        var destinationNames = new List<string>();
+        foreach (var leg in Legs)
+        {
+            if (!leg.Succeeded) continue;
+            destinationTypes.Add(leg.Destination.Type);
+            destinationNames.Add(DeployCommand.DestinationDescription(leg.Destination));
+        }
+
+        bool recorded = SectionPublishState.RecordPublish(
+            course.DirectoryPath, sectionNumber, fingerprint, destinationTypes);
+
+        string joined = JoinedWithAnd(destinationNames);
+        string sentence = recorded
+            ? $"marked {course.Code}-S{sectionNumber}'s pages as published to {joined}"
+            : $"published {course.Code}-S{sectionNumber} to {joined}, but could not note it down — the window will still say Edited";
+        ActivityTrail.Note(ActivityTrail.Event.SectionContentMarkedPublished, sentence, course.Code, sectionNumber);
     }
 
     // ---- Turning an outcome into words ------------------------------------
