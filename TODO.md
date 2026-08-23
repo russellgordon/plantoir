@@ -5,8 +5,18 @@ an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
 - **`CourseRenameInterfaceTests` crashes the whole unit run, intermittently** —
-  seen twice on 2026-08-23 while building the special-folders work, and NOT
-  explained. It is the failure mode the `mac-app` skill already warns about (a
+  seen on 2026-08-23 while building the special-folders work. **PARTLY
+  EXPLAINED, and the explanation was not the one assumed here.** When it turned
+  consistent rather than intermittent, the crash report
+  (`~/Library/Logs/DiagnosticReports/Plantoir-*.ips`) showed `EXC_BAD_ACCESS` in
+  `SwiftUI.AppKitDialogBridge.updateExistingAlert` while an `NSAlert` sheet was
+  closing — a SwiftUI alert-bridge fault, reached because `SectionDetailView`
+  had grown to FOUR `.alert` modifiers. Folding two of them into one fixed it,
+  and three consecutive full runs went green. So the earlier intermittent
+  failures were most likely the same fault at a lower rate, NOT the busy-machine
+  flakiness this entry originally blamed. If it returns, read the crash report
+  first — it named the cause immediately, and the guesswork below cost an hour
+  it need not have. It is the failure mode the `mac-app` skill already warns about (a
   test that hosts real SwiftUI views, on a machine that is busy), and both
   crashes happened while adversarial-review agents were running builds and
   greps concurrently. But it is worth pinning down rather than assuming:

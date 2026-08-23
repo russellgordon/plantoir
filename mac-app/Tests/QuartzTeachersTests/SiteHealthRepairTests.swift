@@ -106,6 +106,62 @@ final class SiteHealthRepairTests: XCTestCase {
         }
     }
 
+    /// A repair that FAILED must say so. Both restore functions can return
+    /// false — a read-only volume, a permissions problem, a file where the
+    /// folder should be — and reporting only success made a failed repair
+    /// indistinguishable from a successful one: the alert closed either way.
+    func testAFailedRepairIsReportedRatherThanPassedOverInSilence() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // A FILE where the Media folder should be: creating the directory
+        // cannot succeed.
+        try "not a folder".write(
+            to: course.directoryURL.appendingPathComponent("Media"),
+            atomically: true, encoding: .utf8
+        )
+
+        let outcome = SiteHealthRepair.outcome(
+            ofRepairing: [finding("mediaFolderMissing", fixable: true)], in: course
+        )
+        XCTAssertNotNil(outcome, "a failed repair must still produce something to show")
+        XCTAssertTrue(outcome?.headline.contains("could not") ?? false, outcome?.headline ?? "")
+        XCTAssertEqual(outcome?.canRebuild, false,
+                       "there is nothing to see, so do not offer to build")
+    }
+
+    /// A fresh preview is no use to somebody whose site is published: only
+    /// publishing again changes what students look at.
+    func testAPublishedSiteIsNotOfferedAPreview() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let outcome = SiteHealthRepair.outcome(
+            ofRepairing: [finding("mediaFolderMissing", fixable: true)], in: course,
+            occasion: .publishing
+        )
+        XCTAssertEqual(outcome?.canRebuild, false)
+        XCTAssertTrue(outcome?.detail.lowercased().contains("publish") ?? false,
+                      outcome?.detail ?? "")
+    }
+
+    /// A finding's section number is parsed from output and falls back to 0.
+    /// Creating a `section0` folder because a line was malformed would invent
+    /// structure the course does not have.
+    func testARepairRefusesASectionTheCourseDoesNotHave() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        XCTAssertFalse(SiteHealthRepair.restoreSectionIndex(forSection: 0, in: course))
+        XCTAssertFalse(SiteHealthRepair.restoreSectionIndex(forSection: 7, in: course))
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: course.directoryURL.appendingPathComponent("section0").path
+            ),
+            "no section0 folder may be conjured up"
+        )
+    }
+
     /// Pressing it twice, or pressing it after fixing the problem in Obsidian,
     /// must change nothing — a repair that overwrote would destroy the very
     /// page the teacher had just written.

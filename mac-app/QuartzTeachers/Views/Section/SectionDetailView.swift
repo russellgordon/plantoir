@@ -48,15 +48,29 @@ struct SectionDetailView: View {
 
     /// Drives the dialog separately from the findings themselves, so the title
     /// is not recomputed from an array that the dismissal is clearing.
-    @State var isShowingHealthFindings: Bool = false
-
     /// Findings that arrived while a dialog was already up, waiting their turn.
     @State var heldHealthFindings: [SiteHealthFinding] = []
 
-    /// What a repair just put back, while that is being shown.
-    @State var repairOutcome: String?
+    /// What a repair just did, while that is being shown.
+    @State var repairOutcome: SiteHealthRepair.Outcome?
 
-    @State var isShowingRepairOutcome: Bool = false
+    /// The same, waiting for the alert it was requested from to go away.
+    @State var pendingRepairOutcome: SiteHealthRepair.Outcome?
+
+    /// Which of the two folder dialogs is up, if either. One alert modifier
+    /// serves both — see the comment on it.
+    @State var healthDialog: HealthDialog?
+
+    enum HealthDialog {
+        case findings
+        case outcome
+    }
+
+    /// Whether the findings on screen came from PUBLISHING rather than from a
+    /// preview — including an overnight publish reported the next morning.
+    /// A fresh preview is no use to somebody whose site is live: only
+    /// publishing again changes what students see.
+    @State var healthFindingsCameFromPublishing: Bool = false
 
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
@@ -295,7 +309,10 @@ struct SectionDetailView: View {
             )
             if !waiting.isEmpty {
                 healthFindings = waiting
-                isShowingHealthFindings = true
+                // The overnight run PUBLISHED; a preview would not change what
+                // students are looking at.
+                healthFindingsCameFromPublishing = true
+                healthDialog = .findings
             }
         }
         .onDisappear {
@@ -322,50 +339,48 @@ struct SectionDetailView: View {
         } message: {
             Text(deployRefusal ?? "")
         }
-        .alert(healthAlertTitle, isPresented: $isShowingHealthFindings) {
-            // Offered only for the problems this app can genuinely put right.
-            // A button that satisfies a check without restoring the feature —
-            // an empty curriculum folder, say — would be worse than none, since
-            // the teacher would then believe it was dealt with.
-            if let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
-                Button(title) {
-                    let repaired: [String] = SiteHealthRepair.repair(healthFindings, in: course)
-                    repairOutcome = SiteHealthRepair.whatWasPutBack(repaired)
-                    isShowingRepairOutcome = repairOutcome != nil
+        // ONE alert for both the findings and what a repair did, switched by
+        // `healthDialog`, rather than two `.alert` modifiers on the same view.
+        //
+        // Two was a crash, not a style preference: SwiftUI's alert bridge
+        // segfaulted in `updateExistingAlert` while closing a sheet, reliably,
+        // once this view carried four alerts. A view presents one alert at a
+        // time anyway, so modelling that explicitly is both what SwiftUI wants
+        // and what the sequencing needs.
+        .alert(healthAlertTitle, isPresented: healthDialogBinding) {
+            switch healthDialog {
+            case .findings:
+                if let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
+                    Button(title) {
+                        // Only REMEMBERED here: the outcome is shown once this
+                        // alert has actually gone, from `onChange`. Raising a
+                        // second alert from inside this action loses one of
+                        // them, and the one lost is the report just asked for.
+                        pendingRepairOutcome = SiteHealthRepair.outcome(
+                            ofRepairing: healthFindings, in: course,
+                            occasion: healthFindingsCameFromPublishing ? .publishing : .building
+                        )
+                    }
                 }
+                Button("OK") { }
+            case .outcome:
+                if repairOutcome?.canRebuild == true {
+                    Button("Build Again") {
+                        rebuildAfterRepair()
+                    }
+                }
+                Button("OK") { }
+            case .none:
+                Button("OK") { }
             }
-            Button("OK") { }
         } message: {
             Text(healthAlertMessage)
         }
-        // Say what the repair did, and offer to act on it. Without this the
-        // button's whole effect is invisible: the folder is back on disk, the
-        // built site still shows how things were, and nothing says either.
-        .alert(repairOutcome ?? "", isPresented: $isShowingRepairOutcome) {
-            Button("Build Again") {
-                repairOutcome = nil
-                rebuildAfterRepair()
-            }
-            Button("Later") {
-                repairOutcome = nil
-            }
-        } message: {
-            Text(SiteHealthRepair.notOnTheSiteYet)
-        }
-        .onChange(of: isShowingHealthFindings) { _, isShowing in
-            // Cleared only once the alert is actually gone. Clearing inside the
-            // button's action re-evaluated the title in the same update as the
-            // dismissal, which made the unreachable-by-design
-            // "0 things need your attention" string reachable.
-            if !isShowing {
+        .onChange(of: healthDialog == nil) { _, isGone in
+            if isGone {
                 healthFindings = []
-                // Anything that arrived while this one was up gets its turn now
-                // rather than being lost.
-                if !heldHealthFindings.isEmpty {
-                    healthFindings = heldHealthFindings
-                    heldHealthFindings = []
-                    isShowingHealthFindings = true
-                }
+                repairOutcome = nil
+                showAnythingWaiting()
             }
         }
     }
@@ -377,13 +392,30 @@ struct SectionDetailView: View {
     /// several are counted, because a title listing three sentences is not a
     /// title.
     var healthAlertTitle: String {
+        if healthDialog == .outcome {
+            return repairOutcome?.headline ?? ""
+        }
         if healthFindings.count == 1 {
             return healthFindings[0].sentence
         }
         return "\(healthFindings.count) things need your attention"
     }
 
+    var healthDialogBinding: Binding<Bool> {
+        return Binding(
+            get: { healthDialog != nil },
+            set: { isPresented in
+                if !isPresented {
+                    healthDialog = nil
+                }
+            }
+        )
+    }
+
     var healthAlertMessage: String {
+        if healthDialog == .outcome {
+            return repairOutcome?.detail ?? ""
+        }
         var paragraphs: [String] = []
         for finding in healthFindings {
             if healthFindings.count == 1 {
@@ -395,6 +427,27 @@ struct SectionDetailView: View {
         return paragraphs.joined(separator: "\n\n")
     }
 
+    /// Shows whatever is queued, now that the dialog it was queued behind has
+    /// gone.
+    ///
+    /// One alert at a time: SwiftUI presents one per view, and asking for a
+    /// second while the first is dismissing loses one of them. A repair's
+    /// outcome goes first — it is the answer to something the teacher just
+    /// pressed — and findings that arrived meanwhile follow.
+    func showAnythingWaiting() {
+        if let waiting = pendingRepairOutcome {
+            pendingRepairOutcome = nil
+            repairOutcome = waiting
+            healthDialog = .outcome
+            return
+        }
+        if !heldHealthFindings.isEmpty {
+            healthFindings = heldHealthFindings
+            heldHealthFindings = []
+            healthDialog = .findings
+        }
+    }
+
     /// Builds the site again after a repair, so the teacher can see it.
     ///
     /// A preview that is already up is stopped first and started again, which
@@ -402,7 +455,19 @@ struct SectionDetailView: View {
     /// the first would take a port it then could not have.
     func rebuildAfterRepair() {
         Task { @MainActor in
-            if previewURL != nil || isWaitingForServer {
+            // Every other way into a preview is gated — the toolbar button is
+            // disabled while the section is busy, and Deploy while a deploy
+            // runs. This was the one path with neither, so it could start a
+            // build in the same working folder as a running deploy.
+            if deployRunner.isRunning || isPreparingDeploy {
+                return
+            }
+            // The LEASE decides, not the window's appearance. A preview whose
+            // wait timed out has cleared `isWaitingForServer` and never set
+            // `previewURL`, while still holding the port — so asking those two
+            // would have skipped the stop and then been refused the lease,
+            // raising a refusal alert out of a repair.
+            if previewLease != nil || previewRunner.isRunning {
                 await stopPreviewAndWait()
             }
             startPreview()
@@ -414,7 +479,7 @@ struct SectionDetailView: View {
     /// Only when the run actually produced some — a healthy course must never
     /// see a dialog, which is the difference between a warning that gets read
     /// and one that gets dismissed by habit.
-    func showHealthFindings(from runner: ScriptRunner?) {
+    func showHealthFindings(from runner: ScriptRunner?, cameFromPublishing: Bool = false) {
         guard let runner, !runner.healthFindings.isEmpty else {
             return
         }
@@ -425,12 +490,13 @@ struct SectionDetailView: View {
         // But HELD, not dropped. Returning early discarded them — and the
         // failed-deploy path can arrive while the overnight findings are
         // already on screen, so this is reachable rather than theoretical.
-        if isShowingHealthFindings {
+        if healthDialog != nil {
             heldHealthFindings = runner.healthFindings
             return
         }
         healthFindings = runner.healthFindings
-        isShowingHealthFindings = true
+        healthFindingsCameFromPublishing = cameFromPublishing
+        healthDialog = .findings
     }
 
     /// Why this section's deploy would not get anywhere, or nil when it
@@ -956,7 +1022,7 @@ struct SectionDetailView: View {
             // finding is most likely to be the cause, and moving the call
             // below the early return had quietly dropped it altogether —
             // de-headlining it was the intent, discarding it was not.
-            showHealthFindings(from: deployRunner.legs.first?.runner)
+            showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.couldNotBuildBeforeDeploying(
@@ -969,7 +1035,7 @@ struct SectionDetailView: View {
         // paths above, so a deploy that did not publish is not headlined by a
         // folder warning. Taken from the FIRST leg: every destination publishes
         // the same built site, so a second leg only repeats the findings.
-        showHealthFindings(from: deployRunner.legs.first?.runner)
+        showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
 
         return MultiDestinationDeployRunner.result(
             course: course.code,

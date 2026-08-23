@@ -153,7 +153,7 @@ forget. Windows ships `plantoir-mcp.exe` instead.
 ## Example content and skeletons
 
 `support/example_content/<CODE>/` holds ready-made course content, one folder
-per Ontario course code (ADA1O is the template to copy; **37 codes** have
+per Ontario course code (ADA1O is the template to copy; **38 codes** have
 payloads today — count the folders rather than trusting a number). Each payload
 is `manifest.json` plus `shared/` and `per_section/` trees, and the manifest is
 the course's ENTIRE structure when a teacher pre-populates: the wizard asks no

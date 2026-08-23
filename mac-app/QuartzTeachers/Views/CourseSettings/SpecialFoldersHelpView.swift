@@ -157,7 +157,12 @@ struct SpecialFoldersHelpView: View {
 
     /// Several folder names, said the way a person would say them.
     static func listed(_ names: [String]) -> String {
-        let kept: [String] = names.filter { name in return !name.isEmpty }
+        var kept: [String] = []
+        for name in names {
+            if !name.isEmpty {
+                kept.append(name)
+            }
+        }
         if kept.isEmpty {
             return "None chosen"
         }

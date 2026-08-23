@@ -2908,6 +2908,50 @@ unambiguous and carries structure a sentence cannot.
   must see nothing at all — the failure mode for this whole feature is nagging,
   and a warning dismissed by habit is dismissed when it matters.
 
+### Offering to put it right
+
+Two of the five findings are repairable — a missing `Media` folder and a missing
+section front page — and three are NOT. The line is the whole design: **a fix
+must restore the FEATURE, not merely satisfy the check.** Recreating an empty
+curriculum folder would silence "the curriculum map could not be built" and
+leave the map missing, because that folder only counts once it holds a page
+named for an expectation code. A button that makes a warning go away without
+fixing anything is worse than none, since the teacher then believes it is dealt
+with.
+
+**Decide from the check's NAME, not from `fixable` alone.** The flag in the
+payload means "this kind of thing is repairable"; what has to be true before you
+show a button is that YOUR app has a repair for it.
+
+Three things the mac had to learn the hard way, all worth copying:
+
+- **Never overwrite.** Both repairs check first, so pressing twice — or pressing
+  after fixing it in Obsidian — changes nothing. The test that matters writes a
+  teacher's own front page first and asserts it survives.
+- **Report the outcome, including failure.** Both restores can fail (a read-only
+  volume, a file sitting where the folder should be). Reporting only success
+  made a failed repair indistinguishable from a successful one — the dialog just
+  closed either way, which is silence on the failure path in the feature written
+  to end silence.
+- **Say the site has not changed yet, and offer the RIGHT next step.** The folder
+  is back on disk; the built site still shows how things were. A teacher who is
+  told "put the Media folder back" will go and look at their site next. But
+  offer a rebuild only when a fresh build is what they will look at: a repair
+  reported after PUBLISHING must not offer a preview, because a preview does not
+  change what students see.
+
+One mac-specific mechanic that may or may not apply to you: a view presents one
+alert at a time, so the outcome is shown from a state change AFTER the first
+dialog has gone rather than raised inside its button action — asking for a second
+while the first is dismissing loses one of them, and the one lost is the report
+the teacher just asked for.
+
+`FolderProblemRepaired` is a separate trail event from `FolderProblemFound`, on
+purpose: one records that something is wrong, the other that somebody acted on
+it, and a trail that could not tell them apart leaves "did they ever fix it?"
+unanswerable. Both are in `contracts/shared-rules.json` → `activityTrail`, and
+the repair rules themselves are in `siteHealth.repair`.
+
 ### The scheduled task NEVER refuses
 
 Russell's call, and the reasoning travels: *"a slightly inaccurate curriculum map

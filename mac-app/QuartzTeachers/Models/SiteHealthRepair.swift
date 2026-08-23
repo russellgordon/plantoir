@@ -34,10 +34,18 @@ enum SiteHealthRepair {
 
     /// What the button says. Plain, and about the teacher's course rather than
     /// about the check.
-    static func buttonTitle(for findings: [SiteHealthFinding]) -> String? {
-        let repairable: [SiteHealthFinding] = findings.filter { finding in
-            return canRepair(finding)
+    static func repairable(among findings: [SiteHealthFinding]) -> [SiteHealthFinding] {
+        var result: [SiteHealthFinding] = []
+        for finding in findings {
+            if canRepair(finding) {
+                result.append(finding)
+            }
         }
+        return result
+    }
+
+    static func buttonTitle(for findings: [SiteHealthFinding]) -> String? {
+        let repairable: [SiteHealthFinding] = repairable(among: findings)
         if repairable.isEmpty {
             return nil
         }
@@ -48,6 +56,60 @@ enum SiteHealthRepair {
             return "Add the missing page"
         }
         return "Put them back"
+    }
+
+    /// What a repair did, ready to be shown.
+    ///
+    /// It exists so that a repair which FAILED is reported too. Both restore
+    /// functions can return false — a read-only volume, a permissions problem,
+    /// a file sitting where the folder should be — and reporting only success
+    /// made a failed repair indistinguishable from a successful one: the alert
+    /// simply closed either way. Silence on the failure path, in the feature
+    /// written to end silence.
+    struct Outcome: Equatable {
+
+        // MARK: - Stored properties
+
+        let headline: String
+        let detail: String
+
+        /// Whether offering to build again makes sense — it does not when
+        /// nothing was actually repaired.
+        let canRebuild: Bool
+    }
+
+    /// Repairs what can be repaired and describes the result, whatever it was.
+    /// Where the teacher met the problem, which decides what they are offered
+    /// next: a fresh preview means nothing to somebody whose site is published.
+    enum Occasion {
+        case building
+        case publishing
+    }
+
+    static func outcome(
+        ofRepairing findings: [SiteHealthFinding], in course: Course,
+        occasion: Occasion = .building
+    ) -> Outcome? {
+        let wanted: [SiteHealthFinding] = repairable(among: findings)
+        if wanted.isEmpty {
+            return nil
+        }
+        let repaired: [String] = repair(wanted, in: course)
+        if let putBack = whatWasPutBack(repaired) {
+            switch occasion {
+            case .building:
+                return Outcome(headline: putBack, detail: notOnTheSiteYet, canRebuild: true)
+            case .publishing:
+                return Outcome(headline: putBack, detail: notPublishedYet, canRebuild: false)
+            }
+        }
+        return Outcome(
+            headline: "Plantoir could not put that back.",
+            detail: "Nothing was changed. You can make the folder yourself in "
+                  + "Obsidian, or check that the folder holding this course "
+                  + "isn't locked or read-only.",
+            canRebuild: false
+        )
     }
 
     /// What was put back, in words a teacher can check against their folder.
@@ -88,6 +150,17 @@ enum SiteHealthRepair {
         "Your site still shows how things were when it was last built. "
         + "Build it again to see the difference."
 
+    /// The same, for a teacher whose site is already PUBLISHED.
+    ///
+    /// Building again produces a fresh preview, which is not what they will go
+    /// and look at: the site students see is the published one, and only
+    /// publishing again changes it. Offering "Build Again" there would promise
+    /// a difference that never appears online — the same confusion one level
+    /// up from the one this whole alert exists to remove.
+    static let notPublishedYet: String =
+        "Your published site still shows how things were when it was last "
+        + "published. Publish again when you are ready."
+
     /// Repairs what can be repaired, and reports what it did.
     ///
     /// Never overwrites: every repair checks first, so pressing the button
@@ -125,10 +198,12 @@ enum SiteHealthRepair {
         }
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            // Not `course:section:` — Media belongs to the whole course, and
+            // that overload stamps a section number into the line. Writing
+            // `ICS3U/0` would name a section that does not exist.
             ActivityTrail.note(
-                .folderProblemFound,
-                "put the Media folder back",
-                course: course.code, section: 0
+                .folderProblemRepaired,
+                course.code + " · put the Media folder back"
             )
             return true
         } catch {
@@ -142,6 +217,13 @@ enum SiteHealthRepair {
     /// inventing content for it would be putting words in their mouth. What it
     /// must have is a title, or the site shows the file name.
     static func restoreSectionIndex(forSection sectionNumber: Int, in course: Course) -> Bool {
+        // A finding's section number is parsed from the build's output and
+        // falls back to 0 when it is missing or the wrong type. Creating a
+        // `section0` folder because a line was malformed would be inventing
+        // structure the course does not have.
+        guard course.configuration.sectionNumbers.contains(sectionNumber) else {
+            return false
+        }
         let sectionURL: URL = course.sectionDirectoryURL(forSection: sectionNumber)
         let indexURL: URL = sectionURL.appendingPathComponent("index.md")
         if FileManager.default.fileExists(atPath: indexURL.path) {
@@ -159,7 +241,7 @@ enum SiteHealthRepair {
             )
             try page.write(to: indexURL, atomically: true, encoding: .utf8)
             ActivityTrail.note(
-                .folderProblemFound,
+                .folderProblemRepaired,
                 "put the front page back",
                 course: course.code, section: sectionNumber
             )

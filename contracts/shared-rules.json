@@ -131,6 +131,11 @@
         "why": "Turning off the confirmation step changes what every later request DOES - it goes straight through instead of stopping for a button. A report that says 'it just did it without asking' is explained entirely by this line, and without it the behaviour looks like a bug in the gate rather than a setting somebody chose."
       },
       {
+        "carries": "which course, the section when the repair is about one, and what was put back \u2014 \"put the front page back\"",
+        "event": "folder problem repaired",
+        "why": "A different event from finding the problem, deliberately: one records that something is wrong, the other that somebody acted on it, and a trail that could not tell them apart leaves \"did they ever fix it?\" unanswerable. Only the two genuinely repairable cases can produce it \u2014 a missing Media folder and a missing section front page."
+      },
+      {
         "carries": "which course and section, and a sentence naming what happened with the stable check NAME in brackets \u2014 'found a problem with this course\u2019s folders (curriculumCoverageFoundNothing)'. Never the product wording, which changes, and never anything written on a page",
         "event": "folder problem found",
         "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk \u2014 a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract."
@@ -744,6 +749,26 @@
       "examples": ["PLANTOIR_HEALTH: {\"name\": \"curriculumCoverageFoundNothing\", \"sentence\": \"The curriculum map for ICS3U Section 1 could not be built.\", \"detail\": \"Plantoir looks for a folder whose name mentions the curriculum, holding one page per expectation. It could not find one, so the Curriculum Coverage page has been left out of this build. If you renamed or moved that folder, the map will come back as soon as it can find it again.\", \"fixable\": false, \"course\": \"ICS3U\", \"section\": 1}", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}"],
       "rule": "One line per finding on stdout, the prefix followed by a single-line JSON object carrying name, sentence, detail, fixable, course and section. The apps parse these lines out of the console transcript they are already reading; the teacher-facing SENTENCE travels in the line rather than being re-authored on each platform, so the two apps cannot word the same problem differently.",
       "why": "A progress marker is matched loosely and getting one wrong is silent (see app-rules.json markerOrigins). A prefixed JSON line is unambiguous, survives being interleaved with ordinary build output, and carries structure a sentence cannot."
+    },
+    "repair": {
+      "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
+      "neverOffered": {
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage"],
+        "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone \u2014 the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it."
+      },
+      "offered": {
+        "checks": ["mediaFolderMissing", "sectionIndexMissing"],
+        "rule": "Create an empty Media folder, or a section index carrying only a title. Never overwrite: check first, so pressing twice \u2014 or pressing after fixing it in Obsidian \u2014 changes nothing.",
+        "why": "An empty folder and a bare front page are the correct starting state rather than a pretence. The pictures themselves are the teacher's and cannot be conjured back, and inventing content for a front page would put words in their mouth."
+      },
+      "afterwards": {
+        "rule": "Say what was put back, say that the site has not changed yet, and offer to build again \u2014 but only when a fresh BUILD is what the teacher will look at. A repair reported from a publish offers no rebuild, because a preview does not change what students see.",
+        "why": "A repair whose outcome is invisible is one nobody trusts a second time, and the Media folder is somewhere a teacher cannot see from the app at all. A repair that FAILED must be reported too: both restores can fail on a read-only volume or a file sitting where the folder should be, and reporting only success made the two indistinguishable \u2014 silence on the failure path, in the feature written to end silence."
+      },
+      "oneAlertAtATime": {
+        "rule": "The outcome is shown AFTER the dialog it was requested from has gone, never raised from inside that dialog's own button action.",
+        "why": "A view presents one alert at a time; asking for a second while the first is dismissing loses one of them, and the one lost would be the report the teacher just asked for."
+      }
     },
     "checks": [
       {

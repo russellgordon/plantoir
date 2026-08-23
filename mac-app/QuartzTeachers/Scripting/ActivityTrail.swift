@@ -71,6 +71,12 @@ nonisolated enum ActivityTrail {
         /// invisible on disk — a renamed folder looks exactly like a folder
         /// that was always called that.
         case folderProblemFound = "folder problem found"
+        /// A folder a feature depends on was put back, at the teacher's
+        /// request. Separate from `folderProblemFound` because it is a
+        /// different event: one records that something is wrong, the other that
+        /// somebody acted on it — and a trail that could not tell them apart
+        /// would leave "did they ever fix it?" unanswerable.
+        case folderProblemRepaired = "folder problem repaired"
     }
 
     // MARK: - Stored properties
