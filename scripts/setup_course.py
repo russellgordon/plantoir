@@ -37,6 +37,31 @@ _HOST_OS = "unknown"  # set from --host-os at runtime
 def _is_windows(host_os: str) -> bool:
     return (host_os or "").lower() == "windows"
 
+def graded_folders_for(manifest: dict, shared_folders: list, per_section_folders: list) -> list:
+    """
+    Which of this course's folders hold work that counts for marks.
+
+    A payload or skeleton says so itself; anything else is worked out from the
+    folders the course actually has, using the same rule the build has always
+    applied — a folder whose name mentions tasks. So a brand-new course starts
+    with exactly the marks it would have had before this key existed, written
+    down explicitly instead of inferred every build.
+
+    Writing it explicitly is safe HERE and only here: a new course has no marks
+    to lose. Existing courses are deliberately left with no key at all, which is
+    what tells the build to keep applying the historical rule — see
+    contracts/shared-rules.json -> gradedFolders.absentIsNotEmpty.
+    """
+    declared = manifest.get("graded_folders") if manifest else None
+    if declared is not None:
+        return [name for name in declared if name]
+    found = []
+    for name in list(shared_folders) + list(per_section_folders):
+        if name and "task" in str(name).lower() and name not in found:
+            found.append(str(name))
+    return found
+
+
 def _cmd_example(script_base: str, course, section, host_os: str) -> str:
     """
     Returns OS-appropriate example command for preview/deploy.
@@ -2241,6 +2266,14 @@ def setup_course(no_backup: bool = False):
         "per_section_files": per_section_files,
         "hidden": hidden_items,
         "expandable": expandable_items,
+        # Which folders hold work that counts for marks. Written explicitly for
+        # a NEW course because there are no marks to lose; an EXISTING course
+        # deliberately has no such key, which is what tells the build to keep
+        # applying the historical rule.
+        "graded_folders": graded_folders_for(
+            example_manifest if prepopulate_example else (skeleton_manifest or {}),
+            shared_folders, per_section_folders
+        ),
         # NEW: global Explorer expansion behaviour for this course
         "expandOnFolderClick": expand_on_click,
         "footer_html": footer_html,

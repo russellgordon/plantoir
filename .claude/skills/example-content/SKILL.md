@@ -419,11 +419,24 @@ mathematics payloads' coding pages, which are also Python.)
 ## Phase 3 — Manifest
 
 `manifest.json`: `shared_folders`, `shared_files`, `per_section_folders`,
-`per_section_files`, `hidden`, `expandable`, `curriculum_folder`. This is
-the whole structure — mirror ADA1O's hidden/expandable choices (Curriculum
+`per_section_files`, `hidden`, `expandable`, `curriculum_folder`,
+`graded_folders`. This is the whole structure — mirror ADA1O's hidden/expandable choices (Curriculum
 and the utility files hidden; content folders expandable; All Classes
 visible but not expandable). Layout: `shared/` → course root;
 `per_section/` → every sectionN/.
+
+**`graded_folders` names the folders whose work counts for marks** — what
+puts the ring on a cell in the Curriculum Coverage map, and what answers
+Ontario's ask that every overall expectation be evaluated at least once.
+Normally `["Tasks"]`. The linter refuses a payload without it, and refuses
+a name that is not one of the course's own folders.
+
+Declare it rather than letting it be inferred. Inference is a SUBSTRING
+("does the folder mention tasks?") while the build matches a pooled name
+EXACTLY, so a payload whose folder was "Thinking Tasks" — the mathematics
+skeleton has one — would silently stop counting under a pool of
+`["Tasks"]`, and a silently ungraded map is the failure this whole key
+exists to prevent.
 
 ## Phase 4 — Generate the Curriculum folder by script
 

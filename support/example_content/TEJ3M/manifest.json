@@ -47,5 +47,8 @@
     "Tasks"
   ],
   "class_weekday_step": 1,
-  "curriculum_folder": "Curriculum"
+  "curriculum_folder": "Curriculum",
+  "graded_folders": [
+    "Tasks"
+  ]
 }

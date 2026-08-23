@@ -41,6 +41,9 @@
     "Tutorials"
   ],
   "curriculum_folder": "Curriculum",
+  "graded_folders": [
+    "Tasks"
+  ],
   "skeleton": true,
   "label": "Literacy"
 }
