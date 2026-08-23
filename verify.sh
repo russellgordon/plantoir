@@ -174,6 +174,23 @@ else
   fi
 fi
 
+# ---- build_site.py: the class-folder rule, against the SHARED contract ----
+# Same reason as the domain test below: build_site.py imports `frontmatter`,
+# which lives only inside the container. This one ALSO needs the contract, and
+# reads it from the image's own /opt/contracts — which is the end-to-end check
+# that the contract really travels with the toolchain, not just that the rule
+# is right.
+echo ""
+echo "🔎 Checking build_site.py's class-folder rule against the shared contract…"
+if docker run --rm \
+  -v "$(pwd)/scripts/test_class_folder.py:/opt/scripts/test_class_folder.py:ro" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_class_folder.py >/tmp/verify_class_folder_test.log 2>&1; then
+  pass "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
+else
+  fail "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
+  cat /tmp/verify_class_folder_test.log
+fi
+
 # ---- build_site.py: custom-domain resolution follows the primary destination ----
 # Needs the real image, not a host run — build_site.py imports `frontmatter`,
 # which lives only inside the container (see Dockerfile's `pip install`), so

@@ -251,7 +251,8 @@ final class ClassPlanningContractTests: XCTestCase {
                 isSectionLocal: folder.contains("Classes"),
                 isVisibleToStudents: visible,
                 date: day,
-                linkedTitles: links.map { $0.lowercased() }
+                linkedTitles: links.map { $0.lowercased() },
+                classFolderName: "All Classes"
             )
         }
 

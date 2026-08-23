@@ -2772,6 +2772,71 @@ the failure the mac hit: a disk filling with something the teacher has never
 heard of and cannot connect to this app. Nobody here can see a Windows
 machine to answer it, so it is a question rather than a finding.
 
+## "Where do the class pages live?" had four answers — and yours was the worst (2026-08-23)
+
+**Action required on your side: build and test. The C# below was written on the
+mac, which has no dotnet, so it has compiled nowhere.**
+
+A teacher whose class folder is not called "All Classes" — "Class Pages", say —
+used to get a different answer from each of four places:
+
+| Where | What it asked |
+|---|---|
+| mac `ClassPages.folderURL` | the course's CONFIGURED per-section folders, first containing "class" |
+| mac `AssistSectionGraph.isClassPage` | the page's IMMEDIATE parent contains "class" |
+| `build_site.py` | any path segment EQUALS "all classes" or "classes" — including the FILE NAME |
+| your `AssistWorkspace.Plan` | the whole ABSOLUTE directory string contains "class" |
+
+Three of those are wrong in ways worth knowing:
+
+- **The build's.** Exact strings, so "Class Pages" matched nothing. When no
+  class pages are found, `_pages_the_course_teaches` returns `None` and the
+  Curriculum Coverage map falls back from "pages the course teaches" to "every
+  published page". The map still renders, still looks healthy, and is wrong —
+  the failure this whole piece exists to close.
+- **The build's, again.** It tested the file name too. Under any substring rule
+  that makes "How This Class Works.md" a lesson — it ships in about twenty
+  payloads — along with "Our Classroom Norms.md" and ADA1O's curriculum
+  expectation page "B3. Connections Beyond the Classroom.md".
+- **Yours.** `Path.GetDirectoryName(pagePath)` is the absolute directory, so a
+  teacher whose working folder is `C:\Users\x\Classroom\` makes **every page
+  in every course** a class page. Where somebody keeps their files is not a fact
+  about their lessons. This is the one that needed fixing most and could not
+  have been found from the mac.
+
+**The one rule**, in `contracts/class-planning.json` → `classFolder`:
+
+- *naming*: the first configured per-section folder whose name CONTAINS "class"
+  (case-insensitive), else the first entry, else the literal "All Classes".
+  Substring is safe here — it is a short list the teacher chose.
+- *isClassPage*: not an `index.md`, and one FOLDER segment — never the file
+  name — EQUALS that folder's name, case-insensitively, with the path taken
+  RELATIVE to the content root.
+
+The asymmetry is deliberate and is the part worth not "simplifying" later:
+naming may use a substring because its input is curated; page matching may not,
+because its input is arbitrary paths. A classics course's "Classical Studies"
+folder must not be mistaken for where its lessons live.
+
+**What changed on your side:**
+
+- new `Plantoir.Core/Models/ClassFolderRule.cs` — `Name(...)` and
+  `IsClassPage(relativePath, classFolder)`. It is called `ClassFolderRule`, not
+  `ClassFolder`, because `AssistWorkspace` already has a private `ClassFolder`
+  method that returns a PATH, and two things with one name returning different
+  kinds of answer is how the next bug gets written;
+- `AssistWorkspace.Plan` now calls
+  `ClassFolderRule.IsClassPage(Relative(pagePath), ClassFolderRule.Name(course.Configuration.PerSectionFolders))`
+  — note `Relative(...)`, which is the fix for the `Classroom` bug;
+- `AssistWorkspace.ClassFolder(course, section)` delegates its naming half;
+- new `Plantoir.Tests/ClassFolderContractTests.cs`, deserialising the same 5 + 9
+  cases the mac suite and `scripts/test_class_folder.py` run.
+
+**Rejected:** unifying on "contains class" everywhere. It reads well and it
+reclassifies real shipped pages — see the payload examples above. Segment
+EQUALITY for pages, substring only for the configured list, is the distinction
+that makes the rule safe.
+
 ## The scripts can now read the contract — and it travels differently on Windows (2026-08-23)
 
 `contracts/` used to be readable only by the two test suites. It is now readable

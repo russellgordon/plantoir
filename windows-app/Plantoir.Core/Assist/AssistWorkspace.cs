@@ -996,8 +996,13 @@ public sealed class AssistWorkspace
         string key = PageFrontmatter.PublishKeyFor(section, sectionLocal);
         string text = File.ReadAllText(pagePath);
         bool isFolderIndex = Path.GetFileName(pagePath).Equals("index.md", StringComparison.OrdinalIgnoreCase);
-        bool isClassPage = !isFolderIndex && (pagePath.Contains("All Classes", StringComparison.OrdinalIgnoreCase) ||
-                           Path.GetDirectoryName(pagePath)?.Contains("class", StringComparison.OrdinalIgnoreCase) == true);
+        // The shared rule (contracts/class-planning.json -> classFolder), against
+        // the path RELATIVE to the working folder. This used to test the whole
+        // directory string, so a teacher whose working folder was
+        // C:\Users\x\Classroom\ made every page in every course a class page.
+        bool isClassPage = ClassFolderRule.IsClassPage(
+            Relative(pagePath),
+            ClassFolderRule.Name(course.Configuration.PerSectionFolders));
         return new PlannedPage(
             Title: Path.GetFileNameWithoutExtension(pagePath),
             RelativePath: Relative(pagePath),
@@ -2766,13 +2771,10 @@ public sealed class AssistWorkspace
     /// <summary>Where a section's class pages live.</summary>
     private static string ClassFolder(Course course, int sectionNumber)
     {
-        var folders = course.Configuration.PerSectionFolders;
-        // "All Classes" by convention, but a course names its own folders and
-        // the first per-section folder is where classes go.
-        string name = folders.FirstOrDefault(f => f.Contains("Class", StringComparison.OrdinalIgnoreCase))
-                      ?? folders.FirstOrDefault()
-                      ?? "All Classes";
-        return Path.Combine(course.SectionDirectory(sectionNumber), name);
+        // The naming half of the shared rule
+        // (contracts/class-planning.json -> classFolder.naming).
+        return Path.Combine(course.SectionDirectory(sectionNumber),
+                            ClassFolderRule.Name(course.Configuration.PerSectionFolders));
     }
 
     /// <summary>

@@ -123,21 +123,12 @@ enum ClassPages {
     /// Read from the course's own settings rather than guessed: it is the
     /// per-section folder whose name mentions classes ("All Classes" by
     /// convention), and failing that the first per-section folder the course
-    /// has.
+    /// has. The rule itself lives in `ClassFolder`, which is the ONE home for
+    /// it — this used to be one of four implementations that disagreed. See
+    /// `contracts/class-planning.json` → `classFolder`.
     static func folderURL(forSection sectionNumber: Int, in course: Course) -> URL {
-        let folders: [String] = course.configuration.perSectionFolders
-        var chosen: String? = nil
-        for folder in folders {
-            if folder.lowercased().contains("class") {
-                chosen = folder
-                break
-            }
-        }
-        if chosen == nil {
-            chosen = folders.first
-        }
         return course.sectionDirectoryURL(forSection: sectionNumber)
-            .appendingPathComponent(chosen ?? "All Classes")
+            .appendingPathComponent(ClassFolder.name(for: course))
     }
 
     /// The section's class pages, in date order, undated ones last.

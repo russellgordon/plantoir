@@ -42,6 +42,12 @@ struct AssistSectionPage {
     /// The pages this one links to, lowercased, as wikilink targets.
     let linkedTitles: [String]
 
+    /// What THIS course calls the folder its class pages live in — "All
+    /// Classes" by convention, and not always. Carried on the page rather than
+    /// worked out from the path, because the answer comes from the course's
+    /// own configured per-section folders and a path cannot know it.
+    let classFolderName: String
+
     // MARK: - Computed properties
 
     /// A folder's landing page. Never a lesson, and never an orphan: it is the
@@ -61,11 +67,18 @@ struct AssistSectionPage {
     /// page, and counting them as orphans made a healthy course look broken:
     /// a real 86-period credit reported 84 pages "linked from nowhere", which
     /// were its lessons.
+    ///
+    /// The rule lives in `ClassFolder` and is pinned by
+    /// `contracts/class-planning.json` → `classFolder`. This used to sniff the
+    /// page's immediate parent for the word "class", which was one of four
+    /// implementations that disagreed with each other — and which answered
+    /// "no" for a lesson filed one folder deeper, since only the immediate
+    /// parent was ever looked at.
     var isClassPage: Bool {
         if isFolderIndex {
             return false
         }
-        return fileURL.deletingLastPathComponent().lastPathComponent.lowercased().contains("class")
+        return ClassFolder.isClassPage(relativePath: relativePath, classFolder: classFolderName)
     }
 
     var lowercasedTitle: String {
@@ -155,7 +168,8 @@ struct AssistSectionGraph {
                     in: text, forSection: sectionNumber, isSectionLocal: isSectionLocal
                 ),
                 date: PageFrontmatter.createdDay(in: text, key: dateKey),
-                linkedTitles: linkTargets(in: text)
+                linkedTitles: linkTargets(in: text),
+                classFolderName: ClassFolder.name(for: course)
             ))
         }
         return AssistSectionGraph(courseCode: course.code, sectionNumber: sectionNumber, pages: pages)

@@ -3582,7 +3582,61 @@ def _is_draft(text: str) -> bool:
     return bool(legacy)
 
 
-def _pages_the_course_teaches(content_root: Path) -> set | None:
+def class_folder_name(config: dict) -> str:
+    """
+    Which folder holds a section's class pages.
+
+    Read from the course's own configured `per_section_folders`, never guessed
+    from what is on disk: the first entry whose name contains "class"
+    (case-insensitive), else the first entry, else the literal "All Classes".
+    Substring matching is safe here because the list is a short curated one the
+    teacher chose — it is NOT safe against arbitrary paths, which is what
+    `_is_class_page_path` below is careful about.
+
+    Pinned by contracts/class-planning.json -> classFolder.naming, which the
+    two apps run against their own implementations of the same rule. This used
+    to be four rules that disagreed; see that contract's note.
+    """
+    folders = config.get("per_section_folders") or []
+    for folder in folders:
+        if "class" in str(folder).lower():
+            return str(folder)
+    if folders:
+        return str(folders[0])
+    return "All Classes"
+
+
+def _is_class_page_path(relative_path: Path, class_folder: str) -> bool:
+    """
+    Whether a page — given by its path RELATIVE to the content root — is one of
+    the section's class pages.
+
+    A class page is not an `index.md`, and one of its FOLDER segments equals the
+    class folder's name, case-insensitively.
+
+    Two things this is deliberately careful about, both of which were real bugs:
+
+    * **Folder segments only, never the file name.** This test used to run over
+      every segment including the file name, so "How This Class Works.md" (about
+      twenty payloads) and ADA1O's curriculum page "B3. Connections Beyond the
+      Classroom.md" counted as lessons, inflating what the course was judged to
+      teach.
+    * **Relative to the content root.** Windows tested the whole directory
+      string, so a teacher whose working folder was ``C:\\Users\\x\\Classroom``
+      made every page in every course a class page.
+
+    Pinned by contracts/class-planning.json -> classFolder.isClassPage.
+    """
+    if relative_path.name.lower() == "index.md":
+        return False
+    wanted = class_folder.lower()
+    for segment in relative_path.parts[:-1]:
+        if segment.lower() == wanted:
+            return True
+    return False
+
+
+def _pages_the_course_teaches(content_root: Path, class_folder: str) -> set | None:
     """
     The pages a student actually reaches by following the schedule.
 
@@ -3599,7 +3653,7 @@ def _pages_the_course_teaches(content_root: Path) -> set | None:
     """
     class_pages = {}
     for page in content_root.rglob("*.md"):
-        if any(part.lower() in ("all classes", "classes") for part in page.parts):
+        if _is_class_page_path(page.relative_to(content_root), class_folder):
             class_pages[page.stem] = page
     if not class_pages:
         return None
@@ -3625,7 +3679,8 @@ def _pages_the_course_teaches(content_root: Path) -> set | None:
     return set(class_pages) | first_hop | second_hop
 
 
-def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict):
+def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
+                     class_folder: str):
     """
     How many pages address each expectation, and which of those are assessed.
 
@@ -3657,7 +3712,7 @@ def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict):
     """
     covered_by = {code: set() for code in specific}
     assessed_by = {code: set() for code in specific}
-    taught = _pages_the_course_teaches(content_root)
+    taught = _pages_the_course_teaches(content_root, class_folder)
     for page in sorted(content_root.rglob("*.md")):
         if taught is not None and page.stem not in taught:
             continue
@@ -3724,7 +3779,8 @@ def _coverage_cell(code: str, page: Path, content_root: Path, count: int, assess
 
 def build_curriculum_coverage(content_root: Path, course_code: str,
                              include_notes: bool = True,
-                             first_class_stamp: str | None = None) -> bool:
+                             first_class_stamp: str | None = None,
+                             class_folder: str = "All Classes") -> bool:
     """
     Write the Curriculum Coverage page. Returns True when one was written.
 
@@ -3741,7 +3797,8 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
     if not specific:
         return False
 
-    covered_by, assessed_by = _coverage_counts(content_root, curriculum_dir, specific)
+    covered_by, assessed_by = _coverage_counts(content_root, curriculum_dir, specific,
+                                               class_folder)
     folder = curriculum_dir.name
 
     strands = {}
@@ -4208,7 +4265,8 @@ def build_section_site(
         if build_curriculum_coverage(
                 content_root, course_code,
                 include_notes=bool(config.get("include_coverage_notes", True)),
-                first_class_stamp=first_class_stamp):
+                first_class_stamp=first_class_stamp,
+                class_folder=class_folder_name(config)):
             link_coverage_from_key_links(content_root)
     else:
         print("ℹ️ Curriculum Coverage page is switched off for this course.")
