@@ -36,7 +36,7 @@ because Russell's Anthropic quota is limited. Know which one you are.
 
 | Agent | Does |
 |---|---|
-| **Fable** | Revises THIS FILE once, folding in Russell's answers to the questions below. Does not write code. |
+| **Fable** | Revised THIS FILE once (2026-08-24), folding in Russell's answers to six product questions. Done; no code. |
 | **Gemini, in Antigravity** | Implements one piece at a time, then adversarially reviews its OWN work before committing. |
 | **Claude (Opus, medium effort)** | Reviews Gemini's committed work for that piece, in a fresh chat. Fixes what it finds, or says plainly that it is sound. |
 
@@ -160,6 +160,36 @@ policy once, up front, and apply it to both: **when may code write `[]`, and
 when must it omit the key instead?** Doing Piece 1's write policy before Piece
 3's meaning is settled risks `setup_course.py` writing the exact `[]` that
 Piece 3 exists to prevent.
+
+**Settled (Russell, 2026-08-24): code may write `[]` when the teacher has been
+asked; only a course that has never been asked omits the key.** Concretely:
+
+* `setup_course.py` **writes `[]`** when reconciliation (Piece 1) leaves the
+  pool empty — even with the coverage map ON. Removing the folder in the wizard
+  IS being asked and answering "nothing", so `[]` is the honest state. Omitting
+  the key would be the wrong lie: the table reads absent as *never asked*, and
+  on a new course absent means the *task*-substring rule, which matches nothing
+  either once the folder is gone — the same silent zero marks, now disguised as
+  an untouched legacy course. `graded_folders_for`'s own docstring
+  (`scripts/setup_course.py:50-53`) says the point of writing the key at
+  creation is that a new course has no marks to lose and can be explicit.
+  Refusing was rejected because `setup_course.py` aborting mid-install over a
+  choice the wizard already accepted puts the refusal in the wrong place — the
+  GUI is where a refusal belongs, and that is Piece 3.
+* What makes `[]` SAFE to write is that it is exactly the input Piece 1's new
+  health check is defined on (map ON, pool names nothing on disk), so the
+  teacher is told rather than left silent. Piece 3 then stops the GUI reaching
+  it in the first place. The two pieces are therefore not in tension: Piece 1
+  writes the honest state and warns; Piece 3 prevents it.
+* **Reconciliation in `setup_course.py` applies to BOTH a manifest-declared
+  pool and an inferred one**, because at wizard time there is no difference:
+  `graded_folders_for` (`setup_course.py:55-62`) returns either the declared
+  list or one inferred from the final folder lists, and the fix is simply to
+  filter whatever it returns against the lists the course actually ends with.
+  A pool a teacher edits LATER in Course Settings never passes through
+  `setup_course.py` at all (`save()` writes JSON only,
+  `CourseSettingsView.swift:236-254`), so that case belongs to Piece 3's
+  `MembershipToggleListView`, not to Piece 1.
 
 ---
 
@@ -287,43 +317,6 @@ amendments he agreed to:
 
 ---
 
-## ASK RUSSELL BEFORE STARTING — these are product decisions, not agent calls
-
-The repo's own rules make these his. Ask in one message, then work
-autonomously.
-
-**For Piece 1**
-1. When reconciliation leaves the marks pool empty while the coverage map is
-   ON, should `setup_course.py` write `[]`, omit the key (restoring the
-   historical *task* rule), or refuse to proceed?
-2. Does reconciliation apply only to a manifest-DECLARED pool, or also to one a
-   teacher has edited?
-
-**For Piece 2**
-3. Is exclusion course-wide or per-section? One flat list of bare names is
-   matched against both `discover_shared_items` (course root) and
-   `discover_section_items` (section root) — `build_site.py:3244-3284` — so a
-   per-section name excluded is excluded for EVERY section. Retrofitting shape
-   onto a shipped key is the expensive version.
-4. Does an exclusion expire when the folder disappears from disk and is later
-   re-created in Obsidian? Discovery is name-based and top-level only, so there
-   is no path identity distinguishing "the folder I excluded" from "the new
-   folder I just made" — and Course Settings promises the opposite in so many
-   words (`CourseSettingsView.swift:99`: "you can also simply create new folders
-   in Obsidian — they're added to your site automatically").
-5. Should the note CREATE an `index.md` in a folder that has none? That is a
-   visible structural change to his vault, made by a build.
-
-**For Piece 3**
-6. The project's stated direction is wording authored in Swift and GENERATED
-   into the contract ("if you are about to type one of the assistant's sentences
-   into a document or a test, don't — name it instead"). Putting `specialNames`
-   sentences directly in hand-authored `shared-rules.json` inverts that. Is the
-   new precedent acceptable, or should the sentences live in Swift with the
-   contract carrying only the rules?
-
----
-
 ## The work, in three pieces, in this order
 
 Keep committing on `issue/special-folders-hardening`. **Do not merge to `dev`**
@@ -336,7 +329,9 @@ Smallest, and the actual harm Russell hit.
 * Reconcile `graded_folders_for` (`setup_course.py:40`) against the folder lists
   the teacher **actually ends with**: drop declared names no longer present.
   Covers path B.
-* Apply the nil-vs-`[]` policy settled above, per Russell's answer to question 1.
+* Apply the nil-vs-`[]` policy settled above: an empty result is written as
+  `[]`, never omitted — and reconciliation covers declared and inferred pools
+  alike.
 * New `site_health.py` check: coverage map ON **and** the pool naming nothing
   that exists → warn that **nothing currently counts for marks**. Phrase it as
   the FEATURE producing nothing. Gate it so it cannot nag a course with no map —
@@ -344,6 +339,8 @@ Smallest, and the actual harm Russell hit.
   this reason.
 * Contract: add the check to `contracts/shared-rules.json` → `siteHealth.checks`
   so both suites run it.
+  Its sentence is hand-authored THERE, not in Swift — see the wording decision
+  under Piece 3, which this check is the first instance of.
 
 **Acceptance, and note what it deliberately does NOT claim:**
 - A course with the coverage map ON whose pool matches nothing on disk emits a
@@ -362,13 +359,44 @@ It is not "no Xcode".
 
 Changes a file format both apps write, so it lands by itself.
 
-* New config key, shaped per Russell's answer to question 3. Document in
+* New config key `excluded_items`, **an object keyed by scope, mirroring the
+  config's existing split**:
+  ```json
+  "excluded_items": {"shared": ["Tasks"], "per_section": ["All Classes"]}
+  ```
+  Decided 2026-08-24. Names in the two scopes are matched by different scans
+  (`discover_shared_items` vs `discover_section_items`,
+  `build_site.py:3244-3284`), and the same bare name can legitimately exist in
+  both, so a flat list would conflate them. Exclusion is **course-wide within a
+  scope**: a per-section name excluded is excluded for every section. A
+  per-section-NUMBER exclusion was rejected for now because nothing can set
+  it — Course Settings edits one course-wide `per_section_folders` list — but
+  the object shape is additive, so a `"sections": {"4": [...]}` key can be
+  added later without retrofitting; a flat array could not. Two top-level keys
+  (`excluded_shared_items` / `excluded_section_items`) were rejected as
+  scattering one concept across keys both apps must remember to write
+  together. ABSENT (not `{}`) for a course that has excluded nothing, like
+  `graded_folders` and `additional_deploy_targets`. Document in
   `contracts/file-formats.json`.
+* **An exclusion does NOT expire when the folder is deleted and later
+  re-created in Obsidian.** It persists until the teacher re-includes the name
+  in Course Settings. Discovery is name-based, so the build cannot tell "the
+  folder I excluded" from "the new folder I just made", and guessing "new"
+  would re-publish something the teacher deliberately excluded — the same harm
+  as today's un-hide bug. The build-time `index.md` note makes the persistence
+  self-explaining: a re-created folder gets the note on its next preview.
+  Amend the promise at `CourseSettingsView.swift:99` ("they're added to your
+  site automatically") so it excepts names removed here; that sentence is now
+  false without the exception.
 * `preflight_update_course_config` must not re-add and must not un-hide an
   excluded name — and must **print a line saying it is skipping it and why**.
 * The `index.md` note: sentinel-delimited, idempotent, never touching the
   teacher's own text, removed on re-inclusion, and **stripped by the merge from
-  any copied `index.md`**. Confirm by inspecting a built `public/` that the
+  any copied `index.md`**. **It is written only into an `index.md` that already
+  exists — the build never CREATES one.** A folder with no `index.md` gets the
+  console skip line only. A build adding files to a teacher's vault is a
+  precedent this project has avoided, and the note is a courtesy, not the
+  mechanism of exclusion (the config key is). Confirm by inspecting a built `public/` that the
   sentinel text is absent — preview and deploy both run preflight, but the note
   is written into the MERGED tree, so prove it does not ship rather than
   assuming it.
@@ -387,7 +415,7 @@ Changes a file format both apps write, so it lands by itself.
 **Acceptance:** remove a folder in Course Settings; preview; assert the folder's
 pages are absent from `public/`, the name is still absent from the config after
 the rebuild, nothing was un-hidden, the skip line appears in the console, and
-the sentinel note is present in the vault and absent from `public/`.
+the sentinel note is present in the vault (where an `index.md` already existed) and absent from `public/`.
 
 ### Piece 3 — the protection model (last)
 
@@ -405,6 +433,18 @@ Needs Piece 2's exclusion state to talk about.
   FROM-SCRATCH paths**: for a pre-populated course the manifest decides
   structure whole (`setup_course.py:2113-2121`) and the GUI hides the list
   editors (`NewCourseWizardView.swift:739-743`).
+* **Where the new sentences live: hand-authored in `contracts/shared-rules.json`
+  under `specialNames`, with tests and documents naming keys, never quoting
+  text.** Decided 2026-08-24. This is not a new precedent: `siteHealth.checks`
+  sentences already live there and `site_health.py` reads them at run time
+  inside the container (`scripts/site_health.py:24-28, 61-63`). Python cannot
+  read Swift, and two of this branch's sentences — Piece 1's health check and
+  Piece 2's `index.md` note — are read by Python. Splitting (Python-read
+  sentences in the contract, the ⓘ sentences in Swift-generated
+  `assist-wording.json`) was rejected because it gives one feature two homes,
+  the drift `CLAUDE.md`'s "one place per kind of truth" table exists to
+  prevent. The "name it, don't quote it" rule stands as written: reference
+  `specialNames.<key>`.
 * Protect the folder `_find_curriculum_folder` would ACTUALLY resolve, not "any
   folder mentioning curriculum" — put that resolution rule in the contract so
   both apps compute the same name. Handle a protected name that is in no list
