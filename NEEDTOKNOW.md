@@ -145,3 +145,105 @@ It needs `courses/EXC2O` present (copy `support/example_course/EXC2O` into
 `courses/`). Without it, it fails that precondition and stops, having run only
 the fast host-side checks — the whole Docker half never executes. With the
 fixture: 42 passed, 0 failed.
+
+---
+
+# Trying it yourself, step by step
+
+About fifteen minutes. Use a THROWAWAY working folder — several steps delete
+folders on purpose, and one of them publishes a real website.
+
+## Setting up (2 minutes)
+
+1. In Finder, make a folder called `plantoir-trial` somewhere convenient.
+2. Inside it make a folder called `courses`.
+3. Copy `support/example_course/EXC2O` from this repository into `courses/`.
+4. Copy the nine launchers from the repository root — `setup.sh`, `preview.sh`,
+   `deploy.sh` and their `.bat`/`.ps1` twins — into `plantoir-trial/` itself.
+   **This step is not optional**: without `preview.sh` at the top level Plantoir
+   does not recognise the folder as a working folder, and the picker simply
+   stays up with no error. (That is intended behaviour, and it cost me an hour.)
+5. Open Plantoir → File → choose `plantoir-trial`. You should see EXC2O in the
+   sidebar. Expand it and select **Section 1**.
+
+## 1. The warning appears, and the machinery does not (3 minutes)
+
+6. In Finder, delete `courses/EXC2O/Media` and `courses/EXC2O/section1/index.md`.
+7. In Plantoir, press **Preview**.
+
+**Expect:** part-way through the build a dialog titled **"2 things need your
+attention"**, naming the Media folder and the missing front page in plain words,
+with buttons **Put them back** and **OK**.
+
+**Also check** — press **Show details** in the console and scroll: you should
+see the two ⚠️ sentences and NOT see any line beginning `PLANTOIR_HEALTH:`.
+That JSON line is how the app hears about the problem, and a teacher should
+never see it. It was visible until last night.
+
+## 2. The repair, and what it tells you (3 minutes)
+
+8. Press **Put them back**.
+
+**Expect:** a second dialog, **"Put the Media folder and the front page back."**,
+saying your preview still shows how things were, with **Preview Again** and
+**OK**.
+
+**Check in Finder:** both `Media/` and `section1/index.md` are back. The index
+should contain only a title line — deliberately, since it is your page to write.
+
+9. Press **Preview Again**. It should stop the running preview and start a new
+   one. (Until last night it did nothing at all, silently.)
+
+10. Press **Put them back** a second time on a later run, or after restoring the
+    folders yourself.
+
+**Expect:** **"That is already put right."** — NOT a warning about the folder
+being locked or read-only. That wording was wrong until last night.
+
+## 3. Publishing, and the different wording (5 minutes)
+
+11. Let the preview finish. Then press **Deploy**. If you want to avoid
+    publishing anything real, set the course's destination to a folder on this
+    Mac first (Course settings → Deploying).
+
+**Expect:** the findings dialog again if anything is still missing — and after
+pressing **Put them back**, the wording is DIFFERENT: **"Publishing is what puts
+this in front of students, so it is not on their site until you publish
+again."** with **Preview Again** still offered.
+
+That difference is the point: a preview shows YOU the repair, and only
+publishing reaches students.
+
+12. Look at the window title after a repair on a section that has published
+    before.
+
+**Expect:** **" — Edited"**. On a section that has NEVER published there is no
+marker, by design — nothing to be "edited since".
+
+## 4. The one that surprised me (2 minutes)
+
+13. Delete `section1/index.md` again, press Preview, dismiss the dialog with
+    **OK** (do not repair), wait for the build, then press **Deploy**.
+
+**Expect:** *"Built site not found … Build first"* — even though you just built.
+A section with no `index.md` cannot be published at all, and the message sends
+you round in a circle. This is pre-existing, is shared Python so Windows has it
+too, and is written up in `WINDOWS-HANDOFF.md` as an open item.
+
+Repairing the front page and previewing again fixes it.
+
+## 5. Which folders count for marks (2 minutes)
+
+14. Course settings → **Marks**. You should see a checklist of this course's
+    folders with **Tasks** ticked, and a link, "What else does Plantoir use my
+    folders for?", which opens a sheet naming THIS course's folders.
+15. Tick **Tests** as well, save, and preview. On the Curriculum Coverage page,
+    the "What counts" section should now say your course's own folders rather
+    than always saying "Tasks".
+
+## If something looks wrong
+
+The activity trail is `~/Library/Logs/Plantoir/Logs/activity.txt`
+(`~/Library/Logs/Plantoir/activity.txt`). A folder problem writes
+`found a problem with this course's folders (name)` and a repair writes
+`put the Media folder back` / `put the front page back`.
