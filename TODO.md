@@ -164,13 +164,9 @@ an item when it ships (finished behaviour is recorded in
   * **Only CSV comes off disk.** `TimetableSource` reads a local file as
     plain text, or exports a shared Google Sheet by link. A teacher's
     `.xlsx` sitting in Downloads is neither, so they have to export it
-    first — while the tool's own help text says “timetable.xlsx”.
-  * **Which lesson lands on which day is still the model's call.**
-    `plan_re_date_classes` takes matching `pages`/`meetings` lists and
-    falls back to an even spread, which the description itself calls a
-    starting point rather than an answer. That mapping is planning, and
-    planning is where the measurements say the local model fails; it has
-    not been measured on real phrasings.
+    first — while the tool's own help text says “timetable.xlsx”. Not
+    worth fixing — teachers export to CSV without friction, and reading
+    `.xlsx` off disk buys little.
 
   **(b) The shared activity lease, finished.** `WorkLease` files under the
   working folder now let the GUI decline a preview while the assistant
