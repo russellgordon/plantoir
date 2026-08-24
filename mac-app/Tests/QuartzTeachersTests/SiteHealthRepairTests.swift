@@ -303,15 +303,40 @@ final class SiteHealthRepairTests: XCTestCase {
 
 /// Does a repair make the section say " — Edited"?
 ///
-/// That marker is derived from a fingerprint of the section's content, and it
-/// is the ONLY prompt a teacher gets that a publish is owed. If a repair is
-/// invisible to it, Plantoir has just changed their course and told the marker
-/// nothing — so they would put a folder back, be told the published site is
-/// unchanged, and see no sign anywhere that publishing is now due.
+/// The marker is `SectionPublishState.hasUnpublishedEdits`, which compares the
+/// section's fingerprint against a STAMP written by a publish. So there are two
+/// questions, and the first version of these tests answered neither: they
+/// called `fingerprint` directly and never touched the marker.
+///
+/// It is also NOT "the only prompt a teacher gets that a publish is owed" —
+/// that claim was wrong and is corrected here. The repair dialog itself says
+/// so, in the sentence shown at the moment of the repair.
 @MainActor
 final class RepairChangesTheEditedMarkerTests: XCTestCase {
 
+    // MARK: - Stored properties
+
+    private var previousTrail: ProblemReportStore?
+
     // MARK: - Functions
+
+    override func setUp() {
+        super.setUp()
+        // These repairs write trail lines. Left alone they land in the real
+        // ~/Library/Logs/Plantoir/activity.txt — somebody's actual machine.
+        previousTrail = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(
+            folderURL: URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("repair-marker-trail-\(UUID().uuidString)")
+        )
+    }
+
+    override func tearDown() {
+        if let previousTrail {
+            ActivityTrail.store = previousTrail
+        }
+        super.tearDown()
+    }
 
     private func makeCourse() throws -> (URL, Course) {
         let root: URL = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -340,23 +365,70 @@ final class RepairChangesTheEditedMarkerTests: XCTestCase {
         ))
     }
 
-    func testPuttingTheFrontPageBackCountsAsAnEdit() throws {
+    /// A section that HAS published: the repair must make the marker appear.
+    func testAfterAPublishARepairMakesTheMarkerAppear() throws {
         let (root, course) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let before: String = SectionPublishState.fingerprint(
-            courseDirectory: course.directoryURL, sectionNumber: 1
+        // Stamp it as published, as a real publish would.
+        _ = SectionPublishState.recordPublish(
+            courseDirectory: course.directoryURL,
+            sectionNumber: 1,
+            fingerprint: SectionPublishState.fingerprint(
+                courseDirectory: course.directoryURL, sectionNumber: 1
+            ),
+            destinations: ["netlify"]
         )
+        XCTAssertFalse(SectionPublishState.hasUnpublishedEdits(
+            courseDirectory: course.directoryURL, sectionNumber: 1
+        ), "nothing has changed since that publish")
+
         XCTAssertTrue(SiteHealthRepair.restoreSectionIndex(forSection: 1, in: course))
-        let after: String = SectionPublishState.fingerprint(
+
+        XCTAssertTrue(SectionPublishState.hasUnpublishedEdits(
             courseDirectory: course.directoryURL, sectionNumber: 1
-        )
-        XCTAssertNotEqual(before, after,
-                          "restoring the front page must show as an edit, or nothing "
-                          + "tells the teacher a publish is now owed")
+        ), "putting the front page back is a change the teacher has not published")
     }
 
-    func testPuttingTheMediaFolderBackIsHonestlyReported() throws {
+    /// And the case the first version of this test missed entirely: with no
+    /// publish behind it, the marker stays off — by design, since "Edited" on a
+    /// course that has never published would always be on.
+    ///
+    /// This matters because a `sectionIndexMissing` finding is raised by a
+    /// PREVIEW too, and a preview records no stamp. So for a never-published
+    /// section the repair is silent as far as the marker goes, and the only
+    /// thing that tells the teacher anything is the dialog's own sentence.
+    func testWithNoPublishBehindItTheMarkerStaysOff() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        XCTAssertTrue(SiteHealthRepair.restoreSectionIndex(forSection: 1, in: course))
+        XCTAssertFalse(SectionPublishState.hasUnpublishedEdits(
+            courseDirectory: course.directoryURL, sectionNumber: 1
+        ), "a section that has never published cannot be 'edited since' anything")
+    }
+
+    /// The repair must edit THIS section, which a bare "the fingerprint moved"
+    /// assertion does not pin: writing junk into the course root would pass it.
+    func testTheFrontPageLandsInTheSectionItWasAskedAbout() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        XCTAssertTrue(SiteHealthRepair.restoreSectionIndex(forSection: 1, in: course))
+        let index: URL = course.directoryURL
+            .appendingPathComponent("section1/index.md")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: index.path))
+        XCTAssertTrue(try String(contentsOf: index, encoding: .utf8)
+            .contains("title: Introduction to Computer Science"))
+    }
+
+    /// Media, both ways round — which is what actually pins the rule.
+    ///
+    /// An EMPTY Media folder does not move the fingerprint, and a FILE inside
+    /// it does. Asserting only the first is indistinguishable from Media being
+    /// excluded from the walk altogether, which is a different rule with the
+    /// same passing test.
+    func testAnEmptyMediaFolderIsNotAnEditButAFileInItIs() throws {
         let (root, course) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -364,17 +436,20 @@ final class RepairChangesTheEditedMarkerTests: XCTestCase {
             courseDirectory: course.directoryURL, sectionNumber: 1
         )
         XCTAssertTrue(SiteHealthRepair.restoreMediaFolder(in: course))
-        let after: String = SectionPublishState.fingerprint(
+        let afterEmptyFolder: String = SectionPublishState.fingerprint(
             courseDirectory: course.directoryURL, sectionNumber: 1
         )
-        // An EMPTY Media folder does NOT count as an edit, and that is the
-        // right answer rather than a gap: the fingerprint is built from regular
-        // files, an empty folder contributes none, and nothing a student could
-        // see has changed. The teacher is not nudged to publish over it.
-        //
-        // Asserted rather than accepted either way — the first version of this
-        // test passed whichever way it fell, which is no test at all.
-        XCTAssertEqual(before, after,
+        XCTAssertEqual(before, afterEmptyFolder,
                        "an empty Media folder is not something students can see")
+
+        try "not really a picture".write(
+            to: course.directoryURL.appendingPathComponent("Media/diagram.png"),
+            atomically: true, encoding: .utf8
+        )
+        let afterAFile: String = SectionPublishState.fingerprint(
+            courseDirectory: course.directoryURL, sectionNumber: 1
+        )
+        XCTAssertNotEqual(afterEmptyFolder, afterAFile,
+                          "Media IS inside the walk — a picture in it is an edit")
     }
 }

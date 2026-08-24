@@ -361,6 +361,14 @@ struct SectionDetailView: View {
             case .findings:
                 if let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
                     Button(title) {
+                        // The marker is refreshed because a repair CHANGES the
+                        // section's content on the teacher's behalf, and
+                        // nothing else here would: `refreshEditedMarker` runs
+                        // on appear, when the section stops being busy, and on
+                        // window activation — the section stopped being busy
+                        // before this alert appeared, and an alert on this
+                        // window does not make it key again.
+                        defer { refreshEditedMarker() }
                         // Only REMEMBERED here: the outcome is shown once this
                         // alert has actually gone, from `onChange`. Raising a
                         // second alert from inside this action loses one of
