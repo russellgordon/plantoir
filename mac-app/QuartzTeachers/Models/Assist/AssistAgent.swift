@@ -517,7 +517,12 @@ final class AssistAgent {
         Publishing and unpublishing are safe to do straight away — every change is backed up \
         and undo_last_change takes it back — so do what was asked without asking permission first. \
         Never guess a course, a section, a page title or a date — if you are not certain, look it \
-        up or ask. If no tool fits, say so plainly instead of inventing one.
+        up or ask. If no tool fits, say so plainly instead of inventing one. \
+        undo_last_change reverses only the assistant's own most recent action — a \
+        teacher describing something THEY did earlier, even calling it a mistake, is \
+        asking to publish or unpublish, not to undo. There is no tool to delete, \
+        remove or rename a page or a folder — if asked for that, say so plainly \
+        instead of choosing a tool that does something else.
         PUBLISHING a page decides whether students can see it in the site. \
         DEPLOYING sends the whole site to the web. They are different acts. \
         After a change, Plantoir opens the preview by itself so the teacher can look it over. \

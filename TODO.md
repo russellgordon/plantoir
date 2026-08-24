@@ -103,13 +103,26 @@ an item when it ships (finished behaviour is recorded in
   is still a shared-design item — agree the remaining shape with the mac
   side first.
 
-  **(c) Re-measure the conversational residue.** The card's fixed shapes
-  no longer touch the model, but the conversational phrasings that still
-  do were last measured at 72% overall after the system-prompt rewrite
-  (`research/ai-assist/promise-card-results.txt`), with undo over-salient
-  and the deletion probe's decline lost. A prompt tweak plus a re-run of
-  `trimmed-surface-suite.py` is a contained afternoon; every change to
-  prompt or schemas retires the cache by design, so batch them.
+  **(c) Re-measure the conversational residue — partially done, 2026-08-24.**
+  Re-run against Qwen2.5-1.5B (native, Vulkan) with a two-sentence prompt
+  tweak: full write-up and raw runs in
+  `research/ai-assist/conversational-residue-results.txt`. The **undo
+  over-salience** cluster (a "posted X by mistake" unpublish request
+  routed to `undo_last_change`) is fixed, and a related case not in the
+  original TODO wording — a hide request declined outright — is fixed as
+  a side effect; conversational-only accuracy went from 85% to 91-94%
+  across two runs, with no new failures elsewhere. Shipped in
+  `AssistAgent.cs` and `AssistAgent.swift` — **the Swift side is written
+  but, per the usual constraint of a Windows session, not yet built or
+  tested on a mac**; see `MAC-HANDOFF.md`.
+
+  **Still open: the deletion probe's decline never came back.** "Delete
+  the Unit 1 folder" still routes to `cancel_scheduled_deploy` instead of
+  declining, unchanged across every wording tried. A more explicit
+  sentence naming that tool directly was tried and made things worse
+  elsewhere (two previously-clean conversational cases regressed) — logged
+  in the results file as a rejected option so it isn't retried unmeasured.
+  Left for a future pass.
 
 - **A "prepare for start of year" operation, and the audit behind it** —
   deferred 2026-08-13, from a real session on the `ai-assist` branch.

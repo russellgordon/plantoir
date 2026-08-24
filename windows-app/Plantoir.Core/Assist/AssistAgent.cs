@@ -297,7 +297,23 @@ public sealed class AssistAgent
         "and undo_last_change takes it back — so do what was asked without asking permission first. " +
         "Never guess a course, a section, a page title " +
         "or a date — if you are not certain, look it up or ask. " +
-        "If no tool fits, say so plainly instead of inventing one.\n" +
+        "If no tool fits, say so plainly instead of inventing one. " +
+        // Measured 2026-08-24 (research/ai-assist/conversational-residue-results.txt):
+        // without these two sentences the model routed "I posted X by mistake, make
+        // it a draft again" to undo_last_change instead of unpublish (undo is for the
+        // ASSISTANT's own last action, not something the teacher did earlier), and
+        // "hide tomorrow's class again — the page is X" sometimes declined outright.
+        // Adding both sentences fixed both clusters and raised conversational routing
+        // accuracy from 85% to 91-94% across two runs, with no new misses elsewhere.
+        // A version that also named cancel_scheduled_deploy explicitly (to fix the
+        // still-unsolved "delete the X folder" probe) made two unrelated cases regress
+        // — kept out for exactly the reason AssistToolRunner.localTools's doc comment
+        // gives: a small model reads an extra clause as new signal, not a boundary.
+        "undo_last_change reverses only the assistant's own most recent action — a " +
+        "teacher describing something THEY did earlier, even calling it a mistake, is " +
+        "asking to publish or unpublish, not to undo. There is no tool to delete, " +
+        "remove or rename a page or a folder — if asked for that, say so plainly " +
+        "instead of choosing a tool that does something else.\n" +
         // Two words that sound alike and are not. The teacher gets this
         // explained once per section by explain_publishing; the model
         // needs it every turn, because it is the distinction it is
