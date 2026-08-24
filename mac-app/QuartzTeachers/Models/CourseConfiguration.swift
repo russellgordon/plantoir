@@ -489,12 +489,21 @@ class CourseConfiguration {
     }
 
     /// Removes an item name from exclusions in a given scope (re-including it).
-    func reinclude(_ name: String, inScope scope: String) {
+    ///
+    /// Returns true only if the name WAS excluded, so a caller can tell a
+    /// genuine re-inclusion from an ordinary add and record only the former
+    /// on the trail — a line saying a folder was re-included when it never
+    /// was excluded would be believed.
+    @discardableResult
+    func reinclude(_ name: String, inScope scope: String) -> Bool {
+        guard isExcluded(name, inScope: scope) else {
+            return false
+        }
         guard var dict = excludedItems else {
-            return
+            return false
         }
         guard let list = dict[scope] else {
-            return
+            return false
         }
         var updated: [String] = []
         for item in list {
@@ -512,6 +521,7 @@ class CourseConfiguration {
         } else {
             excludedItems = dict
         }
+        return true
     }
 
     var hiddenItems: [String] {

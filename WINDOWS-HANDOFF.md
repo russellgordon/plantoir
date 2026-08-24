@@ -412,6 +412,28 @@ this side is expected to say so when the contract is wrong.
       content stripping are in shared `build_site.py` and run identically on Windows.
       The Windows app only needs to implement `ExcludedItems` in `CourseConfiguration.cs`
       and wire exclusion/re-inclusion in the Settings list editors with trail events.
+    - **Why this shape, and what was rejected (decided 2026-08-24).** An object
+      keyed by scope rather than a flat list, because the two scopes are matched by
+      different scans (`discover_shared_items` vs `discover_section_items`) and the
+      same bare name can legitimately exist in both. Two top-level keys
+      (`excluded_shared_items` / `excluded_section_items`) were rejected as one
+      concept scattered across keys both apps must remember to write together. A
+      per-section-NUMBER exclusion was rejected for now because nothing can set it
+      (Course Settings edits one course-wide `per_section_folders` list), but the
+      object is additive so a `"sections": {"4": [...]}` key can be added later.
+    - **An exclusion does NOT expire** when the folder is deleted and re-created in
+      Obsidian. Discovery is name-based, so the build cannot tell "the folder I
+      excluded" from "a new folder", and guessing "new" would re-publish something
+      the teacher deliberately excluded. It ends only when the teacher adds the
+      name back in Course Settings — the `index.md` note exists to make that
+      self-explaining.
+    - **The mechanism of exclusion is the name's ABSENCE from the copy list**
+      (`shared_folders` etc.); `excluded_items` only stops preflight putting it
+      back. So the Windows app must do BOTH on removal — take the name out of the
+      list AND record it in `excluded_items[scope]` — or the folder keeps
+      publishing. Record `item re-included` ONLY when the name was actually in
+      `excluded_items`; an ordinary add is not a re-inclusion, and a trail line
+      that says it was would be believed.
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity

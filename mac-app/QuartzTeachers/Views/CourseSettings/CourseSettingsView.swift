@@ -86,8 +86,9 @@ struct CourseSettingsView: View {
                             ActivityTrail.note(.itemExcluded, "excluded shared folder " + name + " in " + course.code)
                         },
                         onAdd: { name in
-                            configuration.reinclude(name, inScope: "shared")
-                            ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
+                            if configuration.reinclude(name, inScope: "shared") {
+                                ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
+                            }
                         }
                     )
                     StringListEditorView(
@@ -99,8 +100,9 @@ struct CourseSettingsView: View {
                             ActivityTrail.note(.itemExcluded, "excluded shared file " + name + " in " + course.code)
                         },
                         onAdd: { name in
-                            configuration.reinclude(name, inScope: "shared")
-                            ActivityTrail.note(.itemReincluded, "re-included shared file " + name + " in " + course.code)
+                            if configuration.reinclude(name, inScope: "shared") {
+                                ActivityTrail.note(.itemReincluded, "re-included shared file " + name + " in " + course.code)
+                            }
                         }
                     )
                     StringListEditorView(
@@ -111,8 +113,9 @@ struct CourseSettingsView: View {
                             ActivityTrail.note(.itemExcluded, "excluded per-section folder " + name + " in " + course.code)
                         },
                         onAdd: { name in
-                            configuration.reinclude(name, inScope: "per_section")
-                            ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
+                            if configuration.reinclude(name, inScope: "per_section") {
+                                ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
+                            }
                         }
                     )
                     StringListEditorView(
@@ -124,8 +127,9 @@ struct CourseSettingsView: View {
                             ActivityTrail.note(.itemExcluded, "excluded per-section file " + name + " in " + course.code)
                         },
                         onAdd: { name in
-                            configuration.reinclude(name, inScope: "per_section")
-                            ActivityTrail.note(.itemReincluded, "re-included per-section file " + name + " in " + course.code)
+                            if configuration.reinclude(name, inScope: "per_section") {
+                                ActivityTrail.note(.itemReincluded, "re-included per-section file " + name + " in " + course.code)
+                            }
                         }
                     )
                     Text("Tip: you can also simply create new folders in Obsidian — they’re added to your site automatically the next time you preview (unless you have removed them here).")

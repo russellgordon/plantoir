@@ -256,8 +256,12 @@ final class CourseConfigurationTests: XCTestCase {
         configuration.exclude("Handouts", inScope: "per_section")
         XCTAssertTrue(configuration.isExcluded("Handouts", inScope: "per_section"))
 
-        // Re-including shared Tasks cleans shared scope
-        configuration.reinclude("Tasks", inScope: "shared")
+        // An ordinary add is not a re-inclusion: the trail must not say it was
+        XCTAssertFalse(configuration.reinclude("Never Excluded", inScope: "shared"))
+        XCTAssertFalse(configuration.reinclude("Handouts", inScope: "shared"))
+
+        // Re-including shared Tasks cleans shared scope, and says so
+        XCTAssertTrue(configuration.reinclude("Tasks", inScope: "shared"))
         XCTAssertFalse(configuration.isExcluded("Tasks", inScope: "shared"))
         XCTAssertEqual(configuration.excludedItems(forScope: "shared"), [])
         XCTAssertTrue(configuration.isExcluded("Handouts", inScope: "per_section"))
