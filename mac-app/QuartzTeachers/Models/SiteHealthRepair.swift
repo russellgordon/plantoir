@@ -142,11 +142,14 @@ enum SiteHealthRepair {
             )
         }
 
+        // A preview is offered on BOTH occasions: after a publish it is how the
+        // teacher checks the repair worked, and the wording carries the part a
+        // preview cannot do.
         switch occasion {
         case .building:
             return Outcome(headline: putBack, detail: notOnTheSiteYet, canRebuild: true)
         case .publishing:
-            return Outcome(headline: putBack, detail: notPublishedYet, canRebuild: false)
+            return Outcome(headline: putBack, detail: notPublishedYet, canRebuild: true)
         }
     }
 
@@ -208,13 +211,23 @@ enum SiteHealthRepair {
         "Your preview still shows how things were before this. "
         + "Preview it again to see the change."
 
-    /// The same, for a teacher whose site is already PUBLISHED.
+    /// The same, for a teacher whose repair followed a PUBLISH.
     ///
-    /// A fresh preview is not what they will go and look at: the site students
-    /// see is the published one, and only publishing again changes it.
+    /// **The preview is still offered here**, which is a change of mind worth
+    /// recording. It was withheld on the grounds that a preview does not change
+    /// what students see — true, but it conflates two things. The teacher has
+    /// just put a folder back and quite reasonably wants to SEE that it worked,
+    /// and a preview is exactly how. What a preview does NOT do is update the
+    /// published site, and that is a job for the sentence, not for removing the
+    /// button: withholding it took away something useful to prevent a
+    /// misunderstanding the words already prevent.
+    ///
+    /// So this says both halves — what a preview will show them, and what
+    /// students are still looking at until they publish again.
     static let notPublishedYet: String =
-        "Your published site still shows how things were when it was last "
-        + "published. Publish again when you are ready."
+        "Students still see the site as it was when you last published — "
+        + "publishing again is what changes that. You can preview it now to "
+        + "check the change looks right."
 
     /// Repairs what can be repaired, and reports what it did.
     ///

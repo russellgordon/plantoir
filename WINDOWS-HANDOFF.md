@@ -2936,9 +2936,16 @@ Three things the mac had to learn the hard way, all worth copying:
 - **Say what has not changed yet, and offer the RIGHT next step.** The folder is
   back on disk; the preview still shows how things were. A teacher who is told
   "put the Media folder back" will go and look at their site next. Offer the
-  preview only when a preview is what they will look at: a repair reported after
-  PUBLISHING must not offer one, because a preview does not change what students
-  see — say the published site is unchanged until they publish again.
+  preview on BOTH occasions — including after a publish, because that is how a
+  teacher checks the repair worked. What changes is the SENTENCE: after a
+  publish it must name who is still seeing the old site (students) and what
+  changes that (publishing again).
+
+  This reversed an earlier decision, and the reasoning is the useful part. The
+  preview was withheld after a publish on the grounds that it does not change
+  what students see. True, and beside the point: withholding it removed
+  something useful in order to prevent a misunderstanding that the words already
+  prevent.
 
   **Call the button "Preview Again", not "Build Again".** Russell asked what
   "Build Again" meant, which was the answer: the label never said WHAT would be

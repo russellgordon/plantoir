@@ -189,9 +189,15 @@ final class SiteHealthRepairTests: XCTestCase {
                        "there is nothing to see, so do not offer to build")
     }
 
-    /// A fresh preview is no use to somebody whose site is published: only
-    /// publishing again changes what students look at.
-    func testAPublishedSiteIsNotOfferedAPreview() throws {
+    /// After a PUBLISH the preview is still offered — and the sentence carries
+    /// the part a preview cannot do.
+    ///
+    /// It was withheld at first, reasoning that a preview does not change what
+    /// students see. True, and beside the point: the teacher has just put a
+    /// folder back and wants to SEE that it worked. Removing the button took
+    /// away something useful to prevent a misunderstanding the words already
+    /// prevent.
+    func testAPublishedSiteIsStillOfferedAPreviewAndToldWhatItDoesNotDo() throws {
         let (root, course) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -199,9 +205,33 @@ final class SiteHealthRepairTests: XCTestCase {
             ofRepairing: [finding("mediaFolderMissing", fixable: true)], in: course,
             occasion: .publishing
         )
-        XCTAssertEqual(outcome?.canRebuild, false)
-        XCTAssertTrue(outcome?.detail.lowercased().contains("publish") ?? false,
-                      outcome?.detail ?? "")
+        XCTAssertEqual(outcome?.canRebuild, true, "the teacher may look at their repair")
+        let said: String = (outcome?.detail ?? "").lowercased()
+        XCTAssertTrue(said.contains("students"),
+                      "it must say who is still seeing the old site")
+        XCTAssertTrue(said.contains("publishing again") || said.contains("publish again"),
+                      "and what changes that")
+        XCTAssertTrue(said.contains("preview"), "and that a preview is available")
+    }
+
+    /// The two occasions must still differ. If they ever say the same thing,
+    /// the distinction has been quietly lost and a teacher who published is
+    /// being told about a preview as though that were the whole story.
+    func testTheTwoOccasionsStillSayDifferentThings() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let building = SiteHealthRepair.outcome(
+            ofRepairing: [finding("mediaFolderMissing", fixable: true)], in: course,
+            occasion: .building
+        )
+        let publishing = SiteHealthRepair.outcome(
+            ofRepairing: [finding("mediaFolderMissing", fixable: true)], in: course,
+            occasion: .publishing
+        )
+        XCTAssertNotEqual(building?.detail, publishing?.detail)
+        XCTAssertFalse((building?.detail ?? "").lowercased().contains("students"),
+                       "a preview-time repair has not published anything")
     }
 
     /// A finding's section number is parsed from output and falls back to 0.
