@@ -116,6 +116,7 @@ agreed. What follows is the same reading order, in short:
 5. **[`windows-app/PROGRESS.md`](windows-app/PROGRESS.md)** for where that app
    actually stands.
 
-Two known-failing cases are waiting in `contracts/assist-cases.json` — "deploy
-with a preview running" and "deploy while that section is already busy" — and
-they are a fair first task: implementing them fixes a real bug on that side.
+(The two contract cases once flagged here as known-failing — "deploy with a
+preview running" and "deploy while that section is already busy" — are now
+implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
+263, 282, 283, 317 and 318. Confirmed by adversarial review 2026-08-24.)
