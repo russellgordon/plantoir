@@ -22,8 +22,9 @@ made on Windows have no automated gate: verify them by driving a real publish
 through the app, and re-run `verify.sh` from the mac after the next sync.
 
 **The mac suite runs its test classes one at a time, and that is load-bearing.**
-The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`
-and `CourseActivityTests` both reset process-wide statics
+The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`,
+`CourseActivityTests` and `CourseActivityPublishOnlyTests` all reset
+process-wide statics
 (`PreviewLeases.reset()`, `CourseActivity.reset()`) around individual methods,
 so turning parallel testing on would let one class wipe the state another is
 mid-assertion on — an intermittent failure that looks exactly like a

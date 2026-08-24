@@ -510,25 +510,57 @@ struct SectionDetailView: View {
             // not matter while publish-origin findings offered no button at
             // all; widening the offer is what made this reachable, so the guard
             // had to widen with it.
+            // `coursePublishIsRunning`, NOT `courseIsBusy`: the latter is
+            // "previewing OR publishing", so asking it here refused the preview
+            // whenever one was already running — which is every time this
+            // button is offered. Found by pressing it.
+            //
+            // Narrowing it gave something up, though, and this is where it
+            // comes back: `courseIsBusy` also covered a preview held in ANOTHER
+            // window, and without that check `startPreview` would be refused
+            // the lease and raise an error alert out of a repair. So the lease
+            // is asked directly.
             let somebodyElseIsPublishing: Bool = {
                 guard let folder = workspace.workspaceURL else {
                     return false
                 }
-                // `coursePublishIsRunning`, NOT `courseIsBusy`: the latter is
-                // "previewing OR publishing", so asking it here refused the
-                // preview whenever one was already running — which is every
-                // time this button is offered. Found by pressing it.
                 return CourseActivity.coursePublishIsRunning(
                     folderPath: folder.path, courseCode: course.code
                 )
             }()
+            let anotherWindowHasThePreview: Bool = {
+                guard previewLease == nil, let folder = workspace.workspaceURL else {
+                    return false
+                }
+                for lease in PreviewLeases.active {
+                    if lease.folderPath == folder.path
+                        && lease.courseCode == course.code
+                        && lease.sectionNumber == sectionNumber {
+                        return true
+                    }
+                }
+                return false
+            }()
+            if anotherWindowHasThePreview {
+                pendingRepairOutcome = SiteHealthRepair.Outcome(
+                    headline: "This section is open in another window.",
+                    detail: "Preview it from there to see the change.",
+                    canRebuild: false
+                )
+                showAnythingWaiting()
+                return
+            }
             if deployRunner.isRunning || isPreparingDeploy || somebodyElseIsPublishing {
                 // Say so. Every other gated control here disables itself or
                 // shows a refusal; swallowing the press is the silence this
                 // whole feature exists to remove, arriving in the button meant
                 // to end it.
+                // "this course", not "this section": the check matches on the
+                // folder and the course code, and deliberately ignores the
+                // section number, so publishing section 2 would otherwise be
+                // reported as section 1 publishing.
                 pendingRepairOutcome = SiteHealthRepair.Outcome(
-                    headline: "Plantoir is publishing this section just now.",
+                    headline: "Plantoir is publishing this course just now.",
                     // Deliberately not "press Preview Again": this outcome is
                     // the one whose button is withheld, so naming a button that
                     // is not on screen would be worse than saying nothing.

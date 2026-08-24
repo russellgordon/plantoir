@@ -2981,6 +2981,32 @@ it, and a trail that could not tell them apart leaves "did they ever fix it?"
 unanswerable. Both are in `contracts/shared-rules.json` → `activityTrail`, and
 the repair rules themselves are in `siteHealth.repair`.
 
+### A section with no index.md cannot be PUBLISHED — shared Python, so it is yours too
+
+Found while testing the deploy path on the mac, and it breaks identically on
+Windows because it is in `scripts/`.
+
+`_sync_public_to_host` (`build_site.py`) copies the built site back to the host
+only when `public/index.html` exists — and Quartz emits no root `index.html`
+without an `index.md`. So the build SUCCEEDS and prints "Static build complete",
+the sync is silently skipped, and `deploy.py` then reports "Built site not
+found … Build first: ./preview.sh CODE N --build-only" — telling the teacher to
+do the thing they have just done.
+
+The guard itself is right (do not publish half a build). What is wrong is that
+nothing says why, and the message sends them in a circle. Two one-line fixes
+were available and neither is done yet, so this is an open item rather than a
+solved one:
+
+- print a warning in the else-branch of the sync, so the build says why it did
+  not produce a publishable site;
+- or have the deploy's "Built site not found" message name the likely cause.
+
+Meanwhile the `sectionIndexMissing` health check understates it: "the site will
+open on whatever page happens to come first" is true of a PREVIEW, and for
+publishing there is no site at all. Worth strengthening in
+`shared-rules.json` → `siteHealth.checks`.
+
 ### The scheduled task NEVER refuses
 
 Russell's call, and the reasoning travels: *"a slightly inaccurate curriculum map

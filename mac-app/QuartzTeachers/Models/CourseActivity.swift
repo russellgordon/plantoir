@@ -101,12 +101,9 @@ enum CourseActivity {
                 isPreviewing = true
             }
         }
-        var isPublishing: Bool = false
-        for publish in activePublishes {
-            if publish.folderPath == folderPath && publish.courseCode == courseCode {
-                isPublishing = true
-            }
-        }
+        let isPublishing: Bool = coursePublishIsRunning(
+            folderPath: folderPath, courseCode: courseCode
+        )
         if isPreviewing && isPublishing {
             return "Available once preview and deploy completed"
         }

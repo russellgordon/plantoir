@@ -5,6 +5,31 @@ special-folders hardening work (branch `issue/special-folders-hardening`).
 Newest first. This is a HANDOVER note, not a log — `GUI-IMPROVEMENTS.md` is the
 log, and where a row and this file disagree, check the code.
 
+## All three deploy destinations were tested for real (2026-08-23, overnight)
+
+Driven through the app, on the example course, with `Media` deleted so the
+checks had something to report:
+
+| Destination | Result |
+|---|---|
+| A folder on this Mac | published; site written to `~/plantoir-published/section1` |
+| Netlify | published; **https://exc2o-s1-2026-gordon-92321.netlify.app** — HTTP 200 |
+| Cloudflare Pages | published in 17.7s; **https://exc2o-s1-2026-gordon.pages.dev** — HTTP 200 |
+
+Both live sites are real and were created under your accounts, on your say-so.
+Delete them whenever you like; nothing depends on them.
+
+What the run confirmed, watched rather than asserted: the findings dialog
+appears on the DEPLOY path as well as the preview one; the publish wording is
+the right one ("Publishing is what puts this in front of students…"); the
+**Preview Again** button is offered after a publish; the repair works from that
+dialog; and the window title showed **" — Edited"** after the repair, which is
+the marker doing its job on a section that had already published.
+
+Netlify asked two questions the first time (surname, then a site address);
+Cloudflare asked none, because the account ID was already saved. The account ID
+was correctly redacted out of the activity trail.
+
 ## A section with no `index.md` cannot be published at all (2026-08-23)
 
 Found while testing the deploy path, and it is worse than the health check's
