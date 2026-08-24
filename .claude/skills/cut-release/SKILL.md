@@ -194,6 +194,16 @@ git push origin main
 python3 website/build.py --deploy
 ```
 
+`--deploy` fetches `https://plantoir.app` afterward on its own and confirms
+the live version-note line matches `site.json` — watch its output for the
+✅/⚠️/❌ line rather than assuming the push alone means teachers can see the
+new version. A ❌ means the site did not pick up the deploy after several
+retries; tell the user, point them at `https://app.netlify.com`, and do not
+report the release as complete until `python3 website/build.py
+--verify-deploy` comes back ✅. A ⚠️ (network problem reaching the site, not
+a confirmed mismatch) is worth one retry of `--verify-deploy` before treating
+it as a real problem.
+
 **Redraw the brand images in the same commit as the version line.** After
 editing `website/site.json` and rebuilding, and before tagging, run:
 

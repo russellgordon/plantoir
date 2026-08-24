@@ -37,6 +37,7 @@ import concurrent.futures
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -50,6 +51,13 @@ REPO = WEBSITE.parent
 SITE_DIR = REPO / "site"
 KEYCHAIN_SERVICE = "containerized-quartz-netlify"
 
+# How long verify_live() keeps retrying before giving up — mirrors the
+# 2s-interval pattern deploy() already uses to poll Netlify's own deploy
+# state, so a genuine CDN propagation lag has the same kind of runway a
+# slow Netlify build already gets.
+VERIFY_ATTEMPTS = 5
+VERIFY_INTERVAL_SECONDS = 3.0
+
 # scripts/ is a sibling of website/, not a package either lives inside, so it
 # has to be added to sys.path by hand before the shared badge-suppression
 # module can be imported — the same trick scripts/deploy.py itself uses for
@@ -58,9 +66,12 @@ sys.path.insert(0, str(REPO / "scripts"))
 from netlify_badge import write_netlify_headers_file  # noqa: E402
 
 
+def read_config() -> dict:
+    return json.loads((WEBSITE / "site.json").read_text(encoding="utf-8"))
+
+
 def read_site_id() -> str:
-    config = json.loads((WEBSITE / "site.json").read_text(encoding="utf-8"))
-    site_id = config.get("netlify_site_id", "")
+    site_id = read_config().get("netlify_site_id", "")
     if not site_id:
         raise SystemExit("website/site.json has no netlify_site_id; nothing to deploy to.")
     return site_id
@@ -154,6 +165,80 @@ def upload_one(deploy_id: str, token: str, remote_path: str, file: Path) -> None
     raise RuntimeError(f"Upload of {remote_path} kept failing after retries: {last_error}")
 
 
+def verify_live() -> str:
+    """Fetch the live site and confirm its version-note line matches site.json.
+
+    Compares against site.json's own "version" field, not the git release
+    tag: the tag carries a "v" prefix ("v1.1.0") the page text never does,
+    so comparing against the tag would misfire on every release. This is
+    checking "did Netlify actually publish what we just told it to", not
+    "does the live site match the tag" — keep it that way if this is ever
+    touched again.
+
+    A mismatch and a fetch failure are different findings and are reported
+    differently: a fetch failure (network blip, DNS hiccup) says nothing
+    about whether the deploy worked, so it is a soft "unknown", never
+    treated as evidence the deploy failed. Only a page that loads AND shows
+    the wrong version, still wrong after retrying through VERIFY_ATTEMPTS,
+    is reported as a real mismatch — and retrying matters here specifically
+    because Netlify reporting a deploy "ready" and its CDN edges actually
+    serving the new content are not the same instant.
+
+    Returns "match", "mismatch", or "unknown". Never raises for a network
+    or parsing problem — callers decide what an "unknown" should mean for
+    their own exit code.
+    """
+    config = read_config()
+    expected_version = config.get("version", "").strip()
+    base_url = config.get("base_url", "").strip()
+    if not expected_version or not base_url:
+        print("⚠️ Cannot verify the live site: site.json is missing 'version' or 'base_url'.")
+        return "unknown"
+
+    fetch_problem: Exception | None = None
+    wrong_version: str | None = None
+    for attempt in range(VERIFY_ATTEMPTS):
+        if attempt:
+            time.sleep(VERIFY_INTERVAL_SECONDS)
+        try:
+            request = urllib.request.Request(
+                base_url, headers={"Cache-Control": "no-cache", "Pragma": "no-cache"})
+            with urllib.request.urlopen(request, timeout=30) as response:
+                html = response.read().decode("utf-8", errors="ignore")
+        except (urllib.error.URLError, TimeoutError) as error:
+            fetch_problem = error
+            continue
+        match = re.search(r'class="version-note"[^>]*>\s*Version\s+([^\s<&]+)', html)
+        if not match:
+            fetch_problem = RuntimeError("no version-note line found on the page")
+            continue
+        fetch_problem = None
+        live_version = match.group(1).strip()
+        if live_version == expected_version:
+            print(f"✅ {base_url} is serving version {live_version} — the deploy reached "
+                  f"the live site.")
+            return "match"
+        wrong_version = live_version
+        # Keep retrying: the mismatch may just be the CDN not yet caught up
+        # with a deploy Netlify already reports as ready.
+
+    if wrong_version is not None:
+        # The loop only sleeps BETWEEN attempts (none before the first), so
+        # elapsed wall time is one interval short of attempts * interval.
+        elapsed = (VERIFY_ATTEMPTS - 1) * VERIFY_INTERVAL_SECONDS
+        print(f"❌ {base_url} still shows version {wrong_version} after {VERIFY_ATTEMPTS} "
+              f"checks over ~{elapsed:.0f}s; expected {expected_version}. The deploy "
+              f"reported success but the live site has not picked it up. Check "
+              f"https://app.netlify.com for a stuck or failed build, then either wait "
+              f"for it to finish or re-run 'python3 website/build.py --deploy'.")
+        return "mismatch"
+
+    print(f"⚠️ Could not confirm {base_url} is serving version {expected_version} "
+          f"({fetch_problem}). This looks like a network problem reaching the site, not "
+          f"evidence the deploy failed — check https://plantoir.app by hand if in doubt.")
+    return "unknown"
+
+
 def deploy() -> int:
     if not (SITE_DIR / "index.html").exists():
         raise SystemExit("site/ has no index.html — run website/build.py first.")
@@ -205,6 +290,11 @@ def deploy() -> int:
         state = netlify_api("GET", f"/deploys/{deploy_id}", token).get("state", "")
         if state == "ready":
             print("✅ plantoir.app is live with this deploy.")
+            # Advisory only: Netlify has already accepted and served the
+            # upload by this point, so a flaky fetch or a still-propagating
+            # CDN edge here must never turn a genuinely successful deploy
+            # into a failing exit code. See verify_live()'s docstring.
+            verify_live()
             return 0
         if state in ("error", "failed"):
             raise SystemExit(f"❌ Netlify reports the deploy state '{state}'.")
@@ -215,4 +305,13 @@ def deploy() -> int:
 
 
 if __name__ == "__main__":
+    # Must match the flag website/build.py --verify-deploy and every doc
+    # reference teach — "--verify" alone would fall through to a real
+    # deploy below on a plausible typo, which is the one outcome a
+    # read-only check can never be allowed to risk.
+    if "--verify-deploy" in sys.argv:
+        # Standalone check, no deploy: "did the last publish actually reach
+        # plantoir.app", runnable independently and after the fact.
+        outcome = verify_live()
+        raise SystemExit({"match": 0, "mismatch": 2, "unknown": 1}[outcome])
     raise SystemExit(deploy())
