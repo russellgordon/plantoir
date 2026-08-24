@@ -18,6 +18,9 @@ struct StringListEditorView: View {
 
     @Binding var items: [String]
 
+    var onRemove: ((String) -> Void)? = nil
+    var onAdd: ((String) -> Void)? = nil
+
     @State var newItemName: String = ""
 
     // MARK: - Computed properties
@@ -121,6 +124,7 @@ struct StringListEditorView: View {
         }
         if !items.contains(normalized) {
             items.append(normalized)
+            onAdd?(normalized)
         }
         newItemName = ""
     }
@@ -133,5 +137,6 @@ struct StringListEditorView: View {
             }
         }
         items = result
+        onRemove?(name)
     }
 }

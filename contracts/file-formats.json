@@ -17,6 +17,11 @@
         "why": "Extra destinations a course ALSO publishes to, beyond `deploy_target` (the primary) — for redundancy against one host having a bad day. `type` uses the same spellings as `deploy_target`; `path` is only present for `local_folder` entries. ABSENT (not `[]`) for every course that has not opted in, so a course nobody has touched writes the exact same file it always has."
       },
       {
+        "key": "excluded_items",
+        "type": "object with keys 'shared' (array of strings) and/or 'per_section' (array of strings)",
+        "why": "Names of folders or files excluded from previews and deploys, separated by scope. Keyed by scope ('shared' and/or 'per_section') to match the config's structure. Course-wide within a scope. ABSENT (not `{}`) when nothing is excluded."
+      },
+      {
         "example": "ICS3U",
         "key": "course_code",
         "type": "string"

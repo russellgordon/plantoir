@@ -3,7 +3,10 @@ import os
 import shutil
 import sys
 import argparse
-import frontmatter
+try:
+    import frontmatter
+except ImportError:
+    frontmatter = None
 import subprocess
 import signal
 import json
@@ -16,6 +19,7 @@ from pathlib import Path
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import site_health
+import contracts
 import toolchain_paths
 from datetime import datetime, timezone
 import threading
@@ -1755,6 +1759,92 @@ def _as_bool(value) -> bool:
     return str(value).strip().lower() == "true"
 
 
+def _get_excluded_note_config() -> tuple[str, str, str]:
+    """Return (sentinel_start, sentinel_end, note_body) from shared-rules contract."""
+    try:
+        cfg = contracts.section("shared-rules", "specialNames", "excludedFolderIndexNote")
+        start = cfg.get("sentinelStart", "<!-- plantoir:excluded-folder-note:start -->")
+        end = cfg.get("sentinelEnd", "<!-- plantoir:excluded-folder-note:end -->")
+        body = cfg.get("noteBody", "")
+        return start, end, body
+    except Exception:
+        start = "<!-- plantoir:excluded-folder-note:start -->"
+        end = "<!-- plantoir:excluded-folder-note:end -->"
+        body = "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your published site. To include it again, add it back in Course Settings."
+        return start, end, body
+
+
+def _apply_sentinel_note(file_path: Path, start: str, end: str, body: str):
+    """
+    Write or update the sentinel-delimited note in an existing index.md in the vault.
+    Idempotent: preserves mtime if the note is already up to date.
+    Never creates a file.
+    """
+    if not file_path.exists():
+        return
+    try:
+        text = file_path.read_text(encoding="utf-8")
+    except Exception as e:
+        print(f"⚠️ Could not read {file_path} to apply exclusion note: {e}")
+        return
+
+    block = f"{start}\n{body}\n{end}"
+
+    if start in text and end in text:
+        pattern = re.compile(re.escape(start) + r".*?" + re.escape(end), re.DOTALL)
+        new_text = pattern.sub(block, text)
+        if new_text == text:
+            return
+    else:
+        fm_match = re.match(r"^---\s*\n.*?\n---\s*\n?", text, re.DOTALL)
+        if fm_match:
+            fm_end = fm_match.end()
+            rest = text[fm_end:]
+            new_text = text[:fm_end] + block + "\n\n" + rest.lstrip("\n")
+        else:
+            new_text = block + "\n\n" + text
+
+    try:
+        file_path.write_text(new_text, encoding="utf-8")
+        print(f"📝 Added exclusion note to {file_path}")
+    except Exception as e:
+        print(f"⚠️ Could not write exclusion note to {file_path}: {e}")
+
+
+def _remove_sentinel_note(file_path: Path, start: str, end: str):
+    """
+    Remove sentinel note from an index.md in the vault when re-included.
+    Idempotent: does nothing if note is absent.
+    """
+    if not file_path.exists():
+        return
+    try:
+        text = file_path.read_text(encoding="utf-8")
+    except Exception as e:
+        print(f"⚠️ Could not read {file_path} to remove exclusion note: {e}")
+        return
+
+    if start not in text or end not in text:
+        return
+
+    pattern = re.compile(re.escape(start) + r".*?" + re.escape(end) + r"\s*\n?", re.DOTALL)
+    new_text = pattern.sub("", text)
+    if new_text != text:
+        try:
+            file_path.write_text(new_text, encoding="utf-8")
+            print(f"📝 Removed exclusion note from {file_path}")
+        except Exception as e:
+            print(f"⚠️ Could not update {file_path} after removing exclusion note: {e}")
+
+
+def _strip_sentinels(text: str, start: str, end: str) -> str:
+    """Strip sentinel blocks from content before building / deploying."""
+    if start not in text or end not in text:
+        return text
+    pattern = re.compile(re.escape(start) + r".*?" + re.escape(end) + r"\s*\n?", re.DOTALL)
+    return pattern.sub("", text)
+
+
 def process_frontmatter(file_path: Path, section_number: int):
     if file_path.suffix.lower() != ".md":
         return
@@ -1790,6 +1880,11 @@ def process_frontmatter(file_path: Path, section_number: int):
         if (re.match(r"publishForSection\d+", key) or re.match(r"draftSection\d+", key)
                 or re.match(r"createdSection\d+", key) or key == "draft"):
             del post[key]
+
+    # Strip any sentinel notes that may be present in copied files
+    start_sentinel, end_sentinel, _ = _get_excluded_note_config()
+    if post.content and start_sentinel in post.content and end_sentinel in post.content:
+        post.content = _strip_sentinels(post.content, start_sentinel, end_sentinel)
 
     # NOTE: Removed unconditional Curriculum timestamp bump here.
     # The new logic runs after all files are copied, syncing curriculum files
@@ -3311,6 +3406,7 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
 def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path) -> dict:
     """Discover new items and append them to course_config.json (add-only). Return updated config dict.
     Also: any newly discovered folders are marked not hidden and added to the expandable list.
+    Excludes any items listed in excluded_items (skips discovery, does not un-hide, and manages index.md note).
     """
     try:
         with open(config_path, "r", encoding="utf-8") as f:
@@ -3326,20 +3422,52 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     per_section_files = list(cfg.get("per_section_files", []))
     hidden_list = list(cfg.get("hidden", []))
     expandable_list = list(cfg.get("expandable", []))
+    excluded_items = cfg.get("excluded_items") or {}
+    excluded_shared = set(excluded_items.get("shared") or [])
+    excluded_per_section = set(excluded_items.get("per_section") or [])
 
     # Discover
     disc_shared_folders, disc_shared_files = discover_shared_items(course_dir)
     disc_sec_folders, disc_sec_files = discover_section_items(section_dir)
 
+    # Filter out excluded items from discovery and print skip notices
+    allowed_disc_shared_folders = []
+    for f in disc_shared_folders:
+        if f in excluded_shared:
+            print(f"🚫 Skipping excluded shared folder: {f} (listed in excluded_items)")
+        else:
+            allowed_disc_shared_folders.append(f)
+
+    allowed_disc_shared_files = []
+    for f in disc_shared_files:
+        if f in excluded_shared:
+            print(f"🚫 Skipping excluded shared file: {f} (listed in excluded_items)")
+        else:
+            allowed_disc_shared_files.append(f)
+
+    allowed_disc_sec_folders = []
+    for f in disc_sec_folders:
+        if f in excluded_per_section:
+            print(f"🚫 Skipping excluded per-section folder: {f} (listed in excluded_items)")
+        else:
+            allowed_disc_sec_folders.append(f)
+
+    allowed_disc_sec_files = []
+    for f in disc_sec_files:
+        if f in excluded_per_section:
+            print(f"🚫 Skipping excluded per-section file: {f} (listed in excluded_items)")
+        else:
+            allowed_disc_sec_files.append(f)
+
     # Determine which folders are *new* (before mutating lists)
-    new_shared_folders = [x for x in disc_shared_folders if x not in shared_folders]
-    new_sec_folders = [x for x in disc_sec_folders if x not in per_section_folders]
+    new_shared_folders = [x for x in allowed_disc_shared_folders if x not in shared_folders]
+    new_sec_folders = [x for x in allowed_disc_sec_folders if x not in per_section_folders]
 
     # Append-only updates for copy lists
-    added_sf = _safe_unique_append(shared_folders, disc_shared_folders)
-    added_sfi = _safe_unique_append(shared_files, disc_shared_files)
-    added_psf = _safe_unique_append(per_section_folders, disc_sec_folders)
-    added_psfi = _safe_unique_append(per_section_files, disc_sec_files)
+    added_sf = _safe_unique_append(shared_folders, allowed_disc_shared_folders)
+    added_sfi = _safe_unique_append(shared_files, allowed_disc_shared_files)
+    added_psf = _safe_unique_append(per_section_folders, allowed_disc_sec_folders)
+    added_psfi = _safe_unique_append(per_section_files, allowed_disc_sec_files)
 
     # For newly discovered folders: ensure NOT hidden + ensure in expandable
     hidden_changed = False
@@ -3354,10 +3482,36 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
             expandable_changed = True
             print(f"➕ Marked newly discovered folder as expandable: {name}")
 
-    print(f"\n📌 Auto-discovered shared folders: {disc_shared_folders or '—'}")
-    print(f"📌 Auto-discovered shared files: {disc_shared_files or '—'}")
-    print(f"📌 Auto-discovered per-section folders: {disc_sec_folders or '—'}")
-    print(f"📌 Auto-discovered per-section files: {disc_sec_files or '—'}")
+    # Synchronize index.md sentinel notes for excluded and non-excluded folders
+    start_sentinel, end_sentinel, note_body = _get_excluded_note_config()
+    try:
+        if course_dir.exists():
+            for item in course_dir.iterdir():
+                if item.is_dir() and not _is_hidden(item.name) and not _is_section_folder(item.name) and not _is_media_name(item.name) and item.name not in _IGNORED_SHARED_FOLDERS:
+                    idx_file = item / "index.md"
+                    if idx_file.exists():
+                        if item.name in excluded_shared:
+                            _apply_sentinel_note(idx_file, start_sentinel, end_sentinel, note_body)
+                        else:
+                            _remove_sentinel_note(idx_file, start_sentinel, end_sentinel)
+
+            for sec_item in course_dir.iterdir():
+                if sec_item.is_dir() and _is_section_folder(sec_item.name):
+                    for item in sec_item.iterdir():
+                        if item.is_dir() and not _is_hidden(item.name) and not _is_media_name(item.name):
+                            idx_file = item / "index.md"
+                            if idx_file.exists():
+                                if item.name in excluded_per_section:
+                                    _apply_sentinel_note(idx_file, start_sentinel, end_sentinel, note_body)
+                                else:
+                                    _remove_sentinel_note(idx_file, start_sentinel, end_sentinel)
+    except Exception as e:
+        print(f"⚠️ Could not synchronize excluded folder notes: {e}")
+
+    print(f"\n📌 Auto-discovered shared folders: {allowed_disc_shared_folders or '—'}")
+    print(f"📌 Auto-discovered shared files: {allowed_disc_shared_files or '—'}")
+    print(f"📌 Auto-discovered per-section folders: {allowed_disc_sec_folders or '—'}")
+    print(f"📌 Auto-discovered per-section files: {allowed_disc_sec_files or '—'}")
 
     if any([added_sf, added_sfi, added_psf, added_psfi, hidden_changed, expandable_changed]):
         cfg["shared_folders"] = shared_folders

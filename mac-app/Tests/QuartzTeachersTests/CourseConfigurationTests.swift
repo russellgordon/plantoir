@@ -228,4 +228,77 @@ final class CourseConfigurationTests: XCTestCase {
         configuration.setSectionNumbers([8, 1, 6])
         XCTAssertEqual(configuration.sectionNumbers, [1, 6, 8])
     }
+
+    // MARK: - Excluded items
+
+    @MainActor
+    func testExcludedItemsAbsentByDefault() {
+        let configuration: CourseConfiguration = CourseConfiguration(values: [:], lastSavedData: Data())
+        XCTAssertNil(configuration.excludedItems)
+        XCTAssertEqual(configuration.excludedItems(forScope: "shared"), [])
+        XCTAssertEqual(configuration.excludedItems(forScope: "per_section"), [])
+        XCTAssertFalse(configuration.isExcluded("Tasks", inScope: "shared"))
+    }
+
+    @MainActor
+    func testExcludingAndReincludingItems() {
+        let configuration: CourseConfiguration = CourseConfiguration(values: [:], lastSavedData: Data())
+
+        configuration.exclude("Tasks", inScope: "shared")
+        XCTAssertTrue(configuration.isExcluded("Tasks", inScope: "shared"))
+        XCTAssertFalse(configuration.isExcluded("Tasks", inScope: "per_section"))
+        XCTAssertEqual(configuration.excludedItems(forScope: "shared"), ["Tasks"])
+
+        // Duplicate exclusion is a no-op
+        configuration.exclude("Tasks", inScope: "shared")
+        XCTAssertEqual(configuration.excludedItems(forScope: "shared"), ["Tasks"])
+
+        configuration.exclude("Handouts", inScope: "per_section")
+        XCTAssertTrue(configuration.isExcluded("Handouts", inScope: "per_section"))
+
+        // Re-including shared Tasks cleans shared scope
+        configuration.reinclude("Tasks", inScope: "shared")
+        XCTAssertFalse(configuration.isExcluded("Tasks", inScope: "shared"))
+        XCTAssertEqual(configuration.excludedItems(forScope: "shared"), [])
+        XCTAssertTrue(configuration.isExcluded("Handouts", inScope: "per_section"))
+
+        // Re-including last item removes key entirely
+        configuration.reinclude("Handouts", inScope: "per_section")
+        XCTAssertNil(configuration.excludedItems)
+        XCTAssertNil(configuration.values["excluded_items"])
+    }
+
+    @MainActor
+    func testExcludedItemsRoundTrip() throws {
+        var dictionary: [String: Any] = makeFixtureDictionary()
+        dictionary["excluded_items"] = [
+            "shared": ["Old Tasks"],
+            "per_section": ["Drafts"]
+        ]
+        let data: Data = try JSONSerialization.data(withJSONObject: dictionary, options: [.prettyPrinted, .sortedKeys])
+        let fileURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("course_config_excluded_test_\(UUID().uuidString).json")
+        try data.write(to: fileURL)
+        let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+
+        XCTAssertTrue(configuration.isExcluded("Old Tasks", inScope: "shared"))
+        XCTAssertTrue(configuration.isExcluded("Drafts", inScope: "per_section"))
+
+        let outputURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("course_config_excluded_out_\(UUID().uuidString).json")
+        try configuration.write(to: outputURL)
+
+        let writtenData: Data = try Data(contentsOf: outputURL)
+        let decoded: Any = try JSONSerialization.jsonObject(with: writtenData)
+        guard let writtenDictionary = decoded as? [String: Any] else {
+            XCTFail("Written file was not a JSON object")
+            return
+        }
+        guard let writtenExcluded = writtenDictionary["excluded_items"] as? [String: Any] else {
+            XCTFail("excluded_items missing from written dictionary")
+            return
+        }
+        XCTAssertEqual(writtenExcluded["shared"] as? [String], ["Old Tasks"])
+        XCTAssertEqual(writtenExcluded["per_section"] as? [String], ["Drafts"])
+    }
 }

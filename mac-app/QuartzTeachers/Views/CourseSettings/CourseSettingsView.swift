@@ -80,23 +80,55 @@ struct CourseSettingsView: View {
                 Section {
                     StringListEditorView(
                         title: "Shared folders (all sections)",
-                        items: $configuration.sharedFolders
+                        items: $configuration.sharedFolders,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "shared")
+                            ActivityTrail.note(.itemExcluded, "excluded shared folder " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            configuration.reinclude(name, inScope: "shared")
+                            ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
+                        }
                     )
                     StringListEditorView(
                         title: "Shared files (all sections)",
                         hidesMarkdownExtension: true,
-                        items: $configuration.sharedFiles
+                        items: $configuration.sharedFiles,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "shared")
+                            ActivityTrail.note(.itemExcluded, "excluded shared file " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            configuration.reinclude(name, inScope: "shared")
+                            ActivityTrail.note(.itemReincluded, "re-included shared file " + name + " in " + course.code)
+                        }
                     )
                     StringListEditorView(
                         title: "Per-section folders",
-                        items: $configuration.perSectionFolders
+                        items: $configuration.perSectionFolders,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "per_section")
+                            ActivityTrail.note(.itemExcluded, "excluded per-section folder " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            configuration.reinclude(name, inScope: "per_section")
+                            ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
+                        }
                     )
                     StringListEditorView(
                         title: "Per-section files",
                         hidesMarkdownExtension: true,
-                        items: $configuration.perSectionFiles
+                        items: $configuration.perSectionFiles,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "per_section")
+                            ActivityTrail.note(.itemExcluded, "excluded per-section file " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            configuration.reinclude(name, inScope: "per_section")
+                            ActivityTrail.note(.itemReincluded, "re-included per-section file " + name + " in " + course.code)
+                        }
                     )
-                    Text("Tip: you can also simply create new folders in Obsidian — they’re added to your site automatically the next time you preview.")
+                    Text("Tip: you can also simply create new folders in Obsidian — they’re added to your site automatically the next time you preview (unless you have removed them here).")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 } header: {

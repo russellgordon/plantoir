@@ -144,6 +144,16 @@
         "carries": "which section, and which destinations it was published to",
         "event": "section content marked published",
         "why": "Why a section stopped saying \" \u2014 Edited\". The marker is DERIVED - its presence and its absence look identical on disk - so a teacher reporting 'it still says Edited after I published' leaves nothing to look at without this line. It is also the only record that a publish succeeded at EVERY destination rather than merely at one."
+      },
+      {
+        "carries": "the course code, the scope ('shared' or 'per-section'), and the item name",
+        "event": "item excluded",
+        "why": "A teacher removed a folder or file in Course Settings, excluding it from previews and deploys. Without this line, 'why is my folder not showing on the site' cannot be answered from the trail alone."
+      },
+      {
+        "carries": "the course code, the scope ('shared' or 'per-section'), and the item name",
+        "event": "item re-included",
+        "why": "A teacher added back a previously excluded folder or file in Course Settings, returning it to previews and deploys."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -902,5 +912,13 @@
       "why": "Not decoration: a teacher recognises their Desktop or their iCloud Drive by its icon before reading the word. Optional if the platform makes it expensive — say so rather than dropping it silently."
     },
     "note": "The 'Working folder:' bar under the sidebar. Modelled on the host file manager's own path bar — Finder's on the mac — because a teacher who has seen one knows what it does without being told. Reported missing on Windows 2026-08-16, in use: the context menu is not there. The LABELS are per platform ('Finder' against 'File Explorer'); the actions, the gestures and the crumb list are not."
+  },
+  "specialNames": {
+    "excludedFolderIndexNote": {
+      "noteBody": "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your published site. To include it again, add it back in Course Settings.",
+      "sentinelEnd": "<!-- plantoir:excluded-folder-note:end -->",
+      "sentinelStart": "<!-- plantoir:excluded-folder-note:start -->",
+      "why": "Explains why the folder is still present in Obsidian after being removed in Course Settings, and that it is ignored during build. Written into existing index.md files by preflight; stripped during merge so it never ships."
+    }
   }
 }

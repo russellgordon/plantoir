@@ -383,6 +383,36 @@ this side is expected to say so when the contract is wrong.
       receives the finding in the `PLANTOIR_HEALTH:` transcript line and
       displays the contract-authored sentence and detail without re-wording.
 
+11. **Special folders hardening: `excluded_items`, preflight skip, and `index.md` sentinel notes (2026-08-24).**
+    - **`excluded_items` key in `course_config.json`** — An object with optional
+      `shared` and `per_section` arrays of strings:
+      `{"shared": ["Tasks"], "per_section": ["Drafts"]}`. The key is ABSENT
+      (not `{}`) when nothing is excluded. Documented in `contracts/file-formats.json`.
+    - **Course Settings mutations** — In Course Settings, when a teacher removes
+      a folder or file from the list editors, the app adds it to `excluded_items[scope]`
+      and logs the `item excluded` event on the activity trail. When a teacher adds
+      a previously excluded item back, the app removes it from `excluded_items[scope]`
+      (deleting the key when empty) and logs `item re-included`.
+    - **Preflight discovery skipping in `scripts/build_site.py`** —
+      `preflight_update_course_config` checks `excluded_items`. Discovered items
+      present in `excluded_items[scope]` are NOT added to `shared_folders` or
+      `per_section_folders`, are NOT un-hidden, and are NOT added to `expandable`.
+      Preflight prints console skip lines: `🚫 Skipping excluded <scope> <kind>: <name> (listed in excluded_items)`.
+    - **`index.md` sentinel notes** — Preflight checks for existing `index.md` files
+      in excluded folders. If present, it idempotently injects the sentinel note
+      defined in `contracts/shared-rules.json` → `specialNames.excludedFolderIndexNote`
+      between HTML comment delimiters (`<!-- plantoir:excluded-folder-note:start -->` ...
+      `<!-- plantoir:excluded-folder-note:end -->`). If the folder is later re-included,
+      preflight strips the note from the vault's `index.md`. Preflight NEVER creates
+      a new `index.md` file in a teacher's vault.
+    - **Content merge stripping** — `process_frontmatter` strips any sentinel blocks
+      when copying files into the merged `content/` directory so the note can never
+      reach students in `public/`.
+    - **Shared Python**: preflight skipping, sentinel note application/removal, and
+      content stripping are in shared `build_site.py` and run identically on Windows.
+      The Windows app only needs to implement `ExcludedItems` in `CourseConfiguration.cs`
+      and wire exclusion/re-inclusion in the Settings list editors with trail events.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,

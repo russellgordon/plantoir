@@ -77,6 +77,12 @@ nonisolated enum ActivityTrail {
         /// somebody acted on it — and a trail that could not tell them apart
         /// would leave "did they ever fix it?" unanswerable.
         case folderProblemRepaired = "folder problem repaired"
+        /// A folder or file was removed in Course Settings, excluding it
+        /// from previews and deploys.
+        case itemExcluded = "item excluded"
+        /// A previously excluded folder or file was added back in Course
+        /// Settings, returning it to previews and deploys.
+        case itemReincluded = "item re-included"
     }
 
     // MARK: - Stored properties

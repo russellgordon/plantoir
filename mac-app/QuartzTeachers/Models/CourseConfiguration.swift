@@ -404,6 +404,116 @@ class CourseConfiguration {
         }
     }
 
+    /// Folders or files excluded from previews and deploys, separated by scope.
+    ///
+    /// Keyed by scope ("shared" and/or "per_section") to match the config's
+    /// structure. ABSENT (not `{}`) when nothing is excluded.
+    var excludedItems: [String: [String]]? {
+        get {
+            guard let dict = values["excluded_items"] as? [String: Any] else {
+                return nil
+            }
+            var result: [String: [String]] = [:]
+            for (scope, items) in dict {
+                if let list = items as? [String], !list.isEmpty {
+                    result[scope] = list
+                }
+            }
+            if result.isEmpty {
+                return nil
+            }
+            return result
+        }
+        set {
+            if let newValue {
+                var cleaned: [String: [String]] = [:]
+                for (scope, items) in newValue {
+                    if !items.isEmpty {
+                        cleaned[scope] = items
+                    }
+                }
+                if cleaned.isEmpty {
+                    values.removeValue(forKey: "excluded_items")
+                } else {
+                    values["excluded_items"] = cleaned
+                }
+            } else {
+                values.removeValue(forKey: "excluded_items")
+            }
+        }
+    }
+
+    /// Excluded items for a specific scope ("shared" or "per_section").
+    func excludedItems(forScope scope: String) -> [String] {
+        if let dict = values["excluded_items"] as? [String: Any] {
+            if let list = dict[scope] as? [String] {
+                return list
+            }
+        }
+        return []
+    }
+
+    /// Checks whether an item name is excluded in a given scope.
+    func isExcluded(_ name: String, inScope scope: String) -> Bool {
+        let items: [String] = excludedItems(forScope: scope)
+        for item in items {
+            if item == name {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Marks an item name as excluded in a given scope.
+    func exclude(_ name: String, inScope scope: String) {
+        var dict: [String: [String]] = [:]
+        if let existing = excludedItems {
+            dict = existing
+        }
+        var list: [String] = []
+        if let existingList = dict[scope] {
+            list = existingList
+        }
+        var alreadyPresent: Bool = false
+        for item in list {
+            if item == name {
+                alreadyPresent = true
+                break
+            }
+        }
+        if !alreadyPresent {
+            list.append(name)
+        }
+        dict[scope] = list
+        excludedItems = dict
+    }
+
+    /// Removes an item name from exclusions in a given scope (re-including it).
+    func reinclude(_ name: String, inScope scope: String) {
+        guard var dict = excludedItems else {
+            return
+        }
+        guard let list = dict[scope] else {
+            return
+        }
+        var updated: [String] = []
+        for item in list {
+            if item != name {
+                updated.append(item)
+            }
+        }
+        if updated.isEmpty {
+            dict.removeValue(forKey: scope)
+        } else {
+            dict[scope] = updated
+        }
+        if dict.isEmpty {
+            excludedItems = nil
+        } else {
+            excludedItems = dict
+        }
+    }
+
     var hiddenItems: [String] {
         get { return stringListValue(forKey: "hidden") }
         set { values["hidden"] = newValue }
