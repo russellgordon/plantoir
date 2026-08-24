@@ -594,15 +594,15 @@ class ScriptRunner {
 
     private func collectHealthFindings(in text: String) {
         let combined: String = pendingHealthLine + text
+        // Scalar-based, via the same splitter the parser uses: Swift folds
+        // "\r\n" into ONE Character, so splitting on "\n" does not split PTY
+        // output at all.
+        var pieces: [String] = SiteHealthFinding.linesOf(combined)
         var completeLines: [String] = []
         var carried: String = ""
-        var isFirst: Bool = true
-        for piece in combined.components(separatedBy: "\n") {
-            if !isFirst {
-                completeLines.append(carried)
-            }
-            carried = piece
-            isFirst = false
+        if !pieces.isEmpty {
+            carried = pieces.removeLast()
+            completeLines = pieces
         }
         // `carried` is now whatever followed the final newline — an unfinished
         // line, unless the chunk happened to end on one.

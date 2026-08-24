@@ -60,6 +60,51 @@ final class SiteHealthFindingTests: XCTestCase {
         XCTAssertEqual(runner.healthFindings.count, 1)
     }
 
+    /// The console a teacher reads must not show the machine line — checked
+    /// with the line ending REAL output uses.
+    ///
+    /// The filter was written into the plain "\n" branch only, and every test
+    /// here supplied "\n", so they all passed while a real build — which comes
+    /// from a PTY and ends "\r\n" — showed the teacher a raw JSON blob. Found
+    /// by reading the app's own saved transcript after driving it.
+    func testTheMachineLineIsHiddenWithCarriageReturnedLineEndings() {
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput("⚠️  The Media folder is not there.\r\n")
+        runner.receiveOutput(mediaLine + "\r\n")
+        let shown: String = runner.transcript.displayText
+        XCTAssertFalse(shown.contains("PLANTOIR_HEALTH"), shown)
+        XCTAssertTrue(shown.contains("The Media folder is not there."))
+        XCTAssertEqual(runner.healthFindings.count, 1,
+                       "and it must still have been READ before being hidden")
+    }
+
+    /// The bug that got all the way to a running app: Swift folds "\r\n" into
+    /// ONE Character, so `split(separator: "\n")` never splits PTY output.
+    ///
+    /// A marker line then arrives glued to its neighbours — the text CONTAINS
+    /// the prefix but does not START with it — and every finding is dropped.
+    /// Every test here passed because they all used "\n". This one feeds a
+    /// realistic multi-line chunk the way a build actually sends it.
+    func testFindingsSurviveARealisticChunkOfPTYOutput() {
+        let chunk: String = [
+            "  📁 Copied per-section folder: All Classes",
+            "",
+            "📥 Copying per-section files...",
+            curriculumLine,
+            mediaLine,
+            "🗺️  Curriculum Coverage: 50 expectations",
+        ].joined(separator: "\r\n") + "\r\n"
+
+        let found: [SiteHealthFinding] = SiteHealthFinding.findings(in: chunk)
+        XCTAssertEqual(found.count, 2, "both findings must survive \\r\\n output")
+
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput(chunk)
+        XCTAssertEqual(runner.healthFindings.count, 2)
+        XCTAssertFalse(runner.transcript.displayText.contains("PLANTOIR_HEALTH"),
+                       "and the machine lines stay out of what a teacher reads")
+    }
+
     func testOrdinaryOutputCarriesNoFindings() {
         XCTAssertTrue(SiteHealthFinding.findings(in: """
         📁 Shared folders to include for 'Section 1':

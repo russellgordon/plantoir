@@ -51,19 +51,8 @@ struct SiteHealthFinding: Equatable, Identifiable {
     /// real build has long since scrolled past them.
     nonisolated static func findings(in text: String) -> [SiteHealthFinding] {
         var found: [SiteHealthFinding] = []
-        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            // `.whitespacesAndNewlines` rather than `.whitespaces`, because
-            // output arrives from a PTY where lines end "\r\n" and splitting
-            // on "\n" leaves the carriage return behind.
-            //
-            // Belt and braces, NOT a bug fix: this was written believing the
-            // trailing "\r" broke the JSON parse, and it does not —
-            // JSONSerialization tolerates it, and the test below passes
-            // against the old code too. Left in because a control character
-            // riding along on a parsed line is worth removing anyway, and
-            // labelled honestly so nobody reads it as the cause of something.
-            let line: String = String(rawLine)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+        for rawLine in linesOf(text) {
+            let line: String = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             guard line.hasPrefix(markerPrefix) else {
                 continue
             }
@@ -104,6 +93,34 @@ struct SiteHealthFinding: Equatable, Identifiable {
             parts.append(finding.sentence + " " + finding.detail)
         }
         return parts.joined(separator: "\n\n")
+    }
+
+    /// Splits output into lines, on SCALARS rather than Characters.
+    ///
+    /// This is the bug that driving the real app found, and the codebase warned
+    /// about it before I wrote it: Swift folds "\r\n" into ONE Character
+    /// (a grapheme cluster), so `split(separator: "\n")` does not split there
+    /// at all. `TranscriptBuilder.append(rawText:)` says exactly this in a
+    /// comment — "would hide line endings" — and works scalar by scalar for
+    /// the same reason.
+    ///
+    /// Real output comes from a PTY and ends "\r\n", so every marker line was
+    /// glued to its neighbours: the resulting "line" CONTAINED the prefix but
+    /// did not START with it, `hasPrefix` was false, and every finding was
+    /// dropped. Every unit test passed, because they all used "\n".
+    nonisolated static func linesOf(_ text: String) -> [String] {
+        var lines: [String] = []
+        var current: String.UnicodeScalarView = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            if scalar == "\n" || scalar == "\r" {
+                lines.append(String(current))
+                current = String.UnicodeScalarView()
+                continue
+            }
+            current.append(scalar)
+        }
+        lines.append(String(current))
+        return lines
     }
 
     /// Whether a line is one of the machine-readable ones, so the console can
