@@ -245,19 +245,19 @@ If this is ever revisited, the thing to find out first is whether BuildKit can
 be given a scoped cache per build context — a filtered prune, not a bigger
 hammer.
 
-## Assistant replies "deployed" before the deploy finishes (Windows)
+## ✅ Done on Windows — Assistant replies "deployed" before the deploy finishes
 
-Found 2026-08-19 during the deploy-during-preview adversarial review.
-`MainWindow.DeployForAsync` resolves its completion source the moment
-`StartDeployForAutomation()` returns — i.e. at `Deploy_Click`'s first await,
-minutes before the outcome — so the assistant words `AssistWording.Deployed`
-unconditionally, success or not. The mac awaits `deployAndWait()` and words
-the actual result, including destination refusals. Fix is to thread the
-deploy's real outcome back through `DeployForAsync` (a TaskCompletionSource
-resolved in `EndPublishActivity`/failure paths, or `Deploy_Click` returning a
-result the automation wrapper awaits). Contract case "deploy with a preview
-running" expects `wording.deployed` only on success; today Windows says it
-regardless. The scenario test is also blind to this — it injects its own
-`SectionIsBusy`/deploy stubs rather than the production wiring
-(`AssistScenarioTests.cs:80`), so wiring the real lambdas into a testable
-seam is part of the fix.
+Found 2026-08-19 during the deploy-during-preview adversarial review; fixed
+2026-08-23. `SectionDetailView.Deploy_Click`'s body now returns the real
+outcome sentence on every exit path — success/partial/all-failed, or
+`AssistWording.DeployDidNotFinish` when the deploy never actually ran —
+threaded back through `MainWindow.DeployForAsync` to `AssistAgent.RunTool`,
+instead of the old unconditional `AssistWording.Deployed`. An adversarial
+review agent caught a hang in the first attempt (a single shared completion
+field, overwritten by a concurrent busy-branch call, orphaning the first
+caller's await with no timeout); rewritten to return the outcome per call
+instead, closing the race structurally. Full suite: 667/667. Windows-only
+bug — the mac's `deployAndWait()` already awaited the real result, so no mac
+work is owed. Full write-up: `GUI-IMPROVEMENTS.md` row 356,
+`MAC-HANDOFF.md`'s "Open" section (for awareness only).
+

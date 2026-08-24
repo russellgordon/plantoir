@@ -97,6 +97,36 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+- **For awareness only — no mac action required.** TODO.md item: *"Assistant
+  replies 'deployed' before the deploy finishes (Windows)."* Windows'
+  `MainWindow.DeployForAsync` used to resolve the instant the click was
+  dispatched to the UI thread, not when the deploy actually finished, so the
+  in-app assistant said "is deployed. Students can reach it now." after
+  every `deploy_section` call regardless of outcome. Fixed by having
+  `SectionDetailView.Deploy_Click`'s body (now `DeployAsync()`, an
+  `async Task<string?>`) RETURN the true outcome sentence on every exit path
+  — success/partial/all-failed via the existing
+  `MultiDestinationDeployRunner.Result(...)`, `AssistWording.DeployDidNotFinish`
+  on every early return and the catch block — threaded back through
+  `MainWindow.DeployForAsync` → `AssistWindow.StartDeployInAppAsync` →
+  `AssistAgent.RunTool`. Full write-up: `GUI-IMPROVEMENTS.md` row 356.
+
+  The mac's `deployAndWait()` already awaits the real result and words it
+  correctly — this only brought Windows to parity, so there is nothing to
+  port. Two things worth a mac session's attention, not required, not
+  blocking anything: (1) whether an equivalent "second deploy request
+  arrives while one is already running" path exists in
+  `SectionDetailView.swift`, and if so whether it shares mutable state across
+  the two in-flight calls the way the first (rejected) fix here did before an
+  adversarial review caught it — see the "rejected" note in
+  `GUI-IMPROVEMENTS.md` row 356 for the exact shape of that bug, since it is
+  a general trap (a single-slot completion field shared across concurrent
+  callers) worth checking for rather than re-discovering; (2) the Windows
+  scenario test fixture (`AssistScenarioTests.cs`) never wired
+  `StartDeployInAppAsync` at all before this — worth checking whether the
+  mac's own scenario tests exercise the equivalent async production seam or
+  only a sync stand-in.
+
 - ⚠️ **NEEDS A MAC BUILD/TEST/REGEN — authored on Windows, unverified there.**
   TODO.md item 1: *"A preview's progress bar sits at 100% saying 'Opening the
   preview…' for the entire build."* `scripts/build_site.py` prints the final

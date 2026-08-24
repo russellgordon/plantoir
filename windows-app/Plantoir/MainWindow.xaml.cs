@@ -272,10 +272,20 @@ public sealed partial class MainWindow : Window
         });
     }
 
-    public async Task DeployForAsync(string courseCode, int section)
+    /// <summary>
+    /// Deploy through the section's own flow and AWAIT the real outcome —
+    /// success, failure, or a multi-destination partial — rather than only
+    /// the moment the click was dispatched. Returns null if no section view
+    /// was open to deploy through, or an exception struck before the deploy
+    /// even started; callers word that as "did not finish", never as
+    /// success.
+    /// </summary>
+    public async Task<string?> DeployForAsync(string courseCode, int section)
     {
-        var tcs = new TaskCompletionSource();
-        DispatcherQueue.TryEnqueue(() =>
+        var tcs = new TaskCompletionSource<string?>();
+        DispatcherQueue.TryEnqueue(() => _ = RunOnUIThreadAsync());
+
+        async Task RunOnUIThreadAsync()
         {
             try
             {
@@ -285,18 +295,24 @@ public sealed partial class MainWindow : Window
                 {
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
                 }
-                if (DetailHost.Content is SectionDetailView detail) detail.StartDeployForAutomation();
+                if (DetailHost.Content is SectionDetailView detail)
+                {
+                    string? outcome = await detail.StartDeployForAutomationAsync();
+                    tcs.TrySetResult(outcome);
+                }
+                else
+                {
+                    tcs.TrySetResult(null);
+                }
             }
             catch (Exception ex)
             {
                 App.LogDiagnostic($"DeployForAsync exception: {ex}");
+                tcs.TrySetResult(null);
             }
-            finally
-            {
-                tcs.TrySetResult();
-            }
-        });
-        await tcs.Task;
+        }
+
+        return await tcs.Task;
     }
 
     public bool IsSectionBusy(string courseCode, int section)

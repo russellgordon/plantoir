@@ -401,8 +401,18 @@ public sealed class AssistAgent
     /// <summary>Deploy through the main window's own flow, console and all. Any thread.</summary>
     public Action? StartDeployInApp { get; set; }
 
-    /// <summary>Async version of StartDeployInApp.</summary>
-    public Func<Task>? StartDeployInAppAsync { get; set; }
+    /// <summary>
+    /// Async version of StartDeployInApp that AWAITS the deploy's real
+    /// outcome and returns the sentence to say — success, failure, or a
+    /// multi-destination partial — computed by
+    /// <see cref="MultiDestinationDeployRunner.Result"/> from what actually
+    /// happened. A null return means the deploy never actually ran (refused,
+    /// already busy, or an exception before it started) — RunTool falls back
+    /// to <see cref="AssistWording.DeployDidNotFinish"/>, never to the
+    /// unconditional "Deployed" this replaced, because reporting success by
+    /// default is exactly the bug this delegate exists to close.
+    /// </summary>
+    public Func<Task<string?>>? StartDeployInAppAsync { get; set; }
 
     /// <summary>Check if the section is currently busy.</summary>
     public Func<bool>? SectionIsBusy { get; set; }
@@ -1015,11 +1025,13 @@ public sealed class AssistAgent
             _handedToApp = true;
             return Answer(call, AssistWording.PreviewIsRebuilding(_courseCode, _section.ToString()));
         }
-        if (name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) && StartDeployInApp is not null)
+        if (name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) &&
+            (StartDeployInApp is not null || StartDeployInAppAsync is not null))
         {
             if (SectionIsBusy?.Invoke() == true)
             {
-                StartDeployInApp.Invoke();
+                if (StartDeployInApp is not null) StartDeployInApp.Invoke();
+                else if (StartDeployInAppAsync is not null) _ = StartDeployInAppAsync.Invoke();
                 _handedToApp = true;
                 return Answer(call, AssistWording.SectionIsBusy(_courseCode, _section.ToString()));
             }
@@ -1038,14 +1050,19 @@ public sealed class AssistAgent
 
             if (StartDeployInAppAsync is not null)
             {
-                await StartDeployInAppAsync.Invoke();
+                string? outcome = await StartDeployInAppAsync.Invoke();
+                _handedToApp = true;
+                return Answer(call, outcome ?? AssistWording.DeployDidNotFinish(_courseCode, _section.ToString()));
             }
             else
             {
-                StartDeployInApp.Invoke();
+                StartDeployInApp?.Invoke();
+                _handedToApp = true;
+                // No async wiring available means no way to await the real
+                // outcome — the caller pressed the button and this is all
+                // that can honestly be said about it.
+                return Answer(call, AssistWording.Deployed(_courseCode, _section.ToString()));
             }
-            _handedToApp = true;
-            return Answer(call, AssistWording.Deployed(_courseCode, _section.ToString()));
         }
 
         // A page edit does what a person would do: stop the preview, change
