@@ -460,7 +460,7 @@ this side is expected to say so when the contract is wrong.
         - *Materialisation on first edit*: If `graded_folders` is `null` (legacy course), mutating the marks toggle list materialises the inferred pool rather than initializing to `[]`.
       - *Per-Section Folders & Classes*:
         - If `perSectionFolders.count <= 1`: removing is **blocked** (`specialNames.lastPerSectionFolderBlocked`). Prevents empty `per_section_folders: []`.
-        - If multiple per-section folders exist and folder is a class folder (`ClassFolderRule.Names(...)`): **consequential** (`removeClassFolderTitle` / `removeClassFolderMessage`).
+        - The folder named **`All Classes`** (compared case-insensitively — `ClassFolder.isTheAllClassesFolder`, i.e. `ClassFolderRule.FallbackName`) is **blocked** always (`specialNames.classFolderBlocked`), however many per-section folders there are. Every OTHER per-section folder, including other names that mention classes, can be added or removed as before. Russell's decision on 2026-08-24, during the Piece 3 review, replacing the "class folders are consequential when alternatives exist" rule this item first shipped with. The reason: the next-class button and the schedule write pages into that folder, so a confirmation would be asking the teacher to break both. `removeClassFolderConfirmation` was removed from the contract with it.
       - *Section Index File*:
         - Removing `index.md` (case-insensitive) from per-section files is **blocked** (`specialNames.sectionIndexFileBlocked`).
     - **Wizard Marks Control**:
@@ -468,6 +468,12 @@ this side is expected to say so when the contract is wrong.
       - Selected `graded_folders` are written into `course_config.json` on course creation.
     - **Contract Sentences & Tests**:
       - Deserialise all sentences from `contracts/shared-rules.json` → `specialNames` (do not hardcode).
+    - **Review amendments (2026-08-24, row 380)**:
+      - *Removal drops the name from the marks pool.* When a folder leaves `shared_folders` or `per_section_folders` in Course Settings, remove it from `graded_folders` too (materialising a `null` pool from the *task*-substring rule first, as a tick would). Without this the consequential dialog's sentence is false and `graded_folders` names a folder `excluded_items` tells the build to skip. The wizard already reconciles on removal (`reconciledGradedFolders`).
+      - *The resolver is name-only, and that is fine.* `curriculumFolderResolution` is the name half of `_find_curriculum_folder`; the build additionally requires an expectation-code page inside the folder. The GUI cannot see that from the config, so it may protect a folder the build would skip — never the wrong folder among those it can see. Do not try to replicate the disk check.
+      - *`removal blocked` is a trail event* (`activityTrail.mustRecord`): item name, which list, and the sentence shown. Record it where the ⓘ is clicked and where a blocked untick is refused.
+      - *The contract holds 5 resolution cases*, not the 10 row 379 claimed.
+      - *Size the flyout for the longest sentence.* The mac popover truncated to one line until it was given a fixed width and allowed to wrap; the `lastGradedFolderBlocked` sentence is the longest in `specialNames`, so test the flyout with that one.
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity

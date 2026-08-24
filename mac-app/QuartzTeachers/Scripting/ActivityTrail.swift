@@ -83,6 +83,12 @@ nonisolated enum ActivityTrail {
         /// A previously excluded folder or file was added back in Course
         /// Settings, returning it to previews and deploys.
         case itemReincluded = "item re-included"
+        /// A teacher tried to remove or untick a folder or file that a
+        /// feature depends on, and was shown why it cannot go and which
+        /// switch to turn off first. Recorded because "I could not remove
+        /// the folder" is a report support will receive, and the line says
+        /// which rule refused and what the teacher was told.
+        case removalBlocked = "removal blocked"
     }
 
     // MARK: - Stored properties

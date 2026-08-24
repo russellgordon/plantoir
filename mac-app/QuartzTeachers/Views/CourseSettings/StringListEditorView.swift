@@ -2,16 +2,28 @@ import SwiftUI
 
 /// A removal waiting for confirmation from the teacher.
 struct PendingRemoval: Identifiable {
+
+    // MARK: - Stored properties
+
     let item: String
     let title: String
     let message: String
+
+    // MARK: - Computed properties
+
     var id: String { return item }
 }
 
 /// An explanation of why an item cannot be removed.
 struct ActiveExplanation: Identifiable {
+
+    // MARK: - Stored properties
+
     let item: String
     let reason: String
+
+    // MARK: - Computed properties
+
     var id: String { return item }
 }
 
@@ -80,6 +92,7 @@ struct StringListEditorView: View {
                     case .blocked(let reason):
                         Button {
                             activeExplanation = ActiveExplanation(item: item, reason: reason)
+                            ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be removed from " + title + " — " + reason)
                         } label: {
                             Image(systemName: "info.circle")
                                 .foregroundStyle(.secondary)
@@ -100,10 +113,16 @@ struct StringListEditorView: View {
                                 }
                             }
                         ), arrowEdge: .trailing) { explanation in
+                            // A fixed width plus fixedSize: a popover
+                            // sizes itself to its content, and a Text
+                            // with only a maxWidth was measured as one
+                            // line and shown truncated ("…") when the
+                            // real app was driven.
                             Text(explanation.reason)
                                 .font(.callout)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(width: 280, alignment: .leading)
                                 .padding(12)
-                                .frame(maxWidth: 280)
                         }
 
                     case .consequential(let alertTitle, let message):

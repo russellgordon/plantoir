@@ -68,10 +68,16 @@ struct MembershipToggleListView: View {
                                 }
                             }
                         ), arrowEdge: .trailing) { explanation in
+                            // A fixed width plus fixedSize: a popover
+                            // sizes itself to its content, and a Text
+                            // with only a maxWidth was measured as one
+                            // line and shown truncated ("…") when the
+                            // real app was driven.
                             Text(explanation.reason)
                                 .font(.callout)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(width: 280, alignment: .leading)
                                 .padding(12)
-                                .frame(maxWidth: 280)
                         }
                     }
                 }
@@ -95,6 +101,7 @@ struct MembershipToggleListView: View {
                 } else {
                     if case .blocked(let reason) = protection {
                         activeExplanation = ActiveExplanation(item: item, reason: reason)
+                        ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be unticked under " + title + " — " + reason)
                         return
                     }
                     var result: [String] = []

@@ -125,6 +125,8 @@ struct NewCourseWizardView: View {
     /// but the same sheet also adds the example course.
     @State var progressTitle: String = "Creating your course"
 
+    // MARK: - Initializer
+
     init(
         creator: NewCourseCreator = NewCourseCreator(),
         startedForTesting: Bool = false,
@@ -1085,12 +1087,10 @@ struct NewCourseWizardView: View {
         if gradedFolders.contains(folder) && effectiveCurriculumCoverageEnabled && gradedFolders.count <= 1 {
             return .blocked(reason: SpecialNames.lastGradedFolderBlockedWizard)
         }
-        let classFolders: [String] = ClassFolder.names(inPerSectionFolders: perSectionFolders)
-        if classFolders.contains(folder) {
-            return .consequential(
-                title: SpecialNames.removeClassFolderTitle(for: folder),
-                message: SpecialNames.removeClassFolderMessage
-            )
+        // "All Classes" is never removable (Russell, 2026-08-24); see
+        // CourseSettingsView.perSectionFolderProtection.
+        if ClassFolder.isTheAllClassesFolder(folder) {
+            return .blocked(reason: SpecialNames.classFolderBlocked)
         }
         if gradedFolders.contains(folder) {
             return .consequential(

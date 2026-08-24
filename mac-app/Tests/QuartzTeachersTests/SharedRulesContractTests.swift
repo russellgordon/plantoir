@@ -690,6 +690,9 @@ final class SharedRulesContractTests: XCTestCase {
         let lastGradedWiz: [String: Any] = try XCTUnwrap(section["lastGradedFolderBlockedWizard"] as? [String: Any])
         XCTAssertEqual(SpecialNames.lastGradedFolderBlockedWizard, lastGradedWiz["reason"] as? String)
 
+        let classBlocked: [String: Any] = try XCTUnwrap(section["classFolderBlocked"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.classFolderBlocked, classBlocked["reason"] as? String)
+
         let lastPerSec: [String: Any] = try XCTUnwrap(section["lastPerSectionFolderBlocked"] as? [String: Any])
         XCTAssertEqual(SpecialNames.lastPerSectionFolderBlocked, lastPerSec["reason"] as? String)
 
@@ -699,10 +702,6 @@ final class SharedRulesContractTests: XCTestCase {
         let remGraded: [String: Any] = try XCTUnwrap(section["removeGradedFolderConfirmation"] as? [String: Any])
         XCTAssertEqual(SpecialNames.removeGradedFolderMessage, remGraded["message"] as? String)
         XCTAssertEqual(SpecialNames.removeGradedFolderTitle(for: "Tasks"), (remGraded["title"] as? String)?.replacingOccurrences(of: "{name}", with: "Tasks"))
-
-        let remClass: [String: Any] = try XCTUnwrap(section["removeClassFolderConfirmation"] as? [String: Any])
-        XCTAssertEqual(SpecialNames.removeClassFolderMessage, remClass["message"] as? String)
-        XCTAssertEqual(SpecialNames.removeClassFolderTitle(for: "All Classes"), (remClass["title"] as? String)?.replacingOccurrences(of: "{name}", with: "All Classes"))
 
         let remCurriculum: [String: Any] = try XCTUnwrap(section["removeCurriculumFolderConfirmation"] as? [String: Any])
         XCTAssertEqual(SpecialNames.removeCurriculumFolderMessage, remCurriculum["message"] as? String)

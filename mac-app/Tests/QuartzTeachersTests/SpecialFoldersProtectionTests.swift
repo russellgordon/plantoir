@@ -136,7 +136,7 @@ final class SpecialFoldersProtectionTests: XCTestCase {
         XCTAssertEqual(protection, .blocked(reason: SpecialNames.lastPerSectionFolderBlocked))
     }
 
-    func testCourseSettingsClassFolderConsequentialWhenOtherPerSectionFoldersExist() throws {
+    func testCourseSettingsAllClassesIsBlockedEvenWhenOtherPerSectionFoldersExist() throws {
         let root: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("test-prot-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -148,16 +148,28 @@ final class SpecialFoldersProtectionTests: XCTestCase {
         let view: CourseSettingsView = CourseSettingsView(course: course)
 
         let classProtection: ItemProtection = view.perSectionFolderProtection(for: "All Classes")
-        XCTAssertEqual(
-            classProtection,
-            .consequential(
-                title: SpecialNames.removeClassFolderTitle(for: "All Classes"),
-                message: SpecialNames.removeClassFolderMessage
-            )
-        )
+        // Russell's decision, 2026-08-24: "All Classes" is never removable,
+        // however many other per-section folders there are.
+        XCTAssertEqual(classProtection, .blocked(reason: SpecialNames.classFolderBlocked))
 
         let labProtection: ItemProtection = view.perSectionFolderProtection(for: "Labs")
         XCTAssertEqual(labProtection, .ordinary)
+    }
+
+    func testOnlyAllClassesIsBlockedNotEveryClassFolder() throws {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-prot-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // "Class Resources" counts as a class folder for the coverage map,
+        // but it is not "All Classes", so it stays removable.
+        let course: Course = try makeCourse(
+            in: root,
+            perSectionFolders: ["All Classes", "Class Resources", "Labs"]
+        )
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+        XCTAssertEqual(view.perSectionFolderProtection(for: "Class Resources"), .ordinary)
+        XCTAssertEqual(view.perSectionFolderProtection(for: "all classes"), .blocked(reason: SpecialNames.classFolderBlocked))
     }
 
     func testCourseSettingsIndexFileBlocked() throws {
@@ -297,5 +309,44 @@ final class SpecialFoldersProtectionTests: XCTestCase {
             from: currentGraded, validChoices: validChoices
         )
         XCTAssertEqual(reconciled, ["Tasks"])
+    }
+    func testRemovingAGradedFolderInSettingsDropsItFromTheMarksPool() throws {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-prot-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let course: Course = try makeCourse(
+            in: root,
+            sharedFolders: ["Concepts", "Tasks", "Tests"],
+            gradedFolders: ["Tasks", "Tests"],
+            includesCoverage: true
+        )
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+
+        // The confirmation promises the folder leaves the marks pool, and
+        // the build must never be handed a pool naming an excluded folder.
+        view.dropFromMarksPool("Tasks")
+        XCTAssertEqual(course.configuration.gradedFolders, ["Tests"])
+
+        // A name that was never in the pool changes nothing.
+        view.dropFromMarksPool("Concepts")
+        XCTAssertEqual(course.configuration.gradedFolders, ["Tests"])
+    }
+
+    func testRemovingAGradedFolderMaterialisesANeverAskedPool() throws {
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-prot-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let course: Course = try makeCourse(
+            in: root,
+            sharedFolders: ["Concepts", "Tasks", "Homework Tasks"],
+            gradedFolders: nil,
+            includesCoverage: false
+        )
+        let view: CourseSettingsView = CourseSettingsView(course: course)
+
+        view.dropFromMarksPool("Tasks")
+        XCTAssertEqual(course.configuration.gradedFolders, ["Homework Tasks"])
     }
 }

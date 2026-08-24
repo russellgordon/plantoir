@@ -83,6 +83,7 @@ struct CourseSettingsView: View {
                         items: $configuration.sharedFolders,
                         onRemove: { name in
                             configuration.exclude(name, inScope: "shared")
+                            dropFromMarksPool(name)
                             ActivityTrail.note(.itemExcluded, "excluded shared folder " + name + " in " + course.code)
                         },
                         onAdd: { name in
@@ -111,6 +112,7 @@ struct CourseSettingsView: View {
                         items: $configuration.perSectionFolders,
                         onRemove: { name in
                             configuration.exclude(name, inScope: "per_section")
+                            dropFromMarksPool(name)
                             ActivityTrail.note(.itemExcluded, "excluded per-section folder " + name + " in " + course.code)
                         },
                         onAdd: { name in
@@ -354,6 +356,26 @@ struct CourseSettingsView: View {
         }
     }
 
+    /// A folder removed from the course leaves the marks pool as well, so the
+    /// confirmation's promise ("Removing it will take it out of your course's
+    /// marks pool") is kept, and `graded_folders` never names a folder the
+    /// build has been told to exclude. Goes through `gradedFoldersBinding` so
+    /// a never-asked course (nil pool) is materialised on the way, exactly as
+    /// a tick would do it.
+    func dropFromMarksPool(_ name: String) {
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if !currentGraded.contains(name) {
+            return
+        }
+        var remaining: [String] = []
+        for folder in currentGraded {
+            if folder != name {
+                remaining.append(folder)
+            }
+        }
+        gradedFoldersBinding.wrappedValue = remaining
+    }
+
     func sharedFolderProtection(for folder: String) -> ItemProtection {
         let resolvedCurriculum: String? = CurriculumFolderRule.resolvedCurriculumFolder(for: course)
         if let resolvedCurriculum, folder == resolvedCurriculum {
@@ -388,12 +410,12 @@ struct CourseSettingsView: View {
         if currentGraded.contains(folder) && course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
             return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
         }
-        let classFolders: [String] = ClassFolder.names(for: course)
-        if classFolders.contains(folder) {
-            return .consequential(
-                title: SpecialNames.removeClassFolderTitle(for: folder),
-                message: SpecialNames.removeClassFolderMessage
-            )
+        // "All Classes" — exactly that folder — is never removable (Russell,
+        // 2026-08-24): the next-class button and the schedule write pages
+        // into it, so a confirmation would be asking the teacher to break
+        // both. Every other per-section folder can be added or removed.
+        if ClassFolder.isTheAllClassesFolder(folder) {
+            return .blocked(reason: SpecialNames.classFolderBlocked)
         }
         if currentGraded.contains(folder) {
             return .consequential(

@@ -36,6 +36,9 @@ enum SpecialNames {
     static let lastGradedFolderBlockedWizard: String =
         "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Include the curriculum coverage map”."
 
+    static let classFolderBlocked: String =
+        "“All Classes” holds your class pages and lessons — the pages the next-class button and the schedule write to. It cannot be removed; other per-section folders can."
+
     static let lastPerSectionFolderBlocked: String =
         "Each section needs at least one folder for its class pages and lessons. Add another per-section folder first before removing this one."
 
@@ -44,9 +47,6 @@ enum SpecialNames {
 
     static let removeGradedFolderMessage: String =
         "This folder holds work that counts for marks. Removing it will take it out of your course’s marks pool."
-
-    static let removeClassFolderMessage: String =
-        "This folder holds your daily lessons and class pages. If you remove it, another folder will be used for your class pages."
 
     static let removeCurriculumFolderMessage: String =
         "This folder holds your curriculum expectations. Removing it means expectations will not be available if you later enable curriculum coverage."
@@ -58,10 +58,6 @@ enum SpecialNames {
     }
 
     static func removeGradedFolderTitle(for name: String) -> String {
-        return "Remove “\(name)”?"
-    }
-
-    static func removeClassFolderTitle(for name: String) -> String {
         return "Remove “\(name)”?"
     }
 

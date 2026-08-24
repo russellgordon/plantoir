@@ -154,6 +154,11 @@
         "carries": "the course code, the scope ('shared' or 'per-section'), and the item name",
         "event": "item re-included",
         "why": "A teacher added back a previously excluded folder or file in Course Settings, returning it to previews and deploys."
+      },
+      {
+        "carries": "the item name, which list it is in, and the reason sentence the teacher was shown (a specialNames sentence, never page content)",
+        "event": "removal blocked",
+        "why": "A teacher tried to remove or untick a folder or file a feature depends on (Course Settings or the New Course Wizard) and was shown why it cannot go. 'I could not remove the folder' is a report support will receive; the line says which rule refused."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -940,6 +945,10 @@
       "reason": "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Include the curriculum coverage map”.",
       "why": "Explains why the last graded folder cannot be removed or un-ticked in the New Course Wizard while the coverage map is enabled, preventing an empty marks pool."
     },
+    "classFolderBlocked": {
+      "reason": "“All Classes” holds your class pages and lessons — the pages the next-class button and the schedule write to. It cannot be removed; other per-section folders can.",
+      "why": "Explains why the folder named All Classes can never be removed, in Course Settings or the New Course Wizard. Russell's decision, 2026-08-24: exactly that folder is never removable; every other per-section folder can be added or removed as before. The name is compared case-insensitively and is ClassFolder.fallbackName."
+    },
     "lastPerSectionFolderBlocked": {
       "reason": "Each section needs at least one folder for its class pages and lessons. Add another per-section folder first before removing this one.",
       "why": "Explains why the last per-section folder cannot be removed, ensuring each section has a folder for its lessons."
@@ -952,11 +961,6 @@
       "title": "Remove “{name}”?",
       "message": "This folder holds work that counts for marks. Removing it will take it out of your course’s marks pool.",
       "why": "Prompts for confirmation when removing a graded folder when other graded folders exist."
-    },
-    "removeClassFolderConfirmation": {
-      "title": "Remove “{name}”?",
-      "message": "This folder holds your daily lessons and class pages. If you remove it, another folder will be used for your class pages.",
-      "why": "Prompts for confirmation when removing a class folder when other per-section folders exist."
     },
     "removeCurriculumFolderConfirmation": {
       "title": "Remove “{name}”?",
@@ -1015,7 +1019,7 @@
           "why": "No curriculum folder present."
         }
       ],
-      "note": "How the curriculum folder is resolved. Matches build_site.py:_find_curriculum_folder: if `curriculum_folder` is configured and present, it is used; otherwise the alphabetically first folder containing 'curriculum' (case-insensitive) is used."
+      "note": "Which folder the GUI protects as the curriculum folder, computed from the config's shared_folders list: if `curriculum_folder` is configured and in the list, it is used; otherwise the alphabetically first name containing 'curriculum' (case-insensitive). This is the NAME half of build_site.py:_find_curriculum_folder, which additionally scans the vault on disk and accepts a folder only if it holds a page whose title is an expectation code — a check the apps cannot make from the config alone. So the GUI may protect a folder the build would skip (one with no expectation pages yet); it never protects a different folder than the build would pick among those it can see."
     }
   }
 }

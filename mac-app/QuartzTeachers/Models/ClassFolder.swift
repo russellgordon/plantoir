@@ -77,6 +77,14 @@ enum ClassFolder {
         return names(inPerSectionFolders: course.configuration.perSectionFolders)
     }
 
+    /// Whether a per-section folder name is THE "All Classes" folder — the
+    /// one folder a teacher can never remove (Russell, 2026-08-24). Compared
+    /// without regard to case; every other name, class-mentioning or not,
+    /// is removable.
+    static func isTheAllClassesFolder(_ folder: String) -> Bool {
+        return folder.lowercased() == fallbackName.lowercased()
+    }
+
     /// Whether a page is one of the section's class pages, given its path
     /// components RELATIVE to the content root (or the section folder).
     ///
