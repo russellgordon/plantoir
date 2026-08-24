@@ -65,18 +65,6 @@ an item when it ships (finished behaviour is recorded in
   decline (or warn) when the container hosts running previews. Low
   priority — rare, and the next preview self-heals.
 
-- **Publish stops an active preview itself** — deferred 2026-08-11. The
-  idea: the Publish button stays enabled while a preview runs; clicking it
-  stops this section's preview, waits for it to end, then publishes —
-  saving the teacher the Stop Preview click. A first attempt was rolled
-  back: pressing Publish while a preview was still *building* (not yet
-  serving) left the app in an indeterminate state. The tricky moment is a
-  build-phase preview — the console's ownership, the preview lease, the
-  waiting-for-server state, and the publish's own needs-rebuild decision
-  are all in flight at once, so stopping and handing off needs a real
-  design pass rather than a stop-and-wait bolted onto `startDeploy`. Not
-  urgent.
-
 - **AI Assist — the rest of it**, updated 2026-08-14 after a full
   live-tested day on the `ai-assist` branch, since folded into `main`
   (not yet in any tagged release). The
@@ -180,6 +168,28 @@ days of toolchain edits, where a teacher builds on install and then not again.
 If this is ever revisited, the thing to find out first is whether BuildKit can
 be given a scoped cache per build context — a filtered prune, not a bigger
 hammer.
+
+## ✅ Done — Publish stops an active preview itself
+
+Deferred 2026-08-11 as a design problem (the tricky moment being a
+build-phase preview — not yet serving — where the console's ownership, the
+preview lease, the waiting-for-server state, and publish's own
+needs-rebuild decision are all in flight at once). Found already built on
+both platforms while checking this list, 2026-08-24, and confirmed by an
+adversarial review rather than taken on trust.
+
+Mac: `SectionDetailView.swift`'s `deployAndWait()` sets `isPreparingDeploy`
+(disabling the Deploy button and guarding against re-entry), then handles
+both cases — `previewRunner.isRunning` for a serving preview, and an `else`
+branch awaiting `PreviewStopper.waitForStopsToFinish(...)` for the
+build-phase preview the first attempt couldn't handle — before running the
+needs-rebuild decision. Windows: `SectionDetailView.xaml.cs`'s
+`DeployAsync()` mirrors this with `_isPreparingDeploy`. Contract case
+`"deploy with a preview running"` in `contracts/assist-cases.json` is live
+(not skipped) and asserts the event order `stopPreview.begins →
+stopPreview.ends → deploy`. Shipped across `GUI-IMPROVEMENTS.md` rows 263,
+282, 283, 317 and 318 (2026-08-17 through 2026-08-22) — this item just
+never got removed from here once it landed.
 
 ## ✅ Done — A recreated container publishes pages the teacher HID
 
