@@ -51,6 +51,13 @@ def graded_folders_for(manifest: dict, shared_folders: list, per_section_folders
     to lose. Existing courses are deliberately left with no key at all, which is
     what tells the build to keep applying the historical rule — see
     contracts/shared-rules.json -> gradedFolders.absentIsNotEmpty.
+
+    Whatever the source, the result is RECONCILED against the folder lists the
+    course actually ends with: a declared name the teacher removed in the
+    wizard is dropped, and a pool left with nothing is returned as `[]` — the
+    honest "asked, and nothing counts" state, which the build then warns about
+    (site_health `noGradedFolders`) rather than the absent key, which would
+    read as "never asked" and match nothing just as silently.
     """
     actual_list = list(shared_folders or []) + list(per_section_folders or [])
     actual_folders = {str(name) for name in actual_list if name}
