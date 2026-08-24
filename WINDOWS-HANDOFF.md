@@ -2947,6 +2947,21 @@ Three things the mac had to learn the hard way, all worth copying:
   something useful in order to prevent a misunderstanding that the words already
   prevent.
 
+  Three things that fell out of widening the offer, all of which apply to you:
+
+  - **The publish sentence must not assert a past publish.** It is shown after a
+    FAILED deploy too, and for a section publishing for the first time nothing
+    has ever gone out. Say what publishing WILL do, not what it did.
+  - **Guard the preview against every publisher, not just your own button.** On
+    the mac the assistant publishes the same section in the same process,
+    invisible to the view's own deploy runner; the guard had to move to
+    `CourseActivity`. While publish-origin findings offered no button this was
+    unreachable — widening the offer is what made it a hazard.
+  - **A preview build is never deploy-fresh** (`app-rules.json` →
+    `buildFreshness`), so previewing after a successful publish means the next
+    publish rebuilds. Correct, and largely moot: the repair puts content back,
+    which forces a rebuild anyway.
+
   **Call the button "Preview Again", not "Build Again".** Russell asked what
   "Build Again" meant, which was the answer: the label never said WHAT would be
   built, and the thing on offer already has a name the teacher knows. Note this

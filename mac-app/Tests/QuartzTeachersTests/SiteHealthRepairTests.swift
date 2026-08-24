@@ -208,30 +208,53 @@ final class SiteHealthRepairTests: XCTestCase {
         XCTAssertEqual(outcome?.canRebuild, true, "the teacher may look at their repair")
         let said: String = (outcome?.detail ?? "").lowercased()
         XCTAssertTrue(said.contains("students"),
-                      "it must say who is still seeing the old site")
-        XCTAssertTrue(said.contains("publishing again") || said.contains("publish again"),
-                      "and what changes that")
+                      "it must say who this does not reach yet")
+        XCTAssertTrue(said.contains("publish again"), "and what changes that")
         XCTAssertTrue(said.contains("preview"), "and that a preview is available")
+
+        // It must NOT assert a publish that may never have happened. This same
+        // sentence is shown when a deploy FAILED, and for a section publishing
+        // for the first time nothing has ever gone out.
+        XCTAssertFalse(said.contains("last published"), said)
+        XCTAssertFalse(said.contains("still see the site as it was"), said)
     }
 
     /// The two occasions must still differ. If they ever say the same thing,
     /// the distinction has been quietly lost and a teacher who published is
     /// being told about a preview as though that were the whole story.
     func testTheTwoOccasionsStillSayDifferentThings() throws {
-        let (root, course) = try makeCourse()
-        defer { try? FileManager.default.removeItem(at: root) }
+        // A course each: the repair is idempotent, so asking the same course
+        // twice makes the second call a no-op ("already put right") and the
+        // comparison meaningless.
+        let (firstRoot, firstCourse) = try makeCourse()
+        let (secondRoot, secondCourse) = try makeCourse()
+        defer {
+            try? FileManager.default.removeItem(at: firstRoot)
+            try? FileManager.default.removeItem(at: secondRoot)
+        }
 
         let building = SiteHealthRepair.outcome(
-            ofRepairing: [finding("mediaFolderMissing", fixable: true)], in: course,
+            ofRepairing: [finding("mediaFolderMissing", fixable: true)], in: firstCourse,
             occasion: .building
         )
         let publishing = SiteHealthRepair.outcome(
-            ofRepairing: [finding("mediaFolderMissing", fixable: true)], in: course,
+            ofRepairing: [finding("mediaFolderMissing", fixable: true)], in: secondCourse,
             occasion: .publishing
         )
         XCTAssertNotEqual(building?.detail, publishing?.detail)
-        XCTAssertFalse((building?.detail ?? "").lowercased().contains("students"),
+
+        // Not just "different strings" — each must carry its own point, or two
+        // typo variants would satisfy this.
+        let built: String = (building?.detail ?? "").lowercased()
+        let published: String = (publishing?.detail ?? "").lowercased()
+        XCTAssertFalse(built.contains("students"),
                        "a preview-time repair has not published anything")
+        XCTAssertTrue(built.contains("preview"))
+        XCTAssertTrue(published.contains("students"))
+
+        // And the reversal this pair exists to record: BOTH offer the preview.
+        XCTAssertEqual(building?.canRebuild, true)
+        XCTAssertEqual(publishing?.canRebuild, true)
     }
 
     /// A finding's section number is parsed from output and falls back to 0.

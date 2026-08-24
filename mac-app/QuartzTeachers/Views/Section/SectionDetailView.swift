@@ -54,10 +54,8 @@ struct SectionDetailView: View {
     /// The occasion travels WITH them because it decides what is offered next.
     /// Held findings used to be shown with whatever the flag happened to be
     /// from the previous batch, so a preview's findings held behind an
-    /// overnight publish were treated as a publish and denied the offer to
-    /// preview again —
-    /// and the reverse offered a rebuild after publishing, the exact thing the
-    /// occasion exists to prevent.
+    /// overnight publish were given the publish sentence, and the reverse told
+    /// somebody who had just published that only their preview was stale.
     @State var heldHealthFindings: [(findings: [SiteHealthFinding], cameFromPublishing: Bool)] = []
 
     /// What a repair just did, while that is being shown.
@@ -77,8 +75,10 @@ struct SectionDetailView: View {
 
     /// Whether the findings on screen came from PUBLISHING rather than from a
     /// preview — including an overnight publish reported the next morning.
-    /// A fresh preview is no use to somebody whose site is live: only
-    /// publishing again changes what students see.
+    ///
+    /// It chooses the SENTENCE and nothing else. The preview is offered either
+    /// way; what differs is whether the teacher is also told that publishing
+    /// again is what reaches students.
     @State var healthFindingsCameFromPublishing: Bool = false
 
     /// Why a deploy could not start, shown as an alert.
@@ -318,8 +318,8 @@ struct SectionDetailView: View {
             )
             if !waiting.isEmpty {
                 healthFindings = waiting
-                // The overnight run PUBLISHED; a preview would not change what
-                // students are looking at.
+                // The overnight run PUBLISHED, so the sentence must say that
+                // students are still seeing the old site.
                 healthFindingsCameFromPublishing = true
                 healthDialog = .findings
             }
@@ -484,13 +484,33 @@ struct SectionDetailView: View {
     /// A preview that is already up is stopped first and started again, which
     /// is the same order the Deploy button uses — starting a second one behind
     /// the first would take a port it then could not have.
+    /// One consequence worth knowing, because nothing else says it: a preview
+    /// build is never deploy-fresh (`app-rules.json` → `buildFreshness` — serve
+    /// mode bakes a live-reload client into every page), so previewing after a
+    /// successful publish means the NEXT publish rebuilds. That is correct
+    /// rather than unfortunate, and largely moot anyway: the repair itself puts
+    /// content back, which forces a rebuild regardless.
     func rebuildAfterRepair() {
         Task { @MainActor in
             // Every other way into a preview is gated — the toolbar button is
             // disabled while the section is busy, and Deploy while a deploy
             // runs. This was the one path with neither, so it could start a
             // build in the same working folder as a running deploy.
-            if deployRunner.isRunning || isPreparingDeploy {
+            // `CourseActivity` as well as this view's own runner. The
+            // assistant publishes the same section, in this same process,
+            // through `AssistSiteWork` — invisible to `deployRunner`. That did
+            // not matter while publish-origin findings offered no button at
+            // all; widening the offer is what made this reachable, so the guard
+            // had to widen with it.
+            let somebodyElseIsPublishing: Bool = {
+                guard let folder = workspace.workspaceURL else {
+                    return false
+                }
+                return CourseActivity.courseIsBusy(
+                    folderPath: folder.path, courseCode: course.code
+                )
+            }()
+            if deployRunner.isRunning || isPreparingDeploy || somebodyElseIsPublishing {
                 // Say so. Every other gated control here disables itself or
                 // shows a refusal; swallowing the press is the silence this
                 // whole feature exists to remove, arriving in the button meant

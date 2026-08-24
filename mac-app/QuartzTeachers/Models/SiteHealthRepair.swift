@@ -73,14 +73,15 @@ enum SiteHealthRepair {
         let headline: String
         let detail: String
 
-        /// Whether offering to build again makes sense — it does not when
-        /// nothing was actually repaired.
+        /// Whether to offer the preview. False when nothing was actually
+        /// repaired (there is nothing to look at) and when a repair failed.
         let canRebuild: Bool
     }
 
     /// Repairs what can be repaired and describes the result, whatever it was.
-    /// Where the teacher met the problem, which decides what they are offered
-    /// next: a fresh preview means nothing to somebody whose site is published.
+    /// Where the teacher met the problem. It chooses the SENTENCE and nothing
+    /// else — the preview is offered either way — so do not reach for it
+    /// expecting it to gate behaviour.
     enum Occasion {
         case building
         case publishing
@@ -222,12 +223,18 @@ enum SiteHealthRepair {
     /// button: withholding it took away something useful to prevent a
     /// misunderstanding the words already prevent.
     ///
-    /// So this says both halves — what a preview will show them, and what
-    /// students are still looking at until they publish again.
+    /// So this says both halves — what a preview will show them, and what only
+    /// publishing can do.
+    ///
+    /// Careful with the tense: this sentence is ALSO shown when a deploy
+    /// FAILED, and for a section publishing for the first time nothing has ever
+    /// gone out. An earlier version said "students still see the site as it was
+    /// when you last published", which asserts a publish that may never have
+    /// happened. This one is true either way.
     static let notPublishedYet: String =
-        "Students still see the site as it was when you last published — "
-        + "publishing again is what changes that. You can preview it now to "
-        + "check the change looks right."
+        "Publishing is what puts this in front of students, so it is not on "
+        + "their site until you publish again. You can preview it now to check "
+        + "the change looks right."
 
     /// Repairs what can be repaired, and reports what it did.
     ///
