@@ -300,3 +300,81 @@ final class SiteHealthRepairTests: XCTestCase {
         )
     }
 }
+
+/// Does a repair make the section say " — Edited"?
+///
+/// That marker is derived from a fingerprint of the section's content, and it
+/// is the ONLY prompt a teacher gets that a publish is owed. If a repair is
+/// invisible to it, Plantoir has just changed their course and told the marker
+/// nothing — so they would put a folder back, be told the published site is
+/// unchanged, and see no sign anywhere that publishing is now due.
+@MainActor
+final class RepairChangesTheEditedMarkerTests: XCTestCase {
+
+    // MARK: - Functions
+
+    private func makeCourse() throws -> (URL, Course) {
+        let root: URL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("edited-marker-\(UUID().uuidString)")
+        let courseURL: URL = root.appendingPathComponent("courses/ICS3U")
+        try FileManager.default.createDirectory(
+            at: courseURL.appendingPathComponent("section1/All Classes"),
+            withIntermediateDirectories: true
+        )
+        try "# a lesson".write(
+            to: courseURL.appendingPathComponent("section1/All Classes/Unit 1, Day 1.md"),
+            atomically: true, encoding: .utf8
+        )
+        let configuration: [String: Any] = [
+            "course_code": "ICS3U", "course_name": "Introduction to Computer Science",
+            "section_numbers": [1], "num_sections": 1,
+            "shared_folders": [], "per_section_folders": ["All Classes"],
+            "shared_files": [], "per_section_files": [],
+        ]
+        let configURL: URL = courseURL.appendingPathComponent("course_config.json")
+        try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
+            .write(to: configURL)
+        return (root, Course(
+            code: "ICS3U", directoryURL: courseURL,
+            configuration: try CourseConfiguration(contentsOf: configURL)
+        ))
+    }
+
+    func testPuttingTheFrontPageBackCountsAsAnEdit() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let before: String = SectionPublishState.fingerprint(
+            courseDirectory: course.directoryURL, sectionNumber: 1
+        )
+        XCTAssertTrue(SiteHealthRepair.restoreSectionIndex(forSection: 1, in: course))
+        let after: String = SectionPublishState.fingerprint(
+            courseDirectory: course.directoryURL, sectionNumber: 1
+        )
+        XCTAssertNotEqual(before, after,
+                          "restoring the front page must show as an edit, or nothing "
+                          + "tells the teacher a publish is now owed")
+    }
+
+    func testPuttingTheMediaFolderBackIsHonestlyReported() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let before: String = SectionPublishState.fingerprint(
+            courseDirectory: course.directoryURL, sectionNumber: 1
+        )
+        XCTAssertTrue(SiteHealthRepair.restoreMediaFolder(in: course))
+        let after: String = SectionPublishState.fingerprint(
+            courseDirectory: course.directoryURL, sectionNumber: 1
+        )
+        // An EMPTY Media folder does NOT count as an edit, and that is the
+        // right answer rather than a gap: the fingerprint is built from regular
+        // files, an empty folder contributes none, and nothing a student could
+        // see has changed. The teacher is not nudged to publish over it.
+        //
+        // Asserted rather than accepted either way — the first version of this
+        // test passed whichever way it fell, which is no test at all.
+        XCTAssertEqual(before, after,
+                       "an empty Media folder is not something students can see")
+    }
+}
