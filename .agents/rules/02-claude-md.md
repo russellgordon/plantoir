@@ -60,7 +60,24 @@ description: "Plantoir project rules, part 2 of 6 - Rules that override default 
    carrying it credits that person as a contributor to this repository —
    found 2026-08-19, after seven commits had already done exactly that.
    `noreply@google.com` was checked the same day and maps to no account at
-   all, which is the property that makes it safe. The failure
+   all, which is the property that makes it safe.
+
+   **A `commit-msg` hook now enforces this**, because a written rule depends on
+   every agent having read it and the hook does not: `.githooks/commit-msg`
+   rewrites the bad address to the safe one at commit time, and says that it
+   did. It is committed rather than left in `.git/hooks` so it reaches the
+   Windows machine too — but hooks are not installed by cloning, so **each
+   clone must opt in once**:
+
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+
+   Do that on any machine that has not, and check `git config --get
+   core.hooksPath` before assuming you are covered. The seven bad commits are
+   left as they are: removing them from GitHub's contributor list would mean
+   rewriting `main` and `dev` and breaking every existing clone, which costs
+   more than it buys. The failure
    the commit-per-piece order prevents is unchanged: one session's worth of
    unrelated work in one working tree — forty files, a dozen decisions
    tangled together, no way to undo one piece without unpicking the rest —
@@ -155,11 +172,3 @@ description: "Plantoir project rules, part 2 of 6 - Rules that override default 
       after a build that SUCCEEDED and with the bundle confirmed present, since
       quitting his working copy to replace it with nothing is the one genuinely
       damaging move available here.
-
-    The [`mac-app` skill](.claude/skills/mac-app/SKILL.md) carries the rest —
-    when a plain rebuild is not enough, how to clean without leaving the Dock
-    icon pointing at nothing, and what to tell him he must do to see the change.
-    Invoke it rather than reconstructing its steps. Toolchain edits have a
-    second, separate chain to travel besides ("Editing the toolchain: two traps
-    that cost real time", below); rebuilding the app is the first link of it,
-    not a substitute for it.

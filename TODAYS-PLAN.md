@@ -38,7 +38,7 @@ because Russell's Anthropic quota is limited. Know which one you are.
 |---|---|
 | **Fable** | Revises THIS FILE once, folding in Russell's answers to the questions below. Does not write code. |
 | **Gemini, in Antigravity** | Implements one piece at a time, then adversarially reviews its OWN work before committing. |
-| **Claude (Opus, low effort)** | Reviews Gemini's committed work for that piece, in a fresh chat. Fixes what it finds, or says plainly that it is sound. |
+| **Claude (Opus, medium effort)** | Reviews Gemini's committed work for that piece, in a fresh chat. Fixes what it finds, or says plainly that it is sound. |
 
 Then the rotation repeats for the next piece. One piece per rotation, never two.
 
@@ -59,8 +59,14 @@ An Antigravity or Gemini session must end its commit messages with
 and has already been credited on seven commits here by mistake. Claude sessions
 use the trailer their harness supplies. See `CLAUDE.md` rule 6.
 
-**What the reviewing Claude session should check**, in rough priority order,
-since it is running on low effort and should spend it where it counts:
+A `commit-msg` hook now rewrites the bad address automatically, but **hooks are
+not installed by cloning**. Run `git config core.hooksPath .githooks` once per
+clone, and check `git config --get core.hooksPath` before assuming you are
+covered.
+
+**What the reviewing Claude session should check**, in rough priority order.
+It runs at MEDIUM effort — enough to reason about behaviour, not just to check
+that things compile — so spend it on the first item before the others:
 
 1. Every factual claim in the commit message and in any new comment or
    document — verify against the code, with file:line. Claims in this branch
@@ -73,9 +79,12 @@ since it is running on low effort and should spend it where it counts:
    events with redaction respected.
 4. Whether the piece quietly widened or narrowed its scope.
 
-**Piece 2 deserves more care than low effort gives.** It changes a file format
-both apps write, and a shape decision retrofitted later is expensive. Russell
-should expect to spend more of his quota on that review than on Pieces 1 and 3.
+**Piece 2 is the one to slow down on.** It changes a file format both apps
+write, and a shape decision retrofitted later is expensive. Expect that review
+to cost more than Pieces 1 and 3 together, and do not shorten it because the
+diff looks small — both adversarial reviews that shaped this file found
+BLOCKING errors, and both were reasoning errors rather than anything a
+mechanical pass would catch.
 
 ---
 
