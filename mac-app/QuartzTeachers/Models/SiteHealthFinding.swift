@@ -52,12 +52,23 @@ struct SiteHealthFinding: Equatable, Identifiable {
     nonisolated static func findings(in text: String) -> [SiteHealthFinding] {
         var found: [SiteHealthFinding] = []
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let line: String = String(rawLine).trimmingCharacters(in: .whitespaces)
+            // `.whitespacesAndNewlines` rather than `.whitespaces`, because
+            // output arrives from a PTY where lines end "\r\n" and splitting
+            // on "\n" leaves the carriage return behind.
+            //
+            // Belt and braces, NOT a bug fix: this was written believing the
+            // trailing "\r" broke the JSON parse, and it does not —
+            // JSONSerialization tolerates it, and the test below passes
+            // against the old code too. Left in because a control character
+            // riding along on a parsed line is worth removing anyway, and
+            // labelled honestly so nobody reads it as the cause of something.
+            let line: String = String(rawLine)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             guard line.hasPrefix(markerPrefix) else {
                 continue
             }
             let payload: String = String(line.dropFirst(markerPrefix.count))
-                .trimmingCharacters(in: .whitespaces)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             guard let data = payload.data(using: .utf8),
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let name = object["name"] as? String,
@@ -102,6 +113,7 @@ struct SiteHealthFinding: Equatable, Identifiable {
     /// the console is machinery. The human-readable sentence is printed
     /// separately by the toolchain, so hiding this line loses nothing.
     nonisolated static func isMarkerLine(_ line: String) -> Bool {
-        return line.trimmingCharacters(in: .whitespaces).hasPrefix(markerPrefix)
+        return line.trimmingCharacters(in: .whitespacesAndNewlines)
+            .hasPrefix(markerPrefix)
     }
 }

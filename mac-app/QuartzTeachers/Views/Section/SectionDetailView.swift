@@ -384,6 +384,20 @@ struct SectionDetailView: View {
         } message: {
             Text(healthAlertMessage)
         }
+        // Findings go up as soon as the build reports them, NOT when the
+        // preview finishes.
+        //
+        // Driving the real app is what found this. Deleting a section's
+        // index.md produces the "no front page" finding — and also makes every
+        // request 404, so `waitForPreviewServer` never succeeds and the call
+        // after it is never reached. The dialog was gated behind a preview that
+        // the very problem it reports prevents from completing: the worse the
+        // course, the less likely the teacher was to be told.
+        .onChange(of: previewRunner.healthFindings.count) { _, count in
+            if count > 0 {
+                showHealthFindings(from: previewRunner)
+            }
+        }
         .onChange(of: healthDialog == nil) { _, isGone in
             if isGone {
                 healthFindings = []
@@ -817,11 +831,10 @@ struct SectionDetailView: View {
             )
             await waitForPreviewServer(port: lease.port, siteAsItWas: siteAsItWas)
 
-            // Here rather than when the run "finishes": a preview does not
-            // finish, it keeps serving. The folder checks print early, well
-            // before Quartz starts, so by the time the server answers the
-            // findings are already collected — and this is the moment the
-            // teacher is actually looking at the preview.
+            // A second chance, for the ordinary case where the wait finished
+            // quickly and the teacher is now looking at the preview. The
+            // findings usually arrived long before this — see the onChange on
+            // the body, which is what actually gets them on screen.
             showHealthFindings(from: previewRunner)
         }
     }

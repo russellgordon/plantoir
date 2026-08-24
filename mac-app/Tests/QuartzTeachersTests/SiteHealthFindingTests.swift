@@ -38,6 +38,28 @@ final class SiteHealthFindingTests: XCTestCase {
         XCTAssertTrue(found.first?.sentence.contains("could not be built") ?? false)
     }
 
+    /// Real output comes from a PTY and ends "\r\n", while every other test
+    /// here supplies "\n".
+    ///
+    /// Worth pinning even though it already worked: this was written believing
+    /// the trailing carriage return broke the JSON parse, and it does not —
+    /// the test passes against the old code too. It now guards a difference
+    /// between what the tests feed in and what a real build sends.
+    func testAFindingSurvivesWindowsStyleLineEndings() {
+        let asAPTYSendsIt: String = curriculumLine + "\r\n"
+        let found: [SiteHealthFinding] = SiteHealthFinding.findings(in: asAPTYSendsIt)
+        XCTAssertEqual(found.count, 1, "a finding must survive \\r\\n line endings")
+        XCTAssertEqual(found.first?.name, "curriculumCoverageFoundNothing")
+        XCTAssertTrue(SiteHealthFinding.isMarkerLine(curriculumLine + "\r"))
+    }
+
+    func testARunnerReadsAFindingOutOfCarriageReturnedOutput() {
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput("Copying shared folders\r\n")
+        runner.receiveOutput(curriculumLine + "\r\n")
+        XCTAssertEqual(runner.healthFindings.count, 1)
+    }
+
     func testOrdinaryOutputCarriesNoFindings() {
         XCTAssertTrue(SiteHealthFinding.findings(in: """
         📁 Shared folders to include for 'Section 1':
