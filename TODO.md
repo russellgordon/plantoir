@@ -245,3 +245,19 @@ If this is ever revisited, the thing to find out first is whether BuildKit can
 be given a scoped cache per build context — a filtered prune, not a bigger
 hammer.
 
+## ✅ Done on Windows — Assistant replies "deployed" before the deploy finishes
+
+Found 2026-08-19 during the deploy-during-preview adversarial review; fixed
+2026-08-23. `SectionDetailView.Deploy_Click`'s body now returns the real
+outcome sentence on every exit path — success/partial/all-failed, or
+`AssistWording.DeployDidNotFinish` when the deploy never actually ran —
+threaded back through `MainWindow.DeployForAsync` to `AssistAgent.RunTool`,
+instead of the old unconditional `AssistWording.Deployed`. An adversarial
+review agent caught a hang in the first attempt (a single shared completion
+field, overwritten by a concurrent busy-branch call, orphaning the first
+caller's await with no timeout); rewritten to return the outcome per call
+instead, closing the race structurally. Full suite: 667/667. Windows-only
+bug — the mac's `deployAndWait()` already awaited the real result, so no mac
+work is owed. Full write-up: `GUI-IMPROVEMENTS.md` row 356,
+`MAC-HANDOFF.md`'s "Open" section (for awareness only).
+
