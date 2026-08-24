@@ -15,6 +15,7 @@ from pathlib import Path
 
 import build_site
 import contracts
+import setup_course
 import toolchain_paths
 
 
@@ -117,6 +118,94 @@ class HowThePageDescribesTheRule(unittest.TestCase):
         words = build_site._graded_folders_in_words(["Tasks*", "[[Quizzes]]"], True)
         self.assertNotIn("**Tasks***", words)
         self.assertNotIn("[[Quizzes]]", words)
+
+
+class GradedFoldersForReconciliation(unittest.TestCase):
+    """
+    setup_course.graded_folders_for reconciles declared and inferred pools
+    against the actual folder lists the course ends with.
+    """
+
+    def test_declared_pool_reconciles_against_actual_folders(self):
+        manifest = {"graded_folders": ["Tasks"]}
+        result = setup_course.graded_folders_for(manifest, ["Tasks", "Concepts"], ["All Classes"])
+        self.assertEqual(result, ["Tasks"])
+
+    def test_declared_pool_drops_removed_folders(self):
+        manifest = {"graded_folders": ["Tasks"]}
+        result = setup_course.graded_folders_for(manifest, ["Concepts", "Examples"], [])
+        self.assertEqual(result, [])
+
+    def test_declared_pool_preserves_per_section_graded_folder(self):
+        manifest = {"graded_folders": ["Tasks", "Section Tasks"]}
+        result = setup_course.graded_folders_for(manifest, ["Concepts"], ["Section Tasks"])
+        self.assertEqual(result, ["Section Tasks"])
+
+    def test_inferred_pool_finds_task_folders(self):
+        result = setup_course.graded_folders_for(None, ["Thinking Tasks", "Concepts"], [])
+        self.assertEqual(result, ["Thinking Tasks"])
+
+    def test_inferred_pool_empty_when_no_task_folders(self):
+        result = setup_course.graded_folders_for(None, ["Concepts", "Examples"], [])
+        self.assertEqual(result, [])
+
+    def test_manifest_with_explicit_none_graded_folders_returns_empty_list(self):
+        manifest = {"graded_folders": None}
+        result = setup_course.graded_folders_for(manifest, ["Tasks"], [])
+        self.assertEqual(result, [], "explicit null means asked and answered none, not fallback to inferred tasks")
+
+    def test_shared_or_per_section_folders_none_safe(self):
+        manifest = {"graded_folders": ["Tasks"]}
+        result = setup_course.graded_folders_for(manifest, None, None)
+        self.assertEqual(result, [])
+
+    def test_declared_pool_deduplicates_matching_folders(self):
+        manifest = {"graded_folders": ["Tasks", "tasks", "Tasks"]}
+        result = setup_course.graded_folders_for(manifest, ["Tasks"], [])
+        self.assertEqual(result, ["Tasks"])
+
+
+class HasGradedFoldersTests(unittest.TestCase):
+    """
+    build_site._has_graded_folders checks whether any folder in the merged
+    tree counts for marks.
+    """
+
+    def test_configured_pool_finds_existing_folder(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Tasks").mkdir()
+            self.assertTrue(build_site._has_graded_folders(root, ["Tasks"], True))
+            self.assertTrue(build_site._has_graded_folders(root, ["tasks"], True))
+
+    def test_configured_pool_returns_false_when_folder_missing(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Concepts").mkdir()
+            self.assertFalse(build_site._has_graded_folders(root, ["Tasks"], True))
+
+    def test_configured_empty_pool_returns_false(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Tasks").mkdir()
+            self.assertFalse(build_site._has_graded_folders(root, [], True))
+
+    def test_unconfigured_pool_finds_task_folder(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Thinking Tasks").mkdir()
+            self.assertTrue(build_site._has_graded_folders(root, [], False))
+
+    def test_unconfigured_pool_returns_false_when_no_task_folder(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Concepts").mkdir()
+            self.assertFalse(build_site._has_graded_folders(root, [], False))
 
 
 if __name__ == "__main__":

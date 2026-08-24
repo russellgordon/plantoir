@@ -3725,6 +3725,28 @@ def graded_folder_names(config: dict):
     return names, True
 
 
+def _has_graded_folders(content_root: Path, graded_folders: list, was_configured: bool) -> bool:
+    """
+    Whether any folder in the merged content tree counts for marks.
+
+    Configured: at least one directory matches a name in `graded_folders` (case-insensitively).
+    Not configured (historical): at least one directory contains "task" (case-insensitively).
+    """
+    if was_configured:
+        wanted = {str(name).lower() for name in (graded_folders or []) if name}
+        if not wanted:
+            return False
+        for p in content_root.rglob("*"):
+            if p.is_dir() and p.name.lower() in wanted:
+                return True
+        return False
+    else:
+        for p in content_root.rglob("*"):
+            if p.is_dir() and "task" in p.name.lower():
+                return True
+        return False
+
+
 def _escaped_for_markdown(text: str) -> str:
     """
     A folder's name, safe to drop into the page's prose.
@@ -3752,7 +3774,7 @@ def _graded_folders_in_words(graded_folders, was_configured: bool) -> str:
         # "task", so a folder called "Task 1" counts and a teacher reading
         # "tasks" would conclude it did not.
         return "any folder with \u201ctask\u201d in its name"
-    names = [_escaped_for_markdown(str(name)) for name in graded_folders if name]
+    names = [_escaped_for_markdown(str(name)) for name in (graded_folders or []) if name]
     if not names:
         return "no folder at present"
     if len(names) == 1:
@@ -3780,7 +3802,7 @@ def _is_graded_path(relative_path, graded_folders, was_configured: bool) -> bool
             if "task" in segment.lower():
                 return True
         return False
-    wanted = {str(name).lower() for name in graded_folders}
+    wanted = {str(name).lower() for name in (graded_folders or []) if name}
     for segment in folders:
         if segment.lower() in wanted:
             return True
@@ -4525,6 +4547,9 @@ def build_section_site(
         "coverage_wanted": coverage_wanted,
         "curriculum_found": curriculum_dir_here is not None,
         "class_pages_found": taught_here is not None,
+        "graded_folders_found": _has_graded_folders(
+            content_root, graded_folders_here, graded_was_configured_here
+        ),
         # The COURSE-level folder, not content/Media: that one is recreated on
         # every build a few hundred lines above, so checking it always passes.
         # What actually breaks is the folder it points AT.

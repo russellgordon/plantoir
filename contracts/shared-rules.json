@@ -753,17 +753,17 @@
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
-        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage"],
-        "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone \u2014 the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it."
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders"],
+        "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it."
       },
       "offered": {
         "checks": ["mediaFolderMissing", "sectionIndexMissing"],
-        "rule": "Create an empty Media folder, or a section index carrying only a title. Never overwrite: check first, so pressing twice \u2014 or pressing after fixing it in Obsidian \u2014 changes nothing.",
+        "rule": "Create an empty Media folder, or a section index carrying only a title. Never overwrite: check first, so pressing twice — or pressing after fixing it in Obsidian — changes nothing.",
         "why": "An empty folder and a bare front page are the correct starting state rather than a pretence. The pictures themselves are the teacher's and cannot be conjured back, and inventing content for a front page would put words in their mouth."
       },
       "afterwards": {
-        "rule": "Say what was put back, offer to preview it again, and say what the preview does NOT cover. After a repair reported while PUBLISHING, the sentence must name who this does not reach yet (students) and what changes that (publishing again) \u2014 the preview is still offered, because that is how a teacher checks the repair worked. The preview is NOT offered in three cases: nothing needed repairing, the repair failed, and a publish is running just now. And the publish sentence must not assert a past publish: it is shown after a FAILED deploy too, and for a first publish nothing has ever gone out.",
-        "why": "The button is called \"Preview Again\", not \"Build Again\": the old label never said WHAT would be built, and the thing on offer already has a name the teacher knows. The preview was at first WITHHELD after a publish, reasoning that it does not change what students see \u2014 true, and beside the point: the teacher has just put a folder back and wants to SEE that it worked. Withholding it removed something useful to prevent a misunderstanding the words already prevent, so the words carry it instead. A repair whose outcome is invisible is one nobody trusts a second time, and the Media folder is somewhere a teacher cannot see from the app at all. A repair that FAILED must be reported too: both restores can fail on a read-only volume or a file sitting where the folder should be, and reporting only success made the two indistinguishable \u2014 silence on the failure path, in the feature written to end silence."
+        "rule": "Say what was put back, offer to preview it again, and say what the preview does NOT cover. After a repair reported while PUBLISHING, the sentence must name who this does not reach yet (students) and what changes that (publishing again) — the preview is still offered, because that is how a teacher checks the repair worked. The preview is NOT offered in three cases: nothing needed repairing, the repair failed, and a publish is running just now. And the publish sentence must not assert a past publish: it is shown after a FAILED deploy too, and for a first publish nothing has ever gone out.",
+        "why": "The button is called \"Preview Again\", not \"Build Again\": the old label never said WHAT would be built, and the thing on offer already has a name the teacher knows. The preview was at first WITHHELD after a publish, reasoning that it does not change what students see — true, and beside the point: the teacher has just put a folder back and wants to SEE that it worked. Withholding it removed something useful to prevent a misunderstanding the words already prevent, so the words carry it instead. A repair whose outcome is invisible is one nobody trusts a second time, and the Media folder is somewhere a teacher cannot see from the app at all. A repair that FAILED must be reported too: both restores can fail on a read-only volume or a file sitting where the folder should be, and reporting only success made the two indistinguishable — silence on the failure path, in the feature written to end silence."
       },
       "oneAlertAtATime": {
         "rule": "The outcome is shown AFTER the dialog it was requested from has gone, never raised from inside that dialog's own button action.",
@@ -805,6 +805,13 @@
         "detail": "Plantoir writes the Curriculum Coverage page itself, every build. There is a page by that name in your own notes, and it is not the one being published — rename yours to keep it.",
         "fixable": false,
         "why": "The inverse of the other checks: not something missing, something PRESENT that gets clobbered. A name refusal in Settings cannot see this, because a teacher makes this page in Obsidian."
+      },
+      {
+        "name": "noGradedFolders",
+        "sentence": "Nothing in {course} Section {section} currently counts for marks.",
+        "detail": "The curriculum map marks an expectation as evaluated when a page in your graded folders addresses it. None of those folders were found, so every expectation is shown as not yet evaluated. You can choose which folders count in Course Settings.",
+        "fixable": false,
+        "why": "When no folders count for marks or the configured folders are missing, the curriculum map shows zero evaluated expectations. Telling the teacher lets them choose which folders count in Course Settings rather than wondering why no expectations show as evaluated."
       }
     ]
   },

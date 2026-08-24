@@ -363,6 +363,26 @@ this side is expected to say so when the contract is wrong.
    true the moment a second jurisdiction arrives. Ask the data you already
    have before guessing from the characters.
 
+10. **Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check (2026-08-24).**
+    - **`setup_course.py:graded_folders_for` reconciliation** — When a new
+      course is created, `graded_folders_for` now checks the declared pool
+      against the actual folder lists (`shared_folders` +
+      `per_section_folders`). If declared folders (such as `Tasks`) were removed
+      by the teacher during setup, they are dropped from `graded_folders`.
+      If no folders remain, explicit `[]` is written to `course_config.json`
+      (settled policy: `[]` means asked and answered "nothing counts for
+      marks", while omitting the key means unconfigured legacy course).
+    - **`noGradedFolders` health check** — Added in `scripts/site_health.py`
+      and `contracts/shared-rules.json` → `siteHealth.checks`. Fires when
+      `coverage_wanted` is true and curriculum expectation pages are present,
+      but no folder on disk matches `graded_folders` (or contains `task` under
+      the unconfigured rule). Emits `PLANTOIR_HEALTH:` JSON line. It is
+      deliberately unfixable (in `neverOffered.checks`) — an existence fix
+      would not assign marks to pages.
+    - **Shared Python**: both scripts run on Windows identically. Windows
+      receives the finding in the `PLANTOIR_HEALTH:` transcript line and
+      displays the contract-authored sentence and detail without re-wording.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,

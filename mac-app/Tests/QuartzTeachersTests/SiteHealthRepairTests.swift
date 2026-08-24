@@ -39,7 +39,7 @@ final class SiteHealthRepairTests: XCTestCase {
     /// the warning and leave the map missing.
     func testTheUnfixableFindingsAreNeverOffered() {
         for name in ["curriculumCoverageFoundNothing", "courseTeachesNothing",
-                     "handWrittenCoveragePage"] {
+                     "handWrittenCoveragePage", "noGradedFolders"] {
             XCTAssertFalse(
                 SiteHealthRepair.canRepair(finding(name, fixable: true)),
                 "\(name) must never grow a fix button, even if the toolchain calls it fixable"

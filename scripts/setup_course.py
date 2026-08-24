@@ -52,12 +52,26 @@ def graded_folders_for(manifest: dict, shared_folders: list, per_section_folders
     what tells the build to keep applying the historical rule — see
     contracts/shared-rules.json -> gradedFolders.absentIsNotEmpty.
     """
-    declared = manifest.get("graded_folders") if manifest else None
-    if declared is not None:
-        return [name for name in declared if name]
+    actual_list = list(shared_folders or []) + list(per_section_folders or [])
+    actual_folders = {str(name) for name in actual_list if name}
+    actual_lookup = {str(name).lower(): str(name) for name in actual_list if name}
+    if manifest and "graded_folders" in manifest:
+        declared = manifest.get("graded_folders") or []
+        reconciled = []
+        for name in declared:
+            if not name:
+                continue
+            target_name = None
+            if str(name) in actual_folders:
+                target_name = str(name)
+            elif str(name).lower() in actual_lookup:
+                target_name = actual_lookup[str(name).lower()]
+            if target_name and target_name not in reconciled:
+                reconciled.append(target_name)
+        return reconciled
     found = []
-    for name in list(shared_folders) + list(per_section_folders):
-        if name and "task" in str(name).lower() and name not in found:
+    for name in actual_list:
+        if name and "task" in str(name).lower() and str(name) not in found:
             found.append(str(name))
     return found
 
@@ -2278,14 +2292,6 @@ def setup_course(no_backup: bool = False):
             if prepopulate_example
             else (skeleton_manifest or {}).get("curriculum_folder")
         ),
-        # Which folders hold work that counts for marks. Written explicitly for
-        # a NEW course because there are no marks to lose; an EXISTING course
-        # deliberately has no such key, which is what tells the build to keep
-        # applying the historical rule.
-        "graded_folders": graded_folders_for(
-            example_manifest if prepopulate_example else (skeleton_manifest or {}),
-            shared_folders, per_section_folders
-        ),
         # NEW: global Explorer expansion behaviour for this course
         "expandOnFolderClick": expand_on_click,
         "footer_html": footer_html,
@@ -2311,6 +2317,22 @@ def setup_course(no_backup: bool = False):
     else:
         # No schemes available now; keep whatever was previously saved
         config["color_schemes"] = previous_map
+
+    # Which folders hold work that counts for marks. Written explicitly for
+    # a NEW course because there are no marks to lose; an EXISTING course
+    # deliberately has no such key if never configured, which is what tells
+    # the build to keep applying the historical rule.
+    if saved_config:
+        if "graded_folders" in saved_config:
+            config["graded_folders"] = graded_folders_for(
+                {"graded_folders": saved_config["graded_folders"]},
+                shared_folders, per_section_folders
+            )
+    else:
+        config["graded_folders"] = graded_folders_for(
+            example_manifest if prepopulate_example else (skeleton_manifest or {}),
+            shared_folders, per_section_folders
+        )
 
     # Keys this wizard does not own — the desktop apps' publishing choice
     # (deploy_target, deploy_folder_path), and anything a future version

@@ -24,6 +24,7 @@ HEALTHY = {
     "coverage_wanted": True,
     "curriculum_found": True,
     "class_pages_found": True,
+    "graded_folders_found": True,
     "media_target_exists": True,
     "section_index_exists": True,
     "hand_written_coverage_page": False,
@@ -57,6 +58,7 @@ class SiteHealthTests(unittest.TestCase):
         for facts in (
             {"curriculum_found": False},
             {"class_pages_found": False},
+            {"graded_folders_found": False},
             {"media_target_exists": False},
             {"section_index_exists": False},
             {"hand_written_coverage_page": True},
@@ -156,6 +158,26 @@ class SiteHealthTests(unittest.TestCase):
         facts["media_target_exists"] = False
         for item in site_health.findings(facts, "ICS3U", 1):
             self.assertTrue(item.fixable, item.name)
+
+    def test_the_graded_folders_check_fires_when_pool_is_missing(self):
+        facts = dict(HEALTHY)
+        facts["graded_folders_found"] = False
+        found = site_health.findings(facts, "ICS3U", 1)
+        self.assertEqual(_names(found), ["noGradedFolders"])
+        self.assertIn("ICS3U", found[0].sentence)
+        self.assertIn("1", found[0].sentence)
+
+    def test_the_graded_folders_check_is_silent_when_the_map_is_switched_off(self):
+        facts = dict(HEALTHY)
+        facts["coverage_wanted"] = False
+        facts["graded_folders_found"] = False
+        self.assertEqual(site_health.findings(facts, "ICS3U", 1), [],
+                         "a course with the map off must not be warned about marks folders")
+
+    def test_the_graded_folders_finding_is_not_offered_as_fixable(self):
+        facts = dict(HEALTHY)
+        facts["graded_folders_found"] = False
+        self.assertFalse(site_health.findings(facts, "ICS3U", 1)[0].fixable)
 
 
 class TheContractsExampleLinesAreRealOutput(unittest.TestCase):

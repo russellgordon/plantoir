@@ -106,12 +106,13 @@ def findings(facts: dict, course: str, section) -> list:
     imports nothing from `build_site` and touches no filesystem of its own,
     which is what lets it be tested without building a site. The keys:
 
-    * `coverage_wanted`     — is the map switched on for this section?
-    * `curriculum_found`    — did `_find_curriculum_folder` return a folder
-                              that actually holds expectation pages?
-    * `class_pages_found`   — did the section have any class pages at all?
-    * `media_target_exists` — does the COURSE-level `Media` folder exist? Not
-                              `content/Media`, which every build recreates.
+    * `coverage_wanted`      — is the map switched on for this section?
+    * `curriculum_found`     — did `_find_curriculum_folder` return a folder
+                               that actually holds expectation pages?
+    * `class_pages_found`    — did the section have any class pages at all?
+    * `graded_folders_found` — does any folder on disk count for marks?
+    * `media_target_exists`  — does the COURSE-level `Media` folder exist? Not
+                               `content/Media`, which every build recreates.
     * `section_index_exists`
     * `hand_written_coverage_page`
     """
@@ -133,12 +134,16 @@ def findings(facts: dict, course: str, section) -> list:
     coverage_wanted = facts.get("coverage_wanted")
     curriculum_found = facts.get("curriculum_found")
     class_pages_found = facts.get("class_pages_found")
+    graded_folders_found = facts.get("graded_folders_found", True)
 
     if coverage_wanted and not curriculum_found and class_pages_found:
         found.append(finding("curriculumCoverageFoundNothing", course, section, table))
 
     if coverage_wanted and not class_pages_found and curriculum_found:
         found.append(finding("courseTeachesNothing", course, section, table))
+
+    if coverage_wanted and curriculum_found and not graded_folders_found:
+        found.append(finding("noGradedFolders", course, section, table))
 
     if not facts.get("media_target_exists"):
         found.append(finding("mediaFolderMissing", course, section, table))
