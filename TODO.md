@@ -65,22 +65,6 @@ an item when it ships (finished behaviour is recorded in
   decline (or warn) when the container hosts running previews. Low
   priority — rare, and the next preview self-heals.
 
-- **Write the publishing documentation for plantoir.app** — noted
-  2026-08-12, once Cloudflare Pages shipped. The app now offers three
-  destinations and the picker's captions can only carry so much; the
-  website should explain the choice properly. Worth covering: which
-  destination suits whom (Netlify as the default; Cloudflare Pages for
-  unmetered bandwidth and a free per-section address; a folder for
-  teachers whose board gives them their own web space); how to create a
-  token for each, with the exact permission Cloudflare needs (Account →
-  Cloudflare Pages → Edit) and the fact that a Pages token cannot list
-  its own account, which is why the app asks for an Account ID once; and
-  the 25 MB per-file limit — documents, images, and slide decks are
-  comfortably under it, long-form video is not, and embedding from
-  YouTube or Vimeo (what most teachers do anyway) sidesteps it entirely.
-  The in-app orange note says the short version; the site should say the
-  rest. Screenshots of the Publishing section would help.
-
 - **Publish stops an active preview itself** — deferred 2026-08-11. The
   idea: the Publish button stays enabled while a preview runs; clicking it
   stops this section's preview, waits for it to end, then publishes —
@@ -234,6 +218,30 @@ instead, closing the race structurally. Full suite: 667/667. Windows-only
 bug — the mac's `deployAndWait()` already awaited the real result, so no mac
 work is owed. Full write-up: `GUI-IMPROVEMENTS.md` row 356,
 `MAC-HANDOFF.md`'s "Open" section (for awareness only).
+
+## ✅ Done — Write the publishing documentation for plantoir.app
+
+Noted 2026-08-12, once Cloudflare Pages shipped; fixed 2026-08-23.
+`website/pages/publishing.html` is a new page explaining all three
+destinations properly: which suits whom (Netlify as the default;
+Cloudflare Pages for unmetered bandwidth and a free per-section address;
+a folder for teachers whose board gives them their own web space), how
+to set up each, the exact Cloudflare token permission (Account →
+Cloudflare Pages → Edit) and why the app also asks for an Account ID
+(a Pages-scoped token can't list its own account), and the 25 MB
+per-file limit — which applies to Cloudflare only, not Netlify or a
+folder. Added to `site.json`'s nav between "Day to day" and "Support".
+Checked against `documentation/07-deployment.md` and the in-app wording
+by an adversarial review pass, which caught one overstatement (an
+unsourced "no account limits worth worrying about" claim for Netlify,
+corrected to the real, documented caveat: the free-tier API can get
+rate-limited when a whole staff room publishes at once) and one minor
+omission (a local-folder publish also propagates deletions, not just
+changed files) — both fixed. `python3 website/build.py --check` passes.
+No screenshots added — none of the picker or its detail fields exist in
+`shots.json` yet; a future pass could add one. No `contracts/` or
+handoff entry — website copy, not app behavior either platform's
+teacher-facing suite covers.
 
 ## ✅ Done — Nothing verifies that a release actually reached plantoir.app
 
