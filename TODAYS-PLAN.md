@@ -10,12 +10,15 @@ Read in this order, then come back here:
 1. [`CLAUDE.md`](CLAUDE.md) — the rules that override default behaviour.
    Rules 2–5 (write-ups, contract, trail) and rule 6 (never merge to `dev`
    without Russell saying so, in that session, about that piece) all bind here.
-2. **`~/.claude/CLAUDE.md`** — Russell's MACHINE-WIDE Swift style rules, which
-   are NOT in this repository (that is deliberate; see project rule 8). Piece 3
-   is substantial new Swift. Without these you will write
-   `items.filter { $0 != name }` — the exact idiom `removeItem` was hand-written
-   to avoid. No `map`/`filter`/`reduce`, no `ObservableObject`, `// MARK: -`
-   sections, no `$0`.
+2. **Russell's MACHINE-WIDE Swift style rules**, which are NOT in this
+   repository (that is deliberate; see project rule 8) — `~/.gemini/GEMINI.md`
+   if you are Antigravity/Gemini, `~/.claude/CLAUDE.md` if you are Claude Code.
+   The two are kept as identical copies. Piece 3 is substantial new Swift.
+   Without these you will write `items.filter { $0 != name }` — the exact idiom
+   `removeItem` was hand-written to avoid. No `map`/`filter`/`reduce`, no
+   `ObservableObject`, `// MARK: -` sections, no `$0`. Antigravity also loads
+   `.agents/rules/*.md` unconditionally; those are a GENERATED copy of
+   `CLAUDE.md` and must never be hand-edited.
 3. [`PURPOSE.md`](PURPOSE.md) — what this branch is for and what it has already
    shipped.
 4. `GUI-IMPROVEMENTS.md` rows **354–373** — this branch's history. Those are row
@@ -23,6 +26,56 @@ Read in this order, then come back here:
    specification.
 5. [`NEEDTOKNOW.md`](NEEDTOKNOW.md) — handover notes, a manual test guide, and
    one known-open defect.
+
+---
+
+## Who does what — read this before you start working
+
+This piece is being built by THREE different agents in rotation, deliberately,
+because Russell's Anthropic quota is limited. Know which one you are.
+
+| Agent | Does |
+|---|---|
+| **Fable** | Revises THIS FILE once, folding in Russell's answers to the questions below. Does not write code. |
+| **Gemini, in Antigravity** | Implements one piece at a time, then adversarially reviews its OWN work before committing. |
+| **Claude (Opus, low effort)** | Reviews Gemini's committed work for that piece, in a fresh chat. Fixes what it finds, or says plainly that it is sound. |
+
+Then the rotation repeats for the next piece. One piece per rotation, never two.
+
+**Gemini commits its own work to the issue branch, and pushes it.** Do not hold
+a piece uncommitted waiting for review. This branch's own history is already
+built this way — "Item 1: …" followed by "Item 1 review: …" — and it is the
+right shape here for three reasons: an unpushed change is invisible to the next
+agent and to every other machine (learned the hard way on 2026-08-21); a
+reviewer reading a commit can see exactly what changed and when; and work on an
+issue branch costs nobody anything if it turns out to be wrong. The review lands
+as a FOLLOW-UP commit, not as an amendment. **Merging to `dev` is still
+Russell's call alone, every time.**
+
+**Commit trailers differ by agent, and getting this wrong credits a stranger.**
+An Antigravity or Gemini session must end its commit messages with
+`Co-Authored-By: Antigravity <noreply@google.com>` — never
+`antigravity@google.com`, which belongs to an unrelated person's GitHub account
+and has already been credited on seven commits here by mistake. Claude sessions
+use the trailer their harness supplies. See `CLAUDE.md` rule 6.
+
+**What the reviewing Claude session should check**, in rough priority order,
+since it is running on low effort and should spend it where it counts:
+
+1. Every factual claim in the commit message and in any new comment or
+   document — verify against the code, with file:line. Claims in this branch
+   have been wrong before, repeatedly.
+2. The piece's own acceptance criteria, run rather than assumed: the tests
+   green, `./verify.sh` where the toolchain changed, and the bundle actually
+   carrying the edit (see the traps).
+3. The obligations — `GUI-IMPROVEMENTS.md` row with a real "Notes for Windows
+   port" cell, `WINDOWS-HANDOFF.md` where architectural, contract cases, trail
+   events with redaction respected.
+4. Whether the piece quietly widened or narrowed its scope.
+
+**Piece 2 deserves more care than low effort gives.** It changes a file format
+both apps write, and a shape decision retrofitted later is expensive. Russell
+should expect to spend more of his quota on that review than on Pieces 1 and 3.
 
 ---
 
@@ -383,12 +436,15 @@ Test bed: use a THROWAWAY working folder. `~/Desktop/plantoir-trial` holds
 Russell's evidence course — read it, but make a new folder for destructive
 testing. `NEEDTOKNOW.md` has a step-by-step manual guide.
 
-**"Adversarial review after each item"** means: commit the item, then launch a
-subagent whose brief is to attack that specific diff and its claims with
-file:line evidence, fold the findings back in, and commit again. Not a
-self-review, and not batched at the end. That process has caught false claims in
-this branch repeatedly — several `GUI-IMPROVEMENTS.md` rows exist only to
-correct earlier rows.
+**"Adversarial review after each item"** means: attack that specific diff and
+its claims with file:line evidence, fold the findings back in, and commit again.
+Not batched at the end. Gemini does this on its own work before committing —
+spawn a separate reviewer rather than re-reading your own diff in the same
+breath, and give it the brief of finding what is WRONG, not of confirming the
+work. The Claude session then reviews the committed result independently. That
+double pass has caught false claims in this branch repeatedly — several
+`GUI-IMPROVEMENTS.md` rows exist only to correct earlier rows, and this very
+file needed two rounds before it was safe to hand over.
 
 ## Traps that will cost you an afternoon
 
@@ -433,7 +489,8 @@ Per `CLAUDE.md` rules 2–5, as you go — not batched at the end:
 * Contract cases so the Windows suite runs the identical data.
 * Trail events named in both places, with redaction respected.
 * Commit as you go and `git push -u origin issue/special-folders-hardening` in
-  the same session.
+  the same session, with the right `Co-Authored-By` trailer for your agent
+  (see "Who does what" above).
 
 ## Known open, deliberately not in scope
 
