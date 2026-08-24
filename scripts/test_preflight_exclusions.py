@@ -163,6 +163,48 @@ class PreflightExclusionTests(unittest.TestCase):
         sec_excluded_index = self.section_dir / "ExcludedSectionFolder" / "index.md"
         self.assertIn(start, sec_excluded_index.read_text(encoding="utf-8"))
 
+    def test_name_in_both_copy_list_and_excluded_items_is_dropped(self):
+        """excluded_items is authoritative: a name still in a copy list is dropped and written back."""
+        (self.course_dir / "Tasks").mkdir(parents=True)
+        (self.section_dir / "Drafts").mkdir(parents=True)
+        config_data = {
+            "course_code": "ICS3U",
+            "shared_folders": ["Concepts", "Tasks"],
+            "shared_files": ["Notes.md"],
+            "per_section_folders": ["Drafts"],
+            "per_section_files": [],
+            "hidden": [],
+            "expandable": [],
+            "excluded_items": {"shared": ["Tasks", "Notes.md"], "per_section": ["Drafts"]},
+        }
+        self.config_path.write_text(json.dumps(config_data, indent=2), encoding="utf-8")
+
+        output = io.StringIO()
+        with patch("sys.stdout", output):
+            updated_cfg = build_site.preflight_update_course_config(
+                self.course_dir, self.section_dir, self.config_path
+            )
+        stdout = output.getvalue()
+
+        self.assertIn("🚫 Dropped excluded shared folder from the copy list: Tasks", stdout)
+        self.assertIn("🚫 Dropped excluded shared file from the copy list: Notes.md", stdout)
+        self.assertIn("🚫 Dropped excluded per-section folder from the copy list: Drafts", stdout)
+        self.assertEqual(updated_cfg["shared_folders"], ["Concepts"])
+        self.assertEqual(updated_cfg["shared_files"], [])
+        self.assertEqual(updated_cfg["per_section_folders"], [])
+        # Written back, not just returned
+        on_disk = json.loads(self.config_path.read_text(encoding="utf-8"))
+        self.assertEqual(on_disk["shared_folders"], ["Concepts"])
+        self.assertEqual(on_disk["excluded_items"], config_data["excluded_items"])
+
+    def test_preflights_own_backup_is_never_discovered(self):
+        """The write-back's backup file must not become a shared file on the next build."""
+        (self.course_dir / "course_config.backup.json").write_text("{}", encoding="utf-8")
+        (self.course_dir / "course_config.json.tmp").write_text("{}", encoding="utf-8")
+        (self.course_dir / "Real Notes.md").write_text("# real", encoding="utf-8")
+        _, files = build_site.discover_shared_items(self.course_dir)
+        self.assertEqual(files, ["Real Notes.md"])
+
     def test_reincluding_item_removes_sentinel_note(self):
         """When an excluded item is removed from excluded_items, preflight cleans the sentinel note."""
         folder = self.course_dir / "ReincludedFolder"

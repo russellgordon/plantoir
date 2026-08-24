@@ -3317,6 +3317,13 @@ _IGNORED_SHARED_FOLDERS = {
 }
 _IGNORED_SHARED_FILES = {
     "course_config.json",
+    # Preflight's own write-back leaves these beside the config
+    # (_atomic_write_json_with_backup). Without this, the build after any
+    # write-back discovered the backup as a shared file and SHIPPED the
+    # teacher's config to students at public/course_config.backup.json.
+    # Found 2026-08-24; present since discovery was added (8f709000).
+    "course_config.backup.json",
+    "course_config.json.tmp",
     ".DS_Store",
     "Thumbs.db",
 }
@@ -3426,6 +3433,26 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     excluded_shared = set(excluded_items.get("shared") or [])
     excluded_per_section = set(excluded_items.get("per_section") or [])
 
+    # The key is authoritative. Absence from a copy list is what actually
+    # keeps a folder out of the site, and excluded_items is what stops
+    # preflight putting it back - so a name in BOTH would publish while the
+    # console and the index.md note say it is excluded. That state is never
+    # written by a correct app, but a hand edit, a stale copy of the config
+    # saved over a newer one, or an app that records the key without dropping
+    # the name can all produce it. Reconcile here so the two can never
+    # disagree, and say so (decided 2026-08-24, Piece 2 review).
+    reconciled_changed = False
+    for scope_label, names, list_pairs in (
+        ("shared", excluded_shared, (("folder", shared_folders), ("file", shared_files))),
+        ("per-section", excluded_per_section, (("folder", per_section_folders), ("file", per_section_files))),
+    ):
+        for kind, copy_list in list_pairs:
+            for name in list(copy_list):
+                if name in names:
+                    copy_list.remove(name)
+                    reconciled_changed = True
+                    print(f"🚫 Dropped excluded {scope_label} {kind} from the copy list: {name} (listed in excluded_items)")
+
     # Discover
     disc_shared_folders, disc_shared_files = discover_shared_items(course_dir)
     disc_sec_folders, disc_sec_files = discover_section_items(section_dir)
@@ -3513,7 +3540,7 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     print(f"📌 Auto-discovered per-section folders: {allowed_disc_sec_folders or '—'}")
     print(f"📌 Auto-discovered per-section files: {allowed_disc_sec_files or '—'}")
 
-    if any([added_sf, added_sfi, added_psf, added_psfi, hidden_changed, expandable_changed]):
+    if any([added_sf, added_sfi, added_psf, added_psfi, hidden_changed, expandable_changed, reconciled_changed]):
         cfg["shared_folders"] = shared_folders
         cfg["shared_files"] = shared_files
         cfg["per_section_folders"] = per_section_folders

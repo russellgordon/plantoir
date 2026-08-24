@@ -428,10 +428,14 @@ this side is expected to say so when the contract is wrong.
       name back in Course Settings — the `index.md` note exists to make that
       self-explaining.
     - **The mechanism of exclusion is the name's ABSENCE from the copy list**
-      (`shared_folders` etc.); `excluded_items` only stops preflight putting it
-      back. So the Windows app must do BOTH on removal — take the name out of the
-      list AND record it in `excluded_items[scope]` — or the folder keeps
-      publishing. Record `item re-included` ONLY when the name was actually in
+      (`shared_folders` etc.); `excluded_items` stops preflight putting it back
+      AND, since the Piece 2 review, preflight also DROPS any excluded name it
+      finds still in a copy list, prints `🚫 Dropped excluded <scope> <kind> from
+      the copy list: <name>`, and writes the config back. So the key is
+      authoritative and a name in both cannot publish — but the Windows app
+      should still do BOTH on removal (take the name out of the list AND record
+      the key), because the reconciliation only runs at the next build and a
+      teacher reading the list in Settings before then would see it. Record `item re-included` ONLY when the name was actually in
       `excluded_items`; an ordinary add is not a re-inclusion, and a trail line
       that says it was would be believed.
 
