@@ -411,16 +411,28 @@ check_baked support/favicon/icon.png      /opt/support/favicon/icon.png
 # Learning Goals. Asserted against the IMAGE on purpose: a check that ran in a
 # long-lived container would have passed throughout the whole time this was
 # broken.
+#
+# Structural, not a bare substring grep (tightened 2026-08-23 after an
+# adversarial review of this fix): the marker comment proves nothing on its
+# own if it has drifted away from the `omit` Set it documents — a file can
+# contain the literal string CQ4T-OMIT-ANCHOR while nothing wires the hidden
+# list into `filterFn`. `-Pzo` treats the whole file as one NUL-terminated
+# record so the match can span the single newline between the marker's own
+# line and the `const omit =` line it must sit directly above — deliberately
+# NOT `.` matching across arbitrary further lines, which would let an anchor
+# "match" a Set pages of unrelated code away and defeat the point of asking.
+# The same adjacency `build_site.py`'s `_anchor_is_structurally_wired` now
+# requires — read that function's comment before touching either.
 echo ""
-echo "🔎 Checking the Explorer's hide filter is baked into the image…"
+echo "🔎 Checking the Explorer's hide filter is baked into the image, and wired to a live omit Set…"
 ANCHOR_OK="true"
 for layout in /opt/quartz/quartz.layout.ts /opt/quartz-site/quartz.layout.ts; do
-  if ! docker run --rm "$DEV_TEST_IMAGE" grep -q 'CQ4T-OMIT-ANCHOR' "$layout" 2>/dev/null; then
-    fail "The Explorer's hide filter is missing from $layout in the image — hidden pages would be published"
+  if ! docker run --rm "$DEV_TEST_IMAGE" grep -Pzoq '//[ \t]*CQ4T-OMIT-ANCHOR:[^\n]*\n[ \t]*const[ \t]+omit[ \t]*=[ \t]*new[ \t]+Set' "$layout" 2>/dev/null; then
+    fail "The Explorer's hide filter is missing or structurally detached from $layout in the image — hidden pages would be published"
     ANCHOR_OK="false"
   fi
 done
-[[ "$ANCHOR_OK" == "true" ]] && pass "The Explorer's hide filter is baked into the image (both Quartz copies)"
+[[ "$ANCHOR_OK" == "true" ]] && pass "The Explorer's hide filter is baked into the image and wired to a live omit Set (both Quartz copies)"
 
 # -------------------- 5. Drive the real launcher against the image --------------------
 echo ""

@@ -2791,6 +2791,40 @@ def patch_render_page_transclude_title(render_page_tsx_path: Path):
         print(f"⚠️ Error patching renderPage.tsx: {e}")
 # --- END ADD ---
 
+# The anchor comment is only proof of anything if it sits directly above the
+# `const omit = new Set(...)` it is documenting — i.e. the string a plain
+# `grep` (and, until this hardening, `ensure_quartz_layout_anchor` itself)
+# accepts on its own can exist while the Set has drifted away from it (a
+# hand-edit, a future Quartz upstream reshuffle) with nothing left to wire the
+# hidden list into `filterFn`. Deliberately loose about what follows "Set" —
+# it only needs to prove the marker and the Set are adjacent, the same pairing
+# `update_quartz_layout`'s own `pattern_omit` requires to ever touch this Set.
+#
+# Two things this deliberately does NOT tolerate, because nothing in this
+# codebase ever writes either shape and both are cheap to add back if that
+# ever changes: a blank line between the anchor and the `const` (every writer
+# — `_patch_explorer_with_anchor`, `EXPLORER_BLOCK`, `update_quartz_layout`'s
+# own rewrite — puts them on consecutive lines), and a type-annotation form
+# (`const omit: Set<string> = new Set(...)`) rather than a generic on `Set`
+# itself. A hand-edit into either shape would make a healthy file fail this
+# check and refuse to build — noted here rather than silently, so whoever
+# hits it knows this is why, not a new bug.
+#
+# verify.sh's Explorer-anchor check (§4b) must accept exactly the same shapes
+# this does — mirror any change here into that grep pattern too, and vice
+# versa, or the Docker image and the Windows-native build start disagreeing
+# about what "wired" means.
+_ANCHOR_STRUCTURE_RE = re.compile(
+    r'//[ \t]*CQ4T-OMIT-ANCHOR:[^\n]*\n'   # the whole marker line, same line only —
+    r'[ \t]*const[ \t]+omit[ \t]*=[ \t]*new[ \t]+Set',  # — not `.` in DOTALL mode, which
+)                                            # would let the anchor "match" a Set
+                                             # pages of unrelated code away.
+
+
+def _anchor_is_structurally_wired(txt: str) -> bool:
+    return "CQ4T-OMIT-ANCHOR" in txt and bool(_ANCHOR_STRUCTURE_RE.search(txt))
+
+
 # --- HARDENING TWEAK #2: Preflight to ensure omit anchor exists --------------
 def ensure_quartz_layout_anchor(quartz_layout_path: Path) -> bool:
     """
@@ -2813,18 +2847,37 @@ def ensure_quartz_layout_anchor(quartz_layout_path: Path) -> bool:
     the two cannot drift. Baked into the image as well (see the Dockerfile),
     so a freshly created container has it from birth — that is the real fix,
     and this is the belt to its braces for containers that predate it.
+
+    The check is STRUCTURAL, not a bare substring match (`_anchor_is_
+    structurally_wired`, added after an adversarial review of this fix on
+    2026-08-23 flagged the gap): a file can contain the literal string
+    "CQ4T-OMIT-ANCHOR" while the comment has drifted away from the `omit` Set
+    it was documenting — e.g. a hand-edit, or a future Quartz upstream
+    reshuffle inside `Component.Explorer({...})` that none of
+    `_patch_explorer_with_anchor`'s three regex strategies produce cleanly.
+    A bare substring check would report success while `update_quartz_layout`
+    silently inserts a brand-new, disconnected `omit` Set at the top of the
+    file on its next write (its own fallback for "pattern not found") — the
+    hidden-page list would be written and never consulted, which is exactly
+    the failure this whole preflight exists to catch.
     """
     if not quartz_layout_path.exists():
         print(f"❌ quartz.layout.ts not found at {quartz_layout_path}")
         return False
 
     txt = quartz_layout_path.read_text(encoding="utf-8")
-    if "CQ4T-OMIT-ANCHOR" in txt:
+    if _anchor_is_structurally_wired(txt):
         return True
 
-    print("⚠️ The Explorer's hide filter is missing from quartz.layout.ts.")
-    print("   Repairing it before building — without it, pages you have")
-    print("   hidden would be published.")
+    if "CQ4T-OMIT-ANCHOR" in txt:
+        print("⚠️ The Explorer's hide filter marker is present in quartz.layout.ts")
+        print("   but is no longer attached to a live omit Set — repairing it")
+        print("   before building, since pages you have hidden would otherwise")
+        print("   go unrecognized by the filter.")
+    else:
+        print("⚠️ The Explorer's hide filter is missing from quartz.layout.ts.")
+        print("   Repairing it before building — without it, pages you have")
+        print("   hidden would be published.")
 
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -2834,7 +2887,7 @@ def ensure_quartz_layout_anchor(quartz_layout_path: Path) -> bool:
         print(f"❌ Could not load the Explorer patch: {exc}")
         return False
 
-    if not changed or "CQ4T-OMIT-ANCHOR" not in repaired:
+    if not changed or not _anchor_is_structurally_wired(repaired):
         print("❌ Could not restore the Explorer's hide filter.")
         return False
 

@@ -55,42 +55,6 @@ an item when it ships (finished behaviour is recorded in
   comment says — and the on-screen sentence is the accessibility VALUE of
   `taskMilestoneLabel`; its label is empty.
 
-- **A recreated container publishes pages the teacher HID** — found
-  2026-08-17, while re-shooting the marketing screenshots. Highest-severity
-  item on this list: it exposes material a teacher deliberately held back.
-
-  The Explorer's hide list works through a `filterFn` in
-  `quartz.layout.ts` carrying a `CQ4T-OMIT-ANCHOR` marker. That block is
-  written by `setup_course.py`'s `ensure_quartz_explorer_anchor()`, which
-  patches `/opt/quartz/quartz.layout.ts` **inside the running container**.
-  It is NOT in the image: `docker run --rm <image> grep -c CQ4T-OMIT-ANCHOR
-  /opt/quartz/quartz.layout.ts` returns 0. `build_site.py` only overwrites
-  the CONTENTS of the `omit` Set; it cannot create the filter.
-
-  So any container recreation loses it — and recreation is the documented
-  design whenever the recipe hash changes, i.e. after most toolchain
-  updates. The next preview then copies a pristine scaffold, and
-  `ensure_quartz_layout_anchor()` injects a bare `const omit = new Set([])`
-  "to unblock the build". The Set is then populated and **nothing consumes
-  it**, because there is no filter. The build succeeds, and Curriculum,
-  Learning Goals, Help Sessions, Key Links and Private Notes all appear on
-  the class site.
-
-  Reproduced: `docker rm -f` the working folder's container, then rebuild
-  three courses. All three came back with `filterFn` absent and two
-  warnings printed (`Expected omit set not found`, `Sidebar omit anchor not
-  found`) — and a site that hides nothing. Running
-  `ensure_quartz_explorer_anchor()` in the container fixed all three.
-
-  The fix, in order of value: **bake the anchored Explorer block into the
-  IMAGE** (the Dockerfile already copies `patches/Explorer.tsx`, so this
-  belongs beside it) so every container has it from birth and setup's patch
-  becomes a harmless no-op rather than the only source of truth; make the
-  build's fallback inject the real block instead of a bare Set, so existing
-  containers self-heal; and **stop treating a missing filter as a
-  warning** — "about to publish pages the teacher hid" should refuse to
-  build, not print a line. Gated by `verify.sh`.
-
 - **Container recreation can kill live previews** — noted 2026-08-11.
   Every launcher "ensures" the working folder's container, and on a
   toolchain-recipe hash or mount mismatch it recreates it (`docker rm
@@ -232,6 +196,28 @@ days of toolchain edits, where a teacher builds on install and then not again.
 If this is ever revisited, the thing to find out first is whether BuildKit can
 be given a scoped cache per build context — a filtered prune, not a bigger
 hammer.
+
+## ✅ Done — A recreated container publishes pages the teacher HID
+
+Found 2026-08-17 while re-shooting the marketing screenshots; fixed the same
+day (commit `9d7db82b`) and ported to the Windows-native runtime path
+(`fetch-runtime.ps1`) the same day too — this item stayed on the list only
+because nobody had removed it. Confirmed still fixed 2026-08-23, on Windows:
+the Dockerfile bakes the `CQ4T-OMIT-ANCHOR` Explorer filter into the image at
+build time, `scripts/build_site.py`'s `ensure_quartz_layout_anchor` re-asserts
+it on every build and refuses to build rather than warn-and-continue if it
+can't restore it, and `verify.sh` §4b asserts it against the built image.
+
+While confirming it, an adversarial review found the checks only did a bare
+substring match for the marker string — not that it is actually attached to
+a live `omit` Set — so a file could pass every guard while the hidden-page
+list was written to a Set nothing consumed. Tightened the same day: `_anchor_
+is_structurally_wired()` in `build_site.py` and a matching `verify.sh` grep
+now both require the marker's own line to sit directly above `const omit =
+new Set`. Not reachable through any writer in this codebase today, but it is
+exactly the failure class this fix exists to close. Full write-up, including
+what still needs a real mac Docker run to confirm: `MAC-HANDOFF.md`'s "Open"
+section.
 
 ## ✅ Done on Windows — Assistant replies "deployed" before the deploy finishes
 

@@ -97,6 +97,75 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+- ⚠️ **NEEDS A MAC `verify.sh` RUN — authored and reasoned through on
+  Windows, unverified against a real Docker build.** TODO.md's "A recreated
+  container publishes pages the teacher HID" turned out to already be fixed
+  (2026-08-17, commit `9d7db82b`, ported to the Windows-native runtime path
+  the same day via `fetch-runtime.ps1`) — the Dockerfile bakes the
+  `CQ4T-OMIT-ANCHOR` filter into the image, `build_site.py`'s
+  `ensure_quartz_layout_anchor` re-asserts it on every build and refuses
+  (`sys.exit(1)`) rather than warn-and-continue if it can't restore it, and
+  `verify.sh` §4b asserts it against the built image. TODO.md's item was
+  simply stale and has been removed.
+
+  What actually shipped THIS session, on top of that: an adversarial review
+  of the existing fix (asked for by Russell, not found by accident) turned up
+  a real gap — every one of those checks did a bare **substring** match for
+  the literal string `CQ4T-OMIT-ANCHOR`, not that the marker comment is
+  actually attached to a live `omit` Set. A file could contain that string
+  somewhere unrelated while the Set had drifted away from it (a hand-edit, or
+  a future Quartz upstream reshuffle none of `_patch_explorer_with_anchor`'s
+  three regex strategies produce cleanly), and the checks would report
+  success while `update_quartz_layout`'s own fallback silently inserts a
+  brand-new, disconnected `omit` Set elsewhere in the file on its next write
+  — hidden pages would go unrecognized by the filter and publish, with every
+  guard reporting green. Not reachable through any normal flow today (nothing
+  in this codebase currently produces that detached shape), but it is exactly
+  the failure class this whole fix exists to close, so it was tightened
+  rather than left as a latent gap.
+
+  **What changed:** `scripts/build_site.py` gains `_ANCHOR_STRUCTURE_RE` /
+  `_anchor_is_structurally_wired()` — the marker's own line must be
+  immediately followed (next line, leading whitespace only) by
+  `const omit = new Set`, not merely present anywhere in the file.
+  `ensure_quartz_layout_anchor` now calls that instead of a bare
+  `"CQ4T-OMIT-ANCHOR" in txt`, on both the missing-marker path and the
+  repaired-output verification. `verify.sh` §4b's grep was rewritten to
+  `grep -Pzoq '//[ \t]*CQ4T-OMIT-ANCHOR:[^\n]*\n[ \t]*const[ \t]+omit[ \t]*=[ \t]*new[ \t]+Set'`
+  — deliberately mirroring the Python pattern character-for-character (a
+  first draft used a looser bash pattern with `\s` and no `//` prefix
+  requirement; a second adversarial review caught that the two guards'
+  claimed equivalence was false and it was tightened to match exactly, since
+  `verify.sh` is the only guard on the Docker/mac-Linux path and
+  `build_site.py`'s check is the only one on Windows-native — they must agree
+  or the two platforms disagree about what "wired" means). Verified against
+  literal `good.ts`/`bad-detached.ts`/`missing.ts` fixtures with both `python3`
+  and GNU `grep -P` directly (not through Docker — unavailable on this
+  machine); confirmed the three writer shapes (`_patch_explorer_with_anchor`'s
+  three strategies, `EXPLORER_BLOCK`, and `update_quartz_layout`'s own
+  rewrite) all still pass the tightened check, so a normal build → next
+  build/preview cycle does not regress.
+
+  **What the mac still owes:** run `verify.sh` for real (it needs Docker,
+  unreachable here) to confirm §4b's tightened check still passes against an
+  actual freshly-built image, and that the `grep -Pzoq` syntax behaves
+  identically on macOS's grep as it did against GNU grep 3.0 here — worth
+  double-checking, since `-z`/`-P` support and behaviour has differed across
+  grep implementations historically (macOS ships BSD grep by default unless
+  Homebrew's `ggrep`/GNU grep is on PATH; `verify.sh` already assumes
+  something docker-adjacent, confirm which grep binary the check actually
+  runs — it runs INSIDE the container via `docker run`, so it is the image's
+  own grep, likely fine, but worth confirming rather than assuming). No
+  `contracts/` or `GUI-IMPROVEMENTS.md` entry — this is an internal
+  correctness hardening of toolchain logic, not a teacher-visible behaviour
+  change (the original 2026-08-17 fix did not add either either, for the same
+  reason). Two low-priority items noted in the new code comment rather than
+  fixed, since neither is exercised by any writer in this codebase today: a
+  type-annotation form (`const omit: Set<string> = new Set(...)`) and a
+  blank line between the anchor and the `const` would both wrongly fail this
+  check if they ever appeared by hand-edit — cheap to loosen for later if
+  that ever becomes real.
+
 - **For awareness only — no mac action required.** TODO.md item: *"Assistant
   replies 'deployed' before the deploy finishes (Windows)."* Windows'
   `MainWindow.DeployForAsync` used to resolve the instant the click was
