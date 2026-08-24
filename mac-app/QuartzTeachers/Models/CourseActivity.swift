@@ -69,6 +69,23 @@ enum CourseActivity {
         store.activePublishes = remaining
     }
 
+    /// True while any section of the course is PUBLISHING — previews do not
+    /// count.
+    ///
+    /// `courseIsBusy` answers "previewing or publishing", which is right for
+    /// disabling a menu item and wrong for anything that needs to know whether
+    /// somebody is publishing. Asking the wrong one of these made the repair
+    /// dialog's "Preview Again" refuse whenever a preview was running, which is
+    /// every time it is offered.
+    static func coursePublishIsRunning(folderPath: String, courseCode: String) -> Bool {
+        for publish in activePublishes {
+            if publish.folderPath == folderPath && publish.courseCode == courseCode {
+                return true
+            }
+        }
+        return false
+    }
+
     /// True while any section of the course is previewing or publishing.
     static func courseIsBusy(folderPath: String, courseCode: String) -> Bool {
         return busyDescription(folderPath: folderPath, courseCode: courseCode) != nil

@@ -514,7 +514,11 @@ struct SectionDetailView: View {
                 guard let folder = workspace.workspaceURL else {
                     return false
                 }
-                return CourseActivity.courseIsBusy(
+                // `coursePublishIsRunning`, NOT `courseIsBusy`: the latter is
+                // "previewing OR publishing", so asking it here refused the
+                // preview whenever one was already running — which is every
+                // time this button is offered. Found by pressing it.
+                return CourseActivity.coursePublishIsRunning(
                     folderPath: folder.path, courseCode: course.code
                 )
             }()

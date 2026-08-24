@@ -5,6 +5,37 @@ special-folders hardening work (branch `issue/special-folders-hardening`).
 Newest first. This is a HANDOVER note, not a log — `GUI-IMPROVEMENTS.md` is the
 log, and where a row and this file disagree, check the code.
 
+## A section with no `index.md` cannot be published at all (2026-08-23)
+
+Found while testing the deploy path, and it is worse than the health check's
+wording suggests. `_sync_public_to_host` (`scripts/build_site.py:3138`) only
+copies the built site back to the host when `public/index.html` exists — and
+with no `index.md`, Quartz emits no root `index.html`. So:
+
+1. the build SUCCEEDS and says so;
+2. the sync back to `.merged_output` is silently skipped;
+3. `deploy.sh` then reports **"Built site not found … Build first:
+   ./preview.sh EXC2O 1 --build-only"** — after you have just built.
+
+The guard itself is defensible (do not publish half a build), but the message
+sends the teacher to do the thing they just did. What actually fixes it is
+restoring `index.md`, which is what the repair button does — verified end to
+end: repair → Preview Again → `public/index.html` appears on the host → deploy
+succeeds.
+
+The `sectionIndexMissing` check currently says the site "will open on whatever
+page happens to come first". That is true of a PREVIEW and understates the
+consequence for publishing. Worth strengthening.
+
+## The repair dialog asked the wrong "is it busy" question (2026-08-23)
+
+`CourseActivity.courseIsBusy` means "previewing OR publishing". The repair
+dialog's Preview Again guard used it, so it refused whenever a preview was
+running — which is every time the button is offered, since the findings come
+from a build. There is now `coursePublishIsRunning` for callers that mean
+publishing. **If you need to know whether a publish is in flight, do not reach
+for `courseIsBusy`.**
+
 ## The " — Edited" marker after a repair (2026-08-23)
 
 **A repair only shows as " — Edited" on a section that has ALREADY published.**
