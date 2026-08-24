@@ -69,6 +69,12 @@ DATELINE = "(Today is %s, a %s.)" % (TODAY.isoformat(), TODAY.strftime("%A"))
 # 2026-08-14 when the approval gate narrowed to deploys only (plan-first-and-
 # wait removed); the 94% in trimmed-surface-results.txt was measured with the
 # PREVIOUS wording and has not been re-run against this one.
+#
+# Updated again 2026-08-24 with the two sentences that fixed the "undo
+# over-salient" and "hide inversion" clusters flagged in TODO.md — see
+# conversational-residue-results.txt. Keep this in sync with
+# AssistAgent.cs / AssistAgent.swift's SystemPrompt, by hand; nothing pins
+# the three together automatically.
 SYSTEM = (
     f"You are Plantoir's assistant, helping a teacher with {COURSE} section 1. "
     "Choose exactly one tool at a time and fill in its arguments from what the teacher said. "
@@ -76,7 +82,12 @@ SYSTEM = (
     "and undo_last_change takes it back - so do what was asked without asking permission first. "
     "Never guess a course, a section, a page title "
     "or a date - if you are not certain, look it up or ask. "
-    "If no tool fits, say so plainly instead of inventing one.\n"
+    "If no tool fits, say so plainly instead of inventing one. "
+    "undo_last_change reverses only the assistant's own most recent action - a teacher "
+    "describing something THEY did earlier, even calling it a mistake, is asking to "
+    "publish or unpublish, not to undo. There is no tool to delete, remove or rename a "
+    "page or a folder - if asked for that, say so plainly instead of choosing a tool "
+    "that does something else.\n"
     "PUBLISHING a page decides whether students can see it in the site. "
     "DEPLOYING sends the whole site to the web. They are different acts. "
     "After a change, Plantoir opens the preview by itself so the teacher can look it over. "

@@ -17,6 +17,11 @@ TODAY = datetime.date(2026, 8, 16)
 DATELINE = "(Today is %s, a %s.)" % (TODAY.isoformat(), TODAY.strftime("%A"))
 ENDPOINT = "http://127.0.0.1:8099/v1/chat/completions"
 
+# STALE, 2026-08-24: AssistAgent's system prompt gained two sentences
+# (undo_last_change scope, no-delete-tool) after this suite's last real run —
+# see conversational-residue-results.txt. Frozen here on purpose, matching
+# the shelf-phrasings-results.txt this SYSTEM produced; edit both together
+# if this suite is ever re-run, rather than silently drifting from either.
 SYSTEM = ("You are Plantoir's assistant, helping a teacher with ICS3U section 1. "
  "Choose exactly one tool at a time and fill in its arguments from what the teacher said. "
  "Publishing and unpublishing are safe to do straight away — every change is backed up "

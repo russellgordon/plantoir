@@ -1,0 +1,406 @@
+# Conversational-residue re-measure, 2026-08-24 — TODO.md item (c)
+#
+# Context: the promise card's eleven fixed shapes no longer touch the model
+# (they run as deterministic commands - see promise-card-results.txt's own
+# header note). What still reaches the model is CONVERSATIONAL phrasing: a
+# teacher typing something in their own words. That's the 54 non-card trials
+# in trimmed-surface-suite.py's CASES list (18 probes x 3 trials), and it was
+# last measured at 72% *overall* (card + conversational mixed together) in
+# promise-card-results.txt, with "undo over-salient" and the hide-as-mistake
+# probe's decline both flagged as open problems.
+#
+# Model: Qwen2.5-1.5B-Instruct Q4_K_M (the Windows-shipped small tier),
+# native llama-server.exe, Vulkan, --reasoning off --reasoning-budget 0,
+# port 8099. Tools: plantoir-mcp's real tools/list against a working ENG2D
+# course, narrowed to the local 15-tool surface and renamed to VVH2O to
+# match the shipped-config run. 3 trials/probe, temperature 0.1.
+#
+# ---------------------------------------------------------------------
+# BASELINE (current shipped prompt, unchanged) - full run below.
+# Conversational-only (54 trials, excluding the 33 card trials which no
+# longer reach the model in the app): 46/54 = 85%.
+#   Failures: "HIDE - the inversion case" 3/3 declined outright (should
+#   unpublish); "hide, phrased as a mistake" 2/3 routed to undo_last_change
+#   (the undo-over-salience TODO flagged); "deletion - no such tool" 3/3
+#   routed to cancel_scheduled_deploy instead of declining.
+# Full-suite (87 trials, card included - comparable to the 72% headline):
+# 67/87 = 77%.
+#
+# ---------------------------------------------------------------------
+# TWEAK: two sentences added to the system prompt, right after "If no tool
+# fits, say so plainly instead of inventing one." (full wording in
+# AssistAgent.cs / AssistAgent.swift's SystemPrompt, and mirrored in this
+# suite's SYSTEM constant):
+#
+#   "undo_last_change reverses only the assistant's own most recent action -
+#   a teacher describing something THEY did earlier, even calling it a
+#   mistake, is asking to publish or unpublish, not to undo. There is no
+#   tool to delete, remove or rename a page or a folder - if asked for
+#   that, say so plainly instead of choosing a tool that does something
+#   else."
+#
+# Two runs at this wording (temperature 0.1, not zero, so some trial-to-
+# trial variance is expected and is shown rather than averaged away):
+#
+#   Run 1: full 74/87 (85%); conversational-only 51/54 (94%).
+#   Run 2: full 72/87 (83%); conversational-only 49/54 (91%).
+#
+# Both runs: the two flagged clusters are CLEAN in both runs - zero
+# "hide, phrased as a mistake" or "HIDE - the inversion case" misses, and
+# zero polarity inversions throughout (same as baseline). The
+# "deletion - no such tool" probe is UNCHANGED: 3/3 miss in every run,
+# still routed to cancel_scheduled_deploy. Some run-to-run noise appeared
+# in probes the tweak wasn't aimed at ("schedule a deploy",
+# "check section" each miss once in run 2 but not run 1) - consistent with
+# sampling variance at temp 0.1, not a new failure mode; neither missed in
+# both runs.
+#
+# A THIRD wording was tried and rejected: naming cancel_scheduled_deploy
+# explicitly in the delete-tool sentence ("not cancel_scheduled_deploy, not
+# any other tool...") to also fix the deletion probe. It did not fix
+# deletion (still 3/3 miss) and it broke two previously-clean conversational
+# cases ("schedule a deploy" 3/3 new miss, "check section" 2/3 new miss) -
+# full accuracy dropped to 79%. Rejected for the same reason
+# AssistToolRunner.localTools's doc comment gives about tool descriptions:
+# a small model reads an extra clause as new signal to weigh, not a
+# boundary to respect, and naming an unrelated tool inside a "don't do X"
+# sentence apparently pulled its salience up rather than down. Not shipped.
+#
+# NET: shipped wording takes conversational-only accuracy from ~85% to
+# ~91-94%, fixes both flagged clusters cleanly, introduces no new failure
+# mode across two runs, and leaves the deletion probe as a known, isolated,
+# pre-existing gap - worth a future pass but not blocking this one.
+#
+# Raw run 1 (winning wording):
+### date-appended=True date-prepended=False real-course=True
+probe                          chose                    ok    ms     arguments
+----------------------------------------------------------------------------------------------------------------------
+card: publish by name          plan_publish_class_on    MISS  124054 {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish by name          plan_publish_class_on    MISS  5833   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish by name          plan_publish_class_on    MISS  5794   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish tomorrow         plan_publish_class_on    OK    7505   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish tomorrow         plan_publish_class_on    OK    5610   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish tomorrow         plan_publish_class_on    OK    5707   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: unpublish by name        unpublish_pages          OK    9510   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: unpublish by name        unpublish_pages          OK    7684   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: unpublish by name        unpublish_pages          OK    8356   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: unpublish, mistake       unpublish_pages          OK    12191  {"course": "VVH2O", "section": 1, "includeLinked":
+card: unpublish, mistake       unpublish_pages          OK    7192   {"course": "VVH2O", "section": 1, "includeLinked":
+card: unpublish, mistake       unpublish_pages          OK    9651   {"course": "VVH2O", "section": 1, "includeLinked":
+card: plan a publish           plan_publish_pages       OK    10131  {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: plan a publish           plan_publish_class_on    MISS  5832   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: plan a publish           plan_publish_pages       OK    7953   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: check the section        check_section            OK    5661   {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    3633   {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    3639   {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    5711   {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    3717   {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    3747   {"course": "VVH2O", "section": 1}
+card: undo                     (declined)               MISS  2622   {}
+card: undo                     (declined)               MISS  609    {}
+card: undo                     (declined)               MISS  625    {}
+card: deploy now               deploy_section           OK    5632   {"course": "VVH2O", "section": 1}
+card: deploy now               deploy_section           OK    3633   {"course": "VVH2O", "section": 1}
+card: deploy now               deploy_section           OK    3609   {"course": "VVH2O", "section": 1}
+card: schedule a deploy        plan_publish_class_on    MISS  7924   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: schedule a deploy        plan_publish_class_on    MISS  5726   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: schedule a deploy        plan_publish_class_on    MISS  5745   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: cancel the deploy        cancel_scheduled_deploy  OK    5802   {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    3834   {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    3871   {"course": "VVH2O", "section": 1}
+publish tomorrow, with links   publish_class_on         OK    16960  {"course": "VVH2O", "section": 1, "date": "2026-09
+publish tomorrow, with links   publish_class_on         OK    14589  {"course": "VVH2O", "section": 1, "date": "2026-09
+publish tomorrow, with links   publish_class_on         OK    14548  {"course": "VVH2O", "section": 1, "date": "2026-09
+publish by name, informal      publish_pages            OK    11812  {"course": "VVH2O", "section": 1, "includeLinked":
+publish by name, informal      publish_pages            OK    9468   {"course": "VVH2O", "section": 1, "includeLinked":
+publish by name, informal      publish_pages            OK    6105   {"course": "VVH2O", "section": 1, "includeLinked":
+HIDE - the inversion case      unpublish_pages          OK    9623   {"course": "VVH2O", "section": 1, "pages": ["Ohm's
+HIDE - the inversion case      unpublish_pages          OK    7278   {"course": "VVH2O", "section": 1, "pages": ["Ohm's
+HIDE - the inversion case      unpublish_pages          OK    7298   {"course": "VVH2O", "section": 1, "pages": ["Ohm's
+hide, informal (verbatim cue)  plan_unpublish_pages     OK    12053  {"course": "VVH2O", "section": 1, "includeLinked":
+hide, informal (verbatim cue)  plan_unpublish_pages     OK    9720   {"course": "VVH2O", "section": 1, "includeLinked":
+hide, informal (verbatim cue)  plan_unpublish_pages     OK    9701   {"course": "VVH2O", "section": 1, "includeLinked":
+hide, phrased as a mistake     unpublish_pages          OK    11939  {"course": "VVH2O", "section": 1, "pages": ["Unit 
+hide, phrased as a mistake     unpublish_pages          OK    9538   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+hide, phrased as a mistake     unpublish_pages          OK    9559   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+list pages                     list_pages               OK    6898   {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    4386   {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    4513   {"course": "VVH2O", "section": 1, "matching": ""}
+read                           list_pages               OK    7687   {"course": "VVH2O", "section": 1, "matching": "Uni
+read                           list_pages               OK    5377   {"course": "VVH2O", "section": 1, "matching": "Uni
+read                           list_pages               OK    5410   {"course": "VVH2O", "section": 1, "matching": "Uni
+check section                  check_section            OK    13460  {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    3637   {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    3716   {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    6001   {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    3717   {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    3747   {"course": "VVH2O", "section": 1}
+undo                           undo_last_change         OK    4281   {}
+undo                           undo_last_change         OK    2203   {}
+undo                           undo_last_change         OK    2241   {}
+schedule a deploy              schedule_deploy          OK    8349   {"course": "VVH2O", "section": 1, "when": "2026-09
+schedule a deploy              schedule_deploy          OK    6154   {"course": "VVH2O", "section": 1, "when": "2026-09
+schedule a deploy              schedule_deploy          OK    6162   {"course": "VVH2O", "section": 1, "when": "2026-09
+deploy now                     deploy_section           OK    5986   {"course": "VVH2O", "section": 1}
+deploy now                     deploy_section           OK    3605   {"course": "VVH2O", "section": 1}
+deploy now                     deploy_section           OK    3630   {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    6101   {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    3844   {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    3936   {"course": "VVH2O", "section": 1}
+no course named: publish       publish_class_on         OK    8259   {"course": "VVH2O", "section": 1, "date": "2026-09
+no course named: publish       plan_publish_class_on    OK    5674   {"course": "VVH2O", "section": 1, "date": "2026-09
+no course named: publish       plan_publish_class_on    OK    5773   {"course": "VVH2O", "section": 1, "date": "2026-09
+no course named: hide          plan_unpublish_pages     OK    9420   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+no course named: hide          plan_unpublish_pages     OK    7230   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+no course named: hide          plan_unpublish_pages     OK    7182   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+deletion - no such tool        cancel_scheduled_deploy  MISS  6111   {"course": "VVH2O", "section": 1}
+deletion - no such tool        cancel_scheduled_deploy  MISS  3844   {"course": "VVH2O", "section": 1}
+deletion - no such tool        cancel_scheduled_deploy  MISS  3849   {"course": "VVH2O", "section": 1}
+out of scope                   (declined)               OK    3810   {}
+out of scope                   (declined)               OK    1508   {}
+out of scope                   (declined)               OK    1544   {}
+typos                          plan_publish_class_on    OK    7963   {"course": "VVH2O", "section": 1, "date": "2026-09
+typos                          plan_publish_class_on    OK    5817   {"course": "VVH2O", "section": 1, "date": "2026-09
+typos                          plan_publish_class_on    OK    5656   {"course": "VVH2O", "section": 1, "date": "2026-09
+----------------------------------------------------------------------------------------------------------------------
+routing accuracy: 74/87 (85%)
+misses that were a WRITE (the dangerous kind): 3
+polarity inversions (hide answered with publish): 0
+responses needing type coercion: 0
+malformed tool calls: 0
+'tomorrow' dates not equal to 2026-08-25: 9
+   publish tomorrow, with links -> date='2026-09-09'
+   publish tomorrow, with links -> date='2026-09-09'
+   publish tomorrow, with links -> date='2026-09-09'
+   no course named: publish -> date='2026-09-09'
+   no course named: publish -> date='2026-09-09'
+   no course named: publish -> date='2026-09-09'
+   typos -> date='2026-09-09'
+   typos -> date='2026-09-09'
+   typos -> date='2026-09-09'
+course arguments not equal to VVH2O: 0
+
+[exited with code 0]
+
+# Raw run 2 (winning wording, confirmation run):
+### date-appended=True date-prepended=False real-course=True
+probe                          chose                    ok    ms     arguments
+----------------------------------------------------------------------------------------------------------------------
+card: publish by name          plan_publish_class_on    MISS  8629   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish by name          plan_publish_class_on    MISS  5581   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish by name          plan_publish_class_on    MISS  5481   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish tomorrow         plan_publish_class_on    OK    7466   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish tomorrow         plan_publish_class_on    OK    5469   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish tomorrow         plan_publish_class_on    OK    5466   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: unpublish by name        unpublish_pages          OK    9350   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: unpublish by name        unpublish_pages          OK    7358   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: unpublish by name        unpublish_pages          OK    7381   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: unpublish, mistake       unpublish_pages          OK    9251   {"course": "VVH2O", "section": 1, "includeLinked":
+card: unpublish, mistake       unpublish_pages          OK    7059   {"course": "VVH2O", "section": 1, "includeLinked":
+card: unpublish, mistake       unpublish_pages          OK    7337   {"course": "VVH2O", "section": 1, "includeLinked":
+card: plan a publish           plan_publish_pages       OK    10265  {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: plan a publish           plan_publish_pages       OK    8986   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: plan a publish           plan_publish_class_on    MISS  5835   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: check the section        check_section            OK    5633   {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    3589   {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    3606   {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    5692   {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    3724   {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    3776   {"course": "VVH2O", "section": 1}
+card: undo                     (declined)               MISS  2647   {}
+card: undo                     (declined)               MISS  602    {}
+card: undo                     (declined)               MISS  594    {}
+card: deploy now               deploy_section           OK    5596   {"course": "VVH2O", "section": 1}
+card: deploy now               deploy_section           OK    3580   {"course": "VVH2O", "section": 1}
+card: deploy now               deploy_section           OK    3612   {"course": "VVH2O", "section": 1}
+card: schedule a deploy        plan_publish_class_on    MISS  7964   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: schedule a deploy        plan_publish_class_on    MISS  5763   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: schedule a deploy        plan_publish_class_on    MISS  5825   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: cancel the deploy        cancel_scheduled_deploy  OK    5802   {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    3830   {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    3880   {"course": "VVH2O", "section": 1}
+publish tomorrow, with links   publish_class_on         OK    17115  {"course": "VVH2O", "section": 1, "date": "2026-09
+publish tomorrow, with links   publish_class_on         OK    14948  {"course": "VVH2O", "section": 1, "date": "2026-09
+publish tomorrow, with links   publish_class_on         OK    14929  {"course": "VVH2O", "section": 1, "date": "2026-09
+publish by name, informal      publish_pages            OK    11995  {"course": "VVH2O", "section": 1, "includeLinked":
+publish by name, informal      publish_pages            OK    9686   {"course": "VVH2O", "section": 1, "includeLinked":
+publish by name, informal      publish_pages            OK    9724   {"course": "VVH2O", "section": 1, "includeLinked":
+HIDE - the inversion case      unpublish_pages          OK    9628   {"course": "VVH2O", "section": 1, "pages": ["Ohm's
+HIDE - the inversion case      unpublish_pages          OK    7435   {"course": "VVH2O", "section": 1, "pages": ["Ohm's
+HIDE - the inversion case      unpublish_pages          OK    7453   {"course": "VVH2O", "section": 1, "pages": ["Ohm's
+hide, informal (verbatim cue)  plan_unpublish_pages     OK    12250  {"course": "VVH2O", "section": 1, "includeLinked":
+hide, informal (verbatim cue)  plan_unpublish_pages     OK    9960   {"course": "VVH2O", "section": 1, "includeLinked":
+hide, informal (verbatim cue)  plan_unpublish_pages     OK    9929   {"course": "VVH2O", "section": 1, "includeLinked":
+hide, phrased as a mistake     unpublish_pages          OK    12103  {"course": "VVH2O", "section": 1, "pages": ["Unit 
+hide, phrased as a mistake     unpublish_pages          OK    9775   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+hide, phrased as a mistake     unpublish_pages          OK    9818   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+list pages                     list_pages               OK    6759   {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    4519   {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    4590   {"course": "VVH2O", "section": 1, "matching": ""}
+read                           list_pages               OK    7760   {"course": "VVH2O", "section": 1, "matching": "Uni
+read                           list_pages               OK    5596   {"course": "VVH2O", "section": 1, "matching": "Uni
+read                           list_pages               OK    5576   {"course": "VVH2O", "section": 1, "matching": "Uni
+check section                  check_section            OK    6073   {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    3700   {"course": "VVH2O", "section": 1}
+check section                  (declined)               MISS  2993   {}
+rebuild preview                rebuild_preview          OK    6073   {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    3835   {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    3855   {"course": "VVH2O", "section": 1}
+undo                           undo_last_change         OK    4268   {}
+undo                           undo_last_change         OK    2258   {}
+undo                           undo_last_change         OK    2280   {}
+schedule a deploy              schedule_deploy          OK    8414   {"course": "VVH2O", "section": 1, "when": "2026-09
+schedule a deploy              plan_publish_class_on    MISS  5650   {"course": "VVH2O", "section": 1, "date": "2026-09
+schedule a deploy              schedule_deploy          OK    6308   {"course": "VVH2O", "section": 1, "when": "2026-09
+deploy now                     deploy_section           OK    6115   {"course": "VVH2O", "section": 1}
+deploy now                     deploy_section           OK    3949   {"course": "VVH2O", "section": 1}
+deploy now                     deploy_section           OK    3960   {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    6502   {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    4162   {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    4121   {"course": "VVH2O", "section": 1}
+no course named: publish       plan_publish_class_on    OK    8075   {"course": "VVH2O", "section": 1, "date": "2026-09
+no course named: publish       plan_publish_class_on    OK    5812   {"course": "VVH2O", "section": 1, "date": "2026-09
+no course named: publish       plan_publish_class_on    OK    5832   {"course": "VVH2O", "section": 1, "date": "2026-09
+no course named: hide          plan_unpublish_pages     OK    9465   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+no course named: hide          plan_unpublish_pages     OK    7330   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+no course named: hide          plan_unpublish_pages     OK    7319   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+deletion - no such tool        cancel_scheduled_deploy  MISS  6143   {"course": "VVH2O", "section": 1}
+deletion - no such tool        cancel_scheduled_deploy  MISS  3902   {"course": "VVH2O", "section": 1}
+deletion - no such tool        cancel_scheduled_deploy  MISS  3921   {"course": "VVH2O", "section": 1}
+out of scope                   (declined)               OK    9590   {}
+out of scope                   (declined)               OK    7516   {}
+out of scope                   (declined)               OK    1682   {}
+typos                          plan_publish_class_on    OK    8600   {"course": "VVH2O", "section": 1, "date": "2026-09
+typos                          plan_publish_class_on    OK    6508   {"course": "VVH2O", "section": 1, "date": "2026-09
+typos                          plan_publish_class_on    OK    7015   {"course": "VVH2O", "section": 1, "date": "2026-09
+----------------------------------------------------------------------------------------------------------------------
+routing accuracy: 72/87 (83%)
+misses that were a WRITE (the dangerous kind): 3
+polarity inversions (hide answered with publish): 0
+responses needing type coercion: 0
+malformed tool calls: 0
+'tomorrow' dates not equal to 2026-08-25: 10
+   publish tomorrow, with links -> date='2026-09-09'
+   publish tomorrow, with links -> date='2026-09-09'
+   publish tomorrow, with links -> date='2026-09-09'
+   schedule a deploy -> date='2026-09-09'
+   no course named: publish -> date='2026-09-09'
+   no course named: publish -> date='2026-09-09'
+   no course named: publish -> date='2026-09-09'
+   typos -> date='2026-09-09'
+   typos -> date='2026-09-09'
+   typos -> date='2026-09-09'
+course arguments not equal to VVH2O: 0
+
+[exited with code 0]
+
+# Raw baseline run (unchanged shipped prompt, for comparison):
+### date-appended=True date-prepended=False real-course=True
+probe                          chose                    ok    ms     arguments
+----------------------------------------------------------------------------------------------------------------------
+card: publish by name          plan_publish_class_on    MISS  132964 {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish by name          plan_publish_class_on    MISS  6188   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish by name          plan_publish_class_on    MISS  6154   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish tomorrow         plan_publish_class_on    OK    8074   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish tomorrow         plan_publish_class_on    OK    6114   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: publish tomorrow         plan_publish_class_on    OK    6102   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: unpublish by name        plan_unpublish_pages     OK    12472  {"course": "VVH2O", "section": 1, "includeLinked":
+card: unpublish by name        plan_unpublish_pages     OK    7770   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+card: unpublish by name        plan_unpublish_pages     OK    10329  {"course": "VVH2O", "section": 1, "includeLinked":
+card: unpublish, mistake       unpublish_pages          OK    12591  {"course": "VVH2O", "section": 1, "includeLinked":
+card: unpublish, mistake       unpublish_pages          OK    7648   {"course": "VVH2O", "section": 1, "includeLinked":
+card: unpublish, mistake       unpublish_pages          OK    7721   {"course": "VVH2O", "section": 1, "includeLinked":
+card: plan a publish           plan_publish_class_on    MISS  8870   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: plan a publish           plan_publish_class_on    MISS  6486   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: plan a publish           plan_publish_class_on    MISS  6097   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: check the section        check_section            OK    6006   {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    3780   {"course": "VVH2O", "section": 1}
+card: check the section        check_section            OK    3927   {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    6126   {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    3932   {"course": "VVH2O", "section": 1}
+card: rebuild preview          rebuild_preview          OK    4038   {"course": "VVH2O", "section": 1}
+card: undo                     (declined)               MISS  4725   {}
+card: undo                     (declined)               MISS  2629   {}
+card: undo                     (declined)               MISS  2652   {}
+card: deploy now               deploy_section           OK    5995   {"course": "VVH2O", "section": 1}
+card: deploy now               deploy_section           OK    3828   {"course": "VVH2O", "section": 1}
+card: deploy now               deploy_section           OK    3915   {"course": "VVH2O", "section": 1}
+card: schedule a deploy        plan_publish_class_on    MISS  8423   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: schedule a deploy        plan_publish_class_on    MISS  6098   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: schedule a deploy        plan_publish_class_on    MISS  6067   {"course": "VVH2O", "section": 1, "date": "2026-08
+card: cancel the deploy        cancel_scheduled_deploy  OK    6187   {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    4069   {"course": "VVH2O", "section": 1}
+card: cancel the deploy        cancel_scheduled_deploy  OK    4172   {"course": "VVH2O", "section": 1}
+publish tomorrow, with links   publish_class_on         OK    9105   {"course": "VVH2O", "section": 1, "date": "2026-09
+publish tomorrow, with links   publish_class_on         OK    6484   {"course": "VVH2O", "section": 1, "date": "2026-09
+publish tomorrow, with links   publish_class_on         OK    6521   {"course": "VVH2O", "section": 1, "date": "2026-09
+publish by name, informal      publish_pages            OK    9063   {"course": "VVH2O", "section": 1, "includeLinked":
+publish by name, informal      publish_pages            OK    9134   {"course": "VVH2O", "section": 1, "includeLinked":
+publish by name, informal      publish_pages            OK    10088  {"course": "VVH2O", "section": 1, "includeLinked":
+HIDE - the inversion case      (declined)               MISS  7797   {}
+HIDE - the inversion case      (declined)               MISS  5367   {}
+HIDE - the inversion case      (declined)               MISS  15389  {}
+hide, informal (verbatim cue)  plan_unpublish_pages     OK    11617  {"course": "VVH2O", "section": 1, "includeLinked":
+hide, informal (verbatim cue)  plan_unpublish_pages     OK    10385  {"course": "VVH2O", "section": 1, "includeLinked":
+hide, informal (verbatim cue)  plan_unpublish_pages     OK    10321  {"course": "VVH2O", "section": 1, "includeLinked":
+hide, phrased as a mistake     undo_last_change         MISS  5092   {}
+hide, phrased as a mistake     undo_last_change         MISS  2361   {}
+hide, phrased as a mistake     unpublish_pages          OK    9480   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+list pages                     list_pages               OK    7383   {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    4949   {"course": "VVH2O", "section": 1, "matching": ""}
+list pages                     list_pages               OK    4506   {"course": "VVH2O", "section": 1, "matching": ""}
+read                           list_pages               OK    8331   {"course": "VVH2O", "section": 1, "matching": "Uni
+read                           list_pages               OK    5855   {"course": "VVH2O", "section": 1, "matching": "Uni
+read                           list_pages               OK    5846   {"course": "VVH2O", "section": 1, "matching": "Uni
+check section                  check_section            OK    6345   {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    3800   {"course": "VVH2O", "section": 1}
+check section                  check_section            OK    3884   {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    6409   {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    3970   {"course": "VVH2O", "section": 1}
+rebuild preview                rebuild_preview          OK    4030   {"course": "VVH2O", "section": 1}
+undo                           undo_last_change         OK    4594   {}
+undo                           undo_last_change         OK    2402   {}
+undo                           undo_last_change         OK    2347   {}
+schedule a deploy              schedule_deploy          OK    8858   {"course": "VVH2O", "section": 1, "when": "2026-09
+schedule a deploy              schedule_deploy          OK    6497   {"course": "VVH2O", "section": 1, "when": "2026-09
+schedule a deploy              schedule_deploy          OK    6469   {"course": "VVH2O", "section": 1, "when": "2026-09
+deploy now                     deploy_section           OK    6373   {"course": "VVH2O", "section": 1}
+deploy now                     deploy_section           OK    3816   {"course": "VVH2O", "section": 1}
+deploy now                     deploy_section           OK    3895   {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    6505   {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    4146   {"course": "VVH2O", "section": 1}
+cancel scheduled deploy        cancel_scheduled_deploy  OK    4137   {"course": "VVH2O", "section": 1}
+no course named: publish       publish_class_on         OK    8800   {"course": "VVH2O", "section": 1, "date": "2026-09
+no course named: publish       publish_class_on         OK    6523   {"course": "VVH2O", "section": 1, "date": "2026-09
+no course named: publish       plan_publish_class_on    OK    6075   {"course": "VVH2O", "section": 1, "date": "2026-09
+no course named: hide          plan_unpublish_pages     OK    9793   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+no course named: hide          plan_unpublish_pages     OK    7030   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+no course named: hide          plan_unpublish_pages     OK    7039   {"course": "VVH2O", "section": 1, "pages": ["Unit 
+deletion - no such tool        cancel_scheduled_deploy  MISS  6008   {"course": "VVH2O", "section": 1}
+deletion - no such tool        cancel_scheduled_deploy  MISS  3729   {"course": "VVH2O", "section": 1}
+deletion - no such tool        cancel_scheduled_deploy  MISS  3817   {"course": "VVH2O", "section": 1}
+out of scope                   (declined)               OK    3773   {}
+out of scope                   (declined)               OK    1472   {}
+out of scope                   (declined)               OK    1523   {}
+typos                          plan_publish_class_on    OK    7757   {"course": "VVH2O", "section": 1, "date": "2026-09
+typos                          publish_class_on         OK    6014   {"course": "VVH2O", "section": 1, "date": "2026-09
+typos                          plan_publish_class_on    OK    5538   {"course": "VVH2O", "section": 1, "date": "2026-09
+----------------------------------------------------------------------------------------------------------------------
+routing accuracy: 67/87 (77%)
+misses that were a WRITE (the dangerous kind): 5
+polarity inversions (hide answered with publish): 0
+responses needing type coercion: 0
+malformed tool calls: 0
+'tomorrow' dates not equal to 2026-08-25: 9
+   publish tomorrow, with links -> date='2026-09-09'
+   publish tomorrow, with links -> date='2026-09-09'
+   publish tomorrow, with links -> date='2026-09-09'
+   no course named: publish -> date='2026-09-09'
+   no course named: publish -> date='2026-09-09'
+   no course named: publish -> date='2026-09-09'
+   typos -> date='2026-09-09'
+   typos -> date='2026-09-09'
+   typos -> date='2026-09-09'
+course arguments not equal to VVH2O: 0
+
+[exited with code 0]

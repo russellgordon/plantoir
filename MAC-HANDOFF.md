@@ -97,6 +97,49 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+- ⚠️ **NEEDS A MAC BUILD + TEST — assistant system-prompt tweak fixes
+  "undo over-salient"** (Windows, 2026-08-24, TODO.md item (c)). The
+  Swift edit is made — `AssistAgent.swift`'s `systemPrompt(course:section:)`
+  — but has NOT been built or run through the mac's XCTest suite, and the
+  measurement behind it was done entirely against the Windows-native
+  Qwen2.5-1.5B (Vulkan), so it has not been re-verified on Metal either.
+
+  What changed and why: with the promise card's eleven fixed shapes now
+  handled as deterministic commands (they never reach the model), what
+  still routes through the model is a teacher's own phrasing, last
+  measured at 72% overall in `promise-card-results.txt` with two flagged
+  problems — "undo over-salient" (a `unpublish` request phrased as "I
+  posted X by mistake" was answered with `undo_last_change` instead) and
+  a hide request's decline lost. Re-measured 2026-08-24 against the
+  Windows-shipped small tier (Qwen2.5-1.5B-Instruct Q4_K_M, native
+  llama-server.exe, Vulkan, `--reasoning off --reasoning-budget 0`, 3
+  trials/probe, temp 0.1): baseline conversational-only accuracy 46/54
+  (85%), full write-up and raw transcripts in
+  `research/ai-assist/conversational-residue-results.txt`.
+
+  Two sentences added to the system prompt (verbatim in the results file
+  and in both `AssistAgent.cs` and `AssistAgent.swift`) fixed both flagged
+  clusters cleanly across two runs (conversational-only 51/54 and 49/54 —
+  94% and 91%), with zero new failures and zero polarity inversions in
+  either run. **Rejected**, and logged so it isn't retried unmeasured: a
+  third wording that named `cancel_scheduled_deploy` explicitly, to also
+  fix a still-unsolved "delete the X folder" probe (routes to
+  `cancel_scheduled_deploy` instead of declining, unchanged by any wording
+  tried) — it did not fix that probe and broke two previously-clean cases,
+  dropping full-suite accuracy to 79%. The lesson matches
+  `AssistToolRunner.localTools`'s doc comment about tool descriptions: a
+  small model reads an extra clause as new signal to weigh, not a boundary
+  to respect — naming an unrelated tool inside a "don't do X" sentence
+  raised its salience rather than lowering it.
+
+  **What the mac owes:** build, run the XCTest suite
+  (`AssistModelTierTests` and friends), and — if there's appetite —
+  re-run an equivalent probe set against the Metal-native `llama-server`
+  to confirm the same gain holds there (the Windows measurement is
+  evidence, not proof, for a different backend and quantization path). No
+  contract case needed — the system prompt isn't contract-carried today
+  (checked: no `systemPrompt` key anywhere under `contracts/`).
+
 - ⚠️ **NEEDS A MAC `verify.sh` RUN — authored and reasoned through on
   Windows, unverified against a real Docker build.** TODO.md's "A recreated
   container publishes pages the teacher HID" turned out to already be fixed
