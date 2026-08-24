@@ -100,8 +100,12 @@ final class SiteHealthRepairTests: XCTestCase {
     /// teacher believes fixed their site.
     func testTheTeacherIsToldTheSiteHasNotChangedYet() {
         let said: String = SiteHealthRepair.notOnTheSiteYet
-        XCTAssertTrue(said.lowercased().contains("build"), said)
-        for word in ["container", "script", "toolchain", "quartz", "config", "rebuild the toolchain"] {
+        XCTAssertTrue(said.lowercased().contains("preview"), said)
+        // "Build" is machinery, and what is on offer is another look at their
+        // own site. The button said "Build Again" until somebody asked what it
+        // meant.
+        XCTAssertFalse(said.lowercased().contains("build"), said)
+        for word in ["container", "script", "toolchain", "quartz", "config"] {
             XCTAssertFalse(said.lowercased().contains(word), "says \"\(word)\" to a teacher")
         }
     }

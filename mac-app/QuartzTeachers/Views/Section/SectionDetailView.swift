@@ -54,7 +54,8 @@ struct SectionDetailView: View {
     /// The occasion travels WITH them because it decides what is offered next.
     /// Held findings used to be shown with whatever the flag happened to be
     /// from the previous batch, so a preview's findings held behind an
-    /// overnight publish were treated as a publish and denied "Build Again" —
+    /// overnight publish were treated as a publish and denied the offer to
+    /// preview again —
     /// and the reverse offered a rebuild after publishing, the exact thing the
     /// occasion exists to prevent.
     @State var heldHealthFindings: [(findings: [SiteHealthFinding], cameFromPublishing: Bool)] = []
@@ -373,7 +374,7 @@ struct SectionDetailView: View {
                 Button("OK") { }
             case .outcome:
                 if repairOutcome?.canRebuild == true {
-                    Button("Build Again") {
+                    Button("Preview Again") {
                         rebuildAfterRepair()
                     }
                 }
@@ -496,7 +497,7 @@ struct SectionDetailView: View {
                 // to end it.
                 pendingRepairOutcome = SiteHealthRepair.Outcome(
                     headline: "Plantoir is publishing this section just now.",
-                    detail: "Build it again once that has finished, and the "
+                    detail: "Preview it again once that has finished, and the "
                           + "change will be there.",
                     canRebuild: false
                 )
