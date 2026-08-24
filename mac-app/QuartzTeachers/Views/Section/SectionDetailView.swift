@@ -497,8 +497,11 @@ struct SectionDetailView: View {
                 // to end it.
                 pendingRepairOutcome = SiteHealthRepair.Outcome(
                     headline: "Plantoir is publishing this section just now.",
-                    detail: "Preview it again once that has finished, and the "
-                          + "change will be there.",
+                    // Deliberately not "press Preview Again": this outcome is
+                    // the one whose button is withheld, so naming a button that
+                    // is not on screen would be worse than saying nothing.
+                    detail: "You can preview it again once that has finished, "
+                          + "and the change will be there.",
                     canRebuild: false
                 )
                 showAnythingWaiting()

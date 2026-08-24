@@ -190,28 +190,28 @@ enum SiteHealthRepair {
             + " and " + (parts.last ?? "") + " back."
     }
 
-    /// Why the site does not show the repair yet.
-    ///
-    /// The folder is back on disk, and the built site still reflects how things
-    /// were when it was made. Left unsaid, "Put the Media folder back" reads as
-    /// though the site is fixed — which is the same silent gap as a warning
-    /// nobody sees.
     /// Why the preview does not show the repair yet.
     ///
-    /// "Preview", not "build": building is machinery, and what the teacher is
-    /// being offered is another look at their own site. The button was called
-    /// "Build Again" until somebody asked what it meant.
+    /// The folder is back on disk and the preview still shows how things were.
+    /// Left unsaid, "Put the Media folder back" reads as though everything is
+    /// fixed — the same silent gap as a warning nobody sees.
+    ///
+    /// **"Preview", not "build" — for CLARITY, not because "build" is
+    /// forbidden.** The app says "build" in plenty of places a teacher reads
+    /// ("Click Preview to build this section's website"), and that is fine. The
+    /// problem with a button labelled "Build Again" was that it did not say
+    /// WHAT would be built, and the thing on offer already has a name the
+    /// teacher knows. An earlier version of this comment claimed "building is
+    /// machinery"; it is not, and that claim would have justified rewriting
+    /// eight other strings for no gain.
     static let notOnTheSiteYet: String =
         "Your preview still shows how things were before this. "
         + "Preview it again to see the change."
 
     /// The same, for a teacher whose site is already PUBLISHED.
     ///
-    /// Building again produces a fresh preview, which is not what they will go
-    /// and look at: the site students see is the published one, and only
-    /// publishing again changes it. Offering only a PREVIEW there would promise
-    /// a difference that never appears online — the same confusion one level
-    /// up from the one this whole alert exists to remove.
+    /// A fresh preview is not what they will go and look at: the site students
+    /// see is the published one, and only publishing again changes it.
     static let notPublishedYet: String =
         "Your published site still shows how things were when it was last "
         + "published. Publish again when you are ready."

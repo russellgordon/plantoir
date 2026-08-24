@@ -100,13 +100,25 @@ final class SiteHealthRepairTests: XCTestCase {
     /// teacher believes fixed their site.
     func testTheTeacherIsToldTheSiteHasNotChangedYet() {
         let said: String = SiteHealthRepair.notOnTheSiteYet
+        // Names the thing on offer. It used to say "build it again", which
+        // never said WHAT would be built.
         XCTAssertTrue(said.lowercased().contains("preview"), said)
-        // "Build" is machinery, and what is on offer is another look at their
-        // own site. The button said "Build Again" until somebody asked what it
-        // meant.
-        XCTAssertFalse(said.lowercased().contains("build"), said)
-        for word in ["container", "script", "toolchain", "quartz", "config"] {
+
+        // NOT `!contains("build")`. That pinned the letters rather than the
+        // intent — "rebuild", "builds" and "rebuilt" would all trip it — and it
+        // rested on a claim that turned out to be wrong: "build" is ordinary
+        // product vocabulary here, used in the sentence under the Preview
+        // button and in the coverage checks. What must not appear is machinery.
+        for word in ["container", "script", "toolchain", "quartz", "config", "json"] {
             XCTAssertFalse(said.lowercased().contains(word), "says \"\(word)\" to a teacher")
+        }
+
+        // The other half of the same pair, which had no guard at all.
+        let published: String = SiteHealthRepair.notPublishedYet
+        XCTAssertTrue(published.lowercased().contains("publish"), published)
+        for word in ["container", "script", "toolchain", "quartz", "config", "json"] {
+            XCTAssertFalse(published.lowercased().contains(word),
+                           "says \"\(word)\" to a teacher")
         }
     }
 

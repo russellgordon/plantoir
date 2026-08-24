@@ -2933,12 +2933,19 @@ Three things the mac had to learn the hard way, all worth copying:
   made a failed repair indistinguishable from a successful one — the dialog just
   closed either way, which is silence on the failure path in the feature written
   to end silence.
-- **Say the site has not changed yet, and offer the RIGHT next step.** The folder
-  is back on disk; the built site still shows how things were. A teacher who is
-  told "put the Media folder back" will go and look at their site next. But
-  offer a rebuild only when a fresh build is what they will look at: a repair
-  reported after PUBLISHING must not offer a preview, because a preview does not
-  change what students see.
+- **Say what has not changed yet, and offer the RIGHT next step.** The folder is
+  back on disk; the preview still shows how things were. A teacher who is told
+  "put the Media folder back" will go and look at their site next. Offer the
+  preview only when a preview is what they will look at: a repair reported after
+  PUBLISHING must not offer one, because a preview does not change what students
+  see — say the published site is unchanged until they publish again.
+
+  **Call the button "Preview Again", not "Build Again".** Russell asked what
+  "Build Again" meant, which was the answer: the label never said WHAT would be
+  built, and the thing on offer already has a name the teacher knows. Note this
+  is a CLARITY point, not a rule 1 one — "build" is ordinary vocabulary in this
+  product ("Click Preview to build this section's website") and does not need
+  hunting down elsewhere.
 
 One mac-specific mechanic that may or may not apply to you: a view presents one
 alert at a time, so the outcome is shown from a state change AFTER the first
