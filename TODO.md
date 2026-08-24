@@ -91,14 +91,6 @@ an item when it ships (finished behaviour is recorded in
   warning** — "about to publish pages the teacher hid" should refuse to
   build, not print a line. Gated by `verify.sh`.
 
-- **Nothing verifies that a release actually reached plantoir.app** — noted
-  2026-08-14. The `cut-release` skill ends by saying the push "redeploys
-  plantoir.app automatically (Netlify watches `site/`)" and stops there. No
-  check that Netlify's build succeeded, and no check that the live site
-  serves the new version. The download links on that page are load-bearing
-  for every teacher, so a cheap post-push fetch of `https://plantoir.app`
-  confirming the `version-note` line matches the tag would be worth having.
-
 - **Container recreation can kill live previews** — noted 2026-08-11.
   Every launcher "ensures" the working folder's container, and on a
   toolchain-recipe hash or mount mismatch it recreates it (`docker rm

@@ -10,11 +10,22 @@ token from the `containerized-quartz-netlify` Keychain item or
 `NETLIFY_AUTH_TOKEN`, site id from `website/site.json`).
 
 ```bash
-python3 website/build.py          # write site/
-python3 website/build.py --check  # report problems, write nothing
-python3 website/build.py --serve  # preview locally; edits rebuild on refresh
-python3 website/build.py --deploy # build, then publish to plantoir.app
+python3 website/build.py                 # write site/
+python3 website/build.py --check         # report problems, write nothing
+python3 website/build.py --serve         # preview locally; edits rebuild on refresh
+python3 website/build.py --deploy        # build, then publish to plantoir.app
+python3 website/build.py --verify-deploy # fetch plantoir.app, confirm it matches site.json
 ```
+
+`--deploy` automatically runs the same check `--verify-deploy` does once Netlify
+reports the upload ready — it fetches `https://plantoir.app` and confirms the
+page's version-note line matches `site.json`, retrying a few times since
+Netlify reporting "ready" and its CDN actually serving the new content are not
+the same instant. This is advisory, not a build failure: a network blip
+fetching the check is never treated as evidence the deploy itself failed, only
+a genuine, persistent version mismatch is (`website/netlify_deploy.py`,
+`verify_live()`). Run `--verify-deploy` on its own to check a past deploy
+without publishing anything new.
 
 plantoir.app is itself a free-tier Netlify project, so `--deploy` also writes
 `site/_headers` — a Content-Security-Policy that keeps Netlify's own
