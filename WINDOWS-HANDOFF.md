@@ -439,6 +439,36 @@ this side is expected to say so when the contract is wrong.
       `excluded_items`; an ordinary add is not a re-inclusion, and a trail line
       that says it was would be believed.
 
+12. **Special folders hardening: The protection model — row states, curriculum resolution, marks floor, and wizard marks control (2026-08-24).**
+    - **Item Protection in List Editors & Toggle Lists**:
+      Folders and files with special meaning now have protection policies (`ItemProtection` in Swift, `ItemProtection` enum in C#):
+      - `Ordinary`: standard direct removal.
+      - `Consequential(title, message)`: minus button prompts a confirmation dialog with destructive "Remove" and "Cancel" actions before removing.
+      - `Blocked(reason)`: minus button is REPLACED with an info icon (ⓘ). Clicking the info button shows a popover/flyout explaining why removal is forbidden and explicitly naming the switch to turn off first (e.g. "Include the curriculum coverage map").
+    - **Settled UX Decisions**:
+      - Removal is NEVER silently disabled/greyed out with no explanation, nor does clicking minus auto-flip related switches via dialog. The teacher is given a plain-language explanation of what depends on the folder and which switch to toggle first.
+      - In the New Course Wizard, blocking is computed from *effective* switch values (`CourseConfiguration.CurriculumCoverageEnabled(...)`), avoiding disabled-switch deadlocks when parent switches are off.
+    - **Protection Rules by Item Kind**:
+      - *Resolved Curriculum Folder*:
+        - Resolved using `CurriculumFolderRule`: configured `curriculum_folder` if present in candidates, else alphabetically first candidate containing `"curriculum"` (matching `_find_curriculum_folder` from `build_site.py` and `contracts/shared-rules.json` → `specialNames.curriculumFolderResolution`).
+        - In Course Settings, when `include_curriculum_coverage` is true: **blocked** (`specialNames.curriculumFolderBlockedByCoverageSetting`).
+        - When `include_curriculum_coverage` is false: **consequential** (`removeCurriculumFolderTitle` / `removeCurriculumFolderMessage`).
+        - In Wizard, when effective curriculum coverage is true: **blocked** (`specialNames.curriculumFolderBlockedByCoverageMap`). When effective curriculum pages is true: **blocked** (`specialNames.curriculumFolderBlockedByCurriculumPages`). When both false: **consequential**.
+      - *Graded Folders (Marks)*:
+        - In Course Settings and Wizard, when curriculum coverage is ON and `gradedFolders.count <= 1`: removing or un-ticking the last graded folder is **blocked** (`specialNames.lastGradedFolderBlocked` in Settings, `specialNames.lastGradedFolderBlockedWizard` in Wizard).
+        - When more than one graded folder exists or coverage is OFF: removing from shared/per-section list is **consequential** (`removeGradedFolderTitle` / `removeGradedFolderMessage`).
+        - *Materialisation on first edit*: If `graded_folders` is `null` (legacy course), mutating the marks toggle list materialises the inferred pool rather than initializing to `[]`.
+      - *Per-Section Folders & Classes*:
+        - If `perSectionFolders.count <= 1`: removing is **blocked** (`specialNames.lastPerSectionFolderBlocked`). Prevents empty `per_section_folders: []`.
+        - If multiple per-section folders exist and folder is a class folder (`ClassFolderRule.Names(...)`): **consequential** (`removeClassFolderTitle` / `removeClassFolderMessage`).
+      - *Section Index File*:
+        - Removing `index.md` (case-insensitive) from per-section files is **blocked** (`specialNames.sectionIndexFileBlocked`).
+    - **Wizard Marks Control**:
+      - For skeleton and from-scratch courses (`!structureComesFromExampleContent`), the Structure step includes the Marks checklist (`MembershipToggleListView`) populated from current folder lists.
+      - Selected `graded_folders` are written into `course_config.json` on course creation.
+    - **Contract Sentences & Tests**:
+      - Deserialise all sentences from `contracts/shared-rules.json` → `specialNames` (do not hardcode).
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,

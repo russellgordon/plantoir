@@ -116,6 +116,7 @@ struct NewCourseWizardView: View {
     @State var sharedFiles: [String] = WizardDefaults.sharedFiles
     @State var perSectionFolders: [String] = WizardDefaults.perSectionFolders
     @State var perSectionFiles: [String] = WizardDefaults.perSectionFiles
+    @State var gradedFolders: [String] = ["Tasks"]
 
     @State var validationProblem: String?
     @State var hasStarted: Bool = false
@@ -124,13 +125,34 @@ struct NewCourseWizardView: View {
     /// but the same sheet also adds the example course.
     @State var progressTitle: String = "Creating your course"
 
-    // MARK: - Initializer
-
-    init(creator: NewCourseCreator = NewCourseCreator(), startedForTesting: Bool = false) {
+    init(
+        creator: NewCourseCreator = NewCourseCreator(),
+        startedForTesting: Bool = false,
+        courseCode: String = "",
+        prepopulatesExampleContent: Bool = true,
+        startsFromSkeleton: Bool = true,
+        includesCurriculumPages: Bool = true,
+        includesCurriculumCoverage: Bool = true,
+        sharedFolders: [String] = WizardDefaults.sharedFolders,
+        sharedFiles: [String] = WizardDefaults.sharedFiles,
+        perSectionFolders: [String] = WizardDefaults.perSectionFolders,
+        perSectionFiles: [String] = WizardDefaults.perSectionFiles,
+        gradedFolders: [String] = ["Tasks"]
+    ) {
         _creator = State(initialValue: creator)
         if startedForTesting {
             _hasStarted = State(initialValue: true)
         }
+        _courseCode = State(initialValue: courseCode)
+        _prepopulatesExampleContent = State(initialValue: prepopulatesExampleContent)
+        _startsFromSkeleton = State(initialValue: startsFromSkeleton)
+        _includesCurriculumPages = State(initialValue: includesCurriculumPages)
+        _includesCurriculumCoverage = State(initialValue: includesCurriculumCoverage)
+        _sharedFolders = State(initialValue: sharedFolders)
+        _sharedFiles = State(initialValue: sharedFiles)
+        _perSectionFolders = State(initialValue: perSectionFolders)
+        _perSectionFiles = State(initialValue: perSectionFiles)
+        _gradedFolders = State(initialValue: gradedFolders)
     }
 
     // MARK: - Computed properties
@@ -256,6 +278,13 @@ struct NewCourseWizardView: View {
         return CourseCatalog.matching(courseCode, inProvince: province, limit: limit)
     }
 
+    var courseCodeSuggestionIDs: [String] {
+        var result: [String] = []
+        for suggestion in courseCodeSuggestions {
+            result.append(suggestion.id)
+        }
+        return result
+    }
 
     /// Whether the suggestion popup is on screen right now. One place
     /// rather than three: the overlay draws on it, its animation keys
@@ -284,6 +313,82 @@ struct NewCourseWizardView: View {
     /// Windows asks the same question and had the same bug.
     var isClubCode: Bool {
         return ClubCodeRule.isClub(courseCode)
+    }
+
+    var gradedFolderChoices: [String] {
+        var choices: [String] = []
+        for folder in sharedFolders {
+            if !choices.contains(folder) {
+                choices.append(folder)
+            }
+        }
+        for folder in perSectionFolders {
+            if !choices.contains(folder) {
+                choices.append(folder)
+            }
+        }
+        return choices
+    }
+
+    var gradedFoldersBinding: Binding<[String]> {
+        return Binding(
+            get: {
+                return gradedFolders
+            },
+            set: { newValue in
+                gradedFolders = newValue
+            }
+        )
+    }
+
+    var effectiveCurriculumPagesEnabled: Bool {
+        return ExampleContentCatalog.hasContent(forCode: courseCode)
+            && prepopulatesExampleContent
+            && ExampleContentCatalog.includesCurriculum(forCode: courseCode)
+            && includesCurriculumPages
+    }
+
+    var effectiveCurriculumCoverageEnabled: Bool {
+        return CourseConfiguration.curriculumCoverageEnabled(
+            codeHasExampleContent: ExampleContentCatalog.hasContent(forCode: courseCode),
+            prepopulatesExampleContent: prepopulatesExampleContent,
+            payloadIncludesCurriculum: ExampleContentCatalog.includesCurriculum(forCode: courseCode),
+            includesCurriculumPages: includesCurriculumPages,
+            includesCurriculumCoverage: includesCurriculumCoverage
+        )
+    }
+
+    var wizardResolvedCurriculumFolder: String? {
+        let declared: String? = ExampleContentCatalog.curriculumFolder(forCode: courseCode)
+            ?? SkeletonCatalog.family(forCode: courseCode)?.curriculumFolder
+        return CurriculumFolderRule.resolvedCurriculumFolder(configured: declared, in: sharedFolders)
+    }
+
+    /// Offered above the form: someone who has never built a course learns
+    /// far more from opening a finished one than from an empty form.
+    var exampleCourseInvitation: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("New to this?")
+                    .font(.headline)
+                Text("Add a complete example course — a real Grade 9 science course you can explore, change, and remove whenever you like.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 12)
+            Button("Add Example Course") {
+                startExampleInstall()
+            }
+            .accessibilityIdentifier("addExampleCourseButton")
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .padding(.horizontal)
+        .padding(.bottom, 10)
     }
 
     // MARK: - Body
@@ -347,7 +452,7 @@ struct NewCourseWizardView: View {
                     .easeOut(duration: 0.12),
                     value: CourseCodeSuggestionsAnimationKey(
                         isShown: courseCodeSuggestionsAreShown,
-                        rowIDs: courseCodeSuggestions.map { $0.id }
+                        rowIDs: courseCodeSuggestionIDs
                     )
                 )
             }
@@ -762,12 +867,44 @@ struct NewCourseWizardView: View {
 
                     // The lists are long, so they stay collapsed until needed.
                     DisclosureGroup("Folders and files") {
-                        StringListEditorView(title: "Shared folders", items: $sharedFolders)
-                        StringListEditorView(title: "Shared files", hidesMarkdownExtension: true, items: $sharedFiles)
-                        StringListEditorView(title: "Per-section folders", items: $perSectionFolders)
-                        StringListEditorView(title: "Per-section files", hidesMarkdownExtension: true, items: $perSectionFiles)
+                        StringListEditorView(
+                            title: "Shared folders",
+                            items: $sharedFolders,
+                            onRemove: { _ in reconcileGradedFolders() },
+                            protection: wizardSharedFolderProtection
+                        )
+                        StringListEditorView(
+                            title: "Shared files",
+                            hidesMarkdownExtension: true,
+                            items: $sharedFiles
+                        )
+                        StringListEditorView(
+                            title: "Per-section folders",
+                            items: $perSectionFolders,
+                            onRemove: { _ in reconcileGradedFolders() },
+                            protection: wizardPerSectionFolderProtection
+                        )
+                        StringListEditorView(
+                            title: "Per-section files",
+                            hidesMarkdownExtension: true,
+                            items: $perSectionFiles,
+                            protection: wizardPerSectionFileProtection
+                        )
                     }
                     .accessibilityIdentifier("structureDisclosure")
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        MembershipToggleListView(
+                            title: "Folders whose work counts for marks",
+                            allItems: gradedFolderChoices,
+                            members: gradedFoldersBinding,
+                            protection: wizardGradedFolderProtection
+                        )
+                        Text("The curriculum map uses this to show which expectations you have actually evaluated. Most courses keep “Tasks”; add “Tests” or anything else you mark, and remove what you don’t.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 4)
                 }
             } header: {
                 if structureComesFromExampleContent {
@@ -885,6 +1022,101 @@ struct NewCourseWizardView: View {
         sharedFiles = skeleton.sharedFiles
         perSectionFolders = skeleton.perSectionFolders
         perSectionFiles = skeleton.perSectionFiles
+        if !skeleton.gradedFolders.isEmpty {
+            gradedFolders = skeleton.gradedFolders
+        } else {
+            var counted: [String] = []
+            for folder in skeleton.sharedFolders + skeleton.perSectionFolders {
+                if folder.lowercased().contains("task") {
+                    counted.append(folder)
+                }
+            }
+            gradedFolders = counted
+        }
+    }
+
+    static func reconciledGradedFolders(from gradedFolders: [String], validChoices: [String]) -> [String] {
+        var result: [String] = []
+        for folder in gradedFolders {
+            if validChoices.contains(folder) {
+                result.append(folder)
+            }
+        }
+        return result
+    }
+
+    func reconcileGradedFolders() {
+        gradedFolders = NewCourseWizardView.reconciledGradedFolders(
+            from: gradedFolders, validChoices: gradedFolderChoices
+        )
+    }
+
+    func wizardSharedFolderProtection(for folder: String) -> ItemProtection {
+        if let resolvedCurriculum = wizardResolvedCurriculumFolder, folder == resolvedCurriculum {
+            if effectiveCurriculumCoverageEnabled {
+                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageMap)
+            } else if effectiveCurriculumPagesEnabled {
+                let jurisdiction: String = ExampleContentCatalog.jurisdictionName(forCode: courseCode)
+                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCurriculumPages(jurisdiction: jurisdiction))
+            } else {
+                return .consequential(
+                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+                    message: SpecialNames.removeCurriculumFolderMessage
+                )
+            }
+        }
+        if gradedFolders.contains(folder) {
+            if effectiveCurriculumCoverageEnabled && gradedFolders.count <= 1 {
+                return .blocked(reason: SpecialNames.lastGradedFolderBlockedWizard)
+            } else {
+                return .consequential(
+                    title: SpecialNames.removeGradedFolderTitle(for: folder),
+                    message: SpecialNames.removeGradedFolderMessage
+                )
+            }
+        }
+        return .ordinary
+    }
+
+    func wizardPerSectionFolderProtection(for folder: String) -> ItemProtection {
+        if perSectionFolders.count <= 1 {
+            return .blocked(reason: SpecialNames.lastPerSectionFolderBlocked)
+        }
+        if gradedFolders.contains(folder) && effectiveCurriculumCoverageEnabled && gradedFolders.count <= 1 {
+            return .blocked(reason: SpecialNames.lastGradedFolderBlockedWizard)
+        }
+        let classFolders: [String] = ClassFolder.names(inPerSectionFolders: perSectionFolders)
+        if classFolders.contains(folder) {
+            return .consequential(
+                title: SpecialNames.removeClassFolderTitle(for: folder),
+                message: SpecialNames.removeClassFolderMessage
+            )
+        }
+        if gradedFolders.contains(folder) {
+            return .consequential(
+                title: SpecialNames.removeGradedFolderTitle(for: folder),
+                message: SpecialNames.removeGradedFolderMessage
+            )
+        }
+        return .ordinary
+    }
+
+    func wizardPerSectionFileProtection(for file: String) -> ItemProtection {
+        let normalized: String = file.lowercased()
+        if normalized == "index.md" || normalized == "index" {
+            return .blocked(reason: SpecialNames.sectionIndexFileBlocked)
+        }
+        return .ordinary
+    }
+
+    func wizardGradedFolderProtection(for folder: String) -> ItemProtection {
+        guard effectiveCurriculumCoverageEnabled else {
+            return .ordinary
+        }
+        if gradedFolders.contains(folder) && gradedFolders.count <= 1 {
+            return .blocked(reason: SpecialNames.lastGradedFolderBlockedWizard)
+        }
+        return .ordinary
     }
 
     /// When a known course code is entered, pre-fill the name with the
@@ -902,35 +1134,6 @@ struct NewCourseWizardView: View {
             lastAutoFilledName = suggestedName
         }
     }
-
-    /// Offered above the form: someone who has never built a course learns
-    /// far more from opening a finished one than from an empty form.
-    var exampleCourseInvitation: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("New to this?")
-                    .font(.headline)
-                Text("Add a complete example course — a real Grade 9 science course you can explore, change, and remove whenever you like.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 12)
-            Button("Add Example Course") {
-                startExampleInstall()
-            }
-            .accessibilityIdentifier("addExampleCourseButton")
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .padding(.horizontal)
-        .padding(.bottom, 10)
-    }
-
-    // MARK: - Functions
 
     /// Adds the example course. Nothing else on this form is needed for it.
     func startExampleInstall() {
@@ -1163,6 +1366,11 @@ struct NewCourseWizardView: View {
                 encoded.append(entry)
             }
             config["additional_deploy_targets"] = encoded
+        }
+        let structureFromExample: Bool = prepopulatesExampleContent
+            && ExampleContentCatalog.hasContent(forCode: code)
+        if !structureFromExample {
+            config["graded_folders"] = gradedFolders
         }
 
         return config

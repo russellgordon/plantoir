@@ -919,6 +919,103 @@
       "sentinelEnd": "<!-- plantoir:excluded-folder-note:end -->",
       "sentinelStart": "<!-- plantoir:excluded-folder-note:start -->",
       "why": "Explains why the folder is still present in Obsidian after being removed in Course Settings, and that it is ignored during build. Written into existing index.md files by preflight; stripped during merge so it never ships."
+    },
+    "curriculumFolderBlockedByCoverageSetting": {
+      "reason": "The curriculum coverage map needs this folder to show your expectations. To remove it, turn off “Publish the curriculum coverage map” in Settings first.",
+      "why": "Explains why the curriculum folder cannot be removed while the coverage map is enabled in Course Settings, naming the switch to turn off first."
+    },
+    "curriculumFolderBlockedByCurriculumPages": {
+      "reason": "This folder holds your curriculum expectations. To remove it, turn off “Include {jurisdiction} curriculum pages” first.",
+      "why": "Explains why the curriculum folder cannot be removed in the New Course Wizard while curriculum pages are enabled, naming the switch to turn off first."
+    },
+    "curriculumFolderBlockedByCoverageMap": {
+      "reason": "This folder holds your curriculum expectations for the coverage map. To remove it, turn off “Include the curriculum coverage map” first.",
+      "why": "Explains why the curriculum folder cannot be removed in the New Course Wizard while the coverage map is enabled, naming the switch to turn off first."
+    },
+    "lastGradedFolderBlocked": {
+      "reason": "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Publish the curriculum coverage map”.",
+      "why": "Explains why the last graded folder cannot be removed or un-ticked in Course Settings while the coverage map is enabled, preventing an empty marks pool."
+    },
+    "lastGradedFolderBlockedWizard": {
+      "reason": "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Include the curriculum coverage map”.",
+      "why": "Explains why the last graded folder cannot be removed or un-ticked in the New Course Wizard while the coverage map is enabled, preventing an empty marks pool."
+    },
+    "lastPerSectionFolderBlocked": {
+      "reason": "Each section needs at least one folder for its class pages and lessons. Add another per-section folder first before removing this one.",
+      "why": "Explains why the last per-section folder cannot be removed, ensuring each section has a folder for its lessons."
+    },
+    "sectionIndexFileBlocked": {
+      "reason": "Every section needs an index.md page for its home page. Without it, the section cannot be published.",
+      "why": "Explains why index.md cannot be removed from per-section files."
+    },
+    "removeGradedFolderConfirmation": {
+      "title": "Remove “{name}”?",
+      "message": "This folder holds work that counts for marks. Removing it will take it out of your course’s marks pool.",
+      "why": "Prompts for confirmation when removing a graded folder when other graded folders exist."
+    },
+    "removeClassFolderConfirmation": {
+      "title": "Remove “{name}”?",
+      "message": "This folder holds your daily lessons and class pages. If you remove it, another folder will be used for your class pages.",
+      "why": "Prompts for confirmation when removing a class folder when other per-section folders exist."
+    },
+    "removeCurriculumFolderConfirmation": {
+      "title": "Remove “{name}”?",
+      "message": "This folder holds your curriculum expectations. Removing it means expectations will not be available if you later enable curriculum coverage.",
+      "why": "Prompts for confirmation when removing a curriculum folder when curriculum coverage is off."
+    },
+    "curriculumFolderResolution": {
+      "cases": [
+        {
+          "configured": "Ontario Curriculum",
+          "folders": [
+            "Concepts",
+            "Ontario Curriculum",
+            "Tasks"
+          ],
+          "resolved": "Ontario Curriculum",
+          "why": "Configured name wins."
+        },
+        {
+          "configured": "Expectations",
+          "folders": [
+            "Concepts",
+            "Expectations",
+            "Tasks"
+          ],
+          "resolved": "Expectations",
+          "why": "Configured name wins even when it does not mention the word curriculum."
+        },
+        {
+          "configured": null,
+          "folders": [
+            "College Board Curriculum",
+            "Ontario Curriculum",
+            "Tasks"
+          ],
+          "resolved": "College Board Curriculum",
+          "why": "Unconfigured: alphabetically first folder containing 'curriculum' wins."
+        },
+        {
+          "configured": null,
+          "folders": [
+            "Concepts",
+            "Curriculum",
+            "Tasks"
+          ],
+          "resolved": "Curriculum",
+          "why": "Unconfigured single curriculum folder."
+        },
+        {
+          "configured": null,
+          "folders": [
+            "Concepts",
+            "Tasks"
+          ],
+          "resolved": null,
+          "why": "No curriculum folder present."
+        }
+      ],
+      "note": "How the curriculum folder is resolved. Matches build_site.py:_find_curriculum_folder: if `curriculum_folder` is configured and present, it is used; otherwise the alphabetically first folder containing 'curriculum' (case-insensitive) is used."
     }
   }
 }

@@ -663,11 +663,70 @@ final class SharedRulesContractTests: XCTestCase {
         }
     }
 
-    // MARK: - Private
+    // MARK: - Special names and folder protections
 
-    /// The contract names refusals by CASE. The sentences are the product's
-    /// wording and belong to the wording contract; WHICH refusal fired has to
-    /// match on both platforms.
+    func testSpecialNamesSentencesMatchContract() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+
+        let excludedNote: [String: Any] = try XCTUnwrap(section["excludedFolderIndexNote"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.excludedFolderIndexNoteBody, excludedNote["noteBody"] as? String)
+        XCTAssertEqual(SpecialNames.excludedFolderSentinelStart, excludedNote["sentinelStart"] as? String)
+        XCTAssertEqual(SpecialNames.excludedFolderSentinelEnd, excludedNote["sentinelEnd"] as? String)
+
+        let covSetting: [String: Any] = try XCTUnwrap(section["curriculumFolderBlockedByCoverageSetting"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.curriculumFolderBlockedByCoverageSetting, covSetting["reason"] as? String)
+
+        let covMap: [String: Any] = try XCTUnwrap(section["curriculumFolderBlockedByCoverageMap"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.curriculumFolderBlockedByCoverageMap, covMap["reason"] as? String)
+
+        let curPages: [String: Any] = try XCTUnwrap(section["curriculumFolderBlockedByCurriculumPages"] as? [String: Any])
+        let expectedCurPagesTemplate: String = try XCTUnwrap(curPages["reason"] as? String)
+        let actualCurPages: String = SpecialNames.curriculumFolderBlockedByCurriculumPages(jurisdiction: "Ontario")
+        XCTAssertEqual(actualCurPages, expectedCurPagesTemplate.replacingOccurrences(of: "{jurisdiction}", with: "Ontario"))
+
+        let lastGraded: [String: Any] = try XCTUnwrap(section["lastGradedFolderBlocked"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.lastGradedFolderBlocked, lastGraded["reason"] as? String)
+
+        let lastGradedWiz: [String: Any] = try XCTUnwrap(section["lastGradedFolderBlockedWizard"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.lastGradedFolderBlockedWizard, lastGradedWiz["reason"] as? String)
+
+        let lastPerSec: [String: Any] = try XCTUnwrap(section["lastPerSectionFolderBlocked"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.lastPerSectionFolderBlocked, lastPerSec["reason"] as? String)
+
+        let secIndex: [String: Any] = try XCTUnwrap(section["sectionIndexFileBlocked"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.sectionIndexFileBlocked, secIndex["reason"] as? String)
+
+        let remGraded: [String: Any] = try XCTUnwrap(section["removeGradedFolderConfirmation"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.removeGradedFolderMessage, remGraded["message"] as? String)
+        XCTAssertEqual(SpecialNames.removeGradedFolderTitle(for: "Tasks"), (remGraded["title"] as? String)?.replacingOccurrences(of: "{name}", with: "Tasks"))
+
+        let remClass: [String: Any] = try XCTUnwrap(section["removeClassFolderConfirmation"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.removeClassFolderMessage, remClass["message"] as? String)
+        XCTAssertEqual(SpecialNames.removeClassFolderTitle(for: "All Classes"), (remClass["title"] as? String)?.replacingOccurrences(of: "{name}", with: "All Classes"))
+
+        let remCurriculum: [String: Any] = try XCTUnwrap(section["removeCurriculumFolderConfirmation"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.removeCurriculumFolderMessage, remCurriculum["message"] as? String)
+        XCTAssertEqual(SpecialNames.removeCurriculumFolderTitle(for: "Curriculum"), (remCurriculum["title"] as? String)?.replacingOccurrences(of: "{name}", with: "Curriculum"))
+    }
+
+    func testCurriculumFolderResolutionCases() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let resolutionSection: [String: Any] = try XCTUnwrap(section["curriculumFolderResolution"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(resolutionSection["cases"] as? [[String: Any]])
+
+        for testCase in cases {
+            let configured: String? = testCase["configured"] as? String
+            let folders: [String] = try XCTUnwrap(testCase["folders"] as? [String])
+            let expected: String? = testCase["resolved"] as? String
+            let why: String = testCase["why"] as? String ?? ""
+
+            let actual: String? = CurriculumFolderRule.resolvedCurriculumFolder(configured: configured, in: folders)
+            XCTAssertEqual(actual, expected, "Failed case: \(why)")
+        }
+    }
+
+    // MARK: - Functions
+
     private static func name(ofRefusal said: String) -> String {
         if said.contains("has already passed") {
             return "hasAlreadyPassed"

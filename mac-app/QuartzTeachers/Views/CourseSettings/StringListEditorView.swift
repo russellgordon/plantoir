@@ -1,5 +1,20 @@
 import SwiftUI
 
+/// A removal waiting for confirmation from the teacher.
+struct PendingRemoval: Identifiable {
+    let item: String
+    let title: String
+    let message: String
+    var id: String { return item }
+}
+
+/// An explanation of why an item cannot be removed.
+struct ActiveExplanation: Identifiable {
+    let item: String
+    let reason: String
+    var id: String { return item }
+}
+
 /// Edits a list of names (folders or files): shows the current entries with
 /// remove buttons, and a field for adding a new entry.
 ///
@@ -20,8 +35,11 @@ struct StringListEditorView: View {
 
     var onRemove: ((String) -> Void)? = nil
     var onAdd: ((String) -> Void)? = nil
+    var protection: ((String) -> ItemProtection)? = nil
 
     @State var newItemName: String = ""
+    @State var pendingRemoval: PendingRemoval? = nil
+    @State var activeExplanation: ActiveExplanation? = nil
 
     // MARK: - Computed properties
 
@@ -57,11 +75,53 @@ struct StringListEditorView: View {
                 HStack {
                     Text(StringListEditorView.displayName(for: item, hidingMarkdownExtension: hidesMarkdownExtension))
                     Spacer()
-                    Button("Remove \(item)", systemImage: "minus.circle") {
-                        removeItem(named: item)
+                    let state: ItemProtection = protection?(item) ?? .ordinary
+                    switch state {
+                    case .blocked(let reason):
+                        Button {
+                            activeExplanation = ActiveExplanation(item: item, reason: reason)
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("whyBlocked-\(item)")
+                        .help(reason)
+                        .popover(item: Binding(
+                            get: {
+                                if activeExplanation?.item == item {
+                                    return activeExplanation
+                                }
+                                return nil
+                            },
+                            set: { newValue in
+                                if newValue == nil && activeExplanation?.item == item {
+                                    activeExplanation = nil
+                                }
+                            }
+                        ), arrowEdge: .trailing) { explanation in
+                            Text(explanation.reason)
+                                .font(.callout)
+                                .padding(12)
+                                .frame(maxWidth: 280)
+                        }
+
+                    case .consequential(let alertTitle, let message):
+                        Button("Remove \(item)", systemImage: "minus.circle") {
+                            pendingRemoval = PendingRemoval(item: item, title: alertTitle, message: message)
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("remove-\(item)")
+
+                    case .ordinary:
+                        Button("Remove \(item)", systemImage: "minus.circle") {
+                            removeItem(named: item)
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("remove-\(item)")
                     }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
                 }
             }
 
@@ -81,6 +141,16 @@ struct StringListEditorView: View {
             }
         }
         .padding(.vertical, 4)
+        .alert(item: $pendingRemoval) { removal in
+            Alert(
+                title: Text(removal.title),
+                message: Text(removal.message),
+                primaryButton: .destructive(Text("Remove")) {
+                    removeItem(named: removal.item)
+                },
+                secondaryButton: .cancel()
+            )
+        }
     }
 
     // MARK: - Functions

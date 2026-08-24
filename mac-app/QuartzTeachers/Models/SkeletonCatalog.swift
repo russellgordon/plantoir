@@ -29,6 +29,8 @@ enum SkeletonCatalog {
         let perSectionFiles: [String]
         let hidden: [String]
         let expandable: [String]
+        let curriculumFolder: String?
+        let gradedFolders: [String]
     }
 
     // MARK: - Functions
@@ -91,7 +93,9 @@ enum SkeletonCatalog {
             perSectionFolders: list("per_section_folders"),
             perSectionFiles: list("per_section_files"),
             hidden: list("hidden"),
-            expandable: list("expandable")
+            expandable: list("expandable"),
+            curriculumFolder: manifest["curriculum_folder"] as? String,
+            gradedFolders: list("graded_folders")
         )
     }
 
@@ -136,7 +140,9 @@ enum SkeletonCatalog {
             perSectionFolders: list("per_section_folders"),
             perSectionFiles: list("per_section_files"),
             hidden: list("hidden"),
-            expandable: list("expandable")
+            expandable: list("expandable"),
+            curriculumFolder: manifest["curriculum_folder"] as? String,
+            gradedFolders: list("graded_folders")
         )
     }
 

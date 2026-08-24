@@ -89,7 +89,8 @@ struct CourseSettingsView: View {
                             if configuration.reinclude(name, inScope: "shared") {
                                 ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
                             }
-                        }
+                        },
+                        protection: sharedFolderProtection
                     )
                     StringListEditorView(
                         title: "Shared files (all sections)",
@@ -116,7 +117,8 @@ struct CourseSettingsView: View {
                             if configuration.reinclude(name, inScope: "per_section") {
                                 ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
                             }
-                        }
+                        },
+                        protection: perSectionFolderProtection
                     )
                     StringListEditorView(
                         title: "Per-section files",
@@ -130,7 +132,8 @@ struct CourseSettingsView: View {
                             if configuration.reinclude(name, inScope: "per_section") {
                                 ActivityTrail.note(.itemReincluded, "re-included per-section file " + name + " in " + course.code)
                             }
-                        }
+                        },
+                        protection: perSectionFileProtection
                     )
                     Text("Tip: you can also simply create new folders in Obsidian — they’re added to your site automatically the next time you preview (unless you have removed them here).")
                         .font(.callout)
@@ -143,7 +146,8 @@ struct CourseSettingsView: View {
                     MembershipToggleListView(
                         title: "Folders whose work counts for marks",
                         allItems: gradedFolderChoices,
-                        members: gradedFoldersBinding
+                        members: gradedFoldersBinding,
+                        protection: gradedFolderProtection
                     )
                     Text("The curriculum map uses this to show which expectations you have actually evaluated. Most courses keep “Tasks”; add “Tests” or anything else you mark, and remove what you don’t.")
                         .font(.callout)
@@ -267,30 +271,6 @@ struct CourseSettingsView: View {
         return nil
     }
 
-    // MARK: - Functions
-
-    func save() {
-        saveProblem = nil
-        if let savingProblem {
-            saveProblem = savingProblem
-            return
-        }
-        do {
-            try course.configuration.write(to: course.configFileURL)
-            ActivityTrail.note(.settingsSaved, "saved the settings for " + course.code)
-            didJustSave = true
-            Task {
-                try? await Task.sleep(for: .seconds(3))
-                didJustSave = false
-            }
-        } catch {
-            saveProblem = "Could not save: \(error.localizedDescription)"
-            ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
-        }
-    }
-
-    // MARK: - Computed properties
-
     /// Every folder that could hold work counting for marks.
     ///
     /// Not just the top-level lists. The build matches a graded folder at ANY
@@ -318,6 +298,129 @@ struct CourseSettingsView: View {
             }
         }
         return choices
+    }
+
+    /// The pool, shown as ticks.
+    ///
+    /// When the course has never been asked (`gradedFolders` is nil), the
+    /// folders the build currently counts are shown ticked — the historical
+    /// rule, any folder whose name mentions tasks — so what a teacher sees is
+    /// what is actually happening rather than a blank list. Nothing is written
+    /// until they change something, and the moment they do, the answer becomes
+    /// explicit and the historical rule stops applying to this course.
+    ///
+    /// Which is why the derived list must be as complete as it can afford to
+    /// be: the first tick freezes it, so anything the build counts today and
+    /// this list omits loses its marks without a word.
+    var gradedFoldersBinding: Binding<[String]> {
+        return Binding(
+            get: {
+                if let chosen = course.configuration.gradedFolders {
+                    return chosen
+                }
+                var counted: [String] = []
+                for folder in gradedFolderChoices {
+                    if folder.lowercased().contains("task") {
+                        counted.append(folder)
+                    }
+                }
+                return counted
+            },
+            set: { newValue in
+                course.configuration.gradedFolders = newValue
+            }
+        )
+    }
+
+    // MARK: - Functions
+
+    func save() {
+        saveProblem = nil
+        if let savingProblem {
+            saveProblem = savingProblem
+            return
+        }
+        do {
+            try course.configuration.write(to: course.configFileURL)
+            ActivityTrail.note(.settingsSaved, "saved the settings for " + course.code)
+            didJustSave = true
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                didJustSave = false
+            }
+        } catch {
+            saveProblem = "Could not save: \(error.localizedDescription)"
+            ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
+        }
+    }
+
+    func sharedFolderProtection(for folder: String) -> ItemProtection {
+        let resolvedCurriculum: String? = CurriculumFolderRule.resolvedCurriculumFolder(for: course)
+        if let resolvedCurriculum, folder == resolvedCurriculum {
+            if course.configuration.includesCurriculumCoverage {
+                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageSetting)
+            } else {
+                return .consequential(
+                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+                    message: SpecialNames.removeCurriculumFolderMessage
+                )
+            }
+        }
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if currentGraded.contains(folder) {
+            if course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
+                return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+            } else {
+                return .consequential(
+                    title: SpecialNames.removeGradedFolderTitle(for: folder),
+                    message: SpecialNames.removeGradedFolderMessage
+                )
+            }
+        }
+        return .ordinary
+    }
+
+    func perSectionFolderProtection(for folder: String) -> ItemProtection {
+        if course.configuration.perSectionFolders.count <= 1 {
+            return .blocked(reason: SpecialNames.lastPerSectionFolderBlocked)
+        }
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if currentGraded.contains(folder) && course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
+            return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+        }
+        let classFolders: [String] = ClassFolder.names(for: course)
+        if classFolders.contains(folder) {
+            return .consequential(
+                title: SpecialNames.removeClassFolderTitle(for: folder),
+                message: SpecialNames.removeClassFolderMessage
+            )
+        }
+        if currentGraded.contains(folder) {
+            return .consequential(
+                title: SpecialNames.removeGradedFolderTitle(for: folder),
+                message: SpecialNames.removeGradedFolderMessage
+            )
+        }
+        return .ordinary
+    }
+
+    func perSectionFileProtection(for file: String) -> ItemProtection {
+        let normalized: String = file.lowercased()
+        if normalized == "index.md" || normalized == "index" {
+            return .blocked(reason: SpecialNames.sectionIndexFileBlocked)
+        }
+        return .ordinary
+    }
+
+    func gradedFolderProtection(for folder: String) -> ItemProtection {
+        guard course.configuration.includesCurriculumCoverage else {
+            return .ordinary
+        }
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if currentGraded.contains(folder) && currentGraded.count <= 1 {
+            return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+        }
+        return .ordinary
     }
 
     /// Folder names below the top level of a course, so the marks list can
@@ -371,37 +474,5 @@ struct CourseSettingsView: View {
             }
         }
         return names
-    }
-
-    /// The pool, shown as ticks.
-    ///
-    /// When the course has never been asked (`gradedFolders` is nil), the
-    /// folders the build currently counts are shown ticked — the historical
-    /// rule, any folder whose name mentions tasks — so what a teacher sees is
-    /// what is actually happening rather than a blank list. Nothing is written
-    /// until they change something, and the moment they do, the answer becomes
-    /// explicit and the historical rule stops applying to this course.
-    ///
-    /// Which is why the derived list must be as complete as it can afford to
-    /// be: the first tick freezes it, so anything the build counts today and
-    /// this list omits loses its marks without a word.
-    var gradedFoldersBinding: Binding<[String]> {
-        return Binding(
-            get: {
-                if let chosen = course.configuration.gradedFolders {
-                    return chosen
-                }
-                var counted: [String] = []
-                for folder in gradedFolderChoices {
-                    if folder.lowercased().contains("task") {
-                        counted.append(folder)
-                    }
-                }
-                return counted
-            },
-            set: { newValue in
-                course.configuration.gradedFolders = newValue
-            }
-        )
     }
 }
