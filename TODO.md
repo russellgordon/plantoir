@@ -249,3 +249,25 @@ bug — the mac's `deployAndWait()` already awaited the real result, so no mac
 work is owed. Full write-up: `GUI-IMPROVEMENTS.md` row 356,
 `MAC-HANDOFF.md`'s "Open" section (for awareness only).
 
+## ✅ Done — Nothing verifies that a release actually reached plantoir.app
+
+Noted 2026-08-14; fixed 2026-08-23. `website/netlify_deploy.py` gains
+`verify_live()`: after `deploy()` sees Netlify report a deploy "ready", it
+fetches `https://plantoir.app` and confirms the version-note line matches
+`site.json`'s version, retrying a few times since Netlify reporting "ready"
+and its CDN actually serving the new content are not the same instant.
+Advisory only — a flaky fetch or lingering propagation lag never turns a
+genuinely successful deploy into a reported failure, and a confirmed
+mismatch is tracked separately from a fetch/network problem. Comparison
+target is deliberately `site.json`'s own version, not the git release tag
+(the tag carries a `v` prefix the page text never does). Exposed standalone
+as `python3 website/build.py --verify-deploy`, and `cut-release`'s Publish
+section now tells the flow to watch and act on the output. Plan and
+implementation were each checked by a separate adversarial review before
+landing; the implementation review caught a real bug (the CLI's standalone
+entry point checked for `--verify` while every doc taught
+`--verify-deploy` — a plausible typo would have fallen through into
+triggering a real deploy instead of a read-only check). No `contracts/` or
+handoff entry — release tooling, not app behavior either platform's
+teacher-facing suite covers.
+
