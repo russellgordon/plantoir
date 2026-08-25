@@ -480,9 +480,22 @@ this side is expected to say so when the contract is wrong.
       the unconfigured rule). Emits `PLANTOIR_HEALTH:` JSON line. It is
       deliberately unfixable (in `neverOffered.checks`) — an existence fix
       would not assign marks to pages.
-    - **Shared Python**: both scripts run on Windows identically. Windows
-      receives the finding in the `PLANTOIR_HEALTH:` transcript line and
-      displays the contract-authored sentence and detail without re-wording.
+    - **Shared Python**: both scripts run on Windows identically, so the
+      `PLANTOIR_HEALTH:` line is printed into a Windows build console exactly
+      as it is into a mac one.
+    - **CORRECTION (2026-08-25).** This bullet used to end "Windows receives
+      the finding in the `PLANTOIR_HEALTH:` transcript line and displays the
+      contract-authored sentence and detail without re-wording." **That was
+      never true of any Windows build, released or unreleased.** Written on the
+      mac as a description of what the shared Python makes POSSIBLE, it reads
+      as a statement of what Windows already does — and it was believed. At the
+      time it was written, `PLANTOIR_HEALTH` appeared nowhere under
+      `windows-app/` at all: no parser, no dialog, no check registry. So this
+      check, and the five before it, were printed into a Windows console and
+      read by nobody. Windows now PARSES the line and records
+      `folder problem found` on the trail; it still displays nothing. See
+      "Folder problems … Where Windows actually stands with this (2026-08-25)"
+      below, and item 13 in the outstanding list above.
 
 11. **Special folders hardening: `excluded_items`, preflight skip, and `index.md` sentinel notes (2026-08-24).**
     - **`excluded_items` key in `course_config.json`** — An object with optional
@@ -575,6 +588,33 @@ this side is expected to say so when the contract is wrong.
       - *`removal blocked` is a trail event* (`activityTrail.mustRecord`): item name, which list, and the sentence shown. Record it where the ⓘ is clicked and where a blocked untick is refused.
       - *The contract holds 5 resolution cases*, not the 10 row 379 claimed.
       - *Size the flyout for the longest sentence.* The mac popover truncated to one line until it was given a fixed width and allowed to wrap; the `lastGradedFolderBlocked` sentence is the longest in `specialNames`, so test the flyout with that one.
+
+13. **The folder-problems FRONT END: the findings dialog, the Fix button,
+    and the repair (owed since 2026-08-23; scoped 2026-08-25).** The shared
+    Python has printed `PLANTOIR_HEALTH:` lines since the mac's row 357, and
+    until 2026-08-25 nothing on this side read them — see the correction in
+    item 10. What landed on 2026-08-25 is the half a contract can gate:
+    `Plantoir.Core/Models/SiteHealthFinding.cs` parses the marker line and
+    classifies it, `ScriptRunner.CollectHealthFindings` collects findings as
+    output arrives (line-buffered, not per chunk — a pseudo console splits a
+    line across two 150 ms flushes and a per-chunk scan drops exactly those),
+    and each new finding records `folder problem found` on the activity trail.
+    `ScriptRunner.HealthFindings` is the seam the front end attaches to.
+
+    **What is still owed is everything a teacher can see**: the dialog, the
+    Fix button, the two repairs, the outcome report, and "Preview Again". The
+    whole design is already written down for you in "Folder problems: the
+    checks, and the four places they have to surface" below — read that
+    section, not this item, for how to build it. It was left out of the
+    2026-08-25 parity work deliberately: it is a FEATURE (mac rows 357–358,
+    362–364, 367–372), not a port detail, and building it inside a parity
+    session would have meant inventing Windows wording for six mac dialogs
+    without the review history that produced them.
+
+    **Until it exists, a Windows teacher whose curriculum map silently stops
+    building is told nothing** — which is the exact failure the whole feature
+    was written to end. The trail line is a diagnosis after the fact, not a
+    warning at the time.
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
@@ -3281,6 +3321,89 @@ then.
 **The mac suite fails a declared trail event that has no call site** — which is
 what forced the front end to be written rather than promised. Worth checking
 whether your suite does the same; if not, it is a cheap test to add.
+
+**Answered, 2026-08-25: it does not, and that is how the two events sat dead
+here.** The Windows equivalent,
+`ContractTests.SharedRules_ActivityTrailEvents_Exist`, compares
+`ActivityTrail.Event` to `activityTrail.mustRecord` as a SET of names. A
+declared event with no caller anywhere satisfies it perfectly. So
+`FolderProblemFound` and `FolderProblemRepaired` were added to the enum on
+2026-08-23, to satisfy that set comparison against the contract, and had zero
+call sites anywhere in the C# until 2026-08-25 — with the suite green
+throughout. Two days, read out of `git log -S` rather than estimated — and the
+point is not the duration but that nothing on this side would EVER have said
+so. The cheap test the mac suggests is still worth adding and is not yet
+written: it would assert that every `Event` member appears somewhere in the
+product source, which is a grep rather than a behaviour, but it is the grep
+that would have caught this.
+
+### Where Windows actually stands with this (2026-08-25)
+
+Stated plainly because item 10 above previously implied the opposite, and a
+wrong status is worse than none.
+
+- **Landed.** `SiteHealthFinding` parses the `PLANTOIR_HEALTH:` line;
+  `ScriptRunner` collects findings as output arrives and records
+  `folder problem found` per finding, carrying the stable check NAME and never
+  the product wording. Whether a Fix button MAY be offered is decided from the
+  check's name against `siteHealth.repair.offered.checks` — never from the
+  `fixable` flag — so `noGradedFolders` can never acquire one. 23 contract
+  tests + 13 runner tests.
+- **Of the three traps above: the first is honoured, the third is half-done,
+  and the second is not done at all.** Findings are collected as output ARRIVES
+  rather than from a tail (trap one). "Show it once" (trap three) is satisfied
+  as far as it can be without a dialog — findings are de-duplicated on
+  name + course + section, and the collection is handed out as a snapshot
+  rather than as the live list, so a future dialog binding to it cannot be
+  emptied under itself; the rest of that trap is about holding findings in VIEW
+  state, which cannot be done until there is a view. **Trap two is NOT done: the raw
+  `PLANTOIR_HEALTH:` JSON line is still visible in the console a teacher
+  reads.** The mac drops it in
+  `TranscriptBuilder.appendUnlessMachineReadable`, which tests
+  `SiteHealthFinding.isMarkerLine` and simply does not append the line; the
+  findings are read from the RAW text before it is handed there. Windows also
+  reads from the raw text, but nothing removes the line afterwards, so it
+  lands in the transcript a teacher sees. **Copy the mac's shape including its
+  scar**: that function carries the comment *"One function called from BOTH
+  line endings, because having the check in only one of them is exactly the
+  bug this replaced."* Windows'
+  `TranscriptBuilder.Append` has the same two paths — a lone `
+` and a
+  `
+` pair both reach `PushLine` — so the check belongs in `PushLine`
+  itself rather than at either call site. That is rule 1 — machinery in front of a teacher —
+  and it is the cheapest piece of what remains. **It is PRE-EXISTING rather
+  than newly introduced**: the launchers have always printed that line, and
+  nothing on this side has ever removed it, so a Windows teacher has been
+  seeing a raw JSON blob in the console since the checks shipped.
+
+  **And no test on either platform would catch it**, which is worth more than
+  the bug. The rule "hide the marker line from the console a teacher reads"
+  exists only as prose in this section. `shared-rules.json` →
+  `transcriptStripping` covers ANSI colour, OSC titles and control characters,
+  and says nothing about `PLANTOIR_HEALTH:`. By rule 2 it belongs there — it is
+  a rule with an input and one right output, which is the definition the
+  contract uses — and a case would fail on Windows today while passing on the
+  mac, which is exactly the signal wanted. Not proposed here, because adding a
+  case is a decision about the contract rather than a port detail, and because
+  a Windows session should not land a case its own suite then fails.
+- **Not landed.** The dialog, the Fix button, both repairs, the outcome report,
+  "Preview Again", the scheduled-task stash, and the first-leg-only rule for
+  multi-destination deploys. `FolderProblemRepaired` therefore still has no
+  call site, which is honest: nothing on this side can repair anything yet.
+
+One measured note for the mac, since this side had to work it out: the Windows
+`ScriptRunner` coalesces pseudo-console output on a **150 ms** cadence
+(`BufferOutput`), so a health line genuinely can arrive in two pieces. The
+collector buffers by LINE and carries an unterminated tail forward. A draft of
+it — caught in adversarial review and never committed, so there is no shipped
+regression to go looking for — trimmed that carry to its last 4000 characters
+when it outgrew 8 KB —
+copied from the milestone scanner's sliding window, and inverted for a line
+buffer, because after the newline loop the carry is the HEAD of one line and
+the marker sits at the front. A long unterminated line therefore lost its
+finding entirely. It now drops the carry only when the carry cannot contain a
+marker.
 
 ## "Where do the class pages live?" had four answers — and yours was the worst (2026-08-23)
 
