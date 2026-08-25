@@ -495,7 +495,7 @@ this side is expected to say so when the contract is wrong.
       read by nobody. Windows now PARSES the line and records
       `folder problem found` on the trail; it still displays nothing. See
       "Folder problems … Where Windows actually stands with this (2026-08-25)"
-      below, and item 13 in the outstanding list above.
+      below, and item 13 further down this same list.
 
 11. **Special folders hardening: `excluded_items`, preflight skip, and `index.md` sentinel notes (2026-08-24).**
     - **`excluded_items` key in `course_config.json`** — An object with optional
@@ -3170,8 +3170,12 @@ unambiguous and carries structure a sentence cannot.
 
 ### Offering to put it right
 
-Two of the five findings are repairable — a missing `Media` folder and a missing
-section front page — and three are NOT. The line is the whole design: **a fix
+Two of the six findings are repairable — a missing `Media` folder and a missing
+section front page — and four are NOT. (This read "two of the FIVE … and three
+are NOT" until 2026-08-25; `noGradedFolders` was added on 2026-08-24 as a sixth
+check and a fourth unrepairable one, and this sentence was not updated with it.
+Count them in `siteHealth.repair` rather than trusting a number in prose —
+`offered.checks` and `neverOffered.checks` are the two lists that decide it.) The line is the whole design: **a fix
 must restore the FEATURE, not merely satisfy the check.** Recreating an empty
 curriculum folder would silence "the curriculum map could not be built" and
 leave the map missing, because that folder only counts once it holds a page
@@ -3373,9 +3377,11 @@ wrong status is worse than none.
 ` pair both reach `PushLine` — so the check belongs in `PushLine`
   itself rather than at either call site. That is rule 1 — machinery in front of a teacher —
   and it is the cheapest piece of what remains. **It is PRE-EXISTING rather
-  than newly introduced**: the launchers have always printed that line, and
-  nothing on this side has ever removed it, so a Windows teacher has been
-  seeing a raw JSON blob in the console since the checks shipped.
+  than newly introduced**: `scripts/site_health.py` has printed that line —
+  from inside `build_site.py`, not from the launchers — since the checks
+  shipped on 2026-08-23, and nothing on this side has ever removed it. So a
+  Windows teacher has been seeing a raw JSON blob in the console for as long
+  as the checks have existed.
 
   **And no test on either platform would catch it**, which is worth more than
   the bug. The rule "hide the marker line from the console a teacher reads"
