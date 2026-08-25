@@ -5,7 +5,10 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using System.Threading.Tasks;
+using Microsoft.UI.Xaml.Automation;
 using Plantoir.Core.Catalogs;
+using Plantoir.Core.Models;
 using Plantoir.Services;
 
 namespace Plantoir.Views;
@@ -75,14 +78,110 @@ public static class FormBuilders
         return panel;
     }
 
+    // ---- Protected rows -------------------------------------------------
+
+    /// <summary>
+    /// The width a blocked row's ⓘ flyout is given, in effective pixels.
+    ///
+    /// <para>A FIXED width, with the text wrapping inside it. A flyout whose
+    /// text only has a maximum is measured as ONE line and truncates: the mac
+    /// shipped exactly that and it passed every unit test, showing "Each
+    /// section needs at least one folder for it…". Sized against
+    /// <see cref="SpecialNames.LastGradedFolderBlocked"/>, the longest
+    /// sentence there is — a test names it, so a future longer one fails
+    /// rather than quietly becoming the case nobody checked.</para>
+    /// </summary>
+    public const double BlockedReasonFlyoutWidth = 300;
+
+    /// <summary>
+    /// The ⓘ that REPLACES the minus on a blocked row, with the flyout saying
+    /// why and naming the switch to turn off first.
+    ///
+    /// <para>Replaced rather than disabled: a greyed-out button with no
+    /// explanation is the version of this that gets reported as "the app is
+    /// broken". <paramref name="onShown"/> is how the refusal reaches the
+    /// activity trail — "I could not remove the folder" is a report support
+    /// will receive, and the line says which rule refused.</para>
+    /// </summary>
+    public static Button BlockedReasonButton(string reason, string display, Action? onShown = null)
+    {
+        var button = new Button
+        {
+            Content = new FontIcon { Glyph = Glyphs.Info, FontSize = 12 },
+            Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+            BorderThickness = new Thickness(0),
+            MinWidth = 28,
+            MinHeight = 24,
+            Padding = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        ToolTipService.SetToolTip(button, $"Why “{display}” cannot be removed");
+        AutomationProperties.SetAutomationId(button, "blockedReason:" + display);
+        AutomationProperties.SetName(button, $"Why {display} cannot be removed");
+
+        var text = new TextBlock
+        {
+            Text = reason,
+            TextWrapping = TextWrapping.Wrap,
+            Width = BlockedReasonFlyoutWidth,
+        };
+        AutomationProperties.SetAutomationId(text, "blockedReasonText");
+        var flyout = new Flyout { Content = text };
+        button.Flyout = flyout;
+        if (onShown is not null) flyout.Opened += (_, _) => onShown();
+        return button;
+    }
+
+    /// <summary>
+    /// The confirmation a consequential removal asks first; true means go
+    /// ahead.
+    ///
+    /// <para>The DEFAULT button is Cancel. Enter on a dialog that appeared
+    /// under the pointer must not delete a folder.</para>
+    /// </summary>
+    public static async Task<bool> ConfirmRemoval(XamlRoot? root, string title, string message)
+    {
+        if (root is null) return false;
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText = "Remove",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = root,
+        };
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+    }
+
     /// <summary>
     /// A folder/file list editor: rows with remove buttons and an add field
     /// whose + is always enabled (empty input is simply ignored). ".md" is
     /// never shown, always stored; "Media" is reserved for the toolchain.
+    ///
+    /// <para><paramref name="onRemoved"/> and <paramref name="onAdded"/> are
+    /// how Course Settings records an exclusion and its undoing. They fire
+    /// AFTER the list has changed, with the stored name (extension included),
+    /// and only when something really moved — the wizard passes neither,
+    /// because a course that does not exist yet has nothing to exclude
+    /// from.</para>
+    ///
+    /// <para><paramref name="protectionFor"/> says what happens when the
+    /// teacher presses minus on a given row: nothing special, ask first, or
+    /// refuse with an explanation. <b>It is not optional in spirit.</b> An
+    /// editor wired to <paramref name="onRemoved"/> and given no protection
+    /// makes every removal permanent — the name goes into
+    /// <c>excluded_items</c>, which the build treats as authoritative — so
+    /// removing "All Classes" would quietly stop the next-class button and the
+    /// schedule publishing anything.</para>
     /// </summary>
     public static StackPanel StringListEditor(string title, bool hidesMarkdownExtension,
                                               Func<List<string>> get, Action<List<string>> set,
-                                              Action changed)
+                                              Action changed,
+                                              Action<string>? onRemoved = null,
+                                              Action<string>? onAdded = null,
+                                              Func<string, ItemProtection>? protectionFor = null,
+                                              Action<string, string>? onRemovalBlocked = null)
     {
         var panel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 8, 0, 0) };
         panel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 13 });
@@ -103,27 +202,56 @@ public static class FormBuilders
                 string display = hidesMarkdownExtension && item.EndsWith(".md", StringComparison.Ordinal)
                     ? item[..^3] : item;
                 row.Children.Add(new TextBlock { Text = display, VerticalAlignment = VerticalAlignment.Center });
-                var remove = new Button
-                {
-                    Content = new FontIcon { Glyph = Glyphs.Remove, FontSize = 12 },
-                    Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
-                    BorderThickness = new Thickness(0),
-                    MinWidth = 28,
-                    MinHeight = 24,
-                    Padding = new Thickness(0),
-                    VerticalAlignment = VerticalAlignment.Center,   // align with the row's label
-                };
-                ToolTipService.SetToolTip(remove, $"Remove {display}");
-                remove.Click += (_, _) =>
+
+                var protection = protectionFor?.Invoke(item) ?? ItemProtection.Ordinary;
+
+                void DoRemove()
                 {
                     var updated = get();
-                    updated.Remove(item);
+                    if (!updated.Remove(item)) return;
                     set(updated);
+                    onRemoved?.Invoke(item);
                     changed();
                     Rebuild();
-                };
-                Grid.SetColumn(remove, 1);
-                row.Children.Add(remove);
+                }
+
+                FrameworkElement trailing;
+                if (protection.IsBlocked)
+                {
+                    trailing = BlockedReasonButton(protection.Reason, display,
+                        () => onRemovalBlocked?.Invoke(item, protection.Reason));
+                }
+                else
+                {
+                    var remove = new Button
+                    {
+                        Content = new FontIcon { Glyph = Glyphs.Remove, FontSize = 12 },
+                        Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                        BorderThickness = new Thickness(0),
+                        MinWidth = 28,
+                        MinHeight = 24,
+                        Padding = new Thickness(0),
+                        VerticalAlignment = VerticalAlignment.Center,   // align with the row's label
+                    };
+                    ToolTipService.SetToolTip(remove, $"Remove {display}");
+                    AutomationProperties.SetAutomationId(remove, "remove:" + display);
+                    if (protection.AsksFirst)
+                    {
+                        remove.Click += async (_, _) =>
+                        {
+                            if (await ConfirmRemoval(panel.XamlRoot, protection.Title, protection.Message))
+                                DoRemove();
+                        };
+                    }
+                    else
+                    {
+                        remove.Click += (_, _) => DoRemove();
+                    }
+                    trailing = remove;
+                }
+
+                Grid.SetColumn(trailing, 1);
+                row.Children.Add(trailing);
                 rows.Children.Add(row);
             }
         }
@@ -158,6 +286,7 @@ public static class FormBuilders
             if (items.Contains(name)) return;
             items.Add(name);
             set(items);
+            onAdded?.Invoke(name);
             changed();
             Rebuild();
         }
@@ -176,10 +305,19 @@ public static class FormBuilders
     /// <summary>
     /// Membership toggles over the sidebar items. Legacy members that no
     /// longer exist are preserved untouched — never "cleaned" on save.
+    ///
+    /// <para><paramref name="protectionFor"/> guards an UNTICK the same way
+    /// the list editor guards a removal. A blocked box puts itself back and an
+    /// ⓘ beside it says why: the Marks list is where the last graded folder
+    /// would otherwise be un-ticked into an empty pool, which shows every
+    /// expectation as never evaluated and reads as a bug in the coverage map
+    /// rather than a choice the teacher made.</para>
     /// </summary>
     public static StackPanel MembershipToggleList(string title, IReadOnlyList<string> allItems,
                                                   Func<List<string>> get, Action<List<string>> set,
-                                                  Action changed)
+                                                  Action changed,
+                                                  Func<string, ItemProtection>? protectionFor = null,
+                                                  Action<string, string>? onRemovalBlocked = null)
     {
         var panel = new StackPanel { Spacing = 4, Margin = new Thickness(0, 8, 0, 0) };
         panel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 13 });
@@ -193,21 +331,65 @@ public static class FormBuilders
         {
             string display = item.EndsWith(".md", StringComparison.Ordinal) ? item[..^3] : item;
             var check = new CheckBox { Content = display, IsChecked = members.Contains(item), MinHeight = 30 };
+            AutomationProperties.SetAutomationId(check, "member:" + display);
+
+            var row = new Grid { ColumnSpacing = 4 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.Children.Add(check);
+
+            // Re-read on every interaction rather than closing over the value:
+            // ticking a SECOND folder is exactly what un-blocks the first, and a
+            // captured answer would still refuse.
+            Button? reasonButton = null;
+            void RefreshReason()
+            {
+                var protection = protectionFor?.Invoke(item) ?? ItemProtection.Ordinary;
+                bool wanted = protection.IsBlocked && check.IsChecked == true;
+                if (wanted && reasonButton is null)
+                {
+                    reasonButton = BlockedReasonButton(protection.Reason, display,
+                        () => onRemovalBlocked?.Invoke(item, protection.Reason));
+                    Grid.SetColumn(reasonButton, 1);
+                    row.Children.Add(reasonButton);
+                }
+                else if (!wanted && reasonButton is not null)
+                {
+                    row.Children.Remove(reasonButton);
+                    reasonButton = null;
+                }
+            }
+
             check.Checked += (_, _) =>
             {
                 var updated = get();
                 if (!updated.Contains(item)) updated.Add(item);
                 set(updated);
                 changed();
+                RefreshReason();
             };
             check.Unchecked += (_, _) =>
             {
+                var protection = protectionFor?.Invoke(item) ?? ItemProtection.Ordinary;
+                if (protection.IsBlocked)
+                {
+                    // Put it back and explain, rather than letting the pool
+                    // empty. Setting IsChecked re-enters Checked, which is
+                    // harmless: the name is already a member.
+                    check.IsChecked = true;
+                    onRemovalBlocked?.Invoke(item, protection.Reason);
+                    reasonButton?.Flyout?.ShowAt(reasonButton);
+                    return;
+                }
                 var updated = get();
                 updated.Remove(item);
                 set(updated);
                 changed();
+                RefreshReason();
             };
-            panel.Children.Add(check);
+
+            RefreshReason();
+            panel.Children.Add(row);
         }
         return panel;
     }

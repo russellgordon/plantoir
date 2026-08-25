@@ -94,6 +94,121 @@ outstanding.
 
 ## Open — what the mac still owes
 
+- **Windows now has the exclusions AND the protection model, and three things
+  come back to the mac** (Windows, 2026-08-25, branch
+  `issue/windows-special-folders-parity`, `GUI-IMPROVEMENTS.md` row 385).
+  Windows implemented handoff items 11 and 12: `excluded_items`,
+  `graded_folders` and `curriculum_folder` in `CourseConfiguration.cs`, the
+  `ItemProtection` model in the list editors and the marks checklist, a Marks
+  section in Course Settings (which this app never had), and the wizard's marks
+  control. Mostly a **know, not a do** — but three items below are genuine
+  questions for this side.
+
+  **The one finding worth the mac's attention: the two pieces could not be
+  shipped separately, and an adversarial review is what caught it.** Item 11
+  (exclusions) and item 12 (protection) read as independent pieces of work, and
+  Windows implemented item 11 first. That was wrong, and quietly so. Before
+  `excluded_items` existed, a Windows teacher who removed `All Classes` got it
+  back at the next preview, because `preflight_update_course_config`
+  rediscovers folders — the missing protection model was survivable. The moment
+  the app writes `excluded_items`, row 377 makes that key AUTHORITATIVE, the
+  folder never comes back, and the next-class button and the schedule write
+  into a folder that no longer publishes. Same for the resolved curriculum
+  folder (the map silently stops building) and a section's `index.md` (the
+  section cannot be published at all). **Item 11 without item 12 turns a
+  recoverable gap into an unrecoverable one**, and nothing in either item says
+  so. Worth a line in `WINDOWS-HANDOFF.md` if anyone ever ports these
+  separately again.
+
+  **1. The Course Settings tip sentence is contract-pinned on NEITHER
+  platform, and now the two apps word the same rule differently.** Row 375 says
+  the mac "amended Course Settings tip callout to except removed names". That
+  is a sentence a teacher READS, so by CLAUDE.md rule 2 it belongs in
+  `contracts/`; `grep -rn "added to your site automatically" contracts/`
+  returns nothing. Windows therefore wrote its own — "…The exception is
+  anything you remove here: it stays off your site, even if you make it again
+  in Obsidian, until you add it back on this page." **No case has been
+  proposed**, deliberately: proposing one would redden the mac suite over
+  wording the mac already ships, and choosing WHICH sentence becomes the
+  contract is the mac's call. If the mac agrees it belongs there, add it under
+  `specialNames` and Windows will take the mac's wording verbatim.
+
+  **2. `Reconciled` had a case-collision bug, and the mac should check its
+  own.** `setup_course.py:graded_folders_for` builds `actual_lookup` with a
+  dict comprehension, so for a course holding both `Tasks` and `tasks` the
+  LAST one wins. The first Windows cut used `Dictionary.TryAdd`, which keeps
+  the FIRST, and would have returned `["Tasks"]` where the build returns
+  `["tasks"]`. Fixed to last-wins. Vanishingly rare, and there is no contract
+  case pinning it — which is why it survived review on this side until somebody
+  went line-by-line against the Python. If the mac's `reconciledGradedFolders`
+  resolves it the other way, one of the two is wrong.
+
+  **3. Revert leaves a trail line for a removal that did not happen — and the
+  mac has the identical shape.** Proven here: `Exclude("shared", "A")` then
+  `DiscardChanges()` puts the config back, but `item excluded` is already on
+  disk. Windows writes the note inside the editor's remove callback; the mac
+  writes it inside `onRemove` and has a Revert too. So this is **parity, not a
+  Windows regression** — but CLAUDE.md rule 5 says "a line describing what the
+  feature used to do is worse than no line, because it will be believed", and a
+  teacher who removes a folder, thinks better of it, and Reverts leaves a trail
+  claiming they excluded it. The honest fix is to record on SAVE rather than on
+  click, on both sides. Flagged rather than fixed unilaterally, because
+  changing when the mac records an event is not a Windows decision.
+
+  **What was rejected on this side, and why.** (a) Case-INSENSITIVE matching
+  for `excluded_items` — the neighbouring "Media" refusal is case-insensitive,
+  so matching it felt consistent, but `preflight_update_course_config` builds a
+  plain Python `set` and tests exact membership; the app must agree with the
+  BUILD, not with its neighbouring control. (b) Writing `excluded_items` and
+  leaving the name in `shared_folders`, on the grounds that row 377 made the
+  key authoritative — rejected because that reconciliation runs at the NEXT
+  build, and between the save and that build Settings would show a folder the
+  teacher had just removed. (c) Reading the blocked sentences out of
+  `contracts/shared-rules.json` at RUNTIME rather than writing them into
+  `SpecialNames.cs` — rejected for the reason `AssistWording` is written out:
+  the contract is generated from the macOS app, so a changed sentence must fail
+  a Windows BUILD, not change a teacher's screen on a machine the tests never
+  ran on. It earned its keep immediately — the contract test caught a
+  transcription slip where `curriculumFolderBlockedByCoverageMap` had lost the
+  words "for the coverage map".
+
+  **Three switch labels were RENAMED on Windows to match the contract's
+  sentences.** This is the one place Windows changed teacher-visible wording,
+  and the reason is that the blocked sentences name a switch BY NAME: an ⓘ
+  saying "turn off *Publish the curriculum coverage map*" is worse than useless
+  when the app's toggle says "Include Curriculum Coverage map". Course
+  Settings' coverage toggle is now `SpecialNames.CoverageSwitchLabelInSettings`
+  ("Publish the curriculum coverage map"), the wizard's is
+  `CoverageSwitchLabelInWizard` ("Include the curriculum coverage map"), and
+  the wizard's curriculum-pages toggle is built per-province, so a BC teacher
+  is told about a switch a BC teacher can see rather than always "Ontario". The
+  contract's wording won over the Windows label in every case, because the
+  contract is generated from the mac and a Windows-only paraphrase is drift
+  rather than a decision. **If the mac's own labels differ from these, the mac
+  has the same bug** — a test (`EveryBlockedSentenceNamesASwitchTheAppActuallyHas`)
+  now pins label against sentence on this side, and the mac has no equivalent.
+
+  **Numbers, from this hardware** (Windows 11 Pro 26200, x64): the Windows
+  suite went from **673 tests with 2 failing** on the mac's merge to **765
+  passing, 0 failing**. The two failures were
+  `FileFormats_CourseConfigKeys_MatchesContract` — which fails on
+  `curriculum_folder`, NOT `excluded_items`, worth knowing if the mac ever
+  reads that failure as a smaller job than it is — and
+  `SharedRules_ActivityTrailEvents_Exist`. One honest caveat on the first: it
+  asserts `Assert.Contains($"\"{key}\"", source)` against the raw TEXT of
+  `CourseConfiguration.cs`, so it goes green on a key mentioned in a comment.
+  Its greenness is evidence the keys are spelled in that file, not that they
+  are implemented; the behaviour is covered by `ExcludedItemsTests` and
+  `GradedFolderContractTests` instead.
+
+  Reference: `windows-app/Plantoir.Core/Models/` — `CourseConfiguration.cs`,
+  `GradedFolderRule.cs`, `CurriculumFolderRule.cs`, `SpecialNames.cs`,
+  `ItemProtection.cs`; `windows-app/Plantoir/Views/FormBuilders.cs`,
+  `CourseSettingsView.xaml.cs`, `NewCourseDialog.cs`;
+  `windows-app/Plantoir.Tests/` — `ExcludedItemsTests.cs`,
+  `GradedFolderContractTests.cs`, `SpecialNamesContractTests.cs`,
+  `ItemProtectionTests.cs`.
+
 - **The site-health FINDINGS DIALOG does not exist on Windows, and the mac
   side should know it is not there** (Windows, 2026-08-25, branch
   `issue/windows-special-folders-parity`, `GUI-IMPROVEMENTS.md` row 384).

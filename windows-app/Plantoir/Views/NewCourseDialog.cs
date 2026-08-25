@@ -73,6 +73,17 @@ public sealed class NewCourseDialog : ContentDialog
     private List<string> _sharedFiles = WizardDefaults.SharedFiles.ToList();
     private List<string> _perSectionFolders = WizardDefaults.PerSectionFolders.ToList();
     private List<string> _perSectionFiles = WizardDefaults.PerSectionFiles.ToList();
+
+    /// <summary>
+    /// Which of this course's folders will count for marks, written to
+    /// `graded_folders` on Create.
+    ///
+    /// <para>Null until the Marks list is first built, then reconciled against
+    /// the folder lists on every rebuild - a name the teacher removes from the
+    /// structure must not survive in the pool, which is the wizard half of
+    /// `setup_course.py:graded_folders_for`.</para>
+    /// </summary>
+    private List<string>? _gradedFolders;
     private string _lastAutoFilledName = "";
     private readonly CourseNameCatalog _nameCatalog;
     private readonly TextBlock _gradeWarningSlot;
@@ -95,6 +106,7 @@ public sealed class NewCourseDialog : ContentDialog
     private readonly TextBlock _structureCaption;
     private readonly TextBlock _structureLockedNote;
     private readonly StackPanel _structureEditorArea = new() { Spacing = 6 };
+    private readonly StackPanel _marksArea = new() { Spacing = 4, Margin = new Thickness(0, 12, 0, 0) };
     private readonly Expander _structureExpander = new()
     {
         Header = "Folders and files",
@@ -516,6 +528,9 @@ public sealed class NewCourseDialog : ContentDialog
         _structureEditorArea.Children.Add(lcsRow);
         AutomationProperties.SetAutomationId(_structureExpander, "structureDisclosure");
         _structureEditorArea.Children.Add(_structureExpander);
+        // Marks sits OUTSIDE the "Folders and files" disclosure: a teacher who
+        // never opens that expander still has to be able to say what counts.
+        _structureEditorArea.Children.Add(_marksArea);
         RebuildStructureLists();
         form.Children.Add(_structureEditorArea);
         RefreshStructureArea();
@@ -570,7 +585,12 @@ public sealed class NewCourseDialog : ContentDialog
                     OffContent = "",
                 };
                 AutomationProperties.SetAutomationId(curriculumToggle, "curriculumToggle");
-                var curriculumRow = FormBuilders.LabeledRow("Include Ontario curriculum pages", curriculumToggle);
+                // Named by SpecialNames.CurriculumFolderBlockedByCurriculumPages,
+                // so the label has to be built the same way the sentence is -
+                // and it is per-province, because a BC teacher told to turn off
+                // "Include Ontario curriculum pages" has no such switch.
+                var curriculumRow = FormBuilders.LabeledRow(
+                    SpecialNames.CurriculumPagesSwitchLabel(JurisdictionForCode()), curriculumToggle);
                 curriculumRow.Children.Add(FormBuilders.ExampleCaption(
                     "Every expectation as its own page, so lessons and tasks can link to exactly what they address"));
                 _startingContentBody.Children.Add(curriculumRow);
@@ -583,7 +603,9 @@ public sealed class NewCourseDialog : ContentDialog
                     OffContent = "",
                 };
                 AutomationProperties.SetAutomationId(coverageToggle, "curriculumCoverageToggle");
-                var coverageRow = FormBuilders.LabeledRow("Include Curriculum Coverage map", coverageToggle);
+                // Named by SpecialNames.CurriculumFolderBlockedByCoverageMap and
+                // LastGradedFolderBlockedWizard - see the note in CourseSettingsView.
+                var coverageRow = FormBuilders.LabeledRow(SpecialNames.CoverageSwitchLabelInWizard, coverageToggle);
                 coverageRow.Children.Add(FormBuilders.ExampleCaption(
                     "Generates a page showing which specific and overall expectations are addressed"));
                 _startingContentBody.Children.Add(coverageRow);
@@ -604,6 +626,7 @@ public sealed class NewCourseDialog : ContentDialog
                 curriculumToggle.Toggled += (_, _) =>
                 {
                     _includeCurriculum = curriculumToggle.IsOn;
+                    RebuildFolderEditors();
                     if (coverageToggle is not null)
                     {
                         coverageToggle.IsEnabled = _prepopulate && _includeCurriculum;
@@ -619,6 +642,9 @@ public sealed class NewCourseDialog : ContentDialog
                 coverageToggle.Toggled += (_, _) =>
                 {
                     _includeCurriculumCoverage = coverageToggle.IsOn;
+                    // Named by two of the blocked sentences, so the rows have
+                    // to be redrawn against the new answer.
+                    RebuildFolderEditors();
                     if (coverageNotesToggle is not null)
                     {
                         coverageNotesToggle.IsEnabled = _prepopulate && _includeCurriculum && _includeCurriculumCoverage;
@@ -635,6 +661,7 @@ public sealed class NewCourseDialog : ContentDialog
             prepopToggle.Toggled += (_, _) =>
             {
                 _prepopulate = prepopToggle.IsOn;
+                RebuildFolderEditors();
                 if (curriculumToggle is not null) curriculumToggle.IsEnabled = _prepopulate;
                 if (coverageToggle is not null) coverageToggle.IsEnabled = _prepopulate && _includeCurriculum;
                 if (coverageNotesToggle is not null) coverageNotesToggle.IsEnabled = _prepopulate && _includeCurriculum && _includeCurriculumCoverage;
@@ -663,19 +690,120 @@ public sealed class NewCourseDialog : ContentDialog
         _structureCaption.Text = locked ? "Chosen by the example content" : "Defaults are fine for most courses";
     }
 
-    /// <summary>Recreate the four list editors so they read the current lists.</summary>
+    /// <summary>
+    /// The marks pool as it stands, seeded from the folders the course
+    /// currently has and reconciled whenever those change.
+    ///
+    /// <para>Seeded with the historical rule rather than left empty: a brand
+    /// new course starts with exactly the marks it would have had before this
+    /// key existed, written down explicitly instead of inferred every build.
+    /// Reconciled so a folder the teacher removes in the wizard cannot survive
+    /// in a pool that would then match nothing on disk.</para>
+    /// </summary>
+    private List<string> CurrentGradedFolders()
+    {
+        var actual = _sharedFolders.Concat(_perSectionFolders).ToList();
+        _gradedFolders = _gradedFolders is null
+            ? GradedFolderRule.InferredPool(actual)
+            : GradedFolderRule.Reconciled(_gradedFolders, actual);
+        return _gradedFolders;
+    }
+
+    /// <summary>
+    /// The wizard's protection context.
+    ///
+    /// <para>The switch values are EFFECTIVE, not raw. A parent switch being
+    /// off leaves its children disabled but still reading true, and blocking a
+    /// removal on a disabled switch is a deadlock: the teacher is told to turn
+    /// off a control they cannot reach. `include_curriculum_coverage` is
+    /// computed exactly as `BuildConfiguration` writes it, and
+    /// `include_curriculum_pages` likewise, so the rule and the file cannot
+    /// disagree about what is on.</para>
+    /// </summary>
+    private ProtectionContext WizardProtection() => new(
+        InWizard: true,
+        CurriculumCoverageEnabled: CourseConfiguration.CurriculumCoverageEnabled(_includeCurriculumCoverage),
+        CurriculumPagesEnabled: CourseConfiguration.CurriculumPagesEnabled(
+            ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode),
+            _prepopulate,
+            ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode),
+            _includeCurriculum),
+        Jurisdiction: JurisdictionForCode(),
+        ResolvedCurriculumFolder: CurriculumFolderRule.Resolve(null, _sharedFolders),
+        GradedFolders: CurrentGradedFolders(),
+        PerSectionFolders: _perSectionFolders);
+
+    /// <summary>
+    /// Which province's curriculum the switch offers, so the blocked sentence
+    /// names the switch a teacher can actually see rather than always saying
+    /// "Ontario".
+    /// </summary>
+    private string JurisdictionForCode() =>
+        _province == "BC" ? "British Columbia" : SpecialNames.DefaultJurisdiction;
+
+    private void RecordWizardRemovalBlocked(string list, string name, string reason) =>
+        ActivityTrail.Note(ActivityTrail.Event.RemovalBlocked,
+            $"new course {NormalizedCode}: could not remove \u201C{name}\u201D from {list} - {reason}");
+
+    /// <summary>
+    /// Recreate the four list editors AND the marks list — for a change that
+    /// altered which folders exist.
+    /// </summary>
     private void RebuildStructureLists()
     {
+        RebuildFolderEditors();
+        RebuildMarksList();
+    }
+
+    /// <summary>
+    /// Just the four list editors, for a change that altered which rows are
+    /// BLOCKED without altering which folders exist — a coverage switch, or a
+    /// tick in the marks list. Rebuilding the marks list from inside its own
+    /// checkbox handler would destroy the control mid-event.
+    /// </summary>
+    private void RebuildFolderEditors()
+    {
         var lists = new StackPanel { Spacing = 4 };
+        // No onRemoved/onAdded: a course that does not exist yet has nothing to
+        // exclude from. The protection closures ARE passed, because the floors
+        // they enforce are about the course being built, not about a build.
         lists.Children.Add(FormBuilders.StringListEditor("Shared folders", false,
-            () => _sharedFolders, v => _sharedFolders = v, () => { }));
+            () => _sharedFolders, v => _sharedFolders = v, RebuildMarksList,
+            protectionFor: name => ItemProtectionRule.For(name, ItemList.SharedFolders, WizardProtection()),
+            onRemovalBlocked: (name, reason) => RecordWizardRemovalBlocked("the shared folders", name, reason)));
         lists.Children.Add(FormBuilders.StringListEditor("Shared files", true,
-            () => _sharedFiles, v => _sharedFiles = v, () => { }));
+            () => _sharedFiles, v => _sharedFiles = v, () => { },
+            protectionFor: name => ItemProtectionRule.For(name, ItemList.SharedFiles, WizardProtection()),
+            onRemovalBlocked: (name, reason) => RecordWizardRemovalBlocked("the shared files", name, reason)));
         lists.Children.Add(FormBuilders.StringListEditor("Per-section folders", false,
-            () => _perSectionFolders, v => _perSectionFolders = v, () => { }));
+            () => _perSectionFolders, v => _perSectionFolders = v, RebuildMarksList,
+            protectionFor: name => ItemProtectionRule.For(name, ItemList.PerSectionFolders, WizardProtection()),
+            onRemovalBlocked: (name, reason) => RecordWizardRemovalBlocked("the per-section folders", name, reason)));
         lists.Children.Add(FormBuilders.StringListEditor("Per-section files", true,
-            () => _perSectionFiles, v => _perSectionFiles = v, () => { }));
+            () => _perSectionFiles, v => _perSectionFiles = v, () => { },
+            protectionFor: name => ItemProtectionRule.For(name, ItemList.PerSectionFiles, WizardProtection()),
+            onRemovalBlocked: (name, reason) => RecordWizardRemovalBlocked("the per-section files", name, reason)));
         _structureExpander.Content = lists;
+    }
+
+    /// <summary>
+    /// The Marks checklist, rebuilt whenever the folder lists change so a
+    /// folder that has just been added can be ticked and one that has gone
+    /// stops being offered.
+    /// </summary>
+    private void RebuildMarksList()
+    {
+        _marksArea.Children.Clear();
+        _marksArea.Children.Add(FormBuilders.ExampleCaption(
+            "Tick the folders holding work that counts for marks. The Curriculum Coverage map shows an expectation as evaluated when a page in one of these addresses it."));
+        _marksArea.Children.Add(FormBuilders.MembershipToggleList("Folders that count for marks",
+            _sharedFolders.Concat(_perSectionFolders).ToList(),
+            CurrentGradedFolders,
+            v => _gradedFolders = v,
+            // A second ticked folder unblocks the first in the lists above.
+            RebuildFolderEditors,
+            name => ItemProtectionRule.For(name, ItemList.GradedFolders, WizardProtection()),
+            (name, reason) => RecordWizardRemovalBlocked("the marks list", name, reason)));
     }
 
     // ---- Validation and auto-fill ---------------------------------------
@@ -963,6 +1091,14 @@ public sealed class NewCourseDialog : ContentDialog
             ["prepopulate_example_content"] = hasContent && _prepopulate,
             ["include_curriculum_pages"] = hasContent && _prepopulate && includesCurriculum && _includeCurriculum,
             ["include_curriculum_coverage"] = PerSection(_ => _includeCurriculumCoverage),
+            // Reconciled against the folders the course actually ended up with,
+            // so a name the teacher removed here is dropped rather than written
+            // into a pool matching nothing on disk. Written EXPLICITLY, which is
+            // safe here and only here: a new course has no marks to lose, and an
+            // absent key would mean "never asked".
+            ["graded_folders"] = new JArray(
+                GradedFolderRule.Reconciled(CurrentGradedFolders(),
+                    _sharedFolders.Concat(_perSectionFolders))),
             ["include_coverage_notes"] = PerSection(_ => CourseConfiguration.CoverageNotesEnabled(_includeCurriculumCoverage, _includeCoverageNotes)),
             ["use_lcs_terminology"] = _useLcs,
             ["deploy_target"] = _deployTarget,
