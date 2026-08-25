@@ -154,7 +154,7 @@ enum ScheduledDeploy {
     /// Where the agent's own output goes. A deploy that ran at half six
     /// with nobody watching has to have left something behind, or a
     /// failure is invisible until a student says the site is stale.
-    static func logURL(courseCode: String, sectionNumber: Int) -> URL {
+    nonisolated static func logURL(courseCode: String, sectionNumber: Int) -> URL {
         let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
         return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library")
@@ -627,10 +627,16 @@ enum ScheduledDeploy {
         // overnight publish is running did not go out, and stamping the
         // finishing state would mark it published.
         var fingerprintBeforeRunning: String?
+        var logSizeBeforeRunning: UInt64 = 0
         if let section {
             fingerprintBeforeRunning = SectionPublishState.fingerprint(
                 courseDirectory: section.courseDirectory,
                 sectionNumber: section.sectionNumber
+            )
+            // launchd APPENDS to this log and nothing truncates it, so where it
+            // ends now is where this run's own output begins.
+            logSizeBeforeRunning = logSize(
+                courseCode: section.courseCode, sectionNumber: section.sectionNumber
             )
         }
 
@@ -641,6 +647,9 @@ enum ScheduledDeploy {
             try process.run()
             process.waitUntilExit()
             recordScheduledPublish(section: section, fingerprint: fingerprintBeforeRunning)
+            // Publishes regardless; the findings are kept for somebody to read
+            // when they are next at the machine.
+            recordFolderProblems(section: section, fromByteOffset: logSizeBeforeRunning)
             exit(process.terminationStatus)
         } catch {
             FileHandle.standardError.write(Data(
@@ -657,6 +666,115 @@ enum ScheduledDeploy {
             result.append(destination.type)
         }
         return result
+    }
+
+    /// Where a scheduled run leaves the folder problems it found, for the app
+    /// to read the next time it opens.
+    ///
+    /// Beside the success sentinel and consumed the same way, because the
+    /// shape is already proven here: a one-shot run writes a small file, the
+    /// app reads it and deletes it.
+    nonisolated static func findingsSentinelURL(courseCode: String, sectionNumber: Int) -> URL {
+        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Application Support")
+            .appendingPathComponent("Plantoir")
+            .appendingPathComponent("scheduled")
+            .appendingPathComponent("\(label).findings")
+    }
+
+    /// Keeps whatever the run said about this course's folders, so it can be
+    /// shown when somebody is next there to read it.
+    ///
+    /// **A scheduled deploy never refuses on a finding** — it publishes and
+    /// reports afterwards. A slightly inaccurate curriculum map is a paper cut;
+    /// a site update a teacher was counting on that silently did not happen is
+    /// not. See `contracts/shared-rules.json` →
+    /// `siteHealth.scheduledDeployPublishesAnyway`.
+    ///
+    /// The findings are read back out of the LOG rather than from a pipe.
+    /// `runScheduled` deliberately does not capture the child's output —
+    /// launchd points its stdout and stderr at that log and the process
+    /// inherits them — and an unread pipe is exactly what wedged the Windows
+    /// assistant's server, so this reads the file launchd already wrote.
+    nonisolated static func recordFolderProblems(
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
+        fromByteOffset offset: UInt64
+    ) {
+        guard let section else {
+            return
+        }
+        let log: URL = logURL(
+            courseCode: section.courseCode, sectionNumber: section.sectionNumber
+        )
+        guard let text = textOfLog(at: log, fromByteOffset: offset) else {
+            return
+        }
+        var markerLines: [String] = []
+        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line: String = String(rawLine).trimmingCharacters(in: .whitespaces)
+            if SiteHealthFinding.isMarkerLine(line) {
+                markerLines.append(line)
+            }
+        }
+        let sentinel: URL = findingsSentinelURL(
+            courseCode: section.courseCode, sectionNumber: section.sectionNumber
+        )
+        if markerLines.isEmpty {
+            // Nothing wrong this time: clear anything an earlier run left, so
+            // a problem that has since been put right stops being reported.
+            try? FileManager.default.removeItem(at: sentinel)
+            return
+        }
+        try? FileManager.default.createDirectory(
+            at: sentinel.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try? markerLines.joined(separator: "\n").write(to: sentinel, atomically: true, encoding: .utf8)
+    }
+
+    /// How big the log is right now.
+    ///
+    /// Taken BEFORE the run so that afterwards only THIS run's output is read.
+    /// launchd opens `StandardOutPath` with O_APPEND and nothing rotates or
+    /// truncates it, so the file still holds every previous night's output —
+    /// reading the whole thing meant last week's findings were rewritten into
+    /// the sentinel every night, and the "nothing wrong this time" branch
+    /// became unreachable the moment a single problem had ever been logged. A
+    /// teacher who fixed the folder would have gone on being told about it
+    /// forever.
+    nonisolated static func logSize(courseCode: String, sectionNumber: Int) -> UInt64 {
+        let log: URL = logURL(courseCode: courseCode, sectionNumber: sectionNumber)
+        let attributes = try? FileManager.default.attributesOfItem(atPath: log.path)
+        return (attributes?[.size] as? UInt64) ?? 0
+    }
+
+    /// The log from `offset` onward, or the whole file when it is SHORTER than
+    /// the offset — which means somebody rotated or deleted it mid-run, and
+    /// reading from a stale offset would return nothing at all.
+    nonisolated static func textOfLog(at log: URL, fromByteOffset offset: UInt64) -> String? {
+        guard let data = try? Data(contentsOf: log) else {
+            return nil
+        }
+        if offset == 0 || UInt64(data.count) < offset {
+            return String(data: data, encoding: .utf8)
+        }
+        return String(data: data.suffix(from: Int(offset)), encoding: .utf8)
+    }
+
+    /// What the last scheduled run found, if anything, consuming the record so
+    /// it is reported once rather than every time the app opens.
+    nonisolated static func takeFolderProblems(
+        courseCode: String, sectionNumber: Int
+    ) -> [SiteHealthFinding] {
+        let sentinel: URL = findingsSentinelURL(
+            courseCode: courseCode, sectionNumber: sectionNumber
+        )
+        guard let text = try? String(contentsOf: sentinel, encoding: .utf8) else {
+            return []
+        }
+        try? FileManager.default.removeItem(at: sentinel)
+        return SiteHealthFinding.findings(in: text)
     }
 
     /// Marks the section's pages as published, if the script said every

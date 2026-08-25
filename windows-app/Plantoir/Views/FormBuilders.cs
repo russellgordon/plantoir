@@ -150,7 +150,9 @@ public static class FormBuilders
             string name = field.Text.Trim();
             field.Text = "";
             if (name.Length == 0) return;
-            if (name == "Media") return;   // the toolchain manages Media itself
+            // Case-INSENSITIVE, because the filesystem is: "media" typed here
+            // was accepted and then collided with the folder Plantoir links in.
+            if (string.Equals(name, "Media", StringComparison.OrdinalIgnoreCase)) return;
             if (hidesMarkdownExtension && !name.EndsWith(".md", StringComparison.Ordinal)) name += ".md";
             var items = get();
             if (items.Contains(name)) return;

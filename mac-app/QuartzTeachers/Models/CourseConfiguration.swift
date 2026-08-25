@@ -356,6 +356,174 @@ class CourseConfiguration {
         set { values["per_section_files"] = newValue }
     }
 
+    /// What this course calls the folder holding one page per curriculum
+    /// expectation.
+    ///
+    /// Declared by every payload and skeleton manifest and carried into the
+    /// config at creation. The build tries it FIRST and only then falls back to
+    /// scanning for a top-level folder whose name contains "curriculum" — which
+    /// is still the real path for a course made from scratch, but would never
+    /// have found a folder called something else entirely.
+    var curriculumFolder: String? {
+        get { return values["curriculum_folder"] as? String }
+        set {
+            if let newValue {
+                values["curriculum_folder"] = newValue
+            } else {
+                values.removeValue(forKey: "curriculum_folder")
+            }
+        }
+    }
+
+    /// The folders whose contents count for marks — what makes an expectation
+    /// "assessed" on the Curriculum Coverage map.
+    ///
+    /// **Nil is not empty**, and that distinction is the whole migration.
+    /// Nil means the teacher has never been asked, so the build applies the
+    /// historical rule (any folder whose name contains "task") and every course
+    /// made before this existed keeps exactly the marks it had. `[]` means they
+    /// were asked and cleared it, which is a real answer.
+    ///
+    /// Seeding an existing course with ["Tasks"] would NOT have been safe: the
+    /// exact-name rule is narrower than the substring one, and the skeletons
+    /// ship a family whose folder is "Thinking Tasks" — counted by the old rule,
+    /// not by that pool. See `contracts/shared-rules.json` → `gradedFolders`.
+    var gradedFolders: [String]? {
+        get {
+            guard values["graded_folders"] != nil else {
+                return nil
+            }
+            return stringListValue(forKey: "graded_folders")
+        }
+        set {
+            if let newValue {
+                values["graded_folders"] = newValue
+            } else {
+                values.removeValue(forKey: "graded_folders")
+            }
+        }
+    }
+
+    /// Folders or files excluded from previews and deploys, separated by scope.
+    ///
+    /// Keyed by scope ("shared" and/or "per_section") to match the config's
+    /// structure. ABSENT (not `{}`) when nothing is excluded.
+    var excludedItems: [String: [String]]? {
+        get {
+            guard let dict = values["excluded_items"] as? [String: Any] else {
+                return nil
+            }
+            var result: [String: [String]] = [:]
+            for (scope, items) in dict {
+                if let list = items as? [String], !list.isEmpty {
+                    result[scope] = list
+                }
+            }
+            if result.isEmpty {
+                return nil
+            }
+            return result
+        }
+        set {
+            if let newValue {
+                var cleaned: [String: [String]] = [:]
+                for (scope, items) in newValue {
+                    if !items.isEmpty {
+                        cleaned[scope] = items
+                    }
+                }
+                if cleaned.isEmpty {
+                    values.removeValue(forKey: "excluded_items")
+                } else {
+                    values["excluded_items"] = cleaned
+                }
+            } else {
+                values.removeValue(forKey: "excluded_items")
+            }
+        }
+    }
+
+    /// Excluded items for a specific scope ("shared" or "per_section").
+    func excludedItems(forScope scope: String) -> [String] {
+        if let dict = values["excluded_items"] as? [String: Any] {
+            if let list = dict[scope] as? [String] {
+                return list
+            }
+        }
+        return []
+    }
+
+    /// Checks whether an item name is excluded in a given scope.
+    func isExcluded(_ name: String, inScope scope: String) -> Bool {
+        let items: [String] = excludedItems(forScope: scope)
+        for item in items {
+            if item == name {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Marks an item name as excluded in a given scope.
+    func exclude(_ name: String, inScope scope: String) {
+        var dict: [String: [String]] = [:]
+        if let existing = excludedItems {
+            dict = existing
+        }
+        var list: [String] = []
+        if let existingList = dict[scope] {
+            list = existingList
+        }
+        var alreadyPresent: Bool = false
+        for item in list {
+            if item == name {
+                alreadyPresent = true
+                break
+            }
+        }
+        if !alreadyPresent {
+            list.append(name)
+        }
+        dict[scope] = list
+        excludedItems = dict
+    }
+
+    /// Removes an item name from exclusions in a given scope (re-including it).
+    ///
+    /// Returns true only if the name WAS excluded, so a caller can tell a
+    /// genuine re-inclusion from an ordinary add and record only the former
+    /// on the trail — a line saying a folder was re-included when it never
+    /// was excluded would be believed.
+    @discardableResult
+    func reinclude(_ name: String, inScope scope: String) -> Bool {
+        guard isExcluded(name, inScope: scope) else {
+            return false
+        }
+        guard var dict = excludedItems else {
+            return false
+        }
+        guard let list = dict[scope] else {
+            return false
+        }
+        var updated: [String] = []
+        for item in list {
+            if item != name {
+                updated.append(item)
+            }
+        }
+        if updated.isEmpty {
+            dict.removeValue(forKey: scope)
+        } else {
+            dict[scope] = updated
+        }
+        if dict.isEmpty {
+            excludedItems = nil
+        } else {
+            excludedItems = dict
+        }
+        return true
+    }
+
     var hiddenItems: [String] {
         get { return stringListValue(forKey: "hidden") }
         set { values["hidden"] = newValue }

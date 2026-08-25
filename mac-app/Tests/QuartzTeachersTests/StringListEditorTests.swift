@@ -29,6 +29,15 @@ final class StringListEditorTests: XCTestCase {
     func testEmptyAndReservedNamesAreRejected() {
         XCTAssertNil(StringListEditorView.normalizedItemName("   ", appendingMarkdownExtension: false))
         XCTAssertNil(StringListEditorView.normalizedItemName("Media", appendingMarkdownExtension: false))
+        // Case-insensitively: the filesystem is, so "media" typed here was
+        // accepted and then collided with the folder Plantoir links in — two
+        // names in the config for one directory on disk.
+        for spelling in ["media", "MEDIA", "MeDiA", "  media  "] {
+            XCTAssertNil(
+                StringListEditorView.normalizedItemName(spelling, appendingMarkdownExtension: false),
+                "\(spelling) is the Media folder under another spelling"
+            )
+        }
     }
 
     @MainActor

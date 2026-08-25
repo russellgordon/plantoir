@@ -170,6 +170,43 @@ file inside any folder whose name contains "curriculum" up to that
 timestamp (only if older). Curriculum pages thus float alongside current
 content without the teacher ever editing them.
 
+## Stage 3.5: Checking the folders this course depends on
+
+Once the shared and per-section folders have been merged into `content/`, and
+before Quartz builds anything, `scripts/site_health.py` asks whether the
+features that depend on particular folders can still work.
+
+**It runs HERE for two reasons.** Every check is defined over the MERGED tree,
+which does not exist until the copying above has finished — so there is nothing
+for a check to look at earlier, and an app could only ask these questions by
+reimplementing the merge in Swift and C#. And a check that guarded only the
+GUI's button would be bypassed by the assistant, by `Plantoir --mcp-stdio`, by
+the launchers, and by the scheduled deploy, which runs with the app closed.
+
+It is NOT a complete guard on publishing, and it is worth being precise: a
+deploy of a build made in an earlier session carries no health output of its
+own, because `deploy.py` publishes an existing `public/` unless a live preview
+is attached, and `deploy.sh --to-folder` never enters the Python at all. The
+findings are recorded when the BUILD happens.
+
+**Every check asks whether the FEATURE produced anything**, never whether a
+folder exists. Recreating an empty `Ontario Curriculum` folder does not restore
+a teacher's expectation pages — `_find_curriculum_folder` wants a page named for
+an expectation code — so an existence check with a "fix it for me" button would
+have silenced the warning and left the map missing.
+
+Each finding is printed twice: once as a sentence a teacher reads, and once as
+a `PLANTOIR_HEALTH: {json}` line that the apps parse out of the console
+transcript they already read. The teacher-facing sentence travels INSIDE that
+line rather than being written again in Swift and C#, which is what stops the
+same problem being worded differently on the two platforms. The sentences
+themselves live in `contracts/shared-rules.json` → `siteHealth.checks`.
+
+Two of the checks stay quiet unless the other half of the map exists: a
+brand-new course has an empty curriculum folder and an empty class folder on
+day one, and warning about both would nag every build of a course nobody has
+broken.
+
 ## Stage 4: Configuration patching
 
 The remaining per-section settings from `course_config.json` are applied to

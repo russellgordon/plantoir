@@ -1,5 +1,32 @@
 import SwiftUI
 
+/// A removal waiting for confirmation from the teacher.
+struct PendingRemoval: Identifiable {
+
+    // MARK: - Stored properties
+
+    let item: String
+    let title: String
+    let message: String
+
+    // MARK: - Computed properties
+
+    var id: String { return item }
+}
+
+/// An explanation of why an item cannot be removed.
+struct ActiveExplanation: Identifiable {
+
+    // MARK: - Stored properties
+
+    let item: String
+    let reason: String
+
+    // MARK: - Computed properties
+
+    var id: String { return item }
+}
+
 /// Edits a list of names (folders or files): shows the current entries with
 /// remove buttons, and a field for adding a new entry.
 ///
@@ -18,7 +45,13 @@ struct StringListEditorView: View {
 
     @Binding var items: [String]
 
+    var onRemove: ((String) -> Void)? = nil
+    var onAdd: ((String) -> Void)? = nil
+    var protection: ((String) -> ItemProtection)? = nil
+
     @State var newItemName: String = ""
+    @State var pendingRemoval: PendingRemoval? = nil
+    @State var activeExplanation: ActiveExplanation? = nil
 
     // MARK: - Computed properties
 
@@ -54,11 +87,60 @@ struct StringListEditorView: View {
                 HStack {
                     Text(StringListEditorView.displayName(for: item, hidingMarkdownExtension: hidesMarkdownExtension))
                     Spacer()
-                    Button("Remove \(item)", systemImage: "minus.circle") {
-                        removeItem(named: item)
+                    let state: ItemProtection = protection?(item) ?? .ordinary
+                    switch state {
+                    case .blocked(let reason):
+                        Button {
+                            activeExplanation = ActiveExplanation(item: item, reason: reason)
+                            ActivityTrail.note(.removalBlocked, "was told " + item + " cannot be removed from " + title + " — " + reason)
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("whyBlocked-\(item)")
+                        .help(reason)
+                        .popover(item: Binding(
+                            get: {
+                                if activeExplanation?.item == item {
+                                    return activeExplanation
+                                }
+                                return nil
+                            },
+                            set: { newValue in
+                                if newValue == nil && activeExplanation?.item == item {
+                                    activeExplanation = nil
+                                }
+                            }
+                        ), arrowEdge: .trailing) { explanation in
+                            // A fixed width plus fixedSize: a popover
+                            // sizes itself to its content, and a Text
+                            // with only a maxWidth was measured as one
+                            // line and shown truncated ("…") when the
+                            // real app was driven.
+                            Text(explanation.reason)
+                                .font(.callout)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(width: 280, alignment: .leading)
+                                .padding(12)
+                        }
+
+                    case .consequential(let alertTitle, let message):
+                        Button("Remove \(item)", systemImage: "minus.circle") {
+                            pendingRemoval = PendingRemoval(item: item, title: alertTitle, message: message)
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("remove-\(item)")
+
+                    case .ordinary:
+                        Button("Remove \(item)", systemImage: "minus.circle") {
+                            removeItem(named: item)
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("remove-\(item)")
                     }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
                 }
             }
 
@@ -78,6 +160,16 @@ struct StringListEditorView: View {
             }
         }
         .padding(.vertical, 4)
+        .alert(item: $pendingRemoval) { removal in
+            Alert(
+                title: Text(removal.title),
+                message: Text(removal.message),
+                primaryButton: .destructive(Text("Remove")) {
+                    removeItem(named: removal.item)
+                },
+                secondaryButton: .cancel()
+            )
+        }
     }
 
     // MARK: - Functions
@@ -98,9 +190,14 @@ struct StringListEditorView: View {
         if trimmed.isEmpty {
             return nil
         }
-        if trimmed == "Media" {
-            // The toolchain manages the Media folder automatically; the
-            // wizard refuses this name too.
+        if trimmed.lowercased() == "media" {
+            // Plantoir manages the Media folder itself; the wizard refuses this
+            // name too.
+            //
+            // Case-INSENSITIVELY, because the filesystem is: "media" typed here
+            // was accepted, then collided with the folder Plantoir links in,
+            // and the two were the same directory on disk with different names
+            // in the config.
             return nil
         }
         if appendingMarkdownExtension && !trimmed.hasSuffix(".md") {
@@ -116,6 +213,7 @@ struct StringListEditorView: View {
         }
         if !items.contains(normalized) {
             items.append(normalized)
+            onAdd?(normalized)
         }
         newItemName = ""
     }
@@ -128,5 +226,6 @@ struct StringListEditorView: View {
             }
         }
         items = result
+        onRemove?(name)
     }
 }

@@ -42,6 +42,22 @@ struct AssistSectionPage {
     /// The pages this one links to, lowercased, as wikilink targets.
     let linkedTitles: [String]
 
+    /// What THIS course calls the folders its class pages live in — "All
+    /// Classes" by convention, and not always, and not necessarily one.
+    /// Carried on the page rather than worked out from the path, because the
+    /// answer comes from the course's own configured per-section folders and a
+    /// path cannot know it.
+    let classFolderNames: [String]
+
+    /// The page's path relative to its SECTION folder.
+    ///
+    /// Separate from `relativePath`, which is relative to the working folder —
+    /// and which is the FULL ABSOLUTE PATH whenever `workspaceURL` is nil, as
+    /// `SectionIndexPointer.repointIndex` passes it. Asking the class-page
+    /// question of that string meant a teacher whose working folder was
+    /// `~/Documents/All Classes` made every page in every course a class page.
+    let pathWithinSection: String
+
     // MARK: - Computed properties
 
     /// A folder's landing page. Never a lesson, and never an orphan: it is the
@@ -61,11 +77,20 @@ struct AssistSectionPage {
     /// page, and counting them as orphans made a healthy course look broken:
     /// a real 86-period credit reported 84 pages "linked from nowhere", which
     /// were its lessons.
+    ///
+    /// The rule lives in `ClassFolder` and is pinned by
+    /// `contracts/class-planning.json` → `classFolder`. This used to sniff the
+    /// page's immediate parent for the word "class", which was one of four
+    /// implementations that disagreed with each other — and which answered
+    /// "no" for a lesson filed one folder deeper, since only the immediate
+    /// parent was ever looked at.
     var isClassPage: Bool {
         if isFolderIndex {
             return false
         }
-        return fileURL.deletingLastPathComponent().lastPathComponent.lowercased().contains("class")
+        return ClassFolder.isClassPage(
+            relativePath: pathWithinSection, classFolders: classFolderNames
+        )
     }
 
     var lowercasedTitle: String {
@@ -155,7 +180,9 @@ struct AssistSectionGraph {
                     in: text, forSection: sectionNumber, isSectionLocal: isSectionLocal
                 ),
                 date: PageFrontmatter.createdDay(in: text, key: dateKey),
-                linkedTitles: linkTargets(in: text)
+                linkedTitles: linkTargets(in: text),
+                classFolderNames: ClassFolder.names(for: course),
+                pathWithinSection: pathWithinSection(of: pageURL, forSection: sectionNumber, in: course)
             ))
         }
         return AssistSectionGraph(courseCode: course.code, sectionNumber: sectionNumber, pages: pages)
@@ -345,6 +372,34 @@ struct AssistSectionGraph {
 
     private func normalized(_ name: String) -> String {
         return AssistSectionGraph.normalized(name)
+    }
+
+    /// A page's path relative to its SECTION folder, which is the form the
+    /// class-page rule needs: nothing above the section can reach it, so what
+    /// a teacher called their working folder cannot change what counts as a
+    /// lesson. Shared pages live outside the section folder and fall back to
+    /// their own last two components, which is enough for the rule to see the
+    /// folder they sit in.
+    static func pathWithinSection(of url: URL, forSection sectionNumber: Int, in course: Course) -> String {
+        let full: String = url.standardizedFileURL.path
+        let root: String = course.sectionDirectoryURL(forSection: sectionNumber)
+            .standardizedFileURL.path + "/"
+        if full.hasPrefix(root) {
+            return String(full.dropFirst(root.count))
+        }
+        // A page OUTSIDE the section folder — every course-level shared page,
+        // which `ClassPages.pagesOfSection` deliberately includes, and any
+        // section reached through a symlink, since `standardizedFileURL` does
+        // not resolve those.
+        //
+        // The first version of this returned the last two components, which
+        // put the immediate parent's name back in front of the rule — exactly
+        // the discredited "does the parent mention classes" sniff, and a false
+        // POSITIVE waiting to happen: a course-level folder whose name matched
+        // a configured per-section folder would have made its shared pages
+        // lessons. A shared page is not a class page, so say so plainly rather
+        // than guessing from a fragment of path.
+        return url.lastPathComponent
     }
 
     /// Where a page sits, said the way a teacher would say it.

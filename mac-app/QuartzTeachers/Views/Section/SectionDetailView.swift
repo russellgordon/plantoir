@@ -39,6 +39,48 @@ struct SectionDetailView: View {
     /// Why a preview could not start, shown as an alert.
     @State var previewRefusal: String?
 
+    /// Folder problems the last build reported, shown once when it finishes.
+    ///
+    /// Held here rather than read from the runner at render time so that the
+    /// dialog appears ONCE per run: a teacher who dismisses it and carries on
+    /// editing must not have it thrown at them again on every redraw.
+    @State var healthFindings: [SiteHealthFinding] = []
+
+    /// Drives the dialog separately from the findings themselves, so the title
+    /// is not recomputed from an array that the dismissal is clearing.
+    /// Findings that arrived while a dialog was already up, waiting their turn
+    /// — each batch with the occasion it arrived on.
+    ///
+    /// The occasion travels WITH them because it decides what is offered next.
+    /// Held findings used to be shown with whatever the flag happened to be
+    /// from the previous batch, so a preview's findings held behind an
+    /// overnight publish were given the publish sentence, and the reverse told
+    /// somebody who had just published that only their preview was stale.
+    @State var heldHealthFindings: [(findings: [SiteHealthFinding], cameFromPublishing: Bool)] = []
+
+    /// What a repair just did, while that is being shown.
+    @State var repairOutcome: SiteHealthRepair.Outcome?
+
+    /// The same, waiting for the alert it was requested from to go away.
+    @State var pendingRepairOutcome: SiteHealthRepair.Outcome?
+
+    /// Which of the two folder dialogs is up, if either. One alert modifier
+    /// serves both — see the comment on it.
+    @State var healthDialog: HealthDialog?
+
+    enum HealthDialog {
+        case findings
+        case outcome
+    }
+
+    /// Whether the findings on screen came from PUBLISHING rather than from a
+    /// preview — including an overnight publish reported the next morning.
+    ///
+    /// It chooses the SENTENCE and nothing else. The preview is offered either
+    /// way; what differs is whether the teacher is also told that publishing
+    /// again is what reaches students.
+    @State var healthFindingsCameFromPublishing: Bool = false
+
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
 
@@ -260,6 +302,28 @@ struct SectionDetailView: View {
                 )
             )
         }
+        .task {
+            // Anything the overnight publish found. It ran with the app
+            // closed, so this is the first moment there is anywhere to say it
+            // — and `takeFolderProblems` consumes the record, so it is
+            // reported once rather than every time this window opens.
+            // Guard BEFORE consuming: `takeFolderProblems` deletes the record
+            // as it reads it, so taking it while a dialog is already up threw
+            // the overnight findings away permanently.
+            guard healthFindings.isEmpty else {
+                return
+            }
+            let waiting: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
+                courseCode: course.code, sectionNumber: sectionNumber
+            )
+            if !waiting.isEmpty {
+                healthFindings = waiting
+                // The overnight run PUBLISHED, so the sentence must say that
+                // students are still seeing the old site.
+                healthFindingsCameFromPublishing = true
+                healthDialog = .findings
+            }
+        }
         .onDisappear {
             if let folder = workspace.workspaceURL {
                 SectionWindowControllers.shared.unregister(
@@ -284,6 +348,268 @@ struct SectionDetailView: View {
         } message: {
             Text(deployRefusal ?? "")
         }
+        // ONE alert for both the findings and what a repair did, switched by
+        // `healthDialog`, rather than two `.alert` modifiers on the same view.
+        //
+        // Two was a crash, not a style preference: SwiftUI's alert bridge
+        // segfaulted in `updateExistingAlert` while closing a sheet, reliably,
+        // once this view carried four alerts. A view presents one alert at a
+        // time anyway, so modelling that explicitly is both what SwiftUI wants
+        // and what the sequencing needs.
+        .alert(healthAlertTitle, isPresented: healthDialogBinding) {
+            switch healthDialog {
+            case .findings:
+                if let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
+                    Button(title) {
+                        // The marker is refreshed because a repair CHANGES the
+                        // section's content on the teacher's behalf, and
+                        // nothing else here would: `refreshEditedMarker` runs
+                        // on appear, when the section stops being busy, and on
+                        // window activation — the section stopped being busy
+                        // before this alert appeared, and an alert on this
+                        // window does not make it key again.
+                        defer { refreshEditedMarker() }
+                        // Only REMEMBERED here: the outcome is shown once this
+                        // alert has actually gone, from `onChange`. Raising a
+                        // second alert from inside this action loses one of
+                        // them, and the one lost is the report just asked for.
+                        pendingRepairOutcome = SiteHealthRepair.outcome(
+                            ofRepairing: healthFindings, in: course,
+                            occasion: healthFindingsCameFromPublishing ? .publishing : .building
+                        )
+                    }
+                }
+                Button("OK") { }
+            case .outcome:
+                if repairOutcome?.canRebuild == true {
+                    Button("Preview Again") {
+                        rebuildAfterRepair()
+                    }
+                }
+                Button("OK") { }
+            case .none:
+                Button("OK") { }
+            }
+        } message: {
+            Text(healthAlertMessage)
+        }
+        // Findings go up as soon as the build reports them, NOT when the
+        // preview finishes.
+        //
+        // Driving the real app is what found this. Deleting a section's
+        // index.md produces the "no front page" finding — and also makes every
+        // request 404, so `waitForPreviewServer` never succeeds and the call
+        // after it is never reached. The dialog was gated behind a preview that
+        // the very problem it reports prevents from completing: the worse the
+        // course, the less likely the teacher was to be told.
+        .onChange(of: previewRunner.healthFindings.count) { _, count in
+            if count > 0 {
+                showHealthFindings(from: previewRunner)
+            }
+        }
+        .onChange(of: healthDialog == nil) { _, isGone in
+            if isGone {
+                healthFindings = []
+                repairOutcome = nil
+                showAnythingWaiting()
+            }
+        }
+    }
+
+    /// The title of the folder-problem dialog.
+    ///
+    /// Plain words, and never the machinery: a teacher is told what is wrong
+    /// with THEIR course, not that a check failed. One problem names itself;
+    /// several are counted, because a title listing three sentences is not a
+    /// title.
+    var healthAlertTitle: String {
+        if healthDialog == .outcome {
+            return repairOutcome?.headline ?? ""
+        }
+        if healthFindings.count == 1 {
+            return healthFindings[0].sentence
+        }
+        if healthFindings.isEmpty {
+            // Reached only while the alert is being torn down, after the
+            // findings have been cleared. Saying "0 things need your attention"
+            // there is the unreachable-by-design string made reachable, which
+            // this view has now met twice.
+            return ""
+        }
+        return "\(healthFindings.count) things need your attention"
+    }
+
+    var healthDialogBinding: Binding<Bool> {
+        return Binding(
+            get: { healthDialog != nil },
+            set: { isPresented in
+                if !isPresented {
+                    healthDialog = nil
+                }
+            }
+        )
+    }
+
+    var healthAlertMessage: String {
+        if healthDialog == .outcome {
+            return repairOutcome?.detail ?? ""
+        }
+        var paragraphs: [String] = []
+        for finding in healthFindings {
+            if healthFindings.count == 1 {
+                paragraphs.append(finding.detail)
+            } else {
+                paragraphs.append(finding.sentence + "\n" + finding.detail)
+            }
+        }
+        return paragraphs.joined(separator: "\n\n")
+    }
+
+    /// Shows whatever is queued, now that the dialog it was queued behind has
+    /// gone.
+    ///
+    /// One alert at a time: SwiftUI presents one per view, and asking for a
+    /// second while the first is dismissing loses one of them. A repair's
+    /// outcome goes first — it is the answer to something the teacher just
+    /// pressed — and findings that arrived meanwhile follow.
+    func showAnythingWaiting() {
+        if let waiting = pendingRepairOutcome {
+            pendingRepairOutcome = nil
+            repairOutcome = waiting
+            healthDialog = .outcome
+            return
+        }
+        if !heldHealthFindings.isEmpty {
+            let next = heldHealthFindings.removeFirst()
+            healthFindings = next.findings
+            healthFindingsCameFromPublishing = next.cameFromPublishing
+            healthDialog = .findings
+        }
+    }
+
+    /// Builds the site again after a repair, so the teacher can see it.
+    ///
+    /// A preview that is already up is stopped first and started again, which
+    /// is the same order the Deploy button uses — starting a second one behind
+    /// the first would take a port it then could not have.
+    /// One consequence worth knowing, because nothing else says it: a preview
+    /// build is never deploy-fresh (`app-rules.json` → `buildFreshness` — serve
+    /// mode bakes a live-reload client into every page), so previewing after a
+    /// successful publish means the NEXT publish rebuilds. That is correct
+    /// rather than unfortunate, and largely moot anyway: the repair itself puts
+    /// content back, which forces a rebuild regardless.
+    func rebuildAfterRepair() {
+        Task { @MainActor in
+            // Every other way into a preview is gated — the toolbar button is
+            // disabled while the section is busy, and Deploy while a deploy
+            // runs. This was the one path with neither, so it could start a
+            // build in the same working folder as a running deploy.
+            // `CourseActivity` as well as this view's own runner. The
+            // assistant publishes the same section, in this same process,
+            // through `AssistSiteWork` — invisible to `deployRunner`. That did
+            // not matter while publish-origin findings offered no button at
+            // all; widening the offer is what made this reachable, so the guard
+            // had to widen with it.
+            // `coursePublishIsRunning`, NOT `courseIsBusy`: the latter is
+            // "previewing OR publishing", so asking it here refused the preview
+            // whenever one was already running — which is every time this
+            // button is offered. Found by pressing it.
+            //
+            // Narrowing it gave something up, though, and this is where it
+            // comes back: `courseIsBusy` also covered a preview held in ANOTHER
+            // window, and without that check `startPreview` would be refused
+            // the lease and raise an error alert out of a repair. So the lease
+            // is asked directly.
+            let somebodyElseIsPublishing: Bool = {
+                guard let folder = workspace.workspaceURL else {
+                    return false
+                }
+                return CourseActivity.coursePublishIsRunning(
+                    folderPath: folder.path, courseCode: course.code
+                )
+            }()
+            let anotherWindowHasThePreview: Bool = {
+                guard previewLease == nil, let folder = workspace.workspaceURL else {
+                    return false
+                }
+                for lease in PreviewLeases.active {
+                    if lease.folderPath == folder.path
+                        && lease.courseCode == course.code
+                        && lease.sectionNumber == sectionNumber {
+                        return true
+                    }
+                }
+                return false
+            }()
+            if anotherWindowHasThePreview {
+                pendingRepairOutcome = SiteHealthRepair.Outcome(
+                    headline: "This section is open in another window.",
+                    detail: "Preview it from there to see the change.",
+                    canRebuild: false
+                )
+                showAnythingWaiting()
+                return
+            }
+            if deployRunner.isRunning || isPreparingDeploy || somebodyElseIsPublishing {
+                // Say so. Every other gated control here disables itself or
+                // shows a refusal; swallowing the press is the silence this
+                // whole feature exists to remove, arriving in the button meant
+                // to end it.
+                // "this course", not "this section": the check matches on the
+                // folder and the course code, and deliberately ignores the
+                // section number, so publishing section 2 would otherwise be
+                // reported as section 1 publishing.
+                pendingRepairOutcome = SiteHealthRepair.Outcome(
+                    headline: "Plantoir is publishing this course just now.",
+                    // Deliberately not "press Preview Again": this outcome is
+                    // the one whose button is withheld, so naming a button that
+                    // is not on screen would be worse than saying nothing.
+                    detail: "You can preview it again once that has finished, "
+                          + "and the change will be there.",
+                    canRebuild: false
+                )
+                showAnythingWaiting()
+                return
+            }
+            // The LEASE decides, not the window's appearance. A preview whose
+            // wait timed out has cleared `isWaitingForServer` and never set
+            // `previewURL`, while still holding the port — so asking those two
+            // would have skipped the stop and then been refused the lease,
+            // raising a refusal alert out of a repair.
+            if previewLease != nil || previewRunner.isRunning {
+                await stopPreviewAndWait()
+            }
+            startPreview()
+        }
+    }
+
+    /// Puts a finished run's folder problems in front of the teacher.
+    ///
+    /// Only when the run actually produced some — a healthy course must never
+    /// see a dialog, which is the difference between a warning that gets read
+    /// and one that gets dismissed by habit.
+    func showHealthFindings(from runner: ScriptRunner?, cameFromPublishing: Bool = false) {
+        guard let runner, !runner.healthFindings.isEmpty else {
+            return
+        }
+        // Never swap the contents of a dialog that is already up: the title
+        // and the message would change under the teacher's cursor, and the
+        // findings they were reading would vanish unacknowledged.
+        //
+        // But HELD, not dropped. Returning early discarded them — and the
+        // failed-deploy path can arrive while the overnight findings are
+        // already on screen, so this is reachable rather than theoretical.
+        if healthDialog != nil {
+            // Appended, not assigned: three arrivals during one dialog used to
+            // lose the middle batch.
+            heldHealthFindings.append(
+                (findings: runner.healthFindings, cameFromPublishing: cameFromPublishing)
+            )
+            return
+        }
+        healthFindings = runner.healthFindings
+        healthFindingsCameFromPublishing = cameFromPublishing
+        healthDialog = .findings
     }
 
     /// Why this section's deploy would not get anywhere, or nil when it
@@ -572,6 +898,12 @@ struct SectionDetailView: View {
                 workingDirectory: workspaceURL
             )
             await waitForPreviewServer(port: lease.port, siteAsItWas: siteAsItWas)
+
+            // A second chance, for the ordinary case where the wait finished
+            // quickly and the teacher is now looking at the preview. The
+            // findings usually arrived long before this — see the onChange on
+            // the body, which is what actually gets them on screen.
+            showHealthFindings(from: previewRunner)
         }
     }
 
@@ -797,6 +1129,12 @@ struct SectionDetailView: View {
         // reached, so the wording says "could not be built", not "did
         // not finish", which would wrongly suggest the upload failed.
         if deployRunner.legs.first?.buildFailed == true {
+            // Show the folder problems HERE too. A build that failed because
+            // the curriculum folder or Media is missing is the case where the
+            // finding is most likely to be the cause, and moving the call
+            // below the early return had quietly dropped it altogether —
+            // de-headlining it was the intent, discarding it was not.
+            showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.couldNotBuildBeforeDeploying(
@@ -804,6 +1142,12 @@ struct SectionDetailView: View {
                 )
             )
         }
+
+        // What the build said about this course's folders — AFTER the failure
+        // paths above, so a deploy that did not publish is not headlined by a
+        // folder warning. Taken from the FIRST leg: every destination publishes
+        // the same built site, so a second leg only repeats the findings.
+        showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
 
         return MultiDestinationDeployRunner.result(
             course: course.code,

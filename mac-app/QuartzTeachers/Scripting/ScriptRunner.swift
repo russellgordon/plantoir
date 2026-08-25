@@ -147,6 +147,18 @@ class ScriptRunner {
         }
         lastExitCode = nil
         launchProblem = nil
+        // Every run answers for itself. This runner is `@State` on the section
+        // window and is reused for every preview in it, so keeping findings
+        // across runs meant a teacher who fixed the problem in Obsidian and
+        // previewed again was shown the SAME dialog — the nagging this whole
+        // feature is supposed to avoid, produced by the feature itself.
+        //
+        // Guarded exactly as the transcript above is, and for the same reason:
+        // a deploy runs `preview.sh --build-only` and then `deploy.sh` on THIS
+        // runner with `keepingTranscript: true`, and only the build phase
+        // announces health. Clearing unconditionally emptied the array between
+        // the two, so a deploy threw away the findings it had just collected.
+        resetHealthFindings(keepingTranscript: keepingTranscript)
         wasCancelled = false
         wasStoppedByUser = false
         isBetweenPhases = false
@@ -410,6 +422,11 @@ class ScriptRunner {
     /// records it and folds it into the milestone count. (Tests feed
     /// simulated output through here too, so both paths behave alike.)
     func receiveOutput(_ text: String) {
+        // Findings are read from the RAW text first: the transcript drops the
+        // machine-readable lines on the way in (they are machinery, and a
+        // teacher reads that console), so anything that wants them must take
+        // them before they are filtered out.
+        collectHealthFindings(in: text)
         transcript.append(rawText: text)
         advanceMilestones(with: text)
         lastOutputAt = Date()
@@ -498,6 +515,99 @@ class ScriptRunner {
             return nil
         }
         return ScriptRunner.applyingCustomDomain(customDomainForLinks, to: parsed)
+    }
+
+    /// What the build said was wrong with this course's folders.
+    ///
+    /// Collected as output ARRIVES rather than read back off the transcript,
+    /// which is the one thing about this that is easy to get wrong: every
+    /// other structured-line reader here works from
+    /// `transcript.recentText(maximumCharacters: 8000)`, and that is a TAIL.
+    /// The health lines are printed in the middle of a build — before Quartz
+    /// runs — so on any real build they have scrolled well past the end of an
+    /// 8,000-character window by the time anybody asks.
+    private(set) var healthFindings: [SiteHealthFinding] = []
+
+    /// Whatever arrived after the last newline, kept until the rest of the
+    /// line turns up.
+    ///
+    /// Output arrives in PTY-sized chunks, not lines — which is why
+    /// `TranscriptBuilder` keeps a `currentLine` at all. The health payload is
+    /// the LONGEST line a build prints, so it is the likeliest of all to
+    /// straddle a read boundary; without this, a split marker line failed both
+    /// the prefix test and the JSON parse and was dropped silently, and the
+    /// finding never reached the dialog, the assistant, or the trail.
+    private var pendingHealthLine: String = ""
+
+    /// Reads whatever is left in the carry-over buffer as a finished line.
+    /// Seams for the tests, which cannot start a real script but must be able
+    /// to prove that a finding survives the END of a run and the SECOND phase
+    /// of a deploy — the two places findings were being silently dropped.
+    func simulateFinishForTesting(exitCode: Int32) {
+        finishRun(exitCode: exitCode)
+    }
+
+    func prepareForContinuationForTesting(keepingTranscript: Bool) {
+        resetHealthFindings(keepingTranscript: keepingTranscript)
+    }
+
+    /// The one implementation, so the test seam above exercises what `run()`
+    /// actually does rather than a copy of it. A duplicated reset would pass
+    /// while the real path regressed — which is precisely how the scheduled
+    /// log's append bug got through its own test.
+    private func resetHealthFindings(keepingTranscript: Bool) {
+        if keepingTranscript {
+            return
+        }
+        healthFindings = []
+        pendingHealthLine = ""
+    }
+
+    private func flushPendingHealthLine() {
+        let leftover: String = pendingHealthLine
+        pendingHealthLine = ""
+        if leftover.isEmpty {
+            return
+        }
+        rememberHealthFindings(in: leftover)
+    }
+
+    private func rememberHealthFindings(in text: String) {
+        for finding in SiteHealthFinding.findings(in: text) {
+            if healthFindings.contains(finding) {
+                continue
+            }
+            healthFindings.append(finding)
+            // A sentence a teacher would recognise, carrying the stable check
+            // NAME in brackets. Both halves earn their place: rule 5 says a
+            // trail line must read as something that happened rather than as a
+            // function name, while the name is what somebody reading the trail
+            // months later can match against the contract — the product
+            // wording will have been reworded by then.
+            ActivityTrail.note(
+                .folderProblemFound,
+                "found a problem with this course's folders (\(finding.name))",
+                course: finding.course, section: finding.section
+            )
+        }
+    }
+
+    private func collectHealthFindings(in text: String) {
+        let combined: String = pendingHealthLine + text
+        // Scalar-based, via the same splitter the parser uses: Swift folds
+        // "\r\n" into ONE Character, so splitting on "\n" does not split PTY
+        // output at all.
+        var pieces: [String] = SiteHealthFinding.linesOf(combined)
+        var completeLines: [String] = []
+        var carried: String = ""
+        if !pieces.isEmpty {
+            carried = pieces.removeLast()
+            completeLines = pieces
+        }
+        // `carried` is now whatever followed the final newline — an unfinished
+        // line, unless the chunk happened to end on one.
+        pendingHealthLine = carried
+        rememberHealthFindings(in: completeLines.joined(separator: "\n"))
     }
 
     /// The folder a local-folder deploy published into, if the output
@@ -1003,6 +1113,12 @@ class ScriptRunner {
         isAwaitingInput = false
         // Show anything still buffered when the script ended.
         flushBufferedOutput()
+        // And read the last line even if it never got a newline. The carry-over
+        // buffer is only drained by a LATER chunk containing one, so a finding
+        // printed as the very last output would otherwise be lost — the exact
+        // failure the buffer was added to prevent, surviving at the end of the
+        // run instead of in the middle of it.
+        flushPendingHealthLine()
         AppLog.output.info("Finished with exit code \(exitCode), transcript \(self.transcript.lines.count) lines")
         lastExitCode = exitCode
         isRunning = false

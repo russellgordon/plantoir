@@ -221,7 +221,7 @@ rather than being deleted.
   `MultiDestinationDeployRunner.Result(...)`, `AssistWording.DeployDidNotFinish`
   on every early return and the catch block — threaded back through
   `MainWindow.DeployForAsync` → `AssistWindow.StartDeployInAppAsync` →
-  `AssistAgent.RunTool`. Full write-up: `GUI-IMPROVEMENTS.md` row 356.
+  `AssistAgent.RunTool`. Full write-up: `GUI-IMPROVEMENTS.md` row 383.
 
   The mac's `deployAndWait()` already awaits the real result and words it
   correctly — this only brought Windows to parity, so there is nothing to
@@ -231,7 +231,7 @@ rather than being deleted.
   `SectionDetailView.swift`, and if so whether it shares mutable state across
   the two in-flight calls the way the first (rejected) fix here did before an
   adversarial review caught it — see the "rejected" note in
-  `GUI-IMPROVEMENTS.md` row 356 for the exact shape of that bug, since it is
+  `GUI-IMPROVEMENTS.md` row 383 for the exact shape of that bug, since it is
   a general trap (a single-slot completion field shared across concurrent
   callers) worth checking for rather than re-discovering; (2) the Windows
   scenario test fixture (`AssistScenarioTests.cs`) never wired
@@ -740,7 +740,7 @@ rather than being deleted.
 ## For awareness — no mac code needed
 
 - **Windows caught up to the mac's three deploy-after-preview console-race
-  fixes** (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 354, closing
+  fixes** (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 381, closing
   `WINDOWS-HANDOFF.md` item 8; mac originals rows 317–318, 2026-08-22). No mac
   change — this is Windows implementing races the mac already fixed — but the
   investigation confirmed all three were genuinely present, one had a wider

@@ -29,23 +29,28 @@ enum ExampleContentCatalog {
         return manifestURL(forCode: code) != nil
     }
 
+    /// The curriculum folder name defined in the manifest, or nil when none is defined.
+    static func curriculumFolder(forCode code: String) -> String? {
+        guard let url = manifestURL(forCode: code) else {
+            return nil
+        }
+        guard let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        guard let decoded = try? JSONSerialization.jsonObject(with: data) else {
+            return nil
+        }
+        guard let manifest = decoded as? [String: Any] else {
+            return nil
+        }
+        return manifest["curriculum_folder"] as? String
+    }
+
     /// True when the example content for this code includes the official
     /// curriculum pages — the wizard only shows the curriculum toggle when
     /// there are curriculum pages to include.
     static func includesCurriculum(forCode code: String) -> Bool {
-        guard let url = manifestURL(forCode: code) else {
-            return false
-        }
-        guard let data = try? Data(contentsOf: url) else {
-            return false
-        }
-        guard let decoded = try? JSONSerialization.jsonObject(with: data) else {
-            return false
-        }
-        guard let manifest = decoded as? [String: Any] else {
-            return false
-        }
-        guard let folderName = manifest["curriculum_folder"] as? String else {
+        guard let folderName = curriculumFolder(forCode: code) else {
             return false
         }
         return !folderName.isEmpty

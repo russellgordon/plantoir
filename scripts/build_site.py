@@ -3,7 +3,10 @@ import os
 import shutil
 import sys
 import argparse
-import frontmatter
+try:
+    import frontmatter
+except ImportError:
+    frontmatter = None
 import subprocess
 import signal
 import json
@@ -15,6 +18,8 @@ from pathlib import Path
 # be added by hand before sibling imports. Harmless everywhere else.
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
+import site_health
+import contracts
 import toolchain_paths
 from datetime import datetime, timezone
 import threading
@@ -1754,6 +1759,92 @@ def _as_bool(value) -> bool:
     return str(value).strip().lower() == "true"
 
 
+def _get_excluded_note_config() -> tuple[str, str, str]:
+    """Return (sentinel_start, sentinel_end, note_body) from shared-rules contract."""
+    try:
+        cfg = contracts.section("shared-rules", "specialNames", "excludedFolderIndexNote")
+        start = cfg.get("sentinelStart", "<!-- plantoir:excluded-folder-note:start -->")
+        end = cfg.get("sentinelEnd", "<!-- plantoir:excluded-folder-note:end -->")
+        body = cfg.get("noteBody", "")
+        return start, end, body
+    except Exception:
+        start = "<!-- plantoir:excluded-folder-note:start -->"
+        end = "<!-- plantoir:excluded-folder-note:end -->"
+        body = "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your published site. To include it again, add it back in Course Settings."
+        return start, end, body
+
+
+def _apply_sentinel_note(file_path: Path, start: str, end: str, body: str):
+    """
+    Write or update the sentinel-delimited note in an existing index.md in the vault.
+    Idempotent: preserves mtime if the note is already up to date.
+    Never creates a file.
+    """
+    if not file_path.exists():
+        return
+    try:
+        text = file_path.read_text(encoding="utf-8")
+    except Exception as e:
+        print(f"⚠️ Could not read {file_path} to apply exclusion note: {e}")
+        return
+
+    block = f"{start}\n{body}\n{end}"
+
+    if start in text and end in text:
+        pattern = re.compile(re.escape(start) + r".*?" + re.escape(end), re.DOTALL)
+        new_text = pattern.sub(block, text)
+        if new_text == text:
+            return
+    else:
+        fm_match = re.match(r"^---\s*\n.*?\n---\s*\n?", text, re.DOTALL)
+        if fm_match:
+            fm_end = fm_match.end()
+            rest = text[fm_end:]
+            new_text = text[:fm_end] + block + "\n\n" + rest.lstrip("\n")
+        else:
+            new_text = block + "\n\n" + text
+
+    try:
+        file_path.write_text(new_text, encoding="utf-8")
+        print(f"📝 Added exclusion note to {file_path}")
+    except Exception as e:
+        print(f"⚠️ Could not write exclusion note to {file_path}: {e}")
+
+
+def _remove_sentinel_note(file_path: Path, start: str, end: str):
+    """
+    Remove sentinel note from an index.md in the vault when re-included.
+    Idempotent: does nothing if note is absent.
+    """
+    if not file_path.exists():
+        return
+    try:
+        text = file_path.read_text(encoding="utf-8")
+    except Exception as e:
+        print(f"⚠️ Could not read {file_path} to remove exclusion note: {e}")
+        return
+
+    if start not in text or end not in text:
+        return
+
+    pattern = re.compile(re.escape(start) + r".*?" + re.escape(end) + r"\s*\n?", re.DOTALL)
+    new_text = pattern.sub("", text)
+    if new_text != text:
+        try:
+            file_path.write_text(new_text, encoding="utf-8")
+            print(f"📝 Removed exclusion note from {file_path}")
+        except Exception as e:
+            print(f"⚠️ Could not update {file_path} after removing exclusion note: {e}")
+
+
+def _strip_sentinels(text: str, start: str, end: str) -> str:
+    """Strip sentinel blocks from content before building / deploying."""
+    if start not in text or end not in text:
+        return text
+    pattern = re.compile(re.escape(start) + r".*?" + re.escape(end) + r"\s*\n?", re.DOTALL)
+    return pattern.sub("", text)
+
+
 def process_frontmatter(file_path: Path, section_number: int):
     if file_path.suffix.lower() != ".md":
         return
@@ -1789,6 +1880,11 @@ def process_frontmatter(file_path: Path, section_number: int):
         if (re.match(r"publishForSection\d+", key) or re.match(r"draftSection\d+", key)
                 or re.match(r"createdSection\d+", key) or key == "draft"):
             del post[key]
+
+    # Strip any sentinel notes that may be present in copied files
+    start_sentinel, end_sentinel, _ = _get_excluded_note_config()
+    if post.content and start_sentinel in post.content and end_sentinel in post.content:
+        post.content = _strip_sentinels(post.content, start_sentinel, end_sentinel)
 
     # NOTE: Removed unconditional Curriculum timestamp bump here.
     # The new logic runs after all files are copied, syncing curriculum files
@@ -3249,9 +3345,23 @@ def _start_public_sync_watcher(output_dir: Path, host_output_dir: Path) -> threa
     t.start()
     return t
 
+def _is_media_name(name) -> bool:
+    """
+    Whether a configured name refers to the Media folder, in ANY spelling.
+
+    Case-insensitively, because the filesystem is. Both apps used to accept
+    "media" typed into Settings, so configs in the field already carry it — and
+    closing the input gate does nothing for a course that already has one.
+    Left as "media" in the config on purpose: rewriting a teacher's file behind
+    their back to change its capitalisation would be a surprise for no gain,
+    and every reader now recognises it either way.
+    """
+    return str(name).strip().lower() == "media"
+
+
 def _filter_out_media(items: list[str]) -> list[str]:
-    """Return a copy of items with 'Media' removed (case-sensitive)."""
-    return [x for x in (items or []) if x != "Media"]
+    """Return a copy of items with the Media folder removed, in any spelling."""
+    return [x for x in (items or []) if not _is_media_name(x)]
 # -----------------------------------------------------------------------------
 
 # === NEW: Discovery + preflight config update ================================
@@ -3260,6 +3370,13 @@ _IGNORED_SHARED_FOLDERS = {
 }
 _IGNORED_SHARED_FILES = {
     "course_config.json",
+    # Preflight's own write-back leaves these beside the config
+    # (_atomic_write_json_with_backup). Without this, the build after any
+    # write-back discovered the backup as a shared file and SHIPPED the
+    # teacher's config to students at public/course_config.backup.json.
+    # Found 2026-08-24; present since discovery was added (8f709000).
+    "course_config.backup.json",
+    "course_config.json.tmp",
     ".DS_Store",
     "Thumbs.db",
 }
@@ -3289,7 +3406,8 @@ def discover_shared_items(course_dir: Path) -> tuple[list[str], list[str]]:
             if _is_hidden(name):
                 continue
             if item.is_dir():
-                if name in _IGNORED_SHARED_FOLDERS or _is_section_folder(name):
+                if (name in _IGNORED_SHARED_FOLDERS or _is_media_name(name)
+                        or _is_section_folder(name)):
                     continue
                 found_folders.append(name)
             elif item.is_file():
@@ -3310,7 +3428,7 @@ def discover_section_items(section_dir: Path) -> tuple[list[str], list[str]]:
             if _is_hidden(name):
                 continue
             if item.is_dir():
-                if name == "Media":
+                if _is_media_name(name):
                     continue
                 found_folders.append(name)
             elif item.is_file():
@@ -3348,6 +3466,7 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
 def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path) -> dict:
     """Discover new items and append them to course_config.json (add-only). Return updated config dict.
     Also: any newly discovered folders are marked not hidden and added to the expandable list.
+    Excludes any items listed in excluded_items (skips discovery, does not un-hide, and manages index.md note).
     """
     try:
         with open(config_path, "r", encoding="utf-8") as f:
@@ -3363,20 +3482,72 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     per_section_files = list(cfg.get("per_section_files", []))
     hidden_list = list(cfg.get("hidden", []))
     expandable_list = list(cfg.get("expandable", []))
+    excluded_items = cfg.get("excluded_items") or {}
+    excluded_shared = set(excluded_items.get("shared") or [])
+    excluded_per_section = set(excluded_items.get("per_section") or [])
+
+    # The key is authoritative. Absence from a copy list is what actually
+    # keeps a folder out of the site, and excluded_items is what stops
+    # preflight putting it back - so a name in BOTH would publish while the
+    # console and the index.md note say it is excluded. That state is never
+    # written by a correct app, but a hand edit, a stale copy of the config
+    # saved over a newer one, or an app that records the key without dropping
+    # the name can all produce it. Reconcile here so the two can never
+    # disagree, and say so (decided 2026-08-24, Piece 2 review).
+    reconciled_changed = False
+    for scope_label, names, list_pairs in (
+        ("shared", excluded_shared, (("folder", shared_folders), ("file", shared_files))),
+        ("per-section", excluded_per_section, (("folder", per_section_folders), ("file", per_section_files))),
+    ):
+        for kind, copy_list in list_pairs:
+            for name in list(copy_list):
+                if name in names:
+                    copy_list.remove(name)
+                    reconciled_changed = True
+                    print(f"🚫 Dropped excluded {scope_label} {kind} from the copy list: {name} (listed in excluded_items)")
 
     # Discover
     disc_shared_folders, disc_shared_files = discover_shared_items(course_dir)
     disc_sec_folders, disc_sec_files = discover_section_items(section_dir)
 
+    # Filter out excluded items from discovery and print skip notices
+    allowed_disc_shared_folders = []
+    for f in disc_shared_folders:
+        if f in excluded_shared:
+            print(f"🚫 Skipping excluded shared folder: {f} (listed in excluded_items)")
+        else:
+            allowed_disc_shared_folders.append(f)
+
+    allowed_disc_shared_files = []
+    for f in disc_shared_files:
+        if f in excluded_shared:
+            print(f"🚫 Skipping excluded shared file: {f} (listed in excluded_items)")
+        else:
+            allowed_disc_shared_files.append(f)
+
+    allowed_disc_sec_folders = []
+    for f in disc_sec_folders:
+        if f in excluded_per_section:
+            print(f"🚫 Skipping excluded per-section folder: {f} (listed in excluded_items)")
+        else:
+            allowed_disc_sec_folders.append(f)
+
+    allowed_disc_sec_files = []
+    for f in disc_sec_files:
+        if f in excluded_per_section:
+            print(f"🚫 Skipping excluded per-section file: {f} (listed in excluded_items)")
+        else:
+            allowed_disc_sec_files.append(f)
+
     # Determine which folders are *new* (before mutating lists)
-    new_shared_folders = [x for x in disc_shared_folders if x not in shared_folders]
-    new_sec_folders = [x for x in disc_sec_folders if x not in per_section_folders]
+    new_shared_folders = [x for x in allowed_disc_shared_folders if x not in shared_folders]
+    new_sec_folders = [x for x in allowed_disc_sec_folders if x not in per_section_folders]
 
     # Append-only updates for copy lists
-    added_sf = _safe_unique_append(shared_folders, disc_shared_folders)
-    added_sfi = _safe_unique_append(shared_files, disc_shared_files)
-    added_psf = _safe_unique_append(per_section_folders, disc_sec_folders)
-    added_psfi = _safe_unique_append(per_section_files, disc_sec_files)
+    added_sf = _safe_unique_append(shared_folders, allowed_disc_shared_folders)
+    added_sfi = _safe_unique_append(shared_files, allowed_disc_shared_files)
+    added_psf = _safe_unique_append(per_section_folders, allowed_disc_sec_folders)
+    added_psfi = _safe_unique_append(per_section_files, allowed_disc_sec_files)
 
     # For newly discovered folders: ensure NOT hidden + ensure in expandable
     hidden_changed = False
@@ -3391,12 +3562,38 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
             expandable_changed = True
             print(f"➕ Marked newly discovered folder as expandable: {name}")
 
-    print(f"\n📌 Auto-discovered shared folders: {disc_shared_folders or '—'}")
-    print(f"📌 Auto-discovered shared files: {disc_shared_files or '—'}")
-    print(f"📌 Auto-discovered per-section folders: {disc_sec_folders or '—'}")
-    print(f"📌 Auto-discovered per-section files: {disc_sec_files or '—'}")
+    # Synchronize index.md sentinel notes for excluded and non-excluded folders
+    start_sentinel, end_sentinel, note_body = _get_excluded_note_config()
+    try:
+        if course_dir.exists():
+            for item in course_dir.iterdir():
+                if item.is_dir() and not _is_hidden(item.name) and not _is_section_folder(item.name) and not _is_media_name(item.name) and item.name not in _IGNORED_SHARED_FOLDERS:
+                    idx_file = item / "index.md"
+                    if idx_file.exists():
+                        if item.name in excluded_shared:
+                            _apply_sentinel_note(idx_file, start_sentinel, end_sentinel, note_body)
+                        else:
+                            _remove_sentinel_note(idx_file, start_sentinel, end_sentinel)
 
-    if any([added_sf, added_sfi, added_psf, added_psfi, hidden_changed, expandable_changed]):
+            for sec_item in course_dir.iterdir():
+                if sec_item.is_dir() and _is_section_folder(sec_item.name):
+                    for item in sec_item.iterdir():
+                        if item.is_dir() and not _is_hidden(item.name) and not _is_media_name(item.name):
+                            idx_file = item / "index.md"
+                            if idx_file.exists():
+                                if item.name in excluded_per_section:
+                                    _apply_sentinel_note(idx_file, start_sentinel, end_sentinel, note_body)
+                                else:
+                                    _remove_sentinel_note(idx_file, start_sentinel, end_sentinel)
+    except Exception as e:
+        print(f"⚠️ Could not synchronize excluded folder notes: {e}")
+
+    print(f"\n📌 Auto-discovered shared folders: {allowed_disc_shared_folders or '—'}")
+    print(f"📌 Auto-discovered shared files: {allowed_disc_shared_files or '—'}")
+    print(f"📌 Auto-discovered per-section folders: {allowed_disc_sec_folders or '—'}")
+    print(f"📌 Auto-discovered per-section files: {allowed_disc_sec_files or '—'}")
+
+    if any([added_sf, added_sfi, added_psf, added_psfi, hidden_changed, expandable_changed, reconciled_changed]):
         cfg["shared_folders"] = shared_folders
         cfg["shared_files"] = shared_files
         cfg["per_section_folders"] = per_section_folders
@@ -3551,10 +3748,12 @@ the site yet, so it cannot have addressed anything — next week's lesson,
 written early, leaves the map exactly where it was until the day it is
 published.
 
-An expectation counts as **assessed** when one of those pages is in the
-Tasks folder. Ontario asks that every overall expectation be evaluated for
-marks at least once; the chips under each strand letter answer that, and
-the ring on a cell shows which specific expectations carry assessed work.
+An expectation counts as **assessed** when one of those pages is in a
+folder that counts for marks — {graded_folders} for this course, which you
+can change in Settings. Ontario asks that every overall expectation be
+evaluated for marks at least once; the chips under each strand letter
+answer that, and the ring on a cell shows which specific expectations carry
+assessed work.
 
 ## Reading it honestly
 
@@ -3582,8 +3781,44 @@ def _quartz_slug(relative: Path) -> str:
     return "/".join(part.replace(" ", "-") for part in parts)
 
 
-def _find_curriculum_folder(content_root: Path):
-    """The folder holding expectation pages, whatever the course calls it."""
+def _is_single_folder_name(name: str) -> bool:
+    """
+    Whether a configured folder name is just that — a name, not a path.
+
+    `curriculum_folder` comes from `course_config.json`, and the value is used
+    to build a path. "../Other Course/Curriculum" or an absolute path would
+    quietly build somebody else's expectations into this site, and a value like
+    "shared/Curriculum" would work here while disagreeing with every other
+    reader. A name with a separator in it is a mistake either way, so it is
+    refused and the scan takes over.
+    """
+    text = str(name)
+    if not text or text in (".", ".."):
+        return False
+    if "/" in text or "\\" in text:
+        return False
+    return True
+
+
+def _find_curriculum_folder(content_root: Path, named: str = None):
+    """
+    The folder holding expectation pages, whatever the course calls it.
+
+    `named` is the course's own `curriculum_folder` — declared by every payload
+    and skeleton manifest and carried into `course_config.json`. It is tried
+    FIRST, which matters for a course whose folder does not contain the word
+    "curriculum" at all: the scan below would never find one, and the map would
+    quietly not be built.
+
+    The scan remains the fallback, and remains the real path for the majority:
+    a course made from scratch has no manifest to declare anything.
+    """
+    if named and _is_single_folder_name(named):
+        candidate = content_root / named
+        if candidate.is_dir():
+            for page in candidate.glob("*.md"):
+                if SPECIFIC_CODE.match(page.stem):
+                    return candidate
     for candidate in sorted(content_root.iterdir()):
         if not candidate.is_dir():
             continue
@@ -3635,7 +3870,248 @@ def _is_draft(text: str) -> bool:
     return bool(legacy)
 
 
-def _pages_the_course_teaches(content_root: Path) -> set | None:
+def class_folder_name(config: dict) -> str:
+    """
+    WHERE A NEW CLASS PAGE IS WRITTEN.
+
+    Read from the course's own configured `per_section_folders`, never guessed
+    from what is on disk: the first entry whose name contains "class"
+    (case-insensitive), else the first entry, else the literal "All Classes".
+    Substring matching is safe here because the list is a short curated one the
+    teacher chose — it is NOT safe against arbitrary paths, which is what
+    `_is_class_page_path` below is careful about.
+
+    Pinned by contracts/class-planning.json -> classFolder.naming.
+    """
+    folders = config.get("per_section_folders") or []
+    for folder in folders:
+        if folder and "class" in str(folder).lower():
+            return str(folder)
+    if folders and folders[0]:
+        return str(folders[0])
+    return "All Classes"
+
+
+def class_folder_names(config: dict) -> list:
+    """
+    WHICH FOLDERS COUNT as holding class pages — every configured
+    per-section folder whose name mentions classes, and failing that the single
+    name `class_folder_name` chose.
+
+    Naming and membership are the same question only when a course has ONE such
+    folder. A course configured ["Class Resources", "All Classes"] would
+    otherwise resolve to "Class Resources" for both, match zero pages, and drop
+    the coverage map back to "every published page" — reintroducing the exact
+    silent failure this rule was written to close.
+
+    Pinned by contracts/class-planning.json -> classFolder.membership.
+    """
+    names = []
+    for folder in config.get("per_section_folders") or []:
+        if folder and "class" in str(folder).lower():
+            names.append(str(folder))
+    if names:
+        return names
+    return [class_folder_name(config)]
+
+
+GRADED_FOLDERS_KEY = "graded_folders"
+
+
+def graded_folder_names(config: dict):
+    """
+    Which folders hold work that COUNTS FOR MARKS, and whether the teacher has
+    said so explicitly.
+
+    Returns `(names, was_configured)`. An expectation is "assessed" — the ring
+    on a cell in the Curriculum Coverage map, and Ontario's requirement that
+    every overall expectation be evaluated at least once — when a page that
+    addresses it lives in one of these.
+
+    **An ABSENT key is not an empty list, and the difference is the whole
+    migration.** Absent means the teacher has never been asked, so the historical
+    rule applies: any folder whose name CONTAINS "task". Every course made
+    before this key existed keeps exactly the marks it had. An empty list means
+    the teacher was asked and cleared it, which is a real answer and is left
+    alone.
+
+    Why that matters concretely: the exact-name rule is NARROWER than the
+    substring one. `support/skeletons` ships a family whose folder is called
+    "Thinking Tasks", which the old rule counted and a pool of ["Tasks"] would
+    not — so seeding every course with ["Tasks"] would have silently taken the
+    assessed marks off that course's map.
+
+    Nothing is written back to the config here either. Both apps DO preserve
+    keys they do not know about, so the general claim that a build's write would
+    be dropped is too strong; the real risk is narrower and quite enough — an
+    app holding a copy of the file it loaded BEFORE the build wrote the key will
+    overwrite it on the next save, and a teacher with Settings open during a
+    preview is an ordinary thing rather than a corner case.
+
+    Pinned by contracts/shared-rules.json -> gradedFolders.
+    """
+    if GRADED_FOLDERS_KEY not in config:
+        return [], False
+    names = []
+    for folder in config.get(GRADED_FOLDERS_KEY) or []:
+        if folder:
+            names.append(str(folder))
+    return names, True
+
+
+def _has_graded_folders(content_root: Path, graded_folders: list, was_configured: bool) -> bool:
+    """
+    Whether any folder in the merged content tree counts for marks.
+
+    Configured: at least one directory matches a name in `graded_folders` (case-insensitively).
+    Not configured (historical): at least one directory contains "task" (case-insensitively).
+    """
+    if was_configured:
+        wanted = {str(name).lower() for name in (graded_folders or []) if name}
+        if not wanted:
+            return False
+        for p in content_root.rglob("*"):
+            if p.is_dir() and p.name.lower() in wanted:
+                return True
+        return False
+    else:
+        for p in content_root.rglob("*"):
+            if p.is_dir() and "task" in p.name.lower():
+                return True
+        return False
+
+
+def _escaped_for_markdown(text: str) -> str:
+    """
+    A folder's name, safe to drop into the page's prose.
+
+    These names are the teacher's own, and a folder called `Tasks*` or one
+    containing `[[` would otherwise close the bold early or inject a wikilink
+    into a page Plantoir wrote.
+    """
+    escaped = text
+    for character in ("\\", "*", "_", "[", "]", "<", ">", "`"):
+        escaped = escaped.replace(character, "\\" + character)
+    return escaped
+
+
+def _graded_folders_in_words(graded_folders, was_configured: bool) -> str:
+    """
+    How to name this course's graded folders on the page itself.
+
+    A course that has never been asked is described by what it actually does
+    rather than by a list it does not have — saying "Tasks" there would be a
+    guess, and the historical rule is a substring.
+    """
+    if not was_configured:
+        # "mentions tasks" would be a near-miss: the rule is the substring
+        # "task", so a folder called "Task 1" counts and a teacher reading
+        # "tasks" would conclude it did not.
+        return "any folder with \u201ctask\u201d in its name"
+    names = [_escaped_for_markdown(str(name)) for name in (graded_folders or []) if name]
+    if not names:
+        return "no folder at present"
+    if len(names) == 1:
+        return f"**{names[0]}**"
+    quoted = [f"**{name}**" for name in names]
+    return ", ".join(quoted[:-1]) + " and " + quoted[-1]
+
+
+def _is_graded_path(relative_path, graded_folders, was_configured: bool) -> bool:
+    """
+    Whether a page — given RELATIVE to the content root — is work that counts
+    for marks.
+
+    Configured: one of its FOLDER segments equals a pooled name, case
+    insensitively, at any depth, so `Tasks/Unit 1/Quiz.md` counts.
+    Not configured: the historical rule, any folder segment CONTAINING "task".
+
+    Folder segments only, never the file name — a page is not assessed work
+    because of what it is called.
+    """
+    segments = [piece for piece in re.split(r"[\\/]", str(relative_path)) if piece]
+    folders = segments[:-1]
+    if not was_configured:
+        for segment in folders:
+            if "task" in segment.lower():
+                return True
+        return False
+    wanted = {str(name).lower() for name in (graded_folders or []) if name}
+    for segment in folders:
+        if segment.lower() in wanted:
+            return True
+    return False
+
+
+def _is_class_page_path(relative_path, class_folders) -> bool:
+    """
+    Whether a page — given by its path RELATIVE to the content root — is one of
+    the section's class pages.
+
+    Not an `index.md`, and one of its FOLDER segments equals any of
+    `class_folders`, case-insensitively. Either path separator is understood,
+    because the same relative path arrives spelled either way depending on the
+    platform that produced it.
+
+    **Relative, never absolute.** This walked `page.parts` of an ABSOLUTE path
+    — `content_root.rglob` yields absolute paths — so a teacher whose working
+    folder was `~/Documents/All Classes` made every page in every course a
+    class page. Where a teacher keeps their files is not a fact about their
+    lessons.
+
+    The file name is excluded as defence in depth rather than to fix an
+    observed bug: under segment EQUALITY a file name cannot collide with a
+    folder name, but a future change to prefix or substring matching must not
+    silently start counting a page because of what it is CALLED.
+
+    Pinned by contracts/class-planning.json -> classFolder.isClassPage.
+    """
+    if isinstance(class_folders, str):
+        class_folders = [class_folders]
+    text = str(relative_path)
+    segments = [piece for piece in re.split(r"[\\/]", text) if piece]
+    if not segments:
+        return False
+    if segments[-1].lower() == "index.md":
+        return False
+    wanted = {str(name).lower() for name in class_folders}
+    for segment in segments[:-1]:
+        if segment.lower() in wanted:
+            return True
+    return False
+
+
+def resolve_include_curriculum_coverage(config: dict, section_number: int) -> bool:
+    """
+    Whether this SECTION wants the Curriculum Coverage map.
+
+    `include_curriculum_coverage` is a per-section map of booleans
+    (contracts/file-formats.json), and Windows writes it that way —
+    `NewCourseDialog.cs` calls `PerSection(...)`, which produces an object. A
+    plain `bool(config.get(...))` therefore reads EVERY Windows-made course as
+    "coverage on", including one where the teacher said no, because a non-empty
+    dict is truthy; and `{"sections": {}}` gets it wrong the other way.
+
+    Follows resolve_show_section_marker's shape, which has been reading this
+    kind of key correctly for a long time.
+    """
+    value = config.get("include_curriculum_coverage", True)
+    if isinstance(value, dict):
+        sec_key = f"section{section_number}"
+        sections = value.get("sections")
+        if isinstance(sections, dict) and sec_key in sections:
+            return bool(sections[sec_key])
+        if sec_key in value:
+            return bool(value[sec_key])
+        if "default" in value:
+            return bool(value["default"])
+        # A map that says nothing about this section: the feature is on by
+        # default, the same answer a course with no key at all gets.
+        return True
+    return bool(value)
+
+
+def _pages_the_course_teaches(content_root: Path, class_folders: list) -> set | None:
     """
     The pages a student actually reaches by following the schedule.
 
@@ -3652,7 +4128,7 @@ def _pages_the_course_teaches(content_root: Path) -> set | None:
     """
     class_pages = {}
     for page in content_root.rglob("*.md"):
-        if any(part.lower() in ("all classes", "classes") for part in page.parts):
+        if _is_class_page_path(page.relative_to(content_root), class_folders):
             class_pages[page.stem] = page
     if not class_pages:
         return None
@@ -3678,7 +4154,9 @@ def _pages_the_course_teaches(content_root: Path) -> set | None:
     return set(class_pages) | first_hop | second_hop
 
 
-def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict):
+def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict,
+                     class_folders: list, graded_folders: list,
+                     graded_was_configured: bool):
     """
     How many pages address each expectation, and which of those are assessed.
 
@@ -3710,7 +4188,7 @@ def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict):
     """
     covered_by = {code: set() for code in specific}
     assessed_by = {code: set() for code in specific}
-    taught = _pages_the_course_teaches(content_root)
+    taught = _pages_the_course_teaches(content_root, class_folders)
     for page in sorted(content_root.rglob("*.md")):
         if taught is not None and page.stem not in taught:
             continue
@@ -3727,7 +4205,7 @@ def _coverage_counts(content_root: Path, curriculum_dir: Path, specific: dict):
         relative = page.relative_to(content_root)
         # A page in a Tasks folder is assessed work — that is what makes an
         # overall expectation "evaluated" rather than merely "addressed".
-        is_assessed = any("task" in part.lower() for part in relative.parts[:-1])
+        is_assessed = _is_graded_path(relative, graded_folders, graded_was_configured)
 
         targets = set()
         for link in TRANSCLUSION.finditer(text):
@@ -3777,6 +4255,10 @@ def _coverage_cell(code: str, page: Path, content_root: Path, count: int, assess
 
 def build_curriculum_coverage(content_root: Path, course_code: str,
                              include_notes: bool = True,
+                             class_folders: list = None,
+                             graded_folders: list = None,
+                             curriculum_folder_name: str = None,
+                             graded_was_configured: bool = False,
                              first_class_stamp: str | None = None) -> bool:
     """
     Write the Curriculum Coverage page. Returns True when one was written.
@@ -3787,14 +4269,28 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
     already had that conversation can switch them off and keep the map,
     the legend, and the standings table.
     """
-    curriculum_dir = _find_curriculum_folder(content_root)
+    curriculum_dir = _find_curriculum_folder(content_root, curriculum_folder_name)
     if not curriculum_dir:
         return False
     specific, overall = _collect_expectations(curriculum_dir)
     if not specific:
         return False
 
-    covered_by, assessed_by = _coverage_counts(content_root, curriculum_dir, specific)
+    if not class_folders:
+        # Not a defaultable argument. An empty list matches no page, so
+        # `_pages_the_course_teaches` returns None and the caller counts EVERY
+        # published page — the "wrong map that reports success" this work
+        # exists to close, reintroduced by a forgotten argument. The previous
+        # hardcoded "All Classes" default was wrong-but-harmless for the 38
+        # shipped payloads; this would be silently wrong for all of them.
+        raise ValueError(
+            "build_curriculum_coverage needs the course's class folders — "
+            "pass class_folder_names(config). There is no safe default: the "
+            "name is the teacher's to choose."
+        )
+    covered_by, assessed_by = _coverage_counts(content_root, curriculum_dir, specific,
+                                               class_folders, graded_folders or [],
+                                               graded_was_configured)
     folder = curriculum_dir.name
 
     strands = {}
@@ -3842,7 +4338,13 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
             unevaluated.append(overall_code)
 
     # The explanatory sections, which the teacher can switch off.
-    notes = COVERAGE_NOTES if include_notes else ""
+    # The page must describe THIS course's rule. It used to say "the Tasks
+    # folder" whatever the teacher had chosen, so a course graded on "Tests"
+    # got a page whose own explanation was wrong — and a teacher reading it
+    # would reasonably conclude the map was broken.
+    notes = COVERAGE_NOTES.replace(
+        "{graded_folders}", _graded_folders_in_words(graded_folders, graded_was_configured)
+    ) if include_notes else ""
     created_line = f"created: {first_class_stamp}\n" if first_class_stamp else ""
 
     body = f"""---
@@ -3887,7 +4389,8 @@ assessed work addresses them, red when nothing marked does.
     return True
 
 
-def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path):
+def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
+                                   curriculum_folder_name: str = None):
     """
     Tell the backlinks panel which pages reference everything by design.
 
@@ -3901,7 +4404,7 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path)
     """
     if not backlinks_tsx_path.exists():
         return
-    curriculum_dir = _find_curriculum_folder(content_root)
+    curriculum_dir = _find_curriculum_folder(content_root, curriculum_folder_name)
     # Both forms: the folder is matched by name, but a page is matched by
     # its SLUG, and Quartz slugs replace spaces with hyphens. Writing only
     # the title left the coverage map in the panel it was meant to leave.
@@ -3928,7 +4431,7 @@ def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path)
         print(f"✅ Backlinks panel will skip: {', '.join(names)}")
 
 
-def link_coverage_from_key_links(content_root: Path):
+def link_coverage_from_key_links(content_root: Path, curriculum_folder_name: str = None):
     """
     Put the coverage page in Key Links, directly under the curriculum entry.
 
@@ -3949,7 +4452,7 @@ def link_coverage_from_key_links(content_root: Path):
     if f"[[{COVERAGE_PAGE_TITLE}]]" in text:
         return
 
-    curriculum_dir = _find_curriculum_folder(content_root)
+    curriculum_dir = _find_curriculum_folder(content_root, curriculum_folder_name)
     folder = curriculum_dir.name if curriculum_dir else None
     lines = text.split("\n")
     target_index = None
@@ -4041,7 +4544,7 @@ def build_section_site(
     show_marker = resolve_show_section_marker(config, section_number)
 
     # Exclude 'Media' from shared folder processing (we symlink it)
-    if "Media" in shared_folders:
+    if any(_is_media_name(name) for name in shared_folders):
         print("ℹ️ Skipping 'Media' in shared folders (handled via symlink).")
     shared_paths = [course_dir / folder for folder in _filter_out_media(shared_folders)]
 
@@ -4251,22 +4754,70 @@ def build_section_site(
             print(f"  📄 Copied per-section file: {file_name}")
 
 
+    # === Health of the folders this course depends on =========================
+    # Here, and not earlier, because every check is defined over the MERGED
+    # tree, which only exists once the copying above has finished — and before
+    # Quartz builds, so a teacher is told before a site is produced from it.
+    #
+    # NOT a complete guard on publishing: `deploy.py` uploads an EXISTING
+    # `public/` and only rebuilds when a live preview is attached, and
+    # `deploy.sh --to-folder` rsyncs on the host without entering the Python at
+    # all. So a deploy of a build made in an earlier session carries no health
+    # output of its own. What makes that acceptable is that the findings are
+    # recorded when the build happens; what would NOT be acceptable is claiming
+    # otherwise, which an earlier version of this comment did.
+    class_folders_here = class_folder_names(config)
+    graded_folders_here, graded_was_configured_here = graded_folder_names(config)
+    coverage_wanted = resolve_include_curriculum_coverage(config, section_number)
+    curriculum_folder_name_here = config.get("curriculum_folder") or None
+    curriculum_dir_here = _find_curriculum_folder(content_root, curriculum_folder_name_here)
+
+    # Worked out once and reused by the coverage builder below: this crawl
+    # rglobs every page and reads every class page and every first-hop page,
+    # and running it twice per build was pure waste.
+    taught_here = _pages_the_course_teaches(content_root, class_folders_here)
+
+    health_facts = {
+        "coverage_wanted": coverage_wanted,
+        "curriculum_found": curriculum_dir_here is not None,
+        "class_pages_found": taught_here is not None,
+        "graded_folders_found": _has_graded_folders(
+            content_root, graded_folders_here, graded_was_configured_here
+        ),
+        # The COURSE-level folder, not content/Media: that one is recreated on
+        # every build a few hundred lines above, so checking it always passes.
+        # What actually breaks is the folder it points AT.
+        "media_target_exists": (course_dir / "Media").is_dir(),
+        "section_index_exists": (content_root / "index.md").exists(),
+        # Anything by this name at this moment came from the teacher's own
+        # notes: the build writes its own copy further down, so a page here now
+        # is one that is about to be overwritten.
+        "hand_written_coverage_page": (
+            content_root / f"{COVERAGE_PAGE_TITLE}.md").exists(),
+    }
+    site_health.announce_or_stay_quiet(health_facts, course_code, section_number)
+
     # === Curriculum coverage heat map =========================================
     first_class_dt = _find_first_class_created(content_root)
     first_class_stamp = _format_created_timestamp_from_dt(first_class_dt) if first_class_dt else None
 
-    if bool(config.get("include_curriculum_coverage", True)):
+    if coverage_wanted:
         # The explanatory sections are a separate choice, and one that only
         # exists while the map does.
         if build_curriculum_coverage(
                 content_root, course_code,
+                class_folders=class_folders_here,
+                graded_folders=graded_folders_here,
+                graded_was_configured=graded_was_configured_here,
+                curriculum_folder_name=curriculum_folder_name_here,
                 include_notes=bool(config.get("include_coverage_notes", True)),
                 first_class_stamp=first_class_stamp):
-            link_coverage_from_key_links(content_root)
+            link_coverage_from_key_links(content_root, curriculum_folder_name_here)
     else:
         print("ℹ️ Curriculum Coverage page is switched off for this course.")
     set_backlinks_structural_pages(
-        output_dir / "quartz" / "components" / "Backlinks.tsx", content_root)
+        output_dir / "quartz" / "components" / "Backlinks.tsx", content_root,
+        curriculum_folder_name_here)
     # ==========================================================================
 
     # === Post-pass — sync 'created' timestamps for non-class pages =============
@@ -4295,8 +4846,10 @@ def build_section_site(
         print("   your site. Run setup.sh for this course to restore it.")
         sys.exit(1)
 
-    # ensure 'Media' is always hidden in Explorer omit set
-    if "Media" not in hidden_list:
+    # ensure 'Media' is always hidden in Explorer omit set — checked in any
+    # spelling, or a config that already says "media" would gain a SECOND entry
+    # for the same directory every build.
+    if not any(_is_media_name(name) for name in hidden_list):
         hidden_list.append("Media")
 
     # The Curriculum Coverage page is reached from Key Links, deliberately.

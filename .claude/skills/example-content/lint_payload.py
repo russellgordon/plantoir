@@ -52,6 +52,32 @@ def lint(course_code: str) -> int:
     curriculum_folder = manifest.get("curriculum_folder")
 
     problems = []
+
+    # Which folders count for marks — the ring on a cell in the Curriculum
+    # Coverage map. Declared rather than inferred at install time, because
+    # inference is a substring ("task") while the build matches a pooled name
+    # EXACTLY: a payload whose folder was "Thinking Tasks" would silently stop
+    # counting under a pool of ["Tasks"].
+    graded = manifest.get("graded_folders")
+    if graded is None:
+        problems.append(
+            "manifest: no graded_folders. Say which folders hold work that "
+            "counts for marks, even if the answer is []"
+        )
+    else:
+        known = set(manifest.get("shared_folders", [])) \
+            | set(manifest.get("per_section_folders", []))
+        for name in graded:
+            if name not in known:
+                problems.append(
+                    f"manifest: graded folder {name!r} is not one of this "
+                    "course's folders, so nothing will ever count for marks in it"
+                )
+        if not graded:
+            problems.append(
+                "manifest: graded_folders is empty, so no expectation can ever "
+                "be shown as evaluated — name the folder the assessed work lives in"
+            )
     # Obsidian comments, paired exactly the way the vendored Quartz pairs
     # them (`commentRegex = /%%[\s\S]*?%%/g` in ofm.ts): non-greedy, so
     # `%%curriculum-start%%` consumes its own delimiters and the

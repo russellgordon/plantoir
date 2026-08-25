@@ -26,7 +26,7 @@ public static class ToolchainMirror
         "setup.ps1", "preview.ps1", "deploy.ps1",
     };
 
-    public static readonly IReadOnlyList<string> RecipeFolders = new[] { "patches", "scripts", "support" };
+    public static readonly IReadOnlyList<string> RecipeFolders = new[] { "patches", "scripts", "support", "contracts" };
 
     private static readonly HashSet<string> FoldersWithFreshToolchain = new(StringComparer.OrdinalIgnoreCase);
 

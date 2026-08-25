@@ -393,7 +393,7 @@ this side is expected to say so when the contract is wrong.
    silently expanded into this item's scope.
 
 9. ~~Course codes with DASHES, and the club heuristic that misreads them~~
-   — ✅ Done 2026-08-23 (`GUI-IMPROVEMENTS.md` row 355). Both contract-driven
+   — ✅ Done 2026-08-23 (`GUI-IMPROVEMENTS.md` row 382). Both contract-driven
    fixes below are implemented, plus the picker itself was rebuilt as a real
    WinUI `AutoSuggestBox` (see the cross-linked section below), which the
    dashes/club work otherwise had no reason to touch. Two adversarial review
@@ -414,7 +414,7 @@ this side is expected to say so when the contract is wrong.
    `courseCode.clubDetection` cases. **Follow-up the same day:** a Province
    `ComboBox` ("Ontario" / "British Columbia") was added ahead of the
    course-code row, mirroring the mac's segmented Province picker
-   (`GUI-IMPROVEMENTS.md` row 355's addendum) — new `CourseCatalog` (ported
+   (`GUI-IMPROVEMENTS.md` row 382's addendum) — new `CourseCatalog` (ported
    from the mac's `CourseCatalog.swift`) and `CourseNameCatalogs.
    ForProvince`, narrowing the picker's suggestion list to one province
    without gating typed codes through either catalog. Full suite: 659/659,
@@ -463,6 +463,118 @@ this side is expected to say so when the contract is wrong.
    visibility, decline-not-swallow key handling, highlight rows by CODE not
    index, and re-check badge contrast on a highlighted row) apply whether you
    end up hand-building or wiring the real control's template.
+
+10. **Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check (2026-08-24).**
+    - **`setup_course.py:graded_folders_for` reconciliation** — When a new
+      course is created, `graded_folders_for` now checks the declared pool
+      against the actual folder lists (`shared_folders` +
+      `per_section_folders`). If declared folders (such as `Tasks`) were removed
+      by the teacher during setup, they are dropped from `graded_folders`.
+      If no folders remain, explicit `[]` is written to `course_config.json`
+      (settled policy: `[]` means asked and answered "nothing counts for
+      marks", while omitting the key means unconfigured legacy course).
+    - **`noGradedFolders` health check** — Added in `scripts/site_health.py`
+      and `contracts/shared-rules.json` → `siteHealth.checks`. Fires when
+      `coverage_wanted` is true and curriculum expectation pages are present,
+      but no folder on disk matches `graded_folders` (or contains `task` under
+      the unconfigured rule). Emits `PLANTOIR_HEALTH:` JSON line. It is
+      deliberately unfixable (in `neverOffered.checks`) — an existence fix
+      would not assign marks to pages.
+    - **Shared Python**: both scripts run on Windows identically. Windows
+      receives the finding in the `PLANTOIR_HEALTH:` transcript line and
+      displays the contract-authored sentence and detail without re-wording.
+
+11. **Special folders hardening: `excluded_items`, preflight skip, and `index.md` sentinel notes (2026-08-24).**
+    - **`excluded_items` key in `course_config.json`** — An object with optional
+      `shared` and `per_section` arrays of strings:
+      `{"shared": ["Tasks"], "per_section": ["Drafts"]}`. The key is ABSENT
+      (not `{}`) when nothing is excluded. Documented in `contracts/file-formats.json`.
+    - **Course Settings mutations** — In Course Settings, when a teacher removes
+      a folder or file from the list editors, the app adds it to `excluded_items[scope]`
+      and logs the `item excluded` event on the activity trail. When a teacher adds
+      a previously excluded item back, the app removes it from `excluded_items[scope]`
+      (deleting the key when empty) and logs `item re-included`.
+    - **Preflight discovery skipping in `scripts/build_site.py`** —
+      `preflight_update_course_config` checks `excluded_items`. Discovered items
+      present in `excluded_items[scope]` are NOT added to `shared_folders` or
+      `per_section_folders`, are NOT un-hidden, and are NOT added to `expandable`.
+      Preflight prints console skip lines: `🚫 Skipping excluded <scope> <kind>: <name> (listed in excluded_items)`.
+    - **`index.md` sentinel notes** — Preflight checks for existing `index.md` files
+      in excluded folders. If present, it idempotently injects the sentinel note
+      defined in `contracts/shared-rules.json` → `specialNames.excludedFolderIndexNote`
+      between HTML comment delimiters (`<!-- plantoir:excluded-folder-note:start -->` ...
+      `<!-- plantoir:excluded-folder-note:end -->`). If the folder is later re-included,
+      preflight strips the note from the vault's `index.md`. Preflight NEVER creates
+      a new `index.md` file in a teacher's vault.
+    - **Content merge stripping** — `process_frontmatter` strips any sentinel blocks
+      when copying files into the merged `content/` directory so the note can never
+      reach students in `public/`.
+    - **Shared Python**: preflight skipping, sentinel note application/removal, and
+      content stripping are in shared `build_site.py` and run identically on Windows.
+      The Windows app only needs to implement `ExcludedItems` in `CourseConfiguration.cs`
+      and wire exclusion/re-inclusion in the Settings list editors with trail events.
+    - **Why this shape, and what was rejected (decided 2026-08-24).** An object
+      keyed by scope rather than a flat list, because the two scopes are matched by
+      different scans (`discover_shared_items` vs `discover_section_items`) and the
+      same bare name can legitimately exist in both. Two top-level keys
+      (`excluded_shared_items` / `excluded_section_items`) were rejected as one
+      concept scattered across keys both apps must remember to write together. A
+      per-section-NUMBER exclusion was rejected for now because nothing can set it
+      (Course Settings edits one course-wide `per_section_folders` list), but the
+      object is additive so a `"sections": {"4": [...]}` key can be added later.
+    - **An exclusion does NOT expire** when the folder is deleted and re-created in
+      Obsidian. Discovery is name-based, so the build cannot tell "the folder I
+      excluded" from "a new folder", and guessing "new" would re-publish something
+      the teacher deliberately excluded. It ends only when the teacher adds the
+      name back in Course Settings — the `index.md` note exists to make that
+      self-explaining.
+    - **The mechanism of exclusion is the name's ABSENCE from the copy list**
+      (`shared_folders` etc.); `excluded_items` stops preflight putting it back
+      AND, since the Piece 2 review, preflight also DROPS any excluded name it
+      finds still in a copy list, prints `🚫 Dropped excluded <scope> <kind> from
+      the copy list: <name>`, and writes the config back. So the key is
+      authoritative and a name in both cannot publish — but the Windows app
+      should still do BOTH on removal (take the name out of the list AND record
+      the key), because the reconciliation only runs at the next build and a
+      teacher reading the list in Settings before then would see it. Record `item re-included` ONLY when the name was actually in
+      `excluded_items`; an ordinary add is not a re-inclusion, and a trail line
+      that says it was would be believed.
+
+12. **Special folders hardening: The protection model — row states, curriculum resolution, marks floor, and wizard marks control (2026-08-24).**
+    - **Item Protection in List Editors & Toggle Lists**:
+      Folders and files with special meaning now have protection policies (`ItemProtection` in Swift, `ItemProtection` enum in C#):
+      - `Ordinary`: standard direct removal.
+      - `Consequential(title, message)`: minus button prompts a confirmation dialog with destructive "Remove" and "Cancel" actions before removing.
+      - `Blocked(reason)`: minus button is REPLACED with an info icon (ⓘ). Clicking the info button shows a popover/flyout explaining why removal is forbidden and explicitly naming the switch to turn off first (e.g. "Include the curriculum coverage map").
+    - **Settled UX Decisions**:
+      - Removal is NEVER silently disabled/greyed out with no explanation, nor does clicking minus auto-flip related switches via dialog. The teacher is given a plain-language explanation of what depends on the folder and which switch to toggle first.
+      - In the New Course Wizard, blocking is computed from *effective* switch values (`CourseConfiguration.CurriculumCoverageEnabled(...)`), avoiding disabled-switch deadlocks when parent switches are off.
+    - **Protection Rules by Item Kind**:
+      - *Resolved Curriculum Folder*:
+        - Resolved using `CurriculumFolderRule`: configured `curriculum_folder` if present in candidates, else alphabetically first candidate containing `"curriculum"` (matching `_find_curriculum_folder` from `build_site.py` and `contracts/shared-rules.json` → `specialNames.curriculumFolderResolution`).
+        - In Course Settings, when `include_curriculum_coverage` is true: **blocked** (`specialNames.curriculumFolderBlockedByCoverageSetting`).
+        - When `include_curriculum_coverage` is false: **consequential** (`removeCurriculumFolderTitle` / `removeCurriculumFolderMessage`).
+        - In Wizard, when effective curriculum coverage is true: **blocked** (`specialNames.curriculumFolderBlockedByCoverageMap`). When effective curriculum pages is true: **blocked** (`specialNames.curriculumFolderBlockedByCurriculumPages`). When both false: **consequential**.
+      - *Graded Folders (Marks)*:
+        - In Course Settings and Wizard, when curriculum coverage is ON and `gradedFolders.count <= 1`: removing or un-ticking the last graded folder is **blocked** (`specialNames.lastGradedFolderBlocked` in Settings, `specialNames.lastGradedFolderBlockedWizard` in Wizard).
+        - When more than one graded folder exists or coverage is OFF: removing from shared/per-section list is **consequential** (`removeGradedFolderTitle` / `removeGradedFolderMessage`).
+        - *Materialisation on first edit*: If `graded_folders` is `null` (legacy course), mutating the marks toggle list materialises the inferred pool rather than initializing to `[]`.
+      - *Per-Section Folders & Classes*:
+        - If `perSectionFolders.count <= 1`: removing is **blocked** (`specialNames.lastPerSectionFolderBlocked`). Prevents empty `per_section_folders: []`.
+        - The folder named **`All Classes`** (compared case-insensitively — `ClassFolder.isTheAllClassesFolder`, i.e. `ClassFolderRule.FallbackName`) is **blocked** always (`specialNames.classFolderBlocked`), however many per-section folders there are. Every OTHER per-section folder, including other names that mention classes, can be added or removed as before. Russell's decision on 2026-08-24, during the Piece 3 review, replacing the "class folders are consequential when alternatives exist" rule this item first shipped with. The reason: the next-class button and the schedule write pages into that folder, so a confirmation would be asking the teacher to break both. `removeClassFolderConfirmation` was removed from the contract with it.
+      - *Section Index File*:
+        - Removing `index.md` (case-insensitive) from per-section files is **blocked** (`specialNames.sectionIndexFileBlocked`).
+    - **Wizard Marks Control**:
+      - For skeleton and from-scratch courses (`!structureComesFromExampleContent`), the Structure step includes the Marks checklist (`MembershipToggleListView`) populated from current folder lists.
+      - Selected `graded_folders` are written into `course_config.json` on course creation.
+    - **Contract Sentences & Tests**:
+      - Deserialise all sentences from `contracts/shared-rules.json` → `specialNames` (do not hardcode).
+    - **Review amendments (2026-08-24, row 380)**:
+      - *Removal drops the name from the marks pool.* When a folder leaves `shared_folders` or `per_section_folders` in Course Settings, remove it from `graded_folders` too (materialising a `null` pool from the *task*-substring rule first, as a tick would). Without this the consequential dialog's sentence is false and `graded_folders` names a folder `excluded_items` tells the build to skip. The wizard already reconciles on removal (`reconciledGradedFolders`).
+      - *The resolver is name-only, and that is fine.* `curriculumFolderResolution` is the name half of `_find_curriculum_folder`; the build additionally requires an expectation-code page inside the folder. The GUI cannot see that from the config, so it may protect a folder the build would skip — never the wrong folder among those it can see. Do not try to replicate the disk check.
+      - *`removal blocked` is a trail event* (`activityTrail.mustRecord`): item name, which list, and the sentence shown. Record it where the ⓘ is clicked and where a blocked untick is refused.
+      - *The contract holds 5 resolution cases*, not the 10 row 379 claimed.
+      - *Size the flyout for the longest sentence.* The mac popover truncated to one line until it was given a fixed width and allowed to wrap; the `lastGradedFolderBlocked` sentence is the longest in `specialNames`, so test the flyout with that one.
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
@@ -2879,6 +2991,460 @@ behind anywhere it can accumulate across a school year? That is the shape of
 the failure the mac hit: a disk filling with something the teacher has never
 heard of and cannot connect to this app. Nobody here can see a Windows
 machine to answer it, so it is a question rather than a finding.
+
+## Which folders count for marks: absent is not empty (2026-08-23)
+
+The Curriculum Coverage map shows an expectation as ASSESSED — the ring on a
+cell, and Ontario's ask that every overall expectation be evaluated at least
+once — when a page addressing it lives in a folder that counts for marks. That
+used to be hardcoded in `build_site.py` as *any folder whose name contains
+"task"*, and a teacher who called theirs "Tests", or renamed "Tasks", silently
+lost every assessed mark on the map with nothing said.
+
+It is now `graded_folders` in `course_config.json`, matched by EXACT
+folder-segment name at any depth (so `Tasks/Unit 1/Quiz.md` still counts, and a
+page is never assessed because of what it is CALLED).
+
+### The one mistake that matters on your side
+
+**`GradedFolders` must distinguish ABSENT from EMPTY.** A plain
+`List<string>` that defaults to empty when the key is missing would tell the
+build "this teacher has no graded folders", and every course made before this
+key existed would lose every assessed mark on its map — silently, because a map
+with no rings still renders and still looks finished.
+
+- ABSENT means the teacher has never been asked. The build applies the
+  historical substring rule, and the course keeps exactly the marks it had.
+- EMPTY (`[]`) means they were asked and cleared it. That is a real answer and
+  is honoured.
+
+The mac models it as `[String]?` and REMOVES the key when set to nil
+(`CourseConfiguration.swift`). Whatever you use, make the round trip preserve
+"no key at all" — and check your serialiser, because both apps write this file
+wholesale from an in-memory copy.
+
+### Do not seed existing courses
+
+The obvious migration — write `["Tasks"]` into every course — is wrong, and the
+repository proves it rather than the reasoning alone. All 38 payloads use
+"Tasks", but the mathematics skeleton family ships **"Thinking Tasks"**: the
+substring rule counted it, an exact pool of `["Tasks"]` does not. Seeding would
+have quietly stripped that course's assessed marks.
+
+Nothing is written back from a BUILD either. Be precise about why, because the
+first version of this paragraph overstated it: both apps DO preserve keys they
+do not recognise, so a build's write is not dropped in general. The real risk is
+narrower and quite sufficient — an app holding a copy of the file it loaded
+BEFORE the build wrote the key overwrites it at the next save, and a teacher
+with Settings open while a preview runs is ordinary, not a corner case.
+
+**One thing you will notice immediately: `FileFormats_CourseConfigKeys_MatchesContract`
+is RED on your side, deliberately.** `contracts/file-formats.json` now documents
+`graded_folders` and `CourseConfiguration.cs` does not read it yet. That is the
+contract working as designed (CLAUDE.md rule 4) — a request, not damage. It goes
+green when you add the property, and the absent-vs-empty note above is the whole
+of what it has to get right.
+
+### What the Settings control does, and why
+
+The mac's is a checklist of the course's folders, under a "Marks" heading. When
+the course has never been asked, it shows the folders the build CURRENTLY counts
+already ticked, so a teacher sees what is actually happening rather than a blank
+list. Nothing is written until they change something — and the moment they do,
+the answer is explicit and the historical rule stops applying to that course.
+
+### Content declares its own pool
+
+All 38 payload manifests and all 50 skeleton families now carry
+`graded_folders`, and both linters refuse a manifest without one or one naming a
+folder the course does not have. `setup_course.py` writes it at creation from
+the manifest — shared Python, so you inherit that unchanged.
+
+Declared rather than inferred deliberately: inference is a substring while the
+build matches exactly, and those two agree for 88 of the 89 courses here and
+disagree for the one that would have been broken by it.
+
+### Where the rules live
+
+`contracts/shared-rules.json` → `gradedFolders` (9 cases, run by
+`scripts/test_graded_folders.py` in the image) and `contracts/file-formats.json`
+for the key itself.
+
+## Folder problems: the checks, and the four places they have to surface (2026-08-23)
+
+Certain folder and file names carry behaviour — the curriculum folder, the folder
+holding class pages, `Media`, a section's `index.md` — and nothing stopped a
+teacher deleting or renaming one in Obsidian. The features then failed SILENTLY,
+the Curriculum Coverage map worst of all: it still rendered, still looked
+healthy, and was wrong.
+
+**The checks are shared Python and you inherit them unchanged.**
+`scripts/site_health.py` runs inside `build_site.py`, after the content merge and
+before Quartz builds. You run the same file, so there is nothing to reimplement.
+What you owe is the front end.
+
+### Where they run, and where they honestly do not
+
+They run in the toolchain rather than in the app because the GUI button is one of
+five ways a build starts — the assistant, the MCP server, the launchers and the
+scheduled task all bypass it, and the scheduled one runs with the app closed.
+
+**Be careful repeating the "before anything is published" claim**, because an
+earlier version of this section overstated it and it was corrected: `deploy.py`
+publishes an EXISTING `public/` and only rebuilds when a live preview is
+attached, and `deploy.sh --to-folder` never enters the Python at all. So a deploy
+of a build made in an earlier session carries no health output of its own. The
+findings are recorded when the BUILD happens. That is acceptable; claiming
+otherwise is not.
+
+### The sentence is not yours to write
+
+Each finding is printed twice: once as a human sentence, and once as
+`PLANTOIR_HEALTH: {json}` carrying `name`, `sentence`, `detail`, `fixable`,
+`course`, `section`. **Display the `sentence` and `detail` the line carries.**
+Do not compose your own from the `name` — the whole reason the wording travels in
+the payload is so that the same problem cannot be worded differently on the two
+platforms, and the sentences have one home in
+`contracts/shared-rules.json` → `siteHealth.checks`.
+
+A progress marker would not have done: those are matched loosely and getting one
+wrong is silent (see `app-rules.json` → `markerOrigins`). A prefixed JSON line is
+unambiguous and carries structure a sentence cannot.
+
+### Three traps, all met here
+
+- **Do not read the findings from a tail.** Every other structured-line reader in
+  the mac's `ScriptRunner` works from `recentText(maximumCharacters: 8000)`, and
+  the health lines print in the MIDDLE of a build. On any real build they are
+  long past that window by the end. Collect them as output arrives. The mac test
+  floods 400 lines after the finding to prove the point.
+- **Hide the marker line from the console a teacher reads.** A raw JSON blob is
+  machinery (rule 1). The human sentence is printed separately, so nothing is
+  lost. The mac drops it in `TranscriptBuilder`, and reads findings from the raw
+  text BEFORE handing it there.
+- **Show it once.** The mac holds findings in view state rather than reading them
+  off the runner at render time, so a teacher who dismisses the dialog and
+  carries on editing does not meet it again on the next redraw. A healthy course
+  must see nothing at all — the failure mode for this whole feature is nagging,
+  and a warning dismissed by habit is dismissed when it matters.
+
+### Offering to put it right
+
+Two of the five findings are repairable — a missing `Media` folder and a missing
+section front page — and three are NOT. The line is the whole design: **a fix
+must restore the FEATURE, not merely satisfy the check.** Recreating an empty
+curriculum folder would silence "the curriculum map could not be built" and
+leave the map missing, because that folder only counts once it holds a page
+named for an expectation code. A button that makes a warning go away without
+fixing anything is worse than none, since the teacher then believes it is dealt
+with.
+
+**Decide from the check's NAME, not from `fixable` alone.** The flag in the
+payload means "this kind of thing is repairable"; what has to be true before you
+show a button is that YOUR app has a repair for it.
+
+Three things the mac had to learn the hard way, all worth copying:
+
+- **Never overwrite.** Both repairs check first, so pressing twice — or pressing
+  after fixing it in Obsidian — changes nothing. The test that matters writes a
+  teacher's own front page first and asserts it survives.
+- **Report the outcome, including failure.** Both restores can fail (a read-only
+  volume, a file sitting where the folder should be). Reporting only success
+  made a failed repair indistinguishable from a successful one — the dialog just
+  closed either way, which is silence on the failure path in the feature written
+  to end silence.
+- **Say what has not changed yet, and offer the RIGHT next step.** The folder is
+  back on disk; the preview still shows how things were. A teacher who is told
+  "put the Media folder back" will go and look at their site next. Offer the
+  preview on BOTH occasions — including after a publish, because that is how a
+  teacher checks the repair worked. What changes is the SENTENCE: after a
+  publish it must name who is still seeing the old site (students) and what
+  changes that (publishing again).
+
+  This reversed an earlier decision, and the reasoning is the useful part. The
+  preview was withheld after a publish on the grounds that it does not change
+  what students see. True, and beside the point: withholding it removed
+  something useful in order to prevent a misunderstanding that the words already
+  prevent.
+
+  Three things that fell out of widening the offer, all of which apply to you:
+
+  - **The publish sentence must not assert a past publish.** It is shown after a
+    FAILED deploy too, and for a section publishing for the first time nothing
+    has ever gone out. Say what publishing WILL do, not what it did.
+  - **Guard the preview against every publisher, not just your own button.** On
+    the mac the assistant publishes the same section in the same process,
+    invisible to the view's own deploy runner; the guard had to move to
+    `CourseActivity`. While publish-origin findings offered no button this was
+    unreachable — widening the offer is what made it a hazard.
+  - **A preview build is never deploy-fresh** (`app-rules.json` →
+    `buildFreshness`), so previewing after a successful publish means the next
+    publish rebuilds. Correct, and largely moot: the repair puts content back,
+    which forces a rebuild anyway.
+
+  **Call the button "Preview Again", not "Build Again".** Russell asked what
+  "Build Again" meant, which was the answer: the label never said WHAT would be
+  built, and the thing on offer already has a name the teacher knows. Note this
+  is a CLARITY point, not a rule 1 one — "build" is ordinary vocabulary in this
+  product ("Click Preview to build this section's website") and does not need
+  hunting down elsewhere.
+
+One mac-specific mechanic that may or may not apply to you: a view presents one
+alert at a time, so the outcome is shown from a state change AFTER the first
+dialog has gone rather than raised inside its button action — asking for a second
+while the first is dismissing loses one of them, and the one lost is the report
+the teacher just asked for.
+
+`FolderProblemRepaired` is a separate trail event from `FolderProblemFound`, on
+purpose: one records that something is wrong, the other that somebody acted on
+it, and a trail that could not tell them apart leaves "did they ever fix it?"
+unanswerable. Both are in `contracts/shared-rules.json` → `activityTrail`, and
+the repair rules themselves are in `siteHealth.repair`.
+
+### A section with no index.md cannot be PUBLISHED — shared Python, so it is yours too
+
+Found while testing the deploy path on the mac, and it breaks identically on
+Windows because it is in `scripts/`.
+
+`_sync_public_to_host` (`build_site.py`) copies the built site back to the host
+only when `public/index.html` exists — and Quartz emits no root `index.html`
+without an `index.md`. So the build SUCCEEDS and prints "Static build complete",
+the sync is silently skipped, and `deploy.py` then reports "Built site not
+found … Build first: ./preview.sh CODE N --build-only" — telling the teacher to
+do the thing they have just done.
+
+The guard itself is right (do not publish half a build). What is wrong is that
+nothing says why, and the message sends them in a circle. Two one-line fixes
+were available and neither is done yet, so this is an open item rather than a
+solved one:
+
+- print a warning in the else-branch of the sync, so the build says why it did
+  not produce a publishable site;
+- or have the deploy's "Built site not found" message name the likely cause.
+
+Meanwhile the `sectionIndexMissing` health check understates it: "the site will
+open on whatever page happens to come first" is true of a PREVIEW, and for
+publishing there is no site at all. Worth strengthening in
+`shared-rules.json` → `siteHealth.checks`.
+
+### The scheduled task NEVER refuses
+
+Russell's call, and the reasoning travels: *"a slightly inaccurate curriculum map
+is a paper cut, an unpublished site update a teacher was counting on is a broken
+nose."* Pinned as `siteHealth.scheduledDeployPublishesAnyway` and asserted by a
+mac test so it cannot be quietly softened later.
+
+So: publish, then stash what was found for the next time somebody is there. You
+already have the shape — `ScheduledDeployCompletion.cs` stashes a completion
+sentinel exactly this way. Two properties the mac's version has that yours should
+too: the record is CONSUMED when read, so a problem is reported once rather than
+every time the app opens; and a CLEAN run clears it, so a problem the teacher has
+put right stops being reported.
+
+**That second property is harder than it looks, and this section claimed it
+before it was true.** launchd opens the scheduled log with O_APPEND and nothing
+rotates or truncates it, so reading the whole file re-finds LAST week's marker
+lines every night: the sentinel is rewritten with stale findings forever, and the
+"nothing wrong this time" branch becomes unreachable the moment a single problem
+has ever been logged. A teacher who fixed the folder would have been told about
+it every morning until somebody deleted the log.
+
+The mac now records the log's SIZE before the run and reads only from that offset
+afterwards. If your task runner captures output per run you may not have this
+problem at all — but check rather than assume. And note how it got through: the
+test that was supposed to cover it faked the append by rewriting the file, so it
+passed against broken code.
+
+One platform difference worth knowing: the mac reads the findings back out of the
+scheduled run's LOG FILE rather than from a pipe, because `runScheduled`
+deliberately does not capture the child's output — launchd points stdout at that
+log and the process inherits it, and an unread pipe is what wedged your own
+assistant server. If your task runner already captures output, use what you have;
+the log-scrape is a workaround for a constraint you may not share.
+
+### Deploys with several destinations
+
+Take the findings from the FIRST leg only. Every destination publishes the same
+built site, so a second leg repeats them.
+
+### Trail event
+
+`FolderProblemFound` is in `ActivityTrail.cs` and in
+`contracts/shared-rules.json` → `activityTrail.mustRecord`. The line reads
+`found a problem with this course's folders (curriculumCoverageFoundNothing)` —
+a sentence a teacher would recognise, carrying the stable check NAME in brackets.
+Both halves earn their place: rule 5 wants a line that reads as something that
+happened, and the name is what somebody searching the trail months later can
+match against the contract, since the product wording will have been reworded by
+then.
+
+**The mac suite fails a declared trail event that has no call site** — which is
+what forced the front end to be written rather than promised. Worth checking
+whether your suite does the same; if not, it is a cheap test to add.
+
+## "Where do the class pages live?" had four answers — and yours was the worst (2026-08-23)
+
+**Action required on your side: build and test. The C# below was written on the
+mac, which has no dotnet, so it has compiled nowhere.**
+
+A teacher whose class folder is not called "All Classes" — "Class Pages", say —
+used to get a different answer from each of four places:
+
+| Where | What it asked |
+|---|---|
+| mac `ClassPages.folderURL` | the course's CONFIGURED per-section folders, first containing "class" |
+| mac `AssistSectionGraph.isClassPage` | the page's IMMEDIATE parent contains "class" |
+| `build_site.py` | any segment of the ABSOLUTE path EQUALS "all classes" or "classes" |
+| your `AssistWorkspace.Plan` | the whole ABSOLUTE directory string contains "class" |
+
+Three of those are wrong in ways worth knowing:
+
+- **The build's.** Exact strings, so "Class Pages" matched nothing. When no
+  class pages are found, `_pages_the_course_teaches` returns `None` and the
+  Curriculum Coverage map falls back from "pages the course teaches" to "every
+  published page". The map still renders, still looks healthy, and is wrong —
+  the failure this whole piece exists to close.
+- **The build's, again — and this is a CORRECTION to what this section said
+  first.** An earlier draft claimed the build had been counting pages by their
+  file NAME, and named "How This Class Works.md" and ADA1O's "B3. Connections
+  Beyond the Classroom.md" as pages it had miscounted. That was wrong. The old
+  rule was `part.lower() in ("all classes", "classes")` — membership in a
+  tuple, i.e. EQUALITY — so no page was ever counted for its name. The real
+  defect in the same line was different and worse: `content_root.rglob` yields
+  ABSOLUTE paths, so it walked every segment above the content root too. A
+  teacher whose working folder was `~/Documents/All Classes` made every page in
+  every course a lesson — the same bug as yours, on the other platform. The
+  file-name exclusion is kept as defence in depth for a future change to
+  substring matching, and is labelled as such rather than as a fix.
+- **Yours.** `Path.GetDirectoryName(pagePath)` is the absolute directory, so a
+  teacher whose working folder is `C:\Users\x\Classroom\` makes **every page
+  in every course** a class page. Where somebody keeps their files is not a fact
+  about their lessons. This is the one that needed fixing most and could not
+  have been found from the mac.
+
+**The one rule**, in `contracts/class-planning.json` → `classFolder`:
+
+- *naming* (where a NEW page is written): the first configured per-section
+  folder whose name CONTAINS "class" (case-insensitive), else the first entry,
+  else the literal "All Classes". Substring is safe here — it is a short list
+  the teacher chose.
+- *membership* (which folders COUNT): EVERY configured per-section folder whose
+  name contains "class", falling back to the single name naming chose. Added
+  after review: naming and membership are the same question only when a course
+  has one such folder, and a course configured
+  `["Class Resources", "All Classes"]` would otherwise resolve to the first for
+  both, match zero pages, and drop the coverage map back to "every published
+  page" — reintroducing the exact silent failure the rule closes.
+- *isClassPage*: not an `index.md`, and one FOLDER segment — never the file
+  name — EQUALS that folder's name, case-insensitively, with the path taken
+  RELATIVE to the content root.
+
+The asymmetry is deliberate and is the part worth not "simplifying" later:
+naming may use a substring because its input is curated; page matching may not,
+because its input is arbitrary paths. A classics course's "Classical Studies"
+folder must not be mistaken for where its lessons live.
+
+**What changed on your side:**
+
+- new `Plantoir.Core/Models/ClassFolderRule.cs` — `Name(...)` and
+  `IsClassPage(relativePath, classFolder)`. It is called `ClassFolderRule`, not
+  `ClassFolder`, because `AssistWorkspace` already has a private `ClassFolder`
+  method that returns a PATH, and two things with one name returning different
+  kinds of answer is how the next bug gets written;
+- `AssistWorkspace.Plan` now calls
+  `ClassFolderRule.IsClassPage(Relative(pagePath), ClassFolderRule.Names(...))`
+  — note `Relative(...)`, which is the fix for the `Classroom` bug. **The rule
+  is a pure segment matcher and cannot tell an absolute path from a relative
+  one**, so `Relative(...)` is the whole protection: if you ever call
+  `IsClassPage` from somewhere else, pass a relative path or you reintroduce
+  the bug. The mac learned this the same way — its own `AssistSectionPage` had
+  to gain a `pathWithinSection` because `relativePath` is the FULL ABSOLUTE
+  PATH whenever `workspaceURL` is nil;
+- `ClassFolderRule.Name`/`Names` skip null and empty entries: these lists come
+  from JSON, including the contract's own case data, and unguarded LINQ threw
+  where Swift and Python coerce;
+- `AssistWorkspace.ClassFolder(course, section)` delegates its naming half;
+- new `Plantoir.Tests/ClassFolderContractTests.cs`, deserialising the same 5 + 9
+  cases the mac suite and `scripts/test_class_folder.py` run.
+
+**Rejected:** unifying on "contains class" everywhere. It reads well and it
+reclassifies real shipped pages — see the payload examples above. Segment
+EQUALITY for pages, substring only for the configured list, is the distinction
+that makes the rule safe.
+
+## The scripts can now read the contract — and it travels differently on Windows (2026-08-23)
+
+`contracts/` used to be readable only by the two test suites. It is now readable
+from `scripts/*.py` as well, through `scripts/contracts.py`. This is the spine of
+a larger piece (hardening the folder and file names that carry hidden meaning —
+`Tasks`, the curriculum folder, `All Classes`, `Media`, `index.md`,
+`Key Links.md`), and it matters to you because the rules being hardened live in
+`build_site.py`, which is the thing that actually decides what ships. A rule that
+lives there and nowhere a test can reach is a third implementation with no gate
+on it — the drift the contract exists to prevent, arriving by the back door.
+
+**Why it had to be baked into the image, and what that costs.** The container's
+ONLY bind mount is `courses` (see `preview.sh`, `deploy.sh`). The working
+folder's `.toolchain/` sits beside `courses/` and is NOT mounted; the app bundle
+is on the host. So neither of the two obvious routes can be read from inside the
+container, and the contract has to be `COPY`d in by the Dockerfile. The
+consequence is deliberate: `contracts/` is not in `toolchain_hash`'s prune list,
+so every contract edit mints a new `teaching-quartz:src-<hash>` tag and forces an
+image rebuild and container recreate. That is development-time cost on the mac,
+paid on every case added, and it was accepted because the alternative was a
+shared rule the build cannot see.
+
+**None of that applies to you, and that is the point of this section.** Windows
+runs these scripts NATIVELY — no container, no image, no hash. The contract
+reaches Python through `PLANTOIR_CONTRACTS_DIR`, exactly the way
+`PLANTOIR_SUPPORT_DIR` already reaches `support/`. Five things carry it:
+
+- `ToolchainMirror.RecipeFolders` gained `contracts`, so a working folder's
+  `.toolchain/` gets it;
+- `Plantoir.csproj` ships `Toolchain\contracts\`;
+- `setup.ps1`, `preview.ps1` and `deploy.ps1` set `PLANTOIR_CONTRACTS_DIR`;
+- `Vendor/fetch-runtime.ps1` sets it too — a SIXTH env-setting site the first
+  pass missed, and the kind that is latent until it is not: it runs
+  `setup_course.py` while provisioning the runtime, so the first time a script
+  reads a required contract there, it throws `ContractMissing` naming
+  `/opt/contracts` on a Windows host. That error names a container path on a
+  machine that has no container, which is about as confusing as a message gets.
+
+**If you add another place that runs a `scripts/*.py`, it needs the variable.**
+There is no way to make this fail loudly at build time; it fails at run time, in
+whatever feature happened to read a contract first.
+
+**A trap that cost real time here, and travels to you unchanged.** The recipe's
+folder list existed as FOUR hand-maintained copies: the mac's
+`WorkspaceModel.refreshToolchain`, your `ToolchainMirror.RecipeFolders`, the
+marketing screenshot harness (`website/shots/capture.py`), and the Dockerfile's
+own `COPY` lines. They drifted the moment a fifth folder was added, and the one
+that drifted was the harness — whose docstring said, in so many words, "keep them
+in step".
+
+The failure mode is worth understanding because it is not the one you would
+guess. `capture.py` copies the *Dockerfile* too. So the demo workspace got a
+Dockerfile containing `COPY contracts/ /opt/contracts/` with no `contracts/`
+beside it. That workspace is not STALE, it is **unbuildable**: `docker buildx
+build` fails on the missing `COPY`, and `preview.sh`'s friendly "this folder is
+missing the toolchain's build recipe" message cannot fire, because
+`resolve_build_context` only checks that the Dockerfile EXISTS — and it does.
+A folder list that is merely incomplete produces a hard build failure with a
+misleading diagnosis.
+
+The fix, and the pattern worth copying: the list became DATA
+(`contracts/toolchain.json` → `recipeFolders`), and `scripts/test_recipe_folders.py`
+pins every carrier against it — including your `ToolchainMirror.cs` and
+`Plantoir.csproj`, which it reads as TEXT. That is deliberate: one Python test
+can pin a Swift list and a C# list, where a C#-only test could only ever check
+its own half. The test was verified to actually fail when a copy drifts, which
+is the check people skip. **If you add a recipe folder on your side, add it to
+`recipeFolders` and let the test tell the mac.**
+
+**Rejected:** leaving the list in code and adding a comment (that is exactly what
+was there, and it is what failed); and having each platform's own suite check
+only its own copy (two green suites, still drifted).
+
 
 ## The course-code picker is a hand-built combo box — and you probably should NOT build one (2026-08-23)
 

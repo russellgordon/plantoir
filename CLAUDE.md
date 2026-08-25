@@ -201,7 +201,24 @@ Neither app contains toolchain logic of its own: they write the same
    carrying it credits that person as a contributor to this repository —
    found 2026-08-19, after seven commits had already done exactly that.
    `noreply@google.com` was checked the same day and maps to no account at
-   all, which is the property that makes it safe. The failure
+   all, which is the property that makes it safe.
+
+   **A `commit-msg` hook now enforces this**, because a written rule depends on
+   every agent having read it and the hook does not: `.githooks/commit-msg`
+   rewrites the bad address to the safe one at commit time, and says that it
+   did. It is committed rather than left in `.git/hooks` so it reaches the
+   Windows machine too — but hooks are not installed by cloning, so **each
+   clone must opt in once**:
+
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+
+   Do that on any machine that has not, and check `git config --get
+   core.hooksPath` before assuming you are covered. The seven bad commits are
+   left as they are: removing them from GitHub's contributor list would mean
+   rewriting `main` and `dev` and breaking every existing clone, which costs
+   more than it buys. The failure
    the commit-per-piece order prevents is unchanged: one session's worth of
    unrelated work in one working tree — forty files, a dozen decisions
    tangled together, no way to undo one piece without unpicking the rest —
@@ -437,7 +454,7 @@ old `ca.russellgordon.QuartzTeachers` domain.
 ## How the toolchain ships
 
 There is no Docker Hub. The full build recipe (Dockerfile, `patches/`,
-`scripts/`, `support/`, launchers) is bundled inside the app and mirrored into
+`scripts/`, `support/`, `contracts/`, launchers) is bundled inside the app and mirrored into
 each working folder's `.toolchain/`. The launchers:
 
 - tag the image `teaching-quartz:src-<hash>`, where the hash covers every file
@@ -470,7 +487,8 @@ lives inside the Colima VM's disk (`~/.colima`).
 
 ### Editing the toolchain: two traps that cost real time
 
-A change to `scripts/`, `support/`, `patches/` or a launcher does **not** reach
+A change to `scripts/`, `support/`, `patches/`, `contracts/` or a launcher does
+**not** reach
 a working folder until it has travelled through the app bundle. The app mirrors
 its bundled copy into `.toolchain/` whenever it touches a folder, and the
 launchers hash that folder to name the image. The chain is: edit → **rebuild the
@@ -579,7 +597,7 @@ forget. Windows ships `plantoir-mcp.exe` instead.
 ## Example content and skeletons
 
 `support/example_content/<CODE>/` holds ready-made course content, one folder
-per Ontario course code (ADA1O is the template to copy; **37 codes** have
+per Ontario course code (ADA1O is the template to copy; **38 codes** have
 payloads today — count the folders rather than trusting a number). Each payload
 is `manifest.json` plus `shared/` and `per_section/` trees, and the manifest is
 the course's ENTIRE structure when a teacher pre-populates: the wizard asks no
@@ -603,7 +621,7 @@ mistake there is a mistake in nineteen hundred courses.
 
 | Change | Gate |
 |---|---|
-| Toolchain (launchers, `scripts/`, Dockerfile, patches) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
+| Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
 | macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests` |
 | Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` |
 | Assistant routing | **Nothing.** Measured by hand — see below. |
@@ -614,8 +632,9 @@ made on Windows have no automated gate: verify them by driving a real publish
 through the app, and re-run `verify.sh` from the mac after the next sync.
 
 **The mac suite runs its test classes one at a time, and that is load-bearing.**
-The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`
-and `CourseActivityTests` both reset process-wide statics
+The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`,
+`CourseActivityTests` and `CourseActivityPublishOnlyTests` all reset
+process-wide statics
 (`PreviewLeases.reset()`, `CourseActivity.reset()`) around individual methods,
 so turning parallel testing on would let one class wipe the state another is
 mid-assertion on — an intermittent failure that looks exactly like a

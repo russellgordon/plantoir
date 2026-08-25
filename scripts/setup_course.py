@@ -37,6 +37,52 @@ _HOST_OS = "unknown"  # set from --host-os at runtime
 def _is_windows(host_os: str) -> bool:
     return (host_os or "").lower() == "windows"
 
+def graded_folders_for(manifest: dict, shared_folders: list, per_section_folders: list) -> list:
+    """
+    Which of this course's folders hold work that counts for marks.
+
+    A payload or skeleton says so itself; anything else is worked out from the
+    folders the course actually has, using the same rule the build has always
+    applied — a folder whose name mentions tasks. So a brand-new course starts
+    with exactly the marks it would have had before this key existed, written
+    down explicitly instead of inferred every build.
+
+    Writing it explicitly is safe HERE and only here: a new course has no marks
+    to lose. Existing courses are deliberately left with no key at all, which is
+    what tells the build to keep applying the historical rule — see
+    contracts/shared-rules.json -> gradedFolders.absentIsNotEmpty.
+
+    Whatever the source, the result is RECONCILED against the folder lists the
+    course actually ends with: a declared name the teacher removed in the
+    wizard is dropped, and a pool left with nothing is returned as `[]` — the
+    honest "asked, and nothing counts" state, which the build then warns about
+    (site_health `noGradedFolders`) rather than the absent key, which would
+    read as "never asked" and match nothing just as silently.
+    """
+    actual_list = list(shared_folders or []) + list(per_section_folders or [])
+    actual_folders = {str(name) for name in actual_list if name}
+    actual_lookup = {str(name).lower(): str(name) for name in actual_list if name}
+    if manifest and "graded_folders" in manifest:
+        declared = manifest.get("graded_folders") or []
+        reconciled = []
+        for name in declared:
+            if not name:
+                continue
+            target_name = None
+            if str(name) in actual_folders:
+                target_name = str(name)
+            elif str(name).lower() in actual_lookup:
+                target_name = actual_lookup[str(name).lower()]
+            if target_name and target_name not in reconciled:
+                reconciled.append(target_name)
+        return reconciled
+    found = []
+    for name in actual_list:
+        if name and "task" in str(name).lower() and str(name) not in found:
+            found.append(str(name))
+    return found
+
+
 def _cmd_example(script_base: str, course, section, host_os: str) -> str:
     """
     Returns OS-appropriate example command for preview/deploy.
@@ -375,8 +421,11 @@ def prompt_type_list(prompt_text, default_list=None, add_md_extension=False, for
     # Remove forbidden names from provided list and warn
     cleaned = []
     removed = []
+    lowered_forbidden = {str(item).strip().lower() for item in forbidden_names}
     for name in raw:
-        if name in forbidden_names:
+        # Case-insensitively: the filesystem is, so "media" typed here used to
+        # be accepted and then collided with the folder Plantoir manages.
+        if name.strip().lower() in lowered_forbidden:
             removed.append(name)
             continue
         cleaned.append(name + ".md" if add_md_extension and not name.endswith(".md") else name)
@@ -2241,6 +2290,15 @@ def setup_course(no_backup: bool = False):
         "per_section_files": per_section_files,
         "hidden": hidden_items,
         "expandable": expandable_items,
+        # What this course calls its curriculum folder. Declared by every
+        # payload and skeleton manifest, and until now read only at install
+        # time — so the build fell back to scanning for the word "curriculum"
+        # and would never have found a folder that does not contain it.
+        "curriculum_folder": (
+            (example_manifest or {}).get("curriculum_folder")
+            if prepopulate_example
+            else (skeleton_manifest or {}).get("curriculum_folder")
+        ),
         # NEW: global Explorer expansion behaviour for this course
         "expandOnFolderClick": expand_on_click,
         "footer_html": footer_html,
@@ -2266,6 +2324,22 @@ def setup_course(no_backup: bool = False):
     else:
         # No schemes available now; keep whatever was previously saved
         config["color_schemes"] = previous_map
+
+    # Which folders hold work that counts for marks. Written explicitly for
+    # a NEW course because there are no marks to lose; an EXISTING course
+    # deliberately has no such key if never configured, which is what tells
+    # the build to keep applying the historical rule.
+    if saved_config:
+        if "graded_folders" in saved_config:
+            config["graded_folders"] = graded_folders_for(
+                {"graded_folders": saved_config["graded_folders"]},
+                shared_folders, per_section_folders
+            )
+    else:
+        config["graded_folders"] = graded_folders_for(
+            example_manifest if prepopulate_example else (skeleton_manifest or {}),
+            shared_folders, per_section_folders
+        )
 
     # Keys this wizard does not own — the desktop apps' publishing choice
     # (deploy_target, deploy_folder_path), and anything a future version

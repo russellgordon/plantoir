@@ -85,6 +85,27 @@ fi
 # Fast, dependency-free checks that don't need the image — run first so a
 # broken script.py change fails in milliseconds instead of after a full
 # Docker build.
+if (cd scripts && python3 test_site_health.py) >/tmp/verify_site_health_test.log 2>&1; then
+  pass "site_health.py: the checks, and the words they say (scripts/test_site_health.py)"
+else
+  fail "site_health.py: the checks, and the words they say (scripts/test_site_health.py)"
+  cat /tmp/verify_site_health_test.log
+fi
+
+if (cd scripts && python3 test_recipe_folders.py) >/tmp/verify_recipe_folders_test.log 2>&1; then
+  pass "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
+else
+  fail "the toolchain recipe's folder list agrees everywhere it is copied (scripts/test_recipe_folders.py)"
+  cat /tmp/verify_recipe_folders_test.log
+fi
+
+if (cd scripts && python3 test_contracts.py) >/tmp/verify_contracts_test.log 2>&1; then
+  pass "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
+else
+  fail "contracts.py: the scripts can read the Plantoir contract (scripts/test_contracts.py)"
+  cat /tmp/verify_contracts_test.log
+fi
+
 if (cd scripts && python3 test_deploy_netlify_headers.py) >/tmp/verify_deploy_headers_test.log 2>&1; then
   pass "deploy.py: Netlify ad-badge suppression (scripts/test_deploy_netlify_headers.py)"
 else
@@ -104,6 +125,13 @@ if (cd scripts && python3 test_deploy_course_dir_resolution.py) >/tmp/verify_dep
 else
   fail "deploy.py: course directory resolution under a native build root (scripts/test_deploy_course_dir_resolution.py)"
   cat /tmp/verify_deploy_course_dir_test.log
+fi
+
+if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
+  pass "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
+else
+  fail "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
+  cat /tmp/verify_preflight_exclusions_test.log
 fi
 
 # -------------------- 1. Container runtime (shared Colima) --------------------
@@ -158,6 +186,35 @@ else
     fail "docker build failed"
     exit 1
   fi
+fi
+
+# ---- build_site.py: which folders count for marks ----
+echo ""
+echo "🔎 Checking build_site.py's graded-folder rule against the shared contract…"
+if docker run --rm \
+  -v "$(pwd)/scripts/test_graded_folders.py:/opt/scripts/test_graded_folders.py:ro" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_graded_folders.py >/tmp/verify_graded_test.log 2>&1; then
+  pass "build_site.py: graded-folder rule matches contracts/shared-rules.json (scripts/test_graded_folders.py)"
+else
+  fail "build_site.py: graded-folder rule matches contracts/shared-rules.json (scripts/test_graded_folders.py)"
+  cat /tmp/verify_graded_test.log
+fi
+
+# ---- build_site.py: the class-folder rule, against the SHARED contract ----
+# Same reason as the domain test below: build_site.py imports `frontmatter`,
+# which lives only inside the container. This one ALSO needs the contract, and
+# reads it from the image's own /opt/contracts — which is the end-to-end check
+# that the contract really travels with the toolchain, not just that the rule
+# is right.
+echo ""
+echo "🔎 Checking build_site.py's class-folder rule against the shared contract…"
+if docker run --rm \
+  -v "$(pwd)/scripts/test_class_folder.py:/opt/scripts/test_class_folder.py:ro" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_class_folder.py >/tmp/verify_class_folder_test.log 2>&1; then
+  pass "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
+else
+  fail "build_site.py: class-folder rule matches contracts/class-planning.json (scripts/test_class_folder.py)"
+  cat /tmp/verify_class_folder_test.log
 fi
 
 # ---- build_site.py: custom-domain resolution follows the primary destination ----
@@ -385,6 +442,12 @@ check_baked() {
     fail "Image file $image_path differs from repo $repo_path"
   fi
 }
+check_baked scripts/contracts.py          /opt/scripts/contracts.py
+check_baked scripts/site_health.py        /opt/scripts/site_health.py
+# The contract itself must be IN the image: the container's only bind mount is
+# `courses`, so a rule the scripts read has nowhere else to come from. One file
+# stands for the directory — the Dockerfile copies it wholesale.
+check_baked contracts/class-planning.json /opt/contracts/class-planning.json
 check_baked scripts/setup_course.py       /opt/scripts/setup_course.py
 check_baked scripts/build_site.py         /opt/scripts/build_site.py
 check_baked scripts/deploy.py             /opt/scripts/deploy.py

@@ -44,7 +44,7 @@ This toolchain lets a teacher:
   manual step entirely
   (see [Launcher Scripts](03-launcher-scripts.md#container-runtime-bootstrap)).
   Distribution is **the Plantoir app**: it bundles the full build recipe
-  (Dockerfile, patches, scripts, support files, launchers) and mirrors it
+  (Dockerfile, patches, scripts, support files, contracts, launchers) and mirrors it
   into each working folder's `.toolchain/`, refreshing stale copies — so
   teachers never clone this repository, and an app update IS a toolchain
   update (new recipe → new image tag → local rebuild → recreated

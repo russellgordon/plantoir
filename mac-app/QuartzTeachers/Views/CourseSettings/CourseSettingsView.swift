@@ -9,6 +9,7 @@ struct CourseSettingsView: View {
 
     let course: Course
 
+    @State var isShowingFoldersHelp: Bool = false
     @State var saveProblem: String?
     @State var didJustSave: Bool = false
 
@@ -79,27 +80,86 @@ struct CourseSettingsView: View {
                 Section {
                     StringListEditorView(
                         title: "Shared folders (all sections)",
-                        items: $configuration.sharedFolders
+                        items: $configuration.sharedFolders,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "shared")
+                            dropFromMarksPool(name)
+                            ActivityTrail.note(.itemExcluded, "excluded shared folder " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            if configuration.reinclude(name, inScope: "shared") {
+                                ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
+                            }
+                        },
+                        protection: sharedFolderProtection
                     )
                     StringListEditorView(
                         title: "Shared files (all sections)",
                         hidesMarkdownExtension: true,
-                        items: $configuration.sharedFiles
+                        items: $configuration.sharedFiles,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "shared")
+                            ActivityTrail.note(.itemExcluded, "excluded shared file " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            if configuration.reinclude(name, inScope: "shared") {
+                                ActivityTrail.note(.itemReincluded, "re-included shared file " + name + " in " + course.code)
+                            }
+                        }
                     )
                     StringListEditorView(
                         title: "Per-section folders",
-                        items: $configuration.perSectionFolders
+                        items: $configuration.perSectionFolders,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "per_section")
+                            dropFromMarksPool(name)
+                            ActivityTrail.note(.itemExcluded, "excluded per-section folder " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            if configuration.reinclude(name, inScope: "per_section") {
+                                ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
+                            }
+                        },
+                        protection: perSectionFolderProtection
                     )
                     StringListEditorView(
                         title: "Per-section files",
                         hidesMarkdownExtension: true,
-                        items: $configuration.perSectionFiles
+                        items: $configuration.perSectionFiles,
+                        onRemove: { name in
+                            configuration.exclude(name, inScope: "per_section")
+                            ActivityTrail.note(.itemExcluded, "excluded per-section file " + name + " in " + course.code)
+                        },
+                        onAdd: { name in
+                            if configuration.reinclude(name, inScope: "per_section") {
+                                ActivityTrail.note(.itemReincluded, "re-included per-section file " + name + " in " + course.code)
+                            }
+                        },
+                        protection: perSectionFileProtection
                     )
-                    Text("Tip: you can also simply create new folders in Obsidian — they’re added to your site automatically the next time you preview.")
+                    Text("Tip: you can also simply create new folders in Obsidian — they’re added to your site automatically the next time you preview (unless you have removed them here).")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 } header: {
                     FormSectionHeader("Content Structure")
+                }
+
+                Section {
+                    MembershipToggleListView(
+                        title: "Folders whose work counts for marks",
+                        allItems: gradedFolderChoices,
+                        members: gradedFoldersBinding,
+                        protection: gradedFolderProtection
+                    )
+                    Text("The curriculum map uses this to show which expectations you have actually evaluated. Most courses keep “Tasks”; add “Tests” or anything else you mark, and remove what you don’t.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Button("What else does Plantoir use my folders for?") {
+                        isShowingFoldersHelp = true
+                    }
+                    .buttonStyle(.link)
+                } header: {
+                    FormSectionHeader("Marks")
                 }
 
                 Section {
@@ -170,6 +230,9 @@ struct CourseSettingsView: View {
                 }
                 .disabled(!FolderActions.obsidianIsInstalled)
                 .help("Edit this course's pages in Obsidian")
+                .sheet(isPresented: $isShowingFoldersHelp) {
+                    SpecialFoldersHelpView(course: course)
+                }
                 .accessibilityIdentifier("openCourseInObsidianButton")
             }
         }
@@ -210,6 +273,67 @@ struct CourseSettingsView: View {
         return nil
     }
 
+    /// Every folder that could hold work counting for marks.
+    ///
+    /// Not just the top-level lists. The build matches a graded folder at ANY
+    /// DEPTH, so a course with `Portfolios/Tasks` has assessed work that the
+    /// declared lists never mention — and a control that showed only the
+    /// top-level folders would have let a teacher's first tick freeze a pool
+    /// that silently dropped it. That is the same silent mark-loss that made
+    /// seeding every course with ["Tasks"] unsafe, arriving through the
+    /// interface instead.
+    var gradedFolderChoices: [String] {
+        var choices: [String] = []
+        for folder in course.configuration.sharedFolders {
+            if !choices.contains(folder) {
+                choices.append(folder)
+            }
+        }
+        for folder in course.configuration.perSectionFolders {
+            if !choices.contains(folder) {
+                choices.append(folder)
+            }
+        }
+        for folder in CourseSettingsView.nestedFolderNames(in: course) {
+            if !choices.contains(folder) {
+                choices.append(folder)
+            }
+        }
+        return choices
+    }
+
+    /// The pool, shown as ticks.
+    ///
+    /// When the course has never been asked (`gradedFolders` is nil), the
+    /// folders the build currently counts are shown ticked — the historical
+    /// rule, any folder whose name mentions tasks — so what a teacher sees is
+    /// what is actually happening rather than a blank list. Nothing is written
+    /// until they change something, and the moment they do, the answer becomes
+    /// explicit and the historical rule stops applying to this course.
+    ///
+    /// Which is why the derived list must be as complete as it can afford to
+    /// be: the first tick freezes it, so anything the build counts today and
+    /// this list omits loses its marks without a word.
+    var gradedFoldersBinding: Binding<[String]> {
+        return Binding(
+            get: {
+                if let chosen = course.configuration.gradedFolders {
+                    return chosen
+                }
+                var counted: [String] = []
+                for folder in gradedFolderChoices {
+                    if folder.lowercased().contains("task") {
+                        counted.append(folder)
+                    }
+                }
+                return counted
+            },
+            set: { newValue in
+                course.configuration.gradedFolders = newValue
+            }
+        )
+    }
+
     // MARK: - Functions
 
     func save() {
@@ -230,5 +354,147 @@ struct CourseSettingsView: View {
             saveProblem = "Could not save: \(error.localizedDescription)"
             ActivityTrail.note(.settingsCouldNotBeSaved, "could not save the settings for " + course.code + " — " + error.localizedDescription)
         }
+    }
+
+    /// A folder removed from the course leaves the marks pool as well, so the
+    /// confirmation's promise ("Removing it will take it out of your course's
+    /// marks pool") is kept, and `graded_folders` never names a folder the
+    /// build has been told to exclude. Goes through `gradedFoldersBinding` so
+    /// a never-asked course (nil pool) is materialised on the way, exactly as
+    /// a tick would do it.
+    func dropFromMarksPool(_ name: String) {
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if !currentGraded.contains(name) {
+            return
+        }
+        var remaining: [String] = []
+        for folder in currentGraded {
+            if folder != name {
+                remaining.append(folder)
+            }
+        }
+        gradedFoldersBinding.wrappedValue = remaining
+    }
+
+    func sharedFolderProtection(for folder: String) -> ItemProtection {
+        let resolvedCurriculum: String? = CurriculumFolderRule.resolvedCurriculumFolder(for: course)
+        if let resolvedCurriculum, folder == resolvedCurriculum {
+            if course.configuration.includesCurriculumCoverage {
+                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageSetting)
+            } else {
+                return .consequential(
+                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
+                    message: SpecialNames.removeCurriculumFolderMessage
+                )
+            }
+        }
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if currentGraded.contains(folder) {
+            if course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
+                return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+            } else {
+                return .consequential(
+                    title: SpecialNames.removeGradedFolderTitle(for: folder),
+                    message: SpecialNames.removeGradedFolderMessage
+                )
+            }
+        }
+        return .ordinary
+    }
+
+    func perSectionFolderProtection(for folder: String) -> ItemProtection {
+        if course.configuration.perSectionFolders.count <= 1 {
+            return .blocked(reason: SpecialNames.lastPerSectionFolderBlocked)
+        }
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if currentGraded.contains(folder) && course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
+            return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+        }
+        // "All Classes" — exactly that folder — is never removable (Russell,
+        // 2026-08-24): the next-class button and the schedule write pages
+        // into it, so a confirmation would be asking the teacher to break
+        // both. Every other per-section folder can be added or removed.
+        if ClassFolder.isTheAllClassesFolder(folder) {
+            return .blocked(reason: SpecialNames.classFolderBlocked)
+        }
+        if currentGraded.contains(folder) {
+            return .consequential(
+                title: SpecialNames.removeGradedFolderTitle(for: folder),
+                message: SpecialNames.removeGradedFolderMessage
+            )
+        }
+        return .ordinary
+    }
+
+    func perSectionFileProtection(for file: String) -> ItemProtection {
+        let normalized: String = file.lowercased()
+        if normalized == "index.md" || normalized == "index" {
+            return .blocked(reason: SpecialNames.sectionIndexFileBlocked)
+        }
+        return .ordinary
+    }
+
+    func gradedFolderProtection(for folder: String) -> ItemProtection {
+        guard course.configuration.includesCurriculumCoverage else {
+            return .ordinary
+        }
+        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
+        if currentGraded.contains(folder) && currentGraded.count <= 1 {
+            return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+        }
+        return .ordinary
+    }
+
+    /// Folder names below the top level of a course, so the marks list can
+    /// offer what the build can actually count.
+    ///
+    /// Deliberately shallow and cheap: build outputs, Plantoir's own
+    /// bookkeeping and `Media` are skipped, and it stops at four levels deep.
+    ///
+    /// That cap means the list is not exhaustive, and the earlier claim that it
+    /// was "complete before it can be frozen" was too strong — a graded folder
+    /// buried five levels down is still absent. It is far more complete than
+    /// the top-level lists alone, which is what the case that mattered needed,
+    /// and the cap is what keeps this affordable on a course of a few thousand
+    /// pages.
+    static func nestedFolderNames(in course: Course) -> [String] {
+        let skipped: Set<String> = [
+            ".merged_output", "merged_output", ".internal", ".obsidian",
+            "node_modules", "Media", ".git",
+        ]
+        // A section folder is not somewhere work lives — its CONTENTS are
+        // merged into the site and its own name never appears in a page's path
+        // there, so ticking it would count nothing. Its children are still
+        // walked, because a graded folder inside a section certainly does count.
+        let isSectionFolder: (String) -> Bool = { name in
+            return name.lowercased().hasPrefix("section")
+                && Int(name.dropFirst("section".count)) != nil
+        }
+        var names: [String] = []
+        let manager: FileManager = FileManager.default
+        guard let walker = manager.enumerator(
+            at: course.directoryURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return names
+        }
+        for case let url as URL in walker {
+            if walker.level > 4 {
+                walker.skipDescendants()
+                continue
+            }
+            let name: String = url.lastPathComponent
+            if skipped.contains(name) {
+                walker.skipDescendants()
+                continue
+            }
+            let isDirectory: Bool = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?
+                .isDirectory ?? false
+            if isDirectory && !isSectionFolder(name) && !names.contains(name) {
+                names.append(name)
+            }
+        }
+        return names
     }
 }

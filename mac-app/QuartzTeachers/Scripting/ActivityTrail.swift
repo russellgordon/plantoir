@@ -62,6 +62,33 @@ nonisolated enum ActivityTrail {
         /// leaves nothing to look at: the marker is derived, so its
         /// absence and its presence look identical on disk.
         case sectionContentMarkedPublished = "section content marked published"
+        /// A folder a feature depends on was missing, renamed or emptied.
+        /// Carries the check's NAME, never its wording: the sentence is
+        /// product wording and will be reworded, while the name is what
+        /// somebody reading the trail months later can match against the
+        /// contract. The finding itself is printed into a build console that
+        /// is long gone by the time it is reported, and the condition is
+        /// invisible on disk — a renamed folder looks exactly like a folder
+        /// that was always called that.
+        case folderProblemFound = "folder problem found"
+        /// A folder a feature depends on was put back, at the teacher's
+        /// request. Separate from `folderProblemFound` because it is a
+        /// different event: one records that something is wrong, the other that
+        /// somebody acted on it — and a trail that could not tell them apart
+        /// would leave "did they ever fix it?" unanswerable.
+        case folderProblemRepaired = "folder problem repaired"
+        /// A folder or file was removed in Course Settings, excluding it
+        /// from previews and deploys.
+        case itemExcluded = "item excluded"
+        /// A previously excluded folder or file was added back in Course
+        /// Settings, returning it to previews and deploys.
+        case itemReincluded = "item re-included"
+        /// A teacher tried to remove or untick a folder or file that a
+        /// feature depends on, and was shown why it cannot go and which
+        /// switch to turn off first. Recorded because "I could not remove
+        /// the folder" is a report support will receive, and the line says
+        /// which rule refused and what the teacher was told.
+        case removalBlocked = "removal blocked"
     }
 
     // MARK: - Stored properties

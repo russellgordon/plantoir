@@ -250,5 +250,209 @@
       }
     ],
     "note": "Named by case, not by message: which refusal it is must match on both platforms, while the sentence a teacher reads is the product's wording."
+  },
+  "classFolder": {
+    "note": "Which folder holds a section's class pages, and whether a given page is one of them. ONE rule, because there were several and they disagreed — a teacher whose folder was not called 'All Classes' got a different answer from the mac app, the Windows app and the build, and the build's answer silently changed the Curriculum Coverage map from 'pages the course teaches' to 'every published page'. A wrong map that reports success is the failure this rule exists to close.",
+    "naming": {
+      "rule": "WHERE A NEW CLASS PAGE IS WRITTEN. Read from the course's own configured per_section_folders, never guessed from what is on disk: the first entry whose name contains 'class' (case-insensitive), else the first entry, else the literal 'All Classes'. Substring matching is safe HERE because the list is a short curated one the teacher chose; it is NOT safe against arbitrary paths, which is what isClassPage below is careful about.",
+      "cases": [
+        {
+          "name": "the ordinary case",
+          "perSectionFolders": [
+            "All Classes"
+          ],
+          "expect": "All Classes"
+        },
+        {
+          "name": "a teacher's own name for it",
+          "perSectionFolders": [
+            "Handouts",
+            "Class Pages"
+          ],
+          "expect": "Class Pages",
+          "why": "Contains 'class', so it wins over the earlier entry. This is the case that was broken: the build matched only the exact strings 'all classes' and 'classes', so this course's lessons were invisible to it while both apps found them."
+        },
+        {
+          "name": "case-insensitive",
+          "perSectionFolders": [
+            "all classes"
+          ],
+          "expect": "all classes"
+        },
+        {
+          "name": "nothing mentions classes",
+          "perSectionFolders": [
+            "Handouts",
+            "Worksheets"
+          ],
+          "expect": "Handouts",
+          "why": "The first entry, so a course still has somewhere to put a class page rather than failing."
+        },
+        {
+          "name": "no per-section folders at all",
+          "perSectionFolders": [],
+          "expect": "All Classes",
+          "why": "The last-resort literal. A section with nothing configured still gets a predictable answer instead of an empty path."
+        }
+      ]
+    },
+    "isClassPage": {
+      "rule": "A page is a class page when it is NOT an index.md and one of its FOLDER segments — never its file name — equals ANY of the membership names above, case-insensitively. Segments are taken RELATIVE to the content root (or the section folder); the path above it is the teacher's own filing and means nothing here. Either path separator is understood.",
+      "whyFolderSegmentsOnly": "Defence in depth, not a bug that was observed. Under segment EQUALITY a file name can never collide with a folder name (a page is 'x.md' and a folder is 'x'), so excluding the file name changes no answer today. It is kept so that a future change to prefix or substring matching cannot silently start counting a page because of what it is CALLED — 'How This Class Works.md' ships in about twenty payloads, and ADA1O ships a curriculum expectation page called 'B3. Connections Beyond the Classroom.md'. An earlier draft of this contract claimed those pages HAD been miscounted; that was wrong — the previous build rule was equality too — and the claim is corrected here rather than left to be believed.",
+      "whyRelativeToTheContentRoot": "Every implementation had this wrong somewhere. build_site.py walked `page.parts` of an ABSOLUTE path (content_root.rglob yields absolute paths), Windows tested the whole directory STRING, and the mac's AssistSectionGraph returns the FULL ABSOLUTE PATH whenever workspaceURL is nil — which SectionIndexPointer.repointIndex passes. So a teacher whose working folder was 'C:\\\\Users\\\\x\\\\Classroom' or '~/Documents/All Classes' made every page in every course a class page. Where a teacher keeps their files is not a fact about their lessons.",
+      "cases": [
+        {
+          "name": "the ordinary case",
+          "path": "All Classes/Unit 1, Day 1.md",
+          "expect": true,
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "nested inside the class folder",
+          "path": "All Classes/Unit 1/Day 3.md",
+          "expect": true,
+          "why": "Any folder segment, at any depth — a teacher who files lessons by unit has not stopped teaching them.",
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "case-insensitive",
+          "path": "all classes/Unit 1, Day 1.md",
+          "expect": true,
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "a folder index is never a class page",
+          "path": "All Classes/index.md",
+          "expect": false,
+          "why": "A folder index carries the same date as the first class, and treating it as a lesson would let a reshuffle move the way in to the folder.",
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "the file name is ignored",
+          "path": "Setup/How This Class Works.md",
+          "expect": false,
+          "why": "Ships in about twenty payloads. The old build rule counted it.",
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "a curriculum page that mentions a classroom",
+          "path": "Curriculum/B3. Connections Beyond the Classroom.md",
+          "expect": false,
+          "why": "Ships in ADA1O. An expectation page is not a lesson.",
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "a folder that merely contains the word",
+          "path": "Classical Studies/Ovid.md",
+          "expect": false,
+          "why": "The segment must EQUAL the class folder's name. A classics course's reference folder is not where its lessons live.",
+          "classFolders": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "a teacher's own class folder",
+          "path": "Class Pages/Unit 2, Day 4.md",
+          "expect": true,
+          "classFolders": [
+            "Class Pages"
+          ]
+        },
+        {
+          "name": "the old hardcoded name, when it is not this course's",
+          "path": "All Classes/Unit 2, Day 4.md",
+          "expect": false,
+          "why": "The rule follows the COURSE's configured folder, not a name that used to be hardcoded.",
+          "classFolders": [
+            "Class Pages"
+          ]
+        },
+        {
+          "name": "a Windows path separator",
+          "classFolders": [
+            "All Classes"
+          ],
+          "path": "All Classes\\Unit 1, Day 1.md",
+          "expect": true,
+          "why": "The same relative path arrives with either separator depending on the platform that produced it, and one implementation understanding only '/' is a divergence hiding inside a shared rule."
+        },
+        {
+          "name": "the second of two class folders",
+          "classFolders": [
+            "Class Resources",
+            "All Classes"
+          ],
+          "path": "All Classes/Unit 1, Day 1.md",
+          "expect": true,
+          "why": "Membership is every configured folder that mentions classes, not only the one a new page would be written to."
+        },
+        {
+          "name": "a page in the OTHER class folder",
+          "classFolders": [
+            "Class Resources",
+            "All Classes"
+          ],
+          "path": "Class Resources/Seating Plan.md",
+          "expect": true
+        }
+      ]
+    },
+    "membership": {
+      "rule": "WHICH FOLDERS COUNT AS HOLDING CLASS PAGES — every configured per_section_folder whose name contains 'class' (case-insensitive); if none does, just the single name `naming` chose.",
+      "why": "Naming and membership are the same question only when a course has ONE such folder. A course configured [\"Class Resources\", \"All Classes\"] would otherwise resolve to 'Class Resources' for both, match zero pages, and drop the coverage map back to 'every published page' — reintroducing the exact silent failure this rule was written to close. Writing goes to one folder; counting looks at all of them.",
+      "cases": [
+        {
+          "name": "the ordinary case",
+          "perSectionFolders": [
+            "All Classes"
+          ],
+          "expect": [
+            "All Classes"
+          ]
+        },
+        {
+          "name": "two folders that both mention classes",
+          "perSectionFolders": [
+            "Class Resources",
+            "All Classes"
+          ],
+          "expect": [
+            "Class Resources",
+            "All Classes"
+          ],
+          "why": "Both count. Only the first is where a NEW page is written."
+        },
+        {
+          "name": "nothing mentions classes",
+          "perSectionFolders": [
+            "Handouts",
+            "Worksheets"
+          ],
+          "expect": [
+            "Handouts"
+          ],
+          "why": "Falls back to whatever `naming` chose, so a course still has one answer."
+        },
+        {
+          "name": "no per-section folders at all",
+          "perSectionFolders": [],
+          "expect": [
+            "All Classes"
+          ]
+        }
+      ]
+    }
   }
 }

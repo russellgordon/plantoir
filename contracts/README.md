@@ -20,7 +20,7 @@ mechanics, a measurement taken on one machine: not.
 | [`toolchain.json`](toolchain.json) | The image both platforms build from the same recipe: the four pins with the REASON each sits where it does, and what each of the seven Quartz patches changes and why it cannot be dropped. |
 | [`example-content.json`](example-content.json) | The ready-made courses: how a payload is discovered, the manifest's keys, and the allow-list rule that decides what actually installs. |
 | [`file-formats.json`](file-formats.json) | **The two files both apps WRITE and the Python then reads**: every `course_config.json` key with its type and default, and the frontmatter that decides whether students see a page — including the legacy `draft:` spelling, which means the opposite. |
-| [`shared-rules.json`](shared-rules.json) | Ten rule sets on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**. |
+| [`shared-rules.json`](shared-rules.json) | Twelve rule sets on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks**, and **what a teacher is told when a folder a feature depends on has been renamed or deleted**. |
 | [`course-management.json`](course-management.json) | The names the three kinds of zip carry and how they are told apart, what section number is offered next and which entries are refused in whose words, and the grade a course code names. |
 | [`class-planning.json`](class-planning.json) | Which page titles carry numbers, what "the next class" would be called, and — the highest-stakes data here — the ORDER renames must run in when room is made for a class. |
 | [`schedule-rules.json`](schedule-rules.json) | How a teacher's own list of class dates is read: every accepted date form, how an ambiguous `08/09/2026` column is settled or asked about, and what a pasted Google Sheet address becomes. |
@@ -154,7 +154,7 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | `course_config.json` keys, types, defaults | `file-formats.json` → `courseConfigKeys` | CourseConfiguration (10) |
 | Page visibility: `publish:`, legacy `draft:`, per-section keys | `file-formats.json` → `pageVisibility` | ~33 tests across the suite |
 | Image pins and the Quartz patches | `toolchain.json` | checked against `Dockerfile` and `patches/` |
-| Example-content payloads (all 37) | `example-content.json` | ExampleContent (10), and the payloads themselves |
+| Example-content payloads (all 38) | `example-content.json` | ExampleContent (10), and the payloads themselves |
 | Reading a teacher's date list | `schedule-rules.json` | SectionScheduleSource (23) |
 | Scheduled-deploy refusals | `shared-rules.json` → `scheduledDeployRefusals` | ScheduledDeploy (23) |
 | Sidebar filtering | `shared-rules.json` → `sidebarFilter` | CourseFilter (9) |
@@ -173,6 +173,9 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | Adding a section: suggestion, refusals, wording | `course-management.json` → `sectionNumbers` | SectionAdder, SectionNumbersValidation (21) |
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
+| Where a section's class pages live, and whether a page is one | `class-planning.json` → `classFolder` | ClassFolderContract (5), and `scripts/test_class_folder.py` in the image |
+| Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
+| What a teacher is told when a folder a feature needs has gone | `shared-rules.json` → `siteHealth` | SiteHealthContract (5), SiteHealthFinding (11), and `scripts/test_site_health.py` |
 
 **Not shared, and why.** Each of these is a deliberate decision, not an
 oversight:

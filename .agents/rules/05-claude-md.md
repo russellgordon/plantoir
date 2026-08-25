@@ -11,7 +11,7 @@ description: "Plantoir project rules, part 5 of 6 - Testing — what gates what"
 
 | Change | Gate |
 |---|---|
-| Toolchain (launchers, `scripts/`, Dockerfile, patches) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
+| Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
 | macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests` |
 | Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` |
 | Assistant routing | **Nothing.** Measured by hand — see below. |
@@ -22,8 +22,9 @@ made on Windows have no automated gate: verify them by driving a real publish
 through the app, and re-run `verify.sh` from the mac after the next sync.
 
 **The mac suite runs its test classes one at a time, and that is load-bearing.**
-The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`
-and `CourseActivityTests` both reset process-wide statics
+The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`,
+`CourseActivityTests` and `CourseActivityPublishOnlyTests` all reset
+process-wide statics
 (`PreviewLeases.reset()`, `CourseActivity.reset()`) around individual methods,
 so turning parallel testing on would let one class wipe the state another is
 mid-assertion on — an intermittent failure that looks exactly like a

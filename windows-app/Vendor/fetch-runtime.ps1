@@ -127,6 +127,7 @@ try {
     # builds and fails outright on an unwritable install.
     $env:PLANTOIR_QUARTZ_DIR = $quartzDir
     $env:PLANTOIR_SUPPORT_DIR = Join-Path $RepoRoot "support"
+    $env:PLANTOIR_CONTRACTS_DIR = Join-Path $RepoRoot "contracts"
     & "$pyDir\python.exe" -c "import sys; sys.path.insert(0, r'$RepoRoot\scripts'); import setup_course; setup_course.ensure_quartz_explorer_anchor(); setup_course.ensure_quartz_overflowlist_static_id()"
     if ($LASTEXITCODE -ne 0) { throw "Baking the Quartz scaffold patches failed" }
     if (-not (Select-String -Path "$quartzDir\quartz.layout.ts" -Pattern 'CQ4T-OMIT-ANCHOR' -Quiet)) {
@@ -134,6 +135,7 @@ try {
     }
     Remove-Item Env:\PLANTOIR_QUARTZ_DIR
     Remove-Item Env:\PLANTOIR_SUPPORT_DIR
+    Remove-Item Env:\PLANTOIR_CONTRACTS_DIR
     Write-Host "Quartz $QuartzTag patched and provisioned." -ForegroundColor Green
 
     # ---- wrangler (Cloudflare's deploy CLI, pinned below 4.100) --------------

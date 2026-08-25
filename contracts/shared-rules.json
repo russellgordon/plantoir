@@ -131,9 +131,34 @@
         "why": "Turning off the confirmation step changes what every later request DOES - it goes straight through instead of stopping for a button. A report that says 'it just did it without asking' is explained entirely by this line, and without it the behaviour looks like a bug in the gate rather than a setting somebody chose."
       },
       {
+        "carries": "which course, the section when the repair is about one, and what was put back \u2014 \"put the front page back\"",
+        "event": "folder problem repaired",
+        "why": "A different event from finding the problem, deliberately: one records that something is wrong, the other that somebody acted on it, and a trail that could not tell them apart leaves \"did they ever fix it?\" unanswerable. Only the two genuinely repairable cases can produce it \u2014 a missing Media folder and a missing section front page."
+      },
+      {
+        "carries": "which course and section, and a sentence naming what happened with the stable check NAME in brackets \u2014 'found a problem with this course\u2019s folders (curriculumCoverageFoundNothing)'. Never the product wording, which changes, and never anything written on a page",
+        "event": "folder problem found",
+        "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk \u2014 a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract."
+      },
+      {
         "carries": "which section, and which destinations it was published to",
         "event": "section content marked published",
         "why": "Why a section stopped saying \" \u2014 Edited\". The marker is DERIVED - its presence and its absence look identical on disk - so a teacher reporting 'it still says Edited after I published' leaves nothing to look at without this line. It is also the only record that a publish succeeded at EVERY destination rather than merely at one."
+      },
+      {
+        "carries": "the course code, the scope ('shared' or 'per-section'), and the item name",
+        "event": "item excluded",
+        "why": "A teacher removed a folder or file in Course Settings, excluding it from previews and deploys. Without this line, 'why is my folder not showing on the site' cannot be answered from the trail alone."
+      },
+      {
+        "carries": "the course code, the scope ('shared' or 'per-section'), and the item name",
+        "event": "item re-included",
+        "why": "A teacher added back a previously excluded folder or file in Course Settings, returning it to previews and deploys."
+      },
+      {
+        "carries": "the item name, which list it is in, and the reason sentence the teacher was shown (a specialNames sentence, never page content)",
+        "event": "removal blocked",
+        "why": "A teacher tried to remove or untick a folder or file a feature depends on (Course Settings or the New Course Wizard) and was shown why it cannot go. 'I could not remove the folder' is a report support will receive; the line says which rule refused."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -419,6 +444,33 @@
       }
     ]
   },
+  "gradedFolders": {
+    "note": "Which folders hold work that COUNTS FOR MARKS. An expectation is \"assessed\" \u2014 the ring on a cell in the Curriculum Coverage map, and Ontario's requirement that every overall expectation be evaluated at least once \u2014 when a page addressing it lives in one of these. It used to be hardcoded: any folder whose name CONTAINED \"task\". A teacher who called theirs \"Tests\", or renamed \"Tasks\", silently lost every assessed mark on the map with nothing said.",
+    "absentIsNotEmpty": {
+      "rule": "An ABSENT `graded_folders` key means the teacher has never been asked, and the HISTORICAL rule applies: any folder segment containing \"task\", case-insensitive. An EMPTY list means they were asked and cleared it, which is a real answer and is honoured.",
+      "why": "This is the whole migration, and conflating the two breaks courses both ways. The exact-name rule is NARROWER than the substring one \u2014 `support/skeletons` ships a family whose folder is \"Thinking Tasks\", which the old rule counted and a pool of [\"Tasks\"] does not \u2014 so seeding every existing course with [\"Tasks\"] would have quietly taken the assessed marks off that course's map. Nothing is written back from a build either: the apps serialise course_config.json wholesale from their own in-memory copy, so a key a build wrote is dropped the next time a teacher saves anything in Settings."
+    },
+    "matching": {
+      "rule": "A FOLDER segment \u2014 never the file name \u2014 equals a pooled name, case-insensitively, at ANY depth.",
+      "why": "At any depth so a teacher who files by unit inside `Tasks` does not lose credit. Never the file name, because a page is not assessed work on account of what it is called."
+    },
+    "cases": [
+      { "name": "not configured: the historical substring rule", "configured": false, "graded": [], "path": "Tasks/Culminating.md", "expect": true },
+      { "name": "not configured: a folder that merely contains the word", "configured": false, "graded": [], "path": "Thinking Tasks/Problem 3.md", "expect": true,
+        "why": "Ships in a skeleton family. The old rule counted it, so an existing course must keep counting it." },
+      { "name": "not configured: nothing task-ish", "configured": false, "graded": [], "path": "Concepts/Loops.md", "expect": false },
+      { "name": "configured: an exact pooled name", "configured": true, "graded": ["Tasks", "Tests"], "path": "Tests/Unit 1 Quiz.md", "expect": true },
+      { "name": "configured: nested inside a pooled folder", "configured": true, "graded": ["Tasks"], "path": "Tasks/Unit 1/Quiz.md", "expect": true },
+      { "name": "configured: a near miss is NOT a member", "configured": true, "graded": ["Tasks"], "path": "Thinking Tasks/Problem 3.md", "expect": false,
+        "why": "Once a teacher has chosen the list, it means what it says. This is the case that makes seeding an existing course with [\"Tasks\"] unsafe." },
+      { "name": "configured: the teacher removed Tasks", "configured": true, "graded": ["Tests"], "path": "Tasks/Old Assignment.md", "expect": false,
+        "why": "Removing a folder from the pool is the point of the feature." },
+      { "name": "configured: cleared deliberately", "configured": true, "graded": [], "path": "Tasks/Culminating.md", "expect": false },
+      { "name": "the file name never counts", "configured": true, "graded": ["Tasks"], "path": "Concepts/Tasks.md", "expect": false },
+      { "name": "an explicit null is a CLEARED list, not an unset one", "configured": true, "graded": [], "path": "Tasks/Culminating.md", "expect": false,
+        "why": "`{\"graded_folders\": null}` reads as configured-and-empty on both platforms rather than as absent: the key is PRESENT, and the absent case is reserved for a course that has never been asked. Pinned because the two implementations agreed by accident and nothing said which answer was intended." }
+    ]
+  },
   "problemReportDialog": {
     "askAboutPromptsWhen": [
       {
@@ -702,6 +754,82 @@
     ],
     "note": "What the sidebar's filter field shows. Case-insensitive, matched against the course CODE and the course NAME, and mid-word - a teacher typing 'comp' should find Introduction to Computer Science without knowing it starts with ICS. Matching is CONTAINS rather than prefix, deliberately: a teacher who knows their course as 'Calculus' should not have to know it is filed under MCV4U."
   },
+  "siteHealth": {
+    "note": "What the toolchain checks about a course's folders before it builds, and the WORDS a teacher reads when one of them is wrong. Certain folder and file names carry behaviour — the curriculum folder, the folder holding class pages, Media, a section's index — and nothing stopped a teacher deleting or renaming one in Obsidian. The features then failed SILENTLY: the Curriculum Coverage map in particular still rendered, still looked healthy, and was wrong.",
+    "whereItRuns": "Inside build_site.py, after the shared and per-section folders have been merged into content/ and BEFORE Quartz builds or anything is uploaded. It has to run there rather than in the apps: every check is defined over the MERGED tree, which does not exist until the build makes it, and a check that only guarded the GUI button would be bypassed by the assistant, by `Plantoir --mcp-stdio`, by the launchers, and by the scheduled deploy — which runs from launchd or Task Scheduler with the app CLOSED, and is the case that matters most.",
+    "checksTheFeatureNotTheFolder": "Every check asks whether the FEATURE produced anything, never whether a folder exists. Recreating an empty `Ontario Curriculum` folder does not restore a teacher's expectation pages, and `_find_curriculum_folder` requires a page named for an expectation code — so an existence check plus a Fix button would have silenced the warning AND left the map missing. A check that can be satisfied without fixing the problem is worse than no check.",
+    "scheduledDeployPublishesAnyway": "A scheduled deploy NEVER refuses on a health finding. A slightly inaccurate curriculum map is a paper cut; a site update a teacher was counting on that silently did not happen is not. The finding is recorded and surfaced afterwards instead.",
+    "marker": {
+      "prefix": "PLANTOIR_HEALTH:",
+      "examples": ["PLANTOIR_HEALTH: {\"name\": \"curriculumCoverageFoundNothing\", \"sentence\": \"The curriculum map for ICS3U Section 1 could not be built.\", \"detail\": \"Plantoir looks for a folder whose name mentions the curriculum, holding one page per expectation. It could not find one, so the Curriculum Coverage page has been left out of this build. If you renamed or moved that folder, the map will come back as soon as it can find it again.\", \"fixable\": false, \"course\": \"ICS3U\", \"section\": 1}", "PLANTOIR_HEALTH: {\"name\": \"mediaFolderMissing\", \"sentence\": \"The Media folder for ICS3U is not there.\", \"detail\": \"Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.\", \"fixable\": true, \"course\": \"ICS3U\", \"section\": 1}"],
+      "rule": "One line per finding on stdout, the prefix followed by a single-line JSON object carrying name, sentence, detail, fixable, course and section. The apps parse these lines out of the console transcript they are already reading; the teacher-facing SENTENCE travels in the line rather than being re-authored on each platform, so the two apps cannot word the same problem differently.",
+      "why": "A progress marker is matched loosely and getting one wrong is silent (see app-rules.json markerOrigins). A prefixed JSON line is unambiguous, survives being interleaved with ordinary build output, and carries structure a sentence cannot."
+    },
+    "repair": {
+      "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
+      "neverOffered": {
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders"],
+        "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it."
+      },
+      "offered": {
+        "checks": ["mediaFolderMissing", "sectionIndexMissing"],
+        "rule": "Create an empty Media folder, or a section index carrying only a title. Never overwrite: check first, so pressing twice — or pressing after fixing it in Obsidian — changes nothing.",
+        "why": "An empty folder and a bare front page are the correct starting state rather than a pretence. The pictures themselves are the teacher's and cannot be conjured back, and inventing content for a front page would put words in their mouth."
+      },
+      "afterwards": {
+        "rule": "Say what was put back, offer to preview it again, and say what the preview does NOT cover. After a repair reported while PUBLISHING, the sentence must name who this does not reach yet (students) and what changes that (publishing again) — the preview is still offered, because that is how a teacher checks the repair worked. The preview is NOT offered in three cases: nothing needed repairing, the repair failed, and a publish is running just now. And the publish sentence must not assert a past publish: it is shown after a FAILED deploy too, and for a first publish nothing has ever gone out.",
+        "why": "The button is called \"Preview Again\", not \"Build Again\": the old label never said WHAT would be built, and the thing on offer already has a name the teacher knows. The preview was at first WITHHELD after a publish, reasoning that it does not change what students see — true, and beside the point: the teacher has just put a folder back and wants to SEE that it worked. Withholding it removed something useful to prevent a misunderstanding the words already prevent, so the words carry it instead. A repair whose outcome is invisible is one nobody trusts a second time, and the Media folder is somewhere a teacher cannot see from the app at all. A repair that FAILED must be reported too: both restores can fail on a read-only volume or a file sitting where the folder should be, and reporting only success made the two indistinguishable — silence on the failure path, in the feature written to end silence."
+      },
+      "oneAlertAtATime": {
+        "rule": "The outcome is shown AFTER the dialog it was requested from has gone, never raised from inside that dialog's own button action.",
+        "why": "A view presents one alert at a time; asking for a second while the first is dismissing loses one of them, and the one lost would be the report the teacher just asked for."
+      }
+    },
+    "checks": [
+      {
+        "name": "curriculumCoverageFoundNothing",
+        "sentence": "The curriculum map for {course} Section {section} could not be built.",
+        "detail": "Plantoir looks for a folder whose name mentions the curriculum, holding one page per expectation. It could not find one, so the Curriculum Coverage page has been left out of this build. If you renamed or moved that folder, the map will come back as soon as it can find it again.",
+        "fixable": false,
+        "why": "The headline case. The map used to vanish with nothing said, and the page it would have linked from says nothing either — a teacher discovers it in May."
+      },
+      {
+        "name": "courseTeachesNothing",
+        "sentence": "Plantoir could not find any class pages in {course} Section {section}.",
+        "detail": "The curriculum map counts an expectation as addressed when a page that a class links to mentions it. With no class pages to start from, it has counted every published page instead, so the map is more generous than it should be.",
+        "fixable": false,
+        "why": "This is the fallback that made a wrong map look healthy. Saying so is the entire fix: the fallback itself is deliberate, because a map that hid everything would be worse."
+      },
+      {
+        "name": "mediaFolderMissing",
+        "sentence": "The Media folder for {course} is not there.",
+        "detail": "Images and files you have added to pages live in a folder called Media, beside your course. Plantoir could not find it, so anything on a page that points into it will be missing from the built site.",
+        "fixable": true,
+        "why": "Checks the TARGET, not the link: content/Media is recreated on every build, so checking the link itself always passes. What breaks is the course-level folder it points AT."
+      },
+      {
+        "name": "sectionIndexMissing",
+        "sentence": "{course} Section {section} has no front page.",
+        "detail": "Every section has a page called index.md that students land on first. This section's is missing, so the site will open on whatever page happens to come first.",
+        "fixable": true,
+        "why": "Restorable safely, unlike the curriculum folder — which is why this one may offer to fix itself and that one may not."
+      },
+      {
+        "name": "handWrittenCoveragePage",
+        "sentence": "A page called Curriculum Coverage will be overwritten each time you build.",
+        "detail": "Plantoir writes the Curriculum Coverage page itself, every build. There is a page by that name in your own notes, and it is not the one being published — rename yours to keep it.",
+        "fixable": false,
+        "why": "The inverse of the other checks: not something missing, something PRESENT that gets clobbered. A name refusal in Settings cannot see this, because a teacher makes this page in Obsidian."
+      },
+      {
+        "name": "noGradedFolders",
+        "sentence": "Nothing in {course} Section {section} currently counts for marks.",
+        "detail": "The curriculum map marks an expectation as evaluated when a page in your graded folders addresses it. None of those folders were found, so every expectation is shown as not yet evaluated. You can choose which folders count in Course Settings.",
+        "fixable": false,
+        "why": "When no folders count for marks or the configured folders are missing, the curriculum map shows zero evaluated expectations. Telling the teacher lets them choose which folders count in Course Settings rather than wondering why no expectations show as evaluated."
+      }
+    ]
+  },
   "transcriptStripping": {
     "cases": [
       {
@@ -789,5 +917,109 @@
       "why": "Not decoration: a teacher recognises their Desktop or their iCloud Drive by its icon before reading the word. Optional if the platform makes it expensive — say so rather than dropping it silently."
     },
     "note": "The 'Working folder:' bar under the sidebar. Modelled on the host file manager's own path bar — Finder's on the mac — because a teacher who has seen one knows what it does without being told. Reported missing on Windows 2026-08-16, in use: the context menu is not there. The LABELS are per platform ('Finder' against 'File Explorer'); the actions, the gestures and the crumb list are not."
+  },
+  "specialNames": {
+    "excludedFolderIndexNote": {
+      "noteBody": "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your published site. To include it again, add it back in Course Settings.",
+      "sentinelEnd": "<!-- plantoir:excluded-folder-note:end -->",
+      "sentinelStart": "<!-- plantoir:excluded-folder-note:start -->",
+      "why": "Explains why the folder is still present in Obsidian after being removed in Course Settings, and that it is ignored during build. Written into existing index.md files by preflight; stripped during merge so it never ships."
+    },
+    "curriculumFolderBlockedByCoverageSetting": {
+      "reason": "The curriculum coverage map needs this folder to show your expectations. To remove it, turn off “Publish the curriculum coverage map” in Settings first.",
+      "why": "Explains why the curriculum folder cannot be removed while the coverage map is enabled in Course Settings, naming the switch to turn off first."
+    },
+    "curriculumFolderBlockedByCurriculumPages": {
+      "reason": "This folder holds your curriculum expectations. To remove it, turn off “Include {jurisdiction} curriculum pages” first.",
+      "why": "Explains why the curriculum folder cannot be removed in the New Course Wizard while curriculum pages are enabled, naming the switch to turn off first."
+    },
+    "curriculumFolderBlockedByCoverageMap": {
+      "reason": "This folder holds your curriculum expectations for the coverage map. To remove it, turn off “Include the curriculum coverage map” first.",
+      "why": "Explains why the curriculum folder cannot be removed in the New Course Wizard while the coverage map is enabled, naming the switch to turn off first."
+    },
+    "lastGradedFolderBlocked": {
+      "reason": "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Publish the curriculum coverage map”.",
+      "why": "Explains why the last graded folder cannot be removed or un-ticked in Course Settings while the coverage map is enabled, preventing an empty marks pool."
+    },
+    "lastGradedFolderBlockedWizard": {
+      "reason": "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Include the curriculum coverage map”.",
+      "why": "Explains why the last graded folder cannot be removed or un-ticked in the New Course Wizard while the coverage map is enabled, preventing an empty marks pool."
+    },
+    "classFolderBlocked": {
+      "reason": "“All Classes” holds your class pages and lessons — the pages the next-class button and the schedule write to. It cannot be removed; other per-section folders can.",
+      "why": "Explains why the folder named All Classes can never be removed, in Course Settings or the New Course Wizard. Russell's decision, 2026-08-24: exactly that folder is never removable; every other per-section folder can be added or removed as before. The name is compared case-insensitively and is ClassFolder.fallbackName."
+    },
+    "lastPerSectionFolderBlocked": {
+      "reason": "Each section needs at least one folder for its class pages and lessons. Add another per-section folder first before removing this one.",
+      "why": "Explains why the last per-section folder cannot be removed, ensuring each section has a folder for its lessons."
+    },
+    "sectionIndexFileBlocked": {
+      "reason": "Every section needs an index.md page for its home page. Without it, the section cannot be published.",
+      "why": "Explains why index.md cannot be removed from per-section files."
+    },
+    "removeGradedFolderConfirmation": {
+      "title": "Remove “{name}”?",
+      "message": "This folder holds work that counts for marks. Removing it will take it out of your course’s marks pool.",
+      "why": "Prompts for confirmation when removing a graded folder when other graded folders exist."
+    },
+    "removeCurriculumFolderConfirmation": {
+      "title": "Remove “{name}”?",
+      "message": "This folder holds your curriculum expectations. Removing it means expectations will not be available if you later enable curriculum coverage.",
+      "why": "Prompts for confirmation when removing a curriculum folder when curriculum coverage is off."
+    },
+    "curriculumFolderResolution": {
+      "cases": [
+        {
+          "configured": "Ontario Curriculum",
+          "folders": [
+            "Concepts",
+            "Ontario Curriculum",
+            "Tasks"
+          ],
+          "resolved": "Ontario Curriculum",
+          "why": "Configured name wins."
+        },
+        {
+          "configured": "Expectations",
+          "folders": [
+            "Concepts",
+            "Expectations",
+            "Tasks"
+          ],
+          "resolved": "Expectations",
+          "why": "Configured name wins even when it does not mention the word curriculum."
+        },
+        {
+          "configured": null,
+          "folders": [
+            "College Board Curriculum",
+            "Ontario Curriculum",
+            "Tasks"
+          ],
+          "resolved": "College Board Curriculum",
+          "why": "Unconfigured: alphabetically first folder containing 'curriculum' wins."
+        },
+        {
+          "configured": null,
+          "folders": [
+            "Concepts",
+            "Curriculum",
+            "Tasks"
+          ],
+          "resolved": "Curriculum",
+          "why": "Unconfigured single curriculum folder."
+        },
+        {
+          "configured": null,
+          "folders": [
+            "Concepts",
+            "Tasks"
+          ],
+          "resolved": null,
+          "why": "No curriculum folder present."
+        }
+      ],
+      "note": "Which folder the GUI protects as the curriculum folder, computed from the config's shared_folders list: if `curriculum_folder` is configured and in the list, it is used; otherwise the alphabetically first name containing 'curriculum' (case-insensitive). This is the NAME half of build_site.py:_find_curriculum_folder, which additionally scans the vault on disk and accepts a folder only if it holds a page whose title is an expectation code — a check the apps cannot make from the config alone. So the GUI may protect a folder the build would skip (one with no expectation pages yet); it never protects a different folder than the build would pick among those it can see."
+    }
   }
 }

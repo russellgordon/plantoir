@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Keep a stranger off this repository's contributor list.
+#
+# GitHub resolves a Co-Authored-By trailer to whatever account has that email
+# registered. `antigravity@google.com` belongs to an unrelated person's personal
+# account, so every commit carrying it credits them as a contributor here —
+# which happened seven times between 2026-08-17 and 2026-08-19 before anybody
+# noticed. `noreply@google.com` was checked the same day and maps to no account
+# at all, which is the property that makes it safe.
+#
+# CLAUDE.md rule 6 says this in words. Words depend on every agent having read
+# them; this hook does not.
+#
+# ONLY Co-Authored-By LINES ARE TOUCHED, and that is the whole subtlety. The
+# first version of this hook rewrote every occurrence in the message, and the
+# very first commit it ran on was one EXPLAINING the bad address — so the prose
+# came out saying "rule 6 has forbidden noreply@google.com", which is nonsense
+# and would have been believed. Only a trailer credits anybody; prose about the
+# address must survive intact so this rule can be written down at all.
+#
+# It is committed rather than left in .git/hooks so it travels to the Windows
+# machine too. Each clone must opt in ONCE:
+#
+#     git config core.hooksPath .githooks
+#
+# POSIX sh and awk, deliberately: `sed -i` differs between macOS and Git Bash,
+# and sed's case-insensitive `I` flag is not portable between them either.
+
+message_file="$1"
+[ -f "$message_file" ] || exit 0
+
+bad='[Aa][Nn][Tt][Ii][Gg][Rr][Aa][Vv][Ii][Tt][Yy]@[Gg][Oo][Oo][Gg][Ll][Ee][.][Cc][Oo][Mm]'
+
+fixed=$(awk -v bad="$bad" '
+    tolower($0) ~ /^co-authored-by:/ && $0 ~ bad {
+        gsub(bad, "noreply@google.com")
+        changed = 1
+    }
+    { print }
+    END { if (changed) print "PLANTOIR_HOOK_CHANGED" > "/dev/stderr" }
+' "$message_file" 2>/tmp/plantoir_hook_flag.$$)
+
+if grep -q PLANTOIR_HOOK_CHANGED /tmp/plantoir_hook_flag.$$ 2>/dev/null; then
+    printf '%s\n' "$fixed" > "$message_file"
+    echo "Plantoir: rewrote antigravity@google.com to noreply@google.com in a" >&2
+    echo "          Co-Authored-By trailer. That address credits a stranger's" >&2
+    echo "          GitHub account; see CLAUDE.md rule 6." >&2
+fi
+
+rm -f /tmp/plantoir_hook_flag.$$
+exit 0

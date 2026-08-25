@@ -114,8 +114,11 @@ final class AssistToolchainWork: AssistSiteWork {
         }
         return AssistSiteWorkResult(
             succeeded: true,
-            message: AssistWording.rebuiltForACallerWithNoWindow(
-                course: course.code, section: String(sectionNumber)
+            message: SiteHealthFinding.appending(
+                to: AssistWording.rebuiltForACallerWithNoWindow(
+                    course: course.code, section: String(sectionNumber)
+                ),
+                from: runner
             )
         )
     }
@@ -174,19 +177,33 @@ final class AssistToolchainWork: AssistSiteWork {
         )
 
         if deployRunner.legs.first?.buildFailed == true {
-            return AssistSiteWorkResult(
-                succeeded: false,
-                message: AssistWording.couldNotBuildBeforeDeploying(
-                    course: course.code, section: String(sectionNumber)
-                )
+            // The findings travel even when the build failed: a missing
+            // curriculum or Media folder is a likely CAUSE of the failure, and
+            // over stdio there is no other way to mention it.
+            var message: String = AssistWording.couldNotBuildBeforeDeploying(
+                course: course.code, section: String(sectionNumber)
             )
+            if let runner = deployRunner.legs.first?.runner {
+                message = SiteHealthFinding.appending(to: message, from: runner)
+            }
+            return AssistSiteWorkResult(succeeded: false, message: message)
         }
 
-        return MultiDestinationDeployRunner.result(
+        let outcome: AssistSiteWorkResult = MultiDestinationDeployRunner.result(
             course: course.code,
             section: String(sectionNumber),
             destinationCount: destinations.count,
             outcome: deployRunner.outcome
+        )
+        guard let runner = deployRunner.legs.first?.runner else {
+            return outcome
+        }
+        // Taken from the FIRST leg: every destination publishes the same built
+        // site, so a second leg only repeats the same findings.
+        return AssistSiteWorkResult(
+            succeeded: outcome.succeeded,
+            message: SiteHealthFinding.appending(to: outcome.message, from: runner),
+            isAboutTheDestination: outcome.isAboutTheDestination
         )
     }
 }

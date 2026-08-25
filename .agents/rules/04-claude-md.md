@@ -10,7 +10,7 @@ description: "Plantoir project rules, part 4 of 6 - How the toolchain ships"
 ## How the toolchain ships
 
 There is no Docker Hub. The full build recipe (Dockerfile, `patches/`,
-`scripts/`, `support/`, launchers) is bundled inside the app and mirrored into
+`scripts/`, `support/`, `contracts/`, launchers) is bundled inside the app and mirrored into
 each working folder's `.toolchain/`. The launchers:
 
 - tag the image `teaching-quartz:src-<hash>`, where the hash covers every file
@@ -43,7 +43,8 @@ lives inside the Colima VM's disk (`~/.colima`).
 
 ### Editing the toolchain: two traps that cost real time
 
-A change to `scripts/`, `support/`, `patches/` or a launcher does **not** reach
+A change to `scripts/`, `support/`, `patches/`, `contracts/` or a launcher does
+**not** reach
 a working folder until it has travelled through the app bundle. The app mirrors
 its bundled copy into `.toolchain/` whenever it touches a folder, and the
 launchers hash that folder to name the image. The chain is: edit → **rebuild the
@@ -152,7 +153,7 @@ forget. Windows ships `plantoir-mcp.exe` instead.
 ## Example content and skeletons
 
 `support/example_content/<CODE>/` holds ready-made course content, one folder
-per Ontario course code (ADA1O is the template to copy; **37 codes** have
+per Ontario course code (ADA1O is the template to copy; **38 codes** have
 payloads today — count the folders rather than trusting a number). Each payload
 is `manifest.json` plus `shared/` and `per_section/` trees, and the manifest is
 the course's ENTIRE structure when a teacher pre-populates: the wizard asks no
