@@ -207,6 +207,23 @@ outstanding.
   parallelises test CLASSES. **If any mac test sets that path and restores
   nil, the mac has the same leak.**
 
+  **7. The acceptance was DRIVEN, not reasoned about, and the method is worth
+  having.** `System.Windows.Automation` from stock Windows PowerShell 5.1
+  drives WinUI 3 well enough to open an ⓘ flyout, read its text, and
+  photograph it — which is exactly how the mac found its truncated popover,
+  and how this side confirmed the same bug does not reproduce: the longest
+  `specialNames` sentence wraps to five full lines at 600×187 device px. A
+  fresh ICS3U with example content declined showed the ⓘ on exactly `Tasks`,
+  `Ontario Curriculum` and `All Classes`; the written config carried
+  `graded_folders: ["Tasks"]` and `per_section_folders: ["All Classes"]`; and
+  a real `preview.ps1 --build-only` after removing `Discussions` in Settings
+  printed the skip line and emitted a `public/` with zero occurrences of it,
+  the teacher's own folder still in the vault. **What the drive caught that no
+  test did** was the deadlock in item 4 above — and, humblingly, the drive had
+  already photographed that flyout without noticing the switch it named was
+  unreachable. Driving proves the pixels; it does not by itself prove the
+  sentence is actionable.
+
   **What was rejected on this side, and why.** (a) Case-INSENSITIVE matching
   for `excluded_items` — the neighbouring "Media" refusal is case-insensitive,
   so matching it felt consistent, but `preflight_update_course_config` builds a

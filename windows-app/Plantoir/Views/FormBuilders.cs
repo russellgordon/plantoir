@@ -349,7 +349,12 @@ public static class FormBuilders
         {
             string display = item.EndsWith(".md", StringComparison.Ordinal) ? item[..^3] : item;
             var check = new CheckBox { Content = display, IsChecked = members.Contains(item), MinHeight = 30 };
-            AutomationProperties.SetAutomationId(check, "member:" + display);
+            // Prefixed with the LIST, because three of these are on the
+            // Course Settings page at once -- Hide, Expandable and Marks --
+            // and a bare "member:Tasks" matches all three. Found by driving
+            // the real app, where the ambiguity made the marks list look as
+            // though it were offering files it was not.
+            AutomationProperties.SetAutomationId(check, $"member:{title}:{display}");
 
             var row = new Grid { ColumnSpacing = 4 };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
