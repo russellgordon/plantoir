@@ -104,15 +104,6 @@ public sealed partial class CourseSettingsView : UserControl
     }
 
     /// <summary>
-    /// A teacher pressed the info button on a row that cannot go. Record which
-    /// rule refused, and the sentence they were shown.
-    ///
-    /// <para>"I could not remove the folder" is a report support WILL receive,
-    /// and without this the trail shows nothing at all - the teacher clicked a
-    /// button and no state changed. The sentence is a specialNames one, so it
-    /// is product wording rather than anything written on a page.</para>
-    /// </summary>
-    /// <summary>
     /// Redraw the controls whose rows carry a protection state, because that
     /// state is computed at draw time and something has just changed the
     /// answer.
@@ -134,6 +125,15 @@ public sealed partial class CourseSettingsView : UserControl
             FormScroll.ChangeView(null, offset, null, disableAnimation: true);
         });
 
+    /// <summary>
+    /// A teacher pressed the info button on a row that cannot go. Record which
+    /// rule refused, and the sentence they were shown.
+    ///
+    /// <para>"I could not remove the folder" is a report support WILL receive,
+    /// and without this the trail shows nothing at all - the teacher clicked a
+    /// button and no state changed. The sentence is a specialNames one, so it
+    /// is product wording rather than anything written on a page.</para>
+    /// </summary>
     private void RecordRemovalBlocked(string list, string name, string reason)
     {
         ActivityTrail.Note(ActivityTrail.Event.RemovalBlocked,
@@ -148,6 +148,21 @@ public sealed partial class CourseSettingsView : UserControl
     /// unblocks the first, and turning the coverage map off unblocks the
     /// curriculum folder. A captured answer would go on refusing.</para>
     /// </summary>
+    /// <summary>
+    /// What a list editor does after a change: the ordinary dirty-tracking,
+    /// AND a redraw of every control whose rows carry a protection state.
+    ///
+    /// <para>Removing a folder from ONE list can change whether a row in
+    /// ANOTHER may go — the marks floor counts across both folder lists — and
+    /// only the touched editor rebuilds itself. It also changes which folders
+    /// the Marks checklist should be offering at all.</para>
+    /// </summary>
+    private void ChangedAndRedraw()
+    {
+        MarkChanged();
+        RebuildProtectedRows();
+    }
+
     private ProtectionContext Protection() => new(
         InWizard: false,
         CurriculumCoverageEnabled: Config.OverallIncludesCurriculumCoverage,
@@ -310,25 +325,25 @@ public sealed partial class CourseSettingsView : UserControl
         // -------- Content Structure --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Content Structure", null));
         Form.Children.Add(FormBuilders.StringListEditor("Shared folders (all sections)", false,
-            () => Config.SharedFolders, v => Config.SharedFolders = v, MarkChanged,
+            () => Config.SharedFolders, v => Config.SharedFolders = v, ChangedAndRedraw,
             name => RecordExclusion(CourseConfiguration.SharedScope, "folder", name),
             name => RecordReInclusion(CourseConfiguration.SharedScope, "folder", name),
             name => ItemProtectionRule.For(name, ItemList.SharedFolders, Protection()),
             (name, reason) => RecordRemovalBlocked("the shared folders", name, reason)));
         Form.Children.Add(FormBuilders.StringListEditor("Shared files (all sections)", true,
-            () => Config.SharedFiles, v => Config.SharedFiles = v, MarkChanged,
+            () => Config.SharedFiles, v => Config.SharedFiles = v, ChangedAndRedraw,
             name => RecordExclusion(CourseConfiguration.SharedScope, "file", name),
             name => RecordReInclusion(CourseConfiguration.SharedScope, "file", name),
             name => ItemProtectionRule.For(name, ItemList.SharedFiles, Protection()),
             (name, reason) => RecordRemovalBlocked("the shared files", name, reason)));
         Form.Children.Add(FormBuilders.StringListEditor("Per-section folders", false,
-            () => Config.PerSectionFolders, v => Config.PerSectionFolders = v, MarkChanged,
+            () => Config.PerSectionFolders, v => Config.PerSectionFolders = v, ChangedAndRedraw,
             name => RecordExclusion(CourseConfiguration.PerSectionScope, "folder", name),
             name => RecordReInclusion(CourseConfiguration.PerSectionScope, "folder", name),
             name => ItemProtectionRule.For(name, ItemList.PerSectionFolders, Protection()),
             (name, reason) => RecordRemovalBlocked("the per-section folders", name, reason)));
         Form.Children.Add(FormBuilders.StringListEditor("Per-section files", true,
-            () => Config.PerSectionFiles, v => Config.PerSectionFiles = v, MarkChanged,
+            () => Config.PerSectionFiles, v => Config.PerSectionFiles = v, ChangedAndRedraw,
             name => RecordExclusion(CourseConfiguration.PerSectionScope, "file", name),
             name => RecordReInclusion(CourseConfiguration.PerSectionScope, "file", name),
             name => ItemProtectionRule.For(name, ItemList.PerSectionFiles, Protection()),

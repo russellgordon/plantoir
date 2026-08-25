@@ -722,13 +722,26 @@ public sealed class NewCourseDialog : ContentDialog
     /// </summary>
     private ProtectionContext WizardProtection() => new(
         InWizard: true,
-        CurriculumCoverageEnabled: CourseConfiguration.CurriculumCoverageEnabled(_includeCurriculumCoverage),
+        CurriculumCoverageEnabled: CourseConfiguration.CurriculumCoverageEnabled(
+            ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode),
+            _prepopulate,
+            ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode),
+            _includeCurriculum,
+            _includeCurriculumCoverage),
         CurriculumPagesEnabled: CourseConfiguration.CurriculumPagesEnabled(
             ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode),
             _prepopulate,
             ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode),
             _includeCurriculum),
         Jurisdiction: JurisdictionForCode(),
+        // null, not the payload's or skeleton's declared `curriculum_folder`:
+        // this app has no ExampleContentCatalog.CurriculumFolder or
+        // SkeletonCatalog equivalent to ask, so the resolver falls back to the
+        // "alphabetically first name containing curriculum" branch. A skeleton
+        // family whose folder is called something else — "Expectations" — is
+        // protected on the mac and NOT protected here. A KNOWN GAP, written
+        // down in MAC-HANDOFF.md rather than left for somebody to rediscover;
+        // it protects too little, never the wrong folder.
         ResolvedCurriculumFolder: CurriculumFolderRule.Resolve(null, _sharedFolders),
         GradedFolders: CurrentGradedFolders(),
         PerSectionFolders: _perSectionFolders);
@@ -737,6 +750,12 @@ public sealed class NewCourseDialog : ContentDialog
     /// Which province's curriculum the switch offers, so the blocked sentence
     /// names the switch a teacher can actually see rather than always saying
     /// "Ontario".
+    ///
+    /// <para>Read from the PROVINCE DROPDOWN, which is the control that decides
+    /// what the wizard's own label says — so the label and the sentence always
+    /// agree, which is the property that matters here. The mac derives it from
+    /// the course CODE instead, so an Ontario-selected teacher typing a BC code
+    /// sees a different sentence on each platform. Noted in MAC-HANDOFF.md.</para>
     /// </summary>
     private string JurisdictionForCode() =>
         _province == "BC" ? "British Columbia" : SpecialNames.DefaultJurisdiction;
@@ -1091,14 +1110,7 @@ public sealed class NewCourseDialog : ContentDialog
             ["prepopulate_example_content"] = hasContent && _prepopulate,
             ["include_curriculum_pages"] = hasContent && _prepopulate && includesCurriculum && _includeCurriculum,
             ["include_curriculum_coverage"] = PerSection(_ => _includeCurriculumCoverage),
-            // Reconciled against the folders the course actually ended up with,
-            // so a name the teacher removed here is dropped rather than written
-            // into a pool matching nothing on disk. Written EXPLICITLY, which is
-            // safe here and only here: a new course has no marks to lose, and an
-            // absent key would mean "never asked".
-            ["graded_folders"] = new JArray(
-                GradedFolderRule.Reconciled(CurrentGradedFolders(),
-                    _sharedFolders.Concat(_perSectionFolders))),
+
             ["include_coverage_notes"] = PerSection(_ => CourseConfiguration.CoverageNotesEnabled(_includeCurriculumCoverage, _includeCoverageNotes)),
             ["use_lcs_terminology"] = _useLcs,
             ["deploy_target"] = _deployTarget,
@@ -1111,6 +1123,27 @@ public sealed class NewCourseDialog : ContentDialog
             ["show_section_marker"] = PerSection(_ => _showsMarker),
             ["color_schemes"] = flatSchemes,
         };
+
+        // The marks pool is written ONLY when the teacher chose it — which
+        // means only when the structure did not come from example content.
+        //
+        // A payload declares its own `graded_folders` in its manifest, and
+        // `setup_course.py:graded_folders_for` prefers a pool already present in
+        // the saved config over the manifest's. So writing one here for a
+        // pre-populated course would silently OVERRIDE a manifest that had
+        // declared the right answer — and the value written would be an
+        // inference from the wizard's DEFAULT folders, because the structure
+        // editors are collapsed for such a course and never showed the teacher
+        // the payload's real ones. If the payload calls its assessed folder
+        // anything but exactly "Tasks", reconciliation would then leave `[]`:
+        // the explicit "asked, and nothing counts" state, from a teacher who was
+        // never asked. Mirrors the mac's own guard.
+        if (!StructureComesFromExampleContent)
+        {
+            result["graded_folders"] = new JArray(
+                GradedFolderRule.Reconciled(CurrentGradedFolders(),
+                    _sharedFolders.Concat(_perSectionFolders)));
+        }
 
         // Pruned once more, defensively, at the point this actually gets
         // written — so the file on disk is correct even in a hypothetical

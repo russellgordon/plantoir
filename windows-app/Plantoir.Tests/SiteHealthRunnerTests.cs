@@ -13,6 +13,15 @@ namespace Plantoir.Tests;
 /// same door the real pseudo console feeds — including the chunk boundaries,
 /// which is where the interesting bug lives.</para>
 /// </summary>
+/// <remarks>
+/// In the serialized collection because <c>ActivityTrail</c>'s log path is a
+/// process-wide static: two classes redirecting it at once would each read the
+/// other's lines, and xUnit parallelises test CLASSES. That produces an
+/// intermittent failure that looks exactly like a production bug and is not
+/// one — the trap CLAUDE.md names for preview leases and the publish registry,
+/// which the trail path shares.
+/// </remarks>
+[Collection(SharedActivityState.Name)]
 public class SiteHealthRunnerTests : IDisposable
 {
     private readonly string _trailPath;
@@ -25,7 +34,10 @@ public class SiteHealthRunnerTests : IDisposable
 
     public void Dispose()
     {
-        ActivityTrail.SetCustomLogPathForTesting(null);
+        // Back to the SUITE's scratch trail, never to null: null is the real
+        // trail, and every test after this one would then write fixture
+        // courses into a teacher's diagnostic record.
+        ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
         try { File.Delete(_trailPath); } catch { }
     }
 

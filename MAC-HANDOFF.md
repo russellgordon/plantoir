@@ -133,15 +133,19 @@ outstanding.
   contract is the mac's call. If the mac agrees it belongs there, add it under
   `specialNames` and Windows will take the mac's wording verbatim.
 
-  **2. `Reconciled` had a case-collision bug, and the mac should check its
-  own.** `setup_course.py:graded_folders_for` builds `actual_lookup` with a
-  dict comprehension, so for a course holding both `Tasks` and `tasks` the
-  LAST one wins. The first Windows cut used `Dictionary.TryAdd`, which keeps
-  the FIRST, and would have returned `["Tasks"]` where the build returns
-  `["tasks"]`. Fixed to last-wins. Vanishingly rare, and there is no contract
-  case pinning it — which is why it survived review on this side until somebody
-  went line-by-line against the Python. If the mac's `reconciledGradedFolders`
-  resolves it the other way, one of the two is wrong.
+  **2. `reconciledGradedFolders` on the MAC does not match the Python, and
+  that is a finding rather than a question.** This entry originally asked which
+  way the mac resolves a case collision. The answer, checked since: it resolves
+  it neither way — `NewCourseWizardView.reconciledGradedFolders` is an exact
+  `validChoices.contains(folder)` filter with no case-insensitive lookup at
+  all, so a declared `tasks` against an actual `Tasks` is DROPPED. Both
+  `setup_course.py:graded_folders_for` (via `actual_lookup`) and Windows's
+  `GradedFolderRule.Reconciled` map it to the actual folder instead. So the mac
+  silently narrows a pool the build would have kept. Windows also had a bug
+  here — `Dictionary.TryAdd` keeps the FIRST match where the Python's dict
+  comprehension keeps the LAST — and it is fixed. There is no contract case
+  pinning any of this, which is why it survived on both sides; adding one is
+  the mac's call, and Windows will run whatever it says.
 
   **3. Revert leaves a trail line for a removal that did not happen — and the
   mac has the identical shape.** Proven here: `Exclude("shared", "A")` then
@@ -154,6 +158,54 @@ outstanding.
   claiming they excluded it. The honest fix is to record on SAVE rather than on
   click, on both sides. Flagged rather than fixed unilaterally, because
   changing when the mac records an event is not a Windows decision.
+
+  **4. Does the mac's wizard block on a coverage switch a teacher cannot
+  reach?** Windows's `CourseConfiguration.CurriculumCoverageEnabled` was
+  written as an identity function on the switch; the mac's takes five
+  arguments. Restored to five here, because the wizard only CREATES that
+  switch for a code with example content that includes curriculum, and only
+  ENABLES it while pre-populate and curriculum pages are on — so on the
+  commonest from-scratch path the ⓘ named a control that was not on the
+  screen, and there was no way out inside the wizard. The mac's version has
+  the gates, so the mac is probably fine; what is worth CHECKING is the second
+  half. `NewCourseDialog.BuildConfiguration` writes
+  `include_curriculum_coverage` from the RAW switch, so a from-scratch course
+  is created with the map on while the protection rule says it is off — the
+  wizard will let its curriculum folder go after a confirmation, and the build
+  then reports `curriculumCoverageFoundNothing`. Windows chose that failure
+  deliberately over a deadlock: the teacher is told something and has a way
+  forward. **If the mac writes the same key the same way, it has the same
+  tension**, and whether the honest fix is a reachable coverage switch on the
+  from-scratch path is a product decision rather than a port detail. Not taken
+  unilaterally here.
+
+  **5. Two wizard inputs where Windows knowingly does less than the mac.**
+  Both are written down rather than hidden, per rule 4. (a) The wizard passes
+  `null` for the configured curriculum folder — the mac passes
+  `ExampleContentCatalog.curriculumFolder(forCode:) ?? SkeletonCatalog...`,
+  and this app has neither helper. So a skeleton family whose curriculum
+  folder is called something without the word "curriculum" in it is protected
+  on the mac and NOT on Windows. It protects too little; it never protects the
+  wrong folder. (b) `JurisdictionForCode()` reads the PROVINCE DROPDOWN, where
+  the mac derives it from the course CODE. Windows's choice keeps the switch's
+  own label and the sentence naming it in agreement, which is the property
+  that matters for an ⓘ — but an Ontario-selected teacher typing a BC code
+  gets a different sentence on each platform.
+
+  **6. A test on this side was writing into the REAL activity trail, and the
+  mac should check whether its own suite can.** `SiteHealthRunnerTests.Dispose`
+  restored `ActivityTrail`'s log path to `null`, which is the REAL trail, so
+  `TestTrailRedirect`'s module-initializer redirect was defeated for every
+  test that ran afterwards. Fixture courses and lines such as "removed the
+  small assistant — 1.12 GB freed" were written into this machine's
+  `%LOCALAPPDATA%\Plantoir\Logs\activity.txt`. Nothing was actually removed —
+  the 1.04 GB model file is untouched, last written 2026-08-22 — but a
+  diagnostic record carrying events that never happened is worse than no
+  record, and it is the exact failure rule 5 is about. Fixed by restoring the
+  suite's scratch path instead of null, and by putting the class in the
+  serialized collection: the trail path is a process-wide static, and xUnit
+  parallelises test CLASSES. **If any mac test sets that path and restores
+  nil, the mac has the same leak.**
 
   **What was rejected on this side, and why.** (a) Case-INSENSITIVE matching
   for `excluded_items` — the neighbouring "Media" refusal is case-insensitive,

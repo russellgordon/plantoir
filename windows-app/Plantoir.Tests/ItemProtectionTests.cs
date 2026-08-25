@@ -275,6 +275,64 @@ public class ItemProtectionTests
             ItemProtectionRule.For("Concepts", ItemList.SharedFolders, context).Kind);
     }
 
+    // ---- The wizard's EFFECTIVE switch values ---------------------------
+
+    /// <summary>
+    /// The coverage switch counts as ON only when the teacher can REACH it.
+    ///
+    /// <para>The wizard only creates that switch for a code with example
+    /// content that includes curriculum, and only enables it while
+    /// pre-populate and curriculum pages are both on. A rule that reads the
+    /// raw switch instead blocks a removal and names a control that is not on
+    /// the screen — which is the deadlock this was written to prevent, and
+    /// which the first cut of the port shipped.</para>
+    /// </summary>
+    [Theory]
+    // hasContent, prepopulating, contentHasCurriculum, pagesOn, coverageOn, expected
+    [InlineData(true,  true,  true,  true,  true,  true)]
+    [InlineData(false, true,  true,  true,  true,  false)]   // no example content: switch never created
+    [InlineData(true,  false, true,  true,  true,  false)]   // pre-populate off: switch disabled
+    [InlineData(true,  true,  false, true,  true,  false)]   // payload has no curriculum
+    [InlineData(true,  true,  true,  false, true,  false)]   // curriculum pages off: switch disabled
+    [InlineData(true,  true,  true,  true,  false, false)]   // reachable, and switched off
+    public void TheCoverageSwitchCountsAsOnOnlyWhenItCanBeReached(
+        bool hasContent, bool prepopulating, bool contentHasCurriculum,
+        bool pagesOn, bool coverageOn, bool expected)
+    {
+        Assert.Equal(expected, CourseConfiguration.CurriculumCoverageEnabled(
+            hasContent, prepopulating, contentHasCurriculum, pagesOn, coverageOn));
+    }
+
+    /// <summary>
+    /// The commonest from-scratch path, end to end: a code with no example
+    /// content leaves nothing blocked on a switch the teacher cannot see.
+    /// Both folders ask first instead, which is a way forward.
+    /// </summary>
+    [Fact]
+    public void AFromScratchCourseIsNeverBlockedOnAnUnreachableSwitch()
+    {
+        bool coverage = CourseConfiguration.CurriculumCoverageEnabled(
+            hasExampleContent: false, prepopulating: false,
+            contentIncludesCurriculum: false, curriculumPagesSwitchIsOn: true,
+            coverageSwitchIsOn: true);
+        Assert.False(coverage);
+
+        var context = Wizard(coverage: coverage, pages: CourseConfiguration.CurriculumPagesEnabled(
+            hasExampleContent: false, prepopulating: false,
+            contentIncludesCurriculum: false, curriculumSwitchIsOn: true));
+
+        // The wizard's factory defaults: "Ontario Curriculum" and one graded
+        // folder, "Tasks" — the two rows that deadlocked.
+        Assert.True(ItemProtectionRule.For("Ontario Curriculum", ItemList.SharedFolders, context).AsksFirst);
+        Assert.True(ItemProtectionRule.For("Tasks", ItemList.SharedFolders, context).AsksFirst);
+        Assert.False(ItemProtectionRule.For("Ontario Curriculum", ItemList.SharedFolders, context).IsBlocked);
+        Assert.False(ItemProtectionRule.For("Tasks", ItemList.SharedFolders, context).IsBlocked);
+
+        // "All Classes" is blocked by a rule that names no switch at all, so
+        // it stays blocked — and that is correct.
+        Assert.True(ItemProtectionRule.For("All Classes", ItemList.PerSectionFolders, context).IsBlocked);
+    }
+
     /// <summary>
     /// Blocked outranks consequential. A folder that is BOTH the curriculum
     /// folder and the last graded one must show the curriculum reason rather

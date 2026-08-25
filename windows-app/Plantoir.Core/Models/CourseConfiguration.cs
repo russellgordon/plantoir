@@ -727,18 +727,38 @@ public sealed class CourseConfiguration
         coverageEnabled && notesEnabled;
 
     /// <summary>
-    /// The EFFECTIVE value of "include the curriculum coverage map" for a
-    /// course being created, given the wizard's switch.
+    /// Whether the wizard's curriculum-coverage switch is one the teacher can
+    /// actually REACH — which is the only sense in which a blocked-removal
+    /// sentence may name it.
     ///
-    /// <para>Deliberately not gated on pre-populating: a course created
-    /// WITHOUT example content still gets the map, and the wizard writes
-    /// exactly this into `include_curriculum_coverage`. It looks trivial, and
-    /// that is the point — the wizard's protection rules and its config writer
-    /// ask the same function, so they cannot drift into disagreeing about what
-    /// is switched on. A rule that blocks a removal on a value the file will
-    /// not carry is the deadlock this exists to prevent.</para>
+    /// <para><b>All four gates matter, and dropping them deadlocks the
+    /// wizard.</b> The switch is only created when the code has example
+    /// content that includes curriculum, and it is only enabled while
+    /// pre-populate and curriculum pages are both on. The first cut of this
+    /// helper returned the switch value alone, so on the commonest
+    /// from-scratch path — a code with no example content, where the switch is
+    /// never created at all — the ⓘ told a teacher to turn off a control that
+    /// was not on the screen, and there was no way out of it inside the
+    /// wizard. Found by adversarial review, after a real drive of the app had
+    /// walked into it without noticing.</para>
+    ///
+    /// <para><b>A tension worth knowing about, deliberately left alone.</b>
+    /// `NewCourseDialog.BuildConfiguration` writes `include_curriculum_coverage`
+    /// from the raw switch, so a from-scratch course is created with the map
+    /// ON while this returns false — meaning the wizard will let its curriculum
+    /// folder be removed after a confirmation. That is the better failure:
+    /// the build's `curriculumCoverageFoundNothing` health check tells the
+    /// teacher the map could not be built, whereas a deadlock tells them
+    /// nothing and offers no way forward. Changing what the config CARRIES is
+    /// a product decision rather than a port detail, and is raised in
+    /// `MAC-HANDOFF.md` instead of being taken here.</para>
     /// </summary>
-    public static bool CurriculumCoverageEnabled(bool coverageSwitchIsOn) => coverageSwitchIsOn;
+    public static bool CurriculumCoverageEnabled(bool hasExampleContent, bool prepopulating,
+                                                 bool contentIncludesCurriculum,
+                                                 bool curriculumPagesSwitchIsOn,
+                                                 bool coverageSwitchIsOn) =>
+        hasExampleContent && prepopulating && contentIncludesCurriculum &&
+        curriculumPagesSwitchIsOn && coverageSwitchIsOn;
 
     /// <summary>
     /// The EFFECTIVE value of "include curriculum pages", which unlike the

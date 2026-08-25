@@ -203,10 +203,28 @@ public static class FormBuilders
                     ? item[..^3] : item;
                 row.Children.Add(new TextBlock { Text = display, VerticalAlignment = VerticalAlignment.Center });
 
+                // Captured only to decide what this row LOOKS like. Never to
+                // decide whether the removal may go ahead -- see DoRemove.
                 var protection = protectionFor?.Invoke(item) ?? ItemProtection.Ordinary;
 
                 void DoRemove()
                 {
+                    // Asked AGAIN, at the moment of the click. A row is drawn
+                    // once and can be clicked much later, and the answer moves
+                    // underneath it: removing a graded folder from one list
+                    // changes whether the last one in ANOTHER list may go. That
+                    // editor was not redrawn, so its captured answer is stale,
+                    // and acting on it would empty the marks pool while the
+                    // coverage map is on -- exactly the state the floor exists
+                    // to forbid. The redraw is the cosmetics; this is the guard.
+                    var now = protectionFor?.Invoke(item) ?? ItemProtection.Ordinary;
+                    if (now.IsBlocked)
+                    {
+                        onRemovalBlocked?.Invoke(item, now.Reason);
+                        Rebuild();
+                        return;
+                    }
+
                     var updated = get();
                     if (!updated.Remove(item)) return;
                     set(updated);
@@ -360,8 +378,17 @@ public static class FormBuilders
                 }
             }
 
+            // Putting a refused tick back re-enters Checked. Without this
+            // guard a REFUSED action would write the config and mark the form
+            // dirty -- and on a course whose marks pool had never been set, it
+            // would materialise one -- so the teacher's screen changes because
+            // they were told no. It would also queue a rebuild that destroys
+            // the very flyout meant to explain the refusal.
+            bool puttingItBack = false;
+
             check.Checked += (_, _) =>
             {
+                if (puttingItBack) return;
                 var updated = get();
                 if (!updated.Contains(item)) updated.Add(item);
                 set(updated);
@@ -373,12 +400,15 @@ public static class FormBuilders
                 var protection = protectionFor?.Invoke(item) ?? ItemProtection.Ordinary;
                 if (protection.IsBlocked)
                 {
-                    // Put it back and explain, rather than letting the pool
-                    // empty. Setting IsChecked re-enters Checked, which is
-                    // harmless: the name is already a member.
+                    puttingItBack = true;
                     check.IsChecked = true;
+                    puttingItBack = false;
                     onRemovalBlocked?.Invoke(item, protection.Reason);
-                    reasonButton?.Flyout?.ShowAt(reasonButton);
+                    // The button exists already -- RefreshReason put it there
+                    // when the row was drawn, because the row was already
+                    // blocked -- so showing its flyout is what explains the
+                    // refusal without anything being rebuilt.
+                    if (reasonButton is not null) reasonButton.Flyout?.ShowAt(reasonButton);
                     return;
                 }
                 var updated = get();
