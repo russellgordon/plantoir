@@ -94,6 +94,83 @@ outstanding.
 
 ## Open — what the mac still owes
 
+- **The site-health FINDINGS DIALOG does not exist on Windows, and the mac
+  side should know it is not there** (Windows, 2026-08-25, branch
+  `issue/windows-special-folders-parity`, `GUI-IMPROVEMENTS.md` row 384).
+  This is a **know, not a do** for the mac — nothing here asks the mac to
+  change — but `WINDOWS-HANDOFF.md` item 10 currently reads as though Windows
+  already surfaces these findings ("Windows receives the finding in the
+  `PLANTOIR_HEALTH:` transcript line and displays the contract-authored
+  sentence and detail without re-wording"), and on 2026-08-25 that was not
+  true of any released or unreleased Windows build. Grepping `windows-app/`
+  for `PLANTOIR_HEALTH` returned nothing at all, and
+  `ActivityTrail.Event.FolderProblemFound` / `FolderProblemRepaired` had been
+  declared since the trail was built with **no call site anywhere in the C#**.
+  So every check the mac has shipped since row 357 — `curriculumCoverageFoundNothing`,
+  `courseTeachesNothing`, `mediaFolderMissing`, `sectionIndexMissing`,
+  `handWrittenCoveragePage`, and now `noGradedFolders` — has been printed into
+  a Windows build console and read by nobody.
+
+  **What landed this session** is the half a contract can gate: a
+  `SiteHealthFinding` parser (`windows-app/Plantoir.Core/Models/SiteHealthFinding.cs`),
+  its collection in `ScriptRunner`, and a `folder problem found` trail line per
+  finding. **What did NOT land** is the teacher-facing dialog, the Fix button,
+  the repair itself, and the "Preview Again" afterwards — mac rows 357–358,
+  362–364, 367–372. That is a feature, not a port detail, and doing it inside a
+  parity session would have meant inventing Windows wording for six mac dialogs
+  without the mac's own review history to hand. It is owed by Windows to
+  Windows; it is listed here so the next mac session does not read item 10 and
+  assume parity that is not there.
+
+  **What was rejected, and why.** Making `RepairableChecks` read
+  `contracts/shared-rules.json` at RUNTIME was rejected: the contract is
+  bundled into the app today, but a runtime read means a teacher's machine can
+  disagree with the test suite about which checks get a Fix button, and the
+  house rule here is the opposite — hardcode the answer in code and let a test
+  pin it against the contract, so drift fails a build rather than a teacher.
+  Deciding repairability from the finding's `fixable` FLAG was also rejected,
+  for the reason `siteHealth.repair.neverOffered.why` already gives: the flag
+  means "this kind of thing is repairable", not "this app has a repair for it".
+
+  **Reasoned from the code, NOT measured** — said plainly because an
+  adversarial review caught this paragraph claiming otherwise, and a
+  code-reading dressed as a measurement is the failure CLAUDE.md rule 4 exists
+  to prevent. No split was observed in the field; what IS on the record is that
+  `ScriptRunner.BufferOutput` coalesces pseudo-console output on a **150 ms**
+  cadence and hands `ReceiveOutput` whatever bytes are ready, so a
+  `PLANTOIR_HEALTH:` line CAN be split across two flushes. The findings are
+  therefore collected **line-buffered, not per output chunk**;
+  `SiteHealthRunnerTests.AFindingSplitAcrossTwoChunksIsStillFound` splits a
+  real line in half and pins it. If the mac ever parses these from a live
+  stream rather than a finished transcript, the same trap is waiting.
+
+  **Two defects the adversarial review found in the first cut, both worth
+  knowing on the mac.** (1) The carry buffer trimmed to its TAIL when it
+  outgrew 8 KB, copied from the milestone scanner's sliding window — which is
+  INVERTED for a line buffer: after the newline loop the carry is the HEAD of
+  one unterminated line, so the marker sits at the front and a tail-trim throws
+  the finding away. It now drops the carry only when the carry cannot contain a
+  marker, with `AVeryLongUnterminatedLineDoesNotLoseItsMarker` pinning it —
+  and that test was confirmed to FAIL against the old code, not merely to pass
+  against the new. (2) The findings property handed out the live mutable list
+  that `Run(keepTranscript: false)` calls `.Clear()` on; it returns a snapshot
+  now. Neither was reachable today, because nothing reads the collection yet,
+  but both sit exactly on the seam a dialog attaches to.
+
+  **The three new trail events** — `item excluded`, `item re-included`,
+  `removal blocked` — are declared in `ActivityTrail.Event` with this piece,
+  because `activityTrail.mustRecord` names them and the Windows suite pins the
+  enum against that list as a SET, so the suite cannot be green without them.
+  Their call sites arrive with the Course Settings work. That is the same
+  declare-with-no-caller shape that left `FolderProblemFound` dead for months,
+  so the enum carries a comment saying so rather than repeating it silently.
+
+  Reference: `windows-app/Plantoir.Core/Models/SiteHealthFinding.cs`,
+  `windows-app/Plantoir.Core/Scripting/ScriptRunner.cs` (`CollectHealthFindings`),
+  `windows-app/Plantoir.Tests/SiteHealthContractTests.cs`,
+  `windows-app/Plantoir.Tests/SiteHealthRunnerTests.cs`.
+
+
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 

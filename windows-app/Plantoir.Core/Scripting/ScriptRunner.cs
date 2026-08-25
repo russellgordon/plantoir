@@ -28,6 +28,9 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     private bool _flushScheduled;
     private string _unscannedOutput = "";
     private int _reachedMilestoneCount;
+    private string _unscannedHealthOutput = "";
+    private readonly List<Plantoir.Core.Models.SiteHealthFinding> _healthFindings = new();
+    private readonly HashSet<string> _healthFindingsSeen = new(StringComparer.Ordinal);
 
     public TranscriptBuilder Transcript { get; private set; } = new();
 
@@ -108,6 +111,16 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         IsBetweenPhases = false;
         StepDetail = "";
         if (!keepTranscript) _announcedPreviewAddress = null;
+        // Findings follow the transcript: a build-then-publish reads as one
+        // job, so its folder problems do too. The half-line left over when the
+        // previous process ended is dead either way.
+        _unscannedHealthOutput = "";
+        if (!keepTranscript)
+        {
+            _healthFindings.Clear();
+            _healthFindingsSeen.Clear();
+            Notify(nameof(HealthFindings));
+        }
         NotifyRunState();
 
         string scriptPath = Path.Combine(workingDirectory, scriptName);
@@ -236,6 +249,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     {
         Transcript.Append(text);
         AdvanceMilestones(text);
+        CollectHealthFindings(text);
         // Capture the announced preview address the instant it is printed. It
         // appears early (before the build), so by the time the site is serving
         // it has long scrolled out of the recent-text window — relying on that
@@ -508,6 +522,78 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         UpdateStepDetail(newText);
         if (_unscannedOutput.Length > 8000)
             _unscannedOutput = _unscannedOutput[^4000..];
+    }
+
+    /// <summary>
+    /// Every folder problem this run's build reported, in the order it
+    /// reported them.
+    ///
+    /// <para><b>Nothing on Windows displays these yet</b> — there is no
+    /// findings dialog on this platform (see <c>MAC-HANDOFF.md</c>). What the
+    /// collection is for today is the "folder problem found" line each finding
+    /// leaves on the activity trail; the property is the seam a dialog will
+    /// attach to.</para>
+    ///
+    /// <para>A SNAPSHOT, not the live list: the list behind it is appended to
+    /// as output arrives and cleared at the start of an unrelated run, so
+    /// handing it out directly would let a reader be emptied under them, or
+    /// throw mid-enumeration.</para>
+    /// </summary>
+    public IReadOnlyList<Plantoir.Core.Models.SiteHealthFinding> HealthFindings =>
+        _healthFindings.ToArray();
+
+    /// <summary>
+    /// Pull <c>PLANTOIR_HEALTH:</c> lines out of the output as it arrives, and
+    /// record each new one on the activity trail.
+    ///
+    /// <para><b>Line-buffered, not chunk-scanned.</b> A pseudo console hands
+    /// over whatever bytes happened to be ready, so a health line can be split
+    /// across two flushes — scanning each chunk on its own would drop exactly
+    /// the findings that arrived at a boundary, silently and only sometimes.
+    /// The tail of a chunk is carried forward until its newline turns up.</para>
+    ///
+    /// <para>Recorded when the BUILD reports it, not when anything displays
+    /// it: the trail's job is to answer "what was happening when it went
+    /// wrong", and nothing on Windows displays findings at all yet. The line
+    /// carries the check's stable NAME and never the product wording — see
+    /// <c>SiteHealthFinding.TrailSentence</c>.</para>
+    /// </summary>
+    private void CollectHealthFindings(string newText)
+    {
+        _unscannedHealthOutput += TranscriptBuilder.StripControlSequences(newText);
+
+        int lineEnd;
+        while ((lineEnd = _unscannedHealthOutput.IndexOf('\n')) >= 0)
+        {
+            string line = _unscannedHealthOutput[..lineEnd].TrimEnd('\r');
+            _unscannedHealthOutput = _unscannedHealthOutput[(lineEnd + 1)..];
+            RecordHealthFinding(line);
+        }
+
+        // After that loop the carry holds no newline, so it is the HEAD of one
+        // unterminated line — and the marker, if there is one, is at that
+        // head. Keeping a tail here (which is what the milestone scanner's
+        // sliding window does, a few lines up) would throw the marker away and
+        // drop the finding: the exact failure the line buffering exists to
+        // prevent. So a carry that has outgrown any plausible line is dropped
+        // only when it cannot become a finding.
+        if (_unscannedHealthOutput.Length > 8000 &&
+            !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal))
+            _unscannedHealthOutput = "";
+    }
+
+    private void RecordHealthFinding(string line)
+    {
+        var finding = Plantoir.Core.Models.SiteHealthFinding.Parse(line);
+        if (finding is null) return;
+        // The same section rebuilt in one task reports the same problem twice;
+        // that is one problem, not two. The key is the record's own, so this
+        // and SiteHealthFinding.FindingsIn cannot drift apart.
+        if (!_healthFindingsSeen.Add(finding.Identity)) return;
+        _healthFindings.Add(finding);
+        ActivityTrail.Note(ActivityTrail.Event.FolderProblemFound,
+                           finding.TrailSentence, finding.Course, finding.Section);
+        Notify(nameof(HealthFindings));
     }
 
     private void UpdateStepDetail(string newText)

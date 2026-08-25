@@ -44,6 +44,33 @@ public static class ActivityTrail
         /// </summary>
         FolderProblemRepaired,
         AssistantEngineSaid,
+        // The three below are named by contracts/shared-rules.json ->
+        // activityTrail.mustRecord, which SharedRules_ActivityTrailEvents_Exist
+        // pins as a set. They are declared here, with the site-health work, so
+        // that suite is green; their call sites arrive with the Course
+        // Settings exclusion and protection work. Declaring an event with no
+        // caller is exactly what left FolderProblemFound dead for months --
+        // so this is a note that they are owed a caller, not a precedent.
+
+        /// <summary>
+        /// A teacher removes a folder or file in Course Settings, taking it
+        /// out of previews and deploys. Carries the course, the scope and the
+        /// name -- never anything written on the page.
+        /// </summary>
+        ItemExcluded,
+        /// <summary>
+        /// A teacher adds a previously excluded folder or file back. To be
+        /// recorded ONLY when the name really was excluded: an ordinary add is
+        /// not a re-inclusion, and a trail line saying it was would be
+        /// believed.
+        /// </summary>
+        ItemReIncluded,
+        /// <summary>
+        /// A teacher tries to remove or untick something a feature depends on
+        /// and is shown why it cannot go. "I could not remove the folder" is a
+        /// report support will receive; this line says which rule refused.
+        /// </summary>
+        RemovalBlocked,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -76,6 +103,9 @@ public static class ActivityTrail
         Event.FolderProblemFound => "folder problem found",
         Event.FolderProblemRepaired => "folder problem repaired",
         Event.AssistantEngineSaid => "assistant engine said",
+        Event.ItemExcluded => "item excluded",
+        Event.ItemReIncluded => "item re-included",
+        Event.RemovalBlocked => "removal blocked",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
