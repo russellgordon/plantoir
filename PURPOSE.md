@@ -161,11 +161,12 @@ one deliberately left behind (2026-09-01). Read `GUI-IMPROVEMENTS.md` rows
 
 - **A section with no `index.md` cannot be published at all.** ✅ **Fixed
   2026-09-01.** The build succeeded, `_sync_public_to_host` skipped the copy
-  because Quartz emitted no root `index.html`, and `deploy.sh` then said "Built
-  site not found — build first" immediately after a successful build. The build
-  now says why and stops, and the previous build's output is cleared so a
-  publish cannot ship it as though it were current. Shared Python, so Windows
-  inherits it.
+  because Quartz emitted no root `index.html`, and the deploy then reported a
+  missing built site immediately after a successful build. The build now says
+  why and stops, and the previous build's output is cleared so a publish cannot
+  ship it as though it were current. What the teacher is told is
+  `app-rules.json` → `failureExplanations`. Shared Python, so Windows inherits
+  it.
 - **Item 6** (renaming the `Unit` keyword). ✅ **Half done 2026-09-01** — a
   course picks its word when it is made, and the parsing follows it. Renaming
   an EXISTING course's word is still open in `TODO.md`, with the measurements

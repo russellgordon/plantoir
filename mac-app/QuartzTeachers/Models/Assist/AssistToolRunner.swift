@@ -615,12 +615,23 @@ final class AssistToolRunner {
         publishing: Bool
     ) -> AssistToolOutcome? {
         let titles: [String] = names("pages", in: arguments)
-        guard titles.count == 1, let unit = AssistPublishPlanner.unitNamed(titles[0]) else {
+        guard titles.count == 1 else {
             return nil
         }
+        // The course is found BEFORE the sentence is read, because which word
+        // names a unit is a fact about the course — "Module 4" in a Module
+        // course, where reading only "unit" meant the request found nothing
+        // and the teacher was told no page is called that. A course that
+        // cannot be found returns nil rather than a refusal, so the request
+        // falls through to the ordinary page path and gets that path's own,
+        // better-worded answer.
         let found: Result<Located, AssistToolRefusal> = locate(arguments)
         guard case .success(let located) = found else {
-            return AssistToolOutcome.couldNotRead(refusal(from: found).message)
+            return nil
+        }
+        let unitWord: String = located.course.configuration.unitWord
+        guard let unit = AssistPublishPlanner.unitNamed(titles[0], term: unitWord) else {
+            return nil
         }
 
         let all: [ClassPageSummary] = ClassPages.list(
@@ -629,7 +640,7 @@ final class AssistToolRunner {
         let pages: [ClassPageSummary] = AssistPublishPlanner.classPages(inUnit: unit, from: all)
         if pages.isEmpty {
             return AssistToolOutcome.couldNotRead(
-                "I can't find any class pages in Unit \(unit) of \(located.course.code) "
+                "I can't find any class pages in \(unitWord) \(unit) of \(located.course.code) "
                 + "Section \(located.sectionNumber)."
             )
         }
@@ -704,12 +715,23 @@ final class AssistToolRunner {
         publishing: Bool
     ) async -> AssistToolOutcome? {
         let titles: [String] = names("pages", in: arguments)
-        guard titles.count == 1, let unit = AssistPublishPlanner.unitNamed(titles[0]) else {
+        guard titles.count == 1 else {
             return nil
         }
+        // The course is found BEFORE the sentence is read, because which word
+        // names a unit is a fact about the course — "Module 4" in a Module
+        // course, where reading only "unit" meant the request found nothing
+        // and the teacher was told no page is called that. A course that
+        // cannot be found returns nil rather than a refusal, so the request
+        // falls through to the ordinary page path and gets that path's own,
+        // better-worded answer.
         let found: Result<Located, AssistToolRefusal> = locate(arguments)
         guard case .success(let located) = found else {
-            return AssistToolOutcome.refused(refusal(from: found).message)
+            return nil
+        }
+        let unitWord: String = located.course.configuration.unitWord
+        guard let unit = AssistPublishPlanner.unitNamed(titles[0], term: unitWord) else {
+            return nil
         }
 
         var pages: [ClassPageSummary] = AssistPublishPlanner.classPages(
@@ -718,7 +740,7 @@ final class AssistToolRunner {
         )
         if pages.isEmpty {
             return AssistToolOutcome.refused(
-                "I can't find any class pages in Unit \(unit) of \(located.course.code) "
+                "I can't find any class pages in \(unitWord) \(unit) of \(located.course.code) "
                 + "Section \(located.sectionNumber)."
             )
         }

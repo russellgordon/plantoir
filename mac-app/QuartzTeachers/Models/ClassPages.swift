@@ -81,8 +81,6 @@ struct ClassPageSummary {
     /// The day the page's frontmatter puts it on, or nil when it has none.
     let date: CalendarDay?
 
-    // MARK: - Computed properties
-
     /// What the course calls a unit, carried here so every planner that works
     /// from a list of summaries reads and writes the same word without being
     /// handed the course as well.

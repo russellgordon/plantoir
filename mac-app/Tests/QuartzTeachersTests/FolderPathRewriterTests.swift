@@ -103,6 +103,39 @@ final class FolderPathRewriterTests: XCTestCase {
         XCTAssertEqual(FolderPathRewriter.rewriting(text, folderNamed: "Tasks", to: "Assessments"), text)
     }
 
+    /// Found by adversarial review, not by use, and it was a real bug: the
+    /// segment walk is blind to what a path MEANS, so a folder called `Tasks`,
+    /// `Resources` or `Notes` used to repoint every external link whose URL
+    /// happened to carry that segment.
+    func testAWebAddressIsNeverRewritten() {
+        let text: String = "See [the handout](https://example.com/Tasks/handout.pdf) and "
+                         + "[more](http://school.example/Tasks/x)."
+        XCTAssertEqual(FolderPathRewriter.rewriting(text, folderNamed: "Tasks", to: "Assessments"), text)
+        XCTAssertEqual(FolderPathRewriter.countReferences(to: "Tasks", in: text), 0)
+    }
+
+    func testAnAbsolutePathOnThisMachineIsNeverRewritten() {
+        let text: String = "[the file](/Users/teacher/Tasks/notes.md)"
+        XCTAssertEqual(FolderPathRewriter.rewriting(text, folderNamed: "Tasks", to: "Assessments"), text)
+    }
+
+    /// Tested against the SHAPE of a scheme rather than a list of schemes: the
+    /// list is open, and a missed one silently rewrites somebody's link.
+    func testOtherSchemesAreLeftAloneToo() {
+        let text: String = "[vault](obsidian://open?file=Tasks/x) [f](file:///Tasks/y.md)"
+        XCTAssertEqual(FolderPathRewriter.rewriting(text, folderNamed: "Tasks", to: "Assessments"), text)
+    }
+
+    /// The guard must not overreach: a relative path is still rewritten, and a
+    /// course whose own folders contain a colon is impossible (the rename sheet
+    /// refuses one).
+    func testARelativePathIsStillRewritten() {
+        XCTAssertEqual(
+            FolderPathRewriter.rewriting("[q](./Tasks/Quiz 1.md)", folderNamed: "Tasks", to: "Assessments"),
+            "[q](./Assessments/Quiz 1.md)"
+        )
+    }
+
     func testRenamingToTheSameNameChangesNothing() {
         let text: String = "[[Tasks/Quiz 1]]"
         XCTAssertEqual(FolderPathRewriter.rewriting(text, folderNamed: "Tasks", to: "Tasks"), text)

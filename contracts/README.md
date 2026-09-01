@@ -139,6 +139,9 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | Area | Contract | Mac tests it draws on |
 |---|---|---|
 | The assistant's sentences | `assist-wording.json` | AssistToolRunner, AssistAgent |
+
+**Two `pageNaming` sections exist, in different files, and they answer different questions.** `shared-rules.json` → `pageNaming` is what the ASSISTANT calls a page when it talks about one (the frontmatter title, or the folder's name for an `index.md`). `class-planning.json` → `pageNaming` is which class-page TITLES carry unit and day numbers. Grepping for the name alone will send you to the wrong one.
+
 | Deploy/preview order, cards, cancels | `assist-cases.json` → `scenarios` | AssistToolRunner (49), AssistScenario |
 | Card phrasings and near misses | `assist-cases.json` → `cardPhrasings` | AssistAgent (8) |
 | Tool lists, approvals, plan twins | `assist-cases.json` → `tools` | AssistToolRunner |
@@ -147,6 +150,9 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | Validation messages | `app-rules.json` → `configurationRules` | CourseConfiguration (10), CustomDomain (4) |
 | Progress milestones and marker origins | `app-rules.json` → `milestones`, `markerOrigins` | TaskMilestone (12) |
 | Failure explanations | `app-rules.json` → `failureExplanations` | FailureExplainer (8) |
+| Special folder names: what is blocked, what is confirmed, what a rename says and which keys it carries | `shared-rules.json` → `specialNames` | SharedRulesContractTests (24), SpecialFolderRenamer (22) |
+| Which folder holds class pages, and which count | `class-planning.json` → `classFolder` | ClassFolderContractTests (6), and `scripts/test_class_folder.py` |
+| What a course calls a unit | `class-planning.json` → `pageNaming` (the `term` field) and `file-formats.json` → `unit_word` | ClassPageTerm (11), and `scripts/test_class_pages.py` |
 | Whether a deploy must build first | `app-rules.json` → `buildFreshness` | BuildFreshness (6) |
 | Preview ports and the websocket offset | `app-rules.json` → `previewPorts` | PreviewLease (7) |
 | The browser-safe address | `app-rules.json` → `linkRules` | BrowserSafeURL (2) |

@@ -314,6 +314,55 @@
           "perSectionFolders": [],
           "expect": "All Classes",
           "why": "The last-resort literal. A section with nothing configured still gets a predictable answer instead of an empty path."
+        },
+        {
+          "name": "a recorded folder with no 'class' in its name",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "All Days",
+            "Tasks"
+          ],
+          "expect": "All Days",
+          "why": "The case the key exists for. A teacher whose units are Threads and whose classes are Days calls the folder 'All Days'; the guess returns it here only by accident of it being first, and returns 'Tasks' the moment the list is ordered the other way."
+        },
+        {
+          "name": "a recorded folder that is not first",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "Tasks",
+            "All Days"
+          ],
+          "expect": "All Days",
+          "why": "Proves the key beats position. Without it this course's class pages would be written into Tasks."
+        },
+        {
+          "name": "the record beats the guess",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "Class Resources",
+            "All Days"
+          ],
+          "expect": "All Days",
+          "why": "A folder mentioning 'class' is present and is NOT the class folder. The teacher said which one; the guess does not get a vote."
+        },
+        {
+          "name": "a record naming a folder that is no longer there",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "Class Pages",
+            "Tasks"
+          ],
+          "expect": "Class Pages",
+          "why": "A stale key must not win. Falling back to the guess keeps a course working after somebody removes the recorded folder in Obsidian; honouring the stale name would point the next-class button at a folder that is not there."
+        },
+        {
+          "name": "the record's spelling loses to the list's",
+          "classFolder": "all days",
+          "perSectionFolders": [
+            "All Days"
+          ],
+          "expect": "All Days",
+          "why": "Matched case-insensitively, but the LIST's spelling is returned: everything downstream builds file paths out of this answer, and on a case-sensitive volume the key's spelling would not be there."
         }
       ]
     },
@@ -471,6 +520,30 @@
           "perSectionFolders": [],
           "expect": [
             "All Classes"
+          ]
+        },
+        {
+          "name": "a recorded folder counts, and so does a class-mentioning one",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "All Days",
+            "Class Resources"
+          ],
+          "expect": [
+            "All Days",
+            "Class Resources"
+          ],
+          "why": "The recorded folder first, then the guess's answers. Dropping the class-mentioning folder would SHRINK what the course is seen to teach, which is the direction that produces the wrong map; adding the recorded one can only widen it. A course that had 'Class Resources' counting yesterday must not lose it by recording a class folder today."
+        },
+        {
+          "name": "a recorded folder that also mentions classes is counted once",
+          "classFolder": "Class Pages",
+          "perSectionFolders": [
+            "Class Pages",
+            "Tasks"
+          ],
+          "expect": [
+            "Class Pages"
           ]
         }
       ]

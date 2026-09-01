@@ -75,27 +75,34 @@ an item when it ships (finished behaviour is recorded in
 
   **What shipped.** `unit_word` in `course_config.json`, absent meaning “Unit”.
   The wizard asks every course, the ready-made payload is written in that word
-  as it is poured (~3,000 files and their wikilinks, in one pass during the
-  copy), and both the Python and the Swift now read the word rather than
+  as it is poured (a course's own ~86 class pages and the pages around them, in
+  one pass during the copy), and both the Python and the Swift now read the
+  word rather than
   assuming it — `scripts/class_pages.py` and `ClassPageTerm`. The assistant
   says it too. See `GUI-IMPROVEMENTS.md` row 386.
 
-  **The measurement that decided the split still stands**, and is kept here
-  because it is what makes the remaining half unattractive: 3,088 files named
-  `Unit N, Day N` under `support/example_content/`, 3,143 containing such a
-  wikilink, 600 generated skeleton files, and `contracts/class-planning.json`
-  authored end to end in Unit/Day. Payloads are copied fresh at creation, so a
-  NEW course pays none of that — which is exactly why the new-course half was
-  cheap and the existing-course half is not.
+  **The measurements, re-taken 2026-09-01 — and the 2026-08-23 ones were
+  wrong.** Adversarial review found that the numbers this entry used to quote
+  (3,088 named files, 3,143 wikilinks, 600 skeleton files) matched nothing on
+  this tree, and worse, that the per-course figure was being read off a
+  whole-repo total. What is actually there:
 
-  **Still open: renaming an EXISTING course's word.** It means rewriting every
-  class page's name, its frontmatter title and every wikilink pointing at it,
-  across every section and every shared folder, and a half-finished pass leaves
-  a broken site with no obvious way back. The machinery is closer than it was —
-  `ClassInsertionPlanner` already renames class pages, retitles frontmatter and
-  rewrites wikilinks for ONE section, which is the same shape widened to a
-  course — but it still deserves its own design pass and its own undo. Not a
-  checkbox in Settings.
+  - **3,172** files named `Unit N, Day N` across all 38 payloads — but **86 or
+    87 in any ONE course** (median 86, largest 87). A teacher's course is about
+    ninety class pages, not three thousand.
+  - **2,338** skeleton `.md` files, which are generated and therefore cheap.
+  - `contracts/class-planning.json` is authored end to end in Unit/Day.
+
+  **The scale argument was never the real one, and losing it does not make the
+  remaining half safe.** Renaming an EXISTING course's word means rewriting
+  every class page's name, its frontmatter title and every wikilink pointing at
+  it, across every section and every shared folder — and a half-finished pass
+  leaves a broken site with no way back. Ninety pages is not too many to
+  rewrite; it is too many to rewrite WITHOUT AN UNDO. The machinery is closer
+  than it was — `ClassInsertionPlanner` already renames class pages, retitles
+  frontmatter and rewrites wikilinks for ONE section, which is the same shape
+  widened to a course — but it still deserves its own design pass and its own
+  undo. Not a checkbox in Settings.
 
   **Rejected, and logged so it is not retried:** a display-only rename (pages
   titled “Thread 2, Day 3” while the files stay `Unit 2, Day 3.md`). Obsidian is

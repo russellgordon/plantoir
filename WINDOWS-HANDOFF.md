@@ -600,6 +600,13 @@ this side is expected to say so when the contract is wrong.
     until you read `pageNaming`'s new `term` field with a default.** Full
     write-up in "What a course calls a unit" below.
 
+16. **What a course calls its class folder (2026-09-01).** `class_folder` in
+    `course_config.json`, recorded rather than guessed, materialised by a
+    rename along with `curriculum_folder`. Replaces the class-folder refusal
+    item 13 described, which no longer exists. **Eight new contract cases will
+    fail your suite until `ClassFolderRule.cs` reads the key.** Full write-up
+    in "What a course calls its class folder" below.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,
@@ -3288,6 +3295,12 @@ The `TODO.md` item deferred on 2026-08-23 while planning the special-folders
 work, built on the mac once Russell chose the full scope. **You do not have it
 yet**, and the contract carries most of what you need.
 
+**Item 13 said "sentences, refusal rules and the list of keys … are all in
+`shared-rules.json`". That was wrong** — four teacher-facing sentences from
+this work live only in the mac's Swift, and they are listed under "Sentences
+the contract does not carry" below. Corrected 2026-09-01 after adversarial
+review; `GUI-IMPROVEMENTS.md` row 388.
+
 **What it does.** A pencil on each folder row in Course Settings opens a sheet
 that renames the folder ON DISK — in every section that has one — rewrites the
 links that name it, and carries across every `course_config.json` key that
@@ -3312,16 +3325,17 @@ the teacher's machine, which nobody could tell before. Sentences:
    rename to a FRESH read of `course_config.json` (`CourseConfiguration.recordOnDisk`)
    so the teacher's other unsaved edits stay unsaved. That type is a mac type;
    the RULE is what to copy.
-2. **The class folder must keep the word "class" in its new name**, and is
-   refused with a sentence naming why (`specialNames.renameFolder.problems.classFolderMustSayClass`).
-   `ClassFolder` finds the class folder by looking for that substring — your
-   `ClassFolderRule.cs` does the same — so renaming it to "Lessons" would hand
-   the curriculum map a different folder with nothing said. **The proper fix,
-   deliberately NOT done:** a `class_folder` key in `course_config.json` so the
-   name is recorded rather than sniffed. That is a file-format change both apps
-   write, and Piece 2 of the special-folders branch is the standing evidence
-   that such a change lands on its own or not at all. If you want it, propose
-   it as its own piece rather than smuggling it into the rename.
+2. **~~The class folder must keep the word "class" in its new name.~~
+   REVERSED the same day — do NOT build this refusal.** It shipped for a few
+   hours because `ClassFolder` FOUND that folder by looking for the word.
+   Russell's point: that is Plantoir's vocabulary imposed on a teacher's, and
+   somebody whose units are Threads and whose classes are Days calls the folder
+   "All Days". The lookup was what was at fault. `class_folder` is now a
+   recorded key — the thing this entry called "the proper fix, deliberately NOT
+   done" — and the rename MATERIALISES it. See "What a course calls its class
+   folder" below; the sentence
+   `specialNames.renameFolder.problems.classFolderMustSayClass` no longer
+   exists.
 3. **Nothing moves until every destination has been checked.** A per-section
    rename is several moves, and one that got half way through four sections
    would leave a course nobody could reason about.
@@ -3366,7 +3380,9 @@ Module course must NOT read "Unit 2, Day 3" as a class page.
 
 **What the feature is.** `unit_word` in `course_config.json` (documented in
 `file-formats.json`), ABSENT meaning "Unit", so every course in the field is
-untouched. The wizard asks "What do you call a unit?" of EVERY course,
+untouched. A ready-made course holds about **86** class pages, not the ~3,000
+an earlier draft of this section said — that is the total across all 38
+payloads, and the correction is `GUI-IMPROVEMENTS.md` row 388. The wizard asks "What do you call a unit?" of EVERY course,
 ready-made ones included, and the payload is written in that word as it is
 poured rather than renamed afterwards.
 
@@ -3376,8 +3392,14 @@ rewrite — and `setup_course.py` applies it to the payload. You run both.
 
 **What you owe:** a C# mirror of `ClassPageTerm` and of `UnitDay`'s `term`, a
 field in your wizard, and the wizard writing `unit_word` into the config it
-creates. Plus the assistant's own sentences: the mac's now say "Module 4 was
-published" rather than "Unit 4 was published".
+creates. Plus the assistant, in BOTH directions — and the input half is the one
+that was got wrong here first: the mac's output sentences now say "Module 4 was
+published", and `AssistPublishPlanner.unitNamed` now reads the course's word so
+that "publish Module 4" is understood at all. Reading only the literal "unit"
+meant the whole feature was missing for that course, silently, and it shipped
+that way for a few hours. The assistant's unit sentences are hardcoded on both
+sides and are not in `assist-wording.json`; they are listed below with the
+others.
 
 **Why the parsing half mattered more than the naming half, and why the cheap
 option was rejected.** "New courses only, with the parsing left hardcoded" was
@@ -3396,10 +3418,15 @@ silent-success failure the whole special-names family exists to end.
    own configuration; one containing "(" would otherwise match something else
    entirely, or fail to compile in the middle of a build. `Regex.Escape` is
    your equivalent.
-3. **A number or a comma in the word is refused**, in the wizard and in the
-   command-line setup. The pages would otherwise be written and then recognised
-   by nothing — built successfully, and silently outside every feature that
-   works on class pages.
+3. **A number or a comma in the word is refused by the WIZARD**, which will not
+   create the course until it is fixed. The command-line setup does something
+   weaker on purpose — it says the name will not work and falls back to "Unit"
+   rather than re-asking — because it is a single-pass script with no way back
+   to a question. Either way the pages are never written under a name nothing
+   can read back: built successfully, and silently outside every feature that
+   works on class pages. **The sentences for both are Swift and Python
+   respectively and are NOT in the contract** — see "Sentences the contract
+   does not carry" below.
 4. **The payload rewrite matches "Unit" only when a NUMBER follows.** That is
    what separates a unit reference from the ordinary English word, and it is
    run ONLY over content Plantoir itself ships, on the way into a brand-new
@@ -3420,6 +3447,80 @@ title and every wikilink pointing at it, across every section and shared
 folder, and a half-finished pass leaves a broken site with no way back. It
 needs its own design pass and its own undo, and it stays in `TODO.md`. Do not
 add it to your side alone.
+
+### What a course calls its class folder — mac shipped 2026-09-01
+
+Russell's ask, in his words: *"So we could have 'Thread' instead of 'Unit' and
+'Day' instead of 'Class'?"* Yes — and the answer is a recorded key, not a
+looser guess.
+
+**`class_folder` in `course_config.json`**, documented in `file-formats.json`.
+The recorded name wins when it is set and still one of the per-section folders;
+otherwise the OLD GUESS applies unchanged — the first folder whose name
+contains "class", else the first folder, else the literal "All Classes". Keep
+the guess. Every course made before this key existed depends on it, and this is
+additive by design.
+
+**The part that is easy to get wrong: a rename MATERIALISES the key.** Carrying
+an existing key across is not enough. A course made from scratch has NO
+`class_folder` and `curriculum_folder: null`, so both folders are found by
+guessing at their names. Rename `Curriculum` to `Expectations` without WRITING
+the key and the guess stops finding it: the map is built from nothing, and
+nobody is told — the coverage health check cannot fire, because from its point
+of view the folder was never there. Pinned as
+`specialNames.renameFolder.materialisesOnRename`, and the same rule covers
+`class_folder` and `curriculum_folder` together.
+
+**Six new naming cases and two membership cases** in `class-planning.json` →
+`classFolder`, each carrying an optional `classFolder` field. **A case without
+that field is a course that never recorded one**, so read it with a default
+rather than treating its absence as a new shape — the same trap as `pageNaming`'s
+`term`. Two of the cases are worth reading before you implement: a STALE key
+(naming a folder no longer in the list) must lose to the guess, or the
+next-class button writes into a folder that is not there; and a key differing
+only in CASE from the list entry must return the LIST's spelling, because
+everything downstream builds file paths out of the answer and a case-sensitive
+volume would not find the key's.
+
+**Membership widens, never shrinks.** The recorded folder is counted AND every
+class-mentioning folder still is. Dropping the latter would shrink what a
+course is seen to teach, which is the direction that produces the wrong map; a
+course that had "Class Resources" counting yesterday must not lose it by
+recording a class folder today.
+
+**The removal block follows the recorded folder too**, so renaming
+"All Classes" no longer leaves a course's class folder removable. The literal
+"All Classes" is still blocked as well, for courses that never recorded one.
+
+### Sentences the contract does not carry — write your own, knowingly
+
+`contracts/` holds every sentence it can, and the handoff sections above say so
+about the ones it does. These are the exceptions as of 2026-09-01, found by
+adversarial review after an earlier draft of item 13 told you "sentences …
+are all in `shared-rules.json`", which was not true. Each is teacher-facing,
+each lives only in the mac's Swift, and each is one you will have to word
+yourself — so word it deliberately rather than discovering the gap:
+
+- **`ClassPageTerm.problem(with:)`** — the two wizard refusals for a unit word
+  containing a digit or a comma.
+- **`SpecialFolderRenamer.rename`'s half-failure sentence** — "Plantoir renamed
+  N of M copies of 'X' and then could not rename the one in section3: …". The
+  SHAPE is what matters and is worth copying: the count moved, and the section
+  that stopped it. A bare exception here leaves a teacher with a course renamed
+  in two sections out of four and no idea which.
+- **`CourseSettingsView.renameFolder`'s bookkeeping-failure sentence** — the
+  folder moved but the configuration could not be written. Do not report this
+  as "the rename failed": it did not, and saying so sends the teacher looking
+  for a folder under its old name.
+- **The wizard's unit-word caption** — "Class pages will be named '… 1, Day 1'".
+
+**One thing the contract DOES carry that you must not copy verbatim.**
+`specialNames.renameFolder.explanation` and
+`specialNames.removeLeavesTheFolderOnDisk.message` both say "on your Mac".
+Substitute "on this PC", the same way you already do for `app-rules.json`'s
+"this Mac" — `contracts/README.md` documents that substitution. Your contract
+test must compare on the substituted form or it will fail on a difference that
+is correct.
 
 ### The scheduled task NEVER refuses
 

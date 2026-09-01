@@ -720,6 +720,7 @@ final class SharedRulesContractTests: XCTestCase {
                 .replacingOccurrences(of: "{new}", with: "Assessments")
         )
         XCTAssertEqual(SpecialNames.renameFolderRelinked(pages: 0), rename["doneRelinkedNone"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderNothingWasThere, rename["doneNothingWasThere"] as? String)
         XCTAssertEqual(SpecialNames.renameFolderRelinked(pages: 1), rename["doneRelinkedOne"] as? String)
         XCTAssertEqual(
             SpecialNames.renameFolderRelinked(pages: 4),
@@ -732,10 +733,6 @@ final class SharedRulesContractTests: XCTestCase {
         XCTAssertEqual(SpecialNames.renameFolderProblemHasSeparator, renameProblems["hasSeparator"] as? String)
         XCTAssertEqual(SpecialNames.renameFolderProblemIsHidden, renameProblems["isHidden"] as? String)
         XCTAssertEqual(SpecialNames.renameFolderProblemIsMedia, renameProblems["isMedia"] as? String)
-        XCTAssertEqual(
-            SpecialNames.renameFolderProblemClassFolderMustSayClass,
-            renameProblems["classFolderMustSayClass"] as? String
-        )
         XCTAssertEqual(
             SpecialNames.renameFolderProblemAlreadyUsed(name: "Tasks"),
             (renameProblems["alreadyUsed"] as? String)?.replacingOccurrences(of: "{name}", with: "Tasks")

@@ -1121,6 +1121,9 @@ struct NewCourseWizardView: View {
         }
         // "All Classes" is never removable (Russell, 2026-08-24); see
         // CourseSettingsView.perSectionFolderProtection.
+        // The wizard has no recorded class folder to consult: the course does
+        // not exist yet, and the name it will record is the one this rule is
+        // about to pick. The literal is the right test here.
         if ClassFolder.isTheAllClassesFolder(folder) {
             return .blocked(reason: SpecialNames.classFolderBlocked)
         }
@@ -1346,6 +1349,12 @@ struct NewCourseWizardView: View {
             // called; an ABSENT key still means "Unit" for every course made
             // before the choice existed.
             "unit_word": ClassPageTerm.cleaned(unitWord),
+            // Which per-section folder holds class pages, RECORDED rather than
+            // left to be guessed from the word "class". Written at creation so
+            // a teacher whose vocabulary is "Thread 2, Day 3" can call it
+            // "All Days" without the next-class button and the curriculum map
+            // quietly looking somewhere else.
+            "class_folder": ClassFolder.name(inPerSectionFolders: chosenPerSectionFolders),
             // The real wizard reads these as its defaults, exactly like
             // every other answer here. False when no content exists for
             // the code, so a stale true can never mean anything.

@@ -988,20 +988,26 @@
         "isMedia": "Plantoir looks after the Media folder itself, so nothing else can be called Media.",
         "alreadyUsed": "This course already has a folder called “{name}”.",
         "looksLikeASection": "“{name}” is what Plantoir calls a section’s own folder, so it cannot be used here.",
-        "classFolderMustSayClass": "Plantoir finds your class pages by looking for “class” in this folder’s name, so the new name needs it too — “Class Pages”, say. Without it the curriculum coverage map would stop finding your lessons.",
         "destinationExists": "There is already something called “{name}” beside it. Move or rename that first."
       },
       "done": "“{old}” is now “{new}”.",
       "doneRelinkedOne": "One page had links pointing into it, and they now point at the new name.",
       "doneRelinkedMany": "{count} pages had links pointing into it, and they now point at the new name.",
       "doneRelinkedNone": "No page linked into it by name, so nothing else needed changing.",
+      "doneNothingWasThere": "There was no folder by that name on your Mac, so only this course’s settings changed. Make it in Obsidian when you need it.",
       "carriesAcross": [
         "shared_folders",
         "per_section_folders",
         "graded_folders",
         "curriculum_folder",
+        "class_folder",
         "excluded_items"
       ],
+      "materialisesOnRename": {
+        "keys": ["class_folder", "curriculum_folder"],
+        "rule": "Renaming the folder a course currently RESOLVES to as its class folder or its curriculum folder writes that key, even on a course that never had one.",
+        "why": "Both are found by guessing at the name when the key is absent — 'class' in it, or 'curriculum' in it — and a course made from scratch has `curriculum_folder: null` and no `class_folder` at all. Rename `Curriculum` to `Expectations` without writing the key and the guess stops finding it: the map is built from nothing, and NOBODY IS TOLD, because from the coverage check's point of view the folder was never there. Carrying an existing key across is not enough; the key has to be created. A rename is the one moment Plantoir witnesses the change, which is the whole reason renaming belongs in the app rather than in Obsidian."
+      },
       "why": "Renaming was the gap behind the whole special-names family: the list editors changed course_config.json and never touched disk, so Add wrote an entry pointing at no folder and Remove left a folder full of the teacher’s work unreferenced — and a rename was only possible in Obsidian, after which preflight discovered the new name and APPENDED it, leaving the config naming both. Renaming from inside Plantoir is the one place a rename can be WITNESSED, which is what lets every key that names the folder be carried across in the same breath. Two constraints are not arbitrary and must not be relaxed without replacing what they protect. (1) It commits to disk immediately rather than waiting for Save, because the folder really has moved and a Cancel that appeared to undo it would be a lie; only the keys in carriesAcross are written, so a teacher’s other unsaved edits stay unsaved. (2) The class folder must keep a name containing “class”, because ClassFolder.name(inPerSectionFolders:) finds it by that substring — renaming it to “Lessons” would silently hand the curriculum map a different folder, which is the exact silent-wrong-answer this family exists to end. The proper fix for (2) is a class_folder key in course_config.json so the name is recorded rather than sniffed; that is a file-format change both apps write, and Piece 2 of the special-folders branch is the standing evidence that such a change lands on its own or not at all."
     },
     "addCreatesTheFolder": {

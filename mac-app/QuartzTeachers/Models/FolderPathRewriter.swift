@@ -32,9 +32,15 @@ import Foundation
 /// A segment is replaced only when it matches the whole folder name. A folder
 /// called `Tasks` does not rewrite `Extra Tasks/`, and a page whose own NAME is
 /// `Tasks.md` is left alone — the match stops at the last `/`, so a file name
-/// is never a candidate. Absolute paths outside the course (`/Users/...`) and
-/// links to the web are untouched for the same reason: nothing in them is a
-/// segment of this course's tree.
+/// is never a candidate.
+///
+/// **Links to the web and absolute paths are refused explicitly**, by
+/// `pointsOutsideTheCourse`, and NOT because "nothing in them is a segment of
+/// this course's tree" — which is what this comment used to claim and is
+/// exactly wrong. `https://example.com/Tasks/handout.pdf` has `Tasks` sitting
+/// in it as an ordinary segment, and the walk below is blind to what a path
+/// means, so a rename used to repoint that link at a page on somebody else's
+/// website. Found by adversarial review, 2026-09-01.
 enum FolderPathRewriter {
 
     // MARK: - Stored properties
@@ -147,7 +153,7 @@ enum FolderPathRewriter {
     /// The LAST segment is the page or file and is never a candidate, so a
     /// page called `Tasks.md` survives a rename of the `Tasks` folder.
     private static func retargeting(_ target: String, folderNamed oldName: String, to newName: String) -> String {
-        if !target.contains("/") {
+        if !target.contains("/") || pointsOutsideTheCourse(target) {
             return target
         }
         var segments: [String] = []
@@ -172,9 +178,37 @@ enum FolderPathRewriter {
         return rebuilt.joined(separator: "/")
     }
 
+    /// Whether a link target leads somewhere this rename has no business
+    /// touching: the web, or an absolute path on the teacher's machine.
+    ///
+    /// **Found by review rather than by use, and it was a real bug.** The
+    /// segment walk below is blind to what a path MEANS, so
+    /// `https://example.com/Tasks/handout.pdf` had `Tasks` sitting in it as an
+    /// ordinary segment, and renaming a folder called `Tasks` silently
+    /// repointed the link at a page on somebody else's website. Folders called
+    /// `Resources`, `Files`, `Notes` or `Assignments` make that likely rather
+    /// than exotic. Nothing in a course's own tree is reached by an absolute
+    /// path or a URL, so refusing both costs nothing.
+    private static func pointsOutsideTheCourse(_ target: String) -> Bool {
+        if target.hasPrefix("/") || target.hasPrefix("#") {
+            return true
+        }
+        // A scheme — http:, https:, mailto:, obsidian:, file: — is anything
+        // before a colon that comes ahead of the first slash. Tested that way
+        // rather than against a list of schemes, because the list is open and
+        // a missed one silently rewrites somebody's link.
+        guard let colon = target.firstIndex(of: ":") else {
+            return false
+        }
+        if let slash = target.firstIndex(of: "/") {
+            return colon < slash
+        }
+        return true
+    }
+
     /// Whether a target names this folder in any segment but its last.
     private static func pathNames(_ folderName: String, in target: String) -> Bool {
-        if !target.contains("/") {
+        if !target.contains("/") || pointsOutsideTheCourse(target) {
             return false
         }
         var segments: [String] = []

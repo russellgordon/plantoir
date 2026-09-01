@@ -27,13 +27,31 @@ enum ClassFolder {
 
     // MARK: - Functions
 
-    /// The class folder's name, read from the course's own configured
-    /// per-section folders rather than guessed from what is on disk.
+    /// The class folder's name: the course's own `class_folder` FIRST, when it
+    /// is set and still one of the per-section folders, and only then the old
+    /// guess.
+    ///
+    /// **Why the key exists.** Guessing by the word "class" quietly decided
+    /// what a teacher was allowed to call this folder. A teacher whose
+    /// vocabulary is "Thread 2, Day 3" would sensibly call it "All Days" — and
+    /// under the guess alone that folder is not found, so the first
+    /// per-section folder is used instead and the curriculum map counts the
+    /// wrong pages. The map does not FAIL when that happens: it falls back to
+    /// counting every published page, which is a wrong map that reports
+    /// success. Recording the answer is what makes the vocabulary the
+    /// teacher's rather than Plantoir's.
+    ///
+    /// The guess is KEPT as the fallback rather than replaced, because every
+    /// course made before this key existed has no `class_folder` and must go
+    /// on working exactly as it did.
     ///
     /// Substring matching is safe HERE because the list is a short curated one
     /// the teacher chose. It is NOT safe against arbitrary paths, which is what
     /// `isClassPage(relativePathComponents:classFolder:)` is careful about.
-    static func name(inPerSectionFolders folders: [String]) -> String {
+    static func name(inPerSectionFolders folders: [String], configured: String? = nil) -> String {
+        if let recorded = ClassFolder.matching(configured, in: folders) {
+            return recorded
+        }
         for folder in folders {
             if folder.lowercased().contains("class") {
                 return folder
@@ -47,7 +65,29 @@ enum ClassFolder {
 
     /// The class folder's name for a course.
     static func name(for course: Course) -> String {
-        return name(inPerSectionFolders: course.configuration.perSectionFolders)
+        return name(
+            inPerSectionFolders: course.configuration.perSectionFolders,
+            configured: course.configuration.classFolder
+        )
+    }
+
+    /// The configured name as it is spelled in the folder list, or nil when
+    /// nothing is configured or the configured name is no longer there.
+    ///
+    /// Returning the LIST's spelling rather than the configured one matters:
+    /// the two can differ in case, and everything downstream builds file paths
+    /// out of the answer.
+    static func matching(_ configured: String?, in folders: [String]) -> String? {
+        let wanted: String = (configured ?? "").trimmingCharacters(in: .whitespaces)
+        if wanted.isEmpty {
+            return nil
+        }
+        for folder in folders {
+            if folder.caseInsensitiveCompare(wanted) == .orderedSame {
+                return folder
+            }
+        }
+        return nil
     }
 
     /// WHICH FOLDERS COUNT as holding class pages — every configured
@@ -60,28 +100,50 @@ enum ClassFolder {
     /// pages, and drop the coverage map back to "every published page" —
     /// reintroducing the exact silent failure this rule was written to close.
     /// Writing goes to one folder; counting looks at all of them.
-    static func names(inPerSectionFolders folders: [String]) -> [String] {
-        var mentioningClasses: [String] = []
+    /// The class-mentioning folders are still counted when `class_folder` is
+    /// set, and that is deliberate: dropping them would SHRINK what a course is
+    /// seen to teach, which is the direction that produces the wrong map.
+    /// Adding the configured folder can only widen it.
+    static func names(inPerSectionFolders folders: [String], configured: String? = nil) -> [String] {
+        var counting: [String] = []
+        if let recorded = ClassFolder.matching(configured, in: folders) {
+            counting.append(recorded)
+        }
         for folder in folders {
-            if folder.lowercased().contains("class") {
-                mentioningClasses.append(folder)
+            if folder.lowercased().contains("class") && !counting.contains(folder) {
+                counting.append(folder)
             }
         }
-        if !mentioningClasses.isEmpty {
-            return mentioningClasses
+        if !counting.isEmpty {
+            return counting
         }
-        return [name(inPerSectionFolders: folders)]
+        return [name(inPerSectionFolders: folders, configured: configured)]
     }
 
     static func names(for course: Course) -> [String] {
-        return names(inPerSectionFolders: course.configuration.perSectionFolders)
+        return names(
+            inPerSectionFolders: course.configuration.perSectionFolders,
+            configured: course.configuration.classFolder
+        )
     }
 
-    /// Whether a per-section folder name is THE "All Classes" folder — the
-    /// one folder a teacher can never remove (Russell, 2026-08-24). Compared
-    /// without regard to case; every other name, class-mentioning or not,
-    /// is removable.
-    static func isTheAllClassesFolder(_ folder: String) -> Bool {
+    /// Whether a per-section folder is the one a teacher can never remove
+    /// (Russell, 2026-08-24) — the course's RECORDED class folder, or failing
+    /// that the literal "All Classes". Compared without regard to case; every
+    /// other name, class-mentioning or not, is removable.
+    ///
+    /// The recorded name is checked as well as the literal one, and only as
+    /// well: a course made before `class_folder` existed has no recorded name
+    /// and keeps exactly the rule it had. Without the addition, renaming
+    /// "All Classes" to "All Days" would leave the course's class folder
+    /// removable — and removing it takes every lesson off the site while the
+    /// coverage map quietly starts counting every published page instead.
+    static func isTheAllClassesFolder(_ folder: String, configured: String? = nil) -> Bool {
+        if let recorded = configured?.trimmingCharacters(in: .whitespaces), !recorded.isEmpty {
+            if folder.caseInsensitiveCompare(recorded) == .orderedSame {
+                return true
+            }
+        }
         return folder.lowercased() == fallbackName.lowercased()
     }
 

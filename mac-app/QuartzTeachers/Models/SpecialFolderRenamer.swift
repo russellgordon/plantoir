@@ -103,8 +103,7 @@ enum SpecialFolderRenamer {
     static func problem(
         renaming oldName: String,
         to rawNewName: String,
-        existingNames: [String],
-        isTheClassFolder: Bool
+        existingNames: [String]
     ) -> String? {
         let newName: String = rawNewName.trimmingCharacters(in: .whitespaces)
         if newName.isEmpty {
@@ -133,15 +132,17 @@ enum SpecialFolderRenamer {
                 return SpecialNames.renameFolderProblemAlreadyUsed(name: newName)
             }
         }
-        // `ClassFolder.name(inPerSectionFolders:)` finds the class folder by
-        // looking for "class" in the name, so a rename that drops the word
-        // would hand the curriculum map a different folder with nothing said —
-        // the exact silent wrong answer this family of work exists to end.
-        // The proper fix is a `class_folder` key in the config, which is a
-        // file-format change both apps write and belongs in its own piece.
-        if isTheClassFolder && !newName.lowercased().contains("class") {
-            return SpecialNames.renameFolderProblemClassFolderMustSayClass
-        }
+        // There is deliberately NO refusal about the class folder keeping the
+        // word "class" in its name. There was one for a day: `ClassFolder`
+        // used to FIND that folder by looking for the word, so dropping it
+        // handed the curriculum map a different folder with nothing said.
+        // Russell's point (2026-09-01) was that the constraint was
+        // Plantoir's vocabulary imposed on a teacher's — somebody who says
+        // "Thread 2, Day 3" would sensibly call the folder "All Days" — so
+        // the guess was replaced by a recorded `class_folder`, which
+        // `renaming(_:to:scope:in:)` below writes as part of the rename.
+        // A rule enforced because a lookup was weak is a rule to delete once
+        // the lookup is fixed.
         return nil
     }
 
@@ -326,9 +327,37 @@ enum SpecialFolderRenamer {
     ) -> [String: Any] {
         var updated: [String: Any] = values
 
+        // Which special folder, if either, this WAS — worked out before the
+        // list is rewritten, because both answers are derived from it.
+        let perSectionFolders: [String] = values["per_section_folders"] as? [String] ?? []
+        let sharedFolders: [String] = values["shared_folders"] as? [String] ?? []
+        let wasTheClassFolder: Bool = (scope == .perSection) && ClassFolder.name(
+            inPerSectionFolders: perSectionFolders, configured: values["class_folder"] as? String
+        ).caseInsensitiveCompare(oldName) == .orderedSame
+        let wasTheCurriculumFolder: Bool = (scope == .shared) && CurriculumFolderRule
+            .resolvedCurriculumFolder(
+                configured: values["curriculum_folder"] as? String, in: sharedFolders
+            )?.caseInsensitiveCompare(oldName) == .orderedSame
+
         updated[scope.configurationKey] = renaming(
             oldName, to: newName, inList: values[scope.configurationKey] as? [String] ?? []
         )
+
+        // **Materialised on rename, not merely carried across.** A course made
+        // from scratch has `curriculum_folder: null` and no `class_folder` at
+        // all, so both are found by guessing at the name — "curriculum" in it,
+        // or "class" in it. Rename `Curriculum` to `Expectations` without
+        // writing the key and the guess stops finding it, the map is built
+        // from nothing, and nobody is told; the coverage check does not fire,
+        // because from its point of view the folder was never there. Writing
+        // the name down at the one moment Plantoir WITNESSES the rename is the
+        // whole reason renaming belongs in the app.
+        if wasTheClassFolder {
+            updated["class_folder"] = newName
+        }
+        if wasTheCurriculumFolder {
+            updated["curriculum_folder"] = newName
+        }
 
         // The marks pool names folders from either scope, so it is rewritten
         // whichever list the folder came from.
@@ -339,6 +368,12 @@ enum SpecialFolderRenamer {
         if let curriculum = values["curriculum_folder"] as? String {
             if curriculum.caseInsensitiveCompare(oldName) == .orderedSame {
                 updated["curriculum_folder"] = newName
+            }
+        }
+
+        if let classFolder = values["class_folder"] as? String {
+            if classFolder.caseInsensitiveCompare(oldName) == .orderedSame {
+                updated["class_folder"] = newName
             }
         }
 

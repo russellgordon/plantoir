@@ -411,17 +411,8 @@ struct CourseSettingsView: View {
         case .perSection:
             namesInScope = course.configuration.perSectionFolders
         }
-        var isTheClassFolder: Bool = false
-        if scope == .perSection {
-            let classFolder: String = ClassFolder.name(
-                inPerSectionFolders: course.configuration.perSectionFolders
-            )
-            isTheClassFolder = (classFolder == oldName)
-        }
         return SpecialFolderRenamer.problem(
-            renaming: oldName, to: newName,
-            existingNames: namesInScope,
-            isTheClassFolder: isTheClassFolder
+            renaming: oldName, to: newName, existingNames: namesInScope
         )
     }
 
@@ -448,6 +439,17 @@ struct CourseSettingsView: View {
                 return SpecialFolderRenamer.renaming(oldName, to: newName, scope: scope, in: values)
             }, at: course.configFileURL)
         } catch {
+            // Recorded BEFORE returning, and that ordering is the point: this
+            // is the one outcome the trail exists for. The folder has moved
+            // and the settings do not know, which is the state somebody will
+            // be asked to explain later — and it was the one case with no line
+            // at all, because the note used to sit after this block.
+            ActivityTrail.note(
+                .folderRenamed,
+                "renamed the folder " + oldName + " to " + newName + " in " + course.code
+                + " but could not write it to this course's settings — "
+                + error.localizedDescription
+            )
             // The folder HAS moved, so this is not "the rename failed" — it is
             // a rename whose bookkeeping did not land, and saying otherwise
             // would send the teacher looking for a folder under its old name.
@@ -462,6 +464,17 @@ struct CourseSettingsView: View {
             + " (" + scope.configurationKey + ", " + String(outcome.foldersMoved) + " moved, "
             + String(outcome.pagesRelinked) + " pages relinked)"
         )
+        // A rename that moved nothing is not a failure — a per-section folder
+        // may legitimately be missing from a section a teacher never filled in
+        // — but it must not be reported as though folders had moved. Told
+        // plainly, because the alternative is a teacher going to Obsidian to
+        // look for a folder that was never there.
+        if outcome.foldersMoved == 0 {
+            return .renamed(
+                SpecialNames.renameFolderDone(from: oldName, to: newName)
+                + " " + SpecialNames.renameFolderNothingWasThere
+            )
+        }
         return .renamed(
             SpecialNames.renameFolderDone(from: oldName, to: newName)
             + " " + SpecialNames.renameFolderRelinked(pages: outcome.pagesRelinked)
@@ -559,7 +572,7 @@ struct CourseSettingsView: View {
         // 2026-08-24): the next-class button and the schedule write pages
         // into it, so a confirmation would be asking the teacher to break
         // both. Every other per-section folder can be added or removed.
-        if ClassFolder.isTheAllClassesFolder(folder) {
+        if ClassFolder.isTheAllClassesFolder(folder, configured: course.configuration.classFolder) {
             return .blocked(reason: SpecialNames.classFolderBlocked)
         }
         if currentGraded.contains(folder) {

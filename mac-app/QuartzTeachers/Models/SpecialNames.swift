@@ -69,9 +69,6 @@ enum SpecialNames {
     static let renameFolderProblemIsMedia: String =
         "Plantoir looks after the Media folder itself, so nothing else can be called Media."
 
-    static let renameFolderProblemClassFolderMustSayClass: String =
-        "Plantoir finds your class pages by looking for “class” in this folder’s name, so the new name needs it too — “Class Pages”, say. Without it the curriculum coverage map would stop finding your lessons."
-
     // MARK: - Functions
 
     static func curriculumFolderBlockedByCurriculumPages(jurisdiction: String) -> String {
@@ -101,6 +98,9 @@ enum SpecialNames {
     static func renameFolderProblemDestinationExists(name: String) -> String {
         return "There is already something called “\(name)” beside it. Move or rename that first."
     }
+
+    static let renameFolderNothingWasThere: String =
+        "There was no folder by that name on your Mac, so only this course’s settings changed. Make it in Obsidian when you need it."
 
     static func renameFolderDone(from oldName: String, to newName: String) -> String {
         return "“\(oldName)” is now “\(newName)”."

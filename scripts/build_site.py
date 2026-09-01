@@ -3967,47 +3967,22 @@ def _is_draft(text: str) -> bool:
 
 def class_folder_name(config: dict) -> str:
     """
-    WHERE A NEW CLASS PAGE IS WRITTEN.
+    WHERE A NEW CLASS PAGE IS WRITTEN — see `class_pages.folder_name`.
 
-    Read from the course's own configured `per_section_folders`, never guessed
-    from what is on disk: the first entry whose name contains "class"
-    (case-insensitive), else the first entry, else the literal "All Classes".
-    Substring matching is safe here because the list is a short curated one the
-    teacher chose — it is NOT safe against arbitrary paths, which is what
-    `_is_class_page_path` below is careful about.
-
-    Pinned by contracts/class-planning.json -> classFolder.naming.
+    Kept as a name here because every caller in this file uses it and
+    `test_class_folder.py` imports it, but the RULE lives in `class_pages.py`,
+    which `setup_course.py` also reads. One rule, one home: four disagreeing
+    implementations of this question is what the whole `classFolder` contract
+    was written to end, and a fifth living here would be the same mistake.
     """
-    folders = config.get("per_section_folders") or []
-    for folder in folders:
-        if folder and "class" in str(folder).lower():
-            return str(folder)
-    if folders and folders[0]:
-        return str(folders[0])
-    return "All Classes"
+    return class_pages.folder_name(config)
 
 
 def class_folder_names(config: dict) -> list:
     """
-    WHICH FOLDERS COUNT as holding class pages — every configured
-    per-section folder whose name mentions classes, and failing that the single
-    name `class_folder_name` chose.
-
-    Naming and membership are the same question only when a course has ONE such
-    folder. A course configured ["Class Resources", "All Classes"] would
-    otherwise resolve to "Class Resources" for both, match zero pages, and drop
-    the coverage map back to "every published page" — reintroducing the exact
-    silent failure this rule was written to close.
-
-    Pinned by contracts/class-planning.json -> classFolder.membership.
+    WHICH FOLDERS COUNT as holding class pages — see `class_pages.folder_names`.
     """
-    names = []
-    for folder in config.get("per_section_folders") or []:
-        if folder and "class" in str(folder).lower():
-            names.append(str(folder))
-    if names:
-        return names
-    return [class_folder_name(config)]
+    return class_pages.folder_names(config)
 
 
 GRADED_FOLDERS_KEY = "graded_folders"

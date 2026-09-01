@@ -55,9 +55,11 @@ restoring `index.md`, which is what the repair button does — verified end to
 end: repair → Preview Again → `public/index.html` appears on the host → deploy
 succeeds.
 
-The `sectionIndexMissing` check said the site "will open on whatever page
-happens to come first" — true of a PREVIEW, and it understated publishing. Its
-detail now names both outcomes.
+The `sectionIndexMissing` check understated it: its detail was true of a
+PREVIEW and said nothing about publishing. It now names both outcomes — the
+wording itself is `shared-rules.json` → `siteHealth.checks`, not repeated here,
+because a sentence copied into a document is the copy that keeps reading right
+after the product's words change.
 
 **Fixed 2026-09-01, and the fix found a worse defect beside it.** The build no
 longer claims to be complete when it produced nothing: it says "Nothing to
@@ -241,10 +243,14 @@ marker, by design — nothing to be "edited since".
 13. Delete `section1/index.md` again, press Preview, dismiss the dialog with
     **OK** (do not repair), wait for the build, then press **Deploy**.
 
-**Expect, since 2026-09-01:** the build stops and says *"Nothing to publish …
-it has no front page, so no website was produced"*, and the folder-problem
-dialog comes back with **Put them back**. It no longer says "Built site not
-found — build first" to somebody who just built.
+**Expect, since 2026-09-01:** the PREVIEW still runs — nothing about a preview
+changed, and it will open on whatever page comes first. It is pressing
+**Deploy** that is different: the publish's own build stops, saying it produced
+no website because the section has no front page, and the folder-problem dialog
+comes back with **Put them back**. What a teacher is told about the failure is
+`app-rules.json` → `failureExplanations`, the case whose output names a missing
+front page. It no longer says "Built site not found — build first" to somebody
+who just built.
 
 **What it used to do**, kept because the trap is easy to reintroduce: the build
 said "Static build complete", the publish then said *"Built site not found …

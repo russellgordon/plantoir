@@ -371,6 +371,21 @@ class CourseConfiguration {
     /// scanning for a top-level folder whose name contains "curriculum" — which
     /// is still the real path for a course made from scratch, but would never
     /// have found a folder called something else entirely.
+    /// What this course calls the folder holding its class pages. Absent means
+    /// the old guess — the first per-section folder whose name mentions
+    /// "class" — which is what every course made before this key existed
+    /// relies on. See `ClassFolder`.
+    var classFolder: String? {
+        get { return values["class_folder"] as? String }
+        set {
+            if let newValue, !newValue.trimmingCharacters(in: .whitespaces).isEmpty {
+                values["class_folder"] = newValue
+            } else {
+                values.removeValue(forKey: "class_folder")
+            }
+        }
+    }
+
     var curriculumFolder: String? {
         get { return values["curriculum_folder"] as? String }
         set {

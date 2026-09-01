@@ -1701,15 +1701,28 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
     return "---\n" + "\n".join(out) + rest
 
 
-def prompt_unit_word(saved_config: dict) -> str:
+def prompt_unit_word(saved_config: dict, course_exists: bool) -> str:
     """
     Ask what this course calls a unit, defaulting to "Unit".
 
     Only the first word is offered. A teacher who says "Thread" almost
     certainly still says "Day 3", and a second configurable word would double
     the migration for something nobody asked for.
+
+    **Not asked at all once the course exists.** The word is applied to the
+    ready-made pages as they are POURED, so changing it on a re-run would
+    rewrite the configuration and rename nothing: the pages would still say
+    "Unit 2, Day 3" and the build would have stopped recognising them —
+    "built, and then recognised by nothing", the exact state this whole piece
+    exists to prevent. Renaming an existing course's word is deliberately not
+    on offer anywhere; it is in TODO.md with the reasons.
     """
     current = class_pages.word_from_config(saved_config)
+    if course_exists:
+        if current != class_pages.DEFAULT_UNIT_WORD:
+            print(f"\n📘 This course calls its units “{current}”. Changing that now would "
+                  f"rename nothing, so it is not offered.")
+        return current
     print("\nClass pages are named like “Unit 1, Day 1”.")
     print("Some teachers organise by Module or Thread instead.")
     entry = input(f"What do you call a unit? [Default: {current}]: ").strip()
@@ -2184,7 +2197,7 @@ def setup_course(no_backup: bool = False):
     # offered here rather than in Settings because renaming three thousand
     # pages and their wikilinks in a course already in use is a different and
     # far more dangerous piece of work.
-    chosen_unit_word = prompt_unit_word(saved_config)
+    chosen_unit_word = prompt_unit_word(saved_config, course_exists=course_path.exists())
 
     # ---------- Structure: from the example content, or from prompts --------
     if example_manifest:
@@ -2375,6 +2388,16 @@ def setup_course(no_backup: bool = False):
         # "Unit", which is what every course made before this key existed
         # says — see contracts/file-formats.json.
         "unit_word": chosen_unit_word,
+        # Which per-section folder holds class pages, RECORDED rather than left
+        # to be guessed from the word "class". A teacher whose vocabulary is
+        # "Thread 2, Day 3" would sensibly call it "All Days"; under the guess
+        # alone that folder is not found and the curriculum map counts the
+        # wrong pages without failing. Written from the same rule that used to
+        # do the guessing, so a course made today records what it would have
+        # been given anyway.
+        "class_folder": class_pages.folder_name(
+            {"per_section_folders": per_section_folders}
+        ),
         # NEW: example-content choices, remembered for future re-runs
         "prepopulate_example_content": prepopulate_example,
         "use_skeleton": use_skeleton,

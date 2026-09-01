@@ -31,7 +31,7 @@ final class SpecialFolderRenamerTests: XCTestCase {
     func testAnEmptyNameIsRefused() {
         XCTAssertEqual(
             SpecialFolderRenamer.problem(
-                renaming: "Tasks", to: "   ", existingNames: ["Tasks"], isTheClassFolder: false
+                renaming: "Tasks", to: "   ", existingNames: ["Tasks"]
             ),
             SpecialNames.renameFolderProblemEmpty
         )
@@ -40,7 +40,7 @@ final class SpecialFolderRenamerTests: XCTestCase {
     func testTheSameNameIsRefused() {
         XCTAssertEqual(
             SpecialFolderRenamer.problem(
-                renaming: "Tasks", to: "Tasks", existingNames: ["Tasks"], isTheClassFolder: false
+                renaming: "Tasks", to: "Tasks", existingNames: ["Tasks"]
             ),
             SpecialNames.renameFolderProblemUnchanged
         )
@@ -49,7 +49,7 @@ final class SpecialFolderRenamerTests: XCTestCase {
     func testASeparatorIsRefused() {
         XCTAssertEqual(
             SpecialFolderRenamer.problem(
-                renaming: "Tasks", to: "Work/Tasks", existingNames: ["Tasks"], isTheClassFolder: false
+                renaming: "Tasks", to: "Work/Tasks", existingNames: ["Tasks"]
             ),
             SpecialNames.renameFolderProblemHasSeparator
         )
@@ -58,7 +58,7 @@ final class SpecialFolderRenamerTests: XCTestCase {
     func testAHiddenNameIsRefused() {
         XCTAssertEqual(
             SpecialFolderRenamer.problem(
-                renaming: "Tasks", to: ".Tasks", existingNames: ["Tasks"], isTheClassFolder: false
+                renaming: "Tasks", to: ".Tasks", existingNames: ["Tasks"]
             ),
             SpecialNames.renameFolderProblemIsHidden
         )
@@ -70,7 +70,7 @@ final class SpecialFolderRenamerTests: XCTestCase {
     func testMediaIsRefusedInAnyCapitalisation() {
         XCTAssertEqual(
             SpecialFolderRenamer.problem(
-                renaming: "Tasks", to: "media", existingNames: ["Tasks"], isTheClassFolder: false
+                renaming: "Tasks", to: "media", existingNames: ["Tasks"]
             ),
             SpecialNames.renameFolderProblemIsMedia
         )
@@ -79,13 +79,13 @@ final class SpecialFolderRenamerTests: XCTestCase {
     func testASectionFolderNameIsRefused() {
         XCTAssertEqual(
             SpecialFolderRenamer.problem(
-                renaming: "Tasks", to: "section3", existingNames: ["Tasks"], isTheClassFolder: false
+                renaming: "Tasks", to: "section3", existingNames: ["Tasks"]
             ),
             SpecialNames.renameFolderProblemLooksLikeASection(name: "section3")
         )
         XCTAssertNil(
             SpecialFolderRenamer.problem(
-                renaming: "Tasks", to: "Sections", existingNames: ["Tasks"], isTheClassFolder: false
+                renaming: "Tasks", to: "Sections", existingNames: ["Tasks"]
             ),
             "\"Sections\" is an ordinary word, not the pattern Plantoir uses for a section folder"
         )
@@ -95,44 +95,80 @@ final class SpecialFolderRenamerTests: XCTestCase {
         XCTAssertEqual(
             SpecialFolderRenamer.problem(
                 renaming: "Tasks", to: "concepts",
-                existingNames: ["Tasks", "Concepts"], isTheClassFolder: false
+                existingNames: ["Tasks", "Concepts"]
             ),
             SpecialNames.renameFolderProblemAlreadyUsed(name: "concepts"),
             "The filesystem is case-insensitive here, so the clash is real"
         )
     }
 
-    /// The constraint that is not arbitrary: `ClassFolder` finds the class
-    /// folder by looking for "class" in the name, so a rename that dropped the
-    /// word would hand the curriculum map a different folder with nothing
-    /// said.
-    func testTheClassFolderMustKeepTheWordClass() {
-        XCTAssertEqual(
-            SpecialFolderRenamer.problem(
-                renaming: "All Classes", to: "Lessons",
-                existingNames: ["All Classes"], isTheClassFolder: true
-            ),
-            SpecialNames.renameFolderProblemClassFolderMustSayClass
-        )
+    /// **A refusal that was deleted the day after it shipped, and the test is
+    /// kept pointing the other way.** The class folder briefly had to keep the
+    /// word "class" in its name, because `ClassFolder` found it by looking for
+    /// that word. Russell's point (2026-09-01): that was Plantoir's vocabulary
+    /// imposed on a teacher's — somebody who says "Thread 2, Day 3" would
+    /// sensibly call the folder "All Days". The lookup was the thing at fault,
+    /// and it was fixed instead.
+    func testTheClassFolderMayBeCalledAnything() {
         XCTAssertNil(
             SpecialFolderRenamer.problem(
-                renaming: "All Classes", to: "Class Pages",
-                existingNames: ["All Classes"], isTheClassFolder: true
+                renaming: "All Classes", to: "All Days", existingNames: ["All Classes"]
             )
-        )
-        XCTAssertEqual(
-            ClassFolder.name(inPerSectionFolders: ["Class Pages", "Tasks"]), "Class Pages",
-            "The rule the refusal protects: this is why the word has to survive"
         )
     }
 
-    /// The same name is fine on a folder that is not the class folder.
     func testAnOrdinaryFolderMayBeCalledLessons() {
         XCTAssertNil(
             SpecialFolderRenamer.problem(
-                renaming: "Tasks", to: "Lessons", existingNames: ["Tasks"], isTheClassFolder: false
+                renaming: "Tasks", to: "Lessons", existingNames: ["Tasks"]
             )
         )
+    }
+
+    // MARK: - Recording which folder was which
+
+    /// The heart of what replaced the refusal: renaming the class folder
+    /// WRITES `class_folder`, so the answer no longer depends on the word.
+    func testRenamingTheClassFolderRecordsIt() {
+        let updated: [String: Any] = SpecialFolderRenamer.renaming(
+            "All Classes", to: "All Days", scope: .perSection,
+            in: ["per_section_folders": ["All Classes", "Tasks"]]
+        )
+        XCTAssertEqual(updated["class_folder"] as? String, "All Days")
+        XCTAssertEqual(updated["per_section_folders"] as? [String], ["All Days", "Tasks"])
+        XCTAssertEqual(
+            ClassFolder.name(
+                inPerSectionFolders: updated["per_section_folders"] as? [String] ?? [],
+                configured: updated["class_folder"] as? String
+            ),
+            "All Days",
+            "Without the recorded key this course's class pages would go to Tasks"
+        )
+    }
+
+    /// Found by adversarial review: the same trap, unguarded, one folder over.
+    /// A course made from scratch has `curriculum_folder: null`, so renaming
+    /// `Curriculum` used to leave the map built from nothing with nobody told.
+    func testRenamingTheCurriculumFolderRecordsItEvenWhenTheKeyWasNull() {
+        let updated: [String: Any] = SpecialFolderRenamer.renaming(
+            "Curriculum", to: "Expectations", scope: .shared,
+            in: [
+                "shared_folders": ["Curriculum", "Concepts"],
+                "curriculum_folder": NSNull(),
+            ]
+        )
+        XCTAssertEqual(updated["curriculum_folder"] as? String, "Expectations")
+    }
+
+    /// Renaming something ELSE must not invent either key — an absent key is a
+    /// course that has never said, and saying for it is its own kind of wrong.
+    func testRenamingAnOrdinaryFolderRecordsNothingExtra() {
+        let updated: [String: Any] = SpecialFolderRenamer.renaming(
+            "Tasks", to: "Assessments", scope: .perSection,
+            in: ["per_section_folders": ["All Classes", "Tasks"]]
+        )
+        XCTAssertNil(updated["class_folder"])
+        XCTAssertNil(updated["curriculum_folder"])
     }
 
     // MARK: - Where a folder lives
