@@ -1,6 +1,15 @@
 # Why this branch exists
 
-`issue/special-folders-hardening`, branched off `dev` on 2026-08-23.
+`issue/special-folders-hardening`, branched off `dev` on 2026-08-23, **merged
+into `dev` on 2026-08-25**.
+
+**Read this as the record of a finished branch.** It is kept because the
+reasoning in it is still the reasoning behind the code — why the checks ask
+what the FEATURE produced rather than whether a folder exists, why they live in
+the Python rather than in either app, and why they must neither break a build
+nor nag. The last two sections say what has happened since; where they and a
+`GUI-IMPROVEMENTS.md` row disagree, the row is the history and `contracts/` is
+what is true now.
 
 ## The problem, in one sentence
 
@@ -101,37 +110,63 @@ and 371 correct rows 355, 363, 368 and 370 **in place, with the wrong claim left
 visible beside its correction** rather than quietly edited away. That is
 deliberate: a log that silently rewrites itself cannot be trusted about anything.
 
-## Known open, deliberately
+## What Russell found by hand, and what it turned into
 
-- **A section with no `index.md` cannot be published at all.** The build succeeds,
-  `_sync_public_to_host` skips the copy because Quartz emitted no root
-  `index.html`, and `deploy.sh` then says "Built site not found — build first"
-  immediately after a successful build. Shared Python, so Windows has it too.
-  Written up in `WINDOWS-HANDOFF.md` with two one-line fixes available. Not fixed
-  here because it is a separate piece.
-- **Item 6** (renaming the `Unit` keyword) is in `TODO.md`.
+Russell tried the branch on 2026-08-24 and found the hole the first six items
+did not cover: **he removed `Tasks`, the curriculum folder and `All Classes`
+from inside the New Course Wizard, and Plantoir said nothing.**
 
-## What is being worked on right now, and is NOT yet done
-
-Russell tried the branch by hand on 2026-08-24 and found the hole the rest of
-this work does not cover: **he removed `Tasks`, the curriculum folder and
-`All Classes` from inside the New Course Wizard, and Plantoir said nothing.**
-
-That is a fair hit. `StringListEditorView.removeItem`
-(`Views/CourseSettings/StringListEditorView.swift:128`) drops a name with no
-warning and no notion that any name means anything — the same component in the
-wizard (`NewCourseWizardView.swift:765-768`) and in Course Settings
-(`CourseSettingsView.swift:81-97`). It already refuses `Media` on **add**, so it
-has the concept; it just never applies it on **remove**. The build-time dialog
+That was a fair hit. `StringListEditorView.removeItem` dropped a name with no
+warning and no notion that any name meant anything — the same component in the
+wizard and in Course Settings. It already refused `Media` on **add**, so it had
+the concept; it simply never applied it on **remove**. The build-time dialog
 then correctly stayed silent, because removing the curriculum folder in the
-wizard switches the coverage feature OFF (`setup_course.py:2243-2245`) — nothing
-was broken, so nothing complained, and he was never told what he had given up at
-the moment he gave it up.
+wizard switches the coverage feature OFF — nothing was broken, so nothing
+complained, and he was never told what he had given up at the moment he gave
+it up.
 
-Tracing what removal actually costs turned up a second, separate defect: in
-**Course Settings** removal does not stick at all. `preflight_update_course_config`
-(`build_site.py:3311`, called at `:4277`) re-adds on the next build anything it
-finds on disk, AND **un-hides it** (`:3346-3351`) — so removing a deliberately
-hidden folder in Settings can make it appear on the student-facing site.
+Tracing what removal actually cost turned up a second, separate defect: in
+**Course Settings** removal did not stick at all. `preflight_update_course_config`
+re-added on the next build anything it found on disk, AND **un-hid it** — so
+removing a deliberately hidden folder in Settings could make it appear on the
+student-facing site.
 
-Neither is fixed yet. No plan has been agreed.
+**Both are fixed.** They became Pieces 2 and 3, planned in `TODAYS-PLAN.md` and
+merged into `dev` on 2026-08-25: `excluded_items` made removal authoritative at
+build time, and the protection model gave every row in the list editors one of
+three states — blocked with an ⓘ naming the switch to turn off, consequential
+with a confirmation, or ordinary. `GUI-IMPROVEMENTS.md` rows 375–380.
+
+## What has happened since, and where the work stands
+
+**Pieces 1–3 merged into `dev` on 2026-08-25** (rows 374–380). Everything in
+"What Russell asked for" above is done except item 6, and item 6 is now half
+done.
+
+A follow-up branch, `issue/special-names-followups`, took the three things this
+one deliberately left behind (2026-09-01). Read `GUI-IMPROVEMENTS.md` rows
+384–386 for what they became; in one line each:
+
+- **The `index.md` publishing hole below is closed** — and the fix found a
+  worse defect beside it, where a publish after deleting a front page reported
+  success and shipped the previous build's pages.
+- **A teacher can rename a course folder from inside Plantoir**, on disk and in
+  every section, which was the `TODO.md` item deferred while this branch was
+  planned.
+- **A course chooses its own word for "Unit"** when it is made, and both the
+  build and the apps read that word rather than assuming it. That is item 6,
+  in the half Russell chose: new courses, not renaming a course already in use.
+
+## Known open when this branch merged — and what became of it
+
+- **A section with no `index.md` cannot be published at all.** ✅ **Fixed
+  2026-09-01.** The build succeeded, `_sync_public_to_host` skipped the copy
+  because Quartz emitted no root `index.html`, and `deploy.sh` then said "Built
+  site not found — build first" immediately after a successful build. The build
+  now says why and stops, and the previous build's output is cleared so a
+  publish cannot ship it as though it were current. Shared Python, so Windows
+  inherits it.
+- **Item 6** (renaming the `Unit` keyword). ✅ **Half done 2026-09-01** — a
+  course picks its word when it is made, and the parsing follows it. Renaming
+  an EXISTING course's word is still open in `TODO.md`, with the measurements
+  that make it unattractive.

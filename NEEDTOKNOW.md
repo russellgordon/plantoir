@@ -1,9 +1,16 @@
 # Need to know
 
 Things Russell asked to have written down as well as said, from the
-special-folders hardening work (branch `issue/special-folders-hardening`).
-Newest first. This is a HANDOVER note, not a log — `GUI-IMPROVEMENTS.md` is the
-log, and where a row and this file disagree, check the code.
+special-folders hardening work (branch `issue/special-folders-hardening`,
+merged into `dev` on 2026-08-25) and its 2026-09-01 follow-ups. Newest first.
+This is a HANDOVER note, not a log — `GUI-IMPROVEMENTS.md` is the log, and
+where a row and this file disagree, check the code.
+
+**Its one known-open defect is now closed**: a section with no `index.md` used
+to build "successfully" and then refuse to publish with a message that sent the
+teacher round in a circle. Fixed 2026-09-01, along with a worse one beside it.
+The section below says what changed and keeps the old behaviour on the record,
+because the trap is easy to reintroduce.
 
 ## All three deploy destinations were tested for real (2026-08-23, overnight)
 

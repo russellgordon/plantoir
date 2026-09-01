@@ -1,3 +1,29 @@
+# The plan for the GUI affordances — CARRIED OUT, kept for its reasoning
+
+> **✅ DONE. All three pieces were built, reviewed and merged into `dev` on
+> 2026-08-25.** Piece 1 (the marks pool), Piece 2 (`excluded_items`, the
+> preflight fix and the `index.md` notes) and Piece 3 (the protection model)
+> each landed with the adversarial review that followed it —
+> `GUI-IMPROVEMENTS.md` rows 374–380, and commits `11a70b7e` through
+> `0905a87d`.
+>
+> **This file is now HISTORY, not instructions.** Everything below is written
+> in the future tense because that is what it was when it was written; nothing
+> in it is still waiting to be done, and none of its "read this first"
+> or "who does what" instructions apply to a session working today. It is kept
+> for the one thing a finished plan is worth keeping for: the REASONING, and
+> the options that were rejected. The nil-versus-`[]` argument, the decision to
+> key `excluded_items` by scope rather than flat, the reason the two coverage
+> checks are mutually gated, and the note on where new sentences live are all
+> still the reasons the code is shaped the way it is, and all of them would
+> otherwise be re-argued by whoever reads the code next.
+>
+> Where this file and `contracts/` disagree, the contract is what is true now.
+> For what happened AFTER these three pieces, see `PURPOSE.md`'s last two
+> sections.
+
+---
+
 # Today's plan — GUI affordances for the folders that carry meaning
 
 **Written 2026-08-24 for a FRESH session.** The chat that produced it had been
