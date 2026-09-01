@@ -3276,13 +3276,21 @@ def _ensure_media_symlink(content_root: Path, course_dir: Path):
     except Exception as e:
         print(f"❌ Failed to create Media symlink at {link_path}: {e}")
 
-def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
+def _sync_public_to_host(output_dir: Path, host_output_dir: Path) -> bool:
     """
     Sync built static assets (public/) and course_config.json from internal
     container ext4 storage to the host-mounted output directory.
+
+    Returns whether a built SITE was mirrored. The root `index.html` is the
+    test, and the guard on it is right: Quartz emits one only when the merged
+    tree has an `index.md`, and a pile of pages with no front page is not
+    something anybody can publish. What was wrong is that the answer went
+    nowhere — the build printed "Static build complete" either way. The caller
+    now decides what to say based on what actually happened.
     """
     src_public = output_dir / "public"
     dst_public = host_output_dir / "public"
+    mirrored_a_site = False
     if src_public.exists() and (src_public / "index.html").exists():
         dst_public.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -3298,6 +3306,7 @@ def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
             # No rsync on this host (Windows native): incremental mirror,
             # because this runs on every tick of the preview sync watcher.
             toolchain_paths.mirror_tree(src_public, dst_public)
+        mirrored_a_site = True
 
     if (output_dir / "course_config.json").exists():
         try:
@@ -3321,6 +3330,38 @@ def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
             os.close(fd)
     except Exception:
         pass
+
+    return mirrored_a_site
+
+def _clear_stale_host_site(host_output_dir: Path, course_code: str, section_number) -> None:
+    """
+    Throw away the last built site when this build cannot replace it.
+
+    `_sync_public_to_host` mirrors nothing when the merged tree has no
+    `index.md`, and that guard is right — half a build must never be
+    published. What was wrong is what it left BEHIND. The previous build's
+    `public/` stayed on the host, and `deploy.py` publishes whatever it finds
+    there, so a teacher who deleted a front page, built, and published was
+    told the publish had succeeded and shipped LAST week's pages. Nothing
+    anywhere said so. That is the silent wrong answer this whole family of
+    checks exists to end, and it was being produced by the check's own guard.
+
+    Removing it turns a silent wrong answer into an honest refusal: `deploy`
+    says the built site is not there, and the build has already said why.
+    Nothing of the teacher's is lost — `.merged_output` is derived from their
+    notes, and every successful build rewrites this tree wholesale
+    (`rsync --delete`).
+    """
+    stale_public = host_output_dir / "public"
+    if not stale_public.exists():
+        return
+    try:
+        shutil.rmtree(stale_public)
+        print(f"🗑️  Removed the last built website for {course_code} Section {section_number}: "
+              f"without a front page this build cannot replace it, and publishing "
+              f"it again would have sent out the older pages.")
+    except Exception as error:
+        print(f"⚠️  Could not remove the last built website at {stale_public}: {error}")
 
 def _start_public_sync_watcher(output_dir: Path, host_output_dir: Path) -> threading.Thread:
     """
@@ -4797,6 +4838,15 @@ def build_section_site(
     }
     site_health.announce_or_stay_quiet(health_facts, course_code, section_number)
 
+    # A section with no front page produces no root index.html, so this build
+    # cannot replace the one already sitting on the host. Clear it here rather
+    # than in the sync, because BOTH modes need it: a preview never reaches the
+    # sync at all (its watcher waits on an index.html that never appears), and
+    # a publish from the command line after a preview would otherwise upload
+    # the older pages.
+    if not health_facts["section_index_exists"]:
+        _clear_stale_host_site(host_output_dir, course_code, section_number)
+
     # === Curriculum coverage heat map =========================================
     first_class_dt = _find_first_class_created(content_root)
     first_class_stamp = _format_created_timestamp_from_dt(first_class_dt) if first_class_dt else None
@@ -4986,9 +5036,21 @@ def build_section_site(
         public_dir = output_dir / "public"
         if not public_dir.exists():
             print("❌ Quartz build did not emit a 'public' directory — cannot deploy.")
-            return
-        _sync_public_to_host(output_dir, host_output_dir)
-        print("✅ Static build complete.")
+            sys.exit(1)
+        # "Static build complete" used to be printed either way. It is the
+        # sentence that sent teachers round in a circle: the build said it had
+        # finished, `deploy` then said "Built site not found — build first",
+        # and they had just built. A build that produced nothing publishable
+        # now says so and FAILS, so a publish stops at the build with the
+        # reason in front of it instead of at the step that cannot know why.
+        if _sync_public_to_host(output_dir, host_output_dir):
+            print("✅ Static build complete.")
+        else:
+            print(f"❌ Nothing to publish for {course_code} Section {section_number}: "
+                  f"it has no front page, so no website was produced.")
+            print("   Put the front page back — Plantoir offers to do that for "
+                  "you — then build again.")
+            sys.exit(1)
     else:
         # Preview mode (default): do NOT pre-build. Build+serve once.
         # Quartz's dev server opens TWO ports: the site, and a live-reload

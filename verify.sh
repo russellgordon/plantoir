@@ -134,6 +134,13 @@ else
   cat /tmp/verify_preflight_exclusions_test.log
 fi
 
+if (cd scripts && python3 test_publishable_site.py) >/tmp/verify_publishable_site_test.log 2>&1; then
+  pass "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
+else
+  fail "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
+  cat /tmp/verify_publishable_site_test.log
+fi
+
 # -------------------- 1. Container runtime (shared Colima) --------------------
 # Maintainer variant: assumes Colima and the Docker CLI are installed (the
 # teacher-facing launchers handle installation). Never stops a running VM.

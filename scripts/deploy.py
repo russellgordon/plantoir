@@ -997,6 +997,8 @@ def main():
     public_dir = section_dir / "public"
     if not public_dir.exists() or not any(public_dir.iterdir()):
         print(f"❌ Built site not found at: {public_dir}")
+        print(" If you have just built, check this section still has its front page.")
+        print(" A section without one produces no website, so there is nothing to publish.")
         print(f" Please build before deploying.\n For example:")
         print(f"{_cmd_example('preview', args.course, args.section, _HOST_OS)}")
         sys.exit(1)

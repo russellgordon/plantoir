@@ -268,6 +268,9 @@ if (-not $builtFound) {
   Write-Host "Built site not found at:"
   Write-Host " $PUBLIC_DIR_HOST"
   Write-Host ""
+  Write-Host " If you have just built, check this section still has its front page."
+  Write-Host " A section without one produces no website, so there is nothing to publish."
+  Write-Host ""
   Write-Host "Build first:"
   Write-Host (" .\preview.bat {0} {1} --build-only" -f $COURSE_CODE, $SECTION_NUM)
   exit 1

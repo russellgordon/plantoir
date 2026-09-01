@@ -30,7 +30,7 @@ Netlify asked two questions the first time (surname, then a site address);
 Cloudflare asked none, because the account ID was already saved. The account ID
 was correctly redacted out of the activity trail.
 
-## A section with no `index.md` cannot be published at all (2026-08-23)
+## A section with no `index.md` cannot be published at all (2026-08-23) — ✅ FIXED 2026-09-01
 
 Found while testing the deploy path, and it is worse than the health check's
 wording suggests. `_sync_public_to_host` (`scripts/build_site.py:3138`) only
@@ -48,9 +48,18 @@ restoring `index.md`, which is what the repair button does — verified end to
 end: repair → Preview Again → `public/index.html` appears on the host → deploy
 succeeds.
 
-The `sectionIndexMissing` check currently says the site "will open on whatever
-page happens to come first". That is true of a PREVIEW and understates the
-consequence for publishing. Worth strengthening.
+The `sectionIndexMissing` check said the site "will open on whatever page
+happens to come first" — true of a PREVIEW, and it understated publishing. Its
+detail now names both outcomes.
+
+**Fixed 2026-09-01, and the fix found a worse defect beside it.** The build no
+longer claims to be complete when it produced nothing: it says "Nothing to
+publish … it has no front page, so no website was produced" and exits non-zero,
+so a publish stops at the build with the reason in front of it. And the skipped
+sync used to leave the PREVIOUS build's `public/` on the host, which `deploy`
+uploads — so a publish after deleting a front page reported success and shipped
+last week's pages. That mirror is now cleared. See `GUI-IMPROVEMENTS.md` row
+384 and `WINDOWS-HANDOFF.md`.
 
 ## The repair dialog asked the wrong "is it busy" question (2026-08-23)
 
@@ -225,10 +234,15 @@ marker, by design — nothing to be "edited since".
 13. Delete `section1/index.md` again, press Preview, dismiss the dialog with
     **OK** (do not repair), wait for the build, then press **Deploy**.
 
-**Expect:** *"Built site not found … Build first"* — even though you just built.
-A section with no `index.md` cannot be published at all, and the message sends
-you round in a circle. This is pre-existing, is shared Python so Windows has it
-too, and is written up in `WINDOWS-HANDOFF.md` as an open item.
+**Expect, since 2026-09-01:** the build stops and says *"Nothing to publish …
+it has no front page, so no website was produced"*, and the folder-problem
+dialog comes back with **Put them back**. It no longer says "Built site not
+found — build first" to somebody who just built.
+
+**What it used to do**, kept because the trap is easy to reintroduce: the build
+said "Static build complete", the publish then said *"Built site not found …
+Build first"*, and — worse — if that section had ever been published before,
+the publish would have succeeded and sent out the OLDER pages.
 
 Repairing the front page and previewing again fixes it.
 

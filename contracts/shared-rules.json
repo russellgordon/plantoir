@@ -810,9 +810,9 @@
       {
         "name": "sectionIndexMissing",
         "sentence": "{course} Section {section} has no front page.",
-        "detail": "Every section has a page called index.md that students land on first. This section's is missing, so the site will open on whatever page happens to come first.",
+        "detail": "Every section has a page called index.md that students land on first. This section's is missing. A preview will open on whatever page happens to come first, and publishing cannot go ahead at all until the front page is back.",
         "fixable": true,
-        "why": "Restorable safely, unlike the curriculum folder — which is why this one may offer to fix itself and that one may not."
+        "why": "Restorable safely, unlike the curriculum folder — which is why this one may offer to fix itself and that one may not. The detail used to stop at \"whatever page happens to come first\", which is true of a PREVIEW and understates publishing by a mile: Quartz emits no root index.html without an index.md, so the build produces no site to publish and the deploy has nothing to upload. Naming both outcomes is what tells a teacher whether they can carry on for now or must fix it before they publish."
       },
       {
         "name": "handWrittenCoveragePage",

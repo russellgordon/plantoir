@@ -406,6 +406,16 @@
         "output" : "Built site not found at /courses/ICS3U/.merged_output/section1/public"
       },
       {
+        "expect" : "This section has no front page, so there is no website to publish. Put the front page back, then publish again.",
+        "output" : "❌ Nothing to publish for ICS3U Section 1: it has no front page, so no website was produced.",
+        "why" : "A section with no index.md builds without error and produces no root index.html, so nothing publishable exists. The build used to print \"Static build complete\" anyway and the deploy then said \"Built site not found — build first\", sending a teacher to do the thing they had just done. The build now says why and fails, so the reason reaches the teacher from the step that knows it."
+      },
+      {
+        "expect" : "This section has no front page, so there is no website to publish. Put the front page back, then publish again.",
+        "output" : "❌ Nothing to publish for ICS3U Section 1: it has no front page, so no website was produced.\nBuilt site not found at /courses/ICS3U/.merged_output/section1/public",
+        "why" : "Order, pinned. A publish runs the build and then the deploy on ONE transcript, so a missing front page puts both lines in the output. The specific reason must win: \"hasn't been built yet\" is the wrong thing to say to somebody who has just watched it build."
+      },
+      {
         "expect" : "Part of this course folder is a link to another folder, and Windows won't let the website builder follow it. Replace the link with the real folder (the details above name which one), then try again.",
         "output" : "OSError: [WinError 448] The path cannot be traversed because it contains an untrusted mount point: 'C:\\Users\\person\\Documents\\My Course\\courses\\ICS3U\\Media'",
         "why" : "The toolchain creates no Windows links of its own any more, so this error can only come from a link inside the teacher's OWN folder — commonly the Obsidian trick of sharing one Media folder across vaults with a junction, which current Windows refuses to traverse. The teacher can fix it; the raw OSError reads as a crash. Windows-only output — it can never appear on macOS, and the mac recognises it anyway so that the two explainers stay ONE list of troubles rather than growing a platform switch. (The alternative, a `platform` field on every case, was rejected as machinery for a handful of lines.) This is the only Windows-only case left: three one-time-setup cases sat beside it until 2026-08-20, when the native Windows toolchain removed the launcher lines they matched."

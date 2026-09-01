@@ -257,6 +257,9 @@ if [[ "$_BUILT_FOUND" != "true" ]]; then
   echo "❌ Built site not found at:"
   echo " ${PUBLIC_DIR_HOST}"
   echo
+  echo " If you have just built, check this section still has its front page."
+  echo " A section without one produces no website, so there is nothing to publish."
+  echo
   echo " Build first:"
   echo " ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM} --build-only"
   exit 1

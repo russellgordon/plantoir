@@ -3201,31 +3201,62 @@ it, and a trail that could not tell them apart leaves "did they ever fix it?"
 unanswerable. Both are in `contracts/shared-rules.json` → `activityTrail`, and
 the repair rules themselves are in `siteHealth.repair`.
 
-### A section with no index.md cannot be PUBLISHED — shared Python, so it is yours too
+### A section with no index.md cannot be PUBLISHED — ✅ FIXED 2026-09-01, in shared Python, so you inherit it
 
-Found while testing the deploy path on the mac, and it breaks identically on
-Windows because it is in `scripts/`.
+Found while testing the deploy path on the mac; it broke identically on Windows
+because it is in `scripts/`. Left open by the special-folders branch as a
+separate piece, and closed on 2026-09-01. The reasoning is kept because the
+second half of it was never on anybody's list.
 
-`_sync_public_to_host` (`build_site.py`) copies the built site back to the host
-only when `public/index.html` exists — and Quartz emits no root `index.html`
-without an `index.md`. So the build SUCCEEDS and prints "Static build complete",
-the sync is silently skipped, and `deploy.py` then reports "Built site not
-found … Build first: ./preview.sh CODE N --build-only" — telling the teacher to
-do the thing they have just done.
+**What it was.** `_sync_public_to_host` (`build_site.py`) copies the built site
+back to the host only when `public/index.html` exists — and Quartz emits no root
+`index.html` without an `index.md`. So the build SUCCEEDED and printed "Static
+build complete", the sync was silently skipped, and `deploy.py` then reported
+"Built site not found … Build first: ./preview.sh CODE N --build-only",
+telling the teacher to do the thing they had just done.
 
-The guard itself is right (do not publish half a build). What is wrong is that
-nothing says why, and the message sends them in a circle. Two one-line fixes
-were available and neither is done yet, so this is an open item rather than a
-solved one:
+**The guard is still right** — do not publish half a build. What was wrong is
+that its answer went nowhere. The sync now RETURNS whether it mirrored a site,
+and a `--build-only` run that mirrored nothing prints "Nothing to publish …
+it has no front page, so no website was produced" and **exits non-zero**. That
+matters more than the sentence: a publish runs `preview.sh --build-only` and
+then `deploy`, so failing the build stops the run at the step that KNOWS the
+reason. The mac already shows the folder-problem dialog on a failed build, so
+the teacher gets **Put them back** → **Preview Again**; check that your own
+failed-build path does the same rather than swallowing the findings.
 
-- print a warning in the else-branch of the sync, so the build says why it did
-  not produce a publishable site;
-- or have the deploy's "Built site not found" message name the likely cause.
+**The half nobody had named, and the worse one.** The skipped sync left the
+PREVIOUS build's `public/` on the host, and `deploy.py` uploads whatever it
+finds there. So: delete a front page, build, publish — and the teacher is told
+the publish succeeded while students get last week's pages. Nothing anywhere
+said so. `_clear_stale_host_site` now removes that mirror whenever the merged
+tree has no `index.md`, in BOTH preview and build modes, which turns a silent
+wrong answer into an honest refusal. Nothing of the teacher's is lost:
+`.merged_output` is derived from their notes and every successful build
+rewrites it wholesale with `rsync --delete`.
 
-Meanwhile the `sectionIndexMissing` health check understates it: "the site will
-open on whatever page happens to come first" is true of a PREVIEW, and for
-publishing there is no site at all. Worth strengthening in
-`shared-rules.json` → `siteHealth.checks`.
+**What you owe.** The Python is shared, so (almost) nothing. The exception is
+`FailureExplainer.cs`, which gains `MissingFrontPageExplanation` — already
+written on this side — and it must be asked **BEFORE** `MissingBuildExplanation`.
+A publish puts both lines in one transcript, and "hasn't been built yet" is the
+wrong thing to say to somebody who just watched it build. That ordering is a
+contract case (`app-rules.json` → `failureExplanations`, the case whose
+`output` carries both lines), so chaining it the other way round fails your
+suite rather than shipping quietly.
+
+**One thing to check rather than copy.** `_clear_stale_host_site` calls
+`shutil.rmtree` on the host's `public/` — which under `PLANTOIR_BUILD_ROOT` is
+outside the working folder, so outside OneDrive, which is the point of that
+variable. If a scanner or an open handle makes the removal fail, the build says
+so and carries on rather than dying; but the stale-publish risk returns for
+that run. Worth one real test on a machine with OneDrive running, and tell the
+mac what you find.
+
+The `sectionIndexMissing` health check understated the same thing — "the site
+will open on whatever page happens to come first" is true of a PREVIEW, and for
+publishing there is no site at all. Its detail in `shared-rules.json` →
+`siteHealth.checks` now names both outcomes, so a teacher can tell whether they
+may carry on for now or must fix it before they publish.
 
 ### The scheduled task NEVER refuses
 
