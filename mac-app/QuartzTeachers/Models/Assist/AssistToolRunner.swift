@@ -649,9 +649,10 @@ final class AssistToolRunner {
             }
         }
         if moving.isEmpty {
+            let unitWord: String = located.course.configuration.unitWord
             let already: String = publishing
-                ? "Unit \(unit) has already been published."
-                : "Unit \(unit) is already hidden."
+                ? "\(unitWord) \(unit) has already been published."
+                : "\(unitWord) \(unit) is already hidden."
             return AssistToolOutcome.wrote(already, detail: already)
         }
 
@@ -763,7 +764,8 @@ final class AssistToolRunner {
                 changedAnything = true
             } catch {
                 return AssistToolOutcome.refused(
-                    "Unit \(unit) was only partly \(publishing ? "published" : "unpublished"): "
+                    "\(located.course.configuration.unitWord) \(unit) was only partly "
+                    + "\(publishing ? "published" : "unpublished"): "
                     + error.localizedDescription
                 )
             }
@@ -771,21 +773,22 @@ final class AssistToolRunner {
 
         let done: String = publishing ? "published" : "unpublished"
         if !changedAnything {
+            let unitWord: String = located.course.configuration.unitWord
             let already: String = publishing
-                ? "Unit \(unit) has already been published."
-                : "Unit \(unit) is already hidden."
+                ? "\(unitWord) \(unit) has already been published."
+                : "\(unitWord) \(unit) is already hidden."
             return AssistToolOutcome.wrote(already, detail: already)
         }
 
         history.record(AssistChange(
-            whatHappened: "\(done) Unit \(unit)",
+            whatHappened: "\(done) \(located.course.configuration.unitWord) \(unit)",
             courseCode: located.course.code,
             sectionNumber: located.sectionNumber,
             rebuildsThePreview: true,
             files: touched
         ))
 
-        var detail: String = "Unit \(unit) was \(done)."
+        var detail: String = "\(located.course.configuration.unitWord) \(unit) was \(done)."
         if backedUp {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
@@ -793,7 +796,9 @@ final class AssistToolRunner {
             for: located.course, sectionNumber: located.sectionNumber
         ))
 
-        return AssistToolOutcome.wrote("Unit \(unit) was \(done).", detail: detail)
+        return AssistToolOutcome.wrote(
+            "\(located.course.configuration.unitWord) \(unit) was \(done).", detail: detail
+        )
     }
 
     /// Fold a step's files into what earlier steps touched.
@@ -2097,7 +2102,9 @@ final class AssistToolRunner {
                 + "“\(named)”."
             )
         }
-        guard let numbers = UnitDay(pageTitle: source.title) else {
+        guard let numbers = UnitDay(
+            pageTitle: source.title, term: located.course.configuration.unitWord
+        ) else {
             return .failure(
                 "“\(source.displayTitle)” isn't a numbered class page, so there is no next day "
                 + "for it to become."

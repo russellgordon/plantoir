@@ -593,6 +593,13 @@ this side is expected to say so when the contract is wrong.
     pinned by a contract case. See "A section with no index.md cannot be
     PUBLISHED" below.
 
+15. **What a course calls a unit (2026-09-01).** `unit_word` in
+    `course_config.json`, absent meaning "Unit". Shared Python does the rule
+    and the payload rewrite; you owe the C# mirror, a wizard field, and the
+    assistant's sentences. **Three new contract cases will fail your suite
+    until you read `pageNaming`'s new `term` field with a default.** Full
+    write-up in "What a course calls a unit" below.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,
@@ -3342,6 +3349,77 @@ it without one too. `FolderPathRewriter` is about 200 lines; its tests say
 exactly which forms must change and which must not, and the "must not" half is
 the important one — a rewriter that matched substrings would rename folders the
 teacher never touched.
+
+### What a course calls a unit — mac shipped 2026-09-01, and your suite goes RED first
+
+The `TODO.md` item deferred on 2026-08-23. Russell chose the scope on
+2026-09-01: **new courses plus configurable parsing, NOT renaming a course
+already in use.** Read the "red suite" paragraph before you read anything else
+here, because you will meet it before you meet the feature.
+
+**Your suite will fail, and that is the mechanism working.** Three cases were
+added to `contracts/class-planning.json` → `pageNaming`, each carrying a new
+`term` field. A case WITHOUT that field means the DEFAULT word, "Unit" — so
+read `term` with a default rather than treating its absence as a new shape, or
+every existing case breaks. The case that matters most is the one where a
+Module course must NOT read "Unit 2, Day 3" as a class page.
+
+**What the feature is.** `unit_word` in `course_config.json` (documented in
+`file-formats.json`), ABSENT meaning "Unit", so every course in the field is
+untouched. The wizard asks "What do you call a unit?" of EVERY course,
+ready-made ones included, and the payload is written in that word as it is
+poured rather than renamed afterwards.
+
+**Two of the three halves are shared Python and arrive free.**
+`scripts/class_pages.py` is the rule — the default, the regexes, and the
+rewrite — and `setup_course.py` applies it to the payload. You run both.
+
+**What you owe:** a C# mirror of `ClassPageTerm` and of `UnitDay`'s `term`, a
+field in your wizard, and the wizard writing `unit_word` into the config it
+creates. Plus the assistant's own sentences: the mac's now say "Module 4 was
+published" rather than "Unit 4 was published".
+
+**Why the parsing half mattered more than the naming half, and why the cheap
+option was rejected.** "New courses only, with the parsing left hardcoded" was
+on the table and is wrong, for a reason worth carrying: `_is_class_page`
+answering "no" does not FAIL. `_pages_the_course_teaches` returns nothing and
+the curriculum map falls back to counting every published page — so a Module
+course would have got a map that looked healthy and was wrong. That is the same
+silent-success failure the whole special-names family exists to end.
+
+**Four decisions, with the reasoning.**
+
+1. **"Day" stays fixed.** A teacher who says "Thread" almost certainly still
+   says "Day 3", and a second configurable word would double the migration for
+   something nobody asked for.
+2. **The word is escaped before it becomes a regex.** It comes from a teacher's
+   own configuration; one containing "(" would otherwise match something else
+   entirely, or fail to compile in the middle of a build. `Regex.Escape` is
+   your equivalent.
+3. **A number or a comma in the word is refused**, in the wizard and in the
+   command-line setup. The pages would otherwise be written and then recognised
+   by nothing — built successfully, and silently outside every feature that
+   works on class pages.
+4. **The payload rewrite matches "Unit" only when a NUMBER follows.** That is
+   what separates a unit reference from the ordinary English word, and it is
+   run ONLY over content Plantoir itself ships, on the way into a brand-new
+   course. Never let it near a teacher's own writing, where "Unit 3 of the
+   textbook" would be a false positive nobody could undo. It deliberately
+   catches the ~574 payload files that say "by the end of Unit 3" in prose,
+   which would otherwise leave a Module course talking about Units.
+
+**One design detail to copy rather than reinvent:** the word travels ON the
+parsed value (`UnitDay.term`) and on the page summary, not looked up per call.
+A page read out of a Module course is then written back as a Module page
+without every planner needing the course handed to it as well — and the two
+halves of a rename cannot disagree about which word they are in.
+
+**What is deliberately NOT built, on either side:** renaming an existing
+course's word. It means rewriting every class page's name, its frontmatter
+title and every wikilink pointing at it, across every section and shared
+folder, and a half-finished pass leaves a broken site with no way back. It
+needs its own design pass and its own undo, and it stays in `TODO.md`. Do not
+add it to your side alone.
 
 ### The scheduled task NEVER refuses
 

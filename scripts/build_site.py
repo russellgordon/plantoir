@@ -20,6 +20,7 @@ import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import site_health
 import contracts
+import class_pages
 import toolchain_paths
 from datetime import datetime, timezone
 import threading
@@ -1518,19 +1519,71 @@ def _format_created_timestamp_from_dt(dt: datetime) -> str:
             dt = dt.astimezone()
     return dt.strftime("%Y-%m-%dT%H:%M:%S") + ".000" + dt.strftime("%z")
 
-def _is_class_page(path: Path, title: str | None = None) -> bool:
+# ---------------------------------------------------------------------------
+# What THIS build's course calls a unit
+# ---------------------------------------------------------------------------
+#
+# The rule itself — the default, the regexes, and the rewrite used when a new
+# course is poured — lives in `class_pages.py`, because `setup_course.py` needs
+# it too and long before any build. What lives here is this build's ANSWER.
+#
+# Held at module level rather than threaded through six functions because this
+# script builds exactly one section of one course per process, so there is only
+# ever one answer. `set_unit_word` is called once, from `build_section_site`,
+# as soon as the configuration has been read.
+
+DEFAULT_UNIT_WORD = class_pages.DEFAULT_UNIT_WORD
+
+_unit_word = DEFAULT_UNIT_WORD
+
+
+def set_unit_word(word) -> str:
+    """Records what this build's course calls a unit, and returns it."""
+    global _unit_word
+    _unit_word = class_pages._cleaned(word)
+    return _unit_word
+
+
+def unit_word() -> str:
+    """What this build's course calls a unit."""
+    return _unit_word
+
+
+def unit_word_from_config(config: dict) -> str:
+    """The course's word, defaulting the way an absent key must."""
+    return class_pages.word_from_config(config)
+
+
+def class_page_pattern(word: str | None = None) -> str:
+    """This build's class-page pattern, or one for a word given outright."""
+    return class_pages.class_page_pattern(word if word is not None else _unit_word)
+
+
+def first_class_pattern(word: str | None = None) -> str:
+    """This build's first-class-of-the-year pattern."""
+    return class_pages.first_class_pattern(word if word is not None else _unit_word)
+
+
+def _is_class_page(path: Path, title: str | None = None, word: str | None = None) -> bool:
     """
     True if the file represents a class page (e.g., 'Unit 1, Day 1.md' or titled 'Unit 1, Day 1').
     Folder index files ('index.md'), Key Links, Curriculum Coverage, and other non-class files are never class pages.
+
+    `word` defaults to whatever this build's course calls it — see
+    `set_unit_word`. A course that says "Module" names its pages
+    "Module 2, Day 3", and a check still looking for "Unit" would decide the
+    course teaches nothing at all: the coverage map would fall back to counting
+    every published page, which is a wrong map that reports success.
     """
     if path.name.lower() in ("index.md", "key links.md", "curriculum coverage.md"):
         return False
+    pattern = class_page_pattern(word)
     stem = path.stem.strip()
-    if re.match(r"^Unit\s+\d+,\s*Day\s+\d+$", stem, re.IGNORECASE):
+    if re.match(pattern, stem, re.IGNORECASE):
         return True
     if title:
         trimmed_title = title.strip()
-        if re.match(r"^Unit\s+\d+,\s*Day\s+\d+$", trimmed_title, re.IGNORECASE):
+        if re.match(pattern, trimmed_title, re.IGNORECASE):
             return True
     return False
 
@@ -1569,8 +1622,9 @@ def _find_first_class_created(content_root: Path) -> datetime | None:
                     earliest_class_dt = dt
 
                 stem = fp.stem.strip()
-                if re.match(r"^Unit\s+0*1,\s*Day\s+0*1$", stem, re.IGNORECASE) or \
-                   re.match(r"^Unit\s+0*1,\s*Day\s+0*1$", title.strip(), re.IGNORECASE):
+                first_class = first_class_pattern()
+                if re.match(first_class, stem, re.IGNORECASE) or \
+                   re.match(first_class, title.strip(), re.IGNORECASE):
                     first_class_unit1_day1_dt = dt
 
     if first_class_unit1_day1_dt is not None:
@@ -4573,6 +4627,14 @@ def build_section_site(
     print("\n🔎 Preflight: discovering new shared and per-section items...")
     config = preflight_update_course_config(course_dir, section_dir, config_file) or config
     # ========================================================================
+
+    # What this course calls a unit, before anything asks what a class page is.
+    # Set once here rather than passed through every caller — one process
+    # builds one section of one course, so there is only ever one answer.
+    chosen_unit_word = set_unit_word(unit_word_from_config(config))
+    if chosen_unit_word != DEFAULT_UNIT_WORD:
+        print(f"📘 This course calls its units “{chosen_unit_word}”, so a class page is "
+              f"“{chosen_unit_word} 2, Day 3”.")
 
     shared_folders = config.get("shared_folders", [])
     shared_files = config.get("shared_files", [])

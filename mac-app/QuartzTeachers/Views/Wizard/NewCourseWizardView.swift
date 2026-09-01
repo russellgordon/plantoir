@@ -15,6 +15,13 @@ struct NewCourseWizardView: View {
     @State var courseCode: String = ""
     @State var courseName: String = ""
 
+    /// What this course calls a unit — "Unit 2, Day 3", or "Module 2, Day 3".
+    /// Asked here rather than in Settings because the ready-made pages are
+    /// poured in this word: renaming three thousand pages and their wikilinks
+    /// in a course already in use is a different and far more dangerous piece
+    /// of work, and is deliberately not offered.
+    @State var unitWord: String = ClassPageTerm.standard
+
     /// The province the course-code picker is currently browsing —
     /// narrows its suggestion list, never gates typing a code straight
     /// through. Defaults to Ontario, the more common case, so nothing is
@@ -830,6 +837,31 @@ struct NewCourseWizardView: View {
             }
             .disabled(!hasChosenCourse)
 
+            // Asked of EVERY course, including a pre-populated one: the
+            // ready-made pages are poured in this word rather than renamed
+            // afterwards, which is why it cannot be moved into Settings later.
+            Section {
+                LabeledContent("What do you call a unit?") {
+                    TextField("Unit", text: $unitWord, prompt: Text(ClassPageTerm.standard))
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("unitWordField")
+                }
+                if let problem = ClassPageTerm.problem(with: unitWord) {
+                    Text(problem)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("unitWordProblem")
+                } else {
+                    ExampleCaption("Class pages will be named “\(ClassPageTerm.cleaned(unitWord)) 1, Day 1”. Some teachers say Module or Thread.")
+                }
+            } header: {
+                FormSectionHeader(
+                    "Units",
+                    caption: "Chosen once, when the course is made — the pages are named this way as they are written"
+                )
+            }
+            .disabled(!hasChosenCourse)
+
             Section {
                 PublishingChoiceView(
                     deployTarget: $deployTarget,
@@ -1164,6 +1196,13 @@ struct NewCourseWizardView: View {
             validationProblem = problem
             return
         }
+        // The same check the caption under the field shows. Refused here as
+        // well because the pages would otherwise be written with names nothing
+        // can read back — built, and then recognised by nothing.
+        if let problem = ClassPageTerm.problem(with: unitWord) {
+            validationProblem = problem
+            return
+        }
         guard let workspaceURL = workspace.workspaceURL else {
             validationProblem = "No working folder is selected."
             return
@@ -1302,6 +1341,11 @@ struct NewCourseWizardView: View {
             "footer_html": footerHTML,
             "show_reading_time": showReadingTime,
             "show_grade_in_title": ["sections": gradeMap],
+            // What this course calls a unit. Written even when it is the
+            // default, so the file says out loud what the pages will be
+            // called; an ABSENT key still means "Unit" for every course made
+            // before the choice existed.
+            "unit_word": ClassPageTerm.cleaned(unitWord),
             // The real wizard reads these as its defaults, exactly like
             // every other answer here. False when no content exists for
             // the code, so a stale true can never mean anything.

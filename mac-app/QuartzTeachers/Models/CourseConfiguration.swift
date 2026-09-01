@@ -336,6 +336,13 @@ class CourseConfiguration {
         return result
     }
 
+    /// What this course calls a unit — "Unit 2, Day 3", or "Module 2, Day 3".
+    /// Absent means "Unit"; see `ClassPageTerm`.
+    var unitWord: String {
+        get { return ClassPageTerm.cleaned(values["unit_word"] as? String) }
+        set { values["unit_word"] = ClassPageTerm.cleaned(newValue) }
+    }
+
     var sharedFolders: [String] {
         get { return stringListValue(forKey: "shared_folders") }
         set { values["shared_folders"] = newValue }

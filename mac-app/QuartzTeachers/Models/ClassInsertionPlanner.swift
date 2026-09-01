@@ -162,7 +162,9 @@ enum ClassInsertionPlanner {
         var added: [PlannedClass] = []
         for offset in 0..<count {
             let day: Int = atDay + offset
-            let title: String = UnitDay(unit: unit, day: day).title
+            let title: String = UnitDay(
+                unit: unit, day: day, term: course.configuration.unitWord
+            ).title
             added.append(PlannedClass(
                 title: title,
                 fileURL: folderURL.appendingPathComponent(title + ".md"),
@@ -187,7 +189,9 @@ enum ClassInsertionPlanner {
             guard let numbers = page.unitAndDay else {
                 continue
             }
-            let newTitle: String = UnitDay(unit: unit, day: numbers.day + count).title
+            let newTitle: String = UnitDay(
+                unit: unit, day: numbers.day + count, term: course.configuration.unitWord
+            ).title
             renames.append(ClassRename(
                 from: page.title,
                 to: newTitle,
@@ -207,7 +211,9 @@ enum ClassInsertionPlanner {
             }
             var name: String = moving.title
             if let numbers = moving.unitAndDay, numbers.unit == unit {
-                name = UnitDay(unit: unit, day: numbers.day + count).title
+                name = UnitDay(
+                    unit: unit, day: numbers.day + count, term: course.configuration.unitWord
+                ).title
             }
             moves.append(ClassDateMove(
                 title: name,

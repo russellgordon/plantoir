@@ -68,41 +68,39 @@ an item when it ships (finished behaviour is recorded in
   and a create, which is exactly why the rename was worth putting in the app —
   the app is the one place it can be witnessed. Not worth chasing further.
 
-- **Let a teacher rename the `Unit` keyword** — deferred 2026-08-23, while
-  planning the hardening of Plantoir's special folder and file names. Some
-  teachers organise by "Module" or "Thread" rather than "Unit", and today the
-  word is not a preference but a structural assumption: `_is_class_page` in
-  `scripts/build_site.py:1402` matches `^Unit\s+\d+,\s*Day\s+\d+$`, and
-  roughly 290 places in the Swift and 208 in the C# name it.
+- ✅ **Half done 2026-09-01 — a course chooses its word for “Unit” when it is
+  made.** Deferred 2026-08-23; built once Russell chose the scope on
+  2026-09-01: **new courses plus configurable parsing, NOT renaming a course
+  already in use.**
 
-  **It is deferred because of the migration, not the parsing.** The parsing side
-  is mechanical — one configured term threaded through the regexes and the
-  title generators. The measurements that decided it (taken 2026-08-23):
+  **What shipped.** `unit_word` in `course_config.json`, absent meaning “Unit”.
+  The wizard asks every course, the ready-made payload is written in that word
+  as it is poured (~3,000 files and their wikilinks, in one pass during the
+  copy), and both the Python and the Swift now read the word rather than
+  assuming it — `scripts/class_pages.py` and `ClassPageTerm`. The assistant
+  says it too. See `GUI-IMPROVEMENTS.md` row 386.
 
-  - **3,088 files** named `Unit N, Day N` under `support/example_content/`, and
-    **3,143 files** containing a `Unit N, Day N` wikilink;
-  - **600** skeleton files, which are generated and therefore cheap;
-  - `contracts/class-planning.json` is authored end to end in Unit/Day;
-  - the local assistant's routing was measured against sentences like "publish
-    Unit 4" — a teacher who renamed to Thread will type "publish thread 4".
+  **The measurement that decided the split still stands**, and is kept here
+  because it is what makes the remaining half unattractive: 3,088 files named
+  `Unit N, Day N` under `support/example_content/`, 3,143 containing such a
+  wikilink, 600 generated skeleton files, and `contracts/class-planning.json`
+  authored end to end in Unit/Day. Payloads are copied fresh at creation, so a
+  NEW course pays none of that — which is exactly why the new-course half was
+  cheap and the existing-course half is not.
 
-  **The split that makes it tractable.** Payloads are copied fresh at course
-  creation, so a NEW course can pick its term at setup and one rewrite pass
-  during the copy handles all 3,000-odd files and their wikilinks at once. That
-  is cheap, contained, and delivers most of the value. Renaming an EXISTING
-  course is the dangerous half: it means rewriting every wikilink pointing at
-  every renamed page, across every shared folder and every section, and a
-  half-finished rename leaves a broken site with no obvious way back.
-  `WikiLinkRewriter` could do it, but it deserves its own design pass and its
-  own undo — not a checkbox in settings.
+  **Still open: renaming an EXISTING course's word.** It means rewriting every
+  class page's name, its frontmatter title and every wikilink pointing at it,
+  across every section and every shared folder, and a half-finished pass leaves
+  a broken site with no obvious way back. The machinery is closer than it was —
+  `ClassInsertionPlanner` already renames class pages, retitles frontmatter and
+  rewrites wikilinks for ONE section, which is the same shape widened to a
+  course — but it still deserves its own design pass and its own undo. Not a
+  checkbox in Settings.
 
-  **Hold "Day" fixed.** A teacher who says "Thread" almost certainly still says
-  "Day 3"; only the first term looks worth making configurable.
-
-  Rejected: a display-only rename (the page would be titled "Thread 2, Day 3"
-  while the file stayed `Unit 2, Day 3.md`), because Obsidian is the teacher's
-  editor and they would see the old word every time they opened the vault —
-  which is the place the rename was supposed to help.
+  **Rejected, and logged so it is not retried:** a display-only rename (pages
+  titled “Thread 2, Day 3” while the files stay `Unit 2, Day 3.md`). Obsidian is
+  the teacher's editor and they would see the old word every time they opened
+  the vault — which is the place the rename was supposed to help.
 
 - **The assistant's first turn does not wait for its warm-up** — measured
   2026-08-20, while qualifying the mac for v1.1.0. `AssistSession` sets
