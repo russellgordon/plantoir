@@ -146,6 +146,35 @@ enum SpecialFolderRenamer {
         return nil
     }
 
+    /// Whether this folder was the class folder for a reason, rather than by
+    /// being first in the list.
+    ///
+    /// `ClassFolder.name` answers "where does a class page go?" and always
+    /// answers SOMETHING — falling back to the first per-section folder, and
+    /// then to a literal, so that a course always has an answer. That fallback
+    /// is a guess of convenience, and it must not be frozen into the
+    /// configuration by an unrelated rename: a course whose folders are
+    /// `["Tasks", "Homework"]` would otherwise come out of renaming `Tasks`
+    /// with `class_folder: "Assessments"` recorded for good, after which
+    /// adding a real `All Classes` folder would never take over and the
+    /// renamed folder could no longer be removed.
+    ///
+    /// So the key is written only when the answer was CONFIDENT: the course
+    /// had already recorded this folder, or the folder names itself. Found by
+    /// adversarial review, 2026-09-01.
+    static func wasSurelyTheClassFolder(
+        _ name: String, in folders: [String], recorded: String?
+    ) -> Bool {
+        if let alreadyRecorded = ClassFolder.matching(recorded, in: folders) {
+            return alreadyRecorded.caseInsensitiveCompare(name) == .orderedSame
+        }
+        if !name.lowercased().contains("class") {
+            return false
+        }
+        return ClassFolder.name(inPerSectionFolders: folders)
+            .caseInsensitiveCompare(name) == .orderedSame
+    }
+
     /// Whether a name is one Plantoir gives a section's own folder.
     static func looksLikeASectionFolder(_ name: String) -> Bool {
         let lowercased: String = name.lowercased()
@@ -331,9 +360,9 @@ enum SpecialFolderRenamer {
         // list is rewritten, because both answers are derived from it.
         let perSectionFolders: [String] = values["per_section_folders"] as? [String] ?? []
         let sharedFolders: [String] = values["shared_folders"] as? [String] ?? []
-        let wasTheClassFolder: Bool = (scope == .perSection) && ClassFolder.name(
-            inPerSectionFolders: perSectionFolders, configured: values["class_folder"] as? String
-        ).caseInsensitiveCompare(oldName) == .orderedSame
+        let wasTheClassFolder: Bool = (scope == .perSection) && wasSurelyTheClassFolder(
+            oldName, in: perSectionFolders, recorded: values["class_folder"] as? String
+        )
         let wasTheCurriculumFolder: Bool = (scope == .shared) && CurriculumFolderRule
             .resolvedCurriculumFolder(
                 configured: values["curriculum_folder"] as? String, in: sharedFolders

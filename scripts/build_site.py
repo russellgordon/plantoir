@@ -3969,8 +3969,8 @@ def class_folder_name(config: dict) -> str:
     """
     WHERE A NEW CLASS PAGE IS WRITTEN — see `class_pages.folder_name`.
 
-    Kept as a name here because every caller in this file uses it and
-    `test_class_folder.py` imports it, but the RULE lives in `class_pages.py`,
+    Kept as a name here because `test_class_folder.py` imports it and it is the
+    name every write-up refers to, but the RULE lives in `class_pages.py`,
     which `setup_course.py` also reads. One rule, one home: four disagreeing
     implementations of this question is what the whole `classFolder` contract
     was written to end, and a fifth living here would be the same mistake.

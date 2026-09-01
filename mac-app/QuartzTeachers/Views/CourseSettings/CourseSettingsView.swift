@@ -469,7 +469,12 @@ struct CourseSettingsView: View {
         // — but it must not be reported as though folders had moved. Told
         // plainly, because the alternative is a teacher going to Obsidian to
         // look for a folder that was never there.
-        if outcome.foldersMoved == 0 {
+        //
+        // Guarded on the LINKS as well as the folders: a page can carry a
+        // qualified link into a folder no section actually has, and saying
+        // "only this course's settings changed" while pages were rewritten
+        // would be false. Rare, and this sentence exists to be exact.
+        if outcome.foldersMoved == 0 && outcome.pagesRelinked == 0 {
             return .renamed(
                 SpecialNames.renameFolderDone(from: oldName, to: newName)
                 + " " + SpecialNames.renameFolderNothingWasThere

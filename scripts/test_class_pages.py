@@ -132,7 +132,7 @@ class PayloadRewriteTests(unittest.TestCase):
 
     def test_a_bare_unit_reference_in_prose_follows_too(self):
         """
-        Around 574 payload files say things like "by the end of Unit 3". Left
+        Some 611 payload files say things like "by the end of Unit 3". Left
         alone, a Module course would talk about Units in its own pages.
         """
         self.assertEqual(
@@ -168,6 +168,60 @@ class PayloadRewriteTests(unittest.TestCase):
 
     def test_a_backslash_in_the_word_is_not_read_as_an_escape(self):
         self.assertEqual(class_pages.rewritten("Unit 2, Day 3", r"A\1B"), r"A\1B 2, Day 3")
+
+
+class TheCommandLineWizardAsksAtTheRightTimeTests(unittest.TestCase):
+    """
+    Pinned because this went wrong once, as the fix for its own opposite.
+
+    The word is applied to the ready-made pages as they are POURED, so asking
+    again on a course that already exists would rewrite the configuration and
+    rename nothing — "built, and then recognised by nothing". The first attempt
+    at that guard tested whether the course FOLDER existed, which
+    `setup_course` itself creates a couple of hundred lines earlier, so the
+    answer was always yes and a teacher setting up from the command line could
+    never choose the word at all.
+    """
+
+    def setUp(self):
+        import setup_course
+
+        self.setup_course = setup_course
+        self.asked = []
+
+    def _answering(self, reply):
+        def fake_input(prompt=""):
+            self.asked.append(prompt)
+            return reply
+        return fake_input
+
+    def test_a_brand_new_course_is_asked(self):
+        import builtins
+        from unittest.mock import patch
+
+        with patch.object(builtins, "input", self._answering("Module")):
+            chosen = self.setup_course.prompt_unit_word({}, has_been_set_up_before=False)
+        self.assertEqual(chosen, "Module")
+        self.assertTrue(self.asked, "a brand-new course must be offered the choice")
+
+    def test_a_course_already_set_up_is_not_asked(self):
+        import builtins
+        from unittest.mock import patch
+
+        with patch.object(builtins, "input", self._answering("Thread")):
+            chosen = self.setup_course.prompt_unit_word(
+                {"unit_word": "Module"}, has_been_set_up_before=True
+            )
+        self.assertEqual(chosen, "Module", "the word it already has, not a new one")
+        self.assertEqual(self.asked, [], "nothing may be asked on a re-run")
+
+    def test_a_name_that_cannot_be_read_back_falls_back_to_unit(self):
+        import builtins
+        from unittest.mock import patch
+
+        with patch.object(builtins, "input", self._answering("Module2")):
+            chosen = self.setup_course.prompt_unit_word({}, has_been_set_up_before=False)
+        self.assertEqual(chosen, class_pages.DEFAULT_UNIT_WORD)
 
 
 if __name__ == "__main__":

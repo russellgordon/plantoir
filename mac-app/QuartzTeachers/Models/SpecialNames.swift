@@ -66,6 +66,9 @@ enum SpecialNames {
     static let renameFolderProblemIsHidden: String =
         "A name starting with a dot makes the folder hidden, and Plantoir would stop finding it."
 
+    static let renameFolderNothingWasThere: String =
+        "There was no folder by that name on your Mac, so only this course’s settings changed. Make it in Obsidian when you need it."
+
     static let renameFolderProblemIsMedia: String =
         "Plantoir looks after the Media folder itself, so nothing else can be called Media."
 
@@ -98,9 +101,6 @@ enum SpecialNames {
     static func renameFolderProblemDestinationExists(name: String) -> String {
         return "There is already something called “\(name)” beside it. Move or rename that first."
     }
-
-    static let renameFolderNothingWasThere: String =
-        "There was no folder by that name on your Mac, so only this course’s settings changed. Make it in Obsidian when you need it."
 
     static func renameFolderDone(from oldName: String, to newName: String) -> String {
         return "“\(oldName)” is now “\(newName)”."

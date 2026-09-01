@@ -3380,9 +3380,10 @@ Module course must NOT read "Unit 2, Day 3" as a class page.
 
 **What the feature is.** `unit_word` in `course_config.json` (documented in
 `file-formats.json`), ABSENT meaning "Unit", so every course in the field is
-untouched. A ready-made course holds about **86** class pages, not the ~3,000
-an earlier draft of this section said — that is the total across all 38
-payloads, and the correction is `GUI-IMPROVEMENTS.md` row 388. The wizard asks "What do you call a unit?" of EVERY course,
+untouched. A ready-made course holds **84–87** class pages (42 for the two
+half-credit courses), not the ~3,000 an earlier draft of this section said —
+that is the total across all 38 payloads. Corrections: `GUI-IMPROVEMENTS.md`
+rows 388 and 389. The wizard asks "What do you call a unit?" of EVERY course,
 ready-made ones included, and the payload is written in that word as it is
 poured rather than renamed afterwards.
 
@@ -3513,10 +3514,19 @@ yourself — so word it deliberately rather than discovering the gap:
   as "the rename failed": it did not, and saying so sends the teacher looking
   for a folder under its old name.
 - **The wizard's unit-word caption** — "Class pages will be named '… 1, Day 1'".
+- **The assistant's unit sentences**, which item 13 wrongly said were "listed
+  below with the others" until this line was added: "{word} N was published",
+  "{word} N has already been published", "{word} N is already hidden", "{word} N
+  was only partly published", and "I can't find any class pages in {word} N of
+  …". They are hardcoded in `AssistToolRunner` and are in NO contract — not
+  even `assist-wording.json`, which carries the rest of the assistant's words.
+  That is a pre-existing gap this work inherited rather than made, and it is
+  named here so you do not go looking for them.
 
-**One thing the contract DOES carry that you must not copy verbatim.**
-`specialNames.renameFolder.explanation` and
-`specialNames.removeLeavesTheFolderOnDisk.message` both say "on your Mac".
+**Three things the contract DOES carry that you must not copy verbatim.**
+`specialNames.renameFolder.explanation`,
+`specialNames.renameFolder.doneNothingWasThere` and
+`specialNames.removeLeavesTheFolderOnDisk.message` all say "on your Mac".
 Substitute "on this PC", the same way you already do for `app-rules.json`'s
 "this Mac" — `contracts/README.md` documents that substitution. Your contract
 test must compare on the substituted form or it will fail on a difference that

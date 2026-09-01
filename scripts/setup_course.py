@@ -1701,7 +1701,7 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
     return "---\n" + "\n".join(out) + rest
 
 
-def prompt_unit_word(saved_config: dict, course_exists: bool) -> str:
+def prompt_unit_word(saved_config: dict, has_been_set_up_before: bool) -> str:
     """
     Ask what this course calls a unit, defaulting to "Unit".
 
@@ -1709,7 +1709,7 @@ def prompt_unit_word(saved_config: dict, course_exists: bool) -> str:
     certainly still says "Day 3", and a second configurable word would double
     the migration for something nobody asked for.
 
-    **Not asked at all once the course exists.** The word is applied to the
+    **Not asked at all once the course has a configuration.** The word is applied to the
     ready-made pages as they are POURED, so changing it on a re-run would
     rewrite the configuration and rename nothing: the pages would still say
     "Unit 2, Day 3" and the build would have stopped recognising them —
@@ -1718,7 +1718,7 @@ def prompt_unit_word(saved_config: dict, course_exists: bool) -> str:
     on offer anywhere; it is in TODO.md with the reasons.
     """
     current = class_pages.word_from_config(saved_config)
-    if course_exists:
+    if has_been_set_up_before:
         if current != class_pages.DEFAULT_UNIT_WORD:
             print(f"\n📘 This course calls its units “{current}”. Changing that now would "
                   f"rename nothing, so it is not offered.")
@@ -2197,7 +2197,16 @@ def setup_course(no_backup: bool = False):
     # offered here rather than in Settings because renaming three thousand
     # pages and their wikilinks in a course already in use is a different and
     # far more dangerous piece of work.
-    chosen_unit_word = prompt_unit_word(saved_config, course_exists=course_path.exists())
+    # Whether this course has been set up BEFORE — which is not the same as
+    # whether its folder exists. `course_path.mkdir` runs a couple of hundred
+    # lines above, so testing the folder made the answer always "yes" and a
+    # teacher setting up from the command line could never choose the word at
+    # all. Found by adversarial review, 2026-09-01, having been introduced as
+    # the fix for the opposite problem. A saved CONFIGURATION is what "has been
+    # set up before" means — and it is also what the macOS app leaves behind
+    # before it runs this script, which is exactly right: the app has already
+    # asked, so its answer is read rather than asked for a second time.
+    chosen_unit_word = prompt_unit_word(saved_config, has_been_set_up_before=bool(saved_config))
 
     # ---------- Structure: from the example content, or from prompts --------
     if example_manifest:

@@ -75,7 +75,7 @@ an item when it ships (finished behaviour is recorded in
 
   **What shipped.** `unit_word` in `course_config.json`, absent meaning “Unit”.
   The wizard asks every course, the ready-made payload is written in that word
-  as it is poured (a course's own ~86 class pages and the pages around them, in
+  as it is poured (a course's own 84–87 class pages and the pages around them, in
   one pass during the copy), and both the Python and the Swift now read the
   word rather than
   assuming it — `scripts/class_pages.py` and `ClassPageTerm`. The assistant
@@ -87,9 +87,10 @@ an item when it ships (finished behaviour is recorded in
   this tree, and worse, that the per-course figure was being read off a
   whole-repo total. What is actually there:
 
-  - **3,172** files named `Unit N, Day N` across all 38 payloads — but **86 or
-    87 in any ONE course** (median 86, largest 87). A teacher's course is about
-    ninety class pages, not three thousand.
+  - **3,172** files named `Unit N, Day N` across all 38 payloads — but
+    **84–87 in any ONE course** (30 payloads hold 86, four hold 84, one 85, one
+    87), and **42** in each of the two half-credit courses, CHV2O and GLC2O. A
+    teacher's course is under a hundred class pages, not three thousand.
   - **2,338** skeleton `.md` files, which are generated and therefore cheap.
   - `contracts/class-planning.json` is authored end to end in Unit/Day.
 

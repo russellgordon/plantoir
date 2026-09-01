@@ -160,6 +160,34 @@ final class SpecialFolderRenamerTests: XCTestCase {
         XCTAssertEqual(updated["curriculum_folder"] as? String, "Expectations")
     }
 
+    /// **The over-reach found by adversarial review.** `ClassFolder.name`
+    /// always answers something, falling back to the FIRST per-section folder
+    /// so a course is never without an answer. Freezing that guess of
+    /// convenience into the configuration would make an unrelated rename
+    /// decide, permanently, which folder holds class pages — after which a
+    /// real "All Classes" added later would never take over, and the renamed
+    /// folder could no longer be removed.
+    func testRenamingAnOrdinaryFolderInACourseWithNoClassFolderRecordsNothing() {
+        let updated: [String: Any] = SpecialFolderRenamer.renaming(
+            "Tasks", to: "Assessments", scope: .perSection,
+            in: ["per_section_folders": ["Tasks", "Homework"]]
+        )
+        XCTAssertNil(
+            updated["class_folder"],
+            "\"Tasks\" was only the class folder by being first in the list"
+        )
+    }
+
+    /// The other half of the same rule: a course that HAS recorded one gets it
+    /// carried across whatever the folder is called.
+    func testARecordedClassFolderIsCarriedAcrossEvenWithoutTheWordClass() {
+        let updated: [String: Any] = SpecialFolderRenamer.renaming(
+            "All Days", to: "Every Day", scope: .perSection,
+            in: ["per_section_folders": ["All Days", "Tasks"], "class_folder": "All Days"]
+        )
+        XCTAssertEqual(updated["class_folder"] as? String, "Every Day")
+    }
+
     /// Renaming something ELSE must not invent either key — an absent key is a
     /// course that has never said, and saying for it is its own kind of wrong.
     func testRenamingAnOrdinaryFolderRecordsNothingExtra() {
