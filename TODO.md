@@ -41,37 +41,32 @@ an item when it ships (finished behaviour is recorded in
   Where to start: `RemovalButtonTests` next door hosts its view differently and
   does not provoke it — the difference between the two is the cheapest lead.
 
-- **Let a teacher rename a special folder from inside Plantoir** — deferred
-  2026-08-23, while planning the hardening of the special folder and file names.
-  Not `CourseRenamer`, which renames the course CODE and deliberately nothing
-  else: this is renaming `Ontario Curriculum`, `Tasks` or `All Classes` in the
-  app, so the app is the one performing the rename.
+- ✅ **Done 2026-09-01 — let a teacher rename a special folder from inside Plantoir.**
+  Deferred 2026-08-23 while planning the hardening of the special folder and
+  file names; built once Russell chose the full scope on 2026-09-01. Kept here
+  rather than deleted because the reason it was deferred turned out to be
+  WRONG, and that is worth more than the entry itself.
 
-  **What exists today is thinner than it looks.** `StringListEditorView` edits
-  the config LIST only — `addNewItem` appends a string, `removeItem` filters one
-  out, and neither touches disk (there is no `createDirectory`, `moveItem` or
-  `removeItem(at:)` anywhere under `Views/CourseSettings/`). So adding `Tests`
-  to shared folders creates a config entry pointing at no folder; removing
-  `Tasks` leaves the folder on disk, still full of the teacher's work, now
-  unreferenced. Renaming is only possible in Obsidian or Finder — and then
-  `preflight_update_course_config` in `scripts/build_site.py` discovers the new
-  name and APPENDS it, with no removal path, so the config ends up listing both.
+  **What it feared:** that renaming a folder would strand every wikilink
+  pointing into it, so the feature needed its own design pass and its own undo.
+  It does not. Obsidian resolves `[[Quiz 1]]` by searching the vault, so a bare
+  page link keeps working when the folder around it moves; only QUALIFIED links
+  break — `[[Tasks/Quiz 1]]`, a full vault path, or Obsidian's Markdown link
+  style — and `FolderPathRewriter` rewrites exactly those. A folder rename is a
+  far smaller thing than a page rename, which is why this shipped without the
+  undo the deferral assumed it needed.
 
-  **Why it was deferred rather than built.** The hardening work originally
-  rested on recording each special folder's name in `course_config.json` so a
-  check could tell DELETED from RENAMED. It cannot: the app never witnesses a
-  rename, and the build's auto-discovery converts one into a duplicate. Rather
-  than build the rename affordance as a dependency, the checks were rebased onto
-  the FEATURE'S OUTPUT ("the coverage map found no expectations") instead of a
-  folder's existence — which needs no recorded name, cannot be satisfied by an
-  empty folder, and does not fire on a legitimate Obsidian rename. That made
-  this a feature in its own right rather than a prerequisite, and bundling it
-  would roughly have doubled the piece.
+  **What shipped:** a pencil on folder rows in Course Settings, renaming on
+  disk in every section, rewriting qualified links, and carrying across every
+  config key that named the folder. The two foot-guns the entry named are
+  closed too — Add creates the folder, and Remove says the folder and its
+  contents stay on the teacher's Mac. See `GUI-IMPROVEMENTS.md` row 385.
 
-  **What it would still be worth.** It fixes the two foot-guns above (add
-  creates nothing; remove orphans a folder), and it is the one place a rename
-  could be observed. It needs its own design pass for what happens to wikilinks
-  pointing into a renamed folder, and its own undo.
+  **Still open, and inherent:** a rename performed in OBSIDIAN is still
+  discovered by `preflight_update_course_config` as a new folder and appended,
+  leaving the config naming both. The build cannot tell a rename from a delete
+  and a create, which is exactly why the rename was worth putting in the app —
+  the app is the one place it can be witnessed. Not worth chasing further.
 
 - **Let a teacher rename the `Unit` keyword** — deferred 2026-08-23, while
   planning the hardening of Plantoir's special folder and file names. Some

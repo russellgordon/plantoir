@@ -576,6 +576,23 @@ this side is expected to say so when the contract is wrong.
       - *The contract holds 5 resolution cases*, not the 10 row 379 claimed.
       - *Size the flyout for the longest sentence.* The mac popover truncated to one line until it was given a fixed width and allowed to wrap; the `lastGradedFolderBlocked` sentence is the longest in `specialNames`, so test the flyout with that one.
 
+13. **Renaming a course folder from inside the app (2026-09-01).** The mac now
+    renames a folder on disk, in every section, rewriting the links that name
+    it and every config key that mentioned it — plus the two foot-guns behind
+    it: Add creates the folder, Remove says the folder stays. Sentences,
+    refusal rules and the list of keys a rename must carry across are all in
+    `shared-rules.json` → `specialNames`. Two new trail events. **The full
+    write-up, including the three decisions and the one trap that is yours
+    alone (`Directory.Move` and open handles), is in "Renaming a course folder
+    from inside the app" below** — read that rather than this summary.
+
+14. **A section with no front page no longer publishes yesterday's site
+    (2026-09-01).** Shared Python, so you inherit the fix; the one thing you
+    owe is `MissingFrontPageExplanation` in `FailureExplainer.cs`, asked BEFORE
+    `MissingBuildExplanation`, which is already written on this side and is
+    pinned by a contract case. See "A section with no index.md cannot be
+    PUBLISHED" below.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,
@@ -3257,6 +3274,74 @@ will open on whatever page happens to come first" is true of a PREVIEW, and for
 publishing there is no site at all. Its detail in `shared-rules.json` →
 `siteHealth.checks` now names both outcomes, so a teacher can tell whether they
 may carry on for now or must fix it before they publish.
+
+### Renaming a course folder from inside the app — mac shipped 2026-09-01, Windows still to build
+
+The `TODO.md` item deferred on 2026-08-23 while planning the special-folders
+work, built on the mac once Russell chose the full scope. **You do not have it
+yet**, and the contract carries most of what you need.
+
+**What it does.** A pencil on each folder row in Course Settings opens a sheet
+that renames the folder ON DISK — in every section that has one — rewrites the
+links that name it, and carries across every `course_config.json` key that
+mentioned it. The keys are listed in the contract rather than here, at
+`shared-rules.json` → `specialNames.renameFolder.carriesAcross`, and the mac
+has a test that FAILS if a key is added to that list and not to the code. Copy
+that test; it is the one that catches the failure this feature exists to
+prevent (a config naming a folder that is not there).
+
+**Two foot-guns closed in the same change**, and both are yours to mirror:
+adding a name now CREATES the folder — it used to write a config entry pointing
+at nothing — and removing one now says the folder and everything in it stays on
+the teacher's machine, which nobody could tell before. Sentences:
+`specialNames.addCreatesTheFolder` and `specialNames.removeLeavesTheFolderOnDisk`.
+
+**Three decisions, with the reasoning, because none is obvious from the code.**
+
+1. **It commits to disk immediately, not at Save.** Your Settings holds edits in
+   memory and reverts them on Cancel, exactly as the mac's does. A folder that
+   has really moved cannot be un-moved by a Cancel, so a rename that waited for
+   Save would let Cancel appear to undo something it cannot. The mac writes the
+   rename to a FRESH read of `course_config.json` (`CourseConfiguration.recordOnDisk`)
+   so the teacher's other unsaved edits stay unsaved. That type is a mac type;
+   the RULE is what to copy.
+2. **The class folder must keep the word "class" in its new name**, and is
+   refused with a sentence naming why (`specialNames.renameFolder.problems.classFolderMustSayClass`).
+   `ClassFolder` finds the class folder by looking for that substring — your
+   `ClassFolderRule.cs` does the same — so renaming it to "Lessons" would hand
+   the curriculum map a different folder with nothing said. **The proper fix,
+   deliberately NOT done:** a `class_folder` key in `course_config.json` so the
+   name is recorded rather than sniffed. That is a file-format change both apps
+   write, and Piece 2 of the special-folders branch is the standing evidence
+   that such a change lands on its own or not at all. If you want it, propose
+   it as its own piece rather than smuggling it into the rename.
+3. **Nothing moves until every destination has been checked.** A per-section
+   rename is several moves, and one that got half way through four sections
+   would leave a course nobody could reason about.
+
+**The trap that is yours alone.** Point 3 matters more on Windows than it does
+here, because `Directory.Move` refuses a folder with an open handle and both
+OneDrive and Obsidian hold them. Check every destination up front, and if a move
+still fails, say WHICH section it failed in — the mac's message names the count
+moved and the section that stopped it, and a bare exception would leave a
+teacher with a course renamed in two sections out of four and no idea which.
+
+**The trail.** Two new events, `folder renamed` and `folder created`, are in
+`activityTrail.mustRecord`; the test that pins your `ActivityTrail` against that
+list will fail until you add them. What they carry is in the contract — folder
+NAMES, never anything from inside the folder.
+
+**One thing the mac learned that changes how risky this looks.** The `TODO`
+entry deferred this feature because it feared a rename would strand every
+wikilink pointing into the folder, and that is wrong: Obsidian resolves
+`[[Quiz 1]]` by searching the vault, so a bare page link survives the folder
+moving. Only QUALIFIED links break — `[[Tasks/Quiz 1]]`, a full vault path, and
+Obsidian's Markdown link style with its percent-encoded spaces. That is why this
+shipped without the undo the deferral assumed it needed, and why you can build
+it without one too. `FolderPathRewriter` is about 200 lines; its tests say
+exactly which forms must change and which must not, and the "must not" half is
+the important one — a rewriter that matched substrings would rename folders the
+teacher never touched.
 
 ### The scheduled task NEVER refuses
 

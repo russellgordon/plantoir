@@ -706,6 +706,103 @@ final class SharedRulesContractTests: XCTestCase {
         let remCurriculum: [String: Any] = try XCTUnwrap(section["removeCurriculumFolderConfirmation"] as? [String: Any])
         XCTAssertEqual(SpecialNames.removeCurriculumFolderMessage, remCurriculum["message"] as? String)
         XCTAssertEqual(SpecialNames.removeCurriculumFolderTitle(for: "Curriculum"), (remCurriculum["title"] as? String)?.replacingOccurrences(of: "{name}", with: "Curriculum"))
+
+        let rename: [String: Any] = try XCTUnwrap(section["renameFolder"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.renameFolderExplanation, rename["explanation"] as? String)
+        XCTAssertEqual(
+            SpecialNames.renameFolderTitle(for: "Tasks"),
+            (rename["sheetTitle"] as? String)?.replacingOccurrences(of: "{name}", with: "Tasks")
+        )
+        XCTAssertEqual(
+            SpecialNames.renameFolderDone(from: "Tasks", to: "Assessments"),
+            (rename["done"] as? String)?
+                .replacingOccurrences(of: "{old}", with: "Tasks")
+                .replacingOccurrences(of: "{new}", with: "Assessments")
+        )
+        XCTAssertEqual(SpecialNames.renameFolderRelinked(pages: 0), rename["doneRelinkedNone"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderRelinked(pages: 1), rename["doneRelinkedOne"] as? String)
+        XCTAssertEqual(
+            SpecialNames.renameFolderRelinked(pages: 4),
+            (rename["doneRelinkedMany"] as? String)?.replacingOccurrences(of: "{count}", with: "4")
+        )
+
+        let renameProblems: [String: Any] = try XCTUnwrap(rename["problems"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.renameFolderProblemEmpty, renameProblems["empty"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderProblemUnchanged, renameProblems["unchanged"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderProblemHasSeparator, renameProblems["hasSeparator"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderProblemIsHidden, renameProblems["isHidden"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderProblemIsMedia, renameProblems["isMedia"] as? String)
+        XCTAssertEqual(
+            SpecialNames.renameFolderProblemClassFolderMustSayClass,
+            renameProblems["classFolderMustSayClass"] as? String
+        )
+        XCTAssertEqual(
+            SpecialNames.renameFolderProblemAlreadyUsed(name: "Tasks"),
+            (renameProblems["alreadyUsed"] as? String)?.replacingOccurrences(of: "{name}", with: "Tasks")
+        )
+        XCTAssertEqual(
+            SpecialNames.renameFolderProblemLooksLikeASection(name: "section3"),
+            (renameProblems["looksLikeASection"] as? String)?.replacingOccurrences(of: "{name}", with: "section3")
+        )
+        XCTAssertEqual(
+            SpecialNames.renameFolderProblemDestinationExists(name: "Tasks"),
+            (renameProblems["destinationExists"] as? String)?.replacingOccurrences(of: "{name}", with: "Tasks")
+        )
+
+        let added: [String: Any] = try XCTUnwrap(section["addCreatesTheFolder"] as? [String: Any])
+        XCTAssertEqual(
+            SpecialNames.addCreatesTheFolderMessage(name: "Tests"),
+            (added["message"] as? String)?.replacingOccurrences(of: "{name}", with: "Tests")
+        )
+
+        let removed: [String: Any] = try XCTUnwrap(section["removeLeavesTheFolderOnDisk"] as? [String: Any])
+        XCTAssertEqual(
+            SpecialNames.removeLeavesTheFolderOnDiskMessage(name: "Tests"),
+            (removed["message"] as? String)?.replacingOccurrences(of: "{name}", with: "Tests")
+        )
+    }
+
+    /// Every key the contract says a rename carries across is one the renamer
+    /// actually rewrites. A key added to the list and not to the code is the
+    /// failure this catches — the config would then name a folder that is not
+    /// there, which is the state the whole feature exists to make impossible.
+    func testEveryKeyARenameCarriesAcrossIsActuallyRewritten() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let rename: [String: Any] = try XCTUnwrap(section["renameFolder"] as? [String: Any])
+        let keys: [String] = try XCTUnwrap(rename["carriesAcross"] as? [String])
+
+        let before: [String: Any] = [
+            "shared_folders": ["Tasks"],
+            "per_section_folders": ["Tasks"],
+            "graded_folders": ["Tasks"],
+            "curriculum_folder": "Tasks",
+            "excluded_items": ["shared": ["Tasks"], "per_section": ["Tasks"]],
+        ]
+        let afterShared: [String: Any] = SpecialFolderRenamer.renaming(
+            "Tasks", to: "Assessments", scope: .shared, in: before
+        )
+        let afterPerSection: [String: Any] = SpecialFolderRenamer.renaming(
+            "Tasks", to: "Assessments", scope: .perSection, in: before
+        )
+
+        for key in keys {
+            switch key {
+            case "shared_folders":
+                XCTAssertEqual(afterShared[key] as? [String], ["Assessments"])
+            case "per_section_folders":
+                XCTAssertEqual(afterPerSection[key] as? [String], ["Assessments"])
+            case "graded_folders":
+                XCTAssertEqual(afterShared[key] as? [String], ["Assessments"])
+            case "curriculum_folder":
+                XCTAssertEqual(afterShared[key] as? String, "Assessments")
+            case "excluded_items":
+                let excluded: [String: Any] = try XCTUnwrap(afterShared[key] as? [String: Any])
+                XCTAssertEqual(excluded["shared"] as? [String], ["Assessments"])
+                XCTAssertEqual(excluded["per_section"] as? [String], ["Assessments"])
+            default:
+                XCTFail("The contract says a rename carries \(key) across, and nothing here checks it.")
+            }
+        }
     }
 
     func testCurriculumFolderResolutionCases() throws {

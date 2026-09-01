@@ -89,6 +89,18 @@ nonisolated enum ActivityTrail {
         /// the folder" is a report support will receive, and the line says
         /// which rule refused and what the teacher was told.
         case removalBlocked = "removal blocked"
+        /// A folder was renamed from inside Plantoir — on disk, in every
+        /// section that had one, with the config keys that named it carried
+        /// across. Recorded because a rename is invisible afterwards: a folder
+        /// called "Class Pages" looks exactly like one that was always called
+        /// that, and the question a report will ask months later — "when did
+        /// this course stop having a Tasks folder?" — has no other answer.
+        case folderRenamed = "folder renamed"
+        /// A folder was created on disk because a teacher added its name in
+        /// Course Settings. Separate from the rename because it answers a
+        /// different question: a folder appearing in a teacher's vault that
+        /// they did not make in Obsidian is otherwise unexplained.
+        case folderCreated = "folder created"
     }
 
     // MARK: - Stored properties

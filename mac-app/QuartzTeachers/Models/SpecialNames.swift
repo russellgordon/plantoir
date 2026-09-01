@@ -51,6 +51,27 @@ enum SpecialNames {
     static let removeCurriculumFolderMessage: String =
         "This folder holds your curriculum expectations. Removing it means expectations will not be available if you later enable curriculum coverage."
 
+    static let renameFolderExplanation: String =
+        "This renames the folder on your Mac — in every section that has one — and points your pages’ links at the new name. It happens straight away, so Cancel in Settings will not undo it."
+
+    static let renameFolderProblemEmpty: String =
+        "Type the folder’s new name."
+
+    static let renameFolderProblemUnchanged: String =
+        "That is already this folder’s name."
+
+    static let renameFolderProblemHasSeparator: String =
+        "A folder’s name cannot contain “/” or “:”."
+
+    static let renameFolderProblemIsHidden: String =
+        "A name starting with a dot makes the folder hidden, and Plantoir would stop finding it."
+
+    static let renameFolderProblemIsMedia: String =
+        "Plantoir looks after the Media folder itself, so nothing else can be called Media."
+
+    static let renameFolderProblemClassFolderMustSayClass: String =
+        "Plantoir finds your class pages by looking for “class” in this folder’s name, so the new name needs it too — “Class Pages”, say. Without it the curriculum coverage map would stop finding your lessons."
+
     // MARK: - Functions
 
     static func curriculumFolderBlockedByCurriculumPages(jurisdiction: String) -> String {
@@ -63,6 +84,49 @@ enum SpecialNames {
 
     static func removeCurriculumFolderTitle(for name: String) -> String {
         return "Remove “\(name)”?"
+    }
+
+    static func renameFolderTitle(for name: String) -> String {
+        return "Rename “\(name)”"
+    }
+
+    static func renameFolderProblemAlreadyUsed(name: String) -> String {
+        return "This course already has a folder called “\(name)”."
+    }
+
+    static func renameFolderProblemLooksLikeASection(name: String) -> String {
+        return "“\(name)” is what Plantoir calls a section’s own folder, so it cannot be used here."
+    }
+
+    static func renameFolderProblemDestinationExists(name: String) -> String {
+        return "There is already something called “\(name)” beside it. Move or rename that first."
+    }
+
+    static func renameFolderDone(from oldName: String, to newName: String) -> String {
+        return "“\(oldName)” is now “\(newName)”."
+    }
+
+    /// What the rename did to the teacher's links, worded for the number it
+    /// actually found. Three sentences rather than one with a count in
+    /// brackets: "1 pages" is the sort of thing a teacher notices and stops
+    /// trusting, and "no page linked into it" is worth saying out loud rather
+    /// than leaving as silence that could equally mean nothing was checked.
+    static func renameFolderRelinked(pages: Int) -> String {
+        if pages == 0 {
+            return "No page linked into it by name, so nothing else needed changing."
+        }
+        if pages == 1 {
+            return "One page had links pointing into it, and they now point at the new name."
+        }
+        return "\(pages) pages had links pointing into it, and they now point at the new name."
+    }
+
+    static func addCreatesTheFolderMessage(name: String) -> String {
+        return "Plantoir made the folder “\(name)” for you. Open it in Obsidian to put pages in it."
+    }
+
+    static func removeLeavesTheFolderOnDiskMessage(name: String) -> String {
+        return "“\(name)” and everything in it stays on your Mac — this only takes it off your website. Add it back here to include it again."
     }
 }
 

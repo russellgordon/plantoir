@@ -159,6 +159,16 @@
         "carries": "the item name, which list it is in, and the reason sentence the teacher was shown (a specialNames sentence, never page content)",
         "event": "removal blocked",
         "why": "A teacher tried to remove or untick a folder or file a feature depends on (Course Settings or the New Course Wizard) and was shown why it cannot go. 'I could not remove the folder' is a report support will receive; the line says which rule refused."
+      },
+      {
+        "carries": "the course code, the old folder name, the new one, which list it was in, and how many folders on disk were moved",
+        "event": "folder renamed",
+        "why": "A rename leaves nothing behind to look at: a folder called 'Class Pages' is indistinguishable from one that was always called that, and every key that named the old one has been rewritten. Without this line, 'when did this course stop having a Tasks folder?' — the first question asked when a curriculum map goes wrong — has no answer at all. The folder NAME is recorded; nothing from inside the folder ever is."
+      },
+      {
+        "carries": "the course code, the folder name, and which list it was added to",
+        "event": "folder created",
+        "why": "Adding a name in Course Settings now creates the folder on disk, so a folder appears in the teacher's vault that they did not make in Obsidian. Separate from the rename because it answers a different question, and unexplained new folders are exactly what a teacher reports as 'Plantoir did something to my notes'."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -966,6 +976,41 @@
       "title": "Remove “{name}”?",
       "message": "This folder holds your curriculum expectations. Removing it means expectations will not be available if you later enable curriculum coverage.",
       "why": "Prompts for confirmation when removing a curriculum folder when curriculum coverage is off."
+    },
+    "renameFolder": {
+      "sheetTitle": "Rename “{name}”",
+      "explanation": "This renames the folder on your Mac — in every section that has one — and points your pages’ links at the new name. It happens straight away, so Cancel in Settings will not undo it.",
+      "problems": {
+        "empty": "Type the folder’s new name.",
+        "unchanged": "That is already this folder’s name.",
+        "hasSeparator": "A folder’s name cannot contain “/” or “:”.",
+        "isHidden": "A name starting with a dot makes the folder hidden, and Plantoir would stop finding it.",
+        "isMedia": "Plantoir looks after the Media folder itself, so nothing else can be called Media.",
+        "alreadyUsed": "This course already has a folder called “{name}”.",
+        "looksLikeASection": "“{name}” is what Plantoir calls a section’s own folder, so it cannot be used here.",
+        "classFolderMustSayClass": "Plantoir finds your class pages by looking for “class” in this folder’s name, so the new name needs it too — “Class Pages”, say. Without it the curriculum coverage map would stop finding your lessons.",
+        "destinationExists": "There is already something called “{name}” beside it. Move or rename that first."
+      },
+      "done": "“{old}” is now “{new}”.",
+      "doneRelinkedOne": "One page had links pointing into it, and they now point at the new name.",
+      "doneRelinkedMany": "{count} pages had links pointing into it, and they now point at the new name.",
+      "doneRelinkedNone": "No page linked into it by name, so nothing else needed changing.",
+      "carriesAcross": [
+        "shared_folders",
+        "per_section_folders",
+        "graded_folders",
+        "curriculum_folder",
+        "excluded_items"
+      ],
+      "why": "Renaming was the gap behind the whole special-names family: the list editors changed course_config.json and never touched disk, so Add wrote an entry pointing at no folder and Remove left a folder full of the teacher’s work unreferenced — and a rename was only possible in Obsidian, after which preflight discovered the new name and APPENDED it, leaving the config naming both. Renaming from inside Plantoir is the one place a rename can be WITNESSED, which is what lets every key that names the folder be carried across in the same breath. Two constraints are not arbitrary and must not be relaxed without replacing what they protect. (1) It commits to disk immediately rather than waiting for Save, because the folder really has moved and a Cancel that appeared to undo it would be a lie; only the keys in carriesAcross are written, so a teacher’s other unsaved edits stay unsaved. (2) The class folder must keep a name containing “class”, because ClassFolder.name(inPerSectionFolders:) finds it by that substring — renaming it to “Lessons” would silently hand the curriculum map a different folder, which is the exact silent-wrong-answer this family exists to end. The proper fix for (2) is a class_folder key in course_config.json so the name is recorded rather than sniffed; that is a file-format change both apps write, and Piece 2 of the special-folders branch is the standing evidence that such a change lands on its own or not at all."
+    },
+    "addCreatesTheFolder": {
+      "message": "Plantoir made the folder “{name}” for you. Open it in Obsidian to put pages in it.",
+      "why": "Adding a name used to write a config entry pointing at nothing: the folder had to be created in Obsidian afterwards or the entry named a folder that did not exist. Creating it is what makes the list mean what it appears to mean. Nothing is put INSIDE it — an empty folder is the honest starting state, and inventing a page would put words in the teacher’s mouth."
+    },
+    "removeLeavesTheFolderOnDisk": {
+      "message": "“{name}” and everything in it stays on your Mac — this only takes it off your website. Add it back here to include it again.",
+      "why": "Removal excludes; it has never deleted anything, and teachers could not tell. Saying so is what makes the button safe to press, and it is also the sentence that explains why a folder they “removed” is still sitting in Obsidian. Deleting the folder was rejected outright: it holds the teacher’s work, and no button in Settings should be able to destroy it."
     },
     "curriculumFolderResolution": {
       "cases": [

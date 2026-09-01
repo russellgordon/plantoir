@@ -91,7 +91,16 @@ struct CourseSettingsView: View {
                                 ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
                             }
                         },
-                        protection: sharedFolderProtection
+                        protection: sharedFolderProtection,
+                        renameProblem: { oldName, newName in
+                            return folderRenameProblem(oldName, to: newName, scope: .shared)
+                        },
+                        onRename: { oldName, newName in
+                            return renameFolder(oldName, to: newName, scope: .shared)
+                        },
+                        noticeAfterChange: { name, change in
+                            return noticeAfterFolderChange(name, change: change, scope: .shared)
+                        }
                     )
                     StringListEditorView(
                         title: "Shared files (all sections)",
@@ -120,7 +129,16 @@ struct CourseSettingsView: View {
                                 ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
                             }
                         },
-                        protection: perSectionFolderProtection
+                        protection: perSectionFolderProtection,
+                        renameProblem: { oldName, newName in
+                            return folderRenameProblem(oldName, to: newName, scope: .perSection)
+                        },
+                        onRename: { oldName, newName in
+                            return renameFolder(oldName, to: newName, scope: .perSection)
+                        },
+                        noticeAfterChange: { name, change in
+                            return noticeAfterFolderChange(name, change: change, scope: .perSection)
+                        }
                     )
                     StringListEditorView(
                         title: "Per-section files",
@@ -374,6 +392,133 @@ struct CourseSettingsView: View {
             }
         }
         gradedFoldersBinding.wrappedValue = remaining
+    }
+
+    // MARK: - Renaming a folder
+
+    /// Why this folder cannot take that name, or nil when it can.
+    ///
+    /// The names it is checked against are the ones in its OWN scope. A shared
+    /// folder and a per-section folder may legitimately share a name — they
+    /// live in different places on disk, and `discover_shared_items` and
+    /// `discover_section_items` scan for them separately — so checking both
+    /// lists would refuse a rename that is perfectly fine.
+    func folderRenameProblem(_ oldName: String, to newName: String, scope: FolderScope) -> String? {
+        let namesInScope: [String]
+        switch scope {
+        case .shared:
+            namesInScope = course.configuration.sharedFolders
+        case .perSection:
+            namesInScope = course.configuration.perSectionFolders
+        }
+        var isTheClassFolder: Bool = false
+        if scope == .perSection {
+            let classFolder: String = ClassFolder.name(
+                inPerSectionFolders: course.configuration.perSectionFolders
+            )
+            isTheClassFolder = (classFolder == oldName)
+        }
+        return SpecialFolderRenamer.problem(
+            renaming: oldName, to: newName,
+            existingNames: namesInScope,
+            isTheClassFolder: isTheClassFolder
+        )
+    }
+
+    /// Renames the folder on disk and rewrites the configuration keys that
+    /// named it, in that order.
+    ///
+    /// Disk first on purpose: if the move fails, nothing has been written and
+    /// the course is exactly as it was. The other way round would leave a
+    /// configuration naming a folder that is not there — which is the state
+    /// this whole feature exists to make impossible.
+    func renameFolder(_ oldName: String, to newName: String, scope: FolderScope) -> RenameResult {
+        let outcome: FolderRenameOutcome
+        do {
+            outcome = try SpecialFolderRenamer.rename(
+                oldName, to: newName, scope: scope,
+                courseDirectory: course.directoryURL,
+                sectionNumbers: course.configuration.sectionNumbers
+            )
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+        do {
+            try course.configuration.recordOnDisk({ values in
+                return SpecialFolderRenamer.renaming(oldName, to: newName, scope: scope, in: values)
+            }, at: course.configFileURL)
+        } catch {
+            // The folder HAS moved, so this is not "the rename failed" — it is
+            // a rename whose bookkeeping did not land, and saying otherwise
+            // would send the teacher looking for a folder under its old name.
+            return .failed(
+                "“\(oldName)” was renamed to “\(newName)”, but Plantoir could not write the "
+                + "change to this course's settings: \(error.localizedDescription)"
+            )
+        }
+        ActivityTrail.note(
+            .folderRenamed,
+            "renamed the folder " + oldName + " to " + newName + " in " + course.code
+            + " (" + scope.configurationKey + ", " + String(outcome.foldersMoved) + " moved, "
+            + String(outcome.pagesRelinked) + " pages relinked)"
+        )
+        return .renamed(
+            SpecialNames.renameFolderDone(from: oldName, to: newName)
+            + " " + SpecialNames.renameFolderRelinked(pages: outcome.pagesRelinked)
+        )
+    }
+
+    /// What a teacher is told after adding or removing a folder — including
+    /// the folder Plantoir has just made for them, which would otherwise
+    /// appear in their vault unexplained.
+    func noticeAfterFolderChange(_ name: String, change: ListChange, scope: FolderScope) -> String? {
+        switch change {
+        case .added:
+            if createFoldersOnDisk(named: name, scope: scope) {
+                ActivityTrail.note(
+                    .folderCreated,
+                    "created the folder " + name + " in " + course.code
+                    + " (" + scope.configurationKey + ")"
+                )
+                return SpecialNames.addCreatesTheFolderMessage(name: name)
+            }
+            return nil
+        case .removed:
+            return SpecialNames.removeLeavesTheFolderOnDiskMessage(name: name)
+        }
+    }
+
+    /// Makes the folder the teacher just named, wherever its scope says it
+    /// lives, and reports whether anything was actually created.
+    ///
+    /// Adding a name used to write a configuration entry pointing at nothing,
+    /// so the folder had to be made in Obsidian afterwards or the entry named
+    /// something that did not exist. Nothing is put INSIDE it: an empty folder
+    /// is the honest starting state, and inventing a page would put words in
+    /// the teacher's mouth.
+    func createFoldersOnDisk(named name: String, scope: FolderScope) -> Bool {
+        let locations: [URL] = SpecialFolderRenamer.folderLocations(
+            named: name, scope: scope,
+            courseDirectory: course.directoryURL,
+            sectionNumbers: course.configuration.sectionNumbers
+        )
+        var created: Bool = false
+        for location in locations {
+            if FileManager.default.fileExists(atPath: location.path) {
+                continue
+            }
+            do {
+                try FileManager.default.createDirectory(at: location, withIntermediateDirectories: true)
+                created = true
+            } catch {
+                // Re-adding a name whose folder is already there is the common
+                // case and is not worth a word; a genuine failure shows up as
+                // the folder simply not being there, which the build's own
+                // checks already report in the teacher's own terms.
+                continue
+            }
+        }
+        return created
     }
 
     func sharedFolderProtection(for folder: String) -> ItemProtection {

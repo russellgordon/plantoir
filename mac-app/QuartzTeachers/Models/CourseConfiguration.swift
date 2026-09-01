@@ -908,6 +908,32 @@ class CourseConfiguration {
         lastSavedData = data
     }
 
+    /// Records a change that has ALREADY happened on disk — a folder rename —
+    /// in both the file and the in-memory copy, without saving anything else.
+    ///
+    /// Settings normally holds edits in memory until Save, and Cancel reverts
+    /// them. A renamed folder cannot be reverted by a Cancel, so the rename
+    /// has to reach the file at once or the two will disagree the moment the
+    /// teacher presses either button. What must NOT reach the file is
+    /// everything else they have typed and not saved, so the change is applied
+    /// to a FRESH read of the file rather than to the in-memory values, and
+    /// then to the in-memory values separately. `lastSavedData` follows the
+    /// file, so Cancel reverts their other edits and leaves the rename alone —
+    /// which is the only honest answer, because the folder really has moved.
+    func recordOnDisk(_ change: ([String: Any]) -> [String: Any], at url: URL) throws {
+        let data: Data = try Data(contentsOf: url)
+        let decoded: Any = try JSONSerialization.jsonObject(with: data)
+        guard let onDisk = decoded as? [String: Any] else {
+            throw CourseConfigurationError.notADictionary
+        }
+        let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        var written: Data = try JSONSerialization.data(withJSONObject: change(onDisk), options: options)
+        written.append(contentsOf: [0x0A])
+        try written.write(to: url, options: [.atomic])
+        lastSavedData = written
+        values = change(values)
+    }
+
     /// Reverts all in-memory edits back to the last data read from or
     /// written to disk (the Cancel button).
     func discardChanges() throws {

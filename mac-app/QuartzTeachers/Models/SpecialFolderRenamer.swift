@@ -1,0 +1,377 @@
+import Foundation
+
+/// Which of a course's two folder lists a name belongs to. Shared folders sit
+/// beside the course; per-section folders exist once inside EVERY section, so
+/// renaming one is several moves rather than one.
+enum FolderScope {
+
+    case shared
+    case perSection
+
+    // MARK: - Computed properties
+
+    /// The `course_config.json` key holding this scope's folder names.
+    var configurationKey: String {
+        switch self {
+        case .shared:
+            return "shared_folders"
+        case .perSection:
+            return "per_section_folders"
+        }
+    }
+
+    /// The key this scope uses inside `excluded_items`.
+    var exclusionKey: String {
+        switch self {
+        case .shared:
+            return "shared"
+        case .perSection:
+            return "per_section"
+        }
+    }
+}
+
+/// What a rename actually did, so the teacher can be told rather than left to
+/// guess.
+struct FolderRenameOutcome {
+
+    // MARK: - Stored properties
+
+    /// How many folders moved on disk. One for a shared folder; one per
+    /// section that HAD the folder, for a per-section one — which is not
+    /// always every section, because a section a teacher never filled in may
+    /// not have it.
+    let foldersMoved: Int
+
+    /// How many pages had a link pointing into the folder rewritten.
+    let pagesRelinked: Int
+}
+
+/// Something that stopped a rename after it had started, or before it could.
+struct FolderRenameProblem: LocalizedError {
+
+    // MARK: - Stored properties
+
+    let sentence: String
+
+    // MARK: - Computed properties
+
+    var errorDescription: String? { return sentence }
+}
+
+/// Renaming one of a course's folders from inside Plantoir — on disk, in every
+/// section that has one, in the links that name it, and in every
+/// `course_config.json` key that mentions it.
+///
+/// **Why this exists.** Until now the list editors changed the config and
+/// nothing else: adding a name wrote an entry pointing at no folder, removing
+/// one left a folder full of the teacher's work unreferenced, and renaming was
+/// possible only in Obsidian — after which `preflight_update_course_config`
+/// discovered the new name and APPENDED it, so the config ended up naming
+/// both. Doing the rename here is the one place it can be WITNESSED, which is
+/// what lets every key that names the folder be carried across in the same
+/// breath instead of being discovered as a mismatch weeks later.
+///
+/// **It commits to disk immediately, and that is deliberate.** Course Settings
+/// otherwise holds edits in memory until Save, with Cancel reverting them. A
+/// folder that has really moved cannot be reverted by a Cancel, so pretending
+/// otherwise would be a lie; the sheet says so before the teacher agrees. Only
+/// the keys that name the folder are written, so their other unsaved edits
+/// stay unsaved.
+///
+/// The sentences live in `contracts/shared-rules.json` → `specialNames.renameFolder`.
+enum SpecialFolderRenamer {
+
+    // MARK: - Stored properties
+
+    /// Folders never walked when looking for pages to relink: build output,
+    /// Obsidian's own settings, and the deploy markers. All are generated or
+    /// private, and `.merged_output` in particular is a whole second copy of
+    /// the course, so rewriting links in it would be both pointless and slow.
+    static let foldersNeverWalked: Set<String> = [
+        ".merged_output", "merged_output", ".obsidian", ".netlify_sites",
+        ".toolchain", "node_modules", ".git",
+    ]
+
+    // MARK: - Functions
+
+    /// Why this new name cannot be used, or nil when it can.
+    ///
+    /// Pure, so the rules can be tested without a course on disk. The
+    /// filesystem's own objection — something already sitting where the folder
+    /// would go — cannot be answered here and is raised by `rename` instead.
+    static func problem(
+        renaming oldName: String,
+        to rawNewName: String,
+        existingNames: [String],
+        isTheClassFolder: Bool
+    ) -> String? {
+        let newName: String = rawNewName.trimmingCharacters(in: .whitespaces)
+        if newName.isEmpty {
+            return SpecialNames.renameFolderProblemEmpty
+        }
+        if newName == oldName {
+            return SpecialNames.renameFolderProblemUnchanged
+        }
+        if newName.contains("/") || newName.contains(":") {
+            return SpecialNames.renameFolderProblemHasSeparator
+        }
+        if newName.hasPrefix(".") {
+            return SpecialNames.renameFolderProblemIsHidden
+        }
+        if newName.lowercased() == "media" {
+            return SpecialNames.renameFolderProblemIsMedia
+        }
+        if looksLikeASectionFolder(newName) {
+            return SpecialNames.renameFolderProblemLooksLikeASection(name: newName)
+        }
+        for existing in existingNames {
+            if existing == oldName {
+                continue
+            }
+            if existing.caseInsensitiveCompare(newName) == .orderedSame {
+                return SpecialNames.renameFolderProblemAlreadyUsed(name: newName)
+            }
+        }
+        // `ClassFolder.name(inPerSectionFolders:)` finds the class folder by
+        // looking for "class" in the name, so a rename that drops the word
+        // would hand the curriculum map a different folder with nothing said —
+        // the exact silent wrong answer this family of work exists to end.
+        // The proper fix is a `class_folder` key in the config, which is a
+        // file-format change both apps write and belongs in its own piece.
+        if isTheClassFolder && !newName.lowercased().contains("class") {
+            return SpecialNames.renameFolderProblemClassFolderMustSayClass
+        }
+        return nil
+    }
+
+    /// Whether a name is one Plantoir gives a section's own folder.
+    static func looksLikeASectionFolder(_ name: String) -> Bool {
+        let lowercased: String = name.lowercased()
+        if !lowercased.hasPrefix("section") {
+            return false
+        }
+        let tail: Substring = lowercased.dropFirst("section".count)
+        if tail.isEmpty {
+            return false
+        }
+        for character in tail {
+            if !character.isNumber {
+                return false
+            }
+        }
+        return true
+    }
+
+    /// Every place on disk this folder lives, in the order they will be moved.
+    static func folderLocations(
+        named name: String,
+        scope: FolderScope,
+        courseDirectory: URL,
+        sectionNumbers: [Int]
+    ) -> [URL] {
+        switch scope {
+        case .shared:
+            return [courseDirectory.appendingPathComponent(name)]
+        case .perSection:
+            var locations: [URL] = []
+            for number in sectionNumbers {
+                locations.append(
+                    courseDirectory
+                        .appendingPathComponent("section\(number)")
+                        .appendingPathComponent(name)
+                )
+            }
+            return locations
+        }
+    }
+
+    /// Moves the folder, then points every qualified link at its new name.
+    ///
+    /// Nothing is moved until EVERY destination has been checked, so a
+    /// per-section rename cannot get half way through four sections and stop:
+    /// either all of them move or none of them do. A move that fails after
+    /// that check is a filesystem fault, and it is reported with the sections
+    /// that had already moved named in the message rather than silently.
+    @discardableResult
+    static func rename(
+        _ oldName: String,
+        to newName: String,
+        scope: FolderScope,
+        courseDirectory: URL,
+        sectionNumbers: [Int],
+        fileManager: FileManager = .default
+    ) throws -> FolderRenameOutcome {
+        let locations: [URL] = folderLocations(
+            named: oldName, scope: scope,
+            courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
+        )
+
+        var moves: [(from: URL, to: URL)] = []
+        for location in locations {
+            var isDirectory: ObjCBool = false
+            if !fileManager.fileExists(atPath: location.path, isDirectory: &isDirectory) {
+                continue
+            }
+            if !isDirectory.boolValue {
+                continue
+            }
+            let destination: URL = location
+                .deletingLastPathComponent()
+                .appendingPathComponent(newName)
+            // A rename that only changes capitalisation asks the filesystem to
+            // move a folder onto itself. On a case-insensitive volume — which
+            // is the default on a Mac — the destination "exists" because it IS
+            // the source, so the check below would refuse a rename that is
+            // perfectly reasonable.
+            let isOnlyACapitalisationChange: Bool =
+                oldName.caseInsensitiveCompare(newName) == .orderedSame
+            if !isOnlyACapitalisationChange && fileManager.fileExists(atPath: destination.path) {
+                throw FolderRenameProblem(
+                    sentence: SpecialNames.renameFolderProblemDestinationExists(name: newName)
+                )
+            }
+            moves.append((from: location, to: destination))
+        }
+
+        var moved: Int = 0
+        for move in moves {
+            do {
+                try fileManager.moveItem(at: move.from, to: move.to)
+                moved += 1
+            } catch {
+                throw FolderRenameProblem(
+                    sentence: "Plantoir renamed \(moved) of \(moves.count) copies of “\(oldName)” "
+                            + "and then could not rename the one in "
+                            + "\(move.from.deletingLastPathComponent().lastPathComponent): "
+                            + error.localizedDescription
+                )
+            }
+        }
+
+        let relinked: Int = relinkPages(
+            in: courseDirectory, folderNamed: oldName, to: newName, fileManager: fileManager
+        )
+        return FolderRenameOutcome(foldersMoved: moved, pagesRelinked: relinked)
+    }
+
+    /// Rewrites every qualified link in the course's pages, returning how many
+    /// pages changed.
+    static func relinkPages(
+        in courseDirectory: URL,
+        folderNamed oldName: String,
+        to newName: String,
+        fileManager: FileManager = .default
+    ) -> Int {
+        var changed: Int = 0
+        for pageURL in markdownPages(in: courseDirectory, fileManager: fileManager) {
+            guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
+                continue
+            }
+            if FolderPathRewriter.countReferences(to: oldName, in: text) == 0 {
+                continue
+            }
+            let rewritten: String = FolderPathRewriter.rewriting(text, folderNamed: oldName, to: newName)
+            if rewritten == text {
+                continue
+            }
+            do {
+                try rewritten.write(to: pageURL, atomically: true, encoding: .utf8)
+                changed += 1
+            } catch {
+                // One unwritable page must not abandon the rest: the folder has
+                // already moved, so stopping here would leave MORE links broken
+                // than carrying on does.
+                continue
+            }
+        }
+        return changed
+    }
+
+    /// Every Markdown page under a course, skipping generated and private trees.
+    static func markdownPages(in courseDirectory: URL, fileManager: FileManager = .default) -> [URL] {
+        guard let walker = fileManager.enumerator(
+            at: courseDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+        var pages: [URL] = []
+        for case let url as URL in walker {
+            if foldersNeverWalked.contains(url.lastPathComponent) {
+                walker.skipDescendants()
+                continue
+            }
+            if url.pathExtension.lowercased() == "md" {
+                pages.append(url)
+            }
+        }
+        return pages
+    }
+
+    /// The configuration with every key that named the old folder naming the
+    /// new one instead.
+    ///
+    /// Pure and whole-dictionary, so it can be applied to the file and to the
+    /// in-memory copy from the same code — the two cannot disagree about what
+    /// a rename means. The keys are listed in the contract under
+    /// `specialNames.renameFolder.carriesAcross`; a key added there and not
+    /// here is what a reviewer should look for.
+    static func renaming(
+        _ oldName: String,
+        to newName: String,
+        scope: FolderScope,
+        in values: [String: Any]
+    ) -> [String: Any] {
+        var updated: [String: Any] = values
+
+        updated[scope.configurationKey] = renaming(
+            oldName, to: newName, inList: values[scope.configurationKey] as? [String] ?? []
+        )
+
+        // The marks pool names folders from either scope, so it is rewritten
+        // whichever list the folder came from.
+        if let graded = values["graded_folders"] as? [String] {
+            updated["graded_folders"] = renaming(oldName, to: newName, inList: graded)
+        }
+
+        if let curriculum = values["curriculum_folder"] as? String {
+            if curriculum.caseInsensitiveCompare(oldName) == .orderedSame {
+                updated["curriculum_folder"] = newName
+            }
+        }
+
+        // A folder that is excluded is not in the list a teacher can rename
+        // from, so this is defence rather than a path anybody walks today. It
+        // is here because the alternative — an exclusion silently attaching
+        // itself to whatever folder is next called by the old name — is the
+        // failure `excluded_items` was written to prevent.
+        if let excluded = values["excluded_items"] as? [String: Any] {
+            var rewritten: [String: Any] = excluded
+            for key in [FolderScope.shared.exclusionKey, FolderScope.perSection.exclusionKey] {
+                if let names = excluded[key] as? [String] {
+                    rewritten[key] = renaming(oldName, to: newName, inList: names)
+                }
+            }
+            updated["excluded_items"] = rewritten
+        }
+
+        return updated
+    }
+
+    // MARK: - Private helpers
+
+    /// One list of names with the old one replaced, keeping its position.
+    private static func renaming(_ oldName: String, to newName: String, inList names: [String]) -> [String] {
+        var result: [String] = []
+        for name in names {
+            if name.caseInsensitiveCompare(oldName) == .orderedSame {
+                result.append(newName)
+            } else {
+                result.append(name)
+            }
+        }
+        return result
+    }
+}
