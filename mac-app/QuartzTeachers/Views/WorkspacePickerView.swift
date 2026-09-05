@@ -38,6 +38,29 @@ struct WorkspacePickerView: View {
                     .foregroundStyle(.red)
             }
 
+            // A folder a cloud service keeps in sync: say so here, where the
+            // teacher can still change their mind for free. Shown above the
+            // empty-folder offer too, so setting up a synced folder is done
+            // knowing what it costs. Never red — this is not a mistake, it
+            // is a choice.
+            if let syncedFolder = workspace.syncedFolder, workspace.needsCloudSyncDecision {
+                if let chosenURL = workspace.workspaceURL, !workspace.workspaceCanBeInitialized {
+                    ViewThatFits(in: .horizontal) {
+                        FinderPathBarView(folderURL: chosenURL)
+                            .fixedSize(horizontal: true, vertical: false)
+                        FinderPathBarView(folderURL: chosenURL)
+                    }
+                    .frame(maxWidth: 520)
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(CloudSyncWording.headline(service: syncedFolder.serviceName))
+                        .bold()
+                    CloudSyncExplanationView(syncedFolder: syncedFolder)
+                }
+                .frame(maxWidth: 520, alignment: .leading)
+                .accessibilityIdentifier("cloudSyncChoice")
+            }
+
             if workspace.workspaceCanBeInitialized {
                 if let chosenURL = workspace.workspaceURL {
                     // The bar's scroll view greedily fills any width it is
@@ -87,6 +110,21 @@ struct WorkspacePickerView: View {
                     workspace.isChoosingWorkspace = true
                 }
                 .disabled(workspace.isInitializingWorkspace)
+                .accessibilityIdentifier("chooseFolderButton")
+            } else if workspace.needsCloudSyncDecision {
+                // An existing working folder that is synced: going ahead is
+                // one press, and so is picking another. Neither is the
+                // default action — a Return pressed out of habit should not
+                // decide this.
+                Button(CloudSyncWording.useAnywayButton) {
+                    workspace.acknowledgeCloudSync()
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("useSyncedFolderButton")
+
+                Button("Choose a Different Folder…") {
+                    workspace.isChoosingWorkspace = true
+                }
                 .accessibilityIdentifier("chooseFolderButton")
             } else {
                 Button("Choose Folder…") {

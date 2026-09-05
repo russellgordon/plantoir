@@ -101,6 +101,22 @@ nonisolated enum ActivityTrail {
         /// different question: a folder appearing in a teacher's vault that
         /// they did not make in Obsidian is otherwise unexplained.
         case folderCreated = "folder created"
+        /// The working folder just opened is kept in sync by a cloud service
+        /// (iCloud Drive, Dropbox, OneDrive, Google Drive…), and the teacher
+        /// had not yet been told about this folder. Carries the service's
+        /// name and the folder, redacted. Recorded because the effects of a
+        /// synced folder — a slow build, a rename that takes minutes, a move
+        /// that failed once — arrive weeks later as unrelated reports, and
+        /// this one line is what connects them.
+        case syncedFolderNoticed = "synced folder noticed"
+        /// The teacher read the note about a synced folder and went ahead —
+        /// pressed "Use This Folder Anyway" in the picker, or dismissed the
+        /// notice in the window. Carries which of the two it was and the
+        /// service's name. Separate from `syncedFolderNoticed` because it is
+        /// a different fact: one says Plantoir saw it, the other says the
+        /// teacher did, and a report of "nobody warned me" is answered by
+        /// the second.
+        case syncedFolderAccepted = "synced folder accepted"
     }
 
     // MARK: - Stored properties

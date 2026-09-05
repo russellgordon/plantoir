@@ -255,6 +255,35 @@ class WorkspaceModel {
     /// fault, just an unfinished choice.
     var workspaceIsUnrecognized: Bool = false
 
+    /// The cloud service keeping this working folder in sync, when one is
+    /// — see `CloudSyncedFolder` for what that costs and why it is allowed.
+    /// Nil for an ordinary folder.
+    var syncedFolder: CloudSyncedFolder?
+
+    /// True while the picker waits for the teacher to decide about a synced
+    /// folder they have just CHOSEN: use it anyway, or pick a different one.
+    /// The moment they can still change their mind for free, so it is a
+    /// choice here and only a notice later.
+    var needsCloudSyncDecision: Bool = false
+
+    /// True while the window shows the quiet, dismissable notice about a
+    /// synced folder it RESTORED rather than one the teacher just chose — a
+    /// folder that was moved into iCloud after it was set up, or set up
+    /// before Plantoir could tell. Never a dialog: a folder that opens on
+    /// every launch must not nag on every launch.
+    var isShowingCloudSyncNotice: Bool = false
+
+    /// The preferences key holding the folders whose sync note the teacher
+    /// has already seen and gone past. Per folder, not per app: a second
+    /// synced folder deserves its own note.
+    static let acknowledgedSyncedFoldersKey: String = "acknowledgedSyncedFolders"
+
+    /// How a folder is recognised as synced. Replaceable so a test can make
+    /// a temporary folder read as synced without putting one in iCloud.
+    static var syncDetector: (URL) -> CloudSyncedFolder? = { folderURL in
+        return CloudSyncDetector.syncedFolder(at: folderURL)
+    }
+
     /// Set by the test harness (UITEST_WORKSPACE) to bypass persistence.
     private let isUnderUITest: Bool
 
@@ -393,9 +422,75 @@ class WorkspaceModel {
             defaults.set(url.path, forKey: WorkspaceModel.storedPathKey)
         }
         reloadCourses()
+        noticeCloudSync(folderWasChosen: true)
         if let previousPath, previousPath != url.path {
             WorkspaceModel.releaseFolderIfUnused(previousPath)
         }
+    }
+
+    // MARK: - A folder a cloud service keeps in sync
+
+    /// Works out whether the folder just adopted is synced, and what — if
+    /// anything — to show about it.
+    ///
+    /// A folder the teacher has already been told about shows nothing; the
+    /// note is per folder and shown once. Otherwise a folder they CHOSE gets
+    /// the picker's choice, and a folder the window RESTORED gets the notice.
+    private func noticeCloudSync(folderWasChosen: Bool) {
+        needsCloudSyncDecision = false
+        isShowingCloudSyncNotice = false
+        guard let workspaceURL else {
+            syncedFolder = nil
+            return
+        }
+        syncedFolder = WorkspaceModel.syncDetector(workspaceURL)
+        guard let syncedFolder else {
+            return
+        }
+        if hasAcknowledgedCloudSync(forPath: workspaceURL.path) {
+            return
+        }
+        ActivityTrail.note(
+            .syncedFolderNoticed,
+            "noticed the working folder is kept in sync with \(syncedFolder.serviceName) — " + LogRedactor.redacting(workspaceURL.path)
+        )
+        if folderWasChosen {
+            needsCloudSyncDecision = true
+        } else {
+            isShowingCloudSyncNotice = true
+        }
+    }
+
+    /// Whether the teacher has already gone past the note for this folder.
+    func hasAcknowledgedCloudSync(forPath path: String) -> Bool {
+        let acknowledgedPaths: [String] = defaults.stringArray(forKey: WorkspaceModel.acknowledgedSyncedFoldersKey) ?? []
+        return acknowledgedPaths.contains(path)
+    }
+
+    /// The teacher has read the note and chosen to go on — from the picker's
+    /// "Use This Folder Anyway", from setting up an empty synced folder, or
+    /// from dismissing the window's notice. Remembered for this folder so it
+    /// is not said again.
+    func acknowledgeCloudSync() {
+        guard let workspaceURL, let syncedFolder else {
+            needsCloudSyncDecision = false
+            isShowingCloudSyncNotice = false
+            return
+        }
+        let wasAChoice: Bool = needsCloudSyncDecision
+        needsCloudSyncDecision = false
+        isShowingCloudSyncNotice = false
+        if canRememberChoice {
+            var acknowledgedPaths: [String] = defaults.stringArray(forKey: WorkspaceModel.acknowledgedSyncedFoldersKey) ?? []
+            if !acknowledgedPaths.contains(workspaceURL.path) {
+                acknowledgedPaths.append(workspaceURL.path)
+                defaults.set(acknowledgedPaths, forKey: WorkspaceModel.acknowledgedSyncedFoldersKey)
+            }
+        }
+        let howTheyWentOn: String = wasAChoice
+            ? "chose to use the working folder anyway"
+            : "read the note about the working folder"
+        ActivityTrail.note(.syncedFolderAccepted, howTheyWentOn + ", kept in sync with \(syncedFolder.serviceName)")
     }
 
     /// Adopts the folder a window remembered from its last session.
@@ -414,6 +509,7 @@ class WorkspaceModel {
         }
         workspaceURL = URL(fileURLWithPath: path)
         reloadCourses()
+        noticeCloudSync(folderWasChosen: false)
     }
 
     /// Keeps this folder's launcher scripts current.
@@ -1334,6 +1430,13 @@ class WorkspaceModel {
         if let problem {
             workspaceProblem = problem
             return
+        }
+        // Setting up an empty synced folder IS the decision to use it: the
+        // picker showed the note beside the button, and pressing it is the
+        // teacher's answer. Recorded before the reload so the note is not
+        // shown a second time.
+        if needsCloudSyncDecision {
+            acknowledgeCloudSync()
         }
         reloadCourses()
 
