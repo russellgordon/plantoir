@@ -42,6 +42,11 @@ Every launcher derives the image from the folder's build recipe: the tag is
   this to preview sections side by side in separate windows. Each preview
   only ever stops a server on its own port.
 
+  A build for publishing (`--build-only`) also stops a preview, but matches
+  the section's build DIRECTORY rather than a port — it is never given one,
+  and guessing the default took down other sections' previews. See
+  [the build pipeline](05-build-pipeline.md#a-build-for-publishing-stops-that-sections-preview).
+
 ### One container per working folder
 
 Each working folder gets its own container, named

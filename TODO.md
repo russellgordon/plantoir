@@ -4,6 +4,35 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **Two reliability findings from the 2026-09-05 review, understood and NOT
+  fixed.** Both are low-likelihood and neither loses a teacher's work, which is
+  why they were left; they are written down so the next person meets them as
+  known rather than as a mystery.
+
+  **1. An interrupted rename can reach a state only a hand-edit recovers
+  from.** `SpecialFolderRenamer.rename` moves the folders, then rewrites links,
+  then writes the configuration. If the app dies between the move and the
+  write — or the write fails — the folders are under the new name and the
+  configuration still says the old one. A retry recovers *unless a build runs
+  first*: `preflight_update_course_config` discovers the new name on disk and
+  APPENDS it, so the list then holds both, and the rename is refused as
+  "already used". If the folder was the class folder it is also un-removable,
+  so Settings offers no way out.
+
+  The cheap improvement is not a lock: it is to let `problem()` allow a rename
+  whose target is already in the list when the OLD folder is gone from disk and
+  the new one is there — that is not a clash, it is a rename asking to be
+  finished. At minimum the refusal should say what happened rather than
+  "already used".
+
+  **2. `recordOnDisk` is a read-modify-write, and the loser is silent.** It
+  reads `course_config.json`, patches the rename keys, and writes atomically —
+  so nothing corrupts, and the app's own copy stays consistent. But a build
+  that started BEFORE the rename runs `preflight_update_course_config`
+  afterwards, writing its own earlier read, and the rename's keys vanish. The
+  folders have still moved, which puts you in finding 1. Renaming while a build
+  is running is the window, and it is small.
+
 - **Should Plantoir refuse to work in a cloud-synced folder?** Russell's
   question, 2026-09-05, prompted by a reliability review finding that renaming
   a folder reads every page in the course — which on an iCloud-backed vault

@@ -144,8 +144,12 @@ with a confirmation, or ordinary. `GUI-IMPROVEMENTS.md` rows 375–380.
 done.
 
 A follow-up branch, `issue/special-names-followups`, took the three things this
-one deliberately left behind (2026-09-01). Read `GUI-IMPROVEMENTS.md` rows
-384–386 for what they became; in one line each:
+one deliberately left behind, and then grew well past them — it now carries a
+recorded `class_folder`, a publishing harness, and the fixes from four
+adversarial reviews and an overnight verification run. `GUI-IMPROVEMENTS.md`
+rows **384–394** are the record, and rows 388, 389 and 394 are corrections of
+earlier rows in that range, so read the range rather than any single row. The
+three things this branch left behind became:
 
 - **The `index.md` publishing hole below is closed** — and the fix found a
   worse defect beside it, where a publish after deleting a front page reported

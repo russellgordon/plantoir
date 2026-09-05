@@ -268,6 +268,24 @@ Repairing the front page and previewing again fixes it.
     the "What counts" section should now say your course's own folders rather
     than always saying "Tasks".
 
+## 6. Publishing, for real, to everything (opt-in)
+
+`./verify-deploy.sh` publishes this course to a folder, to Netlify and to
+Cloudflare, runs all three primary+secondary pairings, previews it in serve
+mode, and checks the no-front-page refusal — then **fetches every published
+site back and reads it**, because a launcher's own output only proves the
+launcher is happy with itself. 42 checks.
+
+It is deliberately NOT part of `verify.sh`: it needs three credentials, the
+network, and it creates real sites on real accounts. Run it when the publishing
+path changes. It restores the course's settings and its front page on any exit,
+including Ctrl-C.
+
+Two things it found on its first two runs, both of which are the reason it
+exists: publishing straight after a preview shipped the live-reload client to
+students, and a rebuild for publishing lost a race against the preview's own
+sync watcher.
+
 ## If something looks wrong
 
 The activity trail is `~/Library/Logs/Plantoir/Logs/activity.txt`

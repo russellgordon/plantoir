@@ -3545,17 +3545,39 @@ preview overwrites it within a second, and what gets published is the preview,
 live-reload client and all. `kill_existing_quartz` was only ever called from
 the SERVE branch, so `--build-only` never stopped anything.
 
-`build_site.py`'s `--build-only` now stops a preview on its own ports before
-building. **That is shared Python and you inherit it.** Two things to check on
-your side rather than assume:
+`build_site.py`'s `--build-only` now stops the preview serving THIS SECTION
+before building, matched by the section's own build directory.
+**That is shared Python and you inherit it.**
+
+**It was written by PORT first, and that was wrong — do not go back to it.**
+`kill_existing_quartz(port)` looked like the obvious tool and is the right one
+for the SERVE path, where the port is known and leased. A build-only run is
+never given a port: `preview.sh` defaults it to 8081 and the app's deploy
+passes no `--port` at all. So the first version killed whatever was serving on
+8081 — the first section to have previewed in that working folder, which is
+usually a DIFFERENT section from the one being published. Measured 2026-09-05
+by doing it: previewing section 1 and publishing section 2 printed "Killed
+existing process on port 8081" and section 1 stopped answering. A scheduled
+overnight deploy would have done the same to any preview left running.
+
+What works instead is the section's BUILD DIRECTORY, which is on the serve
+process's command line because the launcher runs the Quartz CLI by absolute
+path. It identifies exactly one preview and cannot collide with another. One
+detail that is easy to miss: match on the directory plus a trailing separator,
+or `section1` also matches `section10`.
+
+Two things to check on your side rather than assume:
 
 - **Your preview is not in a container**, so an orphaned server is a plain
   Windows process. Check that killing your launcher actually stops the node
   server — on the mac it demonstrably does not, and that is exactly the kind of
   difference that is assumed rather than measured.
-- **Only OUR ports.** Several previews run at once, one per port, and a build
-  for one section must never take down another section's preview. The mac's
-  `kill_existing_quartz` is careful about this; keep it that way.
+- **`/proc` is how the mac finds it**, and you do not have one. The mac's
+  version is a no-op wherever `/proc` is absent, so on Windows today NOTHING
+  stops an orphaned preview before a build. Finding the equivalent — a process
+  whose command line contains the section's build directory — is yours to
+  write, and until you do, a publish that rebuilds while a preview is running
+  can still lose the race.
 
 **The other one was a partial fix of mine, and is worth knowing as a shape.**
 The first version of the preview guard in `deploy.sh` waited for `index.html`
