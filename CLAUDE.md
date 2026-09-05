@@ -492,7 +492,18 @@ each working folder's `.toolchain/`. The launchers:
 - probe a free host port block per container (8081/8091/8101…), mapping to
   fixed container ports 8081–8084 for sites plus 9081–9084 for Quartz's
   live-reload websockets (`--wsPort` = port + 1000 — without it, concurrent
-  previews collide on the websocket even with distinct site ports).
+  previews collide on the websocket even with distinct site ports);
+- give the container **TWO** bind mounts, not one: `courses/` at
+  `/teaching/courses`, and `~/Library/Application Support/Plantoir/builds/
+  <folder id>` at **its own absolute path**. The second is where built
+  websites live — `courses/<CODE>/.merged_output` is a symlink to it, so the
+  link has to resolve to the same string on both sides. A container missing
+  that mount is recreated, because a mount cannot be added to one that
+  already exists. Every launcher creates the same mount set; if one of them
+  stopped, two launchers would recreate the container away from each other
+  on alternate runs. The rule, and what was rejected, is in
+  [`contracts/shared-rules.json`](contracts/shared-rules.json) →
+  `buildOutputLocation`.
 
 The image carries **wrangler**, Cloudflare's own deploy CLI, used by
 `scripts/deploy.py` for the Cloudflare Pages destination (their upload protocol
@@ -697,7 +708,7 @@ it rather than restating it:
 | How is a teacher's list of class dates read? | [`contracts/schedule-rules.json`](contracts/schedule-rules.json). |
 | Which page titles carry numbers, what is the next class called, what happens when room is made for one? | [`contracts/class-planning.json`](contracts/class-planning.json). |
 | What are the backup and archive files called, and what section number is offered next? | [`contracts/course-management.json`](contracts/course-management.json). |
-| What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, and **which local assistant a teacher may choose (and when one may be removed)**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
+| What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, and **where a section's built website is kept — and what happens to a folder that already has one in the old place**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
 | What keys does `course_config.json` carry, and what decides whether students see a page? | [`contracts/file-formats.json`](contracts/file-formats.json) — a FORMAT rather than a behaviour, and the one both apps write and the Python reads. |
 | WHY is it that way, and what was rejected? | [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) for anything an implementer needs; a code comment for anything a reader of that file needs. |
 | WHAT changed, WHEN, and what it cost | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — a dated log. **Append-only history, not a specification**: a row records what was true that day, and is not edited when the behaviour changes again. Never quote a row as the current wording. |

@@ -949,6 +949,89 @@ final class SharedRulesContractTests: XCTestCase {
             .write(to: courseURL.appendingPathComponent("course_config.json"))
     }
 
+    // MARK: - Where built websites are kept
+
+    /// The contract states the two paths a built website is found at, with
+    /// `{home}` and `{folder id}` standing in — and the app computes exactly
+    /// those. Written out rather than left implicit because the launchers are
+    /// a second implementation of this rule and the contract is what they are
+    /// both written against: if the app's answer drifts, the app and the
+    /// command line build into different places and every build reads as
+    /// stale, which is precisely the failure this section exists to stop.
+    func testTheBuiltWebsiteIsWhereTheContractSaysItIs() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("buildOutputLocation")
+        let macLocation: [String: Any] = try XCTUnwrap(section["macLocation"] as? [String: Any])
+
+        let home: URL = FileManager.default.homeDirectoryForCurrentUser
+        let folder: URL = URL(fileURLWithPath: "/tmp/some working folder")
+        let identifier: String = BuildOutputLocation.folderIdentifier(forWorkingFolder: folder.path)
+
+        func filledIn(_ key: String) throws -> String {
+            return try XCTUnwrap(macLocation[key] as? String)
+                .replacingOccurrences(of: "{home}", with: home.path)
+                .replacingOccurrences(of: "{folder id}", with: identifier)
+                .replacingOccurrences(of: "{COURSE}", with: "ICS3U")
+        }
+
+        // The REAL rule, as a pure function of the home folder: the live
+        // buildsRoot answers a temporary folder while the suite runs so that
+        // no test can write into the teacher's own Application Support.
+        let real: URL = BuildOutputLocation.buildsRoot(inHomeFolder: home)
+            .appendingPathComponent(identifier)
+        XCTAssertEqual(real.path, try filledIn("buildsRoot"))
+        XCTAssertEqual(real.appendingPathComponent("ICS3U").path, try filledIn("perCourse"))
+        XCTAssertEqual(
+            BuildOutputLocation.workingFolderMarkerName,
+            "working-folder.txt",
+            "the contract's macLocation.workingFolderMarker names this file"
+        )
+        XCTAssertTrue(
+            try XCTUnwrap(macLocation["workingFolderMarker"] as? String)
+                .contains(BuildOutputLocation.workingFolderMarkerName)
+        )
+    }
+
+    /// Every launcher carries the same rule, because a teacher at the command
+    /// line and a publish scheduled with launchd have no app to do it for
+    /// them. Checked against the shell itself: all three must define the
+    /// builds root, create it before the container, mount it at its own
+    /// absolute path, and recreate a container that was made without it.
+    func testEveryLauncherCarriesTheSameRule() throws {
+        let repository: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        for launcher in ["setup.sh", "preview.sh", "deploy.sh"] {
+            let text: String = try String(
+                contentsOf: repository.appendingPathComponent(launcher), encoding: .utf8
+            )
+            XCTAssertTrue(
+                text.contains("Library/Application Support/Plantoir/builds/${WORKDIR_ID}"),
+                "\(launcher) does not know where built websites go"
+            )
+            XCTAssertTrue(
+                text.contains("-v \"$BUILD_ROOT\":\"$BUILD_ROOT\""),
+                "\(launcher) does not mount the builds folder at its own absolute path, so the link would dangle inside the container"
+            )
+            // The DEFINITION is not the behaviour. An earlier version of this
+            // test matched only the function names and the mount flag, and
+            // passed with `setup.sh` never calling the function at all — so
+            // each of these asks for the CALL, on its own line.
+            XCTAssertTrue(
+                text.contains("\n  elif ! container_has_builds_mount; then"),
+                "\(launcher) defines the check but never branches on it, so a container made before this change keeps running without the mount — and a mount cannot be added to a container that exists"
+            )
+            XCTAssertTrue(
+                text.contains("\n  ensure_build_root\n  docker run -dit"),
+                "\(launcher) creates the container without making the builds folder first — a bind mount whose source is missing gives the container an empty folder of its own, and the built website goes nowhere"
+            )
+            XCTAssertTrue(
+                text.contains("\nlink_course_build_output \"$")
+                    || text.contains("\n  link_course_build_output \"$"),
+                "\(launcher) never calls link_course_build_output, so it does nothing about where the built website goes"
+            )
+        }
+    }
+
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

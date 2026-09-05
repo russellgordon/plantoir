@@ -13,6 +13,169 @@ cd "$(dirname "$0")"
 WORKDIR_ID="$(pwd -P | shasum -a 256 | cut -c1-8)"
 CONTAINER_NAME="teaching-quartz-${WORKDIR_ID}"
 
+# >>> BUILD OUTPUT BLOCK >>> — identical in setup.sh, preview.sh and
+# deploy.sh, and extracted between these two markers by
+# scripts/test_build_output_link.sh, which runs the real thing against the
+# states an existing teacher's folder can be in. Keep the markers, and keep
+# the three copies the same.
+# ---- Built websites live OUTSIDE this folder -------------------------
+# A built site is DERIVED: every file in it comes from the teacher's notes
+# and can be made again. It used to be written to
+# courses/<CODE>/.merged_output, INSIDE the working folder — where a cloud
+# service uploads every build and charges it to the teacher's quota, Time
+# Machine backs it up, a zip or a Finder copy carries it, and Get Info
+# counts it. It lives here instead, for EVERY working folder rather than
+# only the synced ones: the benefit is not confined to syncing, and one
+# code path is one code path.
+#
+# courses/<CODE>/.merged_output becomes a SYMLINK to this folder, so every
+# script, every scheduled publish and every teacher at the command line
+# still names the same path and still finds the site. Under $HOME on
+# purpose: the container VM mounts only the home folder, so a builds
+# folder anywhere else would appear EMPTY inside the container and every
+# build would seem to vanish. It is bind-mounted into the container at the
+# SAME absolute path, so the link resolves to the same place on both sides.
+#
+# The identical rule is in the app (BuildOutputLocation.swift) and written
+# down in contracts/shared-rules.json -> buildOutputLocation. It is here as
+# well because a teacher at the command line, and a publish scheduled with
+# launchd, have no app to do it for them.
+# ${HOME%/} rather than $HOME: a trailing slash would make this path differ
+# from the one Docker stores (it cleans a mount destination), and the "does
+# this container have the builds mount" check below would then be false on
+# every run and recreate the container every time.
+BUILD_ROOT="${HOME%/}/Library/Application Support/Plantoir/builds/${WORKDIR_ID}"
+
+# Makes the folder the container mounts, and writes down which working
+# folder it belongs to — the id is a hash and cannot be read backwards, so
+# without this a builds folder left behind by a deleted working folder
+# could never be recognised as abandoned.
+ensure_build_root() {
+  mkdir -p "$BUILD_ROOT" 2>/dev/null || true
+  printf '%s\n' "$(pwd -P)" > "$BUILD_ROOT/working-folder.txt" 2>/dev/null || true
+}
+
+# Adds one line to the breadcrumb trail the app keeps, so that a move done by
+# the command line — or by a publish launchd ran at six in the morning, weeks
+# before the app is next opened — leaves the same line the app would have
+# left. Without this the trail would record only the moves the GUI happened to
+# make, which is the half a teacher never asks about.
+#
+# Same file, same shape as ActivityTrail: "YYYY-MM-DD HH:MM:SS · sentence".
+# The app trims the file when it grows; nothing here needs to. Carries a
+# course code and nothing else — never a path, never a credential.
+#
+# One line can be lost: the app rewrites the whole file when it adds a line of
+# its own, so an append landing between its read and its write disappears.
+# That is one line, once, and worth less than the locking it would take.
+note_on_the_trail() {
+  local trail="${HOME%/}/Library/Logs/Plantoir"
+  mkdir -p "$trail" 2>/dev/null || return 0
+  printf '%s · %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$trail/activity.txt" 2>/dev/null || true
+}
+
+# Points courses/<CODE>/.merged_output at this course's folder under
+# BUILD_ROOT, moving an existing built site out of the working folder on
+# the way. Safe to run every time: when the link is already right this
+# touches nothing.
+#
+# A course with NO link is a course whose build cannot be trusted.
+# Archiving a course, restoring one from a backup, and replacing a course's
+# contents all remove the link along with everything else in the folder —
+# and each of them leaves content whose timestamps may be OLDER than the
+# site standing outside. Reusing that build would let a restored course
+# publish last month's pages while every check said it was up to date. So a
+# build folder with no link pointing at it is CLEARED, never adopted.
+link_course_build_output() {
+  local course="$1"
+  local course_dir link target current
+  # A course code, not a path. Checked here rather than trusted, because
+  # this runs before deploy.sh has validated its argument and `..` would
+  # otherwise put a link at the top of the working folder and aim a
+  # deletion at the builds root's own parent.
+  case "$course" in
+    ""|*/*|.|..) return 0 ;;
+  esac
+  course_dir="$(pwd)/courses/$course"
+  [ -d "$course_dir" ] || return 0
+  # A COURSE, not just any folder in courses/. `_backups` lives there too,
+  # and setup.sh links every folder it finds — a link inside the backups
+  # folder would be litter at best and a place to build into at worst.
+  [ -f "$course_dir/course_config.json" ] || return 0
+  link="$course_dir/.merged_output"
+  target="$BUILD_ROOT/$course"
+  ensure_build_root
+
+  # EVERY step below may fail without stopping the run, and that is
+  # deliberate: setup.sh and deploy.sh run under `set -e`, so an unguarded
+  # ln, mv or mkdir would turn "the built website could not be moved" into
+  # "publishing is broken", with no message. Whenever anything here fails
+  # the course is left exactly as it was and the build writes a real
+  # .merged_output folder inside it — which is what it did before any of
+  # this existed, so the fallback is the old behaviour rather than a
+  # broken one.
+  if [ ! -d "$BUILD_ROOT" ]; then
+    echo "⚠️  Could not use $BUILD_ROOT for built websites; keeping them inside your course folder."
+    return 0
+  fi
+
+  # -L first: `-d` is true for a symlink pointing at a directory, so asking
+  # the other way round would take every already-linked course down the
+  # migration path and move the builds folder into itself.
+  if [ -L "$link" ]; then
+    current="$(readlink "$link" 2>/dev/null || true)"
+    if [ "$current" = "$target" ] && [ -d "$target" ]; then
+      return 0
+    fi
+    # A link pointing somewhere else: a course renamed outside the app, or a
+    # course folder synced from ANOTHER Mac, where the path names a different
+    # home folder.
+    #
+    # ADOPTING a build already sitting here was proposed and rejected. It
+    # looks better — a teacher switching between two Macs would keep each
+    # machine's build instead of rebuilding after every switch — but the
+    # second Mac cannot tell "the folder came back unchanged" from "the
+    # folder was archived and restored while I was shut", and in the second
+    # case the pages it adopts a build for are OLDER than that build, so the
+    # freshness check says up to date and the teacher publishes what they
+    # undid. Clearing costs one rebuild, which is cheap and visible.
+    rm -f "$link" 2>/dev/null || return 0
+  elif [ -d "$link" ]; then
+    echo "📦 Moving ${course}'s built website out of your working folder…"
+    rm -rf "$target" 2>/dev/null || true
+    # If clearing failed — an unwritable subfolder under it — `mv` would put
+    # the site INSIDE the surviving folder instead of at it, the link would
+    # succeed, and the section would read as never built while the trail said
+    # it had moved. Better to leave the built website where it is.
+    if [ -e "$target" ]; then
+      echo "⚠️  Could not move it; leaving the built website where it is."
+      return 0
+    fi
+    if ! mv "$link" "$target" 2>/dev/null; then
+      echo "⚠️  Could not move it; leaving the built website where it is."
+      return 0
+    fi
+    if ln -s "$target" "$link" 2>/dev/null; then
+      echo "✅ Built websites for this folder are kept in: $BUILD_ROOT"
+      note_on_the_trail "moved ${course}'s built website out of the working folder, so it is no longer copied, synced or backed up with the course"  # contracts/shared-rules.json -> activityTrail.mustRecord."built site moved out of the working folder".line
+    else
+      # The move worked and the link did not. Put it back: a course with
+      # its built site in the old place still builds and still publishes,
+      # while a course with neither has lost its website for no reason.
+      mv "$target" "$link" 2>/dev/null || true
+      echo "⚠️  Could not move it; leaving the built website where it is."
+    fi
+    return 0
+  elif [ -e "$link" ]; then
+    rm -f "$link" 2>/dev/null || return 0
+  fi
+
+  rm -rf "$target" 2>/dev/null || true
+  mkdir -p "$target" 2>/dev/null || return 0
+  ln -s "$target" "$link" 2>/dev/null || true
+}
+# <<< BUILD OUTPUT BLOCK <<<
+
 # ---- The image is built HERE, from this folder's own recipe ----------
 # Same rules as setup.sh and preview.sh: the tag is a hash of the recipe's
 # contents, built locally when missing. No registry involved.
@@ -201,6 +364,11 @@ else
   echo "🔎 Checking whether your website builder is up to date…"
   IMAGE="teaching-quartz:src-$(toolchain_hash "$BUILD_CONTEXT")"
 fi
+
+# Settled before the paths below are read: MERGED_DIR_HOST and everything
+# under it resolve THROUGH the link, and a course still holding a real
+# .merged_output folder has to be moved out before the preflight looks.
+link_course_build_output "$COURSE_CODE"
 
 # Host-side paths (bind-mounted into the container at /teaching/courses)
 COURSE_DIR_HOST="$(pwd)/courses/${COURSE_CODE}"
@@ -1029,13 +1197,33 @@ run_container_with_mount() {
     exit 1
   }
   echo "🔗 Binding host courses to container: $HOST_COURSES ➜ /teaching/courses"
+  # The builds folder is mounted at its OWN absolute path, unconditionally,
+  # so that courses/<CODE>/.merged_output — a symlink to a path under
+  # $HOME — resolves to the same place inside the container as it does
+  # outside. Mounting it anywhere else would leave the link dangling in
+  # here, and every build would fail on a path the teacher can plainly see
+  # working in Finder. It is created before this runs: a bind mount whose
+  # source is missing gives the container an empty folder of its own
+  # instead, and the built site would go nowhere.
+  ensure_build_root
   docker run -dit \
     --name "$CONTAINER_NAME" \
     -v "$HOST_COURSES":/teaching/courses \
+    -v "$BUILD_ROOT":"$BUILD_ROOT" \
     -p ${HOST_BASE}-$((HOST_BASE + 3)):8081-8084 \
     -p $((HOST_BASE + 1000))-$((HOST_BASE + 1003)):9081-9084 \
     "$IMAGE" \
     tail -f /dev/null
+}
+
+# Whether this container was created with the builds mount. Containers made
+# before built sites moved out of the working folder do not have it, and a
+# mount cannot be added to a container that already exists — recreating is
+# the only way. Listed and matched whole rather than asked for by name in a
+# Go template, because the path contains a space.
+container_has_builds_mount() {
+  docker inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$CONTAINER_NAME" 2>/dev/null \
+    | grep -Fxq "$BUILD_ROOT"
 }
 
 probe_container_write() {
@@ -1079,6 +1267,14 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
     echo " • Existing mount: $CURRENT_MOUNT_SRC"
     echo " • Desired mount: $HOST_COURSES"
     echo "♻️ Recreating container '$CONTAINER_NAME' to point at the new folder…"
+    if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then docker stop "$CONTAINER_NAME" >/dev/null; fi
+    docker rm "$CONTAINER_NAME" >/dev/null || true
+    run_container_with_mount
+  elif ! container_has_builds_mount; then
+    # Built websites moved out of the working folder, which needs a second
+    # mount this container was made without. A mount cannot be added to a
+    # container that already exists.
+    echo "♻️  Rebuilding your workspace so built websites can be kept outside your course folder…"
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then docker stop "$CONTAINER_NAME" >/dev/null; fi
     docker rm "$CONTAINER_NAME" >/dev/null || true
     run_container_with_mount

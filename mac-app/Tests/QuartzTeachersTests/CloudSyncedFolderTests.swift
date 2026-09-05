@@ -136,7 +136,6 @@ final class CloudSyncedFolderTests: XCTestCase {
         XCTAssertEqual(try expected("headline"), CloudSyncWording.headline(service: service))
         XCTAssertEqual(try expected("summary"), CloudSyncWording.summary)
         XCTAssertEqual(try expected("notesStayPut"), CloudSyncWording.notesStayPut)
-        XCTAssertEqual(try expected("buildFilesAreCopied"), CloudSyncWording.buildFilesAreCopied(service: service))
         XCTAssertEqual(try expected("offloadedPagesAreSlow"), CloudSyncWording.offloadedPagesAreSlow(service: service))
         XCTAssertEqual(try expected("syncingCanInterruptAMove"), CloudSyncWording.syncingCanInterruptAMove(service: service))
         XCTAssertEqual(try expected("whatToDo"), CloudSyncWording.whatToDo)
@@ -145,6 +144,40 @@ final class CloudSyncedFolderTests: XCTestCase {
         XCTAssertEqual(try expected("chooseDifferentFolderButton"), CloudSyncWording.chooseDifferentFolderButton)
         XCTAssertEqual(try expected("showDetailsButton"), CloudSyncWording.showDetailsButton)
         XCTAssertEqual(try expected("hideDetailsButton"), CloudSyncWording.hideDetailsButton)
+    }
+
+    /// The sentence about build files being copied to the cloud is RETIRED —
+    /// it left on 2026-09-05, when the built site moved out of the working
+    /// folder on the mac too. Pinned because it is the kind of sentence that
+    /// gets put back by somebody who remembers it: the contract keeps its
+    /// words under a name that says so, and neither the wording nor the
+    /// explanation may carry them again.
+    func testTheBuildFilesSentenceIsGoneFromWhatATeacherReads() throws {
+        let wording: [String: Any] = try XCTUnwrap(contract["wording"] as? [String: Any])
+        XCTAssertNil(wording["buildFilesAreCopied"], "the retired sentence is not a sentence any more")
+        let retired: String = try XCTUnwrap(
+            wording["buildFilesAreCopiedRetired"] as? String,
+            "the contract keeps the retired sentence's words, and why they went"
+        )
+        let order: [String] = try XCTUnwrap(wording["explanationOrder"] as? [String])
+        XCTAssertFalse(order.contains("buildFilesAreCopied"))
+        // The words come from the CONTRACT, never typed here. A quoted copy of
+        // a teacher-facing sentence is the one that keeps passing after the
+        // product's words change — and this test's whole subject is a sentence
+        // that changed.
+        let quoted: String = try XCTUnwrap(
+            retired.components(separatedBy: "'").dropFirst().first,
+            "buildFilesAreCopiedRetired quotes the sentence it retired, between apostrophes"
+        )
+        XCTAssertFalse(quoted.isEmpty)
+        for sentence in CloudSyncWording.explanation(service: "iCloud Drive") {
+            XCTAssertNotEqual(
+                sentence,
+                quoted.replacingOccurrences(of: "{service}", with: "iCloud Drive"),
+                "the retired sentence is back in what a teacher reads"
+            )
+        }
+        XCTAssertTrue(retired.contains("RETIRED"))
     }
 
     /// The explanation is the contract's sentences in the contract's ORDER —

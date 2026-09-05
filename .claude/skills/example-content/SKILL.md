@@ -944,9 +944,13 @@ the linter.
    `grep -rl katex-error <public dir>` finds NOTHING — a katex-error span
    means an equation shattered at a markdown seam (see the math rules in
    Phase 5). For a payload with heavy notation, render every `$…$` span through
-   the build's own KaTeX with `throwOnError: true` — the module lives at
-   `courses/<CODE>/.merged_output/section1/node_modules/katex` after any
-   build.
+   the build's own KaTeX with `throwOnError: true`. **The module is not on
+   your disk**: `node_modules` lives on the container's own storage and is
+   never mirrored out, so reach it inside the container —
+   `docker exec <container> ls /tmp/quartz-builds/<CODE>/section1/node_modules/katex`.
+   (This said `courses/<CODE>/.merged_output/section1/node_modules/katex`,
+   which stopped being true when the build moved to container-internal
+   storage and would now send you to a shortcut out of the working folder.)
 6. **Math fidelity check**: where the source curriculum document
    typesets its mathematics (the 2007 mathematics PDF does), an
    adversarial verifier MUST compare every rendered expression

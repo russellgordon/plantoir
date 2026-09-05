@@ -109,6 +109,20 @@ version line. A list that survives its own release is worse than no list.
 |---|---|---|---|
 | 2026-08-21 | Class sites carry the Plantoir icon in the browser tab, instead of Quartz's logo. Also at the site root, and as the Home Screen icon on iOS. | Both — shared Python and shared assets; no app code changed on either side. First preview after updating rebuilds the website builder once. | [298, 299](GUI-IMPROVEMENTS.md) |
 
+## Warnings the release notes MUST carry
+
+Separate from the table above, and it has to be: that table is for what a
+teacher gains, and this is for what they must DO — the sentences a teacher has
+to read before updating, not after. The notes are drafted from the commits, and
+a caution buried in a commit body is a caution that gets summarised away.
+
+Same rule as the table: **clear this list when the tag goes up**, in the same
+commit that moves the version line.
+
+| Added | The warning | Why it cannot be left out |
+|---|---|---|
+| 2026-09-05 | **If you keep your working folder in iCloud Drive (or Dropbox, or OneDrive) and use it on TWO Macs, update both of them.** A Mac still on the older version will not be able to build a course the newer one has touched, and will quietly undo the newer one's setup each time it opens the folder. | The mac now keeps built websites outside the working folder, and leaves a shortcut behind in their place (rows 402–406). That shortcut syncs. An older `build_site.py` cannot repair one that points somewhere it cannot see — it stops with "File exists", which reads as nonsense — and no version shipped before 2026-09-05 can be taught to. It is worse than one stale machine failing on its own, because the launchers and `.toolchain/` live INSIDE the synced folder: an older app refreshes them back to its own copies, and a publish scheduled on the up-to-date Mac then runs whatever it finds there. **Before this change a version mismatch between two Macs was harmless**, which is exactly why nobody will expect it. Not yet merged to `dev` — this ships when `issue/mac-build-output-outside-working-folder` does, and the warning ships with it. Reasoning: `contracts/shared-rules.json` → `buildOutputLocation.syncedFoldersFollowTheLink.aSecondMacMustBeUPDATED`; implementer's version in `WINDOWS-HANDOFF.md`. |
+
 ## The short version
 
 For future-you, mid-school-year, who remembers nothing. The whys are below.

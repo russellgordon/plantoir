@@ -117,6 +117,15 @@ nonisolated enum ActivityTrail {
         /// teacher did, and a report of "nobody warned me" is answered by
         /// the second.
         case syncedFolderAccepted = "synced folder accepted"
+        /// A course's built website was moved out of the working folder, to
+        /// where built sites now live. Carries the course code. Recorded
+        /// because it is a one-off change a teacher can SEE: a folder they
+        /// may have looked at in Finder is an alias afterwards, their working
+        /// folder suddenly weighs much less, and a folder they sync stops
+        /// uploading builds. Each of those arrives as a separate report
+        /// ("where has my site gone?", "did something delete my files?"), and
+        /// this line — dated, per course — is what answers all three at once.
+        case builtSiteMovedOutOfTheFolder = "built site moved out of the working folder"
     }
 
     // MARK: - Stored properties

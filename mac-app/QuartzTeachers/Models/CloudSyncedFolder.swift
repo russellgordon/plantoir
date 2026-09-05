@@ -190,12 +190,6 @@ nonisolated enum CloudSyncWording {
     static let notesStayPut: String =
         "Your course notes stay exactly where they are. Plantoir never moves them."
 
-    /// The build churn — the worst of the three on the mac, where the built
-    /// site is written inside the working folder.
-    static func buildFilesAreCopied(service: String) -> String {
-        return "Building or previewing a website creates thousands of small files inside this folder, and \(service) will copy every one of them to the cloud. That can make building slower and take up storage space."
-    }
-
     /// Offloaded pages: slow, not harmful.
     static func offloadedPagesAreSlow(service: String) -> String {
         return "If \(service) has moved some of your pages off this computer to save space, Plantoir has to download each one before it can read it. Renaming a folder reads every page, so it can take a while."
@@ -232,7 +226,14 @@ nonisolated enum CloudSyncWording {
     static func explanation(service: String) -> [String] {
         return [
             CloudSyncWording.notesStayPut,
-            CloudSyncWording.buildFilesAreCopied(service: service),
+            // The sentence about thousands of build files being copied to the
+            // cloud used to sit here, and it left on 2026-09-05 when the built
+            // site moved out of the working folder (BuildOutputLocation). It
+            // is not "one fewer warning": it was the only one of the four that
+            // was no longer TRUE, and a warning a teacher can check and find
+            // false costs the other three their credit. See
+            // contracts/shared-rules.json -> cloudSyncedFolders.wording
+            // .buildFilesAreCopiedRetired.
             CloudSyncWording.offloadedPagesAreSlow(service: service),
             CloudSyncWording.syncingCanInterruptAMove(service: service),
             CloudSyncWording.whatToDo,
