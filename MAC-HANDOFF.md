@@ -97,6 +97,17 @@ outstanding.
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 
+> **Keeping this list is a standing instruction, not a courtesy** (`CLAUDE.md`
+> rule 4). A Windows session that creates work for the mac adds an item here in
+> the same session, and this list is the mirror of `WINDOWS-HANDOFF.md`'s
+> numbered "What is still genuinely outstanding" — the same obligation,
+> pointing the other way.
+>
+> The reason is the same in both directions: these files are read top-down and
+> abandoned partway, so this section is the INDEX and the ledger below is the
+> manual. A change that creates an obligation for the other platform and does
+> not list it has, from their side, not been handed over at all.
+
 - ⚠️ **NEEDS A MAC BUILD + TEST — assistant system-prompt tweak fixes
   "undo over-salient"** (Windows, 2026-08-24, TODO.md item (c)). The
   Swift edit is made — `AssistAgent.swift`'s `systemPrompt(course:section:)`

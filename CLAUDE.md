@@ -65,8 +65,22 @@ Neither app contains toolchain logic of its own: they write the same
    - **anything architectural also has a section in
      [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md)**. A log row records a decision;
      the handoff explains it well enough to implement.
+   - **the numbered list under "What is still genuinely outstanding" in that
+     file gains an ITEM, in the same session** — one short paragraph naming
+     what the change is, what Windows inherits free, what they owe, and a
+     pointer to the section that explains it. Mark it done where it stands,
+     struck through with `✅ Done <date>`, rather than deleting it; the list
+     keeps its own history that way.
    - **guidance the change made WRONG is corrected there too.** Stale advice is
      worse than none, because it gets followed.
+
+   **The list is not a duplicate of the section, and this is the part that gets
+   skipped.** A Windows session is told to read that list first
+   ([`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md)), so the list is the INDEX —
+   how they learn there is work at all — and the section below is the manual for
+   doing it. Prose buried three hundred lines down that nothing points at is
+   work they will not find, and a change written up beautifully and never listed
+   is indistinguishable, from their side, from a change nobody wrote up.
 
    Say what you measured, not just what you decided — numbers travel, taste does
    not. Write down the **reasoning**, not only the behaviour: a behaviour can be
@@ -88,6 +102,15 @@ Neither app contains toolchain logic of its own: they write the same
      history, and a proposed contract case is named in that file's
      "Contract cases waiting on the mac" section so a red mac suite reads as a
      request rather than as damage.
+   - **anything the MAC must now do goes in that file's "Open — what the mac
+     still owes", at the TOP of the section, in the same session** — and moves
+     to "Done — the ledger" when it is finished rather than being deleted. That
+     list is the mac's to-do list from Windows, exactly as
+     `WINDOWS-HANDOFF.md`'s numbered list is Windows' from the mac; the two
+     files are read top-down and abandoned partway, so work that is only in
+     prose lower down is work nobody picks up. A change that creates an
+     obligation for the other platform and does not list it has, from their
+     side, not been handed over at all.
    - **`GUI-IMPROVEMENTS.md` gets a row for anything a teacher can see**, so
      the log stays the record of the product rather than of one platform.
    - **anything measured is written with its NUMBERS and the hardware they

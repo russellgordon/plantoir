@@ -41,6 +41,19 @@ this side is expected to say so when the contract is wrong.
 
 ### What is still genuinely outstanding
 
+> **Keeping this list is a standing instruction, not a courtesy** (`CLAUDE.md`
+> rule 3). A macOS session that creates work for Windows adds an item HERE, in
+> the same session — one short paragraph saying what the change is, what
+> Windows inherits free, what they owe, and where the section explaining it is.
+> Done items are struck through in place with `✅ Done <date>`, never deleted,
+> so the list keeps its own history.
+>
+> The reason is what this list IS. A Windows session is told to read it first,
+> so it is the INDEX — how they find out there is work at all — while the
+> sections further down are the manual. A change written up beautifully in a
+> section nothing points at is, from their side, indistinguishable from a
+> change nobody wrote up.
+
 1. ~~A Preview item in a menu bar~~ — ✅ Done 2026-08-22. `MainWindow.xaml`
    gained a top-level "Preview" menu (Back / Forward / Reload Page) between
    File and Help, mirroring `mac-app/QuartzTeachers/App/PreviewCommands.swift`.
