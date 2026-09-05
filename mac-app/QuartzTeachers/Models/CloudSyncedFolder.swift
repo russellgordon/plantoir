@@ -70,15 +70,40 @@ nonisolated enum CloudSyncDetector {
     // MARK: - Functions
 
     /// The service syncing this folder, or nil when no marker says one does.
+    ///
+    /// Symlinks are resolved FIRST. Dropbox and OneDrive both leave a link
+    /// at the old place (`~/Dropbox` → `~/Library/CloudStorage/Dropbox`), and
+    /// a path arriving through it matches no rule while the folder behind it
+    /// matches Dropbox's. Resolving also makes one folder one key for the
+    /// acknowledgement, whichever spelling it arrived by.
     static func syncedFolder(at folderURL: URL, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) -> CloudSyncedFolder? {
-        let folderPath: String = folderURL.standardizedFileURL.path
-        if let serviceName = CloudSyncDetector.serviceName(forPath: folderPath, homePath: homeDirectory.standardizedFileURL.path) {
+        let resolvedURL: URL = folderURL.standardizedFileURL.resolvingSymlinksInPath()
+        let folderPath: String = resolvedURL.path
+        let homePath: String = homeDirectory.standardizedFileURL.resolvingSymlinksInPath().path
+        if let serviceName = CloudSyncDetector.serviceName(forPath: folderPath, homePath: homePath) {
             return CloudSyncedFolder(serviceName: serviceName, folderPath: folderPath)
         }
-        if CloudSyncDetector.isInICloud(folderURL) {
+        if CloudSyncDetector.iCloudFlagIsTrusted(forPath: folderPath, homePath: homePath) && CloudSyncDetector.isInICloud(resolvedURL) {
             return CloudSyncedFolder(serviceName: "iCloud Drive", folderPath: folderPath)
         }
         return nil
+    }
+
+    /// Where the item's own iCloud flag is believed: under `~/Desktop` and
+    /// `~/Documents`, the two folders "Desktop & Documents Folders" syncs in
+    /// place without moving them. Nowhere else — the flag is set for ANY
+    /// File Provider item, a Dropbox or OneDrive folder included (checked on
+    /// a real `~/Library/CloudStorage/Dropbox`), so trusting it everywhere
+    /// would call a Dropbox folder "iCloud Drive" to the teacher's face.
+    static func iCloudFlagIsTrusted(forPath path: String, homePath: String) -> Bool {
+        let home: String = CloudSyncDetector.withoutTrailingSlash(homePath)
+        for folderName in ["Desktop", "Documents"] {
+            let root: String = home + "/" + folderName
+            if path == root || path.hasPrefix(root + "/") {
+                return true
+            }
+        }
+        return false
     }
 
     /// The pure rule: which service, from the path alone.
@@ -122,9 +147,10 @@ nonisolated enum CloudSyncDetector {
         return CloudSyncDetector.unknownServiceName
     }
 
-    /// iCloud's own answer, which is the only way to see a Desktop or
-    /// Documents folder that "Desktop & Documents Folders" syncs in place —
-    /// those stay at `~/Desktop` and `~/Documents` and match no path rule.
+    /// The item's own "ubiquitous" flag — the only way to see a Desktop or
+    /// Documents folder that "Desktop & Documents Folders" syncs in place,
+    /// since those stay at `~/Desktop` and `~/Documents` and match no path
+    /// rule. Only meaningful where `iCloudFlagIsTrusted` says so.
     static func isInICloud(_ folderURL: URL) -> Bool {
         guard let values = try? folderURL.resourceValues(forKeys: [.isUbiquitousItemKey]) else {
             return false
@@ -192,6 +218,15 @@ nonisolated enum CloudSyncWording {
 
     /// The button that dismisses the in-window notice.
     static let dismissNoticeButton: String = "Got It"
+
+    /// The picker's other button — the same words it has always used, named
+    /// here so the contract carries them beside the choice they complete.
+    static let chooseDifferentFolderButton: String = "Choose a Different Folder…"
+
+    /// The notice's button that opens the full explanation in place, and
+    /// what it says once the explanation is open.
+    static let showDetailsButton: String = "Show Details"
+    static let hideDetailsButton: String = "Hide Details"
 
     /// The full explanation, in the order it is shown.
     static func explanation(service: String) -> [String] {

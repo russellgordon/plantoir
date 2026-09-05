@@ -113,6 +113,17 @@ class WorkspaceModel {
         }
     }
 
+    /// True when this model is one a window shows — as against one the
+    /// assistant or the MCP server made for its own reading.
+    static func isShownInAWindow(_ model: WorkspaceModel) -> Bool {
+        for existing in windowModels {
+            if existing === model {
+                return true
+            }
+        }
+        return false
+    }
+
     /// True while some open window is working in this folder.
     static func folderIsInUse(_ path: String) -> Bool {
         for model in windowModels {
@@ -422,7 +433,10 @@ class WorkspaceModel {
             defaults.set(url.path, forKey: WorkspaceModel.storedPathKey)
         }
         reloadCourses()
-        noticeCloudSync(folderWasChosen: true)
+        // Choosing the folder this window already shows is not a new
+        // choice — a teacher who does that with the notice showing would
+        // otherwise find their courses hidden behind the picker.
+        noticeCloudSync(folderWasChosen: previousPath != url.path)
         if let previousPath, previousPath != url.path {
             WorkspaceModel.releaseFolderIfUnused(previousPath)
         }
@@ -454,13 +468,22 @@ class WorkspaceModel {
         if workspaceIsUnrecognized {
             return
         }
-        if hasAcknowledgedCloudSync(forPath: workspaceURL.path) {
+        // Keyed by the RESOLVED path the detector answers with, so a folder
+        // reached through a symlink (`~/Dropbox` → `~/Library/CloudStorage/
+        // Dropbox`) is one folder, told about once.
+        if hasAcknowledgedCloudSync(forPath: syncedFolder.folderPath) {
             return
         }
-        ActivityTrail.note(
-            .syncedFolderNoticed,
-            "noticed the working folder is kept in sync with \(syncedFolder.serviceName) — " + LogRedactor.redacting(workspaceURL.path)
-        )
+        // Only a model that belongs to a window records the line: the
+        // assistant and the MCP server adopt folders on models nothing
+        // shows, and "noticed" from those would say Plantoir told the
+        // teacher something it never did.
+        if WorkspaceModel.isShownInAWindow(self) {
+            ActivityTrail.note(
+                .syncedFolderNoticed,
+                "noticed the working folder is kept in sync with \(syncedFolder.serviceName) — " + LogRedactor.redacting(syncedFolder.folderPath)
+            )
+        }
         if folderWasChosen {
             needsCloudSyncDecision = true
         } else {
@@ -489,9 +512,18 @@ class WorkspaceModel {
         isShowingCloudSyncNotice = false
         if canRememberChoice {
             var acknowledgedPaths: [String] = defaults.stringArray(forKey: WorkspaceModel.acknowledgedSyncedFoldersKey) ?? []
-            if !acknowledgedPaths.contains(workspaceURL.path) {
-                acknowledgedPaths.append(workspaceURL.path)
+            if !acknowledgedPaths.contains(syncedFolder.folderPath) {
+                acknowledgedPaths.append(syncedFolder.folderPath)
                 defaults.set(acknowledgedPaths, forKey: WorkspaceModel.acknowledgedSyncedFoldersKey)
+            }
+        }
+        // The same folder open in a second window: its notice goes too,
+        // or "Got It" here leaves it there until relaunch, against the
+        // once-per-folder rule.
+        for other in WorkspaceModel.windowModels {
+            if other !== self && other.workspaceURL?.path == workspaceURL.path {
+                other.needsCloudSyncDecision = false
+                other.isShowingCloudSyncNotice = false
             }
         }
         let howTheyWentOn: String = wasAChoice
@@ -1442,7 +1474,12 @@ class WorkspaceModel {
         // picker showed the note beside the button, and pressing it is the
         // teacher's answer. Recorded before the reload so the note is not
         // shown a second time.
-        if needsCloudSyncDecision {
+        // …and only if the folder set up is still the one showing. The copy
+        // runs off the main thread, and File › Open Working Folder stays
+        // enabled meanwhile: a synced folder chosen during the copy has a
+        // decision of its own pending, and finishing the FIRST folder's
+        // set-up must not answer it.
+        if needsCloudSyncDecision && self.workspaceURL == workspaceURL {
             acknowledgeCloudSync()
         }
         reloadCourses()

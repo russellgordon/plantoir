@@ -80,6 +80,40 @@ final class CloudSyncedFolderTests: XCTestCase {
         XCTAssertEqual(detection["unknownServiceName"] as? String, CloudSyncDetector.unknownServiceName)
     }
 
+    /// A folder reached through a symlink is recognised by what is BEHIND
+    /// the link — Dropbox and OneDrive both leave one at the old place —
+    /// and answers with the resolved path, so one folder has one key.
+    func testAFolderReachedThroughASymlinkIsRecognisedByWhatIsBehindIt() throws {
+        let home: URL = try makeTemporaryFolder()
+        let realFolder: URL = home
+            .appendingPathComponent("Library/CloudStorage/Dropbox/Course Notes", isDirectory: true)
+        try FileManager.default.createDirectory(at: realFolder, withIntermediateDirectories: true)
+        let link: URL = home.appendingPathComponent("Dropbox")
+        try FileManager.default.createSymbolicLink(
+            at: link,
+            withDestinationURL: home.appendingPathComponent("Library/CloudStorage/Dropbox")
+        )
+
+        let found: CloudSyncedFolder? = CloudSyncDetector.syncedFolder(
+            at: link.appendingPathComponent("Course Notes"),
+            homeDirectory: home
+        )
+        XCTAssertEqual(found?.serviceName, "Dropbox")
+        XCTAssertEqual(found?.folderPath, realFolder.resolvingSymlinksInPath().path, "the key is the resolved path")
+    }
+
+    /// The item's iCloud flag is believed only under ~/Desktop and
+    /// ~/Documents. It is set for ANY File Provider item — a Dropbox folder
+    /// included — so trusted anywhere else it would name the wrong service.
+    func testTheICloudFlagIsTrustedOnlyWhereDesktopAndDocumentsLive() {
+        let home: String = "/Users/teacher"
+        XCTAssertTrue(CloudSyncDetector.iCloudFlagIsTrusted(forPath: "/Users/teacher/Desktop/Course Notes", homePath: home))
+        XCTAssertTrue(CloudSyncDetector.iCloudFlagIsTrusted(forPath: "/Users/teacher/Documents", homePath: home))
+        XCTAssertFalse(CloudSyncDetector.iCloudFlagIsTrusted(forPath: "/Users/teacher/Library/CloudStorage/Dropbox/Course Notes", homePath: home))
+        XCTAssertFalse(CloudSyncDetector.iCloudFlagIsTrusted(forPath: "/Users/teacher/Desktop Extras", homePath: home), "a sibling whose name merely starts the same is not the Desktop")
+        XCTAssertFalse(CloudSyncDetector.iCloudFlagIsTrusted(forPath: "/Users/teacher", homePath: home))
+    }
+
     /// A temporary folder is not in iCloud, so the real detector says nothing
     /// about it — which is what keeps every other test in this suite from
     /// tripping over the note.
@@ -108,6 +142,9 @@ final class CloudSyncedFolderTests: XCTestCase {
         XCTAssertEqual(try expected("whatToDo"), CloudSyncWording.whatToDo)
         XCTAssertEqual(try expected("useAnywayButton"), CloudSyncWording.useAnywayButton)
         XCTAssertEqual(try expected("dismissNoticeButton"), CloudSyncWording.dismissNoticeButton)
+        XCTAssertEqual(try expected("chooseDifferentFolderButton"), CloudSyncWording.chooseDifferentFolderButton)
+        XCTAssertEqual(try expected("showDetailsButton"), CloudSyncWording.showDetailsButton)
+        XCTAssertEqual(try expected("hideDetailsButton"), CloudSyncWording.hideDetailsButton)
     }
 
     /// The explanation is the contract's sentences in the contract's ORDER —
@@ -236,6 +273,45 @@ final class CloudSyncedFolderTests: XCTestCase {
         XCTAssertTrue(workspace.needsCloudSyncDecision, "a different folder deserves its own note")
     }
 
+    /// Choosing, through the picker, the folder a window already shows is
+    /// a restore in disguise: the notice, never the picker — or the
+    /// teacher's courses vanish behind a question about a folder they
+    /// did not change.
+    func testReChoosingTheOpenFolderShowsTheNoticeNotThePicker() throws {
+        pretendEveryFolderIsSynced(by: "iCloud Drive")
+        let folderURL: URL = try makeTemporaryFolder()
+        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        workspace.adoptRestoredPath(folderURL.path)
+        XCTAssertTrue(workspace.isShowingCloudSyncNotice)
+
+        workspace.chooseWorkspace(at: folderURL)
+        XCTAssertFalse(workspace.needsCloudSyncDecision, "the same folder again is not a new choice")
+        XCTAssertTrue(workspace.isShowingCloudSyncNotice, "the notice stays until Got It")
+    }
+
+    /// The same folder open in two windows: Got It in one clears the
+    /// other's notice too. Once per folder means once, not once per window.
+    func testGotItInOneWindowClearsTheNoticeInTheOther() throws {
+        pretendEveryFolderIsSynced(by: "OneDrive")
+        let folderURL: URL = try makeTemporaryFolder()
+        let defaults: UserDefaults = TestDefaults.make()
+        let first: WorkspaceModel = WorkspaceModel(defaults: defaults)
+        let second: WorkspaceModel = WorkspaceModel(defaults: defaults)
+        WorkspaceModel.registerWindowModel(first)
+        WorkspaceModel.registerWindowModel(second)
+        defer {
+            WorkspaceModel.unregisterWindowModel(first)
+            WorkspaceModel.unregisterWindowModel(second)
+        }
+        first.adoptRestoredPath(folderURL.path)
+        second.adoptRestoredPath(folderURL.path)
+        XCTAssertTrue(first.isShowingCloudSyncNotice)
+        XCTAssertTrue(second.isShowingCloudSyncNotice)
+
+        first.acknowledgeCloudSync()
+        XCTAssertFalse(second.isShowingCloudSyncNotice, "the other window's notice goes with it")
+    }
+
     /// Setting up an EMPTY synced folder is the decision: the note was
     /// beside the button, and pressing it answers it.
     func testSettingUpAnEmptySyncedFolderCountsAsGoingAhead() throws {
@@ -268,12 +344,26 @@ final class CloudSyncedFolderTests: XCTestCase {
 
         pretendEveryFolderIsSynced(by: "iCloud Drive")
         let folderURL: URL = try makeTemporaryFolder()
+
+        // A model nothing shows — the assistant's, the MCP server's —
+        // records no "noticed": Plantoir told nobody anything.
+        let headless: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        headless.adoptRestoredPath(folderURL.path)
+        XCTAssertFalse(
+            ActivityTrail.store.activityText(includingPrompts: true).contains("noticed the working folder"),
+            "a model no window shows must not claim the teacher was told"
+        )
+
         let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        WorkspaceModel.registerWindowModel(workspace)
+        defer {
+            WorkspaceModel.unregisterWindowModel(workspace)
+        }
         workspace.chooseWorkspace(at: folderURL)
         workspace.acknowledgeCloudSync()
 
         let trailText: String = ActivityTrail.store.activityText(includingPrompts: true)
-        XCTAssertTrue(trailText.contains("kept in sync with iCloud Drive"), trailText)
+        XCTAssertTrue(trailText.contains("noticed the working folder is kept in sync with iCloud Drive"), trailText)
         XCTAssertTrue(trailText.contains("chose to use the working folder anyway"), trailText)
     }
 }

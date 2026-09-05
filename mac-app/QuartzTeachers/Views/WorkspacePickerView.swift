@@ -106,7 +106,7 @@ struct WorkspacePickerView: View {
                 .disabled(workspace.isInitializingWorkspace)
                 .accessibilityIdentifier("initializeFolderButton")
 
-                Button("Choose a Different Folder…") {
+                Button(CloudSyncWording.chooseDifferentFolderButton) {
                     workspace.isChoosingWorkspace = true
                 }
                 .disabled(workspace.isInitializingWorkspace)
@@ -122,7 +122,7 @@ struct WorkspacePickerView: View {
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("useSyncedFolderButton")
 
-                Button("Choose a Different Folder…") {
+                Button(CloudSyncWording.chooseDifferentFolderButton) {
                     workspace.isChoosingWorkspace = true
                 }
                 .accessibilityIdentifier("chooseFolderButton")

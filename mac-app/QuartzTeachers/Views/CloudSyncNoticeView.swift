@@ -92,7 +92,7 @@ struct CloudSyncNoticeContentView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Button(isShowingDetails ? "Hide Details" : "Show Details") {
+                Button(isShowingDetails ? CloudSyncWording.hideDetailsButton : CloudSyncWording.showDetailsButton) {
                     isShowingDetails.toggle()
                 }
                 .accessibilityIdentifier("cloudSyncDetailsButton")

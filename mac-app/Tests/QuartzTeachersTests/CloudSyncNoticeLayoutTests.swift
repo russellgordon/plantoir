@@ -64,7 +64,9 @@ final class CloudSyncNoticeLayoutTests: XCTestCase {
     /// view then takes as the column's minimum and grows the window's
     /// content past the window. A text WITHOUT that modifier respects the
     /// proposal and stays small. Checked by putting the modifier back and
-    /// watching this fail (1548 points, against 700 proposed).
+    /// watching this fail: 1,548 points, and the same 1,548 whether 700
+    /// points or nothing at all is proposed — the modifier ignores the
+    /// height either way, which is the whole fault.
     @MainActor
     func testTheCollapsedNoticeDoesNotBalloonWhenSqueezed() {
         let measured: CGFloat = measuredHeight(of: makeNotice(isShowingDetails: false), width: 120, height: 0)

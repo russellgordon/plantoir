@@ -171,7 +171,7 @@
         "why": "Adding a name in Course Settings now creates the folder on disk, so a folder appears in the teacher's vault that they did not make in Obsidian. Separate from the rename because it answers a different question, and unexplained new folders are exactly what a teacher reports as 'Plantoir did something to my notes'."
       },
       {
-        "carries": "the service's name and the folder path, redacted",
+        "carries": "the service's name and the folder path, redacted — recorded by a WINDOW only, never by the assistant's or the MCP server's own reading of a folder, since those show nothing",
         "event": "synced folder noticed",
         "why": "The working folder just opened is kept in sync by a cloud service and the teacher had not yet been told about THIS folder. The effects of a synced folder — a slow build, a rename that takes minutes, a move that failed once — arrive weeks later as unrelated reports, and this one line is what connects them. See cloudSyncedFolders."
       },
@@ -953,7 +953,8 @@
       "macMarkers": [
         "Under ~/Library/Mobile Documents/ — iCloud Drive's real location; '~/iCloud Drive' in Finder is a view of it.",
         "Under ~/Library/CloudStorage/<Service>-<Account>/ — where macOS 12.3+ keeps every File Provider service's folders: OneDrive-Personal, GoogleDrive-name@gmail.com, Dropbox, Box-Box. The service is the part of that folder's name before the first hyphen.",
-        "The item's own iCloud flag (isUbiquitousItem), which is the ONLY way to see a ~/Desktop or ~/Documents that 'Desktop & Documents Folders' syncs in place — those match no path rule."
+        "The item's own 'ubiquitous' flag (isUbiquitousItem), trusted ONLY under ~/Desktop and ~/Documents — the two folders 'Desktop & Documents Folders' syncs in place, which match no path rule. The flag is NOT iCloud-specific: it is set for any File Provider item, a Dropbox or OneDrive folder included (checked on a real ~/Library/CloudStorage/Dropbox), so trusting it anywhere else would name the wrong service.",
+        "Symlinks are resolved before any rule runs. Dropbox and OneDrive both leave a link at the old place (~/Dropbox → ~/Library/CloudStorage/Dropbox); a path arriving through it matches no rule while the folder behind it does. The resolved path is also the key the acknowledgement is remembered under, so one folder is one folder whichever spelling it arrives by."
       ],
       "windowsMarkers": [
         "The OneDrive roots the client publishes in the environment: %OneDrive%, %OneDriveConsumer%, %OneDriveCommercial%. A Desktop or Documents moved into OneDrive by 'Known Folder Move' physically lives under one of these, so the prefix rule catches it.",
@@ -1032,8 +1033,12 @@
         "why": "A folder can become synced AFTER it was set up (moved into iCloud, Desktop & Documents turned on) or have been set up before Plantoir could tell. But a folder that opens on every launch must not interrupt every launch, and the teacher did not choose anything just now."
       },
       "rememberedPerFolder": {
-        "rule": "Going ahead — from either button — is remembered for THAT folder, and neither the choice nor the notice is shown for it again. A second synced folder gets its own note.",
-        "why": "Once is information; twice is nagging. And a teacher with two synced folders was told about one of them."
+        "rule": "Going ahead — from either button — is remembered for THAT folder, keyed by its resolved path, and neither the choice nor the notice is shown for it again, in this window or any other window showing the same folder. A second synced folder gets its own note. The list is never pruned: a folder that is renamed or moved is a new key and is asked about again, and a deleted folder's key stays harmlessly.",
+        "why": "Once is information; twice is nagging. And a teacher with two synced folders was told about one of them. Asking again after a rename is accepted: the folder may have moved INTO a synced location, which is exactly the case worth a note."
+      },
+      "reChoosingTheOpenFolder": {
+        "rule": "Choosing, through the picker, the folder a window already shows counts as a restore, not a new choice: the notice form, never the picker's.",
+        "why": "A teacher who re-picks their open folder while the notice is showing would otherwise find their courses hidden behind the picker, and read it as the app losing the folder."
       },
       "checkedEveryOpen": {
         "rule": "The check runs every time a working folder is adopted, not only the first time.",
@@ -1055,7 +1060,10 @@
       "explanationOrder": ["notesStayPut", "buildFilesAreCopied", "offloadedPagesAreSlow", "syncingCanInterruptAMove", "whatToDo"],
       "explanationOrderWhy": "Reassurance first — the words 'kept in sync' beside a warning read as 'your notes are at risk', and they are not. The choice last, once the reasons have been given.",
       "useAnywayButton": "Use This Folder Anyway",
-      "dismissNoticeButton": "Got It"
+      "chooseDifferentFolderButton": "Choose a Different Folder…",
+      "dismissNoticeButton": "Got It",
+      "showDetailsButton": "Show Details",
+      "hideDetailsButton": "Hide Details"
     }
   },
   "specialNames": {
