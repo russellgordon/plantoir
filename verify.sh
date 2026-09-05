@@ -157,6 +157,13 @@ else
   cat /tmp/verify_baked_modules_test.log
 fi
 
+if (cd scripts && python3 test_stop_preview.py) >/tmp/verify_stop_preview_test.log 2>&1; then
+  pass "a build for publishing stops only THIS section's preview (scripts/test_stop_preview.py)"
+else
+  fail "a build for publishing stops only THIS section's preview (scripts/test_stop_preview.py)"
+  cat /tmp/verify_stop_preview_test.log
+fi
+
 # A preview build must never reach a published site, and the FOLDER
 # destination is the one that can: it publishes host-side and never enters the
 # container, so deploy.py's own refusal never runs. Structural rather than

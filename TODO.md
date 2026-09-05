@@ -33,6 +33,26 @@ an item when it ships (finished behaviour is recorded in
   folders have still moved, which puts you in finding 1. Renaming while a build
   is running is the window, and it is small.
 
+- **One rule, three implementations: stopping a section's preview.** Found by
+  review 2026-09-05. `preview.sh --stop` finds this section's processes by
+  working directory (a `/proc` walk it runs inside the container),
+  `preview.ps1 --stop` does the same natively via `Win32_Process` AND walks
+  descendants, and `build_site.py`'s new `stop_preview_serving` is a third,
+  written because the first two are HOST scripts and `build_site.py` runs
+  inside the container, so it cannot call them.
+
+  The reason is sound; three copies of one question is still the shape this
+  project keeps having to undo, and they already differ: only the PowerShell
+  one walks descendants, which its own comment says is needed because a child
+  spawned with a relative path (npx does) carries no directory to match on.
+  The mac's copy has not needed it — the serving node is launched by absolute
+  path — but "has not needed it yet" is how these drift apart.
+
+  Worth unifying, and the cheapest honest version is probably not one
+  implementation but one CONTRACT case listing the command-line shapes that
+  must and must not be stopped, run by all three. `scripts/test_stop_preview.py`
+  is half of that already.
+
 - **Should Plantoir refuse to work in a cloud-synced folder?** Russell's
   question, 2026-09-05, prompted by a reliability review finding that renaming
   a folder reads every page in the course — which on an iCloud-backed vault

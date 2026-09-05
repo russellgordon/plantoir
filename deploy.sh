@@ -293,19 +293,30 @@ if [[ -n "$TO_FOLDER" ]]; then
   # --to-folder …` shipped the live-reload client. Found 2026-09-05 by
   # publishing straight after a preview and looking at what came out: 230 of
   # 244 files carried it.
-  if grep -q "ws://localhost:" "${PUBLIC_DIR_HOST}/index.html" 2>/dev/null; then
+  # Detected across the whole HTML tree, not just the front page. Checking
+  # only `index.html` was the asymmetry that made the guard incomplete: the
+  # WAIT below already scans everything, precisely because a clean front page
+  # can sit in front of stale preview pages — and detection reading only the
+  # front page meant that exact state never triggered a rebuild at all, and was
+  # published. Found by review on 2026-09-05, after the mixture had been
+  # written up as real in the documentation without anyone noticing the
+  # trigger could not see it.
+  if grep -rq --include='*.html' "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
     echo "🔁 This site was built by a preview, which bakes in a live-reload script"
     echo "   that students' browsers would ask about. Rebuilding it for publishing…"
     if ! "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only; then
       echo "❌ Could not rebuild this site for publishing."
       exit 1
     fi
-    # The rebuild writes through the container's bind mount and the host's
-    # view of it LAGS — which is why the "built site not found" loop further
-    # up exists at all. Without waiting here the publish ran against a
-    # directory the host could not see yet and copied NOTHING, reporting
-    # "Published: 0 file(s) updated" over an empty folder. Found by running
-    # the fix rather than reasoning about it, 2026-09-05.
+    # Without waiting here the publish ran against a directory that did not
+    # yet hold the rebuilt site and copied NOTHING, reporting "Published: 0
+    # file(s) updated" over an empty folder.
+    #
+    # That was FIRST blamed on the container's bind mount lagging, and that was
+    # wrong: a rebuild takes about 3 seconds and the tree is clean the moment
+    # it returns. The real cause was a preview still serving this section and
+    # overwriting the rebuild — now stopped by `--build-only` itself. The wait
+    # is kept because it is the honest post-condition either way.
     #
     # Waits on the real CONDITION rather than a guessed interval, and the
     # condition is the WHOLE TREE, not the front page.

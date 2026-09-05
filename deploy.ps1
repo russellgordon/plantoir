@@ -295,9 +295,12 @@ if ($TO_FOLDER) {
   # enters the container, so deploy.py never runs. The app's own publish path
   # is protected by BuildFreshness; the command line was not. Mirrors the fix
   # made in deploy.sh on 2026-09-05 — see GUI-IMPROVEMENTS row 392.
+  # The whole HTML tree, not just the front page — see the same comment in
+  # deploy.sh. Detection that read only `index.html` could not see the one
+  # state the wait below exists for.
   $publishedIndex = Join-Path $PUBLIC_DIR_HOST "index.html"
-  if ((Test-Path -LiteralPath $publishedIndex) -and
-      (Select-String -LiteralPath $publishedIndex -Pattern "ws://localhost:" -Quiet)) {
+  if (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
+      Select-String -Pattern "ws://localhost:" -List -Quiet) {
     Write-Host "This site was built by a preview, which bakes in a live-reload script"
     Write-Host "  that students' browsers would ask about. Rebuilding it for publishing..."
     & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only"
@@ -326,6 +329,14 @@ if ($TO_FOLDER) {
       Write-Host "The rebuilt site still carries the preview's live-reload script."
       Write-Host "  Nothing was published, rather than publishing pages students'"
       Write-Host "  browsers would ask about."
+      exit 1
+    }
+    # deploy.sh has had this since the empty-publish bug; this side did not,
+    # so after a timeout with no front page the HTML scan found nothing, the
+    # loop fell through, and robocopy mirrored an empty directory while
+    # reporting success. Found by review on 2026-09-05.
+    if (-not (Test-Path -LiteralPath $publishedIndex)) {
+      Write-Host "The rebuilt site has not appeared. Nothing was published."
       exit 1
     }
   }

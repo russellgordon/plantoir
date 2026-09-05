@@ -46,6 +46,39 @@ Beyond the actions, the app owns delivery and resources:
   stopped when the folder's last window closes and at quit; Colima itself
   is stopped at quit only when nothing else is running in it.
 
+## Renaming a course folder
+
+Folder rows in Course Settings carry a pencil. It renames the folder **on
+disk** — in every section that has one — rewrites the qualified links that name
+it, and carries across every `course_config.json` key that mentioned it
+(`shared_folders`/`per_section_folders`, `graded_folders`, `curriculum_folder`,
+`class_folder`, `hidden`, `expandable`, `excluded_items`). Renaming the class
+folder or the curriculum folder also WRITES its key, even on a course that
+never had one — a rename is the one moment Plantoir witnesses the change, and
+without it the guess that finds those folders stops finding them with nobody
+told.
+
+Three things about it are deliberate:
+
+- **It commits to disk immediately, not at Save**, and the sheet says so.
+  Settings otherwise holds edits in memory with Cancel reverting them, and a
+  folder that has really moved cannot be un-moved by a Cancel.
+- **Nothing moves until every destination has been checked**, so a per-section
+  rename cannot get half way through four sections and stop.
+- **It runs off the main actor.** The move is quick; reading every page in the
+  course to rewrite links is not, on an iCloud-backed vault where an evicted
+  file downloads on read.
+
+Two neighbouring behaviours changed with it: adding a folder name now CREATES
+the folder (it used to write an entry pointing at nothing), and removing one
+says the folder and its contents stay on the teacher's Mac — removal has never
+deleted anything and nobody could tell.
+
+`hidden` is the entry in that carry-across list worth remembering: it holds what
+is kept OUT of the built site, so a rename that missed it silently un-hid the
+folder and the next publish put pages the teacher had hidden in front of
+students.
+
 ## Reporting a problem
 
 Plantoir keeps a note of every task it runs — in

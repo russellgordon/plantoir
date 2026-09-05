@@ -1009,11 +1009,20 @@ def main():
     # "access other apps and services on this device". Since previewing is the
     # documented way to produce public/, detect the client and quietly re-emit
     # a production build from the same merged sources before uploading.
-    index_html = public_dir / "index.html"
-    try:
-        is_preview_build = "ws://localhost:" in index_html.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        is_preview_build = False
+    # Every page, not just the front one. Serve mode bakes the client into all
+    # of them and the built tree is replaced file by file, so a clean
+    # `index.html` in front of stale preview pages is a real state — and
+    # reading only the front page meant that state was published without a
+    # rebuild. Stops at the first match, so a genuine preview build costs one
+    # file. Found by review on 2026-09-05.
+    is_preview_build = False
+    for page in public_dir.rglob("*.html"):
+        try:
+            if "ws://localhost:" in page.read_text(encoding="utf-8", errors="ignore"):
+                is_preview_build = True
+                break
+        except OSError:
+            continue
     if is_preview_build:
         print(" Preview build detected (live-reload client) — rebuilding for production…")
         rebuild_for_production(args.course, str(args.section), _HOST_OS)

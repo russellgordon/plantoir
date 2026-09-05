@@ -288,7 +288,8 @@ sync watcher.
 
 ## If something looks wrong
 
-The activity trail is `~/Library/Logs/Plantoir/Logs/activity.txt`
-(`~/Library/Logs/Plantoir/activity.txt`). A folder problem writes
+The activity trail is `~/Library/Logs/Plantoir/activity.txt`, which is the
+path `CLAUDE.md` rule 5 gives. (An earlier draft of this file offered two
+paths a line apart; this is the one.) A folder problem writes
 `found a problem with this course's folders (name)` and a repair writes
 `put the Media folder back` / `put the front page back`.

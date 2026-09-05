@@ -251,6 +251,31 @@ checkout at `/opt/quartz` (the template that every build copies from):
 Both are described fully in
 [customizations §B](06-quartz-customizations.md#b-patches-applied-at-setup-time-to-the-scaffold).
 
+## What a course calls a unit, and where its class pages live
+
+Two questions the wizard settles at creation, both recorded in
+`course_config.json` and both documented key-by-key in
+[the config reference](08-course-config-reference.md).
+
+**`unit_word`** — class pages are named "Unit 2, Day 3", and the first word is
+the teacher's. `prompt_unit_word` asks it of every course, ready-made ones
+included, because the payload is written in that word as it is POURED rather
+than renamed afterwards: `install_payload_file` rewrites the text and
+`renamed_for_unit_word` renames the file. **It is asked only when the course
+has no saved configuration** — changing it on a re-run would rewrite the
+configuration and rename nothing, leaving pages the build no longer recognises.
+An absent key means "Unit", so every course made before this existed is
+untouched. "Day" is deliberately fixed.
+
+**`class_folder`** — which per-section folder holds the class pages. Recorded
+rather than guessed from the word "class", because the guess quietly decided
+what a teacher was allowed to call the folder: somebody whose vocabulary is
+"Thread 2, Day 3" calls it "All Days", and the guess would then point the
+next-class button and the curriculum map at whatever folder happened to be
+first. Both wizards write it at creation, and a rename in Course Settings
+writes it even on a course that never had one. The old guess is kept as the
+fallback, never replaced.
+
 ---
 
 [◀ Previous: Launcher Scripts](03-launcher-scripts.md) · [Back to index](README.md) · [Next: The Build Pipeline ▶](05-build-pipeline.md)

@@ -3572,12 +3572,30 @@ Two things to check on your side rather than assume:
   Windows process. Check that killing your launcher actually stops the node
   server — on the mac it demonstrably does not, and that is exactly the kind of
   difference that is assumed rather than measured.
-- **`/proc` is how the mac finds it**, and you do not have one. The mac's
-  version is a no-op wherever `/proc` is absent, so on Windows today NOTHING
-  stops an orphaned preview before a build. Finding the equivalent — a process
-  whose command line contains the section's build directory — is yours to
-  write, and until you do, a publish that rebuilds while a preview is running
-  can still lose the race.
+- **You have already written the algorithm — do not write it again.**
+  `preview.ps1`'s `--stop` block finds this section's processes by WORKING
+  DIRECTORY, walks their descendants, and its own comment says "not port,
+  … parity: preview.sh". That is the same rule, done better than the mac's new
+  copy, which does not walk descendants. What is missing on your side is not
+  the algorithm, it is **calling it from the build-only path before the
+  build**.
+
+  (The mac could not simply call `preview.sh --stop`, because `build_site.py`
+  runs INSIDE the container and `--stop` is a host script — which is why a
+  third copy of this rule now exists. Three implementations of one question is
+  the shape this project keeps having to undo; it is in `TODO.md` as worth
+  unifying.)
+
+- **What is and is not exposed on your side.** The Windows APP already stops a
+  running preview before deploying (`SectionDetailView.xaml.cs`), exactly as
+  the mac's does — so the app is safe on both platforms and always was. The
+  hole is the COMMAND LINE, on both. And in your CONTAINER runtime `/proc`
+  exists, so the mac's new code works there unchanged; it is only the NATIVE
+  Windows runtime that gets nothing.
+
+- **The wait is bounded at 30 seconds** (150 × 0.2 s), not the 15 that
+  `GUI-IMPROVEMENTS.md` row 392 says — that row predates the change and the log
+  is append-only, so this is the current number.
 
 **The other one was a partial fix of mine, and is worth knowing as a shape.**
 The first version of the preview guard in `deploy.sh` waited for `index.html`
