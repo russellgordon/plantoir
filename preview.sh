@@ -462,10 +462,22 @@ export PATH="$TOOLS_DIR/bin:$PATH"
 # anything: no engine bootstrap, no image build, no container creation —
 # if nothing is running, there is nothing to stop.
 #
-# Processes are found by WORKING DIRECTORY, not port: everything a
-# preview runs (python3, npm, node, esbuild) lives in the section's
-# .merged_output folder, so this catches builds as well as servers and
-# can never touch another section's processes.
+# WHICH processes belong to this section is not decided here. That rule
+# lives once, in scripts/stop_preview.py, and is pinned by
+# contracts/shared-rules.json -> stopPreview; it used to be written out
+# three times (here, in preview.ps1, and in build_site.py) and the three
+# had already drifted apart. This block's job is to deliver that rule to
+# the right place and hand it the section's directories.
+#
+# The code is PIPED IN from the recipe rather than run from the image's
+# own /opt/scripts, and that is not a style choice. Stop mode must never
+# build anything, so it runs against whatever container is already there
+# — which, right after an upgrade, is one built from the PREVIOUS image
+# and has no such file. Naming a baked path would make `docker exec`
+# fail with a message nobody sees (both callers discard this script's
+# output and neither checks its exit code) while the build it was asked
+# to stop carried on. Piping the host's copy works against any container
+# old enough to have python3, which every image here has.
 if [[ -n "${STOP_MODE:-}" ]]; then
   if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
     echo "✅ Nothing to stop — the website builder isn't running."
@@ -476,61 +488,24 @@ if [[ -n "${STOP_MODE:-}" ]]; then
     exit 0
   fi
   echo "🧹 Stopping preview processes for ${COURSE} section ${SECTION}…"
-  docker exec -i -e TARGET_DIR="/teaching/courses/${COURSE}/.merged_output/section${SECTION}" "$CONTAINER_NAME" python3 - <<'PY'
-import os
-import signal
-import time
-
-target = os.environ["TARGET_DIR"]
-alt_target = target.replace("/teaching/courses/", "/tmp/quartz-builds/").replace("/.merged_output/", "/")
-# .merged_output is a SYMLINK to the builds folder outside the working
-# folder, and /proc/<pid>/cwd is the REAL path a process is sitting in —
-# never the spelling it used to get there. Without the resolved form this
-# sweep matched nothing at all the moment the build output moved, so
-# --stop would report success and leave the build running.
-targets = []
-for candidate in [target, alt_target]:
-    if not candidate:
-        continue
-    if candidate not in targets:
-        targets.append(candidate)
-    resolved = os.path.realpath(candidate)
-    if resolved not in targets:
-        targets.append(resolved)
-own_pid = os.getpid()
-
-def preview_pids():
-    """PIDs whose working directory is inside this section's output."""
-    found = []
-    for entry in os.listdir("/proc"):
-        if not entry.isdigit():
-            continue
-        pid = int(entry)
-        if pid == own_pid:
-            continue
-        try:
-            cwd = os.readlink(f"/proc/{entry}/cwd")
-        except OSError:
-            continue
-        if any(cwd == t or cwd.startswith(t + "/") for t in targets):
-            found.append(pid)
-    return found
-
-victims = preview_pids()
-for pid in victims:
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-if victims:
-    time.sleep(1)
-for pid in preview_pids():
-    try:
-        os.kill(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-print(f"✅ Stopped {len(victims)} process(es).")
-PY
+  _STOP_RULE="$(resolve_build_context)/scripts/stop_preview.py"
+  if [[ ! -f "$_STOP_RULE" ]]; then
+    echo "⚠️ Cannot stop preview processes: the build recipe is incomplete."
+    exit 0
+  fi
+  # Both spellings of the section's build folder. `.merged_output` is a
+  # SYMLINK to the builds folder outside the working folder, and a
+  # process's working directory is always the REAL path it is sitting in
+  # — never the spelling it used to get there. The rule resolves each of
+  # these as well, but it can only resolve what it was given, and the
+  # symlink resolves correctly only INSIDE the container, which is where
+  # it runs.
+  docker exec -i "$CONTAINER_NAME" python3 - \
+    --dir "/teaching/courses/${COURSE}/.merged_output/section${SECTION}" \
+    --dir "/tmp/quartz-builds/${COURSE}/section${SECTION}" \
+    --course "$COURSE" \
+    --section "$SECTION" \
+    --mode everything < "$_STOP_RULE"
   exit 0
 fi
 

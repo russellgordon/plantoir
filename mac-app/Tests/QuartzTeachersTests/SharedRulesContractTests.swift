@@ -1032,6 +1032,87 @@ final class SharedRulesContractTests: XCTestCase {
         }
     }
 
+    // MARK: - Stopping a section's preview
+
+    /// The mac app does not implement this rule — it shells out to
+    /// `preview.sh --stop`, and the rule itself lives in
+    /// `scripts/stop_preview.py`, run against these cases by
+    /// `scripts/test_stop_preview.py`. What the mac suite is for here is the
+    /// SHAPE: that the cases exist, that they are well formed, and that the
+    /// launcher on this side still delegates rather than growing a fourth
+    /// copy of the question. The same precedent as `gradedFolders`.
+    func testStopPreviewCasesAreWellFormed() throws {
+        let rule: [String: Any] = try Self.section("stopPreview")
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 17,
+            "the stopPreview case list has lost cases; it is the only gate on a rule that "
+                + "used to be written out three times"
+        )
+        var modesSeen: Set<String> = []
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            let mode: String = try XCTUnwrap(oneCase["mode"] as? String, "\(name) has no mode")
+            modesSeen.insert(mode)
+            XCTAssertNotNil(oneCase["why"] as? String, "\(name) does not say why it exists")
+            let section: [String: Any] = try XCTUnwrap(
+                oneCase["section"] as? [String: Any], "\(name) names no section"
+            )
+            let directories: [String] = try XCTUnwrap(section["directories"] as? [String])
+            XCTAssertFalse(directories.isEmpty, "\(name) gives no build directory")
+            let snapshot: [[String: Any]] = try XCTUnwrap(
+                oneCase["snapshot"] as? [[String: Any]], "\(name) has no process snapshot"
+            )
+            XCTAssertFalse(snapshot.isEmpty, "\(name) has an empty snapshot")
+            let pids: Set<Int> = Set(snapshot.compactMap { process in process["pid"] as? Int })
+            XCTAssertEqual(pids.count, snapshot.count, "\(name) reuses a process id")
+            let stops: [Int] = try XCTUnwrap(oneCase["stops"] as? [Int], "\(name) has no verdict")
+            for stopped in stops {
+                XCTAssertTrue(
+                    pids.contains(stopped),
+                    "\(name) expects pid \(stopped) to be stopped and its snapshot has no such process"
+                )
+            }
+        }
+        XCTAssertEqual(
+            modesSeen, ["everything", "servingOnly"],
+            "both questions must be covered: what `--stop` reclaims, and what a build for "
+                + "publishing removes from its own way"
+        )
+    }
+
+    /// The rule has ONE home, and this is what keeps it that way on this side.
+    ///
+    /// The failure being prevented is not a broken copy — it is a WORKING
+    /// one, which passes every behavioural test right up to the day it
+    /// drifts. That is how there came to be three.
+    func testTheLauncherDelegatesRatherThanSweepingProcessesItself() throws {
+        let root: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let launcher: String = try String(
+            contentsOf: root.appendingPathComponent("preview.sh"), encoding: .utf8
+        )
+        XCTAssertTrue(
+            launcher.contains("scripts/stop_preview.py"),
+            "preview.sh no longer uses the shared rule for --stop"
+        )
+        XCTAssertFalse(
+            launcher.contains("/proc/{entry}/cwd"),
+            "preview.sh has grown its own process sweep again"
+        )
+        // Version independence: stop mode runs against whatever container is
+        // ALREADY there, which right after an upgrade was built from the
+        // previous image and has no such file baked in. Both callers discard
+        // this launcher's output and neither checks its exit code, so naming
+        // a baked path fails silently and the build carries on running.
+        XCTAssertFalse(
+            launcher.contains("python3 /opt/scripts/stop_preview.py"),
+            "preview.sh runs the rule from inside the image; an older container does not "
+                + "have it, and the failure is invisible"
+        )
+    }
+
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

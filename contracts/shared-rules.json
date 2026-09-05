@@ -1285,5 +1285,501 @@
       ],
       "note": "Which folder the GUI protects as the curriculum folder, computed from the config's shared_folders list: if `curriculum_folder` is configured and in the list, it is used; otherwise the alphabetically first name containing 'curriculum' (case-insensitive). This is the NAME half of build_site.py:_find_curriculum_folder, which additionally scans the vault on disk and accepts a folder only if it holds a page whose title is an expectation code — a check the apps cannot make from the config alone. So the GUI may protect a folder the build would skip (one with no expectation pages yet); it never protects a different folder than the build would pick among those it can see."
     }
+  },
+  "stopPreview": {
+    "note": "Which processes belong to a section's preview, and must therefore be stopped. This was answered THREE times before it was written down here - `preview.sh --stop` swept working directories inside the container, `preview.ps1 --stop` matched command lines natively, and `build_site.py` matched command lines again from inside the container because it cannot call either host script (both are HOST scripts; it is not). The reason for the third copy is sound and has not gone away. What went wrong is what always goes wrong: they drifted, and by the time anyone looked, only one of the three walked the process tree and one had a prefix bug that stopped the wrong section.",
+    "whatWasNotObvious": "The three were not three copies of one rule - they were three PARTIAL rules, and picking any one of them as 'the' implementation would have shipped that one's blind spot everywhere. A working directory catches what a command line cannot (a child launched by a relative path carries no directory: `npm install` runs exactly that way). A command line catches what a working directory cannot: the Python driver itself, which never calls os.chdir and so sits in the container's own folder for the whole build. So the shared rule is a DISJUNCTION of evidences plus a walk down the process tree, and it stops strictly more than any of the three did on its own.",
+    "modes": {
+      "everything": "The launcher's `--stop`. The teacher, or the app, has ended a preview and the container-side work must be reclaimed: the server, the build, the driver, and every child of them. A mid-flight build is most of the point - ending the host-side script leaves it burning CPU for a preview nobody is waiting for any more.",
+      "servingOnly": "`build_site.py --build-only`. A build for PUBLISHING is about to start and the only thing that must go is the preview SERVER, which would otherwise overwrite what was just built about a second later through its own host mirror. A build must never be stopped here, because the build being protected is itself a build of this section."
+    },
+    "identity": {
+      "evidences": [
+        {
+          "evidence": "workingDirectory",
+          "rule": "The process's working directory IS the section's build directory, or is inside it.",
+          "catches": "Children launched with cwd= and no directory on their command line - `npm install`, and the esbuild workers under it.",
+          "modes": [
+            "everything"
+          ]
+        },
+        {
+          "evidence": "commandLineNamesTheDirectory",
+          "rule": "The command line contains the section's build directory, ending at a path separator, a quote, whitespace, or the end of the line - NEVER as a bare substring.",
+          "catches": "The serving node, which the launcher runs by absolute path precisely so that this works.",
+          "modes": [
+            "everything",
+            "servingOnly"
+          ]
+        },
+        {
+          "evidence": "commandLineIsTheDriver",
+          "rule": "The command line names `build_site.py` and carries `--course` and `--section` whose VALUES, read as arguments rather than as substrings, are this course and this section.",
+          "catches": "The build driver itself, during every phase it does in its own process - which is the only thing running for much of a build.",
+          "modes": [
+            "everything"
+          ]
+        }
+      ],
+      "descendants": "Every descendant of a matched process is matched too, repeatedly until no new child appears - the chain is driver -> npm -> node -> esbuild, so one pass is not enough. This is the half Windows had and the mac did not, and it is what catches a child spawned by a relative path that no evidence above can see.",
+      "boundaries": "Every path and argument comparison ends at a boundary. `.../section1` is a prefix of `.../section10` and `--section=1` is a prefix of `--section=10`; both have already stopped the wrong section on one platform. A boundary is a path separator, a quote, whitespace, or the end of the string - and allowing the end of the string is safe precisely because what follows `section1` in `section10` is `0`, which is not one.",
+      "separators": "Both `/` and `\\` count, on both platforms. The container never sees a backslash and a native Windows run passes POSIX spellings around in places; accepting either costs nothing.",
+      "caseInsensitive": "Every comparison is case-insensitive, on BOTH platforms. Windows filesystems are case-insensitive but case-preserving, so a folder stored as `Ada1o` against a command line saying `ADA1O` is an ordinary Windows state. Making the rule case-sensitive on POSIX only would mean a case here could have two different right answers depending on which suite ran it, and then it is not one rule.",
+      "spellings": "A caller passes EVERY spelling of the directory it knows, because `courses/<CODE>/.merged_output/section<N>` is a symlink to the builds folder outside the working folder and a working directory is always the resolved path. When the built site moved, a sweep that knew only the symlinked spelling matched nothing and reported success while the build ran on.",
+      "neverStop": "Never the calling process, and never pid 1 - in this image pid 1's working directory can be inside a section's folder, and stopping it takes the container down with every other section's work in it."
+    },
+    "notShared": [
+      {
+        "thing": "How the process list is obtained",
+        "mac": "`/proc`, read inside the container, which is where both of the mac's paths run.",
+        "windows": "`Get-CimInstance Win32_Process`, natively. It exposes no working directory at all, which is why the evidences above are a disjunction rather than a list every platform must answer in full: a platform that cannot see one evidence must still reach the same verdict, and the descendant walk is how it does."
+      },
+      {
+        "thing": "How a process is ended",
+        "mac": "SIGTERM, then SIGKILL a second later - ask, then insist. A node server closes its sockets and a Python driver runs its own cleanup.",
+        "windows": "`Stop-Process -Force`. Windows has no SIGTERM to send, so there is nothing to ask with. Deliberately not shared rather than papered over: the rule is WHICH processes, not how they end."
+      }
+    ],
+    "cases": [
+      {
+        "name": "the preview serving this section is stopped",
+        "why": "The ordinary case, and the one both older rules already agreed on.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 101,
+            "ppid": 100,
+            "name": "node",
+            "commandLine": "node /tmp/quartz-builds/ADA1O/section1/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          }
+        ],
+        "stops": [
+          101
+        ]
+      },
+      {
+        "name": "a build for publishing stops the preview that would overwrite it",
+        "why": "Serve mode keeps mirroring its own build to the host every second, so a publish build that leaves the server running has its output replaced by the preview - live-reload client and all - about a second after it lands.",
+        "mode": "servingOnly",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 101,
+            "ppid": 100,
+            "name": "node",
+            "commandLine": "node /tmp/quartz-builds/ADA1O/section1/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          }
+        ],
+        "stops": [
+          101
+        ]
+      },
+      {
+        "name": "another section's preview is left alone",
+        "why": "The regression that caused this rule to be written down. Stopping by PORT killed whatever held the default 8081, which is the first section to have previewed in the folder rather than the one being published: previewing section 1 while publishing section 2 took section 1 down.",
+        "mode": "servingOnly",
+        "section": {
+          "course": "ADA1O",
+          "number": 2,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section2",
+            "/tmp/quartz-builds/ADA1O/section2"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 101,
+            "ppid": 100,
+            "name": "node",
+            "commandLine": "node /tmp/quartz-builds/ADA1O/section1/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          }
+        ],
+        "stops": []
+      },
+      {
+        "name": "section 1 is not section 10",
+        "why": "A LIVE BUG when this was written, on the platform that matched with a bare substring test: `.../section1` is a prefix of `.../section10`, so stopping section 1 stopped section 10's preview. Needs ten sections in one course to bite, which nothing refuses.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 110,
+            "ppid": 100,
+            "name": "node",
+            "commandLine": "node /tmp/quartz-builds/ADA1O/section10/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8082 --wsPort 9082",
+            "cwd": "/tmp/quartz-builds/ADA1O/section10"
+          }
+        ],
+        "stops": []
+      },
+      {
+        "name": "section 10 is stopped when section 10 is what was asked about",
+        "why": "The other half of the boundary: refusing the prefix must not refuse the real thing.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 10,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section10",
+            "/tmp/quartz-builds/ADA1O/section10"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 110,
+            "ppid": 100,
+            "name": "node",
+            "commandLine": "node /tmp/quartz-builds/ADA1O/section10/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8082 --wsPort 9082",
+            "cwd": "/tmp/quartz-builds/ADA1O/section10"
+          }
+        ],
+        "stops": [
+          110
+        ]
+      },
+      {
+        "name": "a publish build is never mistaken for a preview server",
+        "why": "`--serve` is the only honest separator between the two. Without it a build for publishing would stop ITSELF, since the build it is protecting is also a build of this section.",
+        "mode": "servingOnly",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 120,
+            "ppid": 100,
+            "name": "node",
+            "commandLine": "node /tmp/quartz-builds/ADA1O/section1/quartz/bootstrap-cli.mjs build --concurrency 1",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          }
+        ],
+        "stops": []
+      },
+      {
+        "name": "the launcher's stop DOES end a build",
+        "why": "The two questions differ here and this is the case that shows it. A mid-flight build is most of what `--stop` exists to reclaim: ending the host-side script leaves it running, burning real CPU for nothing.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 120,
+            "ppid": 100,
+            "name": "node",
+            "commandLine": "node /tmp/quartz-builds/ADA1O/section1/quartz/bootstrap-cli.mjs build --concurrency 1",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          }
+        ],
+        "stops": [
+          120
+        ]
+      },
+      {
+        "name": "the build driver is found although it sits in the container's own folder",
+        "why": "The mac's blind spot for as long as `--stop` existed. `build_site.py` never calls os.chdir - it passes cwd= to its CHILDREN - so the driver stays in /teaching. During every in-process phase (copying the scaffold, copying content, social cards, the rsync mirror) it is the ONLY process there is to find, and a sweep by working directory found nothing and said so.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 200,
+            "ppid": 99,
+            "name": "python3",
+            "commandLine": "python3 -u /opt/scripts/build_site.py --host-os mac --course=ADA1O --section=1 --port 8081",
+            "cwd": "/teaching"
+          }
+        ],
+        "stops": [
+          200
+        ]
+      },
+      {
+        "name": "--section=1 is not --section=10",
+        "why": "The same prefix bug by a second route, and live on the same platform: the driver is recognised by its arguments, and `--section=1` is a prefix of `--section=10`. Read the value as an ARGUMENT, never as a substring.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 210,
+            "ppid": 99,
+            "name": "python3",
+            "commandLine": "python3 -u /opt/scripts/build_site.py --host-os mac --course=ADA1O --section=10 --port 8082",
+            "cwd": "/teaching"
+          }
+        ],
+        "stops": []
+      },
+      {
+        "name": "another course's build is left alone",
+        "why": "Two courses can build at once in one working folder; a section number on its own means nothing without the code beside it.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 220,
+            "ppid": 99,
+            "name": "python3",
+            "commandLine": "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS3U --section=1 --port 8081",
+            "cwd": "/teaching"
+          }
+        ],
+        "stops": []
+      },
+      {
+        "name": "a child launched by a relative path goes with its parent",
+        "why": "The reason the rule is a walk down the process tree rather than a question about one process. `npm` and the esbuild workers under it carry no directory on their command lines at all, and esbuild does not even sit in the section's folder - it is reachable only through its parent. Windows found this first and had walked descendants for months while both of the mac's copies did not.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 200,
+            "ppid": 99,
+            "name": "python3",
+            "commandLine": "python3 -u /opt/scripts/build_site.py --host-os mac --course=ADA1O --section=1 --port 8081",
+            "cwd": "/teaching"
+          },
+          {
+            "pid": 201,
+            "ppid": 200,
+            "name": "npm",
+            "commandLine": "npm install --no-audit --silent",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          },
+          {
+            "pid": 202,
+            "ppid": 201,
+            "name": "esbuild",
+            "commandLine": "esbuild --service=0.19.9 --ping",
+            "cwd": ""
+          }
+        ],
+        "stops": [
+          200,
+          201,
+          202
+        ]
+      },
+      {
+        "name": "a child of a process that does not belong is left alone",
+        "why": "The walk must start from a real match. A descendant rule that runs from an unmatched root reaches every process on the machine.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 300,
+            "ppid": 1,
+            "name": "node",
+            "commandLine": "node /opt/other-tool/server.mjs",
+            "cwd": "/opt/other-tool"
+          },
+          {
+            "pid": 301,
+            "ppid": 300,
+            "name": "esbuild",
+            "commandLine": "esbuild --service=0.19.9",
+            "cwd": ""
+          }
+        ],
+        "stops": []
+      },
+      {
+        "name": "a process is caught by its working directory alone",
+        "why": "What a command line cannot see. `npm install` runs with cwd= the section's folder and names no directory at all, so a rule that reads only command lines leaves it running.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 201,
+            "ppid": 999,
+            "name": "npm",
+            "commandLine": "npm install --no-audit --silent",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          }
+        ],
+        "stops": [
+          201
+        ]
+      },
+      {
+        "name": "a build for publishing does not stop a build by working directory",
+        "why": "The same process, the other question. `servingOnly` must ignore the working directory entirely: the build being protected is itself sitting in that folder, and so is every child it has already started.",
+        "mode": "servingOnly",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 201,
+            "ppid": 999,
+            "name": "npm",
+            "commandLine": "npm install --no-audit --silent",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          }
+        ],
+        "stops": []
+      },
+      {
+        "name": "a publish build does not stop itself",
+        "why": "`build_site.py --build-only` calls this rule from inside the very process the driver evidence describes. Driver evidence is not consulted in `servingOnly` for exactly this reason - and the caller excludes its own process id besides, because one guarantee that matters this much is worth having twice.",
+        "mode": "servingOnly",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 200,
+            "ppid": 99,
+            "name": "python3",
+            "commandLine": "python3 -u /opt/scripts/build_site.py --host-os mac --course=ADA1O --section=1 --port 8081",
+            "cwd": "/teaching"
+          },
+          {
+            "pid": 101,
+            "ppid": 100,
+            "name": "node",
+            "commandLine": "node /tmp/quartz-builds/ADA1O/section1/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          }
+        ],
+        "stops": [
+          101
+        ]
+      },
+      {
+        "name": "the resolved spelling and the symlinked spelling are one section",
+        "why": "`courses/<CODE>/.merged_output/section<N>` is a SYMLINK to the builds folder outside the working folder, and a process's working directory is always the resolved path - never the spelling used to get there. When the built site moved out of the working folder, a sweep that knew only the symlinked spelling matched nothing at all and reported success while the build kept running. Every caller passes every spelling it knows.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 130,
+            "ppid": 100,
+            "name": "node",
+            "commandLine": "node /teaching/courses/ADA1O/.merged_output/section1/quartz/bootstrap-cli.mjs build --concurrency 1 --serve --port 8081",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          }
+        ],
+        "stops": [
+          130
+        ]
+      },
+      {
+        "name": "the init process is never stopped",
+        "why": "A container's pid 1 is its own entry point, and in this image its working directory is /teaching. Killing it takes the container down with every other section's work inside it.",
+        "mode": "everything",
+        "section": {
+          "course": "ADA1O",
+          "number": 1,
+          "directories": [
+            "/teaching/courses/ADA1O/.merged_output/section1",
+            "/tmp/quartz-builds/ADA1O/section1"
+          ]
+        },
+        "snapshot": [
+          {
+            "pid": 1,
+            "ppid": 0,
+            "name": "sh",
+            "commandLine": "sleep infinity",
+            "cwd": "/tmp/quartz-builds/ADA1O/section1"
+          }
+        ],
+        "stops": []
+      }
+    ]
   }
 }
