@@ -44,10 +44,12 @@ nonisolated enum BuildOutputLocation {
         case migrated
         /// There was nothing to move: a fresh link over a fresh folder.
         case linked
-        /// A link pointing somewhere else — a renamed course, or a folder
-        /// synced from another Mac where that path does not exist — was
-        /// replaced, and any build sitting at the new place was cleared
-        /// because nothing says it belongs to this course.
+        /// A link pointing somewhere else inside THIS machine's builds root —
+        /// a course renamed outside the app — was replaced, and any build
+        /// sitting at the new place was cleared because nothing says it
+        /// belongs to this course. A link naming another MACHINE's builds
+        /// folder is a different thing and answers `.alreadyLinked` when this
+        /// machine has a build of its own; see `ensureLink`.
         case relinked
     }
 
@@ -65,8 +67,15 @@ nonisolated enum BuildOutputLocation {
     /// own rather than writing into the teacher's real Application Support.
     nonisolated(unsafe) static var buildsRootOverride: URL?
 
-    /// True inside the test bundle.
-    static let isRunningTests: Bool = NSClassFromString("XCTestCase") != nil
+    /// True inside the test bundle — and inside the APP process a UI test is
+    /// driving, which is a different process with no XCTest in it at all.
+    /// Without the second half, a UI-tested app writes builds folders for
+    /// fixture paths into the teacher's real Application Support, where the
+    /// sweep will never find them again: their working folders were under
+    /// `/private/var`, and only folders under HOME are ever swept.
+    static let isRunningTests: Bool =
+        NSClassFromString("XCTestCase") != nil
+        || ProcessInfo.processInfo.environment["UITEST_WORKSPACE"] != nil
 
     /// One temporary builds root for the whole test run, so a test that goes
     /// through `CourseArchiver` or `CourseRenamer` without setting an override
@@ -178,6 +187,20 @@ nonisolated enum BuildOutputLocation {
                 return .alreadyLinked
             }
             try fileManager.removeItem(at: link)
+            // A link naming ANOTHER machine's builds folder is not evidence
+            // about this machine's. The folder is synced, so the same course
+            // opened on a second Mac arrives carrying the first Mac's link —
+            // and clearing on the strength of it would mean each Mac threw the
+            // other's work away and rebuilt on every switch. What the clearing
+            // rule is actually about is a course whose link is GONE (archived,
+            // restored, contents replaced), so it only applies to a link that
+            // was pointing inside this machine's own builds root.
+            let cameFromAnotherMachine: Bool = !existingTarget.hasPrefix(buildsRoot.path + "/")
+            if cameFromAnotherMachine && directoryExists(target) {
+                try writeWorkingFolderMarker(workingFolderURL: workingFolderURL)
+                try fileManager.createSymbolicLink(at: link, withDestinationURL: target)
+                return .alreadyLinked
+            }
             try linkFreshly(target: target, at: link, workingFolderURL: workingFolderURL)
             return .relinked
         }
@@ -194,8 +217,19 @@ nonisolated enum BuildOutputLocation {
                 withIntermediateDirectories: true
             )
             try fileManager.moveItem(at: link, to: target)
-            try writeWorkingFolderMarker(workingFolderURL: workingFolderURL)
-            try fileManager.createSymbolicLink(at: link, withDestinationURL: target)
+            do {
+                try writeWorkingFolderMarker(workingFolderURL: workingFolderURL)
+                try fileManager.createSymbolicLink(at: link, withDestinationURL: target)
+            } catch {
+                // The move worked and the link did not. Put it BACK rather
+                // than leave the course with no built site at all: a course
+                // with its website in the old place still builds and still
+                // publishes; a course with neither has lost it for nothing —
+                // and the next reload would clear the orphan outside, because
+                // nothing points at it any more.
+                try? fileManager.moveItem(at: target, to: link)
+                throw error
+            }
             return .migrated
         }
 
@@ -327,14 +361,30 @@ nonisolated enum BuildOutputLocation {
             if path.isEmpty || !path.hasPrefix(homePrefix) {
                 continue
             }
-            if fileManager.fileExists(atPath: path) {
+            if workingFolderMayStillExist(atPath: path) {
                 continue
             }
             try? fileManager.removeItem(at: entry)
         }
     }
 
-    // MARK: - Private functions
+    /// Whether a working folder might still be there.
+    ///
+    /// `lstat` and its errno, not `fileExists`: that answers false for a
+    /// folder Plantoir is not ALLOWED to look at as readily as for one that
+    /// is gone, and the two must not be confused here. A working folder on
+    /// the Desktop or in Documents sits behind a macOS permission grant that
+    /// can be absent at launch, denied, or reset by a re-signed build — and
+    /// reading "false" as "deleted" would throw away the built websites of a
+    /// folder the teacher still has. Only ENOENT (and ENOTDIR, a path whose
+    /// parent is no longer a folder) is deletion.
+    private static func workingFolderMayStillExist(atPath path: String) -> Bool {
+        var details: stat = stat()
+        if lstat(path, &details) == 0 {
+            return true
+        }
+        return !(errno == ENOENT || errno == ENOTDIR)
+    }
 
     /// A fresh target and a fresh link, clearing whatever was standing at the
     /// target: see `ensureLink`'s note on why an unclaimed build is not

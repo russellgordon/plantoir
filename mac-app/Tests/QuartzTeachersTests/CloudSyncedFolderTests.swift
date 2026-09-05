@@ -161,10 +161,20 @@ final class CloudSyncedFolderTests: XCTestCase {
         )
         let order: [String] = try XCTUnwrap(wording["explanationOrder"] as? [String])
         XCTAssertFalse(order.contains("buildFilesAreCopied"))
+        // The words come from the CONTRACT, never typed here. A quoted copy of
+        // a teacher-facing sentence is the one that keeps passing after the
+        // product's words change — and this test's whole subject is a sentence
+        // that changed.
+        let quoted: String = try XCTUnwrap(
+            retired.components(separatedBy: "'").dropFirst().first,
+            "buildFilesAreCopiedRetired quotes the sentence it retired, between apostrophes"
+        )
+        XCTAssertFalse(quoted.isEmpty)
         for sentence in CloudSyncWording.explanation(service: "iCloud Drive") {
-            XCTAssertFalse(
-                sentence.contains("thousands of small files inside this folder"),
-                "the retired sentence is back in what a teacher reads: \(sentence)"
+            XCTAssertNotEqual(
+                sentence,
+                quoted.replacingOccurrences(of: "{service}", with: "iCloud Drive"),
+                "the retired sentence is back in what a teacher reads"
             )
         }
         XCTAssertTrue(retired.contains("RETIRED"))

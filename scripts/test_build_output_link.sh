@@ -75,7 +75,13 @@ new_working_folder() {
   rm -rf "$BUILDS"
 }
 
+make_course() {
+  mkdir -p "courses/$1"
+  echo '{"course_code": "'"$1"'"}' > "courses/$1/course_config.json"
+}
+
 make_course_with_a_built_site() {
+  make_course "$1"
   mkdir -p "courses/$1/.merged_output/section1/public"
   echo "$2" > "courses/$1/.merged_output/section1/public/index.html"
 }
@@ -118,7 +124,7 @@ check "nothing is disturbed" "keep me" "$(cat "$BUILDS/ICS3U/section1/public/ext
 echo
 echo "A course folder synced from a second Mac, where the link names another home"
 new_working_folder
-mkdir -p courses/ICS3U
+make_course ICS3U
 ln -s "/Users/somebody-else/Library/Application Support/Plantoir/builds/xxxx/ICS3U" \
   "courses/ICS3U/.merged_output"
 link_course_build_output ICS3U >/dev/null
@@ -130,13 +136,77 @@ else
   fail "and it resolves to a folder the build can write into"
 fi
 
+# ---- A second Mac, where this Mac already has a build -----------------
+echo
+echo "A link from a second Mac, where THIS Mac already has a build of its own"
+new_working_folder
+make_course ICS3U
+mkdir -p "$BUILDS/ICS3U/section1/public"
+echo "<html>mine</html>" > "$BUILDS/ICS3U/section1/public/index.html"
+ln -s "/Users/somebody-else/Library/Application Support/Plantoir/builds/xxxx/ICS3U" \
+  "courses/ICS3U/.merged_output"
+link_course_build_output ICS3U >/dev/null
+check "this Mac's own build is ADOPTED, not thrown away — two Macs must not rebuild on every switch" \
+  "<html>mine</html>" "$(built_page ICS3U)"
+
+# ---- A course code that is really a path -------------------------------
+echo
+echo "A course argument that is really a path is refused before anything is made"
+new_working_folder
+ensure_build_root
+make_course ICS3U
+link_course_build_output ".." >/dev/null
+link_course_build_output "../../etc" >/dev/null
+link_course_build_output "courses/ICS3U" >/dev/null
+if [ ! -e "courses/.merged_output" ] && [ ! -e ".merged_output" ] \
+   && [ -d "$BUILD_ROOT" ] && [ -f "$BUILD_ROOT/working-folder.txt" ]; then
+  pass "nothing was linked and the builds root is intact"
+else
+  fail "nothing was linked and the builds root is intact"
+fi
+
+# ---- A folder in courses/ that is not a course ------------------------
+echo
+echo "A folder in courses/ that is not a course (setup.sh links every one it finds)"
+new_working_folder
+mkdir -p courses/_backups
+link_course_build_output _backups >/dev/null
+if [ ! -e "courses/_backups/.merged_output" ]; then
+  pass "the backups folder is left alone"
+else
+  fail "the backups folder is left alone"
+fi
+
+# ---- The trail line ---------------------------------------------------
+echo
+echo "A move made at the command line leaves the same trail line the app leaves"
+new_working_folder
+rm -f "$HOME/Library/Logs/Plantoir/activity.txt"
+make_course_with_a_built_site ICS3U "<html>x</html>"
+link_course_build_output ICS3U >/dev/null
+if grep -q "moved ICS3U's built website out of the working folder" \
+    "$HOME/Library/Logs/Plantoir/activity.txt" 2>/dev/null; then
+  pass "the line is on the trail"
+else
+  fail "the line is on the trail"
+fi
+if grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} · ' \
+    "$HOME/Library/Logs/Plantoir/activity.txt" 2>/dev/null; then
+  pass "in the shape the app writes"
+else
+  fail "in the shape the app writes"
+fi
+link_course_build_output ICS3U >/dev/null
+check "and only once — a second run has nothing to say" "1" \
+  "$(grep -c "moved ICS3U's built website" "$HOME/Library/Logs/Plantoir/activity.txt" 2>/dev/null)"
+
 # ---- A course restored from a backup ----------------------------------
 echo
 echo "A course restored from a backup: the link went with the old contents"
 new_working_folder
 mkdir -p "$BUILDS/ICS3U/section1/public"
 echo "<html>last month</html>" > "$BUILDS/ICS3U/section1/public/index.html"
-mkdir -p courses/ICS3U
+make_course ICS3U
 link_course_build_output ICS3U >/dev/null
 check "the old build is NOT adopted — it would publish as up to date" \
   "MISSING" "$(built_page ICS3U)"
@@ -145,7 +215,7 @@ check "the old build is NOT adopted — it would publish as up to date" \
 echo
 echo "A folder that cannot be written into falls back to the old behaviour"
 new_working_folder
-mkdir -p courses/ICS3U
+make_course ICS3U
 chmod 500 courses/ICS3U
 link_course_build_output ICS3U >/dev/null
 STATUS=$?
@@ -161,7 +231,7 @@ fi
 echo
 echo "The builds folder says which working folder it serves"
 new_working_folder
-mkdir -p courses/ICS3U
+make_course ICS3U
 link_course_build_output ICS3U >/dev/null
 check "so an abandoned one can be recognised later" \
   "$(pwd -P)" "$(cat "$BUILDS/working-folder.txt" 2>/dev/null)"

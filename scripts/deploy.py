@@ -986,17 +986,26 @@ def main():
     # (Do NOT migrate or touch any token stores here; host launcher handles that.)
 
     # Path: /teaching/courses/<COURSE>/.merged_output/section<SECTION>
-    section_dir = (toolchain_paths.merged_output_root(toolchain_paths.COURSES_DIR / args.course) / f"section{args.section}").resolve()
+    # Named and resolved separately. `.merged_output` is a symlink to a builds
+    # folder outside the working folder on the mac, so the resolved path is an
+    # Application Support path a teacher has never seen — while the one they
+    # know, and the one every message and every other script names, is the one
+    # under courses/. Resolve for the work; say the name in the messages.
+    section_dir_as_named = toolchain_paths.merged_output_root(
+        toolchain_paths.COURSES_DIR / args.course
+    ) / f"section{args.section}"
+    section_dir = section_dir_as_named.resolve()
     if not section_dir.exists():
-        print(f"❌ Section directory not found: {section_dir}")
+        print(f"❌ Section directory not found: {section_dir_as_named}")
         print(f" Please run the preview/build first:")
         print(f"{_cmd_example('preview', args.course, args.section, _HOST_OS)}")
         sys.exit(1)
 
     # Require the built site (public/)
     public_dir = section_dir / "public"
+    public_dir_as_named = section_dir_as_named / "public"
     if not public_dir.exists() or not any(public_dir.iterdir()):
-        print(f"❌ Built site not found at: {public_dir}")
+        print(f"❌ Built site not found at: {public_dir_as_named}")
         print(" If you have just built, check this section still has its front page.")
         print(" A section without one produces no website, so there is nothing to publish.")
         print(f" Please build before deploying.\n For example:")

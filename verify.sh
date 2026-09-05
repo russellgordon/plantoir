@@ -587,6 +587,55 @@ else
 fi
 rm -f "$STAMP_FILE"
 
+# -------------------- 6a. The built site is OUTSIDE the working folder ------
+# The site above was read through `courses/EXC2O/.merged_output`, which is a
+# LINK. Checked here because every other check in this file would pass just as
+# happily with a real folder in the old place — and the whole point of the
+# change is that the bytes are not in the working folder any more.
+EXPECTED_BUILD_ROOT="${HOME%/}/Library/Application Support/Plantoir/builds/$(pwd -P | shasum -a 256 | cut -c1-8)"
+LINK_TARGET="$(readlink courses/EXC2O/.merged_output 2>/dev/null || true)"
+if [[ -L "courses/EXC2O/.merged_output" && "$LINK_TARGET" == "$EXPECTED_BUILD_ROOT/EXC2O" ]]; then
+  pass "The built site is kept outside the working folder ($LINK_TARGET)"
+else
+  fail "courses/EXC2O/.merged_output is not a link to $EXPECTED_BUILD_ROOT/EXC2O (it is: ${LINK_TARGET:-a real folder})"
+fi
+
+# -------------------- 6b. An existing teacher's container is recreated ------
+# Every container that exists today was made WITHOUT the builds mount, and a
+# mount cannot be added to a container that already exists — so the launcher
+# has to notice and recreate it. Nothing else here exercises that branch: the
+# run above starts by REMOVING the container, so the launcher always takes the
+# create-from-new path. This puts a teacher's container back, deliberately
+# without the mount, and asks the launcher to cope.
+echo ""
+echo "🚦 Putting back a container made WITHOUT the builds mount, the way every"
+echo "   existing teacher's is, and building again…"
+docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+if docker run -dit --name "$CONTAINER_NAME" \
+     -v "$(pwd)/courses":/teaching/courses \
+     -p 8081-8084:8081-8084 -p 9081-9084:9081-9084 \
+     "$DEV_TEST_IMAGE" tail -f /dev/null >/dev/null 2>&1; then
+  if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_old_container.log 2>&1; then
+    pass "a build in a container made before the builds mount existed still works"
+  else
+    fail "a build in a container made before the builds mount existed FAILED"
+    tail -30 /tmp/verify_old_container.log
+  fi
+  if docker inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$CONTAINER_NAME" 2>/dev/null \
+       | grep -Fxq "$EXPECTED_BUILD_ROOT"; then
+    pass "and the container was recreated WITH the builds mount"
+  else
+    fail "the container still has no builds mount, so the link dangles inside it"
+  fi
+  if [[ -f "$SITE_INDEX" ]]; then
+    pass "and the site is still readable at the path every reader names"
+  else
+    fail "the site is gone from $SITE_INDEX after the recreate"
+  fi
+else
+  fail "could not put back a container without the builds mount"
+fi
+
 # -------------------- 6b. The site wears Plantoir's icon, not Quartz's --------------------
 # Two halves that fail independently: the FILES have to be emitted (static/ by
 # the Static emitter, the root copy by the Assets emitter out of content/), and

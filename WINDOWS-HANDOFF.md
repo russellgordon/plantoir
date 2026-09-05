@@ -4312,6 +4312,35 @@ whose folder is gone — **only when that path was under the home folder**, sinc
 there and only the home volume is always mounted. You have the same problem and
 can use the same answer.
 
+### What an adversarial review found afterwards, and what travels
+
+Row 403. Three of the thirteen findings are worth your attention rather than
+just ours:
+
+- **An access DENIAL must never read as "the folder is gone".** The launch
+  sweep asked `fileExists`, which answers false for a folder Plantoir is not
+  ALLOWED to look at exactly as readily as for one that has been deleted — and
+  a working folder on the Desktop or in Documents sits behind a permission
+  grant that can be absent at launch or reset by a re-signed build. Every
+  launch would have deleted that folder's built websites. It asks `lstat` now
+  and treats only `ENOENT`/`ENOTDIR` as deletion. Whatever you use before
+  deleting a builds folder, ask the same question of it.
+- **A test that matches a function's DEFINITION passes on a launcher that never
+  calls it.** The contract test here matched the strings
+  `container_has_builds_mount` and the mount flag — both satisfied by the
+  definition and a comment — and `setup.sh` had no call site at all and passed
+  anyway. Assert the CALL, on its own line.
+- **If anything other than your app can move build output, it owes the trail
+  the same line.** Only the app recorded the move, so a move done at the
+  command line, or by a publish launchd ran at six in the morning weeks before
+  the app was next opened, left no line ever. The launchers append it
+  themselves now.
+
+One finding cannot happen to you and is noted so nobody goes looking: a link
+naming ANOTHER Mac's builds folder was being treated as evidence about this
+one, so a teacher with two Macs had each of them clear the other's build and
+rebuild on every switch. Your build root is per-machine and never travels.
+
 ### Two mac-specific traps, recorded because they cost time
 
 - **`preview.sh --stop` finds a preview's processes by WORKING DIRECTORY**, and
@@ -4325,6 +4354,25 @@ can use the same answer.
   blocker for `--full-rebuild`. It turned out not to matter: that path removes
   the CONTAINER's `/tmp/quartz-builds` tree, not the host output. Written down
   because the research said otherwise and somebody will read it.
+
+### The one thing a release note must carry: BOTH Macs have to be updated
+
+A working folder synced between two Macs now needs both of them on this version
+or later, and this is not a nicety. The mac's OLD `build_site.py` fails outright
+on a link whose target is missing — `mkdir` raises `File exists` — and nothing
+that shipped before 2026-09-05 can repair it. It is worse than one stale machine
+failing on its own, because the launchers and `.toolchain/` live INSIDE the
+synced folder: an older app "refreshes any launcher that differs" back to its
+own copies, and a publish scheduled with launchd on the up-to-date Mac then runs
+whatever `deploy.sh` is in the folder that morning — an old one recreates the
+container without the mount and fails the same way. Before this change a version
+mismatch between two Macs was harmless.
+
+The lesson is portable even though the mechanism is not, and it is worth asking
+on your side before you assume you are clear: **what does an OLD
+`plantoir-mcp.exe`, or an old app, do with a working folder a NEW one has
+touched?** The answer here was "it cannot recover, and it drags the good machine
+back with it".
 
 ### The upgrade path, which is the part that ships to real teachers
 

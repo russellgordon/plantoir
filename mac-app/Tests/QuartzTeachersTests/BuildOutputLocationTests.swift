@@ -198,6 +198,78 @@ final class BuildOutputLocationTests: XCTestCase {
         )
     }
 
+    /// A course folder synced from a second Mac where THIS Mac already has a
+    /// build of its own: the local build is adopted, not thrown away.
+    ///
+    /// The clearing rule is about a course whose link is GONE — archived,
+    /// restored, contents replaced. A link naming another MACHINE's builds
+    /// folder says nothing about this machine's, and treating it as evidence
+    /// would mean a teacher with two Macs had each of them throw the other's
+    /// work away and rebuild on every switch.
+    func testALinkFromAnotherMacDoesNotThrowAwayThisMacsBuild() throws {
+        let courseURL: URL = try makeCourse("ICS3U")
+        let mine: URL = BuildOutputLocation.buildFolder(forWorkingFolder: workingFolder, courseCode: "ICS3U")
+            .appendingPathComponent("section1")
+            .appendingPathComponent("public")
+        try FileManager.default.createDirectory(at: mine, withIntermediateDirectories: true)
+        try Data("<html>mine</html>".utf8).write(to: mine.appendingPathComponent("index.html"))
+        try FileManager.default.createSymbolicLink(
+            at: courseURL.appendingPathComponent(".merged_output"),
+            withDestinationURL: URL(fileURLWithPath: "/Users/somebody-else/builds/xxxx/ICS3U")
+        )
+
+        let outcome: BuildOutputLocation.Outcome = try BuildOutputLocation.ensureLink(
+            courseDirectory: courseURL, workingFolderURL: workingFolder
+        )
+        XCTAssertEqual(outcome, .alreadyLinked)
+        XCTAssertEqual(builtPage(inCourse: courseURL), "<html>mine</html>")
+    }
+
+    /// A link pointing at another course INSIDE this machine's builds root is
+    /// a different matter — a rename done outside the app — and the build
+    /// standing under the new name does not belong to this course.
+    func testALinkAtAnotherCourseOfOursIsStillCleared() throws {
+        let courseURL: URL = try makeCourse("ICS3U")
+        let stale: URL = BuildOutputLocation.buildFolder(forWorkingFolder: workingFolder, courseCode: "ICS3U")
+            .appendingPathComponent("section1")
+            .appendingPathComponent("public")
+        try FileManager.default.createDirectory(at: stale, withIntermediateDirectories: true)
+        try Data("<html>not mine</html>".utf8).write(to: stale.appendingPathComponent("index.html"))
+        try FileManager.default.createSymbolicLink(
+            at: courseURL.appendingPathComponent(".merged_output"),
+            withDestinationURL: BuildOutputLocation.buildFolder(
+                forWorkingFolder: workingFolder, courseCode: "ICS4U"
+            )
+        )
+
+        let outcome: BuildOutputLocation.Outcome = try BuildOutputLocation.ensureLink(
+            courseDirectory: courseURL, workingFolderURL: workingFolder
+        )
+        XCTAssertEqual(outcome, .relinked)
+        XCTAssertNil(builtPage(inCourse: courseURL))
+    }
+
+    /// If the move succeeds and the link cannot be made, the move is put BACK.
+    /// A course with its website in the old place still builds and still
+    /// publishes; a course with neither has lost it for nothing — and the next
+    /// reload would clear the orphan outside, because nothing points at it.
+    func testAMoveThatCannotBeLinkedIsPutBack() throws {
+        let courseURL: URL = try makeCourse("ICS3U", withBuiltSiteSaying: "<html>keep me</html>")
+        // Nothing may be created in the course folder, so the link cannot be
+        // made — but the folder can still be read out of, so the move can.
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: courseURL.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: courseURL.path)
+        }
+
+        XCTAssertThrowsError(
+            try BuildOutputLocation.ensureLink(courseDirectory: courseURL, workingFolderURL: workingFolder)
+        )
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: courseURL.path)
+        XCTAssertEqual(builtPage(inCourse: courseURL), "<html>keep me</html>",
+                       "the built website is back where it was, not orphaned outside")
+    }
+
     /// A stray FILE wearing the name is not a built site and is not a link.
     func testAFileWhereTheLinkBelongsIsReplaced() throws {
         let courseURL: URL = try makeCourse("ICS3U")
@@ -400,6 +472,41 @@ final class BuildOutputLocationTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: gone.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: onAnotherDisk.path), "the disk may be back tomorrow")
         XCTAssertTrue(FileManager.default.fileExists(atPath: unmarked.path), "no marker is no evidence")
+    }
+
+    /// "The folder is not there" and "Plantoir is not allowed to look at it"
+    /// are different answers, and only the first is deletion.
+    ///
+    /// A working folder on the Desktop or in Documents sits behind a macOS
+    /// permission grant that can be absent at launch, denied, or reset by a
+    /// re-signed build. Reading a refusal as "deleted" would throw away the
+    /// built websites of a folder the teacher still has, at every launch.
+    func testAFolderThatCannotBeLookedAtIsNotTreatedAsDeleted() throws {
+        let home: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cq4t-home-\(UUID().uuidString)")
+        let closed: URL = home.appendingPathComponent("closed")
+        let inside: URL = closed.appendingPathComponent("Course Notes")
+        try FileManager.default.createDirectory(at: inside, withIntermediateDirectories: true)
+        let builds: URL = buildsRoot.appendingPathComponent("dddddddd")
+        try FileManager.default.createDirectory(at: builds, withIntermediateDirectories: true)
+        try "\(inside.path)\n".write(
+            to: builds.appendingPathComponent(BuildOutputLocation.workingFolderMarkerName),
+            atomically: true, encoding: .utf8
+        )
+
+        // Nothing may be looked up inside `closed`, so asking about the folder
+        // fails with a refusal rather than with "no such file".
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: closed.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: closed.path)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: inside.path),
+                       "the state being tested: the folder is there and reads as absent")
+
+        BuildOutputLocation.discardBuildsForMissingWorkingFolders(homeDirectory: home)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: builds.path),
+                      "a folder Plantoir cannot look at is not a folder that is gone")
     }
 
     /// A working folder that is still there keeps its builds.

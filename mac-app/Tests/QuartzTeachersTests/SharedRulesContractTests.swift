@@ -1012,9 +1012,22 @@ final class SharedRulesContractTests: XCTestCase {
                 text.contains("-v \"$BUILD_ROOT\":\"$BUILD_ROOT\""),
                 "\(launcher) does not mount the builds folder at its own absolute path, so the link would dangle inside the container"
             )
+            // The DEFINITION is not the behaviour. An earlier version of this
+            // test matched only the function names and the mount flag, and
+            // passed with `setup.sh` never calling the function at all — so
+            // each of these asks for the CALL, on its own line.
             XCTAssertTrue(
-                text.contains("container_has_builds_mount"),
-                "\(launcher) would leave a container made before this change without the mount — and a mount cannot be added to a container that exists"
+                text.contains("\n  elif ! container_has_builds_mount; then"),
+                "\(launcher) defines the check but never branches on it, so a container made before this change keeps running without the mount — and a mount cannot be added to a container that exists"
+            )
+            XCTAssertTrue(
+                text.contains("\n  ensure_build_root\n  docker run -dit"),
+                "\(launcher) creates the container without making the builds folder first — a bind mount whose source is missing gives the container an empty folder of its own, and the built website goes nowhere"
+            )
+            XCTAssertTrue(
+                text.contains("\nlink_course_build_output \"$")
+                    || text.contains("\n  link_course_build_output \"$"),
+                "\(launcher) never calls link_course_build_output, so it does nothing about where the built website goes"
             )
         }
     }

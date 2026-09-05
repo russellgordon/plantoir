@@ -115,7 +115,11 @@ CONTAINER_NAME="teaching-quartz-${WORKDIR_ID}"
 # down in contracts/shared-rules.json -> buildOutputLocation. It is here as
 # well because a teacher at the command line, and a publish scheduled with
 # launchd, have no app to do it for them.
-BUILD_ROOT="$HOME/Library/Application Support/Plantoir/builds/${WORKDIR_ID}"
+# ${HOME%/} rather than $HOME: a trailing slash would make this path differ
+# from the one Docker stores (it cleans a mount destination), and the "does
+# this container have the builds mount" check below would then be false on
+# every run and recreate the container every time.
+BUILD_ROOT="${HOME%/}/Library/Application Support/Plantoir/builds/${WORKDIR_ID}"
 
 # Makes the folder the container mounts, and writes down which working
 # folder it belongs to — the id is a hash and cannot be read backwards, so
@@ -124,6 +128,21 @@ BUILD_ROOT="$HOME/Library/Application Support/Plantoir/builds/${WORKDIR_ID}"
 ensure_build_root() {
   mkdir -p "$BUILD_ROOT" 2>/dev/null || true
   printf '%s\n' "$(pwd -P)" > "$BUILD_ROOT/working-folder.txt" 2>/dev/null || true
+}
+
+# Adds one line to the breadcrumb trail the app keeps, so that a move done by
+# the command line — or by a publish launchd ran at six in the morning, weeks
+# before the app is next opened — leaves the same line the app would have
+# left. Without this the trail would record only the moves the GUI happened to
+# make, which is the half a teacher never asks about.
+#
+# Same file, same shape as ActivityTrail: "YYYY-MM-DD HH:MM:SS · sentence".
+# The app trims the file when it grows; nothing here needs to. Carries a
+# course code and nothing else — never a path, never a credential.
+note_on_the_trail() {
+  local trail="${HOME%/}/Library/Logs/Plantoir"
+  mkdir -p "$trail" 2>/dev/null || return 0
+  printf '%s · %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$trail/activity.txt" 2>/dev/null || true
 }
 
 # Points courses/<CODE>/.merged_output at this course's folder under
@@ -141,8 +160,19 @@ ensure_build_root() {
 link_course_build_output() {
   local course="$1"
   local course_dir link target current
+  # A course code, not a path. Checked here rather than trusted, because
+  # this runs before deploy.sh has validated its argument and `..` would
+  # otherwise put a link at the top of the working folder and aim a
+  # deletion at the builds root's own parent.
+  case "$course" in
+    ""|*/*|.|..) return 0 ;;
+  esac
   course_dir="$(pwd)/courses/$course"
   [ -d "$course_dir" ] || return 0
+  # A COURSE, not just any folder in courses/. `_backups` lives there too,
+  # and setup.sh links every folder it finds — a link inside the backups
+  # folder would be litter at best and a place to build into at worst.
+  [ -f "$course_dir/course_config.json" ] || return 0
   link="$course_dir/.merged_output"
   target="$BUILD_ROOT/$course"
   ensure_build_root
@@ -168,10 +198,26 @@ link_course_build_output() {
     if [ "$current" = "$target" ] && [ -d "$target" ]; then
       return 0
     fi
-    # A link pointing somewhere else: a course renamed outside the app, or
-    # a course folder synced from another Mac, where that path belongs to a
-    # different home folder and does not exist here.
+    # A link pointing somewhere else: a course renamed outside the app, or a
+    # course folder synced from ANOTHER Mac, where the path names a different
+    # home folder.
     rm -f "$link" 2>/dev/null || return 0
+    # The two are not the same thing. A link naming another machine's builds
+    # folder says nothing about THIS machine's, so a build already sitting
+    # here is adopted rather than cleared — otherwise a teacher with two Macs
+    # would have each of them throw the other's work away and rebuild on
+    # every switch. Clearing is for a course whose link is GONE (archived,
+    # restored, contents replaced), and for one whose link pointed inside our
+    # own builds root at some other name.
+    case "$current" in
+      "$BUILD_ROOT"/*) : ;;
+      *)
+        if [ -d "$target" ]; then
+          ln -s "$target" "$link" 2>/dev/null || true
+          return 0
+        fi
+        ;;
+    esac
   elif [ -d "$link" ]; then
     echo "📦 Moving ${course}'s built website out of your working folder…"
     rm -rf "$target" 2>/dev/null || true
@@ -181,6 +227,7 @@ link_course_build_output() {
     fi
     if ln -s "$target" "$link" 2>/dev/null; then
       echo "✅ Built websites for this folder are kept in: $BUILD_ROOT"
+      note_on_the_trail "moved ${course}'s built website out of the working folder, so it is no longer copied, synced or backed up with the course"
     else
       # The move worked and the link did not. Put it back: a course with
       # its built site in the old place still builds and still publishes,
@@ -749,3 +796,14 @@ PASSTHRU_ARGS+=("--host-os" "mac")
 
 docker exec -e HOST_TZ_OFFSET="$HOST_TZ_OFFSET" -it "$CONTAINER_NAME" \
   python3 /opt/scripts/setup_course.py ${PASSTHRU_ARGS+"${PASSTHRU_ARGS[@]}"}
+
+# The wizard may have made a course, or several. Point each one's built
+# website at the builds folder outside the working folder, so a teacher who
+# only ever runs setup.sh is in the same state as one who opens the app —
+# and so this launcher's container mount matches what it is for. Done AFTER
+# the wizard, because a course that did not exist a minute ago cannot be
+# linked before it does.
+for _course_dir in courses/*/; do
+  [ -d "$_course_dir" ] || continue
+  link_course_build_output "$(basename "$_course_dir")"
+done
