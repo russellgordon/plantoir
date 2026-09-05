@@ -57,53 +57,87 @@ an item when it ships (finished behaviour is recorded in
   must and must not be stopped, run by all three. `scripts/test_stop_preview.py`
   is half of that already.
 
-- **Should Plantoir refuse to work in a cloud-synced folder?** Russell's
-  question, 2026-09-05, prompted by a reliability review finding that renaming
-  a folder reads every page in the course — which on an iCloud-backed vault
-  means downloading evicted files, one blocking read at a time. **Open: his
-  call, not made yet.** Both sides written down while they are fresh.
+- **~~Should Plantoir refuse to work in a cloud-synced folder?~~ Decided
+  2026-09-05: no.** Russell's call, prompted by a reliability review finding
+  that renaming a folder reads every page in the course — which on an
+  iCloud-backed vault means downloading evicted files, one blocking read at a
+  time. Shipped as `GUI-IMPROVEMENTS.md` row 399: Plantoir DETECTS a synced
+  working folder from the markers the system exposes, SAYS SO once in plain
+  words (a choice in the picker for a folder just chosen, a quiet notice for
+  one the window restored), and leaves the teacher's content where they put
+  it. The rule, the sentences and the timing are in `shared-rules.json` →
+  `cloudSyncedFolders`. The reasoning, kept because it will be proposed again:
 
-  **What is genuinely broken by cloud sync**, in order of severity:
-
-  1. **Build churn and locks.** A build writes thousands of small files into
-     `.merged_output`. OneDrive uploads all of them AND holds locks mid-build.
-     This is not speculation — it is why `PLANTOIR_BUILD_ROOT` exists, added on
-     Windows for exactly this.
-  2. **Dataless files.** Reading an evicted page blocks on a download. Slow,
-     not corrupting.
-  3. **Rename and move failures** from held locks, which can leave a partial
-     state.
-
-  **Why refusing is probably the wrong answer.** Teachers keep vaults in iCloud
-  *on purpose* — it is how their notes reach their iPad and their second Mac.
+  **Why refusing was the wrong answer.** Teachers keep vaults in iCloud *on
+  purpose* — it is how their notes reach their iPad and their second Mac.
   Refusing means telling them to give up cross-device access to their own
   teaching material, and a hard block is the one response they cannot opt out
-  of. It is also the response this project has already REJECTED once by
-  building something better: `PLANTOIR_BUILD_ROOT` moves the churn out of the
-  synced folder and leaves the content where the teacher wants it. That
-  precedent is the strongest argument here — the same problem was met, and the
-  answer was "relocate the churn", not "refuse the folder".
+  of. Detection is unreliable in both directions besides: a teacher can have a
+  folder literally called "Dropbox" that is not one, and a false refusal on a
+  hard block is unrecoverable for them. And the project had already REJECTED
+  refusal once by building something better — `PLANTOIR_BUILD_ROOT` on
+  Windows moves the churn out of the synced folder and leaves the content
+  where the teacher wants it.
 
-  Detection is unreliable in both directions besides. iCloud Drive is
-  `~/Library/Mobile Documents/`, but Dropbox, Google Drive, OneDrive, pCloud
-  and Sync are arbitrary paths, and a teacher can have a folder literally
-  called "Dropbox" that is not one. A false refusal on a hard block is
-  unrecoverable for them.
+  **What is genuinely broken by cloud sync**, in order of severity: (1) build
+  churn — thousands of small files per build, all uploaded, and on Windows
+  locked mid-build by OneDrive; (2) dataless files — reading an evicted page
+  blocks on a download, slow but not corrupting; (3) rename and move failures
+  from held locks, which can leave a partial state. The explanation a teacher
+  reads names all three as effects, not mechanisms.
 
-  **The shape that seems right instead**, if he wants it built:
+- **Choosing a new working folder keeps the OLD window's selection.** Seen
+  2026-09-05 while driving row 399: with `ICS3U` selected in one folder,
+  choosing a different working folder (with no courses) showed "Course Not
+  Found — reload courses from the File menu, or choose a different working
+  folder" instead of the empty-folder state, because `chooseWorkspace(at:)`
+  reloads the courses but leaves `selection` pointing at a course the new
+  folder does not have. Pre-existing, cosmetic, one line to fix (clear the
+  selection when the folder changes) — but check `WindowRestorationScenarioTests`
+  first, since a RESTORED window sets its folder and then its selection in
+  that order and must keep doing so.
 
-  - DETECT a synced working folder (the enumerable markers, not a name guess).
-  - SAY SO once, plainly, naming what can go wrong.
-  - **Set `PLANTOIR_BUILD_ROOT` automatically** so `.merged_output` lives
-    outside the synced folder — the mac has the variable already and does not
-    use it; Windows does. That alone removes (1) and most of (3).
-  - Leave the teacher's CONTENT where they put it.
+- **Move the mac's build output OUT of a synced working folder** — the half
+  of the 2026-09-05 decision that did NOT ship with row 399, because it is a
+  different size of change. Windows already does it (`PLANTOIR_BUILD_ROOT` →
+  `%LOCALAPPDATA%\Plantoir\builds\<folder-id>`, row 290) and the Python
+  honours the variable (`toolchain_paths.merged_output_root`). The mac cannot
+  flip the same switch, and the research below is what an afternoon found:
 
-  Refusing outright is right in exactly one case worth naming: a synced folder
-  where the build root cannot be relocated (no writable scratch). Then the
-  honest thing is to stop rather than churn.
+  **Why it is not one environment variable on the mac.** The build runs in a
+  container that mounts ONLY `courses/` (`-v "$HOST_COURSES":/teaching/courses`
+  in all three launchers), so a build root outside the working folder is
+  invisible inside the container until a SECOND mount exists — and
+  `preview.sh`'s "does the container need recreating" check compares only the
+  `/teaching/courses` mount, so an added mount would need its own recreate
+  rule. Then every reader that hard-codes `courses/<C>/.merged_output` has to
+  agree: `deploy.sh` (`MERGED_DIR_HOST` for the host-side section listing,
+  `SECTION_DIR_IN_CONTAINER` at the publish), `preview.sh` (`OUTPUT_PATH` in
+  the messages, `TARGET_DIR` in stop mode — the process sweep finds a
+  preview's processes by WORKING DIRECTORY, so a moved output means a stop
+  that finds nothing), and on the host `BuildFreshness`, `ScheduledDeploy` and
+  `SectionDetailView`. A scheduled deploy runs from launchd with no app to set
+  the variable, and a teacher at the command line has none either — so the
+  decision has to live somewhere all three can read, or the app and the CLI
+  will build into different places and `BuildFreshness` will call every build
+  stale. The Colima VM mounts only `$HOME`, so the relocated root must be
+  under it: `~/Library/Application Support/Plantoir/builds/<folder-id>/`.
 
-  Needs Windows parity thinking, and they are ahead here rather than behind.
+  **The design that minimises the blast radius, if it is built:** make
+  `courses/<C>/.merged_output` a SYMLINK to that builds folder, and bind-mount
+  the builds folder into the container at the SAME absolute path,
+  unconditionally, so the link resolves identically on both sides and every
+  reader above keeps working unchanged. Open questions, each needing a real
+  test on a real synced folder before trusting it: how iCloud Drive, Dropbox
+  and OneDrive each treat a symlink (iCloud is believed not to follow them;
+  Dropbox stopped following links outside the folder in 2019); `shutil.rmtree`
+  REFUSES a symlink, and `build_site.py`'s full-rebuild path removes the
+  output folder; the `find … -prune` clauses in the launchers are fine;
+  `verify.sh` and `verify-deploy.sh` both have to run. Rejected: a `.nosync`
+  suffix (iCloud-only — Dropbox and OneDrive ignore it — and it moves the path
+  just as much). When it lands, `buildFilesAreCopied` leaves the mac's
+  explanation and `cloudSyncedFolders.wording.buildFilesAreCopiedAppliesOn`
+  in the contract says so.
 
 - **`CourseRenameInterfaceTests` crashes the whole unit run, intermittently —
   and it is PRE-EXISTING, not caused by the special-folders work.** Measured

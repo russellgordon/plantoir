@@ -169,6 +169,16 @@
         "carries": "the course code, the folder name, and which list it was added to",
         "event": "folder created",
         "why": "Adding a name in Course Settings now creates the folder on disk, so a folder appears in the teacher's vault that they did not make in Obsidian. Separate from the rename because it answers a different question, and unexplained new folders are exactly what a teacher reports as 'Plantoir did something to my notes'."
+      },
+      {
+        "carries": "the service's name and the folder path, redacted — recorded by a WINDOW only, never by the assistant's or the MCP server's own reading of a folder, since those show nothing",
+        "event": "synced folder noticed",
+        "why": "The working folder just opened is kept in sync by a cloud service and the teacher had not yet been told about THIS folder. The effects of a synced folder — a slow build, a rename that takes minutes, a move that failed once — arrive weeks later as unrelated reports, and this one line is what connects them. See cloudSyncedFolders."
+      },
+      {
+        "carries": "whether it was the picker's choice or the window's notice, and the service's name",
+        "event": "synced folder accepted",
+        "why": "The teacher read the note and went ahead. Separate from 'synced folder noticed' because it is a different fact: one says Plantoir saw it, the other says the teacher did — and 'nobody warned me' is answered by the second, not the first."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -922,11 +932,139 @@
       "rule": "EVERY ancestor is clickable, not just the last one.",
       "why": "It is how a teacher gets to the folder ABOVE their working folder — to make a sibling, or to see where things sit — without leaving the app to find it."
     },
+    "tooLongForTheSpace": {
+      "rule": "A path too long for the space it is given shows its END — the folder itself and its nearest ancestors — never its start.",
+      "why": "The folder's own name is the part a teacher is looking for; 'Macintosh HD › Users › …' is the same for every folder they own. Found 2026-09-05 with an iCloud Drive folder, whose real path runs through ~/Library/Mobile Documents/com~apple~CloudDocs and was cut off in the folder picker before reaching the folder's name. Wherever the bar appears — the window's own bar and the picker's — the same rule."
+    },
     "icons": {
       "rule": "Each crumb shows the folder's real icon from the host file manager.",
       "why": "Not decoration: a teacher recognises their Desktop or their iCloud Drive by its icon before reading the word. Optional if the platform makes it expensive — say so rather than dropping it silently."
     },
     "note": "The 'Working folder:' bar under the sidebar. Modelled on the host file manager's own path bar — Finder's on the mac — because a teacher who has seen one knows what it does without being told. Reported missing on Windows 2026-08-16, in use: the context menu is not there. The LABELS are per platform ('Finder' against 'File Explorer'); the actions, the gestures and the crumb list are not."
+  },
+  "cloudSyncedFolders": {
+    "note": "A working folder that a cloud service keeps in sync — iCloud Drive, Dropbox, OneDrive, Google Drive, Box. Teachers keep their notes in such folders ON PURPOSE (it is how the notes reach an iPad and a second machine), so Plantoir never refuses one. It recognises the folder from markers the system exposes, says once and in plain words what a synced folder costs, lets the teacher decide, and leaves their content exactly where they put it. Decided 2026-09-05; both sides of the argument are in TODO.md under 'Should Plantoir refuse to work in a cloud-synced folder?'.",
+    "neverRefused": {
+      "rule": "A synced folder is never blocked, and detection is never treated as certain enough to block on.",
+      "why": "A hard block is the one answer a teacher cannot opt out of, and it would mean telling them to give up reaching their own notes from other devices. Detection is also unreliable in both directions — a false refusal is unrecoverable for them, and a synced folder Plantoir cannot see still works. Refusing was rejected once already, on Windows, where the same problem was met and answered by moving the build output out of the folder rather than turning the folder away."
+    },
+    "detection": {
+      "rule": "From markers the platform exposes, never from a folder's NAME. A teacher can have a folder literally called 'Dropbox' that is not one, and a wrong answer here is shown to them as fact.",
+      "macMarkers": [
+        "Under ~/Library/Mobile Documents/ — iCloud Drive's real location; '~/iCloud Drive' in Finder is a view of it.",
+        "Under ~/Library/CloudStorage/<Service>-<Account>/ — where macOS 12.3+ keeps every File Provider service's folders: OneDrive-Personal, GoogleDrive-name@gmail.com, Dropbox, Box-Box. The service is the part of that folder's name before the first hyphen.",
+        "The item's own 'ubiquitous' flag (isUbiquitousItem), trusted ONLY under ~/Desktop and ~/Documents — the two folders 'Desktop & Documents Folders' syncs in place, which match no path rule. The flag is NOT iCloud-specific: it is set for any File Provider item, a Dropbox or OneDrive folder included (checked on a real ~/Library/CloudStorage/Dropbox), so trusting it anywhere else would name the wrong service.",
+        "Symlinks are resolved before any rule runs. Dropbox and OneDrive both leave a link at the old place (~/Dropbox → ~/Library/CloudStorage/Dropbox); a path arriving through it matches no rule while the folder behind it does. The resolved path is also the key the acknowledgement is remembered under, so one folder is one folder whichever spelling it arrives by."
+      ],
+      "windowsMarkers": [
+        "The OneDrive roots the client publishes in the environment: %OneDrive%, %OneDriveConsumer%, %OneDriveCommercial%. A Desktop or Documents moved into OneDrive by 'Known Folder Move' physically lives under one of these, so the prefix rule catches it.",
+        "Dropbox: the 'path' entries in %APPDATA%\\Dropbox\\info.json (or %LOCALAPPDATA%\\Dropbox\\info.json).",
+        "iCloud for Windows: %USERPROFILE%\\iCloudDrive by default; the client's own setting if it can be read.",
+        "Google Drive for desktop and Box: their mount points, when the client publishes them; otherwise unrecognised, which is allowed — see neverRefused."
+      ],
+      "unknownServiceName": "your cloud service",
+      "cases": [
+        {
+          "path": "{home}/Library/Mobile Documents/com~apple~CloudDocs/Course Notes",
+          "expectService": "iCloud Drive",
+          "why": "The ordinary iCloud Drive folder."
+        },
+        {
+          "path": "{home}/Library/Mobile Documents",
+          "expectService": "iCloud Drive",
+          "why": "The root itself counts."
+        },
+        {
+          "path": "{home}/Library/CloudStorage/OneDrive-Personal/Course Notes",
+          "expectService": "OneDrive"
+        },
+        {
+          "path": "{home}/Library/CloudStorage/GoogleDrive-teacher@gmail.com/My Drive/Course Notes",
+          "expectService": "Google Drive",
+          "why": "The account is part of the folder name; the service is the part before the first hyphen."
+        },
+        {
+          "path": "{home}/Library/CloudStorage/Dropbox/Course Notes",
+          "expectService": "Dropbox",
+          "why": "No hyphen at all — the whole name is the service."
+        },
+        {
+          "path": "{home}/Library/CloudStorage/Box-Box/Course Notes",
+          "expectService": "Box"
+        },
+        {
+          "path": "{home}/Library/CloudStorage/pCloud-Drive/Course Notes",
+          "expectService": "your cloud service",
+          "why": "Recognisably synced — it is in the reserved location — but not a service Plantoir names. Say so honestly rather than guessing."
+        },
+        {
+          "path": "{home}/Library/CloudStorage",
+          "expectService": null,
+          "why": "The reserved folder itself is nobody's."
+        },
+        {
+          "path": "{home}/Desktop/Dropbox/Course Notes",
+          "expectService": null,
+          "why": "A folder CALLED Dropbox proves nothing. The name rule that would catch it is the one that would also be wrong."
+        },
+        {
+          "path": "{home}/Desktop/Course Notes",
+          "expectService": null,
+          "why": "From the path alone, nothing — on a Mac with Desktop & Documents in iCloud, the live iCloud flag is what answers, and this rule must not pretend to."
+        },
+        {
+          "path": "/Volumes/Backup/Users/teacher/Library/CloudStorage/Dropbox/Course Notes",
+          "expectService": null,
+          "why": "Only the teacher's own home folder carries the markers; the same shape on another volume is a copy."
+        }
+      ]
+    },
+    "whenShown": {
+      "chosen": {
+        "rule": "A synced folder the teacher just CHOSE, or an empty synced folder about to be set up, stops at the folder picker: the folder's path bar FIRST, then the headline, the full explanation, and two buttons — go ahead, or choose a different folder. Setting up the empty folder IS going ahead. Neither button is the default action while the note is showing — including the set-up button, which is the default at every other time.",
+        "why": "This is the one moment the choice is free — nothing has been written into the folder yet. A Return pressed out of habit must not decide it. The path bar comes first because the sentences say 'this folder', and a teacher reads that and looks for which folder."
+      },
+      "notAskedAboutAFolderThatCannotBeUsed": {
+        "rule": "A synced folder the picker will not take anyway — neither a working folder nor empty — gets no note about syncing.",
+        "why": "The teacher is about to choose again, and a note about a folder they cannot use is noise beside the guidance that says what to choose."
+      },
+      "restored": {
+        "rule": "A synced folder the window RESTORED — opened on launch, or inherited by a new window — gets a quiet notice inside the window, above the working-folder bar: the headline, the one-line summary, a way to open the full explanation in place, and a button to dismiss it. Never a dialog, never a sheet.",
+        "why": "A folder can become synced AFTER it was set up (moved into iCloud, Desktop & Documents turned on) or have been set up before Plantoir could tell. But a folder that opens on every launch must not interrupt every launch, and the teacher did not choose anything just now."
+      },
+      "rememberedPerFolder": {
+        "rule": "Going ahead — from either button — is remembered for THAT folder, keyed by its resolved path, and neither the choice nor the notice is shown for it again, in this window or any other window showing the same folder. A second synced folder gets its own note. The list is never pruned: a folder that is renamed or moved is a new key and is asked about again, and a deleted folder's key stays harmlessly.",
+        "why": "Once is information; twice is nagging. And a teacher with two synced folders was told about one of them. Asking again after a rename is accepted: the folder may have moved INTO a synced location, which is exactly the case worth a note."
+      },
+      "reChoosingTheOpenFolder": {
+        "rule": "Choosing, through the picker, the folder a window already shows counts as a restore, not a new choice: the notice form, never the picker's.",
+        "why": "A teacher who re-picks their open folder while the notice is showing would otherwise find their courses hidden behind the picker, and read it as the app losing the folder."
+      },
+      "checkedEveryOpen": {
+        "rule": "The check runs every time a working folder is adopted, not only the first time.",
+        "why": "Folders move into cloud services after they are made, and the check costs nothing."
+      }
+    },
+    "wording": {
+      "rule": "The sentences below, word for word, with the service's name where {service} is. They name EFFECTS a teacher can recognise — building can be slower, renaming a folder can take a while — and never machinery. No 'sync client', no 'file provider', no 'dataless file', no 'build root'.",
+      "headline": "This folder is kept in sync with {service}.",
+      "summary": "Plantoir works here, but building can be slower and renaming folders can take a while. Your notes stay where they are.",
+      "notesStayPut": "Your course notes stay exactly where they are. Plantoir never moves them.",
+      "buildFilesAreCopied": "Building or previewing a website creates thousands of small files inside this folder, and {service} will copy every one of them to the cloud. That can make building slower and take up storage space.",
+      "buildFilesAreCopiedAppliesOn": ["mac"],
+      "buildFilesAreCopiedWhy": "TRUE ON THE MAC TODAY and FALSE ON WINDOWS: the mac writes a course's built site inside the working folder (.merged_output), while Windows already builds into %LOCALAPPDATA%\\Plantoir\\builds\\<folder-id> for exactly this reason (PLANTOIR_BUILD_ROOT, row 290). Windows shows the other sentences and leaves this one out. When the mac moves its build output out too — a separate piece, researched in TODO.md — this sentence leaves the mac's explanation as well, and the contract will say so.",
+      "offloadedPagesAreSlow": "If {service} has moved some of your pages off this computer to save space, Plantoir has to download each one before it can read it. Renaming a folder reads every page, so it can take a while.",
+      "syncingCanInterruptAMove": "If {service} is busy copying a file at the moment Plantoir needs to move or rename it, that step can fail. Plantoir checks before it moves anything, and you can try again once syncing has settled.",
+      "whatToDo": "To avoid all of this, keep your working folder somewhere that is not synced — a folder inside your home folder, for example. If reaching your notes from other devices matters more, carry on: Plantoir will work, just more slowly at times.",
+      "whatToDoWhy": "'Your home folder', not 'your Desktop': on a Mac with Desktop & Documents in iCloud, the Desktop IS synced, and the advice would send them to the problem. The second sentence states the trade honestly and pushes neither way.",
+      "explanationOrder": ["notesStayPut", "buildFilesAreCopied", "offloadedPagesAreSlow", "syncingCanInterruptAMove", "whatToDo"],
+      "explanationOrderWhy": "Reassurance first — the words 'kept in sync' beside a warning read as 'your notes are at risk', and they are not. The choice last, once the reasons have been given.",
+      "useAnywayButton": "Use This Folder Anyway",
+      "chooseDifferentFolderButton": "Choose a Different Folder…",
+      "dismissNoticeButton": "Got It",
+      "showDetailsButton": "Show Details",
+      "hideDetailsButton": "Hide Details"
+    }
   },
   "specialNames": {
     "excludedFolderIndexNote": {

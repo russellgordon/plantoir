@@ -626,6 +626,22 @@ this side is expected to say so when the contract is wrong.
     in "`course_config.json` has two writers" and "A rename interrupted after
     the folders moved was a dead end" below.
 
+18. **A working folder kept in sync by a cloud service is explained, never
+    refused (2026-09-05, row 399).** Russell's decision on a question
+    `TODO.md` had left open. You inherit the whole BEHAVIOUR as data —
+    `shared-rules.json` → `cloudSyncedFolders`: the sentences, the two
+    moments they are shown (a choice in the folder picker for a folder just
+    chosen, a dismissable notice for one the window restored), the
+    remembered-per-folder rule, and eleven detection cases to run against
+    your own path function. You owe the detection itself (OneDrive's
+    environment variables, Dropbox's `info.json`, iCloud for Windows — listed
+    in `detection.windowsMarkers`), the two views, and the two new trail
+    events (`synced folder noticed`, `synced folder accepted`), which your
+    `ContractTests` will already be failing on. One sentence is NOT yours:
+    `buildFilesAreCopied` applies on the mac only, because you already build
+    outside the folder. Full write-up in "A cloud-synced working folder:
+    explain it, never refuse it" below.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,
@@ -3940,6 +3956,192 @@ is the check people skip. **If you add a recipe folder on your side, add it to
 was there, and it is what failed); and having each platform's own suite check
 only its own copy (two green suites, still drifted).
 
+
+## A cloud-synced working folder: explain it, never refuse it (2026-09-05)
+
+**The decision, and who made it.** Russell, 2026-09-05, on the question
+`TODO.md` had carried since a reliability review found that renaming a
+folder reads every page in the course — which on an iCloud-backed vault means
+downloading every offloaded page, one blocking read at a time. The question
+was whether Plantoir should refuse a working folder that a cloud service
+keeps in sync. The answer is **no**: recognise it, say once and in plain
+words what it costs, give the teacher the choice, and leave their notes
+exactly where they put them. `GUI-IMPROVEMENTS.md` row 399 is the log entry;
+`shared-rules.json` → `cloudSyncedFolders` is the specification; this
+section is the reasoning.
+
+**Why not refuse.** Three reasons, and each alone would have been enough:
+
+- Teachers keep their vaults in iCloud or OneDrive *on purpose* — it is how
+  the notes reach an iPad and a second machine. A refusal tells them to give
+  up cross-device access to their own teaching material, and a hard block is
+  the one answer they cannot opt out of.
+- Detection is unreliable in both directions. A teacher can have a folder
+  literally called "Dropbox" that is not one; a folder can be synced by a
+  service neither app knows. A false refusal on a hard block is
+  unrecoverable for them, whereas a synced folder Plantoir fails to notice
+  still works — more slowly.
+- **You already rejected refusal, by building something better.** When
+  OneDrive locked build output mid-build, the Windows answer was
+  `PLANTOIR_BUILD_ROOT` — move the churn out, leave the content in. That
+  precedent settled the argument here: the same problem, met once, answered
+  by relocating rather than refusing.
+
+**The two moments, and why they are different things.** This was Russell's
+own question — shown when a synced folder is suspected, when the working
+folder is created, or both? — and the answer is both, as two forms:
+
+- **A folder the teacher just CHOSE, or an empty one about to be set up,
+  stops at the folder picker.** This is the one moment the choice is free:
+  nothing has been written into the folder yet. The picker shows the
+  headline, the five-sentence explanation, and two buttons — "Use This
+  Folder Anyway" and "Choose a Different Folder…". Setting up the empty
+  folder IS going ahead (the note was beside the button; pressing it is the
+  answer). **Neither button is the Return-key default**: a Return pressed
+  out of habit must not decide this.
+- **A folder the window RESTORED gets a quiet notice inside the window**,
+  above the working-folder bar: headline, one-line summary, a way to open
+  the full explanation in place, and "Got It". Never a dialog and never a
+  sheet, because a folder can become synced *after* it was set up (moved
+  into iCloud; Desktop & Documents turned on) and a folder that opens on
+  every launch must not interrupt every launch. On the mac this is a strip
+  above the path bar with a `.quaternary` background; build yours as an
+  InfoBar or the nearest WinUI equivalent — the placement and the
+  dismissability are the contract, the control is yours.
+- **Going ahead is remembered PER FOLDER**, and neither form is shown for
+  that folder again. A second synced folder gets its own note. The mac
+  keeps the list in preferences under `acknowledgedSyncedFolders`; keep
+  yours wherever you keep per-app preferences, keyed by the folder's path.
+- **The check runs on EVERY adoption of a folder**, not only the first —
+  folders move into cloud services after they are made, and the check costs
+  nothing.
+
+**Detection: markers, never names.** The mac reads three things, and all
+three are in `detection.macMarkers`: `~/Library/Mobile Documents` (iCloud
+Drive's real location), `~/Library/CloudStorage/<Service>-<Account>/` (where
+macOS 12.3+ keeps every File Provider service — OneDrive, Google Drive,
+Dropbox, Box — with the service named by the part of the folder name before
+the first hyphen), and the item's own `isUbiquitousItem` flag, trusted ONLY
+under `~/Desktop` and `~/Documents` — the two folders iCloud syncs in place.
+**That flag is not iCloud-specific**: the adversarial review (row 401)
+probed a real `~/Library/CloudStorage/Dropbox` and found it set there too,
+so trusted anywhere else it would call a Dropbox folder "iCloud Drive".
+Whatever Windows exposes for "this item is cloud-managed", assume the same
+until proven otherwise. **Symlinks are resolved before any rule runs** —
+Dropbox and OneDrive both leave a link at the old place (`~/Dropbox` →
+`~/Library/CloudStorage/Dropbox`), and a path arriving through it matched
+nothing while the folder behind it matched Dropbox; on Windows, resolve
+junctions and reparse points the same way, since Known Folder Move leaves
+exactly that indirection. The resolved path is also the acknowledgement's
+key, so one folder is one key whichever spelling it arrives by. Your
+markers are listed in `detection.windowsMarkers`: the OneDrive roots the
+client publishes as `%OneDrive%`, `%OneDriveConsumer%` and
+`%OneDriveCommercial%` (a Desktop moved by Known Folder Move physically lives
+under one of them, so a prefix rule catches it), Dropbox's `info.json`
+(`%APPDATA%\Dropbox\info.json`, `path` entries), and iCloud for Windows
+(`%USERPROFILE%\iCloudDrive` by default). A service you cannot see is
+allowed — see "why not refuse". **Run the eleven `detection.cases` against
+your path function** with `{home}` as `%USERPROFILE%` and the mac's reserved
+paths translated to yours; the cases that matter most are the negative ones:
+a folder CALLED Dropbox on the Desktop, and the reserved root itself. When
+the service is recognisably syncing but not one you name, the contract's
+`unknownServiceName` ("your cloud service") is the honest word.
+
+**The sentences, and the one that is not yours.** All in `wording`, word for
+word, `{service}` filled in. They name EFFECTS a teacher can recognise —
+"building can be slower", "renaming a folder can take a while" — and never
+machinery: no "sync client", no "file provider", no "dataless", no "build
+root". A mac test forbids those words; write the same test. The ORDER is
+part of it (`explanationOrder`): reassurance first, because "kept in sync"
+beside a warning reads as "your notes are at risk" and they are not; the
+choice last, after the reasons. **`buildFilesAreCopied` applies on the mac
+only** (`buildFilesAreCopiedAppliesOn`): it says the built site's thousands
+of files are written inside the folder and copied to the cloud, which is
+true on the mac today — `.merged_output` still lands in the working folder —
+and false on Windows, where row 290 already builds into
+`%LOCALAPPDATA%\Plantoir\builds\<id>`. Show the other four. When the mac
+moves its output out too (a separate piece; the research is in `TODO.md`
+under "Move the mac's build output OUT of a synced working folder", and it
+is bigger on the mac because the build runs in a container that mounts only
+`courses/`), that field will change and the contract diff is how you will
+hear.
+
+**The trail.** Two events, both in `activityTrail.mustRecord` and so already
+failing your `ContractTests` until you add them: `synced folder noticed`
+(the service and the redacted path — recorded because the effects of a
+synced folder arrive weeks later as unrelated reports, and this line is what
+connects them) and `synced folder accepted` (which of the two forms, and the
+service — because "nobody warned me" is answered by this one, not the
+first). The mac's lines read "noticed the working folder is kept in sync
+with iCloud Drive — ~/…" and "chose to use the working folder anyway, kept
+in sync with iCloud Drive"; say the same things in the same words.
+
+**Rejected, so it is not proposed again:** refusing (above); detecting by
+folder name (the case that would catch a real Dropbox folder is the case
+that mislabels a teacher's folder called Dropbox); a dialog or sheet on
+launch (interrupts every launch of a folder that cannot be un-synced from
+inside the app); a single app-wide "don't show again" (a teacher with two
+synced folders was told about one). Not measured: nothing here was timed.
+The iCloud read-on-download slowness that started the question is real but
+was observed, not clocked; if you time a rename on an offloaded OneDrive
+folder, write the number here with the hardware.
+
+**What driving it against a real iCloud Drive folder found** (row 400), in
+the order you are likely to meet the same things:
+
+- **The notice pushed the whole bottom band of the window off screen**, at
+  every window height. The mechanism is SwiftUI's (a text pinned to its
+  vertical size answers a minimum-size probe with a word per line — 1,548
+  points, measured, whether 700 points or no height at all is proposed;
+  the modifier ignores the height either way), but the SHAPE is WinUI's too: a
+  wrapping `TextBlock` in a horizontal `StackPanel` gets unbounded width and
+  never wraps, or bounded width and grows tall. Measure your InfoBar's
+  height with the real sentences at a narrow width before shipping it, and
+  measure with a width PROPOSED — the mac's first test asked for the ideal
+  size with no width and passed the faulty layout.
+- **The path bar cut off the folder's own name.** An iCloud path always runs
+  through `~/Library/Mobile Documents/com~apple~CloudDocs/…`, so the last
+  crumb — the only one that differs between a teacher's folders — was the
+  one lost. Now a contract rule, `workingFolderPathBar.tooLongForTheSpace`:
+  a path too long for the space shows its END. Your bar needs the same.
+- **The folder must be NAMED before it is explained.** The picker showed the
+  five sentences and then the path bar; a teacher reads "this folder" and
+  looks for which folder. Path bar first, in both the empty-folder and the
+  existing-folder states.
+- **Enter still set up the empty folder while the note was showing**, which
+  the contract's own `whenShown.chosen` forbids. The set-up button loses its
+  default-action status while a decision is pending; make sure yours does.
+- **A folder the picker will not take anyway** — neither a working folder
+  nor empty — is not asked about. The rule is in the contract's `whenShown`;
+  the teacher is about to choose again, and the guidance saying what to
+  choose is the message.
+
+**What the adversarial review then found** (row 401), beyond the detection
+points folded in above:
+
+- **Finishing a set-up must acknowledge the folder that was SET UP**, not
+  whichever folder is current when the copy ends. The copy runs off the
+  main thread and the Open Working Folder command stays enabled meanwhile;
+  a second synced folder chosen during it has its own decision pending, and
+  the first folder's completion must not answer it. Guard on the path.
+- **"Synced folder noticed" is recorded by a window only.** The assistant
+  and the MCP server adopt folders on models nothing shows; a "noticed" from
+  those says the teacher was told something they were not, and on the mac it
+  produced six lines for one folder in ten minutes. Your `plantoir-mcp.exe`
+  adopts folders too — same rule.
+- **One folder, every window.** Got It in one window clears the same
+  folder's notice in any other window showing it. Rarer on Windows, where
+  one `MainWindow` shows one folder; verify and say so if it cannot happen.
+- **Re-choosing the open folder is a restore**, not a new choice
+  (`whenShown.reChoosingTheOpenFolder`), or the courses vanish behind the
+  picker for a folder the teacher did not change.
+- **The acknowledgement list is keyed by resolved path and never pruned.** A
+  renamed or moved folder is a new key and is asked again — on purpose,
+  since it may have moved INTO a synced location. A deleted folder's key
+  stays, harmlessly.
+- **Three labels are now in the contract** — `chooseDifferentFolderButton`,
+  `showDetailsButton`, `hideDetailsButton` — so nothing on the picker or the
+  notice is left for you to word.
 
 ## The course-code picker is a hand-built combo box — and you probably should NOT build one (2026-08-23)
 
