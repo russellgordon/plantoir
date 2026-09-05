@@ -961,6 +961,15 @@ class WorkspaceModel {
             codesPresent.append(entryURL.lastPathComponent)
         }
         for course in loadedCourses {
+            // Never out from under a running build. Moving a course's output
+            // while a preview is writing into it would break that build on a
+            // path the teacher can see working, and the courses are reloaded
+            // at plenty of moments a preview is live. A course previewing now
+            // is simply left until the next reload; the launchers ensure the
+            // link before every build in any case.
+            if previewIsRunning(forCourse: course.code) {
+                continue
+            }
             do {
                 let outcome: BuildOutputLocation.Outcome = try BuildOutputLocation.ensureLink(
                     courseDirectory: course.directoryURL,
@@ -984,6 +993,20 @@ class WorkspaceModel {
             workingFolderURL: workspaceURL,
             courseCodesPresent: codesPresent
         )
+    }
+
+    /// Whether any window is previewing a section of this course in this
+    /// folder. Across windows, because the leases are shared.
+    private func previewIsRunning(forCourse code: String) -> Bool {
+        guard let workspaceURL else {
+            return false
+        }
+        for lease in PreviewLeases.active {
+            if lease.folderPath == workspaceURL.path && lease.courseCode == code {
+                return true
+            }
+        }
+        return false
     }
 
     /// The archived item matching a sidebar selection, if that is what is

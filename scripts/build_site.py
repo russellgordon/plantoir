@@ -4681,17 +4681,26 @@ def build_section_site(
 
     # On the mac `.merged_output` is a SYMLINK to a builds folder outside the
     # working folder (contracts/shared-rules.json -> buildOutputLocation). A
-    # link whose target is missing — a course folder synced from a second Mac,
-    # where that path belongs to a different home folder — makes the mkdir
-    # below fail with "File exists", which reads as nonsense. Make the target.
+    # link whose target is not there makes the mkdir below fail with "File
+    # exists", which reads as nonsense — so the link is replaced with a real
+    # folder and the build goes in the OLD place.
+    #
+    # Replaced rather than repaired, and that is the safe way round. The
+    # reasons a target can be missing here are (a) a course folder synced
+    # from a second Mac, where the path names somebody else's home folder,
+    # and (b) a container created before the builds folder was mounted into
+    # it. Making the target would answer (a) and silently ruin (b): the
+    # folder would be created INSIDE the container, the build would write
+    # there, and the host would see an empty site with no error anywhere.
+    # A real folder always works, is visible on the host either way, and the
+    # launchers move it back out on the next run.
     if hidden_output_root.is_symlink() and not hidden_output_root.exists():
-        pointed_at = Path(os.readlink(str(hidden_output_root)))
-        if not pointed_at.is_absolute():
-            pointed_at = hidden_output_root.parent / pointed_at
+        print("ℹ️  Building into this course's own folder: the usual place for "
+              "built websites is not reachable from here.")
         try:
-            pointed_at.mkdir(parents=True, exist_ok=True)
+            hidden_output_root.unlink()
         except OSError as error:
-            print(f"⚠️  Could not make the folder built websites go in ({pointed_at}): {error}")
+            print(f"⚠️  Could not clear {hidden_output_root}: {error}")
 
     host_output_dir = hidden_output_root / section_name
     host_output_dir.mkdir(parents=True, exist_ok=True)

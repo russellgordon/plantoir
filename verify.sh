@@ -120,6 +120,13 @@ else
   cat /tmp/verify_netlify_badge_test.log
 fi
 
+if bash scripts/test_build_output_link.sh >/tmp/verify_build_output_link_test.log 2>&1; then
+  pass "the launchers keep built websites outside the working folder, for every state an existing folder can be in (scripts/test_build_output_link.sh)"
+else
+  fail "the launchers keep built websites outside the working folder, for every state an existing folder can be in (scripts/test_build_output_link.sh)"
+  cat /tmp/verify_build_output_link_test.log
+fi
+
 if (cd scripts && python3 test_deploy_course_dir_resolution.py) >/tmp/verify_deploy_course_dir_test.log 2>&1; then
   pass "deploy.py: course directory resolution under a native build root (scripts/test_deploy_course_dir_resolution.py)"
 else

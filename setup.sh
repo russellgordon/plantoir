@@ -88,6 +88,11 @@ cd "$(dirname "$0")"
 WORKDIR_ID="$(pwd -P | shasum -a 256 | cut -c1-8)"
 CONTAINER_NAME="teaching-quartz-${WORKDIR_ID}"
 
+# >>> BUILD OUTPUT BLOCK >>> — identical in setup.sh, preview.sh and
+# deploy.sh, and extracted between these two markers by
+# scripts/test_build_output_link.sh, which runs the real thing against the
+# states an existing teacher's folder can be in. Keep the markers, and keep
+# the three copies the same.
 # ---- Built websites live OUTSIDE this folder -------------------------
 # A built site is DERIVED: every file in it comes from the teacher's notes
 # and can be made again. It used to be written to
@@ -142,6 +147,19 @@ link_course_build_output() {
   target="$BUILD_ROOT/$course"
   ensure_build_root
 
+  # EVERY step below may fail without stopping the run, and that is
+  # deliberate: setup.sh and deploy.sh run under `set -e`, so an unguarded
+  # ln, mv or mkdir would turn "the built website could not be moved" into
+  # "publishing is broken", with no message. Whenever anything here fails
+  # the course is left exactly as it was and the build writes a real
+  # .merged_output folder inside it — which is what it did before any of
+  # this existed, so the fallback is the old behaviour rather than a
+  # broken one.
+  if [ ! -d "$BUILD_ROOT" ]; then
+    echo "⚠️  Could not use $BUILD_ROOT for built websites; keeping them inside your course folder."
+    return 0
+  fi
+
   # -L first: `-d` is true for a symlink pointing at a directory, so asking
   # the other way round would take every already-linked course down the
   # migration path and move the builds folder into itself.
@@ -151,26 +169,35 @@ link_course_build_output() {
       return 0
     fi
     # A link pointing somewhere else: a course renamed outside the app, or
-    # a folder synced from another Mac where that path does not exist.
-    rm -f "$link"
+    # a course folder synced from another Mac, where that path belongs to a
+    # different home folder and does not exist here.
+    rm -f "$link" 2>/dev/null || return 0
   elif [ -d "$link" ]; then
     echo "📦 Moving ${course}'s built website out of your working folder…"
-    rm -rf "$target"
-    if ! mv "$link" "$target"; then
+    rm -rf "$target" 2>/dev/null || true
+    if ! mv "$link" "$target" 2>/dev/null; then
       echo "⚠️  Could not move it; leaving the built website where it is."
       return 0
     fi
-    ln -s "$target" "$link"
-    echo "✅ Built websites for this folder are kept in: $BUILD_ROOT"
+    if ln -s "$target" "$link" 2>/dev/null; then
+      echo "✅ Built websites for this folder are kept in: $BUILD_ROOT"
+    else
+      # The move worked and the link did not. Put it back: a course with
+      # its built site in the old place still builds and still publishes,
+      # while a course with neither has lost its website for no reason.
+      mv "$target" "$link" 2>/dev/null || true
+      echo "⚠️  Could not move it; leaving the built website where it is."
+    fi
     return 0
   elif [ -e "$link" ]; then
-    rm -f "$link"
+    rm -f "$link" 2>/dev/null || return 0
   fi
 
-  rm -rf "$target"
-  mkdir -p "$target"
-  ln -s "$target" "$link"
+  rm -rf "$target" 2>/dev/null || true
+  mkdir -p "$target" 2>/dev/null || return 0
+  ln -s "$target" "$link" 2>/dev/null || true
 }
+# <<< BUILD OUTPUT BLOCK <<<
 
 # ---- The image is built HERE, from this folder's own recipe ----------
 # The tag is a hash of the recipe's contents: a changed recipe means a new
