@@ -39,20 +39,29 @@ struct WorkspacePickerView: View {
                     .foregroundStyle(.red)
             }
 
+            // The folder under discussion, named FIRST — before the
+            // empty-folder offer, and before the note about syncing, both
+            // of which are about it.
+            if let chosenURL = workspace.workspaceURL, workspace.workspaceCanBeInitialized || workspace.needsCloudSyncDecision {
+                // The bar's scroll view greedily fills any width it is
+                // given, pinning a short path to the left of centred
+                // content. At its natural size the stack can centre
+                // it; only a path too long for the cap gets the
+                // full-width scrolling form.
+                ViewThatFits(in: .horizontal) {
+                    FinderPathBarView(folderURL: chosenURL)
+                        .fixedSize(horizontal: true, vertical: false)
+                    FinderPathBarView(folderURL: chosenURL)
+                }
+                .frame(maxWidth: 520)
+            }
+
             // A folder a cloud service keeps in sync: say so here, where the
             // teacher can still change their mind for free. Shown above the
             // empty-folder offer too, so setting up a synced folder is done
             // knowing what it costs. Never red — this is not a mistake, it
             // is a choice.
             if let syncedFolder = workspace.syncedFolder, workspace.needsCloudSyncDecision {
-                if let chosenURL = workspace.workspaceURL, !workspace.workspaceCanBeInitialized {
-                    ViewThatFits(in: .horizontal) {
-                        FinderPathBarView(folderURL: chosenURL)
-                            .fixedSize(horizontal: true, vertical: false)
-                        FinderPathBarView(folderURL: chosenURL)
-                    }
-                    .frame(maxWidth: 520)
-                }
                 VStack(alignment: .leading, spacing: 10) {
                     Text(CloudSyncWording.headline(service: syncedFolder.serviceName))
                         .bold()
@@ -63,20 +72,6 @@ struct WorkspacePickerView: View {
             }
 
             if workspace.workspaceCanBeInitialized {
-                if let chosenURL = workspace.workspaceURL {
-                    // The bar's scroll view greedily fills any width it is
-                    // given, pinning a short path to the left of centred
-                    // content. At its natural size the stack can centre
-                    // it; only a path too long for the cap gets the
-                    // full-width scrolling form.
-                    ViewThatFits(in: .horizontal) {
-                        FinderPathBarView(folderURL: chosenURL)
-                            .fixedSize(horizontal: true, vertical: false)
-                        FinderPathBarView(folderURL: chosenURL)
-                    }
-                    .frame(maxWidth: 520)
-                }
-
                 Text("This folder is empty. Set it up as your new working folder? Everything needed will be added for you, and you can create your first course right away.")
                     .frame(maxWidth: 460)
                     .multilineTextAlignment(.center)
@@ -103,7 +98,11 @@ struct WorkspacePickerView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
+                // Return sets the folder up — except while the note about
+                // a synced folder is showing, when going ahead is a
+                // decision and a Return pressed out of habit must not make
+                // it.
+                .keyboardShortcut(workspace.needsCloudSyncDecision ? nil : .defaultAction)
                 .disabled(workspace.isInitializingWorkspace)
                 .accessibilityIdentifier("initializeFolderButton")
 

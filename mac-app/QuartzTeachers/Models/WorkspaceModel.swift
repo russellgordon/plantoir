@@ -447,6 +447,13 @@ class WorkspaceModel {
         guard let syncedFolder else {
             return
         }
+        // A folder the picker will not take anyway — neither a working
+        // folder nor empty — gets no question about syncing: the teacher is
+        // about to choose again, and a note about a folder they cannot use
+        // is noise beside the guidance that says what to choose.
+        if workspaceIsUnrecognized {
+            return
+        }
         if hasAcknowledgedCloudSync(forPath: workspaceURL.path) {
             return
         }

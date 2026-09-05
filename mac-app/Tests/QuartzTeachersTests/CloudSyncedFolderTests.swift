@@ -168,6 +168,21 @@ final class CloudSyncedFolderTests: XCTestCase {
         XCTAssertFalse(workspace.needsCloudSyncDecision, "and is never stopped at the picker")
     }
 
+    /// A synced folder the picker will not take anyway — neither a working
+    /// folder nor empty — is not asked about: the teacher is about to
+    /// choose again, and the guidance saying what to choose is the message.
+    func testAnUnrecognisedSyncedFolderIsNotAskedAbout() throws {
+        pretendEveryFolderIsSynced(by: "iCloud Drive")
+        let folderURL: URL = try makeTemporaryFolder()
+        try Data("hello".utf8).write(to: folderURL.appendingPathComponent("unrelated.txt"))
+        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        workspace.chooseWorkspace(at: folderURL)
+
+        XCTAssertTrue(workspace.workspaceIsUnrecognized)
+        XCTAssertFalse(workspace.needsCloudSyncDecision, "nothing to decide about a folder that cannot be used")
+        XCTAssertFalse(workspace.isShowingCloudSyncNotice)
+    }
+
     /// An ordinary folder shows nothing, whichever way it arrived.
     func testAnOrdinaryFolderShowsNothing() throws {
         WorkspaceModel.syncDetector = { _ in

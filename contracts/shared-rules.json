@@ -932,6 +932,10 @@
       "rule": "EVERY ancestor is clickable, not just the last one.",
       "why": "It is how a teacher gets to the folder ABOVE their working folder — to make a sibling, or to see where things sit — without leaving the app to find it."
     },
+    "tooLongForTheSpace": {
+      "rule": "A path too long for the space it is given shows its END — the folder itself and its nearest ancestors — never its start.",
+      "why": "The folder's own name is the part a teacher is looking for; 'Macintosh HD › Users › …' is the same for every folder they own. Found 2026-09-05 with an iCloud Drive folder, whose real path runs through ~/Library/Mobile Documents/com~apple~CloudDocs and was cut off in the folder picker before reaching the folder's name. Wherever the bar appears — the window's own bar and the picker's — the same rule."
+    },
     "icons": {
       "rule": "Each crumb shows the folder's real icon from the host file manager.",
       "why": "Not decoration: a teacher recognises their Desktop or their iCloud Drive by its icon before reading the word. Optional if the platform makes it expensive — say so rather than dropping it silently."
@@ -1016,8 +1020,12 @@
     },
     "whenShown": {
       "chosen": {
-        "rule": "A synced folder the teacher just CHOSE, or an empty synced folder about to be set up, stops at the folder picker: the headline, the full explanation, and two buttons — go ahead, or choose a different folder. Setting up the empty folder IS going ahead. Neither button is the default action.",
-        "why": "This is the one moment the choice is free — nothing has been written into the folder yet. A Return pressed out of habit must not decide it."
+        "rule": "A synced folder the teacher just CHOSE, or an empty synced folder about to be set up, stops at the folder picker: the folder's path bar FIRST, then the headline, the full explanation, and two buttons — go ahead, or choose a different folder. Setting up the empty folder IS going ahead. Neither button is the default action while the note is showing — including the set-up button, which is the default at every other time.",
+        "why": "This is the one moment the choice is free — nothing has been written into the folder yet. A Return pressed out of habit must not decide it. The path bar comes first because the sentences say 'this folder', and a teacher reads that and looks for which folder."
+      },
+      "notAskedAboutAFolderThatCannotBeUsed": {
+        "rule": "A synced folder the picker will not take anyway — neither a working folder nor empty — gets no note about syncing.",
+        "why": "The teacher is about to choose again, and a note about a folder they cannot use is noise beside the guidance that says what to choose."
       },
       "restored": {
         "rule": "A synced folder the window RESTORED — opened on launch, or inherited by a new window — gets a quiet notice inside the window, above the working-folder bar: the headline, the one-line summary, a way to open the full explanation in place, and a button to dismiss it. Never a dialog, never a sheet.",

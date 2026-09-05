@@ -4,6 +4,13 @@ import SwiftUI
 /// sentences in `CloudSyncWording`, one per line, in the order they are meant
 /// to be read. Shown inside the picker beside the choice, and inside the
 /// window's notice when it is expanded.
+///
+/// No `fixedSize` anywhere in here, on purpose. A text told to keep its
+/// vertical size inside a stack that proposes it a narrow width wraps to a
+/// word per line and becomes hundreds of points tall — which is what pushed
+/// the window's path bar off the bottom of the screen the first time this
+/// notice was shown. The texts take the width they are given and wrap in it;
+/// `CloudSyncNoticeLayoutTests` measures the result.
 struct CloudSyncExplanationView: View {
 
     // MARK: - Stored properties
@@ -19,7 +26,7 @@ struct CloudSyncExplanationView: View {
                 HStack(alignment: .top, spacing: 8) {
                     Text("•")
                     Text(sentence)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -46,37 +53,63 @@ struct CloudSyncNoticeView: View {
 
     var body: some View {
         if let syncedFolder = workspace.syncedFolder, workspace.isShowingCloudSyncNotice {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "icloud")
-                        .foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(CloudSyncWording.headline(service: syncedFolder.serviceName))
-                            .bold()
-                        Text(CloudSyncWording.summary)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 16)
-                    Button(isShowingDetails ? "Hide Details" : "Show Details") {
-                        isShowingDetails.toggle()
-                    }
-                    .accessibilityIdentifier("cloudSyncDetailsButton")
-                    Button(CloudSyncWording.dismissNoticeButton) {
-                        workspace.acknowledgeCloudSync()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("cloudSyncGotItButton")
+            CloudSyncNoticeContentView(
+                syncedFolder: syncedFolder,
+                isShowingDetails: $isShowingDetails,
+                dismiss: {
+                    workspace.acknowledgeCloudSync()
                 }
-                if isShowingDetails {
-                    CloudSyncExplanationView(syncedFolder: syncedFolder)
-                        .padding(.leading, 24)
-                }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary.opacity(0.5))
-            .accessibilityIdentifier("cloudSyncNotice")
+            )
         }
+    }
+}
+
+/// The notice's own layout, with nothing read from the environment, so a
+/// test can put it in a hosting view of a known width and measure it.
+struct CloudSyncNoticeContentView: View {
+
+    // MARK: - Stored properties
+
+    var syncedFolder: CloudSyncedFolder
+
+    @Binding var isShowingDetails: Bool
+
+    /// What "Got It" does.
+    var dismiss: () -> Void
+
+    // MARK: - Body
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "icloud")
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(CloudSyncWording.headline(service: syncedFolder.serviceName))
+                        .bold()
+                    Text(CloudSyncWording.summary)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button(isShowingDetails ? "Hide Details" : "Show Details") {
+                    isShowingDetails.toggle()
+                }
+                .accessibilityIdentifier("cloudSyncDetailsButton")
+                Button(CloudSyncWording.dismissNoticeButton) {
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("cloudSyncGotItButton")
+            }
+            if isShowingDetails {
+                CloudSyncExplanationView(syncedFolder: syncedFolder)
+                    .padding(.leading, 24)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.5))
+        .accessibilityIdentifier("cloudSyncNotice")
     }
 }
