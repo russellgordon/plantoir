@@ -38,8 +38,39 @@ an item when it ships (finished behaviour is recorded in
   `CourseRenameInterfaceTests` case, but that test hosts a sidebar ROW and is
   most likely the bystander that happened to be running.
 
-  Where to start: `RemovalButtonTests` next door hosts its view differently and
-  does not provoke it — the difference between the two is the cheapest lead.
+  **Measured properly on 2026-09-04**, with the machine to myself overnight and
+  a clean `dev` worktree built beside the branch — the baseline `TODO.md` says
+  this needs. Twenty-seven full-suite and ten single-class runs:
+
+  | tree | scope | runs | aborted |
+  |---|---|---|---|
+  | `issue/special-names-followups` | full suite | 9 | 6 |
+  | clean `dev` (worktree) | full suite | 8 | 3 |
+  | `issue/special-names-followups` | that class alone | 5 | 0 |
+  | clean `dev` (worktree) | that class alone | 5 | 1 |
+
+  Four things follow, and two of them correct what is written above.
+
+  - **It is pre-existing.** Clean `dev` aborts too, so no branch since has
+    caused it. (Every `dev` run also carried one FAILED case — the stale
+    milestone marker, fixed on the branch in `13da5319`.)
+  - **It is NOT purely a bystander.** The class alone aborts 1 in 10, which the
+    "bystander" reading does not predict: something in that class is enough on
+    its own. The full suite raises the rate to roughly 1 in 2, so earlier tests
+    make it likelier without being necessary.
+  - **The rate is higher than the "one in four" recorded above** — about half of
+    full-suite runs, across both trees.
+  - **It never produces a failed test CASE.** Every abort has `failed=0` and
+    exits 65 partway. So a run that completes is trustworthy, and the branch
+    produced three fully clean full-suite runs (exit 0, 979 passed, 0 failures).
+
+  Where to start, updated: the class ALONE reproduces it, so the cheapest lead
+  is now inside `CourseRenameInterfaceTests` itself rather than in what ran
+  before it. Both named cases (`testACourseThatIsPreviewingIsNotRenamed` and
+  `testAnUnusableCodeIsShownUnderTheFieldRatherThanInAnAlert`) call
+  `workspace.beginRenamingSelectedCourse()` and then leave `renamingCourseCode`
+  set until the end of the test. `RemovalButtonTests` next door hosts its view
+  differently and does not provoke it — that difference is still worth reading.
 
 - ✅ **Done 2026-09-01 — let a teacher rename a special folder from inside Plantoir.**
   Deferred 2026-08-23 while planning the hardening of the special folder and
