@@ -364,6 +364,81 @@ final class SpecialFolderRenamerTests: XCTestCase {
         XCTAssertNil(updated["excluded_items"])
     }
 
+    // MARK: - Finishing a rename that was interrupted
+
+    /// **The dead end this exists to open.** A rename moves the folders, then
+    /// rewrites links, then writes the configuration. Interrupted after the
+    /// move, the folders are under the new name and the configuration still
+    /// says the old one — and the next build DISCOVERS the new folder and
+    /// appends it, so the list holds both. Retrying was then refused as a
+    /// clash, and if the folder was the class folder it could not be removed
+    /// either: no way out but hand-editing the JSON.
+    func testARenameLeftHalfDoneCanBeFinished() throws {
+        let course: URL = try makeCourse(sections: [1, 2], perSectionFolders: ["All Days"])
+
+        XCTAssertTrue(
+            SpecialFolderRenamer.looksLikeAnInterruptedRename(
+                from: "All Classes", to: "All Days", scope: .perSection,
+                courseDirectory: course, sectionNumbers: [1, 2]
+            ),
+            "the old folder is gone from every section and the new one is there"
+        )
+        XCTAssertNil(
+            SpecialFolderRenamer.problem(
+                renaming: "All Classes", to: "All Days",
+                existingNames: ["All Classes", "All Days"],
+                isFinishingAnInterruptedRename: true
+            ),
+            "a list holding both names is the half-done state, not two folders competing"
+        )
+    }
+
+    /// And the refusal must still stand when it really is two folders.
+    func testAGenuineClashIsStillRefused() throws {
+        let course: URL = try makeCourse(sections: [1], perSectionFolders: ["Tasks", "Handouts"])
+
+        XCTAssertFalse(
+            SpecialFolderRenamer.looksLikeAnInterruptedRename(
+                from: "Tasks", to: "Handouts", scope: .perSection,
+                courseDirectory: course, sectionNumbers: [1]
+            ),
+            "both folders are on disk, so nothing was interrupted"
+        )
+        XCTAssertEqual(
+            SpecialFolderRenamer.problem(
+                renaming: "Tasks", to: "Handouts", existingNames: ["Tasks", "Handouts"]
+            ),
+            SpecialNames.renameFolderProblemAlreadyUsed(name: "Handouts")
+        )
+    }
+
+    /// A per-section rename moves EVERY section's copy, so a mixture means
+    /// something other than an interrupted rename and the refusal should hold.
+    func testAMixtureIsNotTreatedAsAnInterruptedRename() throws {
+        let course: URL = try makeCourse(sections: [1, 2], perSectionFolders: ["All Classes"])
+        try FileManager.default.createDirectory(
+            at: course.appendingPathComponent("section1/All Days"), withIntermediateDirectories: true
+        )
+        XCTAssertFalse(
+            SpecialFolderRenamer.looksLikeAnInterruptedRename(
+                from: "All Classes", to: "All Days", scope: .perSection,
+                courseDirectory: course, sectionNumbers: [1, 2]
+            ),
+            "section 2 still has the old folder, so this is not a rename to finish"
+        )
+    }
+
+    /// Finishing the rename must not leave the name in the list twice — the
+    /// starting list holds both, and a `ForEach(id: \.self)` renders duplicate
+    /// identities.
+    func testFinishingARenameLeavesTheNameOnlyOnce() {
+        let updated: [String: Any] = SpecialFolderRenamer.renaming(
+            "All Classes", to: "All Days", scope: .perSection,
+            in: ["per_section_folders": ["All Classes", "All Days", "Tasks"]]
+        )
+        XCTAssertEqual(updated["per_section_folders"] as? [String], ["All Days", "Tasks"])
+    }
+
     // MARK: - Helpers
 
     private func makeCourse(sections: [Int], perSectionFolders: [String]) throws -> URL {

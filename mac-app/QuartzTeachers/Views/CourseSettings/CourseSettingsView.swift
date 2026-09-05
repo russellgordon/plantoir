@@ -411,8 +411,18 @@ struct CourseSettingsView: View {
         case .perSection:
             namesInScope = course.configuration.perSectionFolders
         }
+        // A rename that was interrupted after the folders moved leaves the
+        // configuration naming the old folder and a build appends the new one,
+        // so the list holds both and the ordinary clash check refuses the very
+        // rename that would put it right. Settled by looking at the disk.
+        let finishing: Bool = SpecialFolderRenamer.looksLikeAnInterruptedRename(
+            from: oldName, to: newName, scope: scope,
+            courseDirectory: course.directoryURL,
+            sectionNumbers: course.configuration.sectionNumbers
+        )
         return SpecialFolderRenamer.problem(
-            renaming: oldName, to: newName, existingNames: namesInScope
+            renaming: oldName, to: newName, existingNames: namesInScope,
+            isFinishingAnInterruptedRename: finishing
         )
     }
 

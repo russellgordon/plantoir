@@ -103,7 +103,8 @@ enum SpecialFolderRenamer {
     nonisolated static func problem(
         renaming oldName: String,
         to rawNewName: String,
-        existingNames: [String]
+        existingNames: [String],
+        isFinishingAnInterruptedRename: Bool = false
     ) -> String? {
         let newName: String = rawNewName.trimmingCharacters(in: .whitespaces)
         if newName.isEmpty {
@@ -129,6 +130,20 @@ enum SpecialFolderRenamer {
                 continue
             }
             if existing.caseInsensitiveCompare(newName) == .orderedSame {
+                // Unless this is the SAME rename asking to be finished. A
+                // rename moves folders, then rewrites links, then writes the
+                // configuration; if it is interrupted after the move, the
+                // folders are under the new name and the configuration still
+                // says the old one. A build then DISCOVERS the new name on
+                // disk and appends it, so the list holds both — and retrying
+                // the rename was refused as a clash, with the class folder
+                // also unremovable, leaving no way out but hand-editing the
+                // JSON. The caller decides this by looking at the disk: the
+                // old folder gone, the new one there. That is not two folders
+                // competing for a name, it is one rename half done.
+                if isFinishingAnInterruptedRename {
+                    break
+                }
                 return SpecialNames.renameFolderProblemAlreadyUsed(name: newName)
             }
         }
@@ -173,6 +188,39 @@ enum SpecialFolderRenamer {
         }
         return ClassFolder.name(inPerSectionFolders: folders)
             .caseInsensitiveCompare(name) == .orderedSame
+    }
+
+    /// Whether this rename is one that already happened on disk and never
+    /// finished — the old folder gone, the new one there.
+    ///
+    /// Asked of the FILESYSTEM rather than of the configuration, because the
+    /// configuration is exactly what is wrong in this state. For a per-section
+    /// folder it is enough that no section still has the old one and at least
+    /// one has the new: a rename moves every section's copy, so a mixture
+    /// means something else happened and the ordinary refusal should stand.
+    nonisolated static func looksLikeAnInterruptedRename(
+        from oldName: String,
+        to newName: String,
+        scope: FolderScope,
+        courseDirectory: URL,
+        sectionNumbers: [Int],
+        fileManager: FileManager = .default
+    ) -> Bool {
+        let oldPlaces: [URL] = folderLocations(
+            named: oldName, scope: scope,
+            courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
+        )
+        let newPlaces: [URL] = folderLocations(
+            named: newName, scope: scope,
+            courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
+        )
+        for place in oldPlaces where fileManager.fileExists(atPath: place.path) {
+            return false
+        }
+        for place in newPlaces where fileManager.fileExists(atPath: place.path) {
+            return true
+        }
+        return false
     }
 
     /// Whether a name is one Plantoir gives a section's own folder.
@@ -449,13 +497,24 @@ enum SpecialFolderRenamer {
     // MARK: - Private helpers
 
     /// One list of names with the old one replaced, keeping its position.
+    /// One list of names with the old one replaced, keeping its position — and
+    /// never leaving the new name in twice.
+    ///
+    /// The duplicate is not hypothetical: finishing an interrupted rename
+    /// starts from a list that already holds BOTH names, because a build
+    /// discovered the moved folder and appended it. Renaming the old entry
+    /// then produces the new name twice, which a `ForEach(items, id: \.self)`
+    /// renders with duplicate identities and which no later rename can undo.
     nonisolated private static func renaming(_ oldName: String, to newName: String, inList names: [String]) -> [String] {
         var result: [String] = []
         for name in names {
-            if name.caseInsensitiveCompare(oldName) == .orderedSame {
-                result.append(newName)
-            } else {
-                result.append(name)
+            let renamed: String = name.caseInsensitiveCompare(oldName) == .orderedSame ? newName : name
+            var alreadyThere: Bool = false
+            for kept in result where kept.caseInsensitiveCompare(renamed) == .orderedSame {
+                alreadyThere = true
+            }
+            if !alreadyThere {
+                result.append(renamed)
             }
         }
         return result

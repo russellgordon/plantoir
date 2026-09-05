@@ -953,17 +953,43 @@ class CourseConfiguration {
     /// file, so Cancel reverts their other edits and leaves the rename alone —
     /// which is the only honest answer, because the folder really has moved.
     func recordOnDisk(_ change: ([String: Any]) -> [String: Any], at url: URL) throws {
-        let data: Data = try Data(contentsOf: url)
-        let decoded: Any = try JSONSerialization.jsonObject(with: data)
-        guard let onDisk = decoded as? [String: Any] else {
-            throw CourseConfigurationError.notADictionary
+        // Read, change, and write only if nothing else wrote in between.
+        //
+        // A build's own `preflight_update_course_config` writes this same file,
+        // and the loser of that race used to be silent — whichever write landed
+        // second simply erased the other's keys. The Python side now does the
+        // same compare-and-swap, so between them a rename and a build can no
+        // longer quietly undo each other; whoever notices re-reads and redoes
+        // its work rather than overwriting.
+        //
+        // Re-applying `change` to the fresh read is safe because it is what
+        // `change` is: a rename of names that either are there or are not.
+        var attempts: Int = 0
+        while true {
+            let before: Data = try Data(contentsOf: url)
+            guard let onDisk = try JSONSerialization.jsonObject(with: before) as? [String: Any] else {
+                throw CourseConfigurationError.notADictionary
+            }
+            let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            var written: Data = try JSONSerialization.data(withJSONObject: change(onDisk), options: options)
+            written.append(contentsOf: [0x0A])
+
+            let nowOnDisk: Data = (try? Data(contentsOf: url)) ?? before
+            if nowOnDisk != before {
+                attempts += 1
+                // Three tries, then write anyway. A folder that has MOVED and a
+                // configuration that does not say so is the worse of the two
+                // states, so this ends by recording the truth rather than by
+                // giving up on it.
+                if attempts < 3 {
+                    continue
+                }
+            }
+            try written.write(to: url, options: [.atomic])
+            lastSavedData = written
+            values = change(values)
+            return
         }
-        let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        var written: Data = try JSONSerialization.data(withJSONObject: change(onDisk), options: options)
-        written.append(contentsOf: [0x0A])
-        try written.write(to: url, options: [.atomic])
-        lastSavedData = written
-        values = change(values)
     }
 
     /// Reverts all in-memory edits back to the last data read from or

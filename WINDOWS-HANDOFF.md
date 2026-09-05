@@ -607,6 +607,12 @@ this side is expected to say so when the contract is wrong.
     fail your suite until `ClassFolderRule.cs` reads the key.** Full write-up
     in "What a course calls its class folder" below.
 
+17. **`course_config.json`'s two writers, and the interrupted-rename dead end
+    (2026-09-05).** The Python half of the first is shared and you inherit it;
+    the app-side writer and the whole of the second are yours. Full write-ups
+    in "`course_config.json` has two writers" and "A rename interrupted after
+    the folders moved was a dead end" below.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,
@@ -3531,6 +3537,61 @@ Substitute "on this PC", the same way you already do for `app-rules.json`'s
 "this Mac" — `contracts/README.md` documents that substitution. Your contract
 test must compare on the substituted form or it will fail on a difference that
 is correct.
+
+### `course_config.json` has two writers, and they can erase each other
+
+Fixed on the mac 2026-09-05; **half of it is shared Python you inherit and half
+is yours.**
+
+`preflight_update_course_config` reads the configuration, spends a while
+scanning the course's folders, and writes what it computed. The APP writes the
+same file inside that window — a folder rename does, and it writes at ONCE
+rather than at Save, because the folder has really moved and a Cancel could not
+undo it. Whoever wrote second won, and said nothing. The state that leaves is
+the dead end in the next section: folders moved, configuration naming the old
+name.
+
+- **The Python half you get for free.** Preflight now re-reads the file
+  immediately before writing and, if it changed, redoes the whole discovery
+  against the new contents — bounded at three tries, then it carries on with
+  what is there rather than spinning. Redoing is safe because discovery is a
+  pure function of (what is on disk, what the config says) and is add-only.
+- **The other writer is yours.** Whatever writes `course_config.json` from the
+  Windows app must do the same read-compare-write, or the race is only half
+  closed on your side. The mac's is `CourseConfiguration.recordOnDisk`. One
+  deliberate asymmetry to copy: preflight backs off, the APP ends by writing
+  anyway after three tries — a folder that has MOVED with a configuration that
+  does not say so is the worse of the two states, so the app finishes by
+  recording the truth rather than by giving up on it.
+
+`scripts/test_config_write_race.py` forces the race with a scan that mutates the
+file mid-flight; it runs on your side too if you run the Python suites.
+
+### A rename interrupted after the folders moved was a dead end
+
+**Entirely yours to port** — this exists wherever a rename moves folders before
+writing the configuration, which yours will.
+
+The state: the folders are under the new name, the configuration still says the
+old one. The next build DISCOVERS the moved folder and appends it, so the list
+holds BOTH names — and retrying the rename is then refused as a clash. If the
+folder was the class folder it is unremovable as well, so there is no way out
+of Settings at all; the teacher has to hand-edit `course_config.json`.
+
+**The rule to copy is the disk question, not the code.** A rename whose target
+is already in the list is allowed when the filesystem says the old folder is
+gone and the new one is there: that is not two folders competing for a name, it
+is one rename asking to be finished. Ask the FILESYSTEM, because the
+configuration is exactly what is wrong in this state. Two details that are not
+optional:
+
+- **No section may still hold the old folder.** A per-section rename moves
+  every section's copy, so a mixture means something other than an interrupted
+  rename, and the ordinary refusal must stand.
+- **De-duplicate the list when you finish one.** The starting state holds both
+  names by definition, so a naive rename leaves the new name in twice — which
+  on the mac renders two rows with one identity, and which no later rename can
+  undo.
 
 ### Publishing while a preview is running — the race, and the harness that found it
 

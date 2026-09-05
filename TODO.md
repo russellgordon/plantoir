@@ -4,34 +4,38 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
-- **Two reliability findings from the 2026-09-05 review, understood and NOT
-  fixed.** Both are low-likelihood and neither loses a teacher's work, which is
-  why they were left; they are written down so the next person meets them as
-  known rather than as a mystery.
+- ✅ **Done 2026-09-05 — the two reliability findings from that day's review.**
+  Kept rather than deleted because the SHAPE of each is worth recognising
+  again: both were races nobody would meet often, and both ended in a state a
+  teacher could not get out of.
 
-  **1. An interrupted rename can reach a state only a hand-edit recovers
-  from.** `SpecialFolderRenamer.rename` moves the folders, then rewrites links,
-  then writes the configuration. If the app dies between the move and the
-  write — or the write fails — the folders are under the new name and the
-  configuration still says the old one. A retry recovers *unless a build runs
-  first*: `preflight_update_course_config` discovers the new name on disk and
-  APPENDS it, so the list then holds both, and the rename is refused as
-  "already used". If the folder was the class folder it is also un-removable,
-  so Settings offers no way out.
+  **1. A rename interrupted after the folders moved was a dead end.** The
+  configuration still said the old name, the next build DISCOVERED the moved
+  folder and appended it, and retrying the rename was then refused as a clash —
+  with the class folder unremovable too, so the only exit was hand-editing
+  JSON. The fix is not a lock: `problem()` now accepts a rename whose target is
+  already in the list **when the disk says the old folder is gone and the new
+  one is there**, which is not two folders competing for a name, it is one
+  rename asking to be finished. `looksLikeAnInterruptedRename` asks the
+  filesystem, because the configuration is exactly what is wrong in that state,
+  and it requires that NO section still has the old folder — a mixture means
+  something else happened and the ordinary refusal stands. Finishing also
+  de-duplicates the list, which the starting state needs by definition.
 
-  The cheap improvement is not a lock: it is to let `problem()` allow a rename
-  whose target is already in the list when the OLD folder is gone from disk and
-  the new one is there — that is not a clash, it is a rename asking to be
-  finished. At minimum the refusal should say what happened rather than
-  "already used".
+  **2. Two writers of `course_config.json` could silently erase each other.**
+  `preflight_update_course_config` reads the file, scans the course's folders,
+  and writes what it computed; the app writes the same file in that window,
+  because a rename commits at once rather than at Save. Whoever wrote second
+  won and said nothing. Both writers now compare-and-swap: preflight re-reads
+  before writing and redoes its discovery if the file moved under it (bounded,
+  then carries on with what is there), and `recordOnDisk` does the same but
+  ends by writing anyway — a folder that has MOVED and a configuration that
+  does not say so is the worse of the two states, so it finishes by recording
+  the truth rather than by giving up on it.
 
-  **2. `recordOnDisk` is a read-modify-write, and the loser is silent.** It
-  reads `course_config.json`, patches the rename keys, and writes atomically —
-  so nothing corrupts, and the app's own copy stays consistent. But a build
-  that started BEFORE the rename runs `preflight_update_course_config`
-  afterwards, writing its own earlier read, and the rename's keys vanish. The
-  folders have still moved, which puts you in finding 1. Renaming while a build
-  is running is the window, and it is small.
+  `scripts/test_config_write_race.py` forces the race rather than hoping for
+  it, and was checked the only way worth checking: with the guard disabled it
+  fails with the key missing, exactly as the bug did.
 
 - **One rule, three implementations: stopping a section's preview.** Found by
   review 2026-09-05. `preview.sh --stop` finds this section's processes by

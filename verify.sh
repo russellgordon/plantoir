@@ -164,6 +164,13 @@ else
   cat /tmp/verify_stop_preview_test.log
 fi
 
+if (cd scripts && python3 test_config_write_race.py) >/tmp/verify_config_race_test.log 2>&1; then
+  pass "a build and a rename writing course_config.json cannot erase each other (scripts/test_config_write_race.py)"
+else
+  fail "a build and a rename writing course_config.json cannot erase each other (scripts/test_config_write_race.py)"
+  cat /tmp/verify_config_race_test.log
+fi
+
 # A preview build must never reach a published site, and the FOLDER
 # destination is the one that can: it publishes host-side and never enters the
 # container, so deploy.py's own refusal never runs. Structural rather than

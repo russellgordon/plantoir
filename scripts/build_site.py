@@ -3602,14 +3602,28 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
         except Exception:
             pass
 
-def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path) -> dict:
+def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path,
+                                   _attempt: int = 0) -> dict:
     """Discover new items and append them to course_config.json (add-only). Return updated config dict.
     Also: any newly discovered folders are marked not hidden and added to the expandable list.
     Excludes any items listed in excluded_items (skips discovery, does not un-hide, and manages index.md note).
     """
+    # Read the BYTES, not just the parsed object: the write at the end of this
+    # function is a compare-and-swap against exactly what was read here.
+    #
+    # This reads the configuration, spends a while scanning the course's
+    # folders, and then writes what it computed. The app can write the SAME
+    # file in that window — renaming a folder does, and it writes at once
+    # rather than at Save because the folder has really moved. The loser of
+    # that race used to be silent: preflight wrote its own older read back and
+    # the rename's keys simply vanished, leaving the folders moved and the
+    # configuration naming the old name. Redoing the discovery against the new
+    # contents is safe, because it is a pure function of (what is on disk,
+    # what the config says) and is add-only.
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
+        with open(config_path, "rb") as f:
+            config_bytes_when_read = f.read()
+        cfg = json.loads(config_bytes_when_read.decode("utf-8"))
     except Exception as e:
         print(f"❌ Could not read course_config.json for preflight: {e}")
         return {}
@@ -3741,6 +3755,27 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
             cfg["hidden"] = hidden_list
         if expandable_changed:
             cfg["expandable"] = expandable_list
+        # Compare-and-swap: only write if nothing else has written since the
+        # read at the top. See this function's docstring for what used to be
+        # lost.
+        try:
+            with open(config_path, "rb") as f:
+                config_bytes_now = f.read()
+        except Exception:
+            config_bytes_now = config_bytes_when_read
+        if config_bytes_now != config_bytes_when_read:
+            if _attempt >= 2:
+                print("⚠️ course_config.json kept changing while preflight ran; "
+                      "leaving it alone and building with what is there now.")
+                try:
+                    return json.loads(config_bytes_now.decode("utf-8"))
+                except Exception:
+                    return cfg
+            print("ℹ️ course_config.json changed while preflight was looking "
+                  "(a rename, most likely) — reading it again.")
+            return preflight_update_course_config(
+                course_dir, section_dir, config_path, _attempt + 1
+            )
         _atomic_write_json_with_backup(config_path, cfg)
     else:
         print("ℹ️ No new items discovered; course_config.json unchanged.")
