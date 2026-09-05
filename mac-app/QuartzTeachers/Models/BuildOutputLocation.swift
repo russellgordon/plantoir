@@ -65,6 +65,15 @@ nonisolated enum BuildOutputLocation {
     /// own rather than writing into the teacher's real Application Support.
     nonisolated(unsafe) static var buildsRootOverride: URL?
 
+    /// True inside the test bundle.
+    static let isRunningTests: Bool = NSClassFromString("XCTestCase") != nil
+
+    /// One temporary builds root for the whole test run, so a test that goes
+    /// through `CourseArchiver` or `CourseRenamer` without setting an override
+    /// still cannot touch the real one.
+    static let buildsRootWhileTesting: URL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("plantoir-builds-under-test-\(ProcessInfo.processInfo.processIdentifier)")
+
     // MARK: - Computed properties
 
     /// `~/Library/Application Support/Plantoir/builds`.
@@ -72,18 +81,34 @@ nonisolated enum BuildOutputLocation {
     /// Under the home folder deliberately: the Colima VM mounts only `$HOME`,
     /// so a builds folder anywhere else would bind-mount into the container as
     /// an empty folder and every build would appear to vanish.
+    ///
+    /// **Under tests this answers a temporary folder instead**, and that is
+    /// not tidiness. Archiving and renaming a course now reach in here, and
+    /// their own tests do those things to fixtures with made-up paths — so
+    /// without this, running the suite would scatter folders through the
+    /// teacher's real Application Support and delete things out of it. The
+    /// real answer stays testable as `buildsRoot(inHomeFolder:)`.
     static var buildsRoot: URL {
         if let buildsRootOverride {
             return buildsRootOverride
         }
-        let applicationSupport: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library")
-            .appendingPathComponent("Application Support")
-            .appendingPathComponent("Plantoir")
-        return applicationSupport.appendingPathComponent("builds")
+        if isRunningTests {
+            return buildsRootWhileTesting
+        }
+        return buildsRoot(inHomeFolder: FileManager.default.homeDirectoryForCurrentUser)
     }
 
     // MARK: - Functions
+
+    /// Where builds live for a given home folder — the real rule, as a pure
+    /// function so it can be checked without writing anything anywhere.
+    static func buildsRoot(inHomeFolder home: URL) -> URL {
+        return home
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Application Support")
+            .appendingPathComponent("Plantoir")
+            .appendingPathComponent("builds")
+    }
 
     /// The eight hex characters that stand for one working folder.
     ///
@@ -222,7 +247,18 @@ nonisolated enum BuildOutputLocation {
             try? fileManager.removeItem(at: newTarget)
             try? fileManager.moveItem(at: oldTarget, to: newTarget)
         }
-        _ = try? ensureLink(courseDirectory: renamedCourseDirectory, workingFolderURL: workingFolderURL)
+        // Re-pointed by hand rather than by calling `ensureLink`, and this is
+        // the whole reason this function exists: `ensureLink`'s answer to a
+        // link pointing somewhere else is to clear the target and start from
+        // nothing, which would throw away the site that has just been carried
+        // across.
+        let link: URL = linkURL(courseDirectory: renamedCourseDirectory)
+        if (try? fileManager.destinationOfSymbolicLink(atPath: link.path)) != nil {
+            try? fileManager.removeItem(at: link)
+        }
+        try? fileManager.createDirectory(at: newTarget, withIntermediateDirectories: true)
+        try? writeWorkingFolderMarker(workingFolderURL: workingFolderURL)
+        try? fileManager.createSymbolicLink(at: link, withDestinationURL: newTarget)
     }
 
     /// Removes builds belonging to courses this working folder no longer has.
