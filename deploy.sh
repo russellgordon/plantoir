@@ -307,18 +307,34 @@ if [[ -n "$TO_FOLDER" ]]; then
     # "Published: 0 file(s) updated" over an empty folder. Found by running
     # the fix rather than reasoning about it, 2026-09-05.
     #
-    # Waits on the real CONDITION rather than a guessed interval: a front page
-    # that no longer carries the live-reload client is exactly what "the
-    # rebuild is visible here" means. Bounded, so a rebuild that somehow
-    # produced nothing still falls through to the guard below instead of
-    # hanging.
-    for ((_w=0; _w<75; _w++)); do
+    # Waits on the real CONDITION rather than a guessed interval, and the
+    # condition is the WHOLE TREE, not the front page.
+    #
+    # Checking only index.html was the first attempt and it was wrong in a way
+    # that looked right: serve mode bakes the live-reload client into EVERY
+    # page, the host mirror is replaced file by file, and the front page can be
+    # clean while two hundred other pages are still the preview's. That
+    # published a MIXTURE — a correct front page and stale pages behind it —
+    # which is worse than publishing the preview wholesale, because the front
+    # page looks fine. Caught by verify-deploy.sh on 2026-09-05, which fetches
+    # what was published and reads it.
+    #
+    # `grep -rq` stops at the first match, so the common case costs one file.
+    # Bounded, so a rebuild that produced nothing falls through to the guard
+    # below rather than hanging.
+    for ((_w=0; _w<150; _w++)); do
       if [[ -f "${PUBLIC_DIR_HOST}/index.html" ]] \
-         && ! grep -q "ws://localhost:" "${PUBLIC_DIR_HOST}/index.html" 2>/dev/null; then
+         && ! grep -rq "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
         break
       fi
       sleep 0.2
     done
+    if grep -rq "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
+      echo "❌ The rebuilt site still carries the preview's live-reload script."
+      echo "   Nothing was published, rather than publishing pages students'"
+      echo "   browsers would ask about."
+      exit 1
+    fi
     if [[ ! -f "${PUBLIC_DIR_HOST}/index.html" ]]; then
       echo "❌ The rebuilt site has not appeared. Nothing was published."
       exit 1

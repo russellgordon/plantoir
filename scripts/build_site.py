@@ -5065,6 +5065,27 @@ def build_section_site(
     env.setdefault("SOURCE_DATE_EPOCH", "1704067200")  # 2024-01-01T00:00:00Z
 
     if build_only:
+        # A preview for THIS section may still be serving, and it does not stop
+        # when the launcher that started it is killed: the Python and the node
+        # server both live inside the container, and `_start_public_sync_watcher`
+        # keeps mirroring the SERVE build to the host every second. A build for
+        # publishing that runs alongside one is therefore overwritten within a
+        # second of finishing — the production pages land on the host and the
+        # preview's pages replace them, so what gets published is the preview,
+        # live-reload client and all.
+        #
+        # The APP never meets this, because publishing stops an active preview
+        # first. From the command line nothing did, and `deploy.sh`'s own
+        # rebuild-before-publishing lost this race every time. Stopping the
+        # preview here fixes it for every caller at once, and matches what the
+        # app already does rather than inventing a second rule.
+        #
+        # Only OUR ports, exactly as `kill_existing_quartz` is careful about:
+        # several previews run at once, one per port, and a build for one
+        # section must never take down another section's preview.
+        kill_existing_quartz(port)
+        kill_existing_quartz(port + 1000)
+
         # Static build ONLY (single build)
         print("\n🏗️  Building static site with Quartz → public/")
         safe_clean_public_dir(output_dir / "public")

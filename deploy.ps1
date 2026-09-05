@@ -310,13 +310,22 @@ if ($TO_FOLDER) {
     # filesystem settling after a large write, and OneDrive can add to it.
     # Waits on the condition (a front page without the live-reload client),
     # not a guessed interval, and is bounded.
-    for ($w = 0; $w -lt 75; $w++) {
+    # The WHOLE TREE, not the front page. Serve mode bakes the client into
+    # every page and the mirror is replaced file by file, so a clean front page
+    # with stale pages behind it is a real state — and publishing that mixture
+    # is worse than publishing the preview wholesale, because the front page
+    # looks fine. See the same comment in deploy.sh.
+    for ($w = 0; $w -lt 150; $w++) {
       if ((Test-Path -LiteralPath $publishedIndex) -and
-          -not (Select-String -LiteralPath $publishedIndex -Pattern "ws://localhost:" -Quiet)) { break }
+          -not (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Recurse -File -ErrorAction SilentlyContinue |
+                Select-String -Pattern "ws://localhost:" -List -Quiet)) { break }
       Start-Sleep -Milliseconds 200
     }
-    if (-not (Test-Path -LiteralPath $publishedIndex)) {
-      Write-Host "The rebuilt site has not appeared. Nothing was published."
+    if (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Recurse -File -ErrorAction SilentlyContinue |
+        Select-String -Pattern "ws://localhost:" -List -Quiet) {
+      Write-Host "The rebuilt site still carries the preview's live-reload script."
+      Write-Host "  Nothing was published, rather than publishing pages students'"
+      Write-Host "  browsers would ask about."
       exit 1
     }
   }

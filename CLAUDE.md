@@ -625,6 +625,7 @@ mistake there is a mistake in nineteen hundred courses.
 | macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests` |
 | Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` |
 | Assistant routing | **Nothing.** Measured by hand — see below. |
+| Publishing (any destination, `deploy.sh`/`deploy.py`, the preview→publish path) | `./verify-deploy.sh` — publishes to a folder, Netlify and Cloudflare, and every primary+secondary pairing, then FETCHES EACH SITE BACK and reads it. Deliberately NOT part of `verify.sh`: it needs three credentials, the network, and it creates real sites. Run it when the publishing path changes. |
 
 `verify.sh` **does not run on Windows** (bash, and it expects `docker` on PATH;
 in the normal Windows setup Docker Engine lives inside WSL2). Toolchain changes

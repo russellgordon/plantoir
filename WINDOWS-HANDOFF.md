@@ -3532,6 +3532,61 @@ Substitute "on this PC", the same way you already do for `app-rules.json`'s
 test must compare on the substituted form or it will fail on a difference that
 is correct.
 
+### Publishing while a preview is running — the race, and the harness that found it
+
+Two defects on 2026-09-05, both in the publish path, both invisible to every
+test that does not publish and then LOOK at what came out.
+
+**The race, which is the one that matters.** Killing the preview LAUNCHER does
+not stop the preview. On the mac the Python and the node server both live
+inside the container, and `_start_public_sync_watcher` keeps mirroring the
+SERVE build to the host every second — so a build for publishing lands and the
+preview overwrites it within a second, and what gets published is the preview,
+live-reload client and all. `kill_existing_quartz` was only ever called from
+the SERVE branch, so `--build-only` never stopped anything.
+
+`build_site.py`'s `--build-only` now stops a preview on its own ports before
+building. **That is shared Python and you inherit it.** Two things to check on
+your side rather than assume:
+
+- **Your preview is not in a container**, so an orphaned server is a plain
+  Windows process. Check that killing your launcher actually stops the node
+  server — on the mac it demonstrably does not, and that is exactly the kind of
+  difference that is assumed rather than measured.
+- **Only OUR ports.** Several previews run at once, one per port, and a build
+  for one section must never take down another section's preview. The mac's
+  `kill_existing_quartz` is careful about this; keep it that way.
+
+**The other one was a partial fix of mine, and is worth knowing as a shape.**
+The first version of the preview guard in `deploy.sh` waited for `index.html`
+to lose the live-reload client. Serve mode bakes that client into EVERY page
+and the mirror is replaced file by file, so a clean front page can sit in front
+of two hundred stale preview pages. Publishing that MIXTURE is worse than
+publishing the preview wholesale, because the front page looks fine and nobody
+looks further. Wait on the whole tree; `deploy.ps1` already does.
+
+### `verify-deploy.sh` — the publishing harness, and why it is not in the gate
+
+New on 2026-09-05, at the repository root. It publishes to a folder, to Netlify
+and to Cloudflare, and runs all three primary+secondary pairings, then **fetches
+every published site back and reads it** — the launcher's own output only
+proves the launcher is happy with itself. 42 checks.
+
+**It is deliberately NOT part of `verify.sh`.** The gate must be runnable at any
+moment, on any machine, without credentials and without touching anything
+outside the repository. This needs a Netlify token, a Cloudflare token and an
+account ID, it needs the network, and it CREATES REAL SITES. Build the Windows
+equivalent the same way — opt-in, run when the publishing path changes — rather
+than folding it into whatever you gate on.
+
+One thing it does NOT cover, stated so nobody assumes otherwise:
+`additional_deploy_targets` is not handled by `deploy.sh` at all — the APP loops
+and calls the launcher once per destination. The harness exercises the pairings
+by running that same sequence, which tests the launcher half; that the app
+produces exactly those argument lists is pinned separately by
+`app-rules.json` → `deployArguments`, which your suite already runs. Between the
+two the pairing is covered; neither half covers it alone.
+
 ### The scheduled task NEVER refuses
 
 Russell's call, and the reasoning travels: *"a slightly inaccurate curriculum map
