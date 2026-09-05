@@ -4021,8 +4021,19 @@ three are in `detection.macMarkers`: `~/Library/Mobile Documents` (iCloud
 Drive's real location), `~/Library/CloudStorage/<Service>-<Account>/` (where
 macOS 12.3+ keeps every File Provider service — OneDrive, Google Drive,
 Dropbox, Box — with the service named by the part of the folder name before
-the first hyphen), and the item's own `isUbiquitousItem` flag, which is the
-only way to see a Desktop or Documents that iCloud syncs in place. Your
+the first hyphen), and the item's own `isUbiquitousItem` flag, trusted ONLY
+under `~/Desktop` and `~/Documents` — the two folders iCloud syncs in place.
+**That flag is not iCloud-specific**: the adversarial review (row 401)
+probed a real `~/Library/CloudStorage/Dropbox` and found it set there too,
+so trusted anywhere else it would call a Dropbox folder "iCloud Drive".
+Whatever Windows exposes for "this item is cloud-managed", assume the same
+until proven otherwise. **Symlinks are resolved before any rule runs** —
+Dropbox and OneDrive both leave a link at the old place (`~/Dropbox` →
+`~/Library/CloudStorage/Dropbox`), and a path arriving through it matched
+nothing while the folder behind it matched Dropbox; on Windows, resolve
+junctions and reparse points the same way, since Known Folder Move leaves
+exactly that indirection. The resolved path is also the acknowledgement's
+key, so one folder is one key whichever spelling it arrives by. Your
 markers are listed in `detection.windowsMarkers`: the OneDrive roots the
 client publishes as `%OneDrive%`, `%OneDriveConsumer%` and
 `%OneDriveCommercial%` (a Desktop moved by Known Folder Move physically lives
@@ -4081,7 +4092,8 @@ the order you are likely to meet the same things:
 - **The notice pushed the whole bottom band of the window off screen**, at
   every window height. The mechanism is SwiftUI's (a text pinned to its
   vertical size answers a minimum-size probe with a word per line — 1,548
-  points against 700 proposed, measured), but the SHAPE is WinUI's too: a
+  points, measured, whether 700 points or no height at all is proposed;
+  the modifier ignores the height either way), but the SHAPE is WinUI's too: a
   wrapping `TextBlock` in a horizontal `StackPanel` gets unbounded width and
   never wraps, or bounded width and grows tall. Measure your InfoBar's
   height with the real sentences at a narrow width before shipping it, and
@@ -4103,6 +4115,33 @@ the order you are likely to meet the same things:
   nor empty — is not asked about. The rule is in the contract's `whenShown`;
   the teacher is about to choose again, and the guidance saying what to
   choose is the message.
+
+**What the adversarial review then found** (row 401), beyond the detection
+points folded in above:
+
+- **Finishing a set-up must acknowledge the folder that was SET UP**, not
+  whichever folder is current when the copy ends. The copy runs off the
+  main thread and the Open Working Folder command stays enabled meanwhile;
+  a second synced folder chosen during it has its own decision pending, and
+  the first folder's completion must not answer it. Guard on the path.
+- **"Synced folder noticed" is recorded by a window only.** The assistant
+  and the MCP server adopt folders on models nothing shows; a "noticed" from
+  those says the teacher was told something they were not, and on the mac it
+  produced six lines for one folder in ten minutes. Your `plantoir-mcp.exe`
+  adopts folders too — same rule.
+- **One folder, every window.** Got It in one window clears the same
+  folder's notice in any other window showing it. Rarer on Windows, where
+  one `MainWindow` shows one folder; verify and say so if it cannot happen.
+- **Re-choosing the open folder is a restore**, not a new choice
+  (`whenShown.reChoosingTheOpenFolder`), or the courses vanish behind the
+  picker for a folder the teacher did not change.
+- **The acknowledgement list is keyed by resolved path and never pruned.** A
+  renamed or moved folder is a new key and is asked again — on purpose,
+  since it may have moved INTO a synced location. A deleted folder's key
+  stays, harmlessly.
+- **Three labels are now in the contract** — `chooseDifferentFolderButton`,
+  `showDetailsButton`, `hideDetailsButton` — so nothing on the picker or the
+  notice is left for you to word.
 
 ## The course-code picker is a hand-built combo box — and you probably should NOT build one (2026-08-23)
 

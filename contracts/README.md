@@ -168,7 +168,7 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | What counts as a curriculum expectation | `shared-rules.json` → `curriculumRules` | AssistCurriculumMentions (11) |
 | What is taken out of a problem report | `shared-rules.json` → `problemReportRedaction` | ProblemReport (17), SharedRulesContract (2) |
 | What the breadcrumb trail must record | `shared-rules.json` → `activityTrail` | ActivityTrail via ProblemReport, SharedRulesContract (2) |
-| A working folder a cloud service keeps in sync: how it is recognised, what is said, when | `shared-rules.json` → `cloudSyncedFolders` | CloudSyncedFolder (13) |
+| A working folder a cloud service keeps in sync: how it is recognised, what is said, when | `shared-rules.json` → `cloudSyncedFolders` | CloudSyncedFolder (18), CloudSyncNoticeLayout (5) |
 | When the report asks about the assistant, and what it is called | `shared-rules.json` → `problemReportDialog` | SharedRulesContract (2), ProblemReport (2) |
 | Which assistant a teacher may choose, the caution, and when one may be removed | `shared-rules.json` → `assistantModelChoice` | SharedRulesContract (5), AssistantSettings (22) |
 | What a page is called when the assistant names it | `shared-rules.json` → `pageNaming` | SharedRulesContract (2), AssistPageNaming (7), AssistToolRunner (2) |
