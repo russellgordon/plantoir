@@ -287,6 +287,40 @@ if (-not $builtFound) {
 if ($TO_FOLDER) {
   $targetDir = Join-Path -Path ($TO_FOLDER.TrimEnd('\','/')) -ChildPath ("section{0}" -f $SECTION_NUM)
   New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+  # A PREVIEW build must never reach a published site. Serve mode bakes a
+  # live-reload client into every page, and on a published site that script
+  # makes a student's browser ask permission to access other apps and
+  # services on this device. deploy.py already refuses this, but ONLY for
+  # Netlify and Cloudflare: this branch publishes host-to-host and never
+  # enters the container, so deploy.py never runs. The app's own publish path
+  # is protected by BuildFreshness; the command line was not. Mirrors the fix
+  # made in deploy.sh on 2026-09-05 — see GUI-IMPROVEMENTS row 392.
+  $publishedIndex = Join-Path $PUBLIC_DIR_HOST "index.html"
+  if ((Test-Path -LiteralPath $publishedIndex) -and
+      (Select-String -LiteralPath $publishedIndex -Pattern "ws://localhost:" -Quiet)) {
+    Write-Host "This site was built by a preview, which bakes in a live-reload script"
+    Write-Host "  that students' browsers would ask about. Rebuilding it for publishing..."
+    & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only"
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "Could not rebuild this site for publishing."
+      exit 1
+    }
+    # Wait for the rebuild to become VISIBLE here before copying. On the mac
+    # the lag is the container's bind mount; natively on Windows it is the
+    # filesystem settling after a large write, and OneDrive can add to it.
+    # Waits on the condition (a front page without the live-reload client),
+    # not a guessed interval, and is bounded.
+    for ($w = 0; $w -lt 75; $w++) {
+      if ((Test-Path -LiteralPath $publishedIndex) -and
+          -not (Select-String -LiteralPath $publishedIndex -Pattern "ws://localhost:" -Quiet)) { break }
+      Start-Sleep -Milliseconds 200
+    }
+    if (-not (Test-Path -LiteralPath $publishedIndex)) {
+      Write-Host "The rebuilt site has not appeared. Nothing was published."
+      exit 1
+    }
+  }
+
   Write-Host ("Publishing {0} section {1} to a folder..." -f $COURSE_CODE, $SECTION_NUM)
   # /MIR mirrors (copies changes, deletes removals); robocopy exit codes
   # below 8 all mean success.

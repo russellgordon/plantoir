@@ -157,6 +157,25 @@ else
   cat /tmp/verify_baked_modules_test.log
 fi
 
+# A preview build must never reach a published site, and the FOLDER
+# destination is the one that can: it publishes host-side and never enters the
+# container, so deploy.py's own refusal never runs. Structural rather than
+# behavioural — a real preview-then-publish cycle would add minutes to every
+# run of this script — but it catches the guard being deleted, which is how it
+# came to be missing in the first place.
+_folder_guard_ok=true
+for _launcher in deploy.sh deploy.ps1; do
+  if ! grep -q "ws://localhost:" "$_launcher"; then
+    _folder_guard_ok=false
+    echo "   $_launcher does not check for a preview build before publishing to a folder"
+  fi
+done
+if [ "$_folder_guard_ok" = true ]; then
+  pass "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
+else
+  fail "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
+fi
+
 # -------------------- 1. Container runtime (shared Colima) --------------------
 # Maintainer variant: assumes Colima and the Docker CLI are installed (the
 # teacher-facing launchers handle installation). Never stops a running VM.

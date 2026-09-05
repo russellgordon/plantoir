@@ -24,7 +24,8 @@
         "when" : "the built index cannot be read",
         "why" : "Rebuild rather than trust it."
       }
-    ]
+    ],
+    "theLaunchersMustDoThisToo" : "These rules were implemented in the APPS only, and that left a hole for two years' worth of command-line use. `deploy.py` refuses a preview build for the Netlify and Cloudflare destinations, but publishing TO A FOLDER is handled entirely host-side by `deploy.sh` / `deploy.ps1` — it never enters the container, so `deploy.py` never runs. From the command line, `./preview.sh CODE N` followed by `./deploy.sh CODE N --to-folder …` therefore published the live-reload client: measured 2026-09-05 as 230 of 244 files. The apps were never exposed, because BuildFreshness forces a rebuild first, which is why three destinations tested clean in August. Both launchers now make the same check and rebuild. TWO things are needed, not one: the check, AND a wait for the rebuilt site to become VISIBLE on the host afterwards — the first attempt published an EMPTY folder and reported success, because the container writes through a bind mount the host's view of lags."
   },
   "configurationRules" : {
     "cloudflareAccountID" : [

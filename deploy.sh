@@ -278,6 +278,53 @@ if [[ -n "$TO_FOLDER" ]]; then
     echo "   $TARGET_DIR"
     exit 1
   }
+  # A PREVIEW build must never reach a published site. Serve mode bakes a
+  # live-reload client — new WebSocket('ws://localhost:<port>') — into every
+  # page, and on a published site that script makes a student's browser ask
+  # permission to "access other apps and services on this device".
+  #
+  # `deploy.py` already refuses this, but ONLY for Netlify and Cloudflare:
+  # this branch publishes host-to-host and never enters the container, so
+  # deploy.py never runs and the check was simply absent. The app's own
+  # publish path is protected by BuildFreshness ("the built site was made by
+  # a PREVIEW" forces a rebuild), which is why publishing to a folder from
+  # the APP has always been safe and why this went unnoticed — but from the
+  # command line, `./preview.sh CODE N` followed by `./deploy.sh CODE N
+  # --to-folder …` shipped the live-reload client. Found 2026-09-05 by
+  # publishing straight after a preview and looking at what came out: 230 of
+  # 244 files carried it.
+  if grep -q "ws://localhost:" "${PUBLIC_DIR_HOST}/index.html" 2>/dev/null; then
+    echo "🔁 This site was built by a preview, which bakes in a live-reload script"
+    echo "   that students' browsers would ask about. Rebuilding it for publishing…"
+    if ! "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only; then
+      echo "❌ Could not rebuild this site for publishing."
+      exit 1
+    fi
+    # The rebuild writes through the container's bind mount and the host's
+    # view of it LAGS — which is why the "built site not found" loop further
+    # up exists at all. Without waiting here the publish ran against a
+    # directory the host could not see yet and copied NOTHING, reporting
+    # "Published: 0 file(s) updated" over an empty folder. Found by running
+    # the fix rather than reasoning about it, 2026-09-05.
+    #
+    # Waits on the real CONDITION rather than a guessed interval: a front page
+    # that no longer carries the live-reload client is exactly what "the
+    # rebuild is visible here" means. Bounded, so a rebuild that somehow
+    # produced nothing still falls through to the guard below instead of
+    # hanging.
+    for ((_w=0; _w<75; _w++)); do
+      if [[ -f "${PUBLIC_DIR_HOST}/index.html" ]] \
+         && ! grep -q "ws://localhost:" "${PUBLIC_DIR_HOST}/index.html" 2>/dev/null; then
+        break
+      fi
+      sleep 0.2
+    done
+    if [[ ! -f "${PUBLIC_DIR_HOST}/index.html" ]]; then
+      echo "❌ The rebuilt site has not appeared. Nothing was published."
+      exit 1
+    fi
+  fi
+
   echo "📦 Publishing ${COURSE_CODE} section ${SECTION_NUM} to a folder…"
   # -a preserves what matters, --delete mirrors removals, and the
   # itemized output is counted so the teacher sees how little moved.
