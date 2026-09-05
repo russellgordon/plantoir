@@ -999,7 +999,25 @@ rather than being deleted.
   (`course_dir = COURSES_ROOT / args.course`, unambiguous regardless of
   where the build output lives) is in the ONE shared `deploy.py` both
   platforms run, so **the mac's copy carries the identical change with
-  nothing further to do.** Two new pure-stdlib tests,
+  nothing further to do.**
+
+  **Addendum, 2026-09-05 — your fix is now load-bearing on the mac too, and
+  this entry's "the mac itself was never affected" is true of the day it was
+  written and no longer of today.** The mac has moved its build output out of
+  the working folder as well (`GUI-IMPROVEMENTS.md` rows 402–406). It does it
+  differently — `courses/<CODE>/.merged_output` is a SYMLINK, not an
+  environment variable — but `deploy.py` calls `.resolve()` on the built
+  section's path, so on the mac `section_dir.parent.parent` now climbs to the
+  BUILDS folder's parent, exactly as it did on yours. Had `course_dir` still
+  been derived from that ancestry, the mac would have started writing its
+  Netlify and Cloudflare markers into Application Support and creating a
+  brand-new site on every publish — your bug, on our machine, a fortnight
+  later. It did not, because you had already fixed it and pinned it with
+  `scripts/test_deploy_course_dir_resolution.py`, which is now doing the job
+  on both platforms. **Nothing is owed here; this is the answer-back.** The
+  one thing worth knowing is that the test's docstring, which says the two
+  paths differ "under Windows' native PLANTOIR_BUILD_ROOT", is now true of the
+  mac's symlink as well — it still passes and still guards the right thing. Two new pure-stdlib tests,
   `scripts/test_deploy_course_dir_resolution.py`, wired into `verify.sh` —
   worth running there once, since they exercise `merged_output_root()`
   directly and `verify.sh` is the gate that would have caught this had it

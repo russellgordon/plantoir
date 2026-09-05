@@ -25,7 +25,18 @@ each working folder's `.toolchain/`. The launchers:
 - probe a free host port block per container (8081/8091/8101…), mapping to
   fixed container ports 8081–8084 for sites plus 9081–9084 for Quartz's
   live-reload websockets (`--wsPort` = port + 1000 — without it, concurrent
-  previews collide on the websocket even with distinct site ports).
+  previews collide on the websocket even with distinct site ports);
+- give the container **TWO** bind mounts, not one: `courses/` at
+  `/teaching/courses`, and `~/Library/Application Support/Plantoir/builds/
+  <folder id>` at **its own absolute path**. The second is where built
+  websites live — `courses/<CODE>/.merged_output` is a symlink to it, so the
+  link has to resolve to the same string on both sides. A container missing
+  that mount is recreated, because a mount cannot be added to one that
+  already exists. Every launcher creates the same mount set; if one of them
+  stopped, two launchers would recreate the container away from each other
+  on alternate runs. The rule, and what was rejected, is in
+  [`contracts/shared-rules.json`](contracts/shared-rules.json) →
+  `buildOutputLocation`.
 
 The image carries **wrangler**, Cloudflare's own deploy CLI, used by
 `scripts/deploy.py` for the Cloudflare Pages destination (their upload protocol
@@ -149,26 +160,3 @@ Four things that cost a day each if you do not know them:
 On the mac the MCP server IS the app: `Plantoir --mcp-stdio <working-folder>`
 serves the same tools to Claude Code, so there is no second binary to sign or
 forget. Windows ships `plantoir-mcp.exe` instead.
-
-## Example content and skeletons
-
-`support/example_content/<CODE>/` holds ready-made course content, one folder
-per Ontario course code (ADA1O is the template to copy; **38 codes** have
-payloads today — count the folders rather than trusting a number). Each payload
-is `manifest.json` plus `shared/` and `per_section/` trees, and the manifest is
-the course's ENTIRE structure when a teacher pre-populates: the wizard asks no
-structure questions, so a payload must be complete. Conventions the installer
-relies on are in
-[`.claude/skills/example-content/SKILL.md`](.claude/skills/example-content/SKILL.md)
-— use that skill for any payload work rather than reasoning from scratch.
-
-Adding a course code is pure content: drop in a payload, no code changes. The
-wizard discovers it by the manifest's existence, and the payload automatically
-retires that code's skeleton.
-
-Every other Ontario code (~1,900 of them) gets a **skeleton** from
-`support/skeletons/<family>/`: `families.json` maps 499 three-letter prefixes to
-50 families, with a generic fallback. The skeletons are **generated, never
-hand-edited** — `.claude/skills/example-content/generate_skeletons.py` holds
-eleven shapes and writes ~1,950 pages; `lint_skeletons.py` is the gate. A
-mistake there is a mistake in nineteen hundred courses.

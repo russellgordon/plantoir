@@ -61,6 +61,9 @@ courses/  ◀──────bind mount──────▶  /teaching/course
   ICS3U/                                     │
     course_config.json    ◀── written by setup, read by build
     section1/ … Examples/ …                  │
-    .merged_output/section1/  ◀── Quartz scaffold + merged content
+    .merged_output/  ◀── a SHORTCUT, out of the working folder to
+      section1/            ~/Library/Application Support/Plantoir/builds/…
         public/           ◀── built site  ──▶  Netlify API
+        course_config.json    (the scaffold and node_modules stay on the
+                               container's own storage and never land here)
 ```

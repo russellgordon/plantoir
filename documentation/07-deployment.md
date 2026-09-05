@@ -37,7 +37,11 @@ over the deploy method.
 - The static site must already exist at
   `courses/<CODE>/.merged_output/section<N>/public/`. The deploy launcher
   never builds it: if that folder is missing or empty it stops and tells the
-  teacher to run preview with `--build-only` first.
+  teacher to run preview with `--build-only` first. On macOS that path is a
+  shortcut out of the working folder (see
+  [the build pipeline](05-build-pipeline.md)); `deploy.py` follows it for the
+  work but names the `courses/…` spelling in everything it says, because that
+  is the path the teacher knows.
 - `NETLIFY_AUTH_TOKEN` must be in the environment. The deploy **launcher**
   owns the token (macOS Keychain / Windows Credential Manager — see
   [launcher scripts](03-launcher-scripts.md#deploysh)) and injects it; the

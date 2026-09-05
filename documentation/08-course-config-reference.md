@@ -103,7 +103,8 @@ file — or any file in the working folder.
 | Path (under `courses/`) | Purpose |
 |---|---|
 | `<CODE>/course_config.backup.json` | Automatic backup written before build-time discovery updates the config. |
-| `<CODE>/.merged_output/section<N>/` | Generated Quartz site for the section (scaffold + merged content + `public/`). Safe to delete; rebuilt on demand. |
+| `<CODE>/.merged_output` | **A shortcut, not a folder** (since 2026-09-05): it points at `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>` on macOS, `%LOCALAPPDATA%\Plantoir\builds\<folder id>\<CODE>` on Windows. Built sites are derived and were moved out so that copying, zipping, backing up or syncing a course no longer carries them. Safe to delete; rebuilt on demand. |
+| `<CODE>/.merged_output/section<N>/` | The section's built site as every script names it — `public/` and a copy of `course_config.json`. NOT the Quartz scaffold or `node_modules`: those live on the container's own fast storage and are never mirrored out. |
 | `<CODE>/.netlify_sites/section<N>.json` | Netlify site marker (site id/URL) so re-deploys target the same site. |
 | `<CODE>/.cloudflare_sites/section<N>.json` | Cloudflare Pages marker (project name/id, subdomain, account) so re-publishing reuses the same project instead of creating a second one. |
 | `<CODE>/Media/` | Shared binary assets; symlinked into every build, always hidden from the sidebar. |

@@ -19,6 +19,18 @@ folder) — and does NOT nest a `.merged_output` level when it does, so the
 built section is only ONE level below the build root, not two. Climbing two
 levels there landed on the build root's own parent, not the course.
 
+**It now guards the mac as well** (2026-09-05). The mac moved its build
+output out of the working folder too, by a different route:
+`courses/<CODE>/.merged_output` is a SYMLINK to a builds folder under
+Application Support, and `main()` calls `.resolve()` on the built section's
+path — so `section_dir.parent.parent` climbs to the builds folder's parent
+there too, and the old computation would have written the Netlify/Cloudflare
+markers into Application Support and created a brand-new published site on
+every deploy. The Windows fix was already in place and already pinned here,
+which is why that never happened. The case below still exercises
+`PLANTOIR_BUILD_ROOT`, because that is the layout it can build without a
+symlink; the rule it protects is the same one.
+
 Pure stdlib, no Docker and no network — this pins the structural mismatch
 directly, without needing a real build. Run with:
 
