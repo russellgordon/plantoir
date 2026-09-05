@@ -45,6 +45,18 @@ Beyond the actions, the app owns delivery and resources:
 - **Resources are freed.** Each working folder has its own container,
   stopped when the folder's last window closes and at quit; Colima itself
   is stopped at quit only when nothing else is running in it.
+- **A folder a cloud service keeps in sync is explained, never refused.**
+  A working folder in iCloud Drive, Dropbox, OneDrive, Google Drive or Box
+  is recognised from the markers macOS exposes (`~/Library/Mobile Documents`,
+  `~/Library/CloudStorage/<Service>-…`, and iCloud's own flag on a Desktop or
+  Documents synced in place) — never from a folder's name. A folder the
+  teacher just chose stops at the picker with a plain-words explanation and
+  the choice to go ahead or pick another; a folder a window restored gets a
+  dismissable notice above the path bar. Either is shown once per folder.
+  The sentences, the detection cases and the timing are in
+  `contracts/shared-rules.json` → `cloudSyncedFolders`. The build output
+  still lands inside the folder on the mac (Windows already moves it out);
+  moving it is a separate, researched piece in `TODO.md`.
 
 ## Renaming a course folder
 
