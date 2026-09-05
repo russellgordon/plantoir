@@ -222,6 +222,28 @@ struct StringListEditorView: View {
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("addTo-\(title)")
             }
+
+            // **Said in place, deliberately NOT in an alert.** This used to be
+            // a second `.alert` on this same view, and it crashed the app: a
+            // SwiftUI view presents one thing at a time, and `performRename`
+            // dismissed the rename SHEET and raised the alert in the same
+            // breath — `AppKitDialogBridge.updateExistingAlert` reconciling an
+            // alert while `NSSheetMoveHelper closeSheet` was still animating,
+            // EXC_BAD_ACCESS. Found by driving the real app on 2026-09-04;
+            // every unit test passed. The project already had the rule written
+            // down (`shared-rules.json` → `siteHealth.repair.oneAlertAtATime`)
+            // and this broke it. Inline is also simply better here: what these
+            // sentences say — that a folder was created, that a removed folder
+            // is still on disk — is a note about the list the teacher is
+            // looking at, not news that deserves to interrupt them.
+            if let notice {
+                Text(notice)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+                    .accessibilityIdentifier("listNotice-\(title)")
+            }
         }
         .padding(.vertical, 4)
         .alert(item: $pendingRemoval) { removal in
@@ -236,26 +258,6 @@ struct StringListEditorView: View {
         }
         .sheet(item: $pendingRename) { rename in
             renameSheet(for: rename.item)
-        }
-        // Presented from the view rather than from inside the sheet's own
-        // button: a view shows one thing at a time, and asking for this while
-        // the sheet is dismissing loses whichever arrives second — which would
-        // be the report the teacher just asked for.
-        .alert(
-            "",
-            isPresented: Binding(
-                get: { return notice != nil },
-                set: { newValue in
-                    if !newValue {
-                        notice = nil
-                    }
-                }
-            ),
-            presenting: notice
-        ) { _ in
-            Button("OK") { notice = nil }
-        } message: { message in
-            Text(message)
         }
     }
 

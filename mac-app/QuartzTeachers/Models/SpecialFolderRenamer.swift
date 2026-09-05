@@ -388,10 +388,21 @@ enum SpecialFolderRenamer {
             updated["curriculum_folder"] = newName
         }
 
-        // The marks pool names folders from either scope, so it is rewritten
-        // whichever list the folder came from.
-        if let graded = values["graded_folders"] as? [String] {
-            updated["graded_folders"] = renaming(oldName, to: newName, inList: graded)
+        // Three flat lists that name folders from EITHER scope, so each is
+        // rewritten whichever list the folder came from.
+        //
+        // **`hidden` is the one that matters, and it was missed until the real
+        // app was driven on 2026-09-04.** It holds the folders and files kept
+        // OUT of the built site. Leave it naming the old folder and a rename
+        // silently UN-HIDES it: the very next publish puts pages the teacher
+        // deliberately hid in front of students. The course this was found on
+        // had "Curriculum" in that list. Publishing what a teacher hid is a
+        // failure this project has already had once, from a different cause,
+        // and it is the worst thing in this file's reach.
+        for key in ["graded_folders", "hidden", "expandable"] {
+            if let names = values[key] as? [String] {
+                updated[key] = renaming(oldName, to: newName, inList: names)
+            }
         }
 
         // **Scoped, both of them.** A shared folder and a per-section folder may

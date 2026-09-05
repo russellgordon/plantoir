@@ -774,6 +774,8 @@ final class SharedRulesContractTests: XCTestCase {
             "graded_folders": ["Tasks"],
             "curriculum_folder": "Tasks",
             "class_folder": "Tasks",
+            "hidden": ["Tasks", "Private Notes.md"],
+            "expandable": ["Tasks", "Concepts"],
             "excluded_items": ["shared": ["Tasks"], "per_section": ["Tasks"]],
         ]
         let afterShared: [String: Any] = SpecialFolderRenamer.renaming(
@@ -791,6 +793,14 @@ final class SharedRulesContractTests: XCTestCase {
                 XCTAssertEqual(afterPerSection[key] as? [String], ["Assessments"])
             case "graded_folders":
                 XCTAssertEqual(afterShared[key] as? [String], ["Assessments"])
+            case "hidden":
+                // The dangerous one: left naming the old folder, a rename
+                // un-hides it and the next publish shows students pages the
+                // teacher hid.
+                XCTAssertEqual(afterShared[key] as? [String], ["Assessments", "Private Notes.md"])
+                XCTAssertEqual(afterPerSection[key] as? [String], ["Assessments", "Private Notes.md"])
+            case "expandable":
+                XCTAssertEqual(afterShared[key] as? [String], ["Assessments", "Concepts"])
             case "curriculum_folder":
                 XCTAssertEqual(afterShared[key] as? String, "Assessments")
                 XCTAssertEqual(

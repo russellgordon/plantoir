@@ -1001,8 +1001,11 @@
         "graded_folders",
         "curriculum_folder",
         "class_folder",
+        "hidden",
+        "expandable",
         "excluded_items"
       ],
+      "hiddenIsTheDangerousOne": "`hidden` holds the folders and files kept OUT of the built site. A rename that does not carry it across silently UN-HIDES the folder, and the next publish puts pages the teacher deliberately hid in front of students. Missed until the real app was driven on 2026-09-04, on a course whose `hidden` list named its Curriculum folder. `expandable` beside it is only cosmetic — the sidebar's expansion state — but is carried for the same reason: a key that names a folder and is not rewritten leaves the configuration describing a folder that no longer exists.",
       "materialisesOnRename": {
         "keys": ["class_folder", "curriculum_folder"],
         "rule": "Renaming the folder a course currently RESOLVES to as its class folder or its curriculum folder writes that key, even on a course that never had one.",
