@@ -984,6 +984,17 @@ class CourseConfiguration {
                 if attempts < 3 {
                     continue
                 }
+                // But it writes the FRESHEST computation, not the stale one.
+                // Falling through with `written` — derived from `before`, which
+                // `nowOnDisk` has just proved out of date — would clobber the
+                // other writer's keys, which is the very failure this loop
+                // exists to stop. Apply the change to what is there now.
+                if let latest = try? JSONSerialization.jsonObject(with: nowOnDisk) as? [String: Any] {
+                    written = try JSONSerialization.data(
+                        withJSONObject: change(latest), options: options
+                    )
+                    written.append(contentsOf: [0x0A])
+                }
             }
             try written.write(to: url, options: [.atomic])
             lastSavedData = written

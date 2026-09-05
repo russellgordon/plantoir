@@ -21,6 +21,17 @@ struct PendingRename: Identifiable {
 
     let item: String
 
+    /// The name a rename from this folder was heading for when it stopped, or
+    /// nil when nothing was interrupted. Settled ONCE, when the sheet opens,
+    /// because answering it touches the filesystem — asked from inside the
+    /// view's body it would be a handful of `stat` calls per keystroke.
+    ///
+    /// The TARGET rather than a yes/no, so that the clash check can be relaxed
+    /// for exactly the rename that was interrupted and for no other: a teacher
+    /// who opens this sheet and types a different name gets the ordinary
+    /// refusal back.
+    let interruptedRenameTarget: String?
+
     // MARK: - Computed properties
 
     var id: String { return item }
@@ -83,7 +94,11 @@ struct StringListEditorView: View {
     /// Why a proposed new name cannot be used, or nil when it can. Pure and
     /// asked on every keystroke, so the Rename button can be disabled with the
     /// reason showing rather than refusing after the fact.
-    var renameProblem: ((_ oldName: String, _ newName: String) -> String?)? = nil
+    var renameProblem: ((_ oldName: String, _ newName: String, _ finishing: Bool) -> String?)? = nil
+
+    /// Asked once when the rename sheet opens, not on every keystroke: it
+    /// touches the filesystem.
+    var interruptedRenameTarget: ((_ oldName: String) -> String?)? = nil
 
     /// Performs the rename. Supplying this is what puts the rename control on
     /// the rows — file lists and the New Course Wizard leave it nil, the
@@ -152,7 +167,14 @@ struct StringListEditorView: View {
                         Button("Rename \(item)", systemImage: "pencil") {
                             proposedName = item
                             renameFailure = nil
-                            pendingRename = PendingRename(item: item)
+                            let interrupted: String? = interruptedRenameTarget?(item)
+                            // Filled in with the rename that was interrupted,
+                            // so finishing it is one keypress rather than a
+                            // remembered name.
+                            proposedName = interrupted ?? item
+                            pendingRename = PendingRename(
+                                item: item, interruptedRenameTarget: interrupted
+                            )
                         }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
@@ -264,15 +286,21 @@ struct StringListEditorView: View {
             )
         }
         .sheet(item: $pendingRename) { rename in
-            renameSheet(for: rename.item)
+            renameSheet(for: rename.item, interruptedTarget: rename.interruptedRenameTarget)
         }
     }
 
     // MARK: - The rename sheet
 
     @ViewBuilder
-    func renameSheet(for item: String) -> some View {
-        let problem: String? = renameProblem?(item, proposedName)
+    func renameSheet(for item: String, interruptedTarget: String?) -> some View {
+        // Only the rename that was actually interrupted may skip the clash
+        // check — a pure string comparison here, with the filesystem question
+        // already answered when the sheet opened.
+        let finishing: Bool = interruptedTarget?.caseInsensitiveCompare(
+            proposedName.trimmingCharacters(in: .whitespaces)
+        ) == .orderedSame
+        let problem: String? = renameProblem?(item, proposedName, finishing)
         VStack(alignment: .leading, spacing: 12) {
             Text(SpecialNames.renameFolderTitle(for: item))
                 .font(.headline)
@@ -280,7 +308,7 @@ struct StringListEditorView: View {
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("renameField")
                 .onSubmit {
-                    Task { await performRename(of: item) }
+                    Task { await performRename(of: item, finishing: finishing) }
                 }
             Text(SpecialNames.renameFolderExplanation)
                 .font(.callout)
@@ -305,7 +333,7 @@ struct StringListEditorView: View {
                         .padding(.trailing, 4)
                 }
                 Button("Rename") {
-                    Task { await performRename(of: item) }
+                    Task { await performRename(of: item, finishing: finishing) }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(problem != nil || isRenaming)
@@ -381,11 +409,11 @@ struct StringListEditorView: View {
     /// `items` binding reads that configuration — so editing the array here
     /// too would put the rename in twice, and would put it in even when the
     /// filesystem refused.
-    func performRename(of item: String) async {
+    func performRename(of item: String, finishing: Bool) async {
         guard let onRename, !isRenaming else {
             return
         }
-        if renameProblem?(item, proposedName) != nil {
+        if renameProblem?(item, proposedName, finishing) != nil {
             return
         }
         let newName: String = proposedName.trimmingCharacters(in: .whitespaces)

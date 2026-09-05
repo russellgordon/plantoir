@@ -92,8 +92,17 @@ struct CourseSettingsView: View {
                             }
                         },
                         protection: sharedFolderProtection,
-                        renameProblem: { oldName, newName in
-                            return folderRenameProblem(oldName, to: newName, scope: .shared)
+                        renameProblem: { oldName, newName, finishing in
+                            return folderRenameProblem(
+                                oldName, to: newName, scope: .shared, finishing: finishing
+                            )
+                        },
+                        interruptedRenameTarget: { oldName in
+                            return SpecialFolderRenamer.interruptedRenameTarget(
+                                from: oldName, scope: .shared,
+                                courseDirectory: course.directoryURL,
+                                sectionNumbers: course.configuration.sectionNumbers
+                            )
                         },
                         onRename: { oldName, newName in
                             return await renameFolder(oldName, to: newName, scope: .shared)
@@ -130,8 +139,17 @@ struct CourseSettingsView: View {
                             }
                         },
                         protection: perSectionFolderProtection,
-                        renameProblem: { oldName, newName in
-                            return folderRenameProblem(oldName, to: newName, scope: .perSection)
+                        renameProblem: { oldName, newName, finishing in
+                            return folderRenameProblem(
+                                oldName, to: newName, scope: .perSection, finishing: finishing
+                            )
+                        },
+                        interruptedRenameTarget: { oldName in
+                            return SpecialFolderRenamer.interruptedRenameTarget(
+                                from: oldName, scope: .perSection,
+                                courseDirectory: course.directoryURL,
+                                sectionNumbers: course.configuration.sectionNumbers
+                            )
                         },
                         onRename: { oldName, newName in
                             return await renameFolder(oldName, to: newName, scope: .perSection)
@@ -403,7 +421,9 @@ struct CourseSettingsView: View {
     /// live in different places on disk, and `discover_shared_items` and
     /// `discover_section_items` scan for them separately — so checking both
     /// lists would refuse a rename that is perfectly fine.
-    func folderRenameProblem(_ oldName: String, to newName: String, scope: FolderScope) -> String? {
+    func folderRenameProblem(
+        _ oldName: String, to newName: String, scope: FolderScope, finishing: Bool = false
+    ) -> String? {
         let namesInScope: [String]
         switch scope {
         case .shared:
@@ -411,15 +431,8 @@ struct CourseSettingsView: View {
         case .perSection:
             namesInScope = course.configuration.perSectionFolders
         }
-        // A rename that was interrupted after the folders moved leaves the
-        // configuration naming the old folder and a build appends the new one,
-        // so the list holds both and the ordinary clash check refuses the very
-        // rename that would put it right. Settled by looking at the disk.
-        let finishing: Bool = SpecialFolderRenamer.looksLikeAnInterruptedRename(
-            from: oldName, to: newName, scope: scope,
-            courseDirectory: course.directoryURL,
-            sectionNumbers: course.configuration.sectionNumbers
-        )
+        // `finishing` is settled once when the sheet opens, not here: it
+        // touches the filesystem, and this runs on every keystroke.
         return SpecialFolderRenamer.problem(
             renaming: oldName, to: newName, existingNames: namesInScope,
             isFinishingAnInterruptedRename: finishing
@@ -476,6 +489,10 @@ struct CourseSettingsView: View {
                 + "change to this course's settings: \(error.localizedDescription)"
             )
         }
+        // The configuration is written, so the rename is whole and the record
+        // of it having started can go. Anything that leaves this record behind
+        // is, by definition, a rename that did not finish.
+        SpecialFolderRenamer.clearRenameRecord(courseDirectory: course.directoryURL)
         ActivityTrail.note(
             .folderRenamed,
             "renamed the folder " + oldName + " to " + newName + " in " + course.code

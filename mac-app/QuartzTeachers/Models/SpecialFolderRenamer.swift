@@ -190,14 +190,92 @@ enum SpecialFolderRenamer {
             .caseInsensitiveCompare(name) == .orderedSame
     }
 
-    /// Whether this rename is one that already happened on disk and never
-    /// finished — the old folder gone, the new one there.
+    /// Where a rename records that it has started, so that one interrupted
+    /// half way can be recognised rather than guessed at.
     ///
-    /// Asked of the FILESYSTEM rather than of the configuration, because the
-    /// configuration is exactly what is wrong in this state. For a per-section
-    /// folder it is enough that no section still has the old one and at least
-    /// one has the new: a rename moves every section's copy, so a mixture
-    /// means something else happened and the ordinary refusal should stand.
+    /// Inside `courses/.internal/`, which is where this project already keeps
+    /// transient per-course state (the work leases, the tokens). Deliberately
+    /// NOT a key in `course_config.json`: the whole failure being handled here
+    /// is that the configuration write did not happen.
+    nonisolated static func renameMarkerURL(courseDirectory: URL) -> URL {
+        return courseDirectory
+            .deletingLastPathComponent()
+            .appendingPathComponent(".internal")
+            .appendingPathComponent("renames")
+            .appendingPathComponent(courseDirectory.lastPathComponent + ".json")
+    }
+
+    /// Records that a rename is about to move folders. Written BEFORE anything
+    /// moves and deleted once the configuration has been written, so its
+    /// presence means exactly one thing: a rename got part way and stopped.
+    nonisolated static func recordRenameStarting(
+        from oldName: String, to newName: String, scope: FolderScope, courseDirectory: URL
+    ) {
+        let marker: URL = renameMarkerURL(courseDirectory: courseDirectory)
+        let note: [String: String] = [
+            "from": oldName,
+            "to": newName,
+            "scope": scope.exclusionKey,
+        ]
+        try? FileManager.default.createDirectory(
+            at: marker.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        if let data = try? JSONSerialization.data(withJSONObject: note, options: [.prettyPrinted]) {
+            try? data.write(to: marker, options: [.atomic])
+        }
+    }
+
+    /// Clears the record. Called once the configuration has been written, at
+    /// which point the rename is whole.
+    nonisolated static func clearRenameRecord(courseDirectory: URL) {
+        try? FileManager.default.removeItem(at: renameMarkerURL(courseDirectory: courseDirectory))
+    }
+
+    /// Whether this rename is one that already happened on disk and never
+    /// finished.
+    ///
+    /// **Two things must agree, and the record is the one that matters.** The
+    /// disk state alone — old folder gone, new folder there — is NOT enough,
+    /// and reading it as enough was a real bug: it is also the state of a
+    /// configuration entry whose folder was never created or was deleted in
+    /// Obsidian, renamed onto a genuine second folder. Bypassing the clash
+    /// check there would transfer the phantom entry's attributes onto a real
+    /// folder — `hidden` among them, which would take that folder's pages off
+    /// the next publish with nobody told. The two cases are indistinguishable
+    /// on disk, so the disk cannot be the evidence.
+    ///
+    /// The record written before the folders move is what tells them apart. It
+    /// is still checked against the disk as well, so a stale record left by
+    /// something else cannot open the bypass on its own.
+    /// The name a rename from this folder was heading for when it stopped, or
+    /// nil when nothing was interrupted.
+    ///
+    /// Returns the TARGET rather than a yes/no, because the caller asks this
+    /// when the rename sheet opens — before the teacher has typed anything —
+    /// and the recorded target is both the answer and a sensible thing to fill
+    /// the field with.
+    nonisolated static func interruptedRenameTarget(
+        from oldName: String,
+        scope: FolderScope,
+        courseDirectory: URL,
+        sectionNumbers: [Int],
+        fileManager: FileManager = .default
+    ) -> String? {
+        guard let data = try? Data(contentsOf: renameMarkerURL(courseDirectory: courseDirectory)),
+              let note = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+              note["from"]?.caseInsensitiveCompare(oldName) == .orderedSame,
+              note["scope"] == scope.exclusionKey,
+              let target = note["to"] else {
+            return nil
+        }
+        let agrees: Bool = looksLikeAnInterruptedRename(
+            from: oldName, to: target, scope: scope,
+            courseDirectory: courseDirectory, sectionNumbers: sectionNumbers,
+            fileManager: fileManager
+        )
+        return agrees ? target : nil
+    }
+
     nonisolated static func looksLikeAnInterruptedRename(
         from oldName: String,
         to newName: String,
@@ -206,6 +284,13 @@ enum SpecialFolderRenamer {
         sectionNumbers: [Int],
         fileManager: FileManager = .default
     ) -> Bool {
+        guard let data = try? Data(contentsOf: renameMarkerURL(courseDirectory: courseDirectory)),
+              let note = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+              note["from"]?.caseInsensitiveCompare(oldName) == .orderedSame,
+              note["to"]?.caseInsensitiveCompare(newName) == .orderedSame,
+              note["scope"] == scope.exclusionKey else {
+            return false
+        }
         let oldPlaces: [URL] = folderLocations(
             named: oldName, scope: scope,
             courseDirectory: courseDirectory, sectionNumbers: sectionNumbers
@@ -310,6 +395,16 @@ enum SpecialFolderRenamer {
                 )
             }
             moves.append((from: location, to: destination))
+        }
+
+        // Recorded BEFORE anything moves, so that a rename interrupted between
+        // the move and the configuration write can be recognised rather than
+        // guessed at from the disk — see `looksLikeAnInterruptedRename` for
+        // why the disk alone is not evidence.
+        if !moves.isEmpty {
+            recordRenameStarting(
+                from: oldName, to: newName, scope: scope, courseDirectory: courseDirectory
+            )
         }
 
         var moved: Int = 0

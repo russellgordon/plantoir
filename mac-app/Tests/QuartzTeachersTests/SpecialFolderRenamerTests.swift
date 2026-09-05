@@ -375,13 +375,24 @@ final class SpecialFolderRenamerTests: XCTestCase {
     /// either: no way out but hand-editing the JSON.
     func testARenameLeftHalfDoneCanBeFinished() throws {
         let course: URL = try makeCourse(sections: [1, 2], perSectionFolders: ["All Days"])
+        SpecialFolderRenamer.recordRenameStarting(
+            from: "All Classes", to: "All Days", scope: .perSection, courseDirectory: course
+        )
 
         XCTAssertTrue(
             SpecialFolderRenamer.looksLikeAnInterruptedRename(
                 from: "All Classes", to: "All Days", scope: .perSection,
                 courseDirectory: course, sectionNumbers: [1, 2]
             ),
-            "the old folder is gone from every section and the new one is there"
+            "a rename recorded as started, and the disk agreeing it happened"
+        )
+        XCTAssertEqual(
+            SpecialFolderRenamer.interruptedRenameTarget(
+                from: "All Classes", scope: .perSection,
+                courseDirectory: course, sectionNumbers: [1, 2]
+            ),
+            "All Days",
+            "the sheet fills the field in with the rename that was interrupted"
         )
         XCTAssertNil(
             SpecialFolderRenamer.problem(
@@ -402,7 +413,7 @@ final class SpecialFolderRenamerTests: XCTestCase {
                 from: "Tasks", to: "Handouts", scope: .perSection,
                 courseDirectory: course, sectionNumbers: [1]
             ),
-            "both folders are on disk, so nothing was interrupted"
+            "both folders are on disk, and no rename was recorded"
         )
         XCTAssertEqual(
             SpecialFolderRenamer.problem(
@@ -412,12 +423,71 @@ final class SpecialFolderRenamerTests: XCTestCase {
         )
     }
 
+    /// **The case that decides whether the bypass is safe, and the reason the
+    /// disk alone cannot be the evidence.** A configuration entry whose folder
+    /// was never created — which this code explicitly allows — renamed onto a
+    /// genuine second folder has EXACTLY the disk state of a half-done rename:
+    /// old gone, new present. Bypassing there would hand the real folder the
+    /// phantom's attributes, `hidden` among them, and take its pages off the
+    /// next publish with nobody told. Only a recorded rename opens the bypass.
+    func testAPhantomEntryRenamedOntoARealFolderIsStillRefused() throws {
+        let course: URL = try makeCourse(sections: [1], perSectionFolders: ["Handouts"])
+        // "Tasks" is in the configuration and on disk nowhere — a folder the
+        // teacher deleted in Obsidian, or never filled in.
+        XCTAssertFalse(
+            SpecialFolderRenamer.looksLikeAnInterruptedRename(
+                from: "Tasks", to: "Handouts", scope: .perSection,
+                courseDirectory: course, sectionNumbers: [1]
+            ),
+            "no rename was ever recorded, so this is two folders, not one half-done rename"
+        )
+        XCTAssertEqual(
+            SpecialFolderRenamer.problem(
+                renaming: "Tasks", to: "Handouts", existingNames: ["Tasks", "Handouts"]
+            ),
+            SpecialNames.renameFolderProblemAlreadyUsed(name: "Handouts")
+        )
+    }
+
+    /// A record for a DIFFERENT target must not open the bypass either.
+    func testARecordForAnotherTargetDoesNotOpenTheBypass() throws {
+        let course: URL = try makeCourse(sections: [1], perSectionFolders: ["Handouts"])
+        SpecialFolderRenamer.recordRenameStarting(
+            from: "Tasks", to: "Assessments", scope: .perSection, courseDirectory: course
+        )
+        XCTAssertFalse(
+            SpecialFolderRenamer.looksLikeAnInterruptedRename(
+                from: "Tasks", to: "Handouts", scope: .perSection,
+                courseDirectory: course, sectionNumbers: [1]
+            ),
+            "the interrupted rename was heading somewhere else"
+        )
+    }
+
+    /// And a completed rename leaves no record, so nothing is bypassed after it.
+    func testAFinishedRenameLeavesNoRecord() throws {
+        let course: URL = try makeCourse(sections: [1], perSectionFolders: ["All Days"])
+        SpecialFolderRenamer.recordRenameStarting(
+            from: "All Classes", to: "All Days", scope: .perSection, courseDirectory: course
+        )
+        SpecialFolderRenamer.clearRenameRecord(courseDirectory: course)
+        XCTAssertNil(
+            SpecialFolderRenamer.interruptedRenameTarget(
+                from: "All Classes", scope: .perSection,
+                courseDirectory: course, sectionNumbers: [1]
+            )
+        )
+    }
+
     /// A per-section rename moves EVERY section's copy, so a mixture means
     /// something other than an interrupted rename and the refusal should hold.
     func testAMixtureIsNotTreatedAsAnInterruptedRename() throws {
         let course: URL = try makeCourse(sections: [1, 2], perSectionFolders: ["All Classes"])
         try FileManager.default.createDirectory(
             at: course.appendingPathComponent("section1/All Days"), withIntermediateDirectories: true
+        )
+        SpecialFolderRenamer.recordRenameStarting(
+            from: "All Classes", to: "All Days", scope: .perSection, courseDirectory: course
         )
         XCTAssertFalse(
             SpecialFolderRenamer.looksLikeAnInterruptedRename(

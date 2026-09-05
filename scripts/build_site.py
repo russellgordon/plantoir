@@ -3602,6 +3602,32 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
         except Exception:
             pass
 
+def _dropping_excluded_items(cfg: dict) -> dict:
+    """
+    A configuration with every excluded name taken out of the copy lists.
+
+    The same reconciliation preflight does when it writes, applied to a config
+    it is NOT going to write. Exists for the give-up path of preflight's
+    compare-and-swap: nothing downstream reads `excluded_items`, so a build
+    handed an unreconciled config publishes folders the teacher excluded.
+    """
+    excluded = cfg.get("excluded_items") or {}
+    shared_excluded = {str(n).lower() for n in (excluded.get("shared") or [])}
+    section_excluded = {str(n).lower() for n in (excluded.get("per_section") or [])}
+    corrected = dict(cfg)
+    for key, names in (("shared_folders", shared_excluded), ("shared_files", shared_excluded),
+                       ("per_section_folders", section_excluded),
+                       ("per_section_files", section_excluded)):
+        current = cfg.get(key)
+        if isinstance(current, list) and names:
+            kept = []
+            for entry in current:
+                if str(entry).lower() not in names:
+                    kept.append(entry)
+            corrected[key] = kept
+    return corrected
+
+
 def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path,
                                    _attempt: int = 0) -> dict:
     """Discover new items and append them to course_config.json (add-only). Return updated config dict.
@@ -3766,11 +3792,18 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
         if config_bytes_now != config_bytes_when_read:
             if _attempt >= 2:
                 print("⚠️ course_config.json kept changing while preflight ran; "
-                      "leaving it alone and building with what is there now.")
+                      "leaving the file alone and building with what is there now.")
                 try:
-                    return json.loads(config_bytes_now.decode("utf-8"))
+                    latest = json.loads(config_bytes_now.decode("utf-8"))
                 except Exception:
                     return cfg
+                # Returning the raw file would hand the build a configuration
+                # whose EXCLUSIONS have not been reconciled — and nothing
+                # downstream of preflight consults `excluded_items`, so a folder
+                # the teacher excluded would be published on this build. The
+                # file is still left alone; only what this build is given is
+                # corrected.
+                return _dropping_excluded_items(latest)
             print("ℹ️ course_config.json changed while preflight was looking "
                   "(a rename, most likely) — reading it again.")
             return preflight_update_course_config(

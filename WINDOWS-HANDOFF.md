@@ -3578,12 +3578,26 @@ holds BOTH names — and retrying the rename is then refused as a clash. If the
 folder was the class folder it is unremovable as well, so there is no way out
 of Settings at all; the teacher has to hand-edit `course_config.json`.
 
-**The rule to copy is the disk question, not the code.** A rename whose target
-is already in the list is allowed when the filesystem says the old folder is
-gone and the new one is there: that is not two folders competing for a name, it
-is one rename asking to be finished. Ask the FILESYSTEM, because the
-configuration is exactly what is wrong in this state. Two details that are not
-optional:
+**The rule to copy is: RECORD the rename before moving.** The first version of
+this on the mac decided from the disk alone — old folder gone, new one present
+— and that was wrong in a way worth understanding, because it looks right. It
+is also the state of a configuration entry whose folder was never created (or
+was deleted in Obsidian) being renamed onto a genuine SECOND folder. Bypassing
+there hands the real folder the phantom entry's attributes, `hidden` among
+them, and takes its pages off the next publish with nobody told. The two cases
+are indistinguishable on disk, so the disk cannot be the evidence.
+
+So: write a small record before anything moves, delete it once the
+configuration has been written, and relax the clash check only when BOTH the
+record and the disk agree. The mac keeps it at
+`courses/.internal/renames/<CODE>.json` — the `.internal` convention you
+already share — and deliberately NOT as a `course_config.json` key, because the
+failure being handled is that the configuration write did not happen. Carry the
+TARGET in the record, not just a flag, so a teacher who opens the sheet and
+types something else gets the ordinary refusal back; filling the field in with
+it also makes finishing an interrupted rename one keypress.
+
+Two more details that are not optional:
 
 - **No section may still hold the old folder.** A per-section rename moves
   every section's copy, so a mixture means something other than an interrupted
@@ -3592,6 +3606,13 @@ optional:
   names by definition, so a naive rename leaves the new name in twice — which
   on the mac renders two rows with one identity, and which no later rename can
   undo.
+
+**One more thing your own config writer must not do**, learned the same day:
+when it loses the compare-and-swap race enough times to give up and write
+anyway, it must recompute from the FRESHEST bytes. The mac's first version fell
+through and wrote the computation derived from the read it had just proved
+stale, clobbering the other writer's keys — the exact failure the loop exists
+to stop.
 
 ### Publishing while a preview is running — the race, and the harness that found it
 
