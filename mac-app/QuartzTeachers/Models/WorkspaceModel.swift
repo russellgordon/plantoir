@@ -921,8 +921,69 @@ class WorkspaceModel {
             return firstCourse.code < secondCourse.code
         }
         courses = loadedCourses
+        placeBuiltSitesOutsideTheFolder(for: loadedCourses, everythingIn: entryURLs)
         archivedItems = WorkspaceModel.findArchivedItems(in: coursesDirectoryURL)
         backupItems = WorkspaceModel.findBackupItems(in: coursesDirectoryURL)
+    }
+
+    /// Points every course's `.merged_output` at this folder's builds folder,
+    /// outside the working folder, and clears builds left behind by courses
+    /// that are no longer here.
+    ///
+    /// Run whenever the courses are read rather than once, because a folder
+    /// can gain a course at any time — and because the answer for a course
+    /// that is already linked is one `readlink`, so asking often costs
+    /// nothing. Done SYNCHRONOUSLY, before anything can act on the courses
+    /// just loaded: the work is a rename within one volume, and a build
+    /// started against a `.merged_output` that is about to move would be
+    /// writing into a folder nothing will read again.
+    ///
+    /// The launchers carry the same rule in shell — `preview.sh`, `deploy.sh`
+    /// and `setup.sh` each ensure the link before they build — because a
+    /// teacher at the command line and a deploy scheduled with launchd have no
+    /// app to do it for them. See `contracts/shared-rules.json` →
+    /// `buildOutputLocation`, which is where the rule itself is written down.
+    private func placeBuiltSitesOutsideTheFolder(for loadedCourses: [Course], everythingIn entryURLs: [URL]) {
+        guard let workspaceURL else {
+            return
+        }
+        // Test fixtures build their own folders and must not reach into the
+        // real Application Support; the rule itself is tested directly.
+        if isUnderUITest || WorkspaceModel.isRunningTests {
+            return
+        }
+        // Every folder in `courses/`, not only the courses that LOADED. A
+        // course whose `course_config.json` will not parse is skipped above,
+        // and treating it as gone would throw away the built website of the
+        // one course whose teacher is already having a bad morning.
+        var codesPresent: [String] = []
+        for entryURL in entryURLs {
+            codesPresent.append(entryURL.lastPathComponent)
+        }
+        for course in loadedCourses {
+            do {
+                let outcome: BuildOutputLocation.Outcome = try BuildOutputLocation.ensureLink(
+                    courseDirectory: course.directoryURL,
+                    workingFolderURL: workspaceURL
+                )
+                if outcome == .migrated {
+                    ActivityTrail.note(
+                        .builtSiteMovedOutOfTheFolder,
+                        "moved \(course.code)'s built website out of the working folder, "
+                            + "so it is no longer copied, synced or backed up with the course"
+                    )
+                }
+            } catch {
+                // Not fatal: the launchers try again before every build, and
+                // a build with no link still writes a real folder in the old
+                // place rather than failing.
+                AppLog.interface.error("could not place \(course.code, privacy: .public)'s built site outside the working folder: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        BuildOutputLocation.discardBuildsForMissingCourses(
+            workingFolderURL: workspaceURL,
+            courseCodesPresent: codesPresent
+        )
     }
 
     /// The archived item matching a sidebar selection, if that is what is

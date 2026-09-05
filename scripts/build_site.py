@@ -4679,6 +4679,20 @@ def build_section_site(
         except Exception as e:
             print(f"⚠️ Migration failed (will continue using hidden target): {e}")
 
+    # On the mac `.merged_output` is a SYMLINK to a builds folder outside the
+    # working folder (contracts/shared-rules.json -> buildOutputLocation). A
+    # link whose target is missing — a course folder synced from a second Mac,
+    # where that path belongs to a different home folder — makes the mkdir
+    # below fail with "File exists", which reads as nonsense. Make the target.
+    if hidden_output_root.is_symlink() and not hidden_output_root.exists():
+        pointed_at = Path(os.readlink(str(hidden_output_root)))
+        if not pointed_at.is_absolute():
+            pointed_at = hidden_output_root.parent / pointed_at
+        try:
+            pointed_at.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            print(f"⚠️  Could not make the folder built websites go in ({pointed_at}): {error}")
+
     host_output_dir = hidden_output_root / section_name
     host_output_dir.mkdir(parents=True, exist_ok=True)
 
