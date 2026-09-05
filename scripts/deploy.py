@@ -960,7 +960,10 @@ def print_required_diagnostics(required_shas: list[str], sha_to_pairs: dict[str,
             f.write("Full list (sha remote_path local_rel):\n")
             for sha, remote, rel in items:
                 f.write(f"{sha} {remote} {rel}\n")
-        print(f"\n Wrote full list to: {out}")
+        # The path the teacher knows, not the one it resolves to — the same
+        # rule as every other message here, and the third place it had to be
+        # applied before it was actually true everywhere.
+        print(f"\n Wrote full list to: {named / out.name}")
     except Exception as e:
         print(f"⚠️ Could not write diagnostics file: {e}")
 

@@ -600,46 +600,6 @@ else
   fail "courses/EXC2O/.merged_output is not a link to $EXPECTED_BUILD_ROOT/EXC2O (it is: ${LINK_TARGET:-a real folder})"
 fi
 
-# -------------------- 6d. An existing teacher's container is recreated ------
-# Every container that exists today was made WITHOUT the builds mount, and a
-# mount cannot be added to a container that already exists — so the launcher
-# has to notice and recreate it. Nothing else here exercises that branch: the
-# run above starts by REMOVING the container, so the launcher always takes the
-# create-from-new path. This puts a teacher's container back, deliberately
-# without the mount, and asks the launcher to cope.
-echo ""
-echo "🚦 Putting back a container made WITHOUT the builds mount, the way every"
-echo "   existing teacher's is, and building again…"
-docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-# No published ports: this stand-in only has to EXIST without the builds
-# mount, and the launcher replaces it before anything serves. Publishing
-# 8081-8084 here would fail whenever a real preview is running on this Mac —
-# which is the very situation the launcher's own free-port search exists to
-# cope with — and would have read as a fault in the code under test.
-if docker run -dit --name "$CONTAINER_NAME" \
-     -v "$(pwd)/courses":/teaching/courses \
-     "$DEV_TEST_IMAGE" tail -f /dev/null >/dev/null 2>&1; then
-  if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_old_container.log 2>&1; then
-    pass "a build in a container made before the builds mount existed still works"
-  else
-    fail "a build in a container made before the builds mount existed FAILED"
-    tail -30 /tmp/verify_old_container.log
-  fi
-  if docker inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$CONTAINER_NAME" 2>/dev/null \
-       | grep -Fxq "$EXPECTED_BUILD_ROOT"; then
-    pass "and the container was recreated WITH the builds mount"
-  else
-    fail "the container still has no builds mount, so the link dangles inside it"
-  fi
-  if [[ -f "$SITE_INDEX" ]]; then
-    pass "and the site is still readable at the path every reader names"
-  else
-    fail "the site is gone from $SITE_INDEX after the recreate"
-  fi
-else
-  fail "could not put back a container without the builds mount"
-fi
-
 # -------------------- 6b. The site wears Plantoir's icon, not Quartz's --------------------
 # Two halves that fail independently: the FILES have to be emitted (static/ by
 # the Static emitter, the root copy by the Assets emitter out of content/), and
@@ -676,6 +636,55 @@ if [[ -f "$SITE_INDEX" ]]; then
     fi
   done
   [[ "$ICON_OK" == "true" ]] && pass "Built site carries and links the Plantoir icon (tab, root, Apple touch)"
+fi
+
+# -------------------- 6c. An existing teacher's container is recreated ------
+# Every container that exists today was made WITHOUT the builds mount, and a
+# mount cannot be added to a container that already exists — so the launcher
+# has to notice and recreate it. Nothing else here exercises that branch: the
+# run above starts by REMOVING the container, so the launcher always takes the
+# create-from-new path. This puts a teacher's container back, deliberately
+# without the mount, and asks the launcher to cope.
+echo ""
+echo "🚦 Putting back a container made WITHOUT the builds mount, the way every"
+echo "   existing teacher's is, and building again…"
+docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+# No published ports: this stand-in only has to EXIST without the builds
+# mount, and the launcher replaces it before anything serves. Publishing
+# 8081-8084 here would fail whenever a real preview is running on this Mac —
+# which is the very situation the launcher's own free-port search exists to
+# cope with — and would have read as a fault in the code under test.
+if docker run -dit --name "$CONTAINER_NAME" \
+     -v "$(pwd)/courses":/teaching/courses \
+     "$DEV_TEST_IMAGE" tail -f /dev/null >/dev/null 2>&1; then
+  if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_old_container.log 2>&1; then
+    pass "a build in a container made before the builds mount existed still works"
+  else
+    fail "a build in a container made before the builds mount existed FAILED"
+    tail -30 /tmp/verify_old_container.log
+  fi
+  if docker inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$CONTAINER_NAME" 2>/dev/null \
+       | grep -Fxq "$EXPECTED_BUILD_ROOT"; then
+    pass "and the container was recreated WITH the builds mount"
+  else
+    fail "the container still has no builds mount, so the link dangles inside it"
+  fi
+  # WHICH branch did it. The mount check above also passes if the launcher
+  # recreated for some OTHER reason — a courses mount that did not match, say —
+  # in which case this section would be reporting a pass for the wrong work and
+  # the branch it exists to exercise would still be untested.
+  if grep -q "so built websites can be kept outside" /tmp/verify_old_container.log; then
+    pass "and it recreated it because the builds mount was missing, not for some other reason"
+  else
+    fail "the container was recreated, but not by the missing-builds-mount branch this checks"
+  fi
+  if [[ -f "$SITE_INDEX" ]]; then
+    pass "and the site is still readable at the path every reader names"
+  else
+    fail "the site is gone from $SITE_INDEX after the recreate"
+  fi
+else
+  fail "could not put back a container without the builds mount"
 fi
 
 RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo '(none)')"

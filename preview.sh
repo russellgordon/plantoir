@@ -312,6 +312,10 @@ ensure_build_root() {
 # Same file, same shape as ActivityTrail: "YYYY-MM-DD HH:MM:SS · sentence".
 # The app trims the file when it grows; nothing here needs to. Carries a
 # course code and nothing else — never a path, never a credential.
+#
+# One line can be lost: the app rewrites the whole file when it adds a line of
+# its own, so an append landing between its read and its write disappears.
+# That is one line, once, and worth less than the locking it would take.
 note_on_the_trail() {
   local trail="${HOME%/}/Library/Logs/Plantoir"
   mkdir -p "$trail" 2>/dev/null || return 0
@@ -387,6 +391,14 @@ link_course_build_output() {
   elif [ -d "$link" ]; then
     echo "📦 Moving ${course}'s built website out of your working folder…"
     rm -rf "$target" 2>/dev/null || true
+    # If clearing failed — an unwritable subfolder under it — `mv` would put
+    # the site INSIDE the surviving folder instead of at it, the link would
+    # succeed, and the section would read as never built while the trail said
+    # it had moved. Better to leave the built website where it is.
+    if [ -e "$target" ]; then
+      echo "⚠️  Could not move it; leaving the built website where it is."
+      return 0
+    fi
     if ! mv "$link" "$target" 2>/dev/null; then
       echo "⚠️  Could not move it; leaving the built website where it is."
       return 0
