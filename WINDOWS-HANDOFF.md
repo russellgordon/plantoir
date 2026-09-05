@@ -4075,6 +4075,35 @@ The iCloud read-on-download slowness that started the question is real but
 was observed, not clocked; if you time a rename on an offloaded OneDrive
 folder, write the number here with the hardware.
 
+**What driving it against a real iCloud Drive folder found** (row 400), in
+the order you are likely to meet the same things:
+
+- **The notice pushed the whole bottom band of the window off screen**, at
+  every window height. The mechanism is SwiftUI's (a text pinned to its
+  vertical size answers a minimum-size probe with a word per line — 1,548
+  points against 700 proposed, measured), but the SHAPE is WinUI's too: a
+  wrapping `TextBlock` in a horizontal `StackPanel` gets unbounded width and
+  never wraps, or bounded width and grows tall. Measure your InfoBar's
+  height with the real sentences at a narrow width before shipping it, and
+  measure with a width PROPOSED — the mac's first test asked for the ideal
+  size with no width and passed the faulty layout.
+- **The path bar cut off the folder's own name.** An iCloud path always runs
+  through `~/Library/Mobile Documents/com~apple~CloudDocs/…`, so the last
+  crumb — the only one that differs between a teacher's folders — was the
+  one lost. Now a contract rule, `workingFolderPathBar.tooLongForTheSpace`:
+  a path too long for the space shows its END. Your bar needs the same.
+- **The folder must be NAMED before it is explained.** The picker showed the
+  five sentences and then the path bar; a teacher reads "this folder" and
+  looks for which folder. Path bar first, in both the empty-folder and the
+  existing-folder states.
+- **Enter still set up the empty folder while the note was showing**, which
+  the contract's own `whenShown.chosen` forbids. The set-up button loses its
+  default-action status while a decision is pending; make sure yours does.
+- **A folder the picker will not take anyway** — neither a working folder
+  nor empty — is not asked about. The rule is in the contract's `whenShown`;
+  the teacher is about to choose again, and the guidance saying what to
+  choose is the message.
+
 ## The course-code picker is a hand-built combo box — and you probably should NOT build one (2026-08-23)
 
 `GUI-IMPROVEMENTS.md` rows 333–338 describe the new-course wizard's course-code

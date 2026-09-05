@@ -86,6 +86,17 @@ an item when it ships (finished behaviour is recorded in
   from held locks, which can leave a partial state. The explanation a teacher
   reads names all three as effects, not mechanisms.
 
+- **Choosing a new working folder keeps the OLD window's selection.** Seen
+  2026-09-05 while driving row 399: with `ICS3U` selected in one folder,
+  choosing a different working folder (with no courses) showed "Course Not
+  Found — reload courses from the File menu, or choose a different working
+  folder" instead of the empty-folder state, because `chooseWorkspace(at:)`
+  reloads the courses but leaves `selection` pointing at a course the new
+  folder does not have. Pre-existing, cosmetic, one line to fix (clear the
+  selection when the folder changes) — but check `WindowRestorationScenarioTests`
+  first, since a RESTORED window sets its folder and then its selection in
+  that order and must keep doing so.
+
 - **Move the mac's build output OUT of a synced working folder** — the half
   of the 2026-09-05 decision that did NOT ship with row 399, because it is a
   different size of change. Windows already does it (`PLANTOIR_BUILD_ROOT` →
