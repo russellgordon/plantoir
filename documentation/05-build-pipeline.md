@@ -18,7 +18,8 @@ section<N>/ ────────┼─▶ /tmp/quartz-builds/ ─┤        
 patched Quartz ─────┤    (internal ext4)     │                    │
 support files ──────┘                        │                    ▼
                                              └─▶ rsync ──▶ .merged_output/section<N>/public/
-                                                 (mirror)         │
+                                                 (mirror)   (a link, OUTSIDE
+                                                                  │  the working folder)
                                                                   └─▶ deploy: deploy.py / deploy.ps1
 ```
 
@@ -31,6 +32,21 @@ support files ──────┘                        │                  
    differential `rsync -a --delete` (with `shutil.copytree` fallback). Host-side
    components (`BuildFreshness`, `SectionDetailView`, `ScheduledDeploy`, and `deploy.py`)
    read from this path directly on the host filesystem.
+
+   **That path is a link, and the built site is not inside the working
+   folder.** Since 2026-09-05 `courses/<CODE>/.merged_output` is a symlink to
+   `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>` on
+   macOS, and Windows writes to `%LOCALAPPDATA%\Plantoir\builds\<folder id>`
+   through `PLANTOIR_BUILD_ROOT` (no link and no `.merged_output` level —
+   `toolchain_paths.merged_output_root()` is the one place that knows). The
+   built site is derived and can always be made again, but a synced folder
+   uploads every build of it, Time Machine backs it up, and a zip or a Finder
+   copy of the course carries it. The link means every reader above keeps
+   naming the path it already names; the launchers bind-mount the builds
+   folder into the container at the SAME absolute path so it resolves
+   identically on both sides. The rule, and what was rejected, is in
+   [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+   `buildOutputLocation`.
 
 ## Stage 1: Validation and preflight discovery
 
@@ -65,7 +81,8 @@ Because staging happens on native ext4 storage within the container, copying the
 scaffold takes **< 0.1 seconds**, and `/opt/quartz/node_modules` is symlinked
 directly into the build folder. The host output folder
 `courses/<CODE>/.merged_output/section<N>/` is created to receive the mirrored
-`public/` build outputs.
+`public/` build outputs — inside the builds folder the link points at, not
+inside the working folder.
 
 On a fresh scaffold, the script immediately applies the **first-build
 patches** (Graph removal, locales, date-handling config, folder-page

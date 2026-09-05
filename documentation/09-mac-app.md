@@ -54,9 +54,21 @@ Beyond the actions, the app owns delivery and resources:
   the choice to go ahead or pick another; a folder a window restored gets a
   dismissable notice above the path bar. Either is shown once per folder.
   The sentences, the detection cases and the timing are in
-  `contracts/shared-rules.json` → `cloudSyncedFolders`. The build output
-  still lands inside the folder on the mac (Windows already moves it out);
-  moving it is a separate, researched piece in `TODO.md`.
+  `contracts/shared-rules.json` → `cloudSyncedFolders`.
+- **The built website is kept outside the working folder** — every working
+  folder, not only the synced ones. `courses/<CODE>/.merged_output` is a
+  symlink to `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`,
+  where the folder id is the same `pwd -P | shasum` hash that names the
+  folder's container, and the launchers bind-mount that folder into the
+  container at the same absolute path so the link resolves identically on both
+  sides. A built site is derived and can always be made again; keeping it in
+  the folder meant a synced folder uploaded every build, Time Machine backed
+  it up, and a zip or a Finder copy of the course carried it. The rule, the
+  migration of a folder that already has built sites, and what was rejected
+  are in `contracts/shared-rules.json` → `buildOutputLocation`; the app is one
+  of its two implementations (`BuildOutputLocation.swift`), the three
+  launchers are the other, for a teacher at the command line and for a
+  publish scheduled with launchd.
 
 ## Renaming a course folder
 

@@ -642,6 +642,44 @@ this side is expected to say so when the contract is wrong.
     outside the folder. Full write-up in "A cloud-synced working folder:
     explain it, never refuse it" below.
 
+19. **The mac now builds outside the working folder too, and one sentence
+    you were told to leave out is now gone from BOTH apps (2026-09-05,
+    row 402).** You already do this half — `PLANTOIR_BUILD_ROOT` →
+    `%LOCALAPPDATA%\Plantoir\builds\<id>`, row 290 — and **nothing about
+    your implementation should change**: the symlink the mac uses is a mac
+    answer to a mac problem (a container that mounts only `courses/`, plus
+    three launchers and three Swift readers that name the path), not a better
+    idea to copy. What you owe is small and specific:
+
+    - **`cloudSyncedFolders.wording.buildFilesAreCopied` is RETIRED**, from
+      the contract and from both apps. If you were showing it, stop; if you
+      were skipping it on the strength of `buildFilesAreCopiedAppliesOn`, that
+      key is gone and its words now live under `buildFilesAreCopiedRetired`,
+      which exists so nobody puts them back. `explanationOrder` is four
+      sentences now, not five.
+    - **`activityTrail.mustRecord` gains "built site moved out of the working
+      folder", and it carries `appliesOn: ["mac"]`** — the first entry in that
+      list ever to do so. Your `ContractTests` compares the contract's events
+      against your own enum and WILL go red until it filters on `appliesOn`
+      the way the wording cases already do. Filtering is the right fix, not
+      declaring an event you can never emit: you have nothing to move, because
+      you have never built inside the folder. (If you ever migrate a folder
+      that predates row 290, the event is there to use.)
+    - **Read `buildOutputLocation`** in `shared-rules.json` for the rest —
+      what was measured, what was rejected, the rule that a build with no link
+      pointing at it is cleared rather than adopted, and the upgrade path. Two
+      parts of it are yours in spirit even though the mechanism differs:
+      **archiving or restoring a course must take its build with it** (a
+      restored course's pages can be OLDER than the site built from them, so
+      an adopted build reads as "already up to date" and publishes last
+      month's pages — check what `%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>`
+      does on your side when a course is archived and restored), and
+      **a build folder for a working folder that no longer exists is litter
+      nobody can name** — the mac writes `working-folder.txt` beside each one
+      so a sweep can recognise it, and you have exactly the same problem.
+
+    Full write-up in "Built websites live outside the working folder" below.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,
@@ -4142,6 +4180,175 @@ points folded in above:
 - **Three labels are now in the contract** — `chooseDifferentFolderButton`,
   `showDetailsButton`, `hideDetailsButton` — so nothing on the picker or the
   notice is left for you to word.
+
+## Built websites live outside the working folder (2026-09-05)
+
+**You did this first, in row 290, and the mac has now caught up.** This section
+exists because the mac's answer looks nothing like yours, and somebody reading
+the two side by side will wonder which is right. Both are: the difference is
+the machinery, and copying either one onto the other platform would be a
+mistake.
+
+### What changed on the mac, and what it did NOT change on Windows
+
+A section's built site used to be written to `courses/<CODE>/.merged_output`,
+inside the working folder. It is derived — every file comes from the teacher's
+notes and can be produced again — and Plantoir's own backups already skipped it
+by name, but nothing OUTSIDE Plantoir did: a synced folder uploads every build
+and charges it against the teacher's quota, Time Machine backs it up, a zip or
+a Finder copy of the course carries it, Get Info counts it.
+
+Measured on the small `EXC2O` course the mac's verification suite builds:
+**331 files and 9.8 MB for one section**, and the cost is paid on EVERY build
+rather than once, because Quartz emits its whole output fresh each time and the
+mirror copies every file that has a new timestamp. A real course with media is
+many times that.
+
+**Your side is unchanged and should stay unchanged.** `PLANTOIR_BUILD_ROOT` →
+`%LOCALAPPDATA%\Plantoir\builds\<folder id>`, honoured by
+`scripts/toolchain_paths.py` → `merged_output_root()`, which does not nest a
+`.merged_output` level when the variable is set. That flat layout is already
+pinned by `scripts/test_deploy_course_dir_resolution.py` and is the reason
+`deploy.py` derives the course directory from `COURSES_ROOT / <code>` rather
+than by climbing from the built section — the fix that was YOURS, and the shape
+this piece reused.
+
+### Why the mac could not just set the variable
+
+Three reasons, and each of them is a mac fact:
+
+1. **The build runs in a container that mounts only `courses/`.** A build root
+   outside the working folder is invisible in there until a second mount
+   exists — and `preview.sh`'s "does this container need recreating" check
+   compared only the courses mount, so an added mount needed its own recreate
+   rule as well.
+2. **Six readers name the path today**, on both sides of the mount:
+   `deploy.sh` (`MERGED_DIR_HOST`, `SECTION_DIR_IN_CONTAINER`), `preview.sh`
+   (`OUTPUT_PATH`, and stop mode), and in Swift `BuildFreshness`,
+   `ScheduledDeploy` and `SectionDetailView` — plus the shell freshness check
+   `ScheduledDeploy` WRITES OUT for launchd, `verify.sh`, `verify-deploy.sh`
+   and the screenshot harness.
+3. **A launchd deploy and a teacher at the command line have no app.** If the
+   app set a variable and they did not, the two would build into different
+   places and `BuildFreshness` would call every build stale.
+
+So: `courses/<CODE>/.merged_output` is a **symlink** to
+`~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`, and the
+launchers bind-mount that builds folder into the container **at the same
+absolute path**, unconditionally, so the link resolves identically inside and
+out and all six readers keep working untouched. The folder id is the same
+`pwd -P | shasum -a 256 | cut -c1-8` that already names the folder's container,
+so a folder's container and its builds folder cannot disagree about which
+folder they belong to. It has to be under `$HOME` because the Colima VM mounts
+only the home folder.
+
+**Done for every working folder, not only the synced ones.** The benefit is not
+confined to syncing — a backup, a copy, a zip and a folder size are all smaller
+for it — and one code path is one code path: a rule that ran only for folders
+Plantoir believes are synced would be a rule tested in one case and running in
+another, and the detection is deliberately not certain enough to hang behaviour
+on.
+
+### Rejected, so nobody re-proposes them
+
+- **One environment variable, as on Windows.** The three reasons above.
+- **Computing the path at every reader.** Ten places name it; each one is a
+  chance for two of them to disagree, and the failure mode of disagreeing is a
+  publish that ships the wrong bytes.
+- **A `.nosync` suffix.** iCloud-only — Dropbox and OneDrive ignore it — and it
+  moves the path just as much as this does.
+
+### What was MEASURED rather than read
+
+The open question was whether a sync client would follow the link and upload
+the target anyway, which would have defeated the whole thing. Tested on a real
+Mac on 2026-09-05, giving a real iCloud Drive folder and a real
+`~/Library/CloudStorage/Dropbox` a throwaway course folder holding a real note
+and a `.merged_output` symlink to an outside folder with a 3 MB file in it:
+
+- **iCloud** kept it as a link and reported the LINK as uploaded, at **82
+  bytes** — the length of the target path — with `isUbiquitousItem` true and
+  the 3 MB nowhere.
+- **Dropbox** kept it as a link, tagged the LINK with its own extended
+  attributes, and left the target folder outside Dropbox with none at all, so
+  it had not reached through it.
+- `du` of the synced folder counted 4 KB either way.
+- **OneDrive is not installed on that Mac and was not tested.** If you can
+  test the Windows equivalent cheaply it is worth knowing, even though your
+  layout does not depend on it.
+
+The consequence is worth knowing on your side too: the LINK syncs, so a teacher
+with two Macs receives one naming a home folder that does not exist there. A
+link pointing anywhere other than this machine's own builds folder is replaced
+before anything builds.
+
+### The finding nobody had listed, and the one that is yours in spirit
+
+**Archiving, restoring or replacing a course removes the link, but not the
+build standing outside it.** And a course restored from a backup carries the
+timestamps it had when it was archived, which can be OLDER than the site that
+was built from it. So an adopted build would read as "already up to date" and
+publish last month's pages, with every check agreeing. The rule that answers it
+is one line: **a build folder with no link pointing at it is CLEARED, never
+adopted** — the link is what says a build belongs to this course. Archiving a
+course or a section discards its build outright as well, so the clearing is a
+safety net rather than the only defence. Renaming a course is the exception:
+its build is carried across, because a rename used to cost nothing and should
+still cost nothing.
+
+**Your layout has the same hole in a different shape.** You have no link, so
+the "no link means clear it" rule cannot be copied — but
+`%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>` outlives an archived course
+exactly the way the mac's did, and a restore into that code will find it. Worth
+checking; worth a `MAC-HANDOFF.md` line if it turns out you are already safe,
+because "we checked and it cannot happen here" is as useful to this side as a
+fix.
+
+**And a builds folder for a working folder that no longer exists is litter
+nobody can name**, because the id is a hash and cannot be read backwards. The
+mac writes `working-folder.txt` beside each builds folder and sweeps the ones
+whose folder is gone — **only when that path was under the home folder**, since
+"the folder is not there" and "the disk is not plugged in" look identical from
+there and only the home volume is always mounted. You have the same problem and
+can use the same answer.
+
+### Two mac-specific traps, recorded because they cost time
+
+- **`preview.sh --stop` finds a preview's processes by WORKING DIRECTORY**, and
+  `/proc/<pid>/cwd` is the RESOLVED path — never the spelling a process used to
+  get there. The sweep had to learn the resolved form as well, or `--stop`
+  would report success and leave the build running. Your `--stop` uses
+  `Win32_Process` on command lines and paths; if any part of it compares a path
+  the teacher's process arrived by rather than the one it is in, it has the
+  same bug waiting.
+- **`shutil.rmtree` refuses a symlink**, which the research had flagged as a
+  blocker for `--full-rebuild`. It turned out not to matter: that path removes
+  the CONTAINER's `/tmp/quartz-builds` tree, not the host output. Written down
+  because the research said otherwise and somebody will read it.
+
+### The upgrade path, which is the part that ships to real teachers
+
+Everything a teacher already has survives, and nothing is one-way: the built
+site is MOVED, never rebuilt from scratch and never deleted; `.netlify_sites/`
+and `.cloudflare_sites/` are untouched because they live BESIDE
+`.merged_output`, not inside it; the launchd scripts already written out keep
+naming the old path and keep working through the link; and a container without
+the mount is recreated once, which a toolchain change does anyway.
+
+The rule that makes it safe is worth stating plainly, because your side will
+need the same discipline whenever you change where builds go: **every step is
+allowed to fail without stopping the run, and the fallback is the OLD
+behaviour.** The mac launchers run under `set -euo pipefail`, so an unguarded
+`ln`, `mv` or `mkdir` would have turned "the built website could not be moved"
+into "publishing is broken", silently, on a read-only folder or a full disk. If
+the move succeeds and the link then fails, the move is put BACK — a course with
+its site in the old place still publishes; a course with neither has lost its
+website for nothing.
+
+`scripts/test_build_output_link.sh` runs the real launcher block against every
+one of those states and is wired into `verify.sh`. It is shell rather than
+Python, so it does not run on your side, but the STATES it lists are the ones
+worth checking on any platform that moves build output.
 
 ## The course-code picker is a hand-built combo box — and you probably should NOT build one (2026-08-23)
 

@@ -97,12 +97,39 @@ an item when it ships (finished behaviour is recorded in
   first, since a RESTORED window sets its folder and then its selection in
   that order and must keep doing so.
 
-- **Move the mac's build output OUT of a synced working folder** — the half
-  of the 2026-09-05 decision that did NOT ship with row 399, because it is a
-  different size of change. Windows already does it (`PLANTOIR_BUILD_ROOT` →
-  `%LOCALAPPDATA%\Plantoir\builds\<folder-id>`, row 290) and the Python
-  honours the variable (`toolchain_paths.merged_output_root`). The mac cannot
-  flip the same switch, and the research below is what an afternoon found:
+- ~~**Move the mac's build output OUT of a synced working folder**~~ — ✅
+  **Done 2026-09-05**, row 402. Built on the design sketched below: `.merged_output`
+  is a SYMLINK to `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`
+  and the launchers bind-mount that folder into the container at the same
+  absolute path. Done for EVERY working folder, not only the synced ones — the
+  benefit is not confined to syncing and one code path is one code path. The
+  rule, the measurements, the upgrade path and what was rejected are in
+  `contracts/shared-rules.json` → `buildOutputLocation`, which is now the place
+  to read rather than this entry.
+
+  Four of the open questions below were answered by testing rather than by
+  reading, and one of them was WRONG here:
+
+  - **iCloud and Dropbox both leave a symlink alone.** Measured on this Mac
+    against a real iCloud Drive folder and a real `~/Library/CloudStorage/Dropbox`:
+    both kept it as a link, iCloud uploaded the LINK at 82 bytes (the length of
+    the target path) rather than the 3 MB behind it, and Dropbox left the target
+    folder outside Dropbox with none of its own extended attributes on it. No
+    OneDrive on this Mac; not tested.
+  - **`shutil.rmtree` refusing a symlink turned out not to matter.** The
+    `--full-rebuild` path removes `output_dir`, which is the CONTAINER's
+    `/tmp/quartz-builds` tree, not the host's `.merged_output`. This entry
+    implied otherwise.
+  - **The real hazard was elsewhere**: `preview.sh --stop` finds a preview's
+    processes by working directory, and `/proc/<pid>/cwd` is the RESOLVED path,
+    so the sweep had to learn the resolved form too.
+  - **And the one nobody had listed**: archiving, restoring or replacing a
+    course removes the link but not the build standing outside, and a restored
+    course's pages can be OLDER than that build — which would read as "already
+    up to date" and publish last month's site. A build with no link pointing at
+    it is now cleared rather than adopted.
+
+  The original research is kept below because the reasoning is the point.
 
   **Why it is not one environment variable on the mac.** The build runs in a
   container that mounts ONLY `courses/` (`-v "$HOST_COURSES":/teaching/courses`
@@ -123,21 +150,8 @@ an item when it ships (finished behaviour is recorded in
   stale. The Colima VM mounts only `$HOME`, so the relocated root must be
   under it: `~/Library/Application Support/Plantoir/builds/<folder-id>/`.
 
-  **The design that minimises the blast radius, if it is built:** make
-  `courses/<C>/.merged_output` a SYMLINK to that builds folder, and bind-mount
-  the builds folder into the container at the SAME absolute path,
-  unconditionally, so the link resolves identically on both sides and every
-  reader above keeps working unchanged. Open questions, each needing a real
-  test on a real synced folder before trusting it: how iCloud Drive, Dropbox
-  and OneDrive each treat a symlink (iCloud is believed not to follow them;
-  Dropbox stopped following links outside the folder in 2019); `shutil.rmtree`
-  REFUSES a symlink, and `build_site.py`'s full-rebuild path removes the
-  output folder; the `find … -prune` clauses in the launchers are fine;
-  `verify.sh` and `verify-deploy.sh` both have to run. Rejected: a `.nosync`
-  suffix (iCloud-only — Dropbox and OneDrive ignore it — and it moves the path
-  just as much). When it lands, `buildFilesAreCopied` leaves the mac's
-  explanation and `cloudSyncedFolders.wording.buildFilesAreCopiedAppliesOn`
-  in the contract says so.
+  Rejected: a `.nosync` suffix (iCloud-only — Dropbox and OneDrive ignore it —
+  and it moves the path just as much).
 
 - **`CourseRenameInterfaceTests` crashes the whole unit run, intermittently —
   and it is PRE-EXISTING, not caused by the special-folders work.** Measured
