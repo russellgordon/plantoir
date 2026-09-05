@@ -15,8 +15,9 @@ struct WorkspacePickerView: View {
             // Once a folder HAS been chosen and is awaiting confirmation,
             // a headline saying "Choose Your Working Folder" answers a
             // question that was just answered — so the header appears only
-            // while choosing, and the confirmation stands on its own.
-            if !workspace.workspaceCanBeInitialized {
+            // while choosing, and the confirmation stands on its own. The
+            // same goes for a synced folder awaiting the teacher's decision.
+            if !workspace.workspaceCanBeInitialized && !workspace.needsCloudSyncDecision {
                 Image(systemName: "folder.badge.gearshape")
                     .font(.system(size: 56))
                     .foregroundStyle(.secondary)
