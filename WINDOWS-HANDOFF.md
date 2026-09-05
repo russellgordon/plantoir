@@ -3982,6 +3982,17 @@ lesson worth keeping is that fixing a boundary bug in one direction is not
 finishing it — check every edge of the match, and check that the thing being
 matched is a real value.
 
+**One harness lesson, learned twice in one afternoon.** A process that scans
+other processes for a marker string finds ITSELF — the marker is on its own
+command line. In `verify.sh` 6d this first inflated a count so that every
+check in the section failed while the code under test was correct, and then,
+in the cleanup, made the script SIGKILL itself part-way through: it printed
+nothing, exited quietly, and left behind the very processes it was written to
+collect. The second one was found only by checking the container afterwards
+rather than trusting a green run. Exclude your own process id, and treat
+"scanning for a string I am myself carrying" as a shape worth recognising —
+the same trap that `stop_preview.py` already guards against for the real rule.
+
 **What was measured, not decided.** The two `preview.ps1` prefix bugs were
 found by reading, and both are real: `$lower.Contains($sectionNeedle)` with a
 needle ending `\section1` matches `\section10`, and

@@ -803,9 +803,17 @@ fi
 # makes "leaves the container as it found it" true rather than nearly true.
 docker exec "$CONTAINER_NAME" python3 -c '
 import os, signal
+# Skip THIS process. Its own command line carries the marker — the script
+# text is the argument — so without this it marks itself, SIGKILLs itself
+# part-way through, prints nothing and leaves the children it was written to
+# collect. That is exactly what happened, and it is the second time
+# self-matching has bitten in this one section: `_count_matching` above needs
+# the same guard for the same reason. A process scanning for a string it is
+# itself carrying is the shape to watch for here.
+mine = os.getpid()
 marked = set()
 for entry in os.listdir("/proc"):
-    if not entry.isdigit():
+    if not entry.isdigit() or int(entry) == mine:
         continue
     try:
         line = open("/proc/%s/cmdline" % entry, "rb").read()
@@ -815,7 +823,7 @@ for entry in os.listdir("/proc"):
         marked.add(int(entry))
 doomed = set(marked)
 for entry in os.listdir("/proc"):
-    if not entry.isdigit():
+    if not entry.isdigit() or int(entry) == mine:
         continue
     try:
         for row in open("/proc/%s/status" % entry, encoding="utf-8", errors="replace"):
