@@ -317,11 +317,11 @@ if ($TO_FOLDER) {
     # looks fine. See the same comment in deploy.sh.
     for ($w = 0; $w -lt 150; $w++) {
       if ((Test-Path -LiteralPath $publishedIndex) -and
-          -not (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Recurse -File -ErrorAction SilentlyContinue |
+          -not (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
                 Select-String -Pattern "ws://localhost:" -List -Quiet)) { break }
       Start-Sleep -Milliseconds 200
     }
-    if (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Recurse -File -ErrorAction SilentlyContinue |
+    if (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
         Select-String -Pattern "ws://localhost:" -List -Quiet) {
       Write-Host "The rebuilt site still carries the preview's live-reload script."
       Write-Host "  Nothing was published, rather than publishing pages students'"

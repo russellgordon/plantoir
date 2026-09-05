@@ -54,7 +54,7 @@ set -u
 WORKING_FOLDER="${1:-$HOME/Desktop/plantoir-overnight}"
 COURSE="${2:-ADA1O}"
 SECTION="${3:-1}"
-WORK=/tmp/plantoir-deploy-verify
+WORK=/tmp/plantoir-deploy-verify-$$
 FOLDER_TARGET="$WORK/published"
 
 PASS=0; FAIL=0; SKIP=0
@@ -68,10 +68,33 @@ PUBLIC_DIR="$WORKING_FOLDER/courses/$COURSE/.merged_output/section$SECTION/publi
 
 mkdir -p "$WORK"
 
+# Everything this script borrows is put back on ANY exit — including Ctrl-C and
+# a crash. It moves a section's `index.md` aside to test the refusal, and it
+# rewrites the course's destination on every case; without this, an interrupted
+# run leaves a course with no front page and pointing at whichever destination
+# happened to be last. The default target is a scratch folder, but the working
+# folder is an argument, so this could be a real course.
+ORIGINAL_CONFIG="$WORK/course_config.original.json"
+STASHED_INDEX="$WORK/index.md.stashed"
+restore_what_was_borrowed() {
+  if [ -f "$STASHED_INDEX" ]; then
+    mv -f "$STASHED_INDEX" "$WORKING_FOLDER/courses/$COURSE/section$SECTION/index.md" 2>/dev/null \
+      && echo "  ↩︎  put the section's front page back"
+  fi
+  if [ -f "$ORIGINAL_CONFIG" ]; then
+    cp -f "$ORIGINAL_CONFIG" "$CONFIG" 2>/dev/null \
+      && echo "  ↩︎  put the course's destination settings back"
+  fi
+  pkill -f "preview.sh $COURSE" 2>/dev/null
+}
+trap restore_what_was_borrowed EXIT INT TERM
+
 # ---------------------------------------------------------------- preflight
 hdr "Preflight — refuse clearly rather than half-running"
 [ -f "$CONFIG" ] || { echo "  ❌ No course at $CONFIG"; exit 1; }
 ok "course found: $COURSE section $SECTION in $WORKING_FOLDER"
+cp "$CONFIG" "$ORIGINAL_CONFIG"
+ok "the course's own settings saved, and restored on any exit"
 
 HAVE_NETLIFY=false; HAVE_CLOUDFLARE=false
 security find-generic-password -s "containerized-quartz-netlify" -w >/dev/null 2>&1 \
@@ -103,6 +126,7 @@ run_deploy() {  # run_deploy <logfile> <args...>
       -re {Enter Netlify site name} { send \"\r\"; exp_continue }
       -re {different Netlify site name} { send \"\r\"; exp_continue }
       -re {\\(y/n\\): }          { send \"y\r\"; exp_continue }
+      timeout { puts \"\nTIMED OUT waiting on the launcher\"; catch {close}; exit 124 }
       eof {}
     }
     catch wait result
@@ -223,9 +247,15 @@ run_deploy "$WORK/deploy-after-preview.log" "$COURSE" "$SECTION" --to-folder "$F
 grep -aq "built by a preview" "$WORK/deploy-after-preview.log" \
   && ok "the launcher noticed and rebuilt for publishing" \
   || no "the launcher did not notice it was publishing a preview build"
-grep -aq "Killed existing process" "$WORK/deploy-after-preview.log" \
-  && ok "the rebuild stopped the preview that was still serving, so it could not overwrite" \
-  || skip "no preview was still serving to stop"
+# Asserted, not skipped. A preview WAS left serving two lines above, so if
+# nothing was stopped the race is back — and a check that can only pass or be
+# skipped proves nothing.
+grep -aq "Stopped the preview that was still serving this section" "$WORK/deploy-after-preview.log" \
+  && ok "the rebuild stopped the preview still serving THIS section, so it could not overwrite" \
+  || no "nothing stopped the preview that was still serving — the race is back"
+grep -aq "Killed existing process on port" "$WORK/deploy-after-preview.log" \
+  && no "a preview was stopped BY PORT, which takes down other sections' previews" \
+  || ok "no preview was stopped by port"
 check_folder "folder (after a preview)" "$FOLDER_TARGET/section$SECTION"
 
 # ------------------------------------------------------ each destination alone
@@ -316,7 +346,7 @@ fi
 
 # ------------------------------------------ the machinery this branch added
 hdr "A section with no front page refuses to publish, and ships nothing stale"
-STASH="$WORK/index.md.stashed"
+STASH="$STASHED_INDEX"
 if [ -f "$WORKING_FOLDER/courses/$COURSE/section$SECTION/index.md" ]; then
   MARK="verify-deploy-$(date +%s)"
   echo "<!-- $MARK -->" >> "$PUBLIC_DIR/index.html" 2>/dev/null

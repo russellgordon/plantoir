@@ -1022,6 +1022,50 @@ def toggle_custom_og_images(config_path: str, enable: bool):
         print("No changes needed to quartz.config.ts")
 
 
+def stop_preview_serving(output_dir: Path) -> int:
+    """
+    Stop the preview serving THIS section, and nothing else.
+
+    Killing by port is wrong for a build that was given no port — see the
+    caller. Killing by the section's own build directory is exact: the
+    launcher runs the Quartz CLI by absolute path, so the directory is on the
+    serve process's command line.
+
+    Stopping the node server is enough. Its Python parent waits on it with
+    `check=True`, so the parent exits when it dies, and the parent's sync
+    watcher — a daemon thread, and the actual cause of the race this closes —
+    goes with it.
+
+    Reads `/proc`, which exists wherever this runs on the mac (inside the
+    container) and on Linux. Natively on Windows there is no `/proc` and this
+    does nothing, exactly as `kill_existing_quartz` already does nothing there
+    without `lsof`; Windows has its own answer to make — see WINDOWS-HANDOFF.
+    """
+    marker = str(output_dir).rstrip("/") + "/"
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return 0
+    stopped = 0
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            command = (entry / "cmdline").read_bytes().replace(b"\x00", b" ").decode(
+                "utf-8", "replace")
+        except OSError:
+            continue
+        if marker not in command or "--serve" not in command:
+            continue
+        try:
+            os.kill(int(entry.name), signal.SIGKILL)
+            stopped += 1
+            print(f"🛑 Stopped the preview that was still serving this section "
+                  f"(PID {entry.name}), so it cannot overwrite this build.")
+        except (ValueError, ProcessLookupError, PermissionError) as error:
+            print(f"⚠️ Could not stop the preview process {entry.name}: {error}")
+    return stopped
+
+
 def kill_existing_quartz(port: int = 8081):
     # Only OUR port: several previews can run at once, one per port, and
     # starting one must never take down another window's preview.
@@ -5080,11 +5124,24 @@ def build_section_site(
         # preview here fixes it for every caller at once, and matches what the
         # app already does rather than inventing a second rule.
         #
-        # Only OUR ports, exactly as `kill_existing_quartz` is careful about:
-        # several previews run at once, one per port, and a build for one
-        # section must never take down another section's preview.
-        kill_existing_quartz(port)
-        kill_existing_quartz(port + 1000)
+        # Matched by this section's OWN BUILD DIRECTORY, never by port.
+        #
+        # The first version of this killed `port`, and `port` is 8081 for every
+        # build-only run: `preview.sh` defaults it and the app's deploy passes
+        # no `--port` at all. So it killed whatever was serving on 8081 — the
+        # first section to have started previewing in this working folder,
+        # which is usually a DIFFERENT section from the one being published.
+        # Previewing section 1 while publishing section 2 took section 1's
+        # preview down, in the exact multi-section workflow the app is built
+        # around. Measured 2026-09-05 by doing it: "Killed existing process on
+        # port 8081", and section 1 stopped answering.
+        #
+        # The section's build directory is on the serve process's command line
+        # (the launcher runs the scaffold's CLI by absolute path, which is why
+        # it is there), so it identifies exactly one preview and cannot collide
+        # with another. The trailing separator matters: without it `section1`
+        # would also match `section10`.
+        stop_preview_serving(output_dir)
 
         # Static build ONLY (single build)
         print("\n🏗️  Building static site with Quartz → public/")

@@ -3,7 +3,7 @@ import Foundation
 /// Which of a course's two folder lists a name belongs to. Shared folders sit
 /// beside the course; per-section folders exist once inside EVERY section, so
 /// renaming one is several moves rather than one.
-enum FolderScope {
+nonisolated enum FolderScope {
 
     case shared
     case perSection
@@ -88,7 +88,7 @@ enum SpecialFolderRenamer {
     /// Obsidian's own settings, and the deploy markers. All are generated or
     /// private, and `.merged_output` in particular is a whole second copy of
     /// the course, so rewriting links in it would be both pointless and slow.
-    static let foldersNeverWalked: Set<String> = [
+    nonisolated static let foldersNeverWalked: Set<String> = [
         ".merged_output", "merged_output", ".obsidian", ".netlify_sites",
         ".toolchain", "node_modules", ".git",
     ]
@@ -100,7 +100,7 @@ enum SpecialFolderRenamer {
     /// Pure, so the rules can be tested without a course on disk. The
     /// filesystem's own objection — something already sitting where the folder
     /// would go — cannot be answered here and is raised by `rename` instead.
-    static func problem(
+    nonisolated static func problem(
         renaming oldName: String,
         to rawNewName: String,
         existingNames: [String]
@@ -162,7 +162,7 @@ enum SpecialFolderRenamer {
     /// So the key is written only when the answer was CONFIDENT: the course
     /// had already recorded this folder, or the folder names itself. Found by
     /// adversarial review, 2026-09-01.
-    static func wasSurelyTheClassFolder(
+    nonisolated static func wasSurelyTheClassFolder(
         _ name: String, in folders: [String], recorded: String?
     ) -> Bool {
         if let alreadyRecorded = ClassFolder.matching(recorded, in: folders) {
@@ -176,7 +176,7 @@ enum SpecialFolderRenamer {
     }
 
     /// Whether a name is one Plantoir gives a section's own folder.
-    static func looksLikeASectionFolder(_ name: String) -> Bool {
+    nonisolated static func looksLikeASectionFolder(_ name: String) -> Bool {
         let lowercased: String = name.lowercased()
         if !lowercased.hasPrefix("section") {
             return false
@@ -194,7 +194,7 @@ enum SpecialFolderRenamer {
     }
 
     /// Every place on disk this folder lives, in the order they will be moved.
-    static func folderLocations(
+    nonisolated static func folderLocations(
         named name: String,
         scope: FolderScope,
         courseDirectory: URL,
@@ -224,7 +224,7 @@ enum SpecialFolderRenamer {
     /// that check is a filesystem fault, and it is reported with the sections
     /// that had already moved named in the message rather than silently.
     @discardableResult
-    static func rename(
+    nonisolated static func rename(
         _ oldName: String,
         to newName: String,
         scope: FolderScope,
@@ -287,7 +287,7 @@ enum SpecialFolderRenamer {
 
     /// Rewrites every qualified link in the course's pages, returning how many
     /// pages changed.
-    static func relinkPages(
+    nonisolated static func relinkPages(
         in courseDirectory: URL,
         folderNamed oldName: String,
         to newName: String,
@@ -319,7 +319,7 @@ enum SpecialFolderRenamer {
     }
 
     /// Every Markdown page under a course, skipping generated and private trees.
-    static func markdownPages(in courseDirectory: URL, fileManager: FileManager = .default) -> [URL] {
+    nonisolated static func markdownPages(in courseDirectory: URL, fileManager: FileManager = .default) -> [URL] {
         guard let walker = fileManager.enumerator(
             at: courseDirectory,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -348,7 +348,7 @@ enum SpecialFolderRenamer {
     /// a rename means. The keys are listed in the contract under
     /// `specialNames.renameFolder.carriesAcross`; a key added there and not
     /// here is what a reviewer should look for.
-    static func renaming(
+    nonisolated static func renaming(
         _ oldName: String,
         to newName: String,
         scope: FolderScope,
@@ -449,7 +449,7 @@ enum SpecialFolderRenamer {
     // MARK: - Private helpers
 
     /// One list of names with the old one replaced, keeping its position.
-    private static func renaming(_ oldName: String, to newName: String, inList names: [String]) -> [String] {
+    nonisolated private static func renaming(_ oldName: String, to newName: String, inList names: [String]) -> [String] {
         var result: [String] = []
         for name in names {
             if name.caseInsensitiveCompare(oldName) == .orderedSame {

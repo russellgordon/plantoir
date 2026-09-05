@@ -23,7 +23,7 @@ enum ClassFolder {
     /// The name used when a course has no per-section folders configured at
     /// all, so a section still has a predictable answer rather than an empty
     /// path.
-    static let fallbackName: String = "All Classes"
+    nonisolated static let fallbackName: String = "All Classes"
 
     // MARK: - Functions
 
@@ -48,7 +48,7 @@ enum ClassFolder {
     /// Substring matching is safe HERE because the list is a short curated one
     /// the teacher chose. It is NOT safe against arbitrary paths, which is what
     /// `isClassPage(relativePathComponents:classFolder:)` is careful about.
-    static func name(inPerSectionFolders folders: [String], configured: String? = nil) -> String {
+    nonisolated static func name(inPerSectionFolders folders: [String], configured: String? = nil) -> String {
         if let recorded = ClassFolder.matching(configured, in: folders) {
             return recorded
         }
@@ -77,7 +77,7 @@ enum ClassFolder {
     /// Returning the LIST's spelling rather than the configured one matters:
     /// the two can differ in case, and everything downstream builds file paths
     /// out of the answer.
-    static func matching(_ configured: String?, in folders: [String]) -> String? {
+    nonisolated static func matching(_ configured: String?, in folders: [String]) -> String? {
         let wanted: String = (configured ?? "").trimmingCharacters(in: .whitespaces)
         if wanted.isEmpty {
             return nil
@@ -104,7 +104,7 @@ enum ClassFolder {
     /// set, and that is deliberate: dropping them would SHRINK what a course is
     /// seen to teach, which is the direction that produces the wrong map.
     /// Adding the configured folder can only widen it.
-    static func names(inPerSectionFolders folders: [String], configured: String? = nil) -> [String] {
+    nonisolated static func names(inPerSectionFolders folders: [String], configured: String? = nil) -> [String] {
         var counting: [String] = []
         if let recorded = ClassFolder.matching(configured, in: folders) {
             counting.append(recorded)
@@ -138,7 +138,7 @@ enum ClassFolder {
     /// "All Classes" to "All Days" would leave the course's class folder
     /// removable — and removing it takes every lesson off the site while the
     /// coverage map quietly starts counting every published page instead.
-    static func isTheAllClassesFolder(_ folder: String, configured: String? = nil) -> Bool {
+    nonisolated static func isTheAllClassesFolder(_ folder: String, configured: String? = nil) -> Bool {
         if let recorded = configured?.trimmingCharacters(in: .whitespaces), !recorded.isEmpty {
             if folder.caseInsensitiveCompare(recorded) == .orderedSame {
                 return true
@@ -163,7 +163,7 @@ enum ClassFolder {
     /// observed bug: under segment EQUALITY a file name cannot collide with a
     /// folder name, but a future change to prefix or substring matching must
     /// not silently start counting a page because of what it is CALLED.
-    static func isClassPage(relativePathComponents components: [String], classFolders: [String]) -> Bool {
+    nonisolated static func isClassPage(relativePathComponents components: [String], classFolders: [String]) -> Bool {
         guard let fileName = components.last else {
             return false
         }
@@ -185,7 +185,7 @@ enum ClassFolder {
     /// The same question asked of a relative path written as one string, with
     /// either separator — what the contract's cases carry, and what arrives
     /// from a platform that spells paths the other way.
-    static func isClassPage(relativePath path: String, classFolders: [String]) -> Bool {
+    nonisolated static func isClassPage(relativePath path: String, classFolders: [String]) -> Bool {
         var components: [String] = []
         for piece in path.split(whereSeparator: { character in
             return character == "/" || character == "\\"

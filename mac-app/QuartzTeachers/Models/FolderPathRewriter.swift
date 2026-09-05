@@ -50,17 +50,35 @@ enum FolderPathRewriter {
     /// reference stay where they are. `WikiLinkRewriter`'s pattern, and the
     /// same one on purpose: two link finders that disagreed about what a link
     /// is would rewrite different halves of the same vault.
-    static let wikiLinkPattern: String = #"(!?\[\[)([^\]|#]+)"#
+    nonisolated static let wikiLinkPattern: String = #"(!?\[\[)([^\]|#]+)"#
 
     /// A Markdown link or embed's target: everything between `](` and the
     /// closing bracket. Titles (`](path "title")`) are left in place because
     /// the path is taken only up to the first space.
-    static let markdownLinkPattern: String = #"(\]\()([^)\s]+)"#
+    nonisolated static let markdownLinkPattern: String = #"(\]\()([^)\s]+)"#
+
+    /// Compiled ONCE, not per file. A rename walks every page in the course
+    /// and each page used to build four of these; the cost is small but it is
+    /// the kind of per-file work that makes an O(files) walk worse than it
+    /// needs to be, and these patterns are constants.
+    nonisolated private static let wikiLinkExpression: NSRegularExpression? =
+        try? NSRegularExpression(pattern: wikiLinkPattern)
+
+    nonisolated private static let markdownLinkExpression: NSRegularExpression? =
+        try? NSRegularExpression(pattern: markdownLinkPattern)
+
+    /// The compiled form of one of the two patterns above.
+    nonisolated private static func expression(for pattern: String) -> NSRegularExpression? {
+        if pattern == wikiLinkPattern {
+            return wikiLinkExpression
+        }
+        return markdownLinkExpression
+    }
 
     // MARK: - Functions
 
     /// The text with every qualified link to `oldName` pointing at `newName`.
-    static func rewriting(_ text: String, folderNamed oldName: String, to newName: String) -> String {
+    nonisolated static func rewriting(_ text: String, folderNamed oldName: String, to newName: String) -> String {
         let trimmedOld: String = oldName.trimmingCharacters(in: .whitespaces)
         let trimmedNew: String = newName.trimmingCharacters(in: .whitespaces)
         if trimmedOld.isEmpty || trimmedNew.isEmpty || trimmedOld == trimmedNew {
@@ -76,7 +94,7 @@ enum FolderPathRewriter {
 
     /// How many qualified links in this text name the folder. Used to report
     /// what a rename touched, and to skip writing a file nothing changed in.
-    static func countReferences(to folderName: String, in text: String) -> Int {
+    nonisolated static func countReferences(to folderName: String, in text: String) -> Int {
         let trimmed: String = folderName.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty {
             return 0
@@ -95,8 +113,8 @@ enum FolderPathRewriter {
     // MARK: - Private helpers
 
     /// Every link target in the text, for one of the two link styles.
-    private static func targets(in text: String, matching pattern: String) -> [String] {
-        guard let expression = try? NSRegularExpression(pattern: pattern) else {
+    nonisolated private static func targets(in text: String, matching pattern: String) -> [String] {
+        guard let expression = FolderPathRewriter.expression(for: pattern) else {
             return []
         }
         let whole: NSRange = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -114,10 +132,10 @@ enum FolderPathRewriter {
     /// Walks the matches in order and copies the text between them, rather
     /// than replacing in place: a replacement changes the string's length, and
     /// ranges found beforehand would then point at the wrong characters.
-    private static func rewritingTargets(
+    nonisolated private static func rewritingTargets(
         in text: String, matching pattern: String, folderNamed oldName: String, to newName: String
     ) -> String {
-        guard let expression = try? NSRegularExpression(pattern: pattern) else {
+        guard let expression = FolderPathRewriter.expression(for: pattern) else {
             return text
         }
         let whole: NSRange = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -152,7 +170,7 @@ enum FolderPathRewriter {
     ///
     /// The LAST segment is the page or file and is never a candidate, so a
     /// page called `Tasks.md` survives a rename of the `Tasks` folder.
-    private static func retargeting(_ target: String, folderNamed oldName: String, to newName: String) -> String {
+    nonisolated private static func retargeting(_ target: String, folderNamed oldName: String, to newName: String) -> String {
         if !target.contains("/") || pointsOutsideTheCourse(target) {
             return target
         }
@@ -189,7 +207,7 @@ enum FolderPathRewriter {
     /// `Resources`, `Files`, `Notes` or `Assignments` make that likely rather
     /// than exotic. Nothing in a course's own tree is reached by an absolute
     /// path or a URL, so refusing both costs nothing.
-    private static func pointsOutsideTheCourse(_ target: String) -> Bool {
+    nonisolated private static func pointsOutsideTheCourse(_ target: String) -> Bool {
         if target.hasPrefix("/") || target.hasPrefix("#") {
             return true
         }
@@ -207,7 +225,7 @@ enum FolderPathRewriter {
     }
 
     /// Whether a target names this folder in any segment but its last.
-    private static func pathNames(_ folderName: String, in target: String) -> Bool {
+    nonisolated private static func pathNames(_ folderName: String, in target: String) -> Bool {
         if !target.contains("/") || pointsOutsideTheCourse(target) {
             return false
         }
@@ -226,7 +244,7 @@ enum FolderPathRewriter {
     /// Whether one path segment IS this folder, allowing for the percent
     /// encoding Obsidian writes into Markdown-style links, and matching case
     /// insensitively the way Obsidian resolves names.
-    private static func matches(_ segment: String, name: String) -> Bool {
+    nonisolated private static func matches(_ segment: String, name: String) -> Bool {
         let plain: String = segment.trimmingCharacters(in: .whitespaces)
         if plain.caseInsensitiveCompare(name) == .orderedSame {
             return true
@@ -240,7 +258,7 @@ enum FolderPathRewriter {
     /// The new name written the way the segment it replaces was written: a
     /// percent-encoded segment stays percent-encoded, so a Markdown link keeps
     /// working, and a wikilink keeps its plain spaces.
-    private static func encoded(_ name: String, likeThe segment: String) -> String {
+    nonisolated private static func encoded(_ name: String, likeThe segment: String) -> String {
         let wasEncoded: Bool = segment.contains("%") && segment.removingPercentEncoding != segment
         if !wasEncoded {
             return name

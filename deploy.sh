@@ -319,17 +319,20 @@ if [[ -n "$TO_FOLDER" ]]; then
     # page looks fine. Caught by verify-deploy.sh on 2026-09-05, which fetches
     # what was published and reads it.
     #
-    # `grep -rq` stops at the first match, so the common case costs one file.
-    # Bounded, so a rebuild that produced nothing falls through to the guard
-    # below rather than hanging.
+    # HTML only. The live-reload client is only ever in a page, and the
+    # SUCCESS condition is "no match anywhere" — which means every file is read
+    # to the end. Without the filter that is a full pass over `public/`,
+    # including every image the course embeds, over a bind mount, twice per
+    # publish. Bounded, so a rebuild that produced nothing falls through to the
+    # guard below rather than hanging.
     for ((_w=0; _w<150; _w++)); do
       if [[ -f "${PUBLIC_DIR_HOST}/index.html" ]] \
-         && ! grep -rq "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
+         && ! grep -rq --include='*.html' "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
         break
       fi
       sleep 0.2
     done
-    if grep -rq "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
+    if grep -rq --include='*.html' "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
       echo "❌ The rebuilt site still carries the preview's live-reload script."
       echo "   Nothing was published, rather than publishing pages students'"
       echo "   browsers would ask about."

@@ -96,7 +96,7 @@ struct CourseSettingsView: View {
                             return folderRenameProblem(oldName, to: newName, scope: .shared)
                         },
                         onRename: { oldName, newName in
-                            return renameFolder(oldName, to: newName, scope: .shared)
+                            return await renameFolder(oldName, to: newName, scope: .shared)
                         },
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .shared)
@@ -134,7 +134,7 @@ struct CourseSettingsView: View {
                             return folderRenameProblem(oldName, to: newName, scope: .perSection)
                         },
                         onRename: { oldName, newName in
-                            return renameFolder(oldName, to: newName, scope: .perSection)
+                            return await renameFolder(oldName, to: newName, scope: .perSection)
                         },
                         noticeAfterChange: { name, change in
                             return noticeAfterFolderChange(name, change: change, scope: .perSection)
@@ -423,14 +423,22 @@ struct CourseSettingsView: View {
     /// the course is exactly as it was. The other way round would leave a
     /// configuration naming a folder that is not there — which is the state
     /// this whole feature exists to make impossible.
-    func renameFolder(_ oldName: String, to newName: String, scope: FolderScope) -> RenameResult {
+    func renameFolder(_ oldName: String, to newName: String, scope: FolderScope) async -> RenameResult {
         let outcome: FolderRenameOutcome
+        // OFF the main thread. The move is quick; reading every page in the
+        // course to rewrite links is not, on an iCloud-backed vault where an
+        // evicted file downloads on read. The configuration write below stays
+        // on the main actor, because it touches the observable model.
+        let courseDirectory: URL = course.directoryURL
+        let sectionNumbers: [Int] = course.configuration.sectionNumbers
         do {
-            outcome = try SpecialFolderRenamer.rename(
-                oldName, to: newName, scope: scope,
-                courseDirectory: course.directoryURL,
-                sectionNumbers: course.configuration.sectionNumbers
-            )
+            outcome = try await Task.detached(priority: .userInitiated) {
+                return try SpecialFolderRenamer.rename(
+                    oldName, to: newName, scope: scope,
+                    courseDirectory: courseDirectory,
+                    sectionNumbers: sectionNumbers
+                )
+            }.value
         } catch {
             return .failed(error.localizedDescription)
         }

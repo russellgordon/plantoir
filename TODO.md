@@ -4,6 +4,54 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **Should Plantoir refuse to work in a cloud-synced folder?** Russell's
+  question, 2026-09-05, prompted by a reliability review finding that renaming
+  a folder reads every page in the course — which on an iCloud-backed vault
+  means downloading evicted files, one blocking read at a time. **Open: his
+  call, not made yet.** Both sides written down while they are fresh.
+
+  **What is genuinely broken by cloud sync**, in order of severity:
+
+  1. **Build churn and locks.** A build writes thousands of small files into
+     `.merged_output`. OneDrive uploads all of them AND holds locks mid-build.
+     This is not speculation — it is why `PLANTOIR_BUILD_ROOT` exists, added on
+     Windows for exactly this.
+  2. **Dataless files.** Reading an evicted page blocks on a download. Slow,
+     not corrupting.
+  3. **Rename and move failures** from held locks, which can leave a partial
+     state.
+
+  **Why refusing is probably the wrong answer.** Teachers keep vaults in iCloud
+  *on purpose* — it is how their notes reach their iPad and their second Mac.
+  Refusing means telling them to give up cross-device access to their own
+  teaching material, and a hard block is the one response they cannot opt out
+  of. It is also the response this project has already REJECTED once by
+  building something better: `PLANTOIR_BUILD_ROOT` moves the churn out of the
+  synced folder and leaves the content where the teacher wants it. That
+  precedent is the strongest argument here — the same problem was met, and the
+  answer was "relocate the churn", not "refuse the folder".
+
+  Detection is unreliable in both directions besides. iCloud Drive is
+  `~/Library/Mobile Documents/`, but Dropbox, Google Drive, OneDrive, pCloud
+  and Sync are arbitrary paths, and a teacher can have a folder literally
+  called "Dropbox" that is not one. A false refusal on a hard block is
+  unrecoverable for them.
+
+  **The shape that seems right instead**, if he wants it built:
+
+  - DETECT a synced working folder (the enumerable markers, not a name guess).
+  - SAY SO once, plainly, naming what can go wrong.
+  - **Set `PLANTOIR_BUILD_ROOT` automatically** so `.merged_output` lives
+    outside the synced folder — the mac has the variable already and does not
+    use it; Windows does. That alone removes (1) and most of (3).
+  - Leave the teacher's CONTENT where they put it.
+
+  Refusing outright is right in exactly one case worth naming: a synced folder
+  where the build root cannot be relocated (no writable scratch). Then the
+  honest thing is to stop rather than churn.
+
+  Needs Windows parity thinking, and they are ahead here rather than behind.
+
 - **`CourseRenameInterfaceTests` crashes the whole unit run, intermittently —
   and it is PRE-EXISTING, not caused by the special-folders work.** Measured
   2026-08-23 on a clean `origin/dev` worktree with none of that branch's

@@ -88,7 +88,13 @@ struct StringListEditorView: View {
     /// Performs the rename. Supplying this is what puts the rename control on
     /// the rows — file lists and the New Course Wizard leave it nil, the
     /// wizard because its course does not exist on disk yet.
-    var onRename: ((_ oldName: String, _ newName: String) -> RenameResult)? = nil
+    /// Performs the rename. `async`, and that is not decoration: it moves
+    /// folders and then reads every Markdown page in the course. On a local
+    /// disk that is milliseconds, but Obsidian vaults commonly live in iCloud
+    /// Drive, where reading a page that has been evicted downloads it first —
+    /// so on the main thread this would freeze the whole app for as long as
+    /// the network takes, once per page.
+    var onRename: ((_ oldName: String, _ newName: String) async -> RenameResult)? = nil
 
     /// Something to tell the teacher after the list changed. Returning nil
     /// says nothing.
@@ -100,6 +106,7 @@ struct StringListEditorView: View {
     @State var pendingRename: PendingRename? = nil
     @State var proposedName: String = ""
     @State var renameFailure: String? = nil
+    @State var isRenaming: Bool = false
     @State var notice: String? = nil
 
     // MARK: - Computed properties
@@ -273,7 +280,7 @@ struct StringListEditorView: View {
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("renameField")
                 .onSubmit {
-                    performRename(of: item)
+                    Task { await performRename(of: item) }
                 }
             Text(SpecialNames.renameFolderExplanation)
                 .font(.callout)
@@ -292,11 +299,16 @@ struct StringListEditorView: View {
                     pendingRename = nil
                 }
                 .keyboardShortcut(.cancelAction)
+                if isRenaming {
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(.trailing, 4)
+                }
                 Button("Rename") {
-                    performRename(of: item)
+                    Task { await performRename(of: item) }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(problem != nil)
+                .disabled(problem != nil || isRenaming)
             }
         }
         .padding(20)
@@ -369,15 +381,17 @@ struct StringListEditorView: View {
     /// `items` binding reads that configuration — so editing the array here
     /// too would put the rename in twice, and would put it in even when the
     /// filesystem refused.
-    func performRename(of item: String) {
-        guard let onRename else {
+    func performRename(of item: String) async {
+        guard let onRename, !isRenaming else {
             return
         }
         if renameProblem?(item, proposedName) != nil {
             return
         }
         let newName: String = proposedName.trimmingCharacters(in: .whitespaces)
-        switch onRename(item, newName) {
+        isRenaming = true
+        defer { isRenaming = false }
+        switch await onRename(item, newName) {
         case .renamed(let sentence):
             pendingRename = nil
             renameFailure = nil
