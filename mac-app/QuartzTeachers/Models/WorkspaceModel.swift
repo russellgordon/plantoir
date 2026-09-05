@@ -978,8 +978,7 @@ class WorkspaceModel {
                 if outcome == .migrated {
                     ActivityTrail.note(
                         .builtSiteMovedOutOfTheFolder,
-                        "moved \(course.code)'s built website out of the working folder, "
-                            + "so it is no longer copied, synced or backed up with the course"
+                        BuildOutputLocation.trailLine(courseCode: course.code)
                     )
                 }
             } catch {

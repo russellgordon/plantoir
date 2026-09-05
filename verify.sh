@@ -600,7 +600,7 @@ else
   fail "courses/EXC2O/.merged_output is not a link to $EXPECTED_BUILD_ROOT/EXC2O (it is: ${LINK_TARGET:-a real folder})"
 fi
 
-# -------------------- 6b. An existing teacher's container is recreated ------
+# -------------------- 6d. An existing teacher's container is recreated ------
 # Every container that exists today was made WITHOUT the builds mount, and a
 # mount cannot be added to a container that already exists — so the launcher
 # has to notice and recreate it. Nothing else here exercises that branch: the
@@ -611,9 +611,13 @@ echo ""
 echo "🚦 Putting back a container made WITHOUT the builds mount, the way every"
 echo "   existing teacher's is, and building again…"
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+# No published ports: this stand-in only has to EXIST without the builds
+# mount, and the launcher replaces it before anything serves. Publishing
+# 8081-8084 here would fail whenever a real preview is running on this Mac —
+# which is the very situation the launcher's own free-port search exists to
+# cope with — and would have read as a fault in the code under test.
 if docker run -dit --name "$CONTAINER_NAME" \
      -v "$(pwd)/courses":/teaching/courses \
-     -p 8081-8084:8081-8084 -p 9081-9084:9081-9084 \
      "$DEV_TEST_IMAGE" tail -f /dev/null >/dev/null 2>&1; then
   if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_old_container.log 2>&1; then
     pass "a build in a container made before the builds mount existed still works"

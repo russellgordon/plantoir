@@ -44,12 +44,10 @@ nonisolated enum BuildOutputLocation {
         case migrated
         /// There was nothing to move: a fresh link over a fresh folder.
         case linked
-        /// A link pointing somewhere else inside THIS machine's builds root —
-        /// a course renamed outside the app — was replaced, and any build
-        /// sitting at the new place was cleared because nothing says it
-        /// belongs to this course. A link naming another MACHINE's builds
-        /// folder is a different thing and answers `.alreadyLinked` when this
-        /// machine has a build of its own; see `ensureLink`.
+        /// A link pointing somewhere else — a course renamed outside the app,
+        /// or a folder synced from a second Mac — was replaced, and any build
+        /// sitting at the new place was cleared, because nothing left says it
+        /// belongs to this course as it now stands.
         case relinked
     }
 
@@ -152,6 +150,18 @@ nonisolated enum BuildOutputLocation {
         return buildsFolder(forWorkingFolder: workingFolderURL).appendingPathComponent(courseCode)
     }
 
+    /// The line the trail carries when a course's built website moves.
+    ///
+    /// Named here rather than typed at the call site, because there are TWO
+    /// call sites — the app and the launchers' shell — and a sentence typed
+    /// twice is a sentence that stops matching. Pinned against
+    /// `contracts/shared-rules.json` → `activityTrail.mustRecord`, where the
+    /// launchers' copy is checked against it too.
+    static func trailLine(courseCode: String) -> String {
+        return "moved \(courseCode)'s built website out of the working folder, "
+            + "so it is no longer copied, synced or backed up with the course"
+    }
+
     /// The link inside a course folder.
     static func linkURL(courseDirectory: URL) -> URL {
         return courseDirectory.appendingPathComponent(linkName)
@@ -187,20 +197,26 @@ nonisolated enum BuildOutputLocation {
                 return .alreadyLinked
             }
             try fileManager.removeItem(at: link)
-            // A link naming ANOTHER machine's builds folder is not evidence
-            // about this machine's. The folder is synced, so the same course
-            // opened on a second Mac arrives carrying the first Mac's link —
-            // and clearing on the strength of it would mean each Mac threw the
-            // other's work away and rebuilt on every switch. What the clearing
-            // rule is actually about is a course whose link is GONE (archived,
-            // restored, contents replaced), so it only applies to a link that
-            // was pointing inside this machine's own builds root.
-            let cameFromAnotherMachine: Bool = !existingTarget.hasPrefix(buildsRoot.path + "/")
-            if cameFromAnotherMachine && directoryExists(target) {
-                try writeWorkingFolderMarker(workingFolderURL: workingFolderURL)
-                try fileManager.createSymbolicLink(at: link, withDestinationURL: target)
-                return .alreadyLinked
-            }
+            // A link that is not this machine's own is a link this machine
+            // cannot read anything into — including a link left by a SECOND
+            // MAC sharing the folder, which is the common case, since the link
+            // syncs along with everything else.
+            //
+            // **Adopting the local build here was proposed and rejected**, and
+            // the reasoning is the point. Adopting looks better: a teacher
+            // switching between two Macs would keep each machine's build
+            // instead of rebuilding after every switch. But the second Mac
+            // cannot tell "the folder came back unchanged" from "the folder
+            // was archived and restored while I was shut", and in the second
+            // case the restored pages are OLDER than the build it just
+            // adopted — so the freshness check says up to date and the teacher
+            // publishes what they undid. Clearing costs one rebuild, which is
+            // visible and cheap; adopting risks a wrong site nobody is told
+            // about, which is the failure this whole family of checks exists
+            // to refuse. A generation stamp carried in the course folder would
+            // buy both, and is not worth a new synced file for a case this
+            // rare — see `contracts/shared-rules.json` →
+            // `buildOutputLocation.aBuildWithNoLinkIsNotAdopted`.
             try linkFreshly(target: target, at: link, workingFolderURL: workingFolderURL)
             return .relinked
         }

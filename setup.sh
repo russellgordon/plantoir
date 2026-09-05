@@ -201,23 +201,16 @@ link_course_build_output() {
     # A link pointing somewhere else: a course renamed outside the app, or a
     # course folder synced from ANOTHER Mac, where the path names a different
     # home folder.
+    #
+    # ADOPTING a build already sitting here was proposed and rejected. It
+    # looks better — a teacher switching between two Macs would keep each
+    # machine's build instead of rebuilding after every switch — but the
+    # second Mac cannot tell "the folder came back unchanged" from "the
+    # folder was archived and restored while I was shut", and in the second
+    # case the pages it adopts a build for are OLDER than that build, so the
+    # freshness check says up to date and the teacher publishes what they
+    # undid. Clearing costs one rebuild, which is cheap and visible.
     rm -f "$link" 2>/dev/null || return 0
-    # The two are not the same thing. A link naming another machine's builds
-    # folder says nothing about THIS machine's, so a build already sitting
-    # here is adopted rather than cleared — otherwise a teacher with two Macs
-    # would have each of them throw the other's work away and rebuild on
-    # every switch. Clearing is for a course whose link is GONE (archived,
-    # restored, contents replaced), and for one whose link pointed inside our
-    # own builds root at some other name.
-    case "$current" in
-      "$BUILD_ROOT"/*) : ;;
-      *)
-        if [ -d "$target" ]; then
-          ln -s "$target" "$link" 2>/dev/null || true
-          return 0
-        fi
-        ;;
-    esac
   elif [ -d "$link" ]; then
     echo "📦 Moving ${course}'s built website out of your working folder…"
     rm -rf "$target" 2>/dev/null || true
@@ -227,7 +220,7 @@ link_course_build_output() {
     fi
     if ln -s "$target" "$link" 2>/dev/null; then
       echo "✅ Built websites for this folder are kept in: $BUILD_ROOT"
-      note_on_the_trail "moved ${course}'s built website out of the working folder, so it is no longer copied, synced or backed up with the course"
+      note_on_the_trail "moved ${course}'s built website out of the working folder, so it is no longer copied, synced or backed up with the course"  # contracts/shared-rules.json -> activityTrail.mustRecord."built site moved out of the working folder".line
     else
       # The move worked and the link did not. Put it back: a course with
       # its built site in the old place still builds and still publishes,

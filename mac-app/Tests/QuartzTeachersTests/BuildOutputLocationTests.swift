@@ -198,15 +198,17 @@ final class BuildOutputLocationTests: XCTestCase {
         )
     }
 
-    /// A course folder synced from a second Mac where THIS Mac already has a
-    /// build of its own: the local build is adopted, not thrown away.
+    /// A link left by a SECOND MAC clears this machine's build rather than
+    /// adopting it — the safe answer, at the price of one rebuild.
     ///
-    /// The clearing rule is about a course whose link is GONE — archived,
-    /// restored, contents replaced. A link naming another MACHINE's builds
-    /// folder says nothing about this machine's, and treating it as evidence
-    /// would mean a teacher with two Macs had each of them throw the other's
-    /// work away and rebuild on every switch.
-    func testALinkFromAnotherMacDoesNotThrowAwayThisMacsBuild() throws {
+    /// Adopting was proposed and rejected. It would save a rebuild on every
+    /// switch between two Macs, but this Mac cannot tell "the folder came back
+    /// unchanged" from "it was archived and restored while I was shut", and in
+    /// the second case the pages it would adopt a build for are OLDER than
+    /// that build — so the freshness check says up to date and the teacher
+    /// publishes what they undid. A rebuild is cheap and visible; a wrong site
+    /// nobody is told about is neither.
+    func testALinkFromAnotherMacClearsRatherThanAdopts() throws {
         let courseURL: URL = try makeCourse("ICS3U")
         let mine: URL = BuildOutputLocation.buildFolder(forWorkingFolder: workingFolder, courseCode: "ICS3U")
             .appendingPathComponent("section1")
@@ -221,13 +223,18 @@ final class BuildOutputLocationTests: XCTestCase {
         let outcome: BuildOutputLocation.Outcome = try BuildOutputLocation.ensureLink(
             courseDirectory: courseURL, workingFolderURL: workingFolder
         )
-        XCTAssertEqual(outcome, .alreadyLinked)
-        XCTAssertEqual(builtPage(inCourse: courseURL), "<html>mine</html>")
+        XCTAssertEqual(outcome, .relinked)
+        XCTAssertNil(builtPage(inCourse: courseURL))
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(
+                atPath: courseURL.appendingPathComponent(".merged_output").path
+            ),
+            BuildOutputLocation.buildFolder(forWorkingFolder: workingFolder, courseCode: "ICS3U").path
+        )
     }
 
-    /// A link pointing at another course INSIDE this machine's builds root is
-    /// a different matter — a rename done outside the app — and the build
-    /// standing under the new name does not belong to this course.
+    /// A link pointing at another course inside this machine's own builds root
+    /// — a rename done outside the app — is cleared for the same reason.
     func testALinkAtAnotherCourseOfOursIsStillCleared() throws {
         let courseURL: URL = try makeCourse("ICS3U")
         let stale: URL = BuildOutputLocation.buildFolder(forWorkingFolder: workingFolder, courseCode: "ICS3U")
@@ -255,19 +262,33 @@ final class BuildOutputLocationTests: XCTestCase {
     /// reload would clear the orphan outside, because nothing points at it.
     func testAMoveThatCannotBeLinkedIsPutBack() throws {
         let courseURL: URL = try makeCourse("ICS3U", withBuiltSiteSaying: "<html>keep me</html>")
-        // Nothing may be created in the course folder, so the link cannot be
-        // made — but the folder can still be read out of, so the move can.
-        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: courseURL.path)
-        defer {
-            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: courseURL.path)
-        }
+
+        // The failure has to land AFTER the move, which is the whole point of
+        // the branch. Making the course folder read-only does NOT do it — a
+        // rename needs write permission on the SOURCE parent, so the move
+        // itself fails and the put-back is never reached. (The first version
+        // of this test did exactly that and passed with the put-back deleted.)
+        // A DIRECTORY standing where the marker file goes fails the step
+        // between the move and the link instead.
+        let builds: URL = BuildOutputLocation.buildsFolder(forWorkingFolder: workingFolder)
+        try FileManager.default.createDirectory(
+            at: builds.appendingPathComponent(BuildOutputLocation.workingFolderMarkerName),
+            withIntermediateDirectories: true
+        )
 
         XCTAssertThrowsError(
             try BuildOutputLocation.ensureLink(courseDirectory: courseURL, workingFolderURL: workingFolder)
         )
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: courseURL.path)
         XCTAssertEqual(builtPage(inCourse: courseURL), "<html>keep me</html>",
                        "the built website is back where it was, not orphaned outside")
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: BuildOutputLocation.buildFolder(
+                    forWorkingFolder: workingFolder, courseCode: "ICS3U"
+                ).path
+            ),
+            "and nothing is left outside for the next reload to delete"
+        )
     }
 
     /// A stray FILE wearing the name is not a built site and is not a link.
@@ -371,6 +392,30 @@ final class BuildOutputLocationTests: XCTestCase {
             "a restored section's pages can be OLDER than the site built from them, so a "
                 + "built site left standing reads as up to date and publishes what was undone"
         )
+    }
+
+    /// The sentence the trail carries is the contract's, word for word — and
+    /// it has TWO authors: this app, and the launchers' shell. A sentence
+    /// typed in two places is a sentence that stops matching.
+    func testTheTrailSentenceIsTheContracts() throws {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let trail: [String: Any] = try XCTUnwrap(all["activityTrail"] as? [String: Any])
+        let required: [[String: Any]] = try XCTUnwrap(trail["mustRecord"] as? [[String: Any]])
+        var template: String?
+        for entry in required {
+            if entry["event"] as? String == "built site moved out of the working folder" {
+                template = entry["line"] as? String
+            }
+        }
+        let expected: String = try XCTUnwrap(template, "the contract carries this line's words")
+            .replacingOccurrences(of: "{course}", with: "ICS3U")
+        XCTAssertEqual(BuildOutputLocation.trailLine(courseCode: "ICS3U"), expected)
     }
 
     // MARK: - Renaming

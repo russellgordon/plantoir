@@ -915,7 +915,7 @@ def _category_for(rel: str) -> str:
     if ext in _MEDIA_EXT: return "media"
     return "other"
 
-def print_required_diagnostics(required_shas: list[str], sha_to_pairs: dict[str, list[tuple[str, str]]], public_dir: Path):
+def print_required_diagnostics(required_shas: list[str], sha_to_pairs: dict[str, list[tuple[str, str]]], public_dir: Path, public_dir_as_named: Path | None = None):
     """
     Summarize and persist the 'required' list from Netlify.
     Writes full, ordered list to: public/_required_last_deploy.txt
@@ -943,11 +943,15 @@ def print_required_diagnostics(required_shas: list[str], sha_to_pairs: dict[str,
         print(f" - {rel} [{sha[:8]}…]")
 
     # Persist full list
+    # Written INTO the built tree, but naming the path the teacher knows:
+    # `.merged_output` is a link out of the working folder on the mac, and the
+    # resolved form is an Application Support path they have never seen.
+    named = public_dir_as_named or public_dir
     out = public_dir / "_required_last_deploy.txt"
     try:
         with out.open("w", encoding="utf-8") as f:
             f.write(f"Required files for last deploy — generated {NOW.isoformat(timespec='seconds')}\n")
-            f.write(f"Public root: {public_dir}\n\n")
+            f.write(f"Public root: {named}\n\n")
             f.write("Count by category:\n")
             for k in ("html","styles","scripts","data","images","fonts","media","other"):
                 if cat.get(k):
@@ -1062,7 +1066,11 @@ def main():
     except Exception:
         teacher_last_name = None
 
-    print(f" Deploying from local build: {public_dir}")
+    # The path the teacher knows, not the one it resolves to. On the mac
+    # `.merged_output` is a link out of the working folder, so the resolved
+    # form names an Application Support folder they have never seen — and the
+    # failure explainer's own contract case pins the courses/ spelling.
+    print(f" Deploying from local build: {public_dir_as_named}")
     print(f" Timestamp TZ offset: {NOW.strftime('%z')}")
 
     # Everything above is target-independent: the same built folder is what
@@ -1175,7 +1183,7 @@ def main():
         sha_to_pairs = manifest_resp.get("_sha_to_pairs") or {}
         print(f" Netlify requires {len(required)} file(s) for this deploy.")
         if args.diagnose:
-            print_required_diagnostics(required, sha_to_pairs, public_dir)
+            print_required_diagnostics(required, sha_to_pairs, public_dir, public_dir_as_named)
         _upload_required_files(deploy_id, netlify_token, public_dir, required, sha_to_pairs)
         print("✅ Delta deploy created (production).")
         if deploy_id:

@@ -137,6 +137,12 @@ else
 fi
 
 # ---- A second Mac, where this Mac already has a build -----------------
+# ADOPTING this machine's build was proposed and rejected. It would save a
+# rebuild on every switch between two Macs — but this Mac cannot tell "the
+# folder came back unchanged" from "it was archived and restored while I was
+# shut", and in the second case the pages are OLDER than the build it would
+# adopt, so publishing ships what the teacher undid. A rebuild is cheap and
+# visible; a wrong site nobody is told about is neither.
 echo
 echo "A link from a second Mac, where THIS Mac already has a build of its own"
 new_working_folder
@@ -146,8 +152,9 @@ echo "<html>mine</html>" > "$BUILDS/ICS3U/section1/public/index.html"
 ln -s "/Users/somebody-else/Library/Application Support/Plantoir/builds/xxxx/ICS3U" \
   "courses/ICS3U/.merged_output"
 link_course_build_output ICS3U >/dev/null
-check "this Mac's own build is ADOPTED, not thrown away — two Macs must not rebuild on every switch" \
-  "<html>mine</html>" "$(built_page ICS3U)"
+check "the build is cleared, not adopted — the safe answer, at the price of one rebuild" \
+  "MISSING" "$(built_page ICS3U)"
+check "and the link points here again" "$BUILDS/ICS3U" "$(readlink courses/ICS3U/.merged_output)"
 
 # ---- A course code that is really a path -------------------------------
 echo
@@ -184,11 +191,23 @@ new_working_folder
 rm -f "$HOME/Library/Logs/Plantoir/activity.txt"
 make_course_with_a_built_site ICS3U "<html>x</html>"
 link_course_build_output ICS3U >/dev/null
-if grep -q "moved ICS3U's built website out of the working folder" \
-    "$HOME/Library/Logs/Plantoir/activity.txt" 2>/dev/null; then
-  pass "the line is on the trail"
+# The sentence comes from the CONTRACT, never typed here: the app writes the
+# same line from BuildOutputLocation.trailLine, and a copy typed in a test is
+# the copy that keeps passing after the words change.
+EXPECTED_LINE="$(python3 -c "
+import json, sys
+rules = json.load(open(sys.argv[1]))
+for entry in rules['activityTrail']['mustRecord']:
+    if entry['event'] == 'built site moved out of the working folder':
+        print(entry['line'].replace('{course}', 'ICS3U'))
+        break
+" "$REPO/contracts/shared-rules.json")"
+if [ -z "$EXPECTED_LINE" ]; then
+  fail "the contract has no line for 'built site moved out of the working folder'"
+elif grep -qF "$EXPECTED_LINE" "$HOME/Library/Logs/Plantoir/activity.txt" 2>/dev/null; then
+  pass "the line is on the trail, word for word as the contract has it"
 else
-  fail "the line is on the trail"
+  fail "the line is on the trail, word for word as the contract has it"
 fi
 if grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} · ' \
     "$HOME/Library/Logs/Plantoir/activity.txt" 2>/dev/null; then
@@ -198,7 +217,7 @@ else
 fi
 link_course_build_output ICS3U >/dev/null
 check "and only once — a second run has nothing to say" "1" \
-  "$(grep -c "moved ICS3U's built website" "$HOME/Library/Logs/Plantoir/activity.txt" 2>/dev/null)"
+  "$(grep -cF "$EXPECTED_LINE" "$HOME/Library/Logs/Plantoir/activity.txt" 2>/dev/null)"
 
 # ---- A course restored from a backup ----------------------------------
 echo
@@ -210,6 +229,26 @@ make_course ICS3U
 link_course_build_output ICS3U >/dev/null
 check "the old build is NOT adopted — it would publish as up to date" \
   "MISSING" "$(built_page ICS3U)"
+
+# ---- The move works and the link does not ------------------------------
+# The failure has to land AFTER the move, which is the whole point of the
+# put-back. Making the course folder read-only does NOT do it — `mv` needs
+# write permission on the SOURCE parent, so the move itself fails and the
+# put-back is never reached. Shadowing `ln` fails exactly the step between.
+echo
+echo "A move that works, followed by a link that does not, is put BACK"
+new_working_folder
+make_course_with_a_built_site ICS3U "<html>keep me</html>"
+ln() { return 1; }
+link_course_build_output ICS3U >/dev/null
+unset -f ln
+check "the built website is back where it was, not orphaned outside" \
+  "<html>keep me</html>" "$(built_page ICS3U)"
+if [ ! -e "$BUILDS/ICS3U" ]; then
+  pass "and nothing is left outside for the next run to delete"
+else
+  fail "and nothing is left outside for the next run to delete"
+fi
 
 # ---- A folder nothing may be written into -----------------------------
 echo

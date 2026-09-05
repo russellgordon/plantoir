@@ -4336,10 +4336,29 @@ just ours:
   the app was next opened, left no line ever. The launchers append it
   themselves now.
 
-One finding cannot happen to you and is noted so nobody goes looking: a link
-naming ANOTHER Mac's builds folder was being treated as evidence about this
-one, so a teacher with two Macs had each of them clear the other's build and
-rebuild on every switch. Your build root is per-machine and never travels.
+A fourth finding was made, acted on, and then REVERSED by the next review, and
+the reversal is the part worth carrying: it was proposed that a link naming
+ANOTHER Mac's builds folder should let this Mac ADOPT its own existing build
+rather than clear it, saving a rebuild on every switch between two machines.
+That is unsafe. A Mac cannot tell "the folder came back unchanged" from "the
+folder was archived and restored while I was shut", and in the second case the
+pages it would adopt a build for are OLDER than that build — so the freshness
+check says up to date and the teacher publishes what they undid. Clearing costs
+one rebuild, which is cheap and visible. **The general rule, which is yours as
+much as ours: never adopt a build you cannot prove belongs to the content as it
+now stands.** A generation stamp — a UUID written beside the link and copied
+into the build, adopted only when the two match — would buy both, and is
+written down in the contract as the design to build if it is ever worth it.
+
+And one that cannot happen to you at all, noted so nobody goes looking: your
+build root is per-machine and never travels, so there is no foreign link to
+read.
+
+The second review also found the trap worth remembering about TESTING any
+"we put it back" branch: the first version of the test made the course folder
+read-only, which fails the MOVE rather than the link, so the branch never ran
+and the test passed with the put-back deleted. Fail the step in the MIDDLE, and
+re-check by putting the fault back.
 
 ### Two mac-specific traps, recorded because they cost time
 
