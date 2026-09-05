@@ -148,6 +148,15 @@ else
   cat /tmp/verify_class_pages_test.log
 fi
 
+# Runs BEFORE the image build below, on purpose: it answers in a tenth of a
+# second the question the image build answers in three minutes.
+if (cd scripts && python3 test_baked_modules.py) >/tmp/verify_baked_modules_test.log 2>&1; then
+  pass "every module a baked script imports is baked into the image too (scripts/test_baked_modules.py)"
+else
+  fail "every module a baked script imports is baked into the image too (scripts/test_baked_modules.py)"
+  cat /tmp/verify_baked_modules_test.log
+fi
+
 # -------------------- 1. Container runtime (shared Colima) --------------------
 # Maintainer variant: assumes Colima and the Docker CLI are installed (the
 # teacher-facing launchers handle installation). Never stops a running VM.
