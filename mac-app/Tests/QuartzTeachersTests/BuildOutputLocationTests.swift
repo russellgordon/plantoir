@@ -260,6 +260,47 @@ final class BuildOutputLocationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: target.appendingPathComponent("section2").path))
     }
 
+    /// Putting a section's pages back must take that section's built website
+    /// with them, or publishing ships the pages the teacher has just undone.
+    ///
+    /// Driven through `CourseRestorer` rather than the primitive, because the
+    /// primitive was already right and the wiring was what was missing.
+    @MainActor
+    func testRestoringASectionThrowsAwayItsBuiltSite() throws {
+        let courseURL: URL = try makeCourse("ICS3U")
+        let sectionURL: URL = courseURL.appendingPathComponent("section1")
+        try FileManager.default.createDirectory(at: sectionURL, withIntermediateDirectories: true)
+        try Data("# today\n".utf8).write(to: sectionURL.appendingPathComponent("index.md"))
+        let values: [String: Any] = ["course_code": "ICS3U", "section_numbers": [1]]
+        let configurationData: Data = try JSONSerialization.data(withJSONObject: values)
+        try configurationData.write(to: courseURL.appendingPathComponent("course_config.json"))
+        try BuildOutputLocation.ensureLink(courseDirectory: courseURL, workingFolderURL: workingFolder)
+
+        let built: URL = BuildOutputLocation.buildFolder(forWorkingFolder: workingFolder, courseCode: "ICS3U")
+            .appendingPathComponent("section1")
+            .appendingPathComponent("public")
+        try FileManager.default.createDirectory(at: built, withIntermediateDirectories: true)
+        try Data("<html>today</html>".utf8).write(to: built.appendingPathComponent("index.html"))
+
+        // A backup of the section as it was, made the way the app makes one.
+        let course: Course = Course(
+            code: "ICS3U",
+            directoryURL: courseURL,
+            configuration: CourseConfiguration(values: values, lastSavedData: configurationData)
+        )
+        let coursesURL: URL = workingFolder.appendingPathComponent("courses")
+        let backupURL: URL = try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesURL)
+        let backup: BackupItem = try XCTUnwrap(BackupItem.from(fileURL: backupURL, courseCode: "ICS3U"))
+
+        try CourseRestorer.restoreSection(1, from: backup, coursesDirectoryURL: coursesURL)
+
+        XCTAssertNil(
+            builtPage(inCourse: courseURL),
+            "a restored section's pages can be OLDER than the site built from them, so a "
+                + "built site left standing reads as up to date and publishes what was undone"
+        )
+    }
+
     // MARK: - Renaming
 
     /// A rename used to cost nothing, because the built site sat inside the
