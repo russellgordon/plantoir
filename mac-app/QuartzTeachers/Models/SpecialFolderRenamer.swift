@@ -394,13 +394,21 @@ enum SpecialFolderRenamer {
             updated["graded_folders"] = renaming(oldName, to: newName, inList: graded)
         }
 
-        if let curriculum = values["curriculum_folder"] as? String {
+        // **Scoped, both of them.** A shared folder and a per-section folder may
+        // legitimately share a name — they are different folders in different
+        // places, found by different scans — so renaming the shared `Tasks`
+        // must not rewrite a course whose CLASS folder is a per-section
+        // `Tasks`. The curriculum folder is shared and the class folder is
+        // per-section, so each is carried only by a rename in its own scope.
+        // Found by the suite on 2026-09-04, next door to a test that was
+        // failing for a different reason.
+        if scope == .shared, let curriculum = values["curriculum_folder"] as? String {
             if curriculum.caseInsensitiveCompare(oldName) == .orderedSame {
                 updated["curriculum_folder"] = newName
             }
         }
 
-        if let classFolder = values["class_folder"] as? String {
+        if scope == .perSection, let classFolder = values["class_folder"] as? String {
             if classFolder.caseInsensitiveCompare(oldName) == .orderedSame {
                 updated["class_folder"] = newName
             }
@@ -413,10 +421,13 @@ enum SpecialFolderRenamer {
         // failure `excluded_items` was written to prevent.
         if let excluded = values["excluded_items"] as? [String: Any] {
             var rewritten: [String: Any] = excluded
-            for key in [FolderScope.shared.exclusionKey, FolderScope.perSection.exclusionKey] {
-                if let names = excluded[key] as? [String] {
-                    rewritten[key] = renaming(oldName, to: newName, inList: names)
-                }
+            // This scope's list only, for the same reason as the two keys
+            // above: `excluded_items` is keyed by scope precisely BECAUSE the
+            // same bare name can exist in both, and rewriting the other
+            // scope's entry would silently re-include a folder the teacher
+            // excluded.
+            if let names = excluded[scope.exclusionKey] as? [String] {
+                rewritten[scope.exclusionKey] = renaming(oldName, to: newName, inList: names)
             }
             updated["excluded_items"] = rewritten
         }

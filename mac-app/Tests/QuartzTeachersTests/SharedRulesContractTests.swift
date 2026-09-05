@@ -773,6 +773,7 @@ final class SharedRulesContractTests: XCTestCase {
             "per_section_folders": ["Tasks"],
             "graded_folders": ["Tasks"],
             "curriculum_folder": "Tasks",
+            "class_folder": "Tasks",
             "excluded_items": ["shared": ["Tasks"], "per_section": ["Tasks"]],
         ]
         let afterShared: [String: Any] = SpecialFolderRenamer.renaming(
@@ -792,10 +793,29 @@ final class SharedRulesContractTests: XCTestCase {
                 XCTAssertEqual(afterShared[key] as? [String], ["Assessments"])
             case "curriculum_folder":
                 XCTAssertEqual(afterShared[key] as? String, "Assessments")
+                XCTAssertEqual(
+                    afterPerSection[key] as? String, "Tasks",
+                    "The curriculum folder is SHARED; a per-section rename must not touch it"
+                )
+            case "class_folder":
+                // Carried by the per-section rename: a class folder is a
+                // per-section folder, and a SHARED rename of a name that
+                // happens to match must not touch it.
+                XCTAssertEqual(afterPerSection[key] as? String, "Assessments")
+                XCTAssertEqual(
+                    afterShared[key] as? String, "Tasks",
+                    "The class folder is PER-SECTION; a shared rename must not touch it"
+                )
             case "excluded_items":
-                let excluded: [String: Any] = try XCTUnwrap(afterShared[key] as? [String: Any])
-                XCTAssertEqual(excluded["shared"] as? [String], ["Assessments"])
-                XCTAssertEqual(excluded["per_section"] as? [String], ["Assessments"])
+                // Each scope's list is rewritten by a rename in THAT scope and
+                // left alone by the other — the whole reason the key is keyed
+                // by scope is that the same bare name can exist in both.
+                let shared: [String: Any] = try XCTUnwrap(afterShared[key] as? [String: Any])
+                XCTAssertEqual(shared["shared"] as? [String], ["Assessments"])
+                XCTAssertEqual(shared["per_section"] as? [String], ["Tasks"])
+                let perSection: [String: Any] = try XCTUnwrap(afterPerSection[key] as? [String: Any])
+                XCTAssertEqual(perSection["per_section"] as? [String], ["Assessments"])
+                XCTAssertEqual(perSection["shared"] as? [String], ["Tasks"])
             default:
                 XCTFail("The contract says a rename carries \(key) across, and nothing here checks it.")
             }

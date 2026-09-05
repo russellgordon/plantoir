@@ -339,7 +339,17 @@ class CourseConfiguration {
     /// What this course calls a unit — "Unit 2, Day 3", or "Module 2, Day 3".
     /// Absent means "Unit"; see `ClassPageTerm`.
     var unitWord: String {
-        get { return ClassPageTerm.cleaned(values["unit_word"] as? String) }
+        // Read through `stringValue(forKey:)` like every other string here,
+        // rather than by subscript. Not decoration: `FileFormatsContractTests`
+        // counts the keys this file reads by scanning the SOURCE for that
+        // labelled argument, and compares the count against the contract — so
+        // a key reached only by subscript is invisible to the very check that
+        // exists to stop a config key being added without telling Windows.
+        // Caught by the suite on 2026-09-04, after the key HAD been
+        // documented: the intent was met and the mechanism could not see it.
+        // (Which is also why this comment describes the literal rather than
+        // spelling it out — the scan would count the comment as a key.)
+        get { return ClassPageTerm.cleaned(stringValue(forKey: "unit_word")) }
         set { values["unit_word"] = ClassPageTerm.cleaned(newValue) }
     }
 
