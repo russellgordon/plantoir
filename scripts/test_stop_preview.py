@@ -16,6 +16,9 @@ Run with:
 
     python3 scripts/test_stop_preview.py
 """
+import json
+import os
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -44,10 +47,12 @@ class StopPreviewContractTests(unittest.TestCase):
 
     def test_every_case(self):
         cases = self.contract["cases"]
-        # A floor rather than an equality, so a case PROPOSED FROM WINDOWS
-        # makes this suite fail loudly rather than being skipped quietly —
-        # which is the mechanism the contract exists for.
-        self.assertGreaterEqual(len(cases), 17, "the contract lost stopPreview cases")
+        # The floor guards against LOSS. What guards against a case proposed
+        # from Windows being ignored is that this test runs every case it
+        # finds, so an unimplemented proposal fails here rather than passing
+        # quietly — the two are different mechanisms and the comment that
+        # used to be here confused them.
+        self.assertGreaterEqual(len(cases), 23, "the contract lost stopPreview cases")
         for case in cases:
             with self.subTest(case=case["name"]):
                 section = case["section"]
@@ -61,6 +66,66 @@ class StopPreviewContractTests(unittest.TestCase):
                     ),
                     case["stops"],
                     case.get("why", ""))
+
+    def test_needs_evidence_is_honest(self):
+        """
+        A case marked `needsEvidence: ["workingDirectory"]` says Windows may
+        skip it, because `Win32_Process` cannot see a working directory. That
+        is a claim about the case, and an untrue one would quietly excuse a
+        platform from a case it could actually answer.
+
+        So the claim is CHECKED: take the working directories away and the
+        verdict must change. If it does not, the case is decidable without
+        them and nobody should be skipping it.
+        """
+        marked = 0
+        for case in self.contract["cases"]:
+            needs = case.get("needsEvidence") or []
+            if "workingDirectory" not in needs:
+                continue
+            marked += 1
+            section = case["section"]
+            blinded = []
+            for process in case["snapshot"]:
+                copy = dict(process)
+                copy["cwd"] = ""
+                blinded.append(copy)
+            with self.subTest(case=case["name"]):
+                self.assertNotEqual(
+                    stop_preview.pids_to_stop(
+                        blinded, section["directories"],
+                        course=section.get("course"), section=section.get("number"),
+                        mode=case["mode"]),
+                    case["stops"],
+                    "this case is decidable WITHOUT a working directory, so marking it "
+                    "needsEvidence lets a platform skip a case it could have answered")
+        self.assertGreater(marked, 0, "nothing is marked, so this proves nothing")
+
+    def test_every_case_that_is_not_marked_survives_losing_the_working_directory(self):
+        """
+        The other direction, and the one that matters for the port: a case
+        WITHOUT the marker must reach the same verdict with no working
+        directory at all — otherwise Windows fails it through no fault of its
+        implementation.
+        """
+        for case in self.contract["cases"]:
+            if "workingDirectory" in (case.get("needsEvidence") or []):
+                continue
+            section = case["section"]
+            blinded = []
+            for process in case["snapshot"]:
+                copy = dict(process)
+                copy["cwd"] = ""
+                blinded.append(copy)
+            with self.subTest(case=case["name"]):
+                self.assertEqual(
+                    stop_preview.pids_to_stop(
+                        blinded, section["directories"],
+                        course=section.get("course"), section=section.get("number"),
+                        mode=case["mode"]),
+                    case["stops"],
+                    "a platform with no working directory cannot pass this case, and it "
+                    "is not marked as needing one")
 
     def test_both_modes_are_exercised(self):
         """
@@ -161,6 +226,69 @@ class TheRuleStopsStrictlyMoreThanTheOldSweepDid(unittest.TestCase):
                 self.SNAPSHOT, self.DIRECTORIES, course="ADA1O", section=1,
                 mode=stop_preview.MODE_SERVING_ONLY),
             [])
+
+
+class TheEntryPointAPlatformWithoutProcCanUse(unittest.TestCase):
+    """
+    `--match-stdin` reads a process list and prints the pids the rule names,
+    touching nothing.
+
+    It exists so a platform that cannot read `/proc` can still use the ONE
+    rule — enumerate with its own tools, ask here WHICH, kill with its own
+    tools. Windows has not adopted it (see WINDOWS-HANDOFF item 20), and an
+    entry point that is offered but never executed is how a docstring becomes
+    fiction. So it is exercised here as a real subprocess, against the same
+    contract cases.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        repo_contracts = REPO / "contracts"
+        if repo_contracts.is_dir():
+            toolchain_paths.CONTRACTS_DIR = repo_contracts
+        contracts.reset_cache()
+        cls.contract = contracts.section("shared-rules", "stopPreview")
+
+    def run_it(self, snapshot, section, mode):
+        arguments = [sys.executable, str(REPO / "scripts" / "stop_preview.py"),
+                     "--match-stdin", "--mode", mode]
+        for directory in section["directories"]:
+            arguments += ["--dir", directory]
+        if section.get("course"):
+            arguments += ["--course", str(section["course"])]
+        if section.get("number") is not None:
+            arguments += ["--section", str(section["number"])]
+        finished = subprocess.run(arguments, input=json.dumps(snapshot),
+                                  capture_output=True, text=True, check=True)
+        return [int(line) for line in finished.stdout.split() if line.strip()]
+
+    def test_it_answers_every_contract_case(self):
+        for case in self.contract["cases"]:
+            with self.subTest(case=case["name"]):
+                self.assertEqual(
+                    self.run_it(case["snapshot"], case["section"], case["mode"]),
+                    case["stops"], case.get("why", ""))
+
+    def test_it_stops_nothing(self):
+        """
+        The property that makes it safe to hand a process list to: it decides,
+        it does not act. A live process is used rather than a made-up pid,
+        because "did not kill it" is only worth asserting about something that
+        could actually have been killed.
+        """
+        victim = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        try:
+            snapshot = [{"pid": victim.pid, "ppid": os.getpid(), "name": "python3",
+                         "commandLine": "python3 /opt/scripts/build_site.py "
+                                        "--course=ADA1O --section=1",
+                         "cwd": "/teaching"}]
+            section = {"course": "ADA1O", "number": 1,
+                       "directories": ["/tmp/quartz-builds/ADA1O/section1"]}
+            self.assertEqual(self.run_it(snapshot, section, "everything"), [victim.pid])
+            self.assertIsNone(victim.poll(), "--match-stdin killed a process; it must only report")
+        finally:
+            victim.kill()
+            victim.wait()
 
 
 class ThereIsOnlyOneCopyOfTheRule(unittest.TestCase):

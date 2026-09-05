@@ -701,6 +701,21 @@ this side is expected to say so when the contract is wrong.
 
     **What you owe, in order.**
 
+    - **`activityTrail.mustRecord` gains "section processes reclaimed", and
+      your `ContractTests` will go RED until you emit it.** No `appliesOn`
+      key: unlike the built-site event in item 19, this one is genuinely
+      yours too — you run the same `--stop` and it prints the same count.
+      It carries the course, the section and HOW MANY processes were ended,
+      and the count is the whole point: nothing else on either platform's
+      trail separates "there was nothing left to stop" from "a build was
+      still running and was ended", which are the two explanations a teacher
+      reporting a half-finished publish is choosing between. `PreviewStopper`
+      on the mac discarded the launcher's stdout for months; check whether
+      `PreviewStopper.cs` does the same. Two details worth copying rather
+      than re-deciding: a sweep that never RAN (no container, no recipe)
+      leaves NO line, because a line claiming zero would not be true; and
+      the line says "reclaimed 3 leftover website-builder processes", never
+      the launcher's own "Stopped 3 process(es)".
     - **Verify the two fixes I made to `preview.ps1` from this Mac.** They
       are the only edits to your file, and this machine has no `pwsh`, so
       the PowerShell was reasoned about and never executed. Both are the
@@ -723,13 +738,35 @@ this side is expected to say so when the contract is wrong.
       carries `cwd`, which `Win32_Process` cannot give you: those cases are
       not yours to answer directly, and the fact that you still reach the
       same verdict through the descendant walk is the thing worth proving.
+    - **Two things about your matcher that the contract now records rather
+      than hides.** `preview.ps1:313` considers only `node.exe` and
+      `python.exe` for direct evidence; the shared rule has no such filter,
+      so a `cmd.exe` running `npm.cmd` with the section's folder on its
+      command line is direct evidence on the mac and reaches you only through
+      the descendant walk. It is written down in `stopPreview.notShared`
+      ("Which processes are even considered") rather than quietly fixed from
+      here, because whether it can be dropped safely on Windows is yours to
+      judge. And both implementations read a repeated `--section` as the
+      FIRST occurrence while argparse takes the LAST — nothing produces a
+      repeated flag today, so it is recorded, not fixed.
+    - **`PreviewStopper.cs:14-20` says the launcher "kills the section's
+      processes by working directory".** It never has, on your platform —
+      that is the mac's mechanism and `Win32_Process` has no such field. The
+      same wrong sentence was in two places in THIS file and has been
+      corrected; yours is a code comment and is yours to fix.
     - **Then decide about `--match-stdin`, and tell the mac.**
       `stop_preview.py` has an entry point that reads a JSON process list on
-      stdin and prints the pids the rule names, touching nothing. It exists
-      so a platform that cannot read `/proc` can still use the ONE rule:
-      enumerate with `Get-CimInstance`, ask Python which, kill with
-      `Stop-Process`. That would leave one implementation and two ports
-      rather than two implementations. It is deliberately NOT adopted here,
+      stdin and prints the pids the rule names, touching nothing — and it is
+      exercised by the mac's suite as a real subprocess against every
+      contract case, including one that proves it kills nothing, so it is a
+      working route rather than a docstring. It exists so a platform that
+      cannot read `/proc` can still use the ONE rule: enumerate with
+      `Get-CimInstance`, ask Python which, kill with `Stop-Process`. That
+      would leave one implementation and two ports rather than two
+      implementations, and would make the two `preview.ps1` functions
+      unnecessary. Note your native runtime already requires `python.exe`
+      before stop mode runs, so the dependency is not new. It is deliberately
+      NOT adopted here,
       because whether you can rely on Python being resolvable on that path
       is a question only your machine can answer — `--stop` must never start
       anything, and a Python that has to be found is a small risk you can
@@ -3919,6 +3956,31 @@ lists, which is the precise failure `contracts/toolchain.json` →
 `recipeFolders` exists to record. The functions are defined inside
 `preview.ps1`'s stop block instead. If you want them dot-sourceable, that is a
 real cost to weigh, not a free tidy-up.
+
+**A case a platform may skip, and why that is not a loophole.** One case —
+"a process is caught by its working directory alone" — can be decided ONLY
+with a working directory, which `Win32_Process` does not expose. Rather than
+delete it (it pins the evidence that catches `npm install`) or let it fail on
+Windows, cases carry `needsEvidence`, and a runner without that evidence skips
+it naming what was missing. The loophole this could obviously become is closed
+by a test rather than by discipline: the mac's suite BLINDS every case — takes
+the working directories away — and asserts that a marked case's verdict
+changes and an unmarked case's does not. It caught a case wearing the marker
+that did not need it on the first run, which is exactly the drift the marker
+would otherwise invite.
+
+**Three holes the second review found, all in the rule itself, all the same
+family as the bug being fixed.** A blank or root build directory was evidence
+for EVERY process, because an empty string is a prefix of everything — a
+caller that lost track of which section it was asking about would have swept
+the whole container rather than failed. A target that is a SUFFIX of a longer
+absolute path matched as well, so `/x/tmp/quartz-builds/ADA1O/section1` was
+evidence for `/tmp/quartz-builds/ADA1O/section1`. Both are the section1 /
+section10 mistake pointed in different directions: one about where a path
+ends, one about where it begins, one about whether it is a path at all. The
+lesson worth keeping is that fixing a boundary bug in one direction is not
+finishing it — check every edge of the match, and check that the thing being
+matched is a real value.
 
 **What was measured, not decided.** The two `preview.ps1` prefix bugs were
 found by reading, and both are real: `$lower.Contains($sectionNeedle)` with a

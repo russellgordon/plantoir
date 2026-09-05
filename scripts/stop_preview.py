@@ -86,6 +86,31 @@ SEPARATORS = ("/", "\\")
 # was previously missed.
 BOUNDARIES = SEPARATORS + (" ", "\t", '"', "'")
 
+# What may legally precede it, for the same reason in the other direction:
+# without this, `/x/tmp/quartz-builds/ADA1O/section1/q.mjs` is evidence for
+# `/tmp/quartz-builds/ADA1O/section1`, because the target is a SUFFIX of a
+# longer absolute path. It needs another absolute path ending in this one to
+# bite, which is unlikely — and is exactly the kind of "unlikely" that the
+# section1/section10 bug also was.
+LEADING_BOUNDARIES = (" ", "\t", '"', "'", "=")
+
+
+def _is_a_real_directory(target: str) -> bool:
+    """
+    A target that is empty, or is the root, is not a section's build folder —
+    it is a caller that has lost track of what it was asking about.
+
+    Without this, `pids_to_stop(snapshot, [""])` matches EVERY process (an
+    empty string is a prefix of everything and `"" + separator` appears in any
+    path), so one caller passing a blank sweeps the whole container. That is
+    the same failure as the prefix bug one level up, and it belongs here
+    rather than in `expand_directories`: the matching functions are the public
+    API, and `build_site.py` and the contract runner both call them directly.
+    """
+    if not target:
+        return False
+    return target not in ("/", "\\")
+
 
 def _normalise(text: str) -> str:
     """
@@ -121,6 +146,8 @@ def cwd_is_inside(cwd: str, directory: str) -> bool:
         return False
     here = _normalise(_strip_trailing_separator(cwd))
     target = _normalise(_strip_trailing_separator(directory))
+    if not _is_a_real_directory(target):
+        return False
     if here == target:
         return True
     for separator in SEPARATORS:
@@ -146,10 +173,14 @@ def command_names_directory(command_line: str, directory: str) -> bool:
         return False
     haystack = _normalise(command_line)
     target = _normalise(_strip_trailing_separator(directory))
+    if not _is_a_real_directory(target):
+        return False
     start = haystack.find(target)
     while start != -1:
         after = start + len(target)
-        if after >= len(haystack) or haystack[after] in BOUNDARIES:
+        ends_cleanly = after >= len(haystack) or haystack[after] in BOUNDARIES
+        starts_cleanly = start == 0 or haystack[start - 1] in LEADING_BOUNDARIES
+        if ends_cleanly and starts_cleanly:
             return True
         start = haystack.find(target, start + 1)
     return False

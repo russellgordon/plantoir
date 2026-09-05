@@ -793,11 +793,50 @@ fi
 # Leave the container as it was found: the stand-ins ended, and the file this
 # section deleted from it put back. The container is left running on purpose
 # (the summary tells you so), and handing it on with a hole in /opt/scripts
-# would make the NEXT run's older-container check pass for the wrong reason.
-docker exec "$CONTAINER_NAME" sh -c \
-  'for p in /proc/[0-9]*; do grep -aq cq4t-probe "$p/cmdline" 2>/dev/null && kill -9 "${p#/proc/}"; done' \
-  >/dev/null 2>&1 || true
+# would make the NEXT run's older-container check pass for the wrong reason —
+# and, sooner than that, make an ordinary build fail on `import stop_preview`
+# with an error that reads like a broken toolchain rather than like litter.
+#
+# Children too, not only the marked shells: this image's /bin/sh FORKS
+# `sleep 600` rather than exec'ing it, so each stand-in leaves a child whose
+# own command line carries no marker. Matching on the parent as well is what
+# makes "leaves the container as it found it" true rather than nearly true.
+docker exec "$CONTAINER_NAME" python3 -c '
+import os, signal
+marked = set()
+for entry in os.listdir("/proc"):
+    if not entry.isdigit():
+        continue
+    try:
+        line = open("/proc/%s/cmdline" % entry, "rb").read()
+    except OSError:
+        continue
+    if b"cq4t-probe" in line:
+        marked.add(int(entry))
+doomed = set(marked)
+for entry in os.listdir("/proc"):
+    if not entry.isdigit():
+        continue
+    try:
+        for row in open("/proc/%s/status" % entry, encoding="utf-8", errors="replace"):
+            if row.startswith("PPid:") and int(row.split()[1]) in marked:
+                doomed.add(int(entry))
+                break
+    except (OSError, ValueError, IndexError):
+        continue
+for pid in doomed:
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
+' >/dev/null 2>&1 || true
+
 docker cp scripts/stop_preview.py "$CONTAINER_NAME:/opt/scripts/stop_preview.py" >/dev/null 2>&1 || true
+if docker exec "$CONTAINER_NAME" test -f /opt/scripts/stop_preview.py 2>/dev/null; then
+  pass "and the container was left as it was found (the rule put back in /opt/scripts)"
+else
+  fail "the container is still missing /opt/scripts/stop_preview.py — the next build in it will fail on an import, which reads as a broken toolchain rather than as this section's litter"
+fi
 
 RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo '(none)')"
 if [[ "$RUNNING_IMAGE" == "$DEV_TEST_IMAGE" ]]; then

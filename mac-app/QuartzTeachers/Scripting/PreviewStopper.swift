@@ -42,10 +42,26 @@ enum PreviewStopper {
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = [scriptURL.path, courseCode, String(sectionNumber), "--stop"]
         process.currentDirectoryURL = workspaceURL
-        process.standardOutput = FileHandle.nullDevice
+        // The launcher prints how many processes it ended, and this used to
+        // send that straight to the null device. The number is the one thing
+        // that separates "there was nothing left to stop" from "a build was
+        // still running and was ended", which are the two explanations for a
+        // teacher reporting that their publish stopped halfway — so it is
+        // read, put on the trail, and otherwise still ignored. Errors stay
+        // discarded: this runs behind actions that have their own feedback,
+        // and a stop that fails is handled by the next preview freeing the
+        // ports anyway.
+        let output: Pipe = Pipe()
+        process.standardOutput = output
         process.standardError = FileHandle.nullDevice
         process.terminationHandler = { finished in
+            let printed: String = String(
+                data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8
+            ) ?? ""
             Task { @MainActor in
+                PreviewStopper.noteWhatWasReclaimed(
+                    printed, courseCode: courseCode, sectionNumber: sectionNumber
+                )
                 var remaining: [Stopping] = []
                 for candidate in running {
                     if candidate.process !== finished {
@@ -64,6 +80,54 @@ enum PreviewStopper {
         } catch {
             // Could not start: nothing held, nothing to clean up.
         }
+    }
+
+    /// How many processes the launcher said it ended, or nil when it said
+    /// nothing of the kind.
+    ///
+    /// Parsed rather than counted here because the counting happens inside
+    /// the container, where the rule runs — see `contracts/shared-rules.json`
+    /// → `stopPreview`. The launcher's own sentence is the only report of it
+    /// that crosses back.
+    nonisolated static func countReclaimed(in printed: String) -> Int? {
+        for line in printed.split(separator: "\n") {
+            guard let stopped = line.range(of: "Stopped ") else {
+                continue
+            }
+            let rest: Substring = line[stopped.upperBound...]
+            var digits: String = ""
+            for character in rest {
+                if character.isNumber {
+                    digits.append(character)
+                } else {
+                    break
+                }
+            }
+            if let value = Int(digits) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    /// Puts the count on the trail, in the words a teacher would recognise.
+    ///
+    /// Nothing is recorded when the launcher said nothing countable — it
+    /// declines to start when there is no container, and a line claiming
+    /// zero would be indistinguishable from a sweep that ran and found
+    /// nothing. Those are different facts and the trail should not blur them.
+    static func noteWhatWasReclaimed(
+        _ printed: String, courseCode: String, sectionNumber: Int
+    ) {
+        guard let count = countReclaimed(in: printed) else {
+            return
+        }
+        let what: String = count == 1
+            ? "reclaimed 1 leftover website-builder process"
+            : "reclaimed \(count) leftover website-builder processes"
+        ActivityTrail.note(
+            .sectionProcessesReclaimed, what, course: courseCode, section: sectionNumber
+        )
     }
 
     /// Stop the section's container-side processes and WAIT for that to

@@ -1045,7 +1045,7 @@ final class SharedRulesContractTests: XCTestCase {
         let rule: [String: Any] = try Self.section("stopPreview")
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
         XCTAssertGreaterThanOrEqual(
-            cases.count, 17,
+            cases.count, 23,
             "the stopPreview case list has lost cases; it is the only gate on a rule that "
                 + "used to be written out three times"
         )
@@ -1060,6 +1060,31 @@ final class SharedRulesContractTests: XCTestCase {
             )
             let directories: [String] = try XCTUnwrap(section["directories"] as? [String])
             XCTAssertFalse(directories.isEmpty, "\(name) gives no build directory")
+            // A blank directory is a prefix of every path, so a case carrying
+            // one would sweep an entire container — that was a real hole in
+            // the rule, found by review. One case tests it ON PURPOSE and
+            // says so in its name; anything else with a blank is a mistake.
+            if !name.contains("blank build directory") {
+                for directory in directories {
+                    XCTAssertFalse(
+                        directory.isEmpty,
+                        "\(name) carries a blank build directory, which matches everything"
+                    )
+                }
+            }
+            // A case that only some platforms can answer must SAY so, and
+            // may name only evidence a platform can genuinely lack.
+            if let needs = oneCase["needsEvidence"] as? [String] {
+                XCTAssertFalse(needs.isEmpty, "\(name) has an empty needsEvidence")
+                for evidence in needs {
+                    XCTAssertEqual(
+                        evidence, "workingDirectory",
+                        "\(name) excuses a runner from '\(evidence)', which every platform "
+                            + "can see; the only evidence a platform genuinely lacks is a "
+                            + "working directory, and Windows is the platform"
+                    )
+                }
+            }
             let snapshot: [[String: Any]] = try XCTUnwrap(
                 oneCase["snapshot"] as? [[String: Any]], "\(name) has no process snapshot"
             )
@@ -1081,37 +1106,14 @@ final class SharedRulesContractTests: XCTestCase {
         )
     }
 
-    /// The rule has ONE home, and this is what keeps it that way on this side.
-    ///
-    /// The failure being prevented is not a broken copy — it is a WORKING
-    /// one, which passes every behavioural test right up to the day it
-    /// drifts. That is how there came to be three.
-    func testTheLauncherDelegatesRatherThanSweepingProcessesItself() throws {
-        let root: URL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent()
-        let launcher: String = try String(
-            contentsOf: root.appendingPathComponent("preview.sh"), encoding: .utf8
-        )
-        XCTAssertTrue(
-            launcher.contains("scripts/stop_preview.py"),
-            "preview.sh no longer uses the shared rule for --stop"
-        )
-        XCTAssertFalse(
-            launcher.contains("/proc/{entry}/cwd"),
-            "preview.sh has grown its own process sweep again"
-        )
-        // Version independence: stop mode runs against whatever container is
-        // ALREADY there, which right after an upgrade was built from the
-        // previous image and has no such file baked in. Both callers discard
-        // this launcher's output and neither checks its exit code, so naming
-        // a baked path fails silently and the build carries on running.
-        XCTAssertFalse(
-            launcher.contains("python3 /opt/scripts/stop_preview.py"),
-            "preview.sh runs the rule from inside the image; an older container does not "
-                + "have it, and the failure is invisible"
-        )
-    }
+    // The launcher's own half of this — that `preview.sh` delegates to the
+    // shared rule, keeps no sweep of its own, and pipes the code in rather
+    // than naming a path baked into the image — is asserted ONCE, in
+    // `scripts/test_stop_preview.py` (`ThereIsOnlyOneCopyOfTheRule`), which
+    // runs in `verify.sh` beside the rule it protects. It was asserted here
+    // too for a while; two gates checking the same three substrings of the
+    // same file is the shape that drifts, and the toolchain's gate is the
+    // right home for a claim about a toolchain file.
 
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)

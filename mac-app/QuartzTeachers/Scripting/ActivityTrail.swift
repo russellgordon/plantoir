@@ -126,6 +126,18 @@ nonisolated enum ActivityTrail {
         /// ("where has my site gone?", "did something delete my files?"), and
         /// this line — dated, per course — is what answers all three at once.
         case builtSiteMovedOutOfTheFolder = "built site moved out of the working folder"
+        /// A section's leftover website-builder processes were reclaimed —
+        /// after a preview was stopped, a window closed, or a publish was
+        /// cancelled. Carries the course, the section, and HOW MANY were
+        /// ended. The count is the whole value: nothing else in the trail
+        /// distinguishes "the preview had already finished" (nothing to
+        /// stop) from "a build was still running and was ended", and those
+        /// are the two competing explanations for a teacher reporting that
+        /// their publish stopped halfway through. Added when this sweep
+        /// began ending a mid-flight BUILD and its driver rather than only a
+        /// server — a real change in what a teacher can lose, which had no
+        /// line describing it.
+        case sectionProcessesReclaimed = "section processes reclaimed"
     }
 
     // MARK: - Stored properties
