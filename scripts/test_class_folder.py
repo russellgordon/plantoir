@@ -44,20 +44,27 @@ class ClassFolderContractTests(unittest.TestCase):
 
     def test_naming_cases(self):
         cases = self.contract["naming"]["cases"]
-        self.assertGreaterEqual(len(cases), 5, "the contract lost naming cases")
+        self.assertGreaterEqual(len(cases), 10, "the contract lost naming cases")
         for case in cases:
             with self.subTest(case=case["name"]):
+                # A case with no `classFolder` is a course that has never
+                # recorded one, which is every course made before the key
+                # existed. Those must go on getting the old guess.
                 config = {"per_section_folders": case["perSectionFolders"]}
+                if case.get("classFolder"):
+                    config["class_folder"] = case["classFolder"]
                 self.assertEqual(
                     build_site.class_folder_name(config), case["expect"],
                     case.get("why", ""))
 
     def test_membership_cases(self):
         cases = self.contract["membership"]["cases"]
-        self.assertGreaterEqual(len(cases), 4, "the contract lost membership cases")
+        self.assertGreaterEqual(len(cases), 6, "the contract lost membership cases")
         for case in cases:
             with self.subTest(case=case["name"]):
                 config = {"per_section_folders": case["perSectionFolders"]}
+                if case.get("classFolder"):
+                    config["class_folder"] = case["classFolder"]
                 self.assertEqual(
                     build_site.class_folder_names(config), case["expect"],
                     case.get("why", ""))

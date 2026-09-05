@@ -336,6 +336,23 @@ class CourseConfiguration {
         return result
     }
 
+    /// What this course calls a unit — "Unit 2, Day 3", or "Module 2, Day 3".
+    /// Absent means "Unit"; see `ClassPageTerm`.
+    var unitWord: String {
+        // Read through `stringValue(forKey:)` like every other string here,
+        // rather than by subscript. Not decoration: `FileFormatsContractTests`
+        // counts the keys this file reads by scanning the SOURCE for that
+        // labelled argument, and compares the count against the contract — so
+        // a key reached only by subscript is invisible to the very check that
+        // exists to stop a config key being added without telling Windows.
+        // Caught by the suite on 2026-09-04, after the key HAD been
+        // documented: the intent was met and the mechanism could not see it.
+        // (Which is also why this comment describes the literal rather than
+        // spelling it out — the scan would count the comment as a key.)
+        get { return ClassPageTerm.cleaned(stringValue(forKey: "unit_word")) }
+        set { values["unit_word"] = ClassPageTerm.cleaned(newValue) }
+    }
+
     var sharedFolders: [String] {
         get { return stringListValue(forKey: "shared_folders") }
         set { values["shared_folders"] = newValue }
@@ -364,6 +381,21 @@ class CourseConfiguration {
     /// scanning for a top-level folder whose name contains "curriculum" — which
     /// is still the real path for a course made from scratch, but would never
     /// have found a folder called something else entirely.
+    /// What this course calls the folder holding its class pages. Absent means
+    /// the old guess — the first per-section folder whose name mentions
+    /// "class" — which is what every course made before this key existed
+    /// relies on. See `ClassFolder`.
+    var classFolder: String? {
+        get { return values["class_folder"] as? String }
+        set {
+            if let newValue, !newValue.trimmingCharacters(in: .whitespaces).isEmpty {
+                values["class_folder"] = newValue
+            } else {
+                values.removeValue(forKey: "class_folder")
+            }
+        }
+    }
+
     var curriculumFolder: String? {
         get { return values["curriculum_folder"] as? String }
         set {
@@ -906,6 +938,69 @@ class CourseConfiguration {
         data.append(contentsOf: [0x0A])
         try data.write(to: url, options: [.atomic])
         lastSavedData = data
+    }
+
+    /// Records a change that has ALREADY happened on disk — a folder rename —
+    /// in both the file and the in-memory copy, without saving anything else.
+    ///
+    /// Settings normally holds edits in memory until Save, and Cancel reverts
+    /// them. A renamed folder cannot be reverted by a Cancel, so the rename
+    /// has to reach the file at once or the two will disagree the moment the
+    /// teacher presses either button. What must NOT reach the file is
+    /// everything else they have typed and not saved, so the change is applied
+    /// to a FRESH read of the file rather than to the in-memory values, and
+    /// then to the in-memory values separately. `lastSavedData` follows the
+    /// file, so Cancel reverts their other edits and leaves the rename alone —
+    /// which is the only honest answer, because the folder really has moved.
+    func recordOnDisk(_ change: ([String: Any]) -> [String: Any], at url: URL) throws {
+        // Read, change, and write only if nothing else wrote in between.
+        //
+        // A build's own `preflight_update_course_config` writes this same file,
+        // and the loser of that race used to be silent — whichever write landed
+        // second simply erased the other's keys. The Python side now does the
+        // same compare-and-swap, so between them a rename and a build can no
+        // longer quietly undo each other; whoever notices re-reads and redoes
+        // its work rather than overwriting.
+        //
+        // Re-applying `change` to the fresh read is safe because it is what
+        // `change` is: a rename of names that either are there or are not.
+        var attempts: Int = 0
+        while true {
+            let before: Data = try Data(contentsOf: url)
+            guard let onDisk = try JSONSerialization.jsonObject(with: before) as? [String: Any] else {
+                throw CourseConfigurationError.notADictionary
+            }
+            let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            var written: Data = try JSONSerialization.data(withJSONObject: change(onDisk), options: options)
+            written.append(contentsOf: [0x0A])
+
+            let nowOnDisk: Data = (try? Data(contentsOf: url)) ?? before
+            if nowOnDisk != before {
+                attempts += 1
+                // Three tries, then write anyway. A folder that has MOVED and a
+                // configuration that does not say so is the worse of the two
+                // states, so this ends by recording the truth rather than by
+                // giving up on it.
+                if attempts < 3 {
+                    continue
+                }
+                // But it writes the FRESHEST computation, not the stale one.
+                // Falling through with `written` — derived from `before`, which
+                // `nowOnDisk` has just proved out of date — would clobber the
+                // other writer's keys, which is the very failure this loop
+                // exists to stop. Apply the change to what is there now.
+                if let latest = try? JSONSerialization.jsonObject(with: nowOnDisk) as? [String: Any] {
+                    written = try JSONSerialization.data(
+                        withJSONObject: change(latest), options: options
+                    )
+                    written.append(contentsOf: [0x0A])
+                }
+            }
+            try written.write(to: url, options: [.atomic])
+            lastSavedData = written
+            values = change(values)
+            return
+        }
     }
 
     /// Reverts all in-memory edits back to the last data read from or

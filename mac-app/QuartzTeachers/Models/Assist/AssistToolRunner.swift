@@ -615,12 +615,23 @@ final class AssistToolRunner {
         publishing: Bool
     ) -> AssistToolOutcome? {
         let titles: [String] = names("pages", in: arguments)
-        guard titles.count == 1, let unit = AssistPublishPlanner.unitNamed(titles[0]) else {
+        guard titles.count == 1 else {
             return nil
         }
+        // The course is found BEFORE the sentence is read, because which word
+        // names a unit is a fact about the course — "Module 4" in a Module
+        // course, where reading only "unit" meant the request found nothing
+        // and the teacher was told no page is called that. A course that
+        // cannot be found returns nil rather than a refusal, so the request
+        // falls through to the ordinary page path and gets that path's own,
+        // better-worded answer.
         let found: Result<Located, AssistToolRefusal> = locate(arguments)
         guard case .success(let located) = found else {
-            return AssistToolOutcome.couldNotRead(refusal(from: found).message)
+            return nil
+        }
+        let unitWord: String = located.course.configuration.unitWord
+        guard let unit = AssistPublishPlanner.unitNamed(titles[0], term: unitWord) else {
+            return nil
         }
 
         let all: [ClassPageSummary] = ClassPages.list(
@@ -629,7 +640,7 @@ final class AssistToolRunner {
         let pages: [ClassPageSummary] = AssistPublishPlanner.classPages(inUnit: unit, from: all)
         if pages.isEmpty {
             return AssistToolOutcome.couldNotRead(
-                "I can't find any class pages in Unit \(unit) of \(located.course.code) "
+                "I can't find any class pages in \(unitWord) \(unit) of \(located.course.code) "
                 + "Section \(located.sectionNumber)."
             )
         }
@@ -649,9 +660,10 @@ final class AssistToolRunner {
             }
         }
         if moving.isEmpty {
+            let unitWord: String = located.course.configuration.unitWord
             let already: String = publishing
-                ? "Unit \(unit) has already been published."
-                : "Unit \(unit) is already hidden."
+                ? "\(unitWord) \(unit) has already been published."
+                : "\(unitWord) \(unit) is already hidden."
             return AssistToolOutcome.wrote(already, detail: already)
         }
 
@@ -703,12 +715,23 @@ final class AssistToolRunner {
         publishing: Bool
     ) async -> AssistToolOutcome? {
         let titles: [String] = names("pages", in: arguments)
-        guard titles.count == 1, let unit = AssistPublishPlanner.unitNamed(titles[0]) else {
+        guard titles.count == 1 else {
             return nil
         }
+        // The course is found BEFORE the sentence is read, because which word
+        // names a unit is a fact about the course — "Module 4" in a Module
+        // course, where reading only "unit" meant the request found nothing
+        // and the teacher was told no page is called that. A course that
+        // cannot be found returns nil rather than a refusal, so the request
+        // falls through to the ordinary page path and gets that path's own,
+        // better-worded answer.
         let found: Result<Located, AssistToolRefusal> = locate(arguments)
         guard case .success(let located) = found else {
-            return AssistToolOutcome.refused(refusal(from: found).message)
+            return nil
+        }
+        let unitWord: String = located.course.configuration.unitWord
+        guard let unit = AssistPublishPlanner.unitNamed(titles[0], term: unitWord) else {
+            return nil
         }
 
         var pages: [ClassPageSummary] = AssistPublishPlanner.classPages(
@@ -717,7 +740,7 @@ final class AssistToolRunner {
         )
         if pages.isEmpty {
             return AssistToolOutcome.refused(
-                "I can't find any class pages in Unit \(unit) of \(located.course.code) "
+                "I can't find any class pages in \(unitWord) \(unit) of \(located.course.code) "
                 + "Section \(located.sectionNumber)."
             )
         }
@@ -763,7 +786,8 @@ final class AssistToolRunner {
                 changedAnything = true
             } catch {
                 return AssistToolOutcome.refused(
-                    "Unit \(unit) was only partly \(publishing ? "published" : "unpublished"): "
+                    "\(located.course.configuration.unitWord) \(unit) was only partly "
+                    + "\(publishing ? "published" : "unpublished"): "
                     + error.localizedDescription
                 )
             }
@@ -771,21 +795,22 @@ final class AssistToolRunner {
 
         let done: String = publishing ? "published" : "unpublished"
         if !changedAnything {
+            let unitWord: String = located.course.configuration.unitWord
             let already: String = publishing
-                ? "Unit \(unit) has already been published."
-                : "Unit \(unit) is already hidden."
+                ? "\(unitWord) \(unit) has already been published."
+                : "\(unitWord) \(unit) is already hidden."
             return AssistToolOutcome.wrote(already, detail: already)
         }
 
         history.record(AssistChange(
-            whatHappened: "\(done) Unit \(unit)",
+            whatHappened: "\(done) \(located.course.configuration.unitWord) \(unit)",
             courseCode: located.course.code,
             sectionNumber: located.sectionNumber,
             rebuildsThePreview: true,
             files: touched
         ))
 
-        var detail: String = "Unit \(unit) was \(done)."
+        var detail: String = "\(located.course.configuration.unitWord) \(unit) was \(done)."
         if backedUp {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
@@ -793,7 +818,9 @@ final class AssistToolRunner {
             for: located.course, sectionNumber: located.sectionNumber
         ))
 
-        return AssistToolOutcome.wrote("Unit \(unit) was \(done).", detail: detail)
+        return AssistToolOutcome.wrote(
+            "\(located.course.configuration.unitWord) \(unit) was \(done).", detail: detail
+        )
     }
 
     /// Fold a step's files into what earlier steps touched.
@@ -2097,7 +2124,9 @@ final class AssistToolRunner {
                 + "“\(named)”."
             )
         }
-        guard let numbers = UnitDay(pageTitle: source.title) else {
+        guard let numbers = UnitDay(
+            pageTitle: source.title, term: located.course.configuration.unitWord
+        ) else {
             return .failure(
                 "“\(source.displayTitle)” isn't a numbered class page, so there is no next day "
                 + "for it to become."

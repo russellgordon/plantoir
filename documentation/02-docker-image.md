@@ -78,9 +78,25 @@ The image is layered as follows (in order):
 7. **`cp -r /opt/quartz /opt/quartz-site`** — a spare copy of the scaffold
    (not used by the current build path, which copies from `/opt/quartz`
    directly).
-8. **Copy the four Python scripts** into `/opt/scripts/`:
-   `setup_course.py`, `build_site.py`, `deploy.py`, and `social_card.py`
-   (the per-section social sharing card renderer).
+8. **Copy the Python scripts** into `/opt/scripts/` — nine of them as of
+   2026-09-05: `toolchain_paths.py`, `contracts.py`, `site_health.py`,
+   `class_pages.py`, `setup_course.py`, `build_site.py`, `deploy.py`,
+   `social_card.py` and `netlify_badge.py`.
+
+   **They are copied ONE BY ONE, by name, and that is a trap worth knowing.**
+   Splitting a rule out into a new sibling module is therefore a change to the
+   Dockerfile whether or not anybody remembers it is: the baked scripts import
+   their siblings by bare name, which resolves only if the file is sitting
+   beside them. When `class_pages.py` was added and not copied, the image
+   could not be BUILT at all — the Dockerfile imports `setup_course` during
+   the build to bake the Explorer's hide filter, so the failure was not a
+   run-time surprise for one teacher, it was a hard failure of the build that
+   produces the toolchain. Every unit test was green throughout.
+
+   `scripts/test_baked_modules.py` now walks the imports of every baked script
+   with `ast` and fails if one is missing. `verify.sh` runs it BEFORE the image
+   build, because it answers in a tenth of a second what the build answers in
+   three minutes.
 9. **Copy `support/` → `/opt/support/`** — data files consumed by the
    scripts:
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to

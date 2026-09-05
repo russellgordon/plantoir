@@ -4,6 +4,107 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- ✅ **Done 2026-09-05 — the two reliability findings from that day's review.**
+  Kept rather than deleted because the SHAPE of each is worth recognising
+  again: both were races nobody would meet often, and both ended in a state a
+  teacher could not get out of.
+
+  **1. A rename interrupted after the folders moved was a dead end.** The
+  configuration still said the old name, the next build DISCOVERED the moved
+  folder and appended it, and retrying the rename was then refused as a clash —
+  with the class folder unremovable too, so the only exit was hand-editing
+  JSON. The fix is not a lock: `problem()` now accepts a rename whose target is
+  already in the list **when the disk says the old folder is gone and the new
+  one is there**, which is not two folders competing for a name, it is one
+  rename asking to be finished. `looksLikeAnInterruptedRename` asks the
+  filesystem, because the configuration is exactly what is wrong in that state,
+  and it requires that NO section still has the old folder — a mixture means
+  something else happened and the ordinary refusal stands. Finishing also
+  de-duplicates the list, which the starting state needs by definition.
+
+  **2. Two writers of `course_config.json` could silently erase each other.**
+  `preflight_update_course_config` reads the file, scans the course's folders,
+  and writes what it computed; the app writes the same file in that window,
+  because a rename commits at once rather than at Save. Whoever wrote second
+  won and said nothing. Both writers now compare-and-swap: preflight re-reads
+  before writing and redoes its discovery if the file moved under it (bounded,
+  then carries on with what is there), and `recordOnDisk` does the same but
+  ends by writing anyway — a folder that has MOVED and a configuration that
+  does not say so is the worse of the two states, so it finishes by recording
+  the truth rather than by giving up on it.
+
+  `scripts/test_config_write_race.py` forces the race rather than hoping for
+  it, and was checked the only way worth checking: with the guard disabled it
+  fails with the key missing, exactly as the bug did.
+
+- **One rule, three implementations: stopping a section's preview.** Found by
+  review 2026-09-05. `preview.sh --stop` finds this section's processes by
+  working directory (a `/proc` walk it runs inside the container),
+  `preview.ps1 --stop` does the same natively via `Win32_Process` AND walks
+  descendants, and `build_site.py`'s new `stop_preview_serving` is a third,
+  written because the first two are HOST scripts and `build_site.py` runs
+  inside the container, so it cannot call them.
+
+  The reason is sound; three copies of one question is still the shape this
+  project keeps having to undo, and they already differ: only the PowerShell
+  one walks descendants, which its own comment says is needed because a child
+  spawned with a relative path (npx does) carries no directory to match on.
+  The mac's copy has not needed it — the serving node is launched by absolute
+  path — but "has not needed it yet" is how these drift apart.
+
+  Worth unifying, and the cheapest honest version is probably not one
+  implementation but one CONTRACT case listing the command-line shapes that
+  must and must not be stopped, run by all three. `scripts/test_stop_preview.py`
+  is half of that already.
+
+- **Should Plantoir refuse to work in a cloud-synced folder?** Russell's
+  question, 2026-09-05, prompted by a reliability review finding that renaming
+  a folder reads every page in the course — which on an iCloud-backed vault
+  means downloading evicted files, one blocking read at a time. **Open: his
+  call, not made yet.** Both sides written down while they are fresh.
+
+  **What is genuinely broken by cloud sync**, in order of severity:
+
+  1. **Build churn and locks.** A build writes thousands of small files into
+     `.merged_output`. OneDrive uploads all of them AND holds locks mid-build.
+     This is not speculation — it is why `PLANTOIR_BUILD_ROOT` exists, added on
+     Windows for exactly this.
+  2. **Dataless files.** Reading an evicted page blocks on a download. Slow,
+     not corrupting.
+  3. **Rename and move failures** from held locks, which can leave a partial
+     state.
+
+  **Why refusing is probably the wrong answer.** Teachers keep vaults in iCloud
+  *on purpose* — it is how their notes reach their iPad and their second Mac.
+  Refusing means telling them to give up cross-device access to their own
+  teaching material, and a hard block is the one response they cannot opt out
+  of. It is also the response this project has already REJECTED once by
+  building something better: `PLANTOIR_BUILD_ROOT` moves the churn out of the
+  synced folder and leaves the content where the teacher wants it. That
+  precedent is the strongest argument here — the same problem was met, and the
+  answer was "relocate the churn", not "refuse the folder".
+
+  Detection is unreliable in both directions besides. iCloud Drive is
+  `~/Library/Mobile Documents/`, but Dropbox, Google Drive, OneDrive, pCloud
+  and Sync are arbitrary paths, and a teacher can have a folder literally
+  called "Dropbox" that is not one. A false refusal on a hard block is
+  unrecoverable for them.
+
+  **The shape that seems right instead**, if he wants it built:
+
+  - DETECT a synced working folder (the enumerable markers, not a name guess).
+  - SAY SO once, plainly, naming what can go wrong.
+  - **Set `PLANTOIR_BUILD_ROOT` automatically** so `.merged_output` lives
+    outside the synced folder — the mac has the variable already and does not
+    use it; Windows does. That alone removes (1) and most of (3).
+  - Leave the teacher's CONTENT where they put it.
+
+  Refusing outright is right in exactly one case worth naming: a synced folder
+  where the build root cannot be relocated (no writable scratch). Then the
+  honest thing is to stop rather than churn.
+
+  Needs Windows parity thinking, and they are ahead here rather than behind.
+
 - **`CourseRenameInterfaceTests` crashes the whole unit run, intermittently —
   and it is PRE-EXISTING, not caused by the special-folders work.** Measured
   2026-08-23 on a clean `origin/dev` worktree with none of that branch's
@@ -38,76 +139,108 @@ an item when it ships (finished behaviour is recorded in
   `CourseRenameInterfaceTests` case, but that test hosts a sidebar ROW and is
   most likely the bystander that happened to be running.
 
-  Where to start: `RemovalButtonTests` next door hosts its view differently and
-  does not provoke it — the difference between the two is the cheapest lead.
+  **Measured properly on 2026-09-04**, with the machine to myself overnight and
+  a clean `dev` worktree built beside the branch — the baseline `TODO.md` says
+  this needs. Twenty-seven full-suite and ten single-class runs:
 
-- **Let a teacher rename a special folder from inside Plantoir** — deferred
-  2026-08-23, while planning the hardening of the special folder and file names.
-  Not `CourseRenamer`, which renames the course CODE and deliberately nothing
-  else: this is renaming `Ontario Curriculum`, `Tasks` or `All Classes` in the
-  app, so the app is the one performing the rename.
+  | tree | scope | runs | aborted |
+  |---|---|---|---|
+  | `issue/special-names-followups` | full suite | 9 | 6 |
+  | clean `dev` (worktree) | full suite | 8 | 3 |
+  | `issue/special-names-followups` | that class alone | 5 | 0 |
+  | clean `dev` (worktree) | that class alone | 5 | 1 |
 
-  **What exists today is thinner than it looks.** `StringListEditorView` edits
-  the config LIST only — `addNewItem` appends a string, `removeItem` filters one
-  out, and neither touches disk (there is no `createDirectory`, `moveItem` or
-  `removeItem(at:)` anywhere under `Views/CourseSettings/`). So adding `Tests`
-  to shared folders creates a config entry pointing at no folder; removing
-  `Tasks` leaves the folder on disk, still full of the teacher's work, now
-  unreferenced. Renaming is only possible in Obsidian or Finder — and then
-  `preflight_update_course_config` in `scripts/build_site.py` discovers the new
-  name and APPENDS it, with no removal path, so the config ends up listing both.
+  Four things follow, and two of them correct what is written above.
 
-  **Why it was deferred rather than built.** The hardening work originally
-  rested on recording each special folder's name in `course_config.json` so a
-  check could tell DELETED from RENAMED. It cannot: the app never witnesses a
-  rename, and the build's auto-discovery converts one into a duplicate. Rather
-  than build the rename affordance as a dependency, the checks were rebased onto
-  the FEATURE'S OUTPUT ("the coverage map found no expectations") instead of a
-  folder's existence — which needs no recorded name, cannot be satisfied by an
-  empty folder, and does not fire on a legitimate Obsidian rename. That made
-  this a feature in its own right rather than a prerequisite, and bundling it
-  would roughly have doubled the piece.
+  - **It is pre-existing.** Clean `dev` aborts too, so no branch since has
+    caused it. (Every `dev` run also carried one FAILED case — the stale
+    milestone marker, fixed on the branch in `13da5319`.)
+  - **It is NOT purely a bystander.** The class alone aborts 1 in 10, which the
+    "bystander" reading does not predict: something in that class is enough on
+    its own. The full suite raises the rate to roughly 1 in 2, so earlier tests
+    make it likelier without being necessary.
+  - **The rate is higher than the "one in four" recorded above** — about half of
+    full-suite runs, across both trees.
+  - **It never produces a failed test CASE.** Every abort has `failed=0` and
+    exits 65 partway. So a run that completes is trustworthy, and the branch
+    produced three fully clean full-suite runs (exit 0, 979 passed, 0 failures).
 
-  **What it would still be worth.** It fixes the two foot-guns above (add
-  creates nothing; remove orphans a folder), and it is the one place a rename
-  could be observed. It needs its own design pass for what happens to wikilinks
-  pointing into a renamed folder, and its own undo.
+  Where to start, updated: the class ALONE reproduces it, so the cheapest lead
+  is now inside `CourseRenameInterfaceTests` itself rather than in what ran
+  before it. Both named cases (`testACourseThatIsPreviewingIsNotRenamed` and
+  `testAnUnusableCodeIsShownUnderTheFieldRatherThanInAnAlert`) call
+  `workspace.beginRenamingSelectedCourse()` and then leave `renamingCourseCode`
+  set until the end of the test. `RemovalButtonTests` next door hosts its view
+  differently and does not provoke it — that difference is still worth reading.
 
-- **Let a teacher rename the `Unit` keyword** — deferred 2026-08-23, while
-  planning the hardening of Plantoir's special folder and file names. Some
-  teachers organise by "Module" or "Thread" rather than "Unit", and today the
-  word is not a preference but a structural assumption: `_is_class_page` in
-  `scripts/build_site.py:1402` matches `^Unit\s+\d+,\s*Day\s+\d+$`, and
-  roughly 290 places in the Swift and 208 in the C# name it.
+- ✅ **Done 2026-09-01 — let a teacher rename a special folder from inside Plantoir.**
+  Deferred 2026-08-23 while planning the hardening of the special folder and
+  file names; built once Russell chose the full scope on 2026-09-01. Kept here
+  rather than deleted because the reason it was deferred turned out to be
+  WRONG, and that is worth more than the entry itself.
 
-  **It is deferred because of the migration, not the parsing.** The parsing side
-  is mechanical — one configured term threaded through the regexes and the
-  title generators. The measurements that decided it (taken 2026-08-23):
+  **What it feared:** that renaming a folder would strand every wikilink
+  pointing into it, so the feature needed its own design pass and its own undo.
+  It does not. Obsidian resolves `[[Quiz 1]]` by searching the vault, so a bare
+  page link keeps working when the folder around it moves; only QUALIFIED links
+  break — `[[Tasks/Quiz 1]]`, a full vault path, or Obsidian's Markdown link
+  style — and `FolderPathRewriter` rewrites exactly those. A folder rename is a
+  far smaller thing than a page rename, which is why this shipped without the
+  undo the deferral assumed it needed.
 
-  - **3,088 files** named `Unit N, Day N` under `support/example_content/`, and
-    **3,143 files** containing a `Unit N, Day N` wikilink;
-  - **600** skeleton files, which are generated and therefore cheap;
-  - `contracts/class-planning.json` is authored end to end in Unit/Day;
-  - the local assistant's routing was measured against sentences like "publish
-    Unit 4" — a teacher who renamed to Thread will type "publish thread 4".
+  **What shipped:** a pencil on folder rows in Course Settings, renaming on
+  disk in every section, rewriting qualified links, and carrying across every
+  config key that named the folder. The two foot-guns the entry named are
+  closed too — Add creates the folder, and Remove says the folder and its
+  contents stay on the teacher's Mac. See `GUI-IMPROVEMENTS.md` row 385.
 
-  **The split that makes it tractable.** Payloads are copied fresh at course
-  creation, so a NEW course can pick its term at setup and one rewrite pass
-  during the copy handles all 3,000-odd files and their wikilinks at once. That
-  is cheap, contained, and delivers most of the value. Renaming an EXISTING
-  course is the dangerous half: it means rewriting every wikilink pointing at
-  every renamed page, across every shared folder and every section, and a
-  half-finished rename leaves a broken site with no obvious way back.
-  `WikiLinkRewriter` could do it, but it deserves its own design pass and its
-  own undo — not a checkbox in settings.
+  **Still open, and inherent:** a rename performed in OBSIDIAN is still
+  discovered by `preflight_update_course_config` as a new folder and appended,
+  leaving the config naming both. The build cannot tell a rename from a delete
+  and a create, which is exactly why the rename was worth putting in the app —
+  the app is the one place it can be witnessed. Not worth chasing further.
 
-  **Hold "Day" fixed.** A teacher who says "Thread" almost certainly still says
-  "Day 3"; only the first term looks worth making configurable.
+- ✅ **Half done 2026-09-01 — a course chooses its word for “Unit” when it is
+  made.** Deferred 2026-08-23; built once Russell chose the scope on
+  2026-09-01: **new courses plus configurable parsing, NOT renaming a course
+  already in use.**
 
-  Rejected: a display-only rename (the page would be titled "Thread 2, Day 3"
-  while the file stayed `Unit 2, Day 3.md`), because Obsidian is the teacher's
-  editor and they would see the old word every time they opened the vault —
-  which is the place the rename was supposed to help.
+  **What shipped.** `unit_word` in `course_config.json`, absent meaning “Unit”.
+  The wizard asks every course, the ready-made payload is written in that word
+  as it is poured (a course's own 84–87 class pages and the pages around them, in
+  one pass during the copy), and both the Python and the Swift now read the
+  word rather than
+  assuming it — `scripts/class_pages.py` and `ClassPageTerm`. The assistant
+  says it too. See `GUI-IMPROVEMENTS.md` row 386.
+
+  **The measurements, re-taken 2026-09-01 — and the 2026-08-23 ones were
+  wrong.** Adversarial review found that the numbers this entry used to quote
+  (3,088 named files, 3,143 wikilinks, 600 skeleton files) matched nothing on
+  this tree, and worse, that the per-course figure was being read off a
+  whole-repo total. What is actually there:
+
+  - **3,172** files named `Unit N, Day N` across all 38 payloads — but
+    **84–87 in any ONE course** (30 payloads hold 86, four hold 84, one 85, one
+    87), and **42** in each of the two half-credit courses, CHV2O and GLC2O. A
+    teacher's course is under a hundred class pages, not three thousand.
+  - **2,338** skeleton `.md` files, which are generated and therefore cheap.
+  - `contracts/class-planning.json` is authored end to end in Unit/Day.
+
+  **The scale argument was never the real one, and losing it does not make the
+  remaining half safe.** Renaming an EXISTING course's word means rewriting
+  every class page's name, its frontmatter title and every wikilink pointing at
+  it, across every section and every shared folder — and a half-finished pass
+  leaves a broken site with no way back. Ninety pages is not too many to
+  rewrite; it is too many to rewrite WITHOUT AN UNDO. The machinery is closer
+  than it was — `ClassInsertionPlanner` already renames class pages, retitles
+  frontmatter and rewrites wikilinks for ONE section, which is the same shape
+  widened to a course — but it still deserves its own design pass and its own
+  undo. Not a checkbox in Settings.
+
+  **Rejected, and logged so it is not retried:** a display-only rename (pages
+  titled “Thread 2, Day 3” while the files stay `Unit 2, Day 3.md`). Obsidian is
+  the teacher's editor and they would see the old word every time they opened
+  the vault — which is the place the rename was supposed to help.
 
 - **The assistant's first turn does not wait for its warm-up** — measured
   2026-08-20, while qualifying the mac for v1.1.0. `AssistSession` sets

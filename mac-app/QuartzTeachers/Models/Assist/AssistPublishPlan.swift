@@ -723,21 +723,35 @@ enum AssistPublishPlanner {
 
     /// The unit a teacher named, if that is what they named: "Unit 4",
     /// "unit 4", "Unit 4." — but never "Unit 4, Day 3", which is one page.
-    static func unitNamed(_ raw: String) -> Int? {
+    ///
+    /// **The course's own word is accepted, and so is "unit".** A course whose
+    /// class pages are "Module 2, Day 3" gets asked to publish "Module 4", and
+    /// reading only "unit" meant the request found nothing and the teacher was
+    /// told no page is called that — a whole feature missing for that course,
+    /// silently. "unit" is still accepted alongside it because a teacher types
+    /// what they are used to and the model echoes what it was shown; the unit
+    /// NUMBER is the answer either way, so accepting both cannot be ambiguous.
+    static func unitNamed(_ raw: String, term: String = ClassPageTerm.standard) -> Int? {
         let tidied: String = raw
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
             .lowercased()
-        guard tidied.hasPrefix("unit ") else {
+        var rest: String? = nil
+        for word in [ClassPageTerm.cleaned(term).lowercased(), "unit"] {
+            let prefix: String = word + " "
+            if tidied.hasPrefix(prefix) {
+                rest = String(tidied.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+                break
+            }
+        }
+        guard let named = rest else {
             return nil
         }
-        let rest: String = String(tidied.dropFirst("unit ".count))
-            .trimmingCharacters(in: .whitespaces)
         // A comma means they went on to name a day, which is a page.
-        if rest.isEmpty || rest.contains(",") {
+        if named.isEmpty || named.contains(",") {
             return nil
         }
-        return Int(rest)
+        return Int(named)
     }
 
     /// A unit's class pages, **highest day first**.

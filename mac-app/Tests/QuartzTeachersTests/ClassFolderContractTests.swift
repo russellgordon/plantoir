@@ -35,13 +35,18 @@ final class ClassFolderContractTests: XCTestCase {
     func testNamingCasesFromTheContract() throws {
         let naming: [String: Any] = try XCTUnwrap(contract["naming"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(naming["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 5, "the contract lost naming cases")
+        XCTAssertGreaterThanOrEqual(cases.count, 10, "the contract lost naming cases")
         for testCase in cases {
             let name: String = (testCase["name"] as? String) ?? "unnamed"
             let folders: [String] = (testCase["perSectionFolders"] as? [String]) ?? []
             let expected: String = try XCTUnwrap(testCase["expect"] as? String)
             XCTAssertEqual(
-                ClassFolder.name(inPerSectionFolders: folders), expected,
+                // A case with no `classFolder` is a course that has never
+                // recorded one — every course made before the key existed —
+                // and must still get the old guess.
+                ClassFolder.name(
+                    inPerSectionFolders: folders, configured: testCase["classFolder"] as? String
+                ), expected,
                 "\(name): \((testCase["why"] as? String) ?? "")"
             )
         }
@@ -66,13 +71,15 @@ final class ClassFolderContractTests: XCTestCase {
     func testMembershipCasesFromTheContract() throws {
         let rule: [String: Any] = try XCTUnwrap(contract["membership"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 4, "the contract lost membership cases")
+        XCTAssertGreaterThanOrEqual(cases.count, 6, "the contract lost membership cases")
         for testCase in cases {
             let name: String = (testCase["name"] as? String) ?? "unnamed"
             let folders: [String] = (testCase["perSectionFolders"] as? [String]) ?? []
             let expected: [String] = try XCTUnwrap(testCase["expect"] as? [String])
             XCTAssertEqual(
-                ClassFolder.names(inPerSectionFolders: folders), expected,
+                ClassFolder.names(
+                    inPerSectionFolders: folders, configured: testCase["classFolder"] as? String
+                ), expected,
                 "\(name): \((testCase["why"] as? String) ?? "")"
             )
         }

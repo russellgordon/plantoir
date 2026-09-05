@@ -257,6 +257,9 @@ if [[ "$_BUILT_FOUND" != "true" ]]; then
   echo "❌ Built site not found at:"
   echo " ${PUBLIC_DIR_HOST}"
   echo
+  echo " If you have just built, check this section still has its front page."
+  echo " A section without one produces no website, so there is nothing to publish."
+  echo
   echo " Build first:"
   echo " ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM} --build-only"
   exit 1
@@ -275,6 +278,83 @@ if [[ -n "$TO_FOLDER" ]]; then
     echo "   $TARGET_DIR"
     exit 1
   }
+  # A PREVIEW build must never reach a published site. Serve mode bakes a
+  # live-reload client — new WebSocket('ws://localhost:<port>') — into every
+  # page, and on a published site that script makes a student's browser ask
+  # permission to "access other apps and services on this device".
+  #
+  # `deploy.py` already refuses this, but ONLY for Netlify and Cloudflare:
+  # this branch publishes host-to-host and never enters the container, so
+  # deploy.py never runs and the check was simply absent. The app's own
+  # publish path is protected by BuildFreshness ("the built site was made by
+  # a PREVIEW" forces a rebuild), which is why publishing to a folder from
+  # the APP has always been safe and why this went unnoticed — but from the
+  # command line, `./preview.sh CODE N` followed by `./deploy.sh CODE N
+  # --to-folder …` shipped the live-reload client. Found 2026-09-05 by
+  # publishing straight after a preview and looking at what came out: 230 of
+  # 244 files carried it.
+  # Detected across the whole HTML tree, not just the front page. Checking
+  # only `index.html` was the asymmetry that made the guard incomplete: the
+  # WAIT below already scans everything, precisely because a clean front page
+  # can sit in front of stale preview pages — and detection reading only the
+  # front page meant that exact state never triggered a rebuild at all, and was
+  # published. Found by review on 2026-09-05, after the mixture had been
+  # written up as real in the documentation without anyone noticing the
+  # trigger could not see it.
+  if grep -rq --include='*.html' "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
+    echo "🔁 This site was built by a preview, which bakes in a live-reload script"
+    echo "   that students' browsers would ask about. Rebuilding it for publishing…"
+    if ! "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only; then
+      echo "❌ Could not rebuild this site for publishing."
+      exit 1
+    fi
+    # Without waiting here the publish ran against a directory that did not
+    # yet hold the rebuilt site and copied NOTHING, reporting "Published: 0
+    # file(s) updated" over an empty folder.
+    #
+    # That was FIRST blamed on the container's bind mount lagging, and that was
+    # wrong: a rebuild takes about 3 seconds and the tree is clean the moment
+    # it returns. The real cause was a preview still serving this section and
+    # overwriting the rebuild — now stopped by `--build-only` itself. The wait
+    # is kept because it is the honest post-condition either way.
+    #
+    # Waits on the real CONDITION rather than a guessed interval, and the
+    # condition is the WHOLE TREE, not the front page.
+    #
+    # Checking only index.html was the first attempt and it was wrong in a way
+    # that looked right: serve mode bakes the live-reload client into EVERY
+    # page, the host mirror is replaced file by file, and the front page can be
+    # clean while two hundred other pages are still the preview's. That
+    # published a MIXTURE — a correct front page and stale pages behind it —
+    # which is worse than publishing the preview wholesale, because the front
+    # page looks fine. Caught by verify-deploy.sh on 2026-09-05, which fetches
+    # what was published and reads it.
+    #
+    # HTML only. The live-reload client is only ever in a page, and the
+    # SUCCESS condition is "no match anywhere" — which means every file is read
+    # to the end. Without the filter that is a full pass over `public/`,
+    # including every image the course embeds, over a bind mount, twice per
+    # publish. Bounded, so a rebuild that produced nothing falls through to the
+    # guard below rather than hanging.
+    for ((_w=0; _w<150; _w++)); do
+      if [[ -f "${PUBLIC_DIR_HOST}/index.html" ]] \
+         && ! grep -rq --include='*.html' "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
+        break
+      fi
+      sleep 0.2
+    done
+    if grep -rq --include='*.html' "ws://localhost:" "${PUBLIC_DIR_HOST}" 2>/dev/null; then
+      echo "❌ The rebuilt site still carries the preview's live-reload script."
+      echo "   Nothing was published, rather than publishing pages students'"
+      echo "   browsers would ask about."
+      exit 1
+    fi
+    if [[ ! -f "${PUBLIC_DIR_HOST}/index.html" ]]; then
+      echo "❌ The rebuilt site has not appeared. Nothing was published."
+      exit 1
+    fi
+  fi
+
   echo "📦 Publishing ${COURSE_CODE} section ${SECTION_NUM} to a folder…"
   # -a preserves what matters, --delete mirrors removals, and the
   # itemized output is counted so the teacher sees how little moved.

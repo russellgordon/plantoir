@@ -13,23 +13,32 @@ struct UnitDay: Equatable, Hashable {
     let unit: Int
     let day: Int
 
+    /// What this course calls a unit. Carried on the value rather than looked
+    /// up, so a page read out of a Module course cannot be written back as a
+    /// Unit — the two halves of a rename are the same object.
+    let term: String
+
     // MARK: - Computed properties
 
     /// The page name these numbers make: "Unit 2, Day 3".
     var title: String {
-        return "Unit \(unit), Day \(day)"
+        return "\(term) \(unit), Day \(day)"
     }
 
     // MARK: - Initializer
 
-    init(unit: Int, day: Int) {
+    init(unit: Int, day: Int, term: String = ClassPageTerm.standard) {
         self.unit = unit
         self.day = day
+        self.term = ClassPageTerm.cleaned(term)
     }
 
     /// The numbers inside a page name, or nil when it is named some other way.
-    init?(pageTitle: String) {
-        let pattern: String = #"^Unit\s+(\d+),\s*Day\s+(\d+)$"#
+    init?(pageTitle: String, term: String = ClassPageTerm.standard) {
+        let word: String = ClassPageTerm.cleaned(term)
+        self.term = word
+        let pattern: String = "^" + NSRegularExpression.escapedPattern(for: word)
+                            + #"\s+(\d+),\s*Day\s+(\d+)$"#
         guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
             return nil
         }
@@ -72,19 +81,25 @@ struct ClassPageSummary {
     /// The day the page's frontmatter puts it on, or nil when it has none.
     let date: CalendarDay?
 
+    /// What the course calls a unit, carried here so every planner that works
+    /// from a list of summaries reads and writes the same word without being
+    /// handed the course as well.
+    let term: String
+
     // MARK: - Computed properties
 
     /// The unit and day in the page's name, when it is named that way.
     var unitAndDay: UnitDay? {
-        return UnitDay(pageTitle: title)
+        return UnitDay(pageTitle: title, term: term)
     }
 
     // MARK: - Initializer
 
-    init(title: String, fileURL: URL, date: CalendarDay?) {
+    init(title: String, fileURL: URL, date: CalendarDay?, term: String = ClassPageTerm.standard) {
         self.title = title
         self.fileURL = fileURL
         self.date = date
+        self.term = ClassPageTerm.cleaned(term)
     }
 }
 
@@ -150,7 +165,12 @@ enum ClassPages {
                 if pageURL.lastPathComponent.lowercased() == "index.md" {
                     continue
                 }
-                summaries.append(summary(ofPageAt: pageURL, forSection: sectionNumber))
+                summaries.append(
+                    summary(
+                        ofPageAt: pageURL, forSection: sectionNumber,
+                        term: course.configuration.unitWord
+                    )
+                )
             }
         }
 
@@ -174,7 +194,10 @@ enum ClassPages {
     }
 
     /// One page, read.
-    static func summary(ofPageAt url: URL, forSection sectionNumber: Int) -> ClassPageSummary {
+    static func summary(
+        ofPageAt url: URL, forSection sectionNumber: Int,
+        term: String = ClassPageTerm.standard
+    ) -> ClassPageSummary {
         let title: String = url.deletingPathExtension().lastPathComponent
         var date: CalendarDay? = nil
         if let text = try? String(contentsOf: url, encoding: .utf8) {
@@ -184,7 +207,7 @@ enum ClassPages {
                 in: text, key: PageFrontmatter.createdKey(forSection: sectionNumber, isSectionLocal: true)
             )
         }
-        return ClassPageSummary(title: title, fileURL: url, date: date)
+        return ClassPageSummary(title: title, fileURL: url, date: date, term: term)
     }
 
     /// Every markdown page belonging to one section: the section's own folder,

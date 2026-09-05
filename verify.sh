@@ -134,6 +134,62 @@ else
   cat /tmp/verify_preflight_exclusions_test.log
 fi
 
+if (cd scripts && python3 test_publishable_site.py) >/tmp/verify_publishable_site_test.log 2>&1; then
+  pass "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
+else
+  fail "build_site.py: a build with no front page produces no site, and clears the last one (scripts/test_publishable_site.py)"
+  cat /tmp/verify_publishable_site_test.log
+fi
+
+if (cd scripts && python3 test_class_pages.py) >/tmp/verify_class_pages_test.log 2>&1; then
+  pass "class_pages.py: what a course calls a unit, and what the build counts as a class page (scripts/test_class_pages.py)"
+else
+  fail "class_pages.py: what a course calls a unit, and what the build counts as a class page (scripts/test_class_pages.py)"
+  cat /tmp/verify_class_pages_test.log
+fi
+
+# Runs BEFORE the image build below, on purpose: it answers in a tenth of a
+# second the question the image build answers in three minutes.
+if (cd scripts && python3 test_baked_modules.py) >/tmp/verify_baked_modules_test.log 2>&1; then
+  pass "every module a baked script imports is baked into the image too (scripts/test_baked_modules.py)"
+else
+  fail "every module a baked script imports is baked into the image too (scripts/test_baked_modules.py)"
+  cat /tmp/verify_baked_modules_test.log
+fi
+
+if (cd scripts && python3 test_stop_preview.py) >/tmp/verify_stop_preview_test.log 2>&1; then
+  pass "a build for publishing stops only THIS section's preview (scripts/test_stop_preview.py)"
+else
+  fail "a build for publishing stops only THIS section's preview (scripts/test_stop_preview.py)"
+  cat /tmp/verify_stop_preview_test.log
+fi
+
+if (cd scripts && python3 test_config_write_race.py) >/tmp/verify_config_race_test.log 2>&1; then
+  pass "a build and a rename writing course_config.json cannot erase each other (scripts/test_config_write_race.py)"
+else
+  fail "a build and a rename writing course_config.json cannot erase each other (scripts/test_config_write_race.py)"
+  cat /tmp/verify_config_race_test.log
+fi
+
+# A preview build must never reach a published site, and the FOLDER
+# destination is the one that can: it publishes host-side and never enters the
+# container, so deploy.py's own refusal never runs. Structural rather than
+# behavioural — a real preview-then-publish cycle would add minutes to every
+# run of this script — but it catches the guard being deleted, which is how it
+# came to be missing in the first place.
+_folder_guard_ok=true
+for _launcher in deploy.sh deploy.ps1; do
+  if ! grep -q "ws://localhost:" "$_launcher"; then
+    _folder_guard_ok=false
+    echo "   $_launcher does not check for a preview build before publishing to a folder"
+  fi
+done
+if [ "$_folder_guard_ok" = true ]; then
+  pass "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
+else
+  fail "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
+fi
+
 # -------------------- 1. Container runtime (shared Colima) --------------------
 # Maintainer variant: assumes Colima and the Docker CLI are installed (the
 # teacher-facing launchers handle installation). Never stops a running VM.

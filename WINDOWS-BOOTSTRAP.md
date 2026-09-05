@@ -124,6 +124,13 @@ order; it was chosen so each item makes the next one cheaper.
   working. Name the case so it reads as a proposal and log it in
   `MAC-HANDOFF.md` under "Contract cases waiting on the mac".
 - **Do not run `--write-contracts`.** That is macOS-only.
+- **Anything the MAC must now do goes in `MAC-HANDOFF.md`'s "Open — what the
+  mac still owes", at the TOP of that section, in the same session.** Standing
+  instruction, `CLAUDE.md` rule 4. That section is the mac's to-do list from
+  you, exactly as `WINDOWS-HANDOFF.md`'s numbered list is yours from them —
+  both files are read top-down and abandoned partway, so an obligation that
+  lives only in prose lower down is one nobody picks up. Move it to the ledger
+  when it is done rather than deleting it.
 - **Write every change up before moving on**, to the template at the top of
   `MAC-HANDOFF.md`: what changed, why, what you rejected, and — for anything
   measured — the numbers **with the hardware they came from**. "The Vulkan

@@ -244,6 +244,24 @@ site-build time* to know which folders are expandable.
 
 ## Stage 5: Dependencies and the actual Quartz build
 
+**A build for publishing stops that section's preview.**
+<a id="a-build-for-publishing-stops-that-sections-preview"></a>
+A preview does not stop when the launcher that started it is killed: on the mac
+the Python and the node server both live inside the container, and the Python's
+sync watcher keeps mirroring the SERVE build to the host every second. A
+`--build-only` run alongside one is therefore overwritten within a second of
+finishing, and what gets published is the preview — live-reload client and all.
+So `--build-only` stops the preview serving that section first.
+
+It is matched by the section's own BUILD DIRECTORY, which is on the serve
+process's command line, and deliberately **not** by port: a build-only run is
+never given one, so an earlier version killed whatever held the default 8081 —
+a different section's preview, in the ordinary case of previewing one section
+while publishing another. Match on the directory plus a trailing separator, or
+`section1` also matches `section10`. It reads `/proc`, so it does nothing where
+there is none (Windows, natively) — see `WINDOWS-HANDOFF.md`.
+
+
 - **Pre-baked dependencies:** If `node_modules` is not present in the workspace,
   it is symlinked instantly from `/opt/quartz/node_modules` in the image. `npm install`
   is only invoked if explicitly requested with `--force-npm-install`.

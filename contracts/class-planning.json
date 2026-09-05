@@ -224,9 +224,30 @@
         "expectUnit": null,
         "title": "Unit 2 Day 4",
         "why": "The comma is part of the form. Accepting near-misses means guessing at what a teacher meant by a name, and the cost of guessing wrong is a renamed lesson."
+      },
+      {
+        "expectDay": 3,
+        "expectUnit": 2,
+        "term": "Module",
+        "title": "Module 2, Day 3",
+        "why": "A course that says Module. Its pages are named this way as the course is made \u2014 see file-formats.json, `unit_word`."
+      },
+      {
+        "expectDay": null,
+        "expectUnit": null,
+        "term": "Module",
+        "title": "Unit 2, Day 3",
+        "why": "The load-bearing case, and the one that fails silently if it is got wrong. In a Module course a page called \"Unit 2, Day 3\" is NOT a class page. Reading it as one would put two numbering schemes in one section, and reading it as one only sometimes is worse still."
+      },
+      {
+        "expectDay": 1,
+        "expectUnit": 1,
+        "term": "Thread",
+        "title": "thread 1, day 1",
+        "why": "Case-insensitive, exactly as the default word already is."
       }
     ],
-    "note": "Which class-page titles carry numbers. A page named some other way — 'Field Trip', 'Exam Review' — is NOT guessed at: it is passed over everywhere classes are renumbered, and keeps its own date. The plan says how many were skipped so nobody is surprised."
+    "note": "Which class-page titles carry numbers. A page named some other way — 'Field Trip', 'Exam Review' — is NOT guessed at: it is passed over everywhere classes are renumbered, and keeps its own date. The plan says how many were skipped so nobody is surprised. A case with no `term` uses the default word, \u201cUnit\u201d \u2014 which is what a course says when `unit_word` is absent from its configuration, and what every course made before 2026-09-01 says."
   },
   "refusals": {
     "cases": [
@@ -293,6 +314,55 @@
           "perSectionFolders": [],
           "expect": "All Classes",
           "why": "The last-resort literal. A section with nothing configured still gets a predictable answer instead of an empty path."
+        },
+        {
+          "name": "a recorded folder with no 'class' in its name",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "All Days",
+            "Tasks"
+          ],
+          "expect": "All Days",
+          "why": "The case the key exists for. A teacher whose units are Threads and whose classes are Days calls the folder 'All Days'; the guess returns it here only by accident of it being first, and returns 'Tasks' the moment the list is ordered the other way."
+        },
+        {
+          "name": "a recorded folder that is not first",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "Tasks",
+            "All Days"
+          ],
+          "expect": "All Days",
+          "why": "Proves the key beats position. Without it this course's class pages would be written into Tasks."
+        },
+        {
+          "name": "the record beats the guess",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "Class Resources",
+            "All Days"
+          ],
+          "expect": "All Days",
+          "why": "A folder mentioning 'class' is present and is NOT the class folder. The teacher said which one; the guess does not get a vote."
+        },
+        {
+          "name": "a record naming a folder that is no longer there",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "Class Pages",
+            "Tasks"
+          ],
+          "expect": "Class Pages",
+          "why": "A stale key must not win. Falling back to the guess keeps a course working after somebody removes the recorded folder in Obsidian; honouring the stale name would point the next-class button at a folder that is not there."
+        },
+        {
+          "name": "the record's spelling loses to the list's",
+          "classFolder": "all days",
+          "perSectionFolders": [
+            "All Days"
+          ],
+          "expect": "All Days",
+          "why": "Matched case-insensitively, but the LIST's spelling is returned: everything downstream builds file paths out of this answer, and on a case-sensitive volume the key's spelling would not be there."
         }
       ]
     },
@@ -450,6 +520,30 @@
           "perSectionFolders": [],
           "expect": [
             "All Classes"
+          ]
+        },
+        {
+          "name": "a recorded folder counts, and so does a class-mentioning one",
+          "classFolder": "All Days",
+          "perSectionFolders": [
+            "All Days",
+            "Class Resources"
+          ],
+          "expect": [
+            "All Days",
+            "Class Resources"
+          ],
+          "why": "The recorded folder first, then the guess's answers. Dropping the class-mentioning folder would SHRINK what the course is seen to teach, which is the direction that produces the wrong map; adding the recorded one can only widen it. A course that had 'Class Resources' counting yesterday must not lose it by recording a class folder today."
+        },
+        {
+          "name": "a recorded folder that also mentions classes is counted once",
+          "classFolder": "Class Pages",
+          "perSectionFolders": [
+            "Class Pages",
+            "Tasks"
+          ],
+          "expect": [
+            "Class Pages"
           ]
         }
       ]

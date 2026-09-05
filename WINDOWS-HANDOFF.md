@@ -41,6 +41,19 @@ this side is expected to say so when the contract is wrong.
 
 ### What is still genuinely outstanding
 
+> **Keeping this list is a standing instruction, not a courtesy** (`CLAUDE.md`
+> rule 3). A macOS session that creates work for Windows adds an item HERE, in
+> the same session — one short paragraph saying what the change is, what
+> Windows inherits free, what they owe, and where the section explaining it is.
+> Done items are struck through in place with `✅ Done <date>`, never deleted,
+> so the list keeps its own history.
+>
+> The reason is what this list IS. A Windows session is told to read it first,
+> so it is the INDEX — how they find out there is work at all — while the
+> sections further down are the manual. A change written up beautifully in a
+> section nothing points at is, from their side, indistinguishable from a
+> change nobody wrote up.
+
 1. ~~A Preview item in a menu bar~~ — ✅ Done 2026-08-22. `MainWindow.xaml`
    gained a top-level "Preview" menu (Back / Forward / Reload Page) between
    File and Help, mirroring `mac-app/QuartzTeachers/App/PreviewCommands.swift`.
@@ -575,6 +588,43 @@ this side is expected to say so when the contract is wrong.
       - *`removal blocked` is a trail event* (`activityTrail.mustRecord`): item name, which list, and the sentence shown. Record it where the ⓘ is clicked and where a blocked untick is refused.
       - *The contract holds 5 resolution cases*, not the 10 row 379 claimed.
       - *Size the flyout for the longest sentence.* The mac popover truncated to one line until it was given a fixed width and allowed to wrap; the `lastGradedFolderBlocked` sentence is the longest in `specialNames`, so test the flyout with that one.
+
+13. **Renaming a course folder from inside the app (2026-09-01).** The mac now
+    renames a folder on disk, in every section, rewriting the links that name
+    it and every config key that mentioned it — plus the two foot-guns behind
+    it: Add creates the folder, Remove says the folder stays. Sentences,
+    refusal rules and the list of keys a rename must carry across are all in
+    `shared-rules.json` → `specialNames`. Two new trail events. **The full
+    write-up, including the three decisions and the one trap that is yours
+    alone (`Directory.Move` and open handles), is in "Renaming a course folder
+    from inside the app" below** — read that rather than this summary.
+
+14. **A section with no front page no longer publishes yesterday's site
+    (2026-09-01).** Shared Python, so you inherit the fix; the one thing you
+    owe is `MissingFrontPageExplanation` in `FailureExplainer.cs`, asked BEFORE
+    `MissingBuildExplanation`, which is already written on this side and is
+    pinned by a contract case. See "A section with no index.md cannot be
+    PUBLISHED" below.
+
+15. **What a course calls a unit (2026-09-01).** `unit_word` in
+    `course_config.json`, absent meaning "Unit". Shared Python does the rule
+    and the payload rewrite; you owe the C# mirror, a wizard field, and the
+    assistant's sentences. **Three new contract cases will fail your suite
+    until you read `pageNaming`'s new `term` field with a default.** Full
+    write-up in "What a course calls a unit" below.
+
+16. **What a course calls its class folder (2026-09-01).** `class_folder` in
+    `course_config.json`, recorded rather than guessed, materialised by a
+    rename along with `curriculum_folder`. Replaces the class-folder refusal
+    item 13 described, which no longer exists. **Eight new contract cases will
+    fail your suite until `ClassFolderRule.cs` reads the key.** Full write-up
+    in "What a course calls its class folder" below.
+
+17. **`course_config.json`'s two writers, and the interrupted-rename dead end
+    (2026-09-05).** The Python half of the first is shared and you inherit it;
+    the app-side writer and the whole of the second are yours. Full write-ups
+    in "`course_config.json` has two writers" and "A rename interrupted after
+    the folders moved was a dead end" below.
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
@@ -3201,31 +3251,476 @@ it, and a trail that could not tell them apart leaves "did they ever fix it?"
 unanswerable. Both are in `contracts/shared-rules.json` → `activityTrail`, and
 the repair rules themselves are in `siteHealth.repair`.
 
-### A section with no index.md cannot be PUBLISHED — shared Python, so it is yours too
+### A section with no index.md cannot be PUBLISHED — ✅ FIXED 2026-09-01, in shared Python, so you inherit it
 
-Found while testing the deploy path on the mac, and it breaks identically on
-Windows because it is in `scripts/`.
+Found while testing the deploy path on the mac; it broke identically on Windows
+because it is in `scripts/`. Left open by the special-folders branch as a
+separate piece, and closed on 2026-09-01. The reasoning is kept because the
+second half of it was never on anybody's list.
 
-`_sync_public_to_host` (`build_site.py`) copies the built site back to the host
-only when `public/index.html` exists — and Quartz emits no root `index.html`
-without an `index.md`. So the build SUCCEEDS and prints "Static build complete",
-the sync is silently skipped, and `deploy.py` then reports "Built site not
-found … Build first: ./preview.sh CODE N --build-only" — telling the teacher to
-do the thing they have just done.
+**What it was.** `_sync_public_to_host` (`build_site.py`) copies the built site
+back to the host only when `public/index.html` exists — and Quartz emits no root
+`index.html` without an `index.md`. So the build SUCCEEDED and printed "Static
+build complete", the sync was silently skipped, and `deploy.py` then reported
+"Built site not found … Build first: ./preview.sh CODE N --build-only",
+telling the teacher to do the thing they had just done.
 
-The guard itself is right (do not publish half a build). What is wrong is that
-nothing says why, and the message sends them in a circle. Two one-line fixes
-were available and neither is done yet, so this is an open item rather than a
-solved one:
+**The guard is still right** — do not publish half a build. What was wrong is
+that its answer went nowhere. The sync now RETURNS whether it mirrored a site,
+and a `--build-only` run that mirrored nothing prints "Nothing to publish …
+it has no front page, so no website was produced" and **exits non-zero**. That
+matters more than the sentence: a publish runs `preview.sh --build-only` and
+then `deploy`, so failing the build stops the run at the step that KNOWS the
+reason. The mac already shows the folder-problem dialog on a failed build, so
+the teacher gets **Put them back** → **Preview Again**; check that your own
+failed-build path does the same rather than swallowing the findings.
 
-- print a warning in the else-branch of the sync, so the build says why it did
-  not produce a publishable site;
-- or have the deploy's "Built site not found" message name the likely cause.
+**The half nobody had named, and the worse one.** The skipped sync left the
+PREVIOUS build's `public/` on the host, and `deploy.py` uploads whatever it
+finds there. So: delete a front page, build, publish — and the teacher is told
+the publish succeeded while students get last week's pages. Nothing anywhere
+said so. `_clear_stale_host_site` now removes that mirror whenever the merged
+tree has no `index.md`, in BOTH preview and build modes, which turns a silent
+wrong answer into an honest refusal. Nothing of the teacher's is lost:
+`.merged_output` is derived from their notes and every successful build
+rewrites it wholesale with `rsync --delete`.
 
-Meanwhile the `sectionIndexMissing` health check understates it: "the site will
-open on whatever page happens to come first" is true of a PREVIEW, and for
-publishing there is no site at all. Worth strengthening in
-`shared-rules.json` → `siteHealth.checks`.
+**What you owe.** The Python is shared, so (almost) nothing. The exception is
+`FailureExplainer.cs`, which gains `MissingFrontPageExplanation` — already
+written on this side — and it must be asked **BEFORE** `MissingBuildExplanation`.
+A publish puts both lines in one transcript, and "hasn't been built yet" is the
+wrong thing to say to somebody who just watched it build. That ordering is a
+contract case (`app-rules.json` → `failureExplanations`, the case whose
+`output` carries both lines), so chaining it the other way round fails your
+suite rather than shipping quietly.
+
+**One thing to check rather than copy.** `_clear_stale_host_site` calls
+`shutil.rmtree` on the host's `public/` — which under `PLANTOIR_BUILD_ROOT` is
+outside the working folder, so outside OneDrive, which is the point of that
+variable. If a scanner or an open handle makes the removal fail, the build says
+so and carries on rather than dying; but the stale-publish risk returns for
+that run. Worth one real test on a machine with OneDrive running, and tell the
+mac what you find.
+
+The `sectionIndexMissing` health check understated the same thing — "the site
+will open on whatever page happens to come first" is true of a PREVIEW, and for
+publishing there is no site at all. Its detail in `shared-rules.json` →
+`siteHealth.checks` now names both outcomes, so a teacher can tell whether they
+may carry on for now or must fix it before they publish.
+
+### Renaming a course folder from inside the app — mac shipped 2026-09-01, Windows still to build
+
+The `TODO.md` item deferred on 2026-08-23 while planning the special-folders
+work, built on the mac once Russell chose the full scope. **You do not have it
+yet**, and the contract carries most of what you need.
+
+**Item 13 said "sentences, refusal rules and the list of keys … are all in
+`shared-rules.json`". That was wrong** — four teacher-facing sentences from
+this work live only in the mac's Swift, and they are listed under "Sentences
+the contract does not carry" below. Corrected 2026-09-01 after adversarial
+review; `GUI-IMPROVEMENTS.md` row 388.
+
+**What it does.** A pencil on each folder row in Course Settings opens a sheet
+that renames the folder ON DISK — in every section that has one — rewrites the
+links that name it, and carries across every `course_config.json` key that
+mentioned it. The keys are listed in the contract rather than here, at
+`shared-rules.json` → `specialNames.renameFolder.carriesAcross`, and the mac
+has a test that FAILS if a key is added to that list and not to the code. Copy
+that test; it is the one that catches the failure this feature exists to
+prevent (a config naming a folder that is not there).
+
+**Two foot-guns closed in the same change**, and both are yours to mirror:
+adding a name now CREATES the folder — it used to write a config entry pointing
+at nothing — and removing one now says the folder and everything in it stays on
+the teacher's machine, which nobody could tell before. Sentences:
+`specialNames.addCreatesTheFolder` and `specialNames.removeLeavesTheFolderOnDisk`.
+
+**Three decisions, with the reasoning, because none is obvious from the code.**
+
+1. **It commits to disk immediately, not at Save.** Your Settings holds edits in
+   memory and reverts them on Cancel, exactly as the mac's does. A folder that
+   has really moved cannot be un-moved by a Cancel, so a rename that waited for
+   Save would let Cancel appear to undo something it cannot. The mac writes the
+   rename to a FRESH read of `course_config.json` (`CourseConfiguration.recordOnDisk`)
+   so the teacher's other unsaved edits stay unsaved. That type is a mac type;
+   the RULE is what to copy.
+2. **~~The class folder must keep the word "class" in its new name.~~
+   REVERSED the same day — do NOT build this refusal.** It shipped for a few
+   hours because `ClassFolder` FOUND that folder by looking for the word.
+   Russell's point: that is Plantoir's vocabulary imposed on a teacher's, and
+   somebody whose units are Threads and whose classes are Days calls the folder
+   "All Days". The lookup was what was at fault. `class_folder` is now a
+   recorded key — the thing this entry called "the proper fix, deliberately NOT
+   done" — and the rename MATERIALISES it. See "What a course calls its class
+   folder" below; the sentence
+   `specialNames.renameFolder.problems.classFolderMustSayClass` no longer
+   exists.
+3. **Nothing moves until every destination has been checked.** A per-section
+   rename is several moves, and one that got half way through four sections
+   would leave a course nobody could reason about.
+
+**The trap that is yours alone.** Point 3 matters more on Windows than it does
+here, because `Directory.Move` refuses a folder with an open handle and both
+OneDrive and Obsidian hold them. Check every destination up front, and if a move
+still fails, say WHICH section it failed in — the mac's message names the count
+moved and the section that stopped it, and a bare exception would leave a
+teacher with a course renamed in two sections out of four and no idea which.
+
+**The trail.** Two new events, `folder renamed` and `folder created`, are in
+`activityTrail.mustRecord`; the test that pins your `ActivityTrail` against that
+list will fail until you add them. What they carry is in the contract — folder
+NAMES, never anything from inside the folder.
+
+**One thing the mac learned that changes how risky this looks.** The `TODO`
+entry deferred this feature because it feared a rename would strand every
+wikilink pointing into the folder, and that is wrong: Obsidian resolves
+`[[Quiz 1]]` by searching the vault, so a bare page link survives the folder
+moving. Only QUALIFIED links break — `[[Tasks/Quiz 1]]`, a full vault path, and
+Obsidian's Markdown link style with its percent-encoded spaces. That is why this
+shipped without the undo the deferral assumed it needed, and why you can build
+it without one too. `FolderPathRewriter` is about 200 lines; its tests say
+exactly which forms must change and which must not, and the "must not" half is
+the important one — a rewriter that matched substrings would rename folders the
+teacher never touched.
+
+### What a course calls a unit — mac shipped 2026-09-01, and your suite goes RED first
+
+The `TODO.md` item deferred on 2026-08-23. Russell chose the scope on
+2026-09-01: **new courses plus configurable parsing, NOT renaming a course
+already in use.** Read the "red suite" paragraph before you read anything else
+here, because you will meet it before you meet the feature.
+
+**Your suite will fail, and that is the mechanism working.** Three cases were
+added to `contracts/class-planning.json` → `pageNaming`, each carrying a new
+`term` field. A case WITHOUT that field means the DEFAULT word, "Unit" — so
+read `term` with a default rather than treating its absence as a new shape, or
+every existing case breaks. The case that matters most is the one where a
+Module course must NOT read "Unit 2, Day 3" as a class page.
+
+**What the feature is.** `unit_word` in `course_config.json` (documented in
+`file-formats.json`), ABSENT meaning "Unit", so every course in the field is
+untouched. A ready-made course holds **84–87** class pages (42 for the two
+half-credit courses), not the ~3,000 an earlier draft of this section said —
+that is the total across all 38 payloads. Corrections: `GUI-IMPROVEMENTS.md`
+rows 388 and 389. The wizard asks "What do you call a unit?" of EVERY course,
+ready-made ones included, and the payload is written in that word as it is
+poured rather than renamed afterwards.
+
+**Two of the three halves are shared Python and arrive free.**
+`scripts/class_pages.py` is the rule — the default, the regexes, and the
+rewrite — and `setup_course.py` applies it to the payload. You run both.
+
+**What you owe:** a C# mirror of `ClassPageTerm` and of `UnitDay`'s `term`, a
+field in your wizard, and the wizard writing `unit_word` into the config it
+creates. Plus the assistant, in BOTH directions — and the input half is the one
+that was got wrong here first: the mac's output sentences now say "Module 4 was
+published", and `AssistPublishPlanner.unitNamed` now reads the course's word so
+that "publish Module 4" is understood at all. Reading only the literal "unit"
+meant the whole feature was missing for that course, silently, and it shipped
+that way for a few hours. The assistant's unit sentences are hardcoded on both
+sides and are not in `assist-wording.json`; they are listed below with the
+others.
+
+**Why the parsing half mattered more than the naming half, and why the cheap
+option was rejected.** "New courses only, with the parsing left hardcoded" was
+on the table and is wrong, for a reason worth carrying: `_is_class_page`
+answering "no" does not FAIL. `_pages_the_course_teaches` returns nothing and
+the curriculum map falls back to counting every published page — so a Module
+course would have got a map that looked healthy and was wrong. That is the same
+silent-success failure the whole special-names family exists to end.
+
+**Four decisions, with the reasoning.**
+
+1. **"Day" stays fixed.** A teacher who says "Thread" almost certainly still
+   says "Day 3", and a second configurable word would double the migration for
+   something nobody asked for.
+2. **The word is escaped before it becomes a regex.** It comes from a teacher's
+   own configuration; one containing "(" would otherwise match something else
+   entirely, or fail to compile in the middle of a build. `Regex.Escape` is
+   your equivalent.
+3. **A number or a comma in the word is refused by the WIZARD**, which will not
+   create the course until it is fixed. The command-line setup does something
+   weaker on purpose — it says the name will not work and falls back to "Unit"
+   rather than re-asking — because it is a single-pass script with no way back
+   to a question. Either way the pages are never written under a name nothing
+   can read back: built successfully, and silently outside every feature that
+   works on class pages. **The sentences for both are Swift and Python
+   respectively and are NOT in the contract** — see "Sentences the contract
+   does not carry" below.
+4. **The payload rewrite matches "Unit" only when a NUMBER follows.** That is
+   what separates a unit reference from the ordinary English word, and it is
+   run ONLY over content Plantoir itself ships, on the way into a brand-new
+   course. Never let it near a teacher's own writing, where "Unit 3 of the
+   textbook" would be a false positive nobody could undo. It deliberately
+   catches the ~574 payload files that say "by the end of Unit 3" in prose,
+   which would otherwise leave a Module course talking about Units.
+
+**One design detail to copy rather than reinvent:** the word travels ON the
+parsed value (`UnitDay.term`) and on the page summary, not looked up per call.
+A page read out of a Module course is then written back as a Module page
+without every planner needing the course handed to it as well — and the two
+halves of a rename cannot disagree about which word they are in.
+
+**What is deliberately NOT built, on either side:** renaming an existing
+course's word. It means rewriting every class page's name, its frontmatter
+title and every wikilink pointing at it, across every section and shared
+folder, and a half-finished pass leaves a broken site with no way back. It
+needs its own design pass and its own undo, and it stays in `TODO.md`. Do not
+add it to your side alone.
+
+### What a course calls its class folder — mac shipped 2026-09-01
+
+Russell's ask, in his words: *"So we could have 'Thread' instead of 'Unit' and
+'Day' instead of 'Class'?"* Yes — and the answer is a recorded key, not a
+looser guess.
+
+**`class_folder` in `course_config.json`**, documented in `file-formats.json`.
+The recorded name wins when it is set and still one of the per-section folders;
+otherwise the OLD GUESS applies unchanged — the first folder whose name
+contains "class", else the first folder, else the literal "All Classes". Keep
+the guess. Every course made before this key existed depends on it, and this is
+additive by design.
+
+**The part that is easy to get wrong: a rename MATERIALISES the key.** Carrying
+an existing key across is not enough. A course made from scratch has NO
+`class_folder` and `curriculum_folder: null`, so both folders are found by
+guessing at their names. Rename `Curriculum` to `Expectations` without WRITING
+the key and the guess stops finding it: the map is built from nothing, and
+nobody is told — the coverage health check cannot fire, because from its point
+of view the folder was never there. Pinned as
+`specialNames.renameFolder.materialisesOnRename`, and the same rule covers
+`class_folder` and `curriculum_folder` together.
+
+**Six new naming cases and two membership cases** in `class-planning.json` →
+`classFolder`, each carrying an optional `classFolder` field. **A case without
+that field is a course that never recorded one**, so read it with a default
+rather than treating its absence as a new shape — the same trap as `pageNaming`'s
+`term`. Two of the cases are worth reading before you implement: a STALE key
+(naming a folder no longer in the list) must lose to the guess, or the
+next-class button writes into a folder that is not there; and a key differing
+only in CASE from the list entry must return the LIST's spelling, because
+everything downstream builds file paths out of the answer and a case-sensitive
+volume would not find the key's.
+
+**Membership widens, never shrinks.** The recorded folder is counted AND every
+class-mentioning folder still is. Dropping the latter would shrink what a
+course is seen to teach, which is the direction that produces the wrong map; a
+course that had "Class Resources" counting yesterday must not lose it by
+recording a class folder today.
+
+**The removal block follows the recorded folder too**, so renaming
+"All Classes" no longer leaves a course's class folder removable. The literal
+"All Classes" is still blocked as well, for courses that never recorded one.
+
+### Sentences the contract does not carry — write your own, knowingly
+
+`contracts/` holds every sentence it can, and the handoff sections above say so
+about the ones it does. These are the exceptions as of 2026-09-01, found by
+adversarial review after an earlier draft of item 13 told you "sentences …
+are all in `shared-rules.json`", which was not true. Each is teacher-facing,
+each lives only in the mac's Swift, and each is one you will have to word
+yourself — so word it deliberately rather than discovering the gap:
+
+- **`ClassPageTerm.problem(with:)`** — the two wizard refusals for a unit word
+  containing a digit or a comma.
+- **`SpecialFolderRenamer.rename`'s half-failure sentence** — "Plantoir renamed
+  N of M copies of 'X' and then could not rename the one in section3: …". The
+  SHAPE is what matters and is worth copying: the count moved, and the section
+  that stopped it. A bare exception here leaves a teacher with a course renamed
+  in two sections out of four and no idea which.
+- **`CourseSettingsView.renameFolder`'s bookkeeping-failure sentence** — the
+  folder moved but the configuration could not be written. Do not report this
+  as "the rename failed": it did not, and saying so sends the teacher looking
+  for a folder under its old name.
+- **The wizard's unit-word caption** — "Class pages will be named '… 1, Day 1'".
+- **The assistant's unit sentences**, which item 13 wrongly said were "listed
+  below with the others" until this line was added: "{word} N was published",
+  "{word} N has already been published", "{word} N is already hidden", "{word} N
+  was only partly published", and "I can't find any class pages in {word} N of
+  …". They are hardcoded in `AssistToolRunner` and are in NO contract — not
+  even `assist-wording.json`, which carries the rest of the assistant's words.
+  That is a pre-existing gap this work inherited rather than made, and it is
+  named here so you do not go looking for them.
+
+**Three things the contract DOES carry that you must not copy verbatim.**
+`specialNames.renameFolder.explanation`,
+`specialNames.renameFolder.doneNothingWasThere` and
+`specialNames.removeLeavesTheFolderOnDisk.message` all say "on your Mac".
+Substitute "on this PC", the same way you already do for `app-rules.json`'s
+"this Mac" — `contracts/README.md` documents that substitution. Your contract
+test must compare on the substituted form or it will fail on a difference that
+is correct.
+
+### `course_config.json` has two writers, and they can erase each other
+
+Fixed on the mac 2026-09-05; **half of it is shared Python you inherit and half
+is yours.**
+
+`preflight_update_course_config` reads the configuration, spends a while
+scanning the course's folders, and writes what it computed. The APP writes the
+same file inside that window — a folder rename does, and it writes at ONCE
+rather than at Save, because the folder has really moved and a Cancel could not
+undo it. Whoever wrote second won, and said nothing. The state that leaves is
+the dead end in the next section: folders moved, configuration naming the old
+name.
+
+- **The Python half you get for free.** Preflight now re-reads the file
+  immediately before writing and, if it changed, redoes the whole discovery
+  against the new contents — bounded at three tries, then it carries on with
+  what is there rather than spinning. Redoing is safe because discovery is a
+  pure function of (what is on disk, what the config says) and is add-only.
+- **The other writer is yours.** Whatever writes `course_config.json` from the
+  Windows app must do the same read-compare-write, or the race is only half
+  closed on your side. The mac's is `CourseConfiguration.recordOnDisk`. One
+  deliberate asymmetry to copy: preflight backs off, the APP ends by writing
+  anyway after three tries — a folder that has MOVED with a configuration that
+  does not say so is the worse of the two states, so the app finishes by
+  recording the truth rather than by giving up on it.
+
+`scripts/test_config_write_race.py` forces the race with a scan that mutates the
+file mid-flight; it runs on your side too if you run the Python suites.
+
+### A rename interrupted after the folders moved was a dead end
+
+**Entirely yours to port** — this exists wherever a rename moves folders before
+writing the configuration, which yours will.
+
+The state: the folders are under the new name, the configuration still says the
+old one. The next build DISCOVERS the moved folder and appends it, so the list
+holds BOTH names — and retrying the rename is then refused as a clash. If the
+folder was the class folder it is unremovable as well, so there is no way out
+of Settings at all; the teacher has to hand-edit `course_config.json`.
+
+**The rule to copy is: RECORD the rename before moving.** The first version of
+this on the mac decided from the disk alone — old folder gone, new one present
+— and that was wrong in a way worth understanding, because it looks right. It
+is also the state of a configuration entry whose folder was never created (or
+was deleted in Obsidian) being renamed onto a genuine SECOND folder. Bypassing
+there hands the real folder the phantom entry's attributes, `hidden` among
+them, and takes its pages off the next publish with nobody told. The two cases
+are indistinguishable on disk, so the disk cannot be the evidence.
+
+So: write a small record before anything moves, delete it once the
+configuration has been written, and relax the clash check only when BOTH the
+record and the disk agree. The mac keeps it at
+`courses/.internal/renames/<CODE>.json` — the `.internal` convention you
+already share — and deliberately NOT as a `course_config.json` key, because the
+failure being handled is that the configuration write did not happen. Carry the
+TARGET in the record, not just a flag, so a teacher who opens the sheet and
+types something else gets the ordinary refusal back; filling the field in with
+it also makes finishing an interrupted rename one keypress.
+
+Two more details that are not optional:
+
+- **No section may still hold the old folder.** A per-section rename moves
+  every section's copy, so a mixture means something other than an interrupted
+  rename, and the ordinary refusal must stand.
+- **De-duplicate the list when you finish one.** The starting state holds both
+  names by definition, so a naive rename leaves the new name in twice — which
+  on the mac renders two rows with one identity, and which no later rename can
+  undo.
+
+**One more thing your own config writer must not do**, learned the same day:
+when it loses the compare-and-swap race enough times to give up and write
+anyway, it must recompute from the FRESHEST bytes. The mac's first version fell
+through and wrote the computation derived from the read it had just proved
+stale, clobbering the other writer's keys — the exact failure the loop exists
+to stop.
+
+### Publishing while a preview is running — the race, and the harness that found it
+
+Two defects on 2026-09-05, both in the publish path, both invisible to every
+test that does not publish and then LOOK at what came out.
+
+**The race, which is the one that matters.** Killing the preview LAUNCHER does
+not stop the preview. On the mac the Python and the node server both live
+inside the container, and `_start_public_sync_watcher` keeps mirroring the
+SERVE build to the host every second — so a build for publishing lands and the
+preview overwrites it within a second, and what gets published is the preview,
+live-reload client and all. `kill_existing_quartz` was only ever called from
+the SERVE branch, so `--build-only` never stopped anything.
+
+`build_site.py`'s `--build-only` now stops the preview serving THIS SECTION
+before building, matched by the section's own build directory.
+**That is shared Python and you inherit it.**
+
+**It was written by PORT first, and that was wrong — do not go back to it.**
+`kill_existing_quartz(port)` looked like the obvious tool and is the right one
+for the SERVE path, where the port is known and leased. A build-only run is
+never given a port: `preview.sh` defaults it to 8081 and the app's deploy
+passes no `--port` at all. So the first version killed whatever was serving on
+8081 — the first section to have previewed in that working folder, which is
+usually a DIFFERENT section from the one being published. Measured 2026-09-05
+by doing it: previewing section 1 and publishing section 2 printed "Killed
+existing process on port 8081" and section 1 stopped answering. A scheduled
+overnight deploy would have done the same to any preview left running.
+
+What works instead is the section's BUILD DIRECTORY, which is on the serve
+process's command line because the launcher runs the Quartz CLI by absolute
+path. It identifies exactly one preview and cannot collide with another. One
+detail that is easy to miss: match on the directory plus a trailing separator,
+or `section1` also matches `section10`.
+
+Two things to check on your side rather than assume:
+
+- **Your preview is not in a container**, so an orphaned server is a plain
+  Windows process. Check that killing your launcher actually stops the node
+  server — on the mac it demonstrably does not, and that is exactly the kind of
+  difference that is assumed rather than measured.
+- **You have already written the algorithm — do not write it again.**
+  `preview.ps1`'s `--stop` block finds this section's processes by WORKING
+  DIRECTORY, walks their descendants, and its own comment says "not port,
+  … parity: preview.sh". That is the same rule, done better than the mac's new
+  copy, which does not walk descendants. What is missing on your side is not
+  the algorithm, it is **calling it from the build-only path before the
+  build**.
+
+  (The mac could not simply call `preview.sh --stop`, because `build_site.py`
+  runs INSIDE the container and `--stop` is a host script — which is why a
+  third copy of this rule now exists. Three implementations of one question is
+  the shape this project keeps having to undo; it is in `TODO.md` as worth
+  unifying.)
+
+- **What is and is not exposed on your side.** The Windows APP already stops a
+  running preview before deploying (`SectionDetailView.xaml.cs`), exactly as
+  the mac's does — so the app is safe on both platforms and always was. The
+  hole is the COMMAND LINE, on both. And in your CONTAINER runtime `/proc`
+  exists, so the mac's new code works there unchanged; it is only the NATIVE
+  Windows runtime that gets nothing.
+
+- **The wait is bounded at 30 seconds** (150 × 0.2 s), not the 15 that
+  `GUI-IMPROVEMENTS.md` row 392 says — that row predates the change and the log
+  is append-only, so this is the current number.
+
+**The other one was a partial fix of mine, and is worth knowing as a shape.**
+The first version of the preview guard in `deploy.sh` waited for `index.html`
+to lose the live-reload client. Serve mode bakes that client into EVERY page
+and the mirror is replaced file by file, so a clean front page can sit in front
+of two hundred stale preview pages. Publishing that MIXTURE is worse than
+publishing the preview wholesale, because the front page looks fine and nobody
+looks further. Wait on the whole tree; `deploy.ps1` already does.
+
+### `verify-deploy.sh` — the publishing harness, and why it is not in the gate
+
+New on 2026-09-05, at the repository root. It publishes to a folder, to Netlify
+and to Cloudflare, and runs all three primary+secondary pairings, then **fetches
+every published site back and reads it** — the launcher's own output only
+proves the launcher is happy with itself. 42 checks.
+
+**It is deliberately NOT part of `verify.sh`.** The gate must be runnable at any
+moment, on any machine, without credentials and without touching anything
+outside the repository. This needs a Netlify token, a Cloudflare token and an
+account ID, it needs the network, and it CREATES REAL SITES. Build the Windows
+equivalent the same way — opt-in, run when the publishing path changes — rather
+than folding it into whatever you gate on.
+
+One thing it does NOT cover, stated so nobody assumes otherwise:
+`additional_deploy_targets` is not handled by `deploy.sh` at all — the APP loops
+and calls the launcher once per destination. The harness exercises the pairings
+by running that same sequence, which tests the launcher half; that the app
+produces exactly those argument lists is pinned separately by
+`app-rules.json` → `deployArguments`, which your suite already runs. Between the
+two the pairing is covered; neither half covers it alone.
 
 ### The scheduled task NEVER refuses
 

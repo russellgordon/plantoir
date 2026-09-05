@@ -50,6 +50,14 @@ RUN cp -r /opt/quartz /opt/quartz-site
 COPY scripts/toolchain_paths.py /opt/scripts/toolchain_paths.py
 COPY scripts/contracts.py /opt/scripts/contracts.py
 COPY scripts/site_health.py /opt/scripts/site_health.py
+# What a course calls its class pages and which folder they live in. Both
+# setup_course.py and build_site.py import it by bare name, which only resolves
+# if it is baked in beside them — and setup_course.py is IMPORTED further down
+# this file, so a missing copy does not fail at run time, it fails the image
+# build. Caught by verify.sh on 2026-09-04, which is the whole reason a
+# toolchain change is gated on it: the unit tests were green and the image
+# could not be built at all.
+COPY scripts/class_pages.py /opt/scripts/class_pages.py
 COPY scripts/setup_course.py /opt/scripts/setup_course.py
 COPY scripts/build_site.py /opt/scripts/build_site.py
 COPY scripts/deploy.py /opt/scripts/deploy.py

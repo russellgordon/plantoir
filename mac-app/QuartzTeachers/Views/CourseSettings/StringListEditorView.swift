@@ -14,6 +14,48 @@ struct PendingRemoval: Identifiable {
     var id: String { return item }
 }
 
+/// A rename the teacher is part way through typing.
+struct PendingRename: Identifiable {
+
+    // MARK: - Stored properties
+
+    let item: String
+
+    /// The name a rename from this folder was heading for when it stopped, or
+    /// nil when nothing was interrupted. Settled ONCE, when the sheet opens,
+    /// because answering it touches the filesystem — asked from inside the
+    /// view's body it would be a handful of `stat` calls per keystroke.
+    ///
+    /// The TARGET rather than a yes/no, so that the clash check can be relaxed
+    /// for exactly the rename that was interrupted and for no other: a teacher
+    /// who opens this sheet and types a different name gets the ordinary
+    /// refusal back.
+    let interruptedRenameTarget: String?
+
+    // MARK: - Computed properties
+
+    var id: String { return item }
+}
+
+/// What happened to a list, for the sake of what the teacher is told
+/// afterwards. Adding a folder now creates it on disk and removing one
+/// deliberately does not delete it, and neither is guessable from the button.
+enum ListChange {
+    case added
+    case removed
+}
+
+/// What a caller made of an attempted rename.
+enum RenameResult {
+
+    /// It worked. The sentence is shown afterwards, and says what moved.
+    case renamed(String)
+
+    /// It did not. The sentence is shown inside the sheet, which stays open so
+    /// the teacher can type a different name rather than start again.
+    case failed(String)
+}
+
 /// An explanation of why an item cannot be removed.
 struct ActiveExplanation: Identifiable {
 
@@ -49,9 +91,38 @@ struct StringListEditorView: View {
     var onAdd: ((String) -> Void)? = nil
     var protection: ((String) -> ItemProtection)? = nil
 
+    /// Why a proposed new name cannot be used, or nil when it can. Pure and
+    /// asked on every keystroke, so the Rename button can be disabled with the
+    /// reason showing rather than refusing after the fact.
+    var renameProblem: ((_ oldName: String, _ newName: String, _ finishing: Bool) -> String?)? = nil
+
+    /// Asked once when the rename sheet opens, not on every keystroke: it
+    /// touches the filesystem.
+    var interruptedRenameTarget: ((_ oldName: String) -> String?)? = nil
+
+    /// Performs the rename. Supplying this is what puts the rename control on
+    /// the rows — file lists and the New Course Wizard leave it nil, the
+    /// wizard because its course does not exist on disk yet.
+    /// Performs the rename. `async`, and that is not decoration: it moves
+    /// folders and then reads every Markdown page in the course. On a local
+    /// disk that is milliseconds, but Obsidian vaults commonly live in iCloud
+    /// Drive, where reading a page that has been evicted downloads it first —
+    /// so on the main thread this would freeze the whole app for as long as
+    /// the network takes, once per page.
+    var onRename: ((_ oldName: String, _ newName: String) async -> RenameResult)? = nil
+
+    /// Something to tell the teacher after the list changed. Returning nil
+    /// says nothing.
+    var noticeAfterChange: ((_ name: String, _ change: ListChange) -> String?)? = nil
+
     @State var newItemName: String = ""
     @State var pendingRemoval: PendingRemoval? = nil
     @State var activeExplanation: ActiveExplanation? = nil
+    @State var pendingRename: PendingRename? = nil
+    @State var proposedName: String = ""
+    @State var renameFailure: String? = nil
+    @State var isRenaming: Bool = false
+    @State var notice: String? = nil
 
     // MARK: - Computed properties
 
@@ -87,6 +158,28 @@ struct StringListEditorView: View {
                 HStack {
                     Text(StringListEditorView.displayName(for: item, hidingMarkdownExtension: hidesMarkdownExtension))
                     Spacer()
+                    // Offered even on a row whose REMOVAL is blocked: "All
+                    // Classes" can never be removed and can perfectly well be
+                    // called something else, and conflating the two would make
+                    // the one folder every course has the only one a teacher
+                    // cannot rename.
+                    if onRename != nil {
+                        Button("Rename \(item)", systemImage: "pencil") {
+                            proposedName = item
+                            renameFailure = nil
+                            let interrupted: String? = interruptedRenameTarget?(item)
+                            // Filled in with the rename that was interrupted,
+                            // so finishing it is one keypress rather than a
+                            // remembered name.
+                            proposedName = interrupted ?? item
+                            pendingRename = PendingRename(
+                                item: item, interruptedRenameTarget: interrupted
+                            )
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("rename-\(item)")
+                    }
                     let state: ItemProtection = protection?(item) ?? .ordinary
                     switch state {
                     case .blocked(let reason):
@@ -158,6 +251,28 @@ struct StringListEditorView: View {
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("addTo-\(title)")
             }
+
+            // **Said in place, deliberately NOT in an alert.** This used to be
+            // a second `.alert` on this same view, and it crashed the app: a
+            // SwiftUI view presents one thing at a time, and `performRename`
+            // dismissed the rename SHEET and raised the alert in the same
+            // breath — `AppKitDialogBridge.updateExistingAlert` reconciling an
+            // alert while `NSSheetMoveHelper closeSheet` was still animating,
+            // EXC_BAD_ACCESS. Found by driving the real app on 2026-09-04;
+            // every unit test passed. The project already had the rule written
+            // down (`shared-rules.json` → `siteHealth.repair.oneAlertAtATime`)
+            // and this broke it. Inline is also simply better here: what these
+            // sentences say — that a folder was created, that a removed folder
+            // is still on disk — is a note about the list the teacher is
+            // looking at, not news that deserves to interrupt them.
+            if let notice {
+                Text(notice)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+                    .accessibilityIdentifier("listNotice-\(title)")
+            }
         }
         .padding(.vertical, 4)
         .alert(item: $pendingRemoval) { removal in
@@ -170,6 +285,62 @@ struct StringListEditorView: View {
                 secondaryButton: .cancel()
             )
         }
+        .sheet(item: $pendingRename) { rename in
+            renameSheet(for: rename.item, interruptedTarget: rename.interruptedRenameTarget)
+        }
+    }
+
+    // MARK: - The rename sheet
+
+    @ViewBuilder
+    func renameSheet(for item: String, interruptedTarget: String?) -> some View {
+        // Only the rename that was actually interrupted may skip the clash
+        // check — a pure string comparison here, with the filesystem question
+        // already answered when the sheet opened.
+        let finishing: Bool = interruptedTarget?.caseInsensitiveCompare(
+            proposedName.trimmingCharacters(in: .whitespaces)
+        ) == .orderedSame
+        let problem: String? = renameProblem?(item, proposedName, finishing)
+        VStack(alignment: .leading, spacing: 12) {
+            Text(SpecialNames.renameFolderTitle(for: item))
+                .font(.headline)
+            TextField("New name", text: $proposedName)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("renameField")
+                .onSubmit {
+                    Task { await performRename(of: item, finishing: finishing) }
+                }
+            Text(SpecialNames.renameFolderExplanation)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let sentence = renameFailure ?? problem {
+                Text(sentence)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("renameProblem")
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    pendingRename = nil
+                }
+                .keyboardShortcut(.cancelAction)
+                if isRenaming {
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(.trailing, 4)
+                }
+                Button("Rename") {
+                    Task { await performRename(of: item, finishing: finishing) }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(problem != nil || isRenaming)
+            }
+        }
+        .padding(20)
+        .frame(width: 420)
     }
 
     // MARK: - Functions
@@ -214,6 +385,7 @@ struct StringListEditorView: View {
         if !items.contains(normalized) {
             items.append(normalized)
             onAdd?(normalized)
+            notice = noticeAfterChange?(normalized, .added)
         }
         newItemName = ""
     }
@@ -227,5 +399,33 @@ struct StringListEditorView: View {
         }
         items = result
         onRemove?(name)
+        notice = noticeAfterChange?(name, .removed)
+    }
+
+    /// Hands the rename to the caller and reports what came back.
+    ///
+    /// The list itself is NOT edited here. The caller renames the folder on
+    /// disk and rewrites the configuration in one step, and this view's
+    /// `items` binding reads that configuration — so editing the array here
+    /// too would put the rename in twice, and would put it in even when the
+    /// filesystem refused.
+    func performRename(of item: String, finishing: Bool) async {
+        guard let onRename, !isRenaming else {
+            return
+        }
+        if renameProblem?(item, proposedName, finishing) != nil {
+            return
+        }
+        let newName: String = proposedName.trimmingCharacters(in: .whitespaces)
+        isRenaming = true
+        defer { isRenaming = false }
+        switch await onRename(item, newName) {
+        case .renamed(let sentence):
+            pendingRename = nil
+            renameFailure = nil
+            notice = sentence
+        case .failed(let sentence):
+            renameFailure = sentence
+        }
     }
 }

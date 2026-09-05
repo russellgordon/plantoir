@@ -20,6 +20,7 @@ import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import site_health
 import contracts
+import class_pages
 import toolchain_paths
 from datetime import datetime, timezone
 import threading
@@ -1021,6 +1022,50 @@ def toggle_custom_og_images(config_path: str, enable: bool):
         print("No changes needed to quartz.config.ts")
 
 
+def stop_preview_serving(output_dir: Path) -> int:
+    """
+    Stop the preview serving THIS section, and nothing else.
+
+    Killing by port is wrong for a build that was given no port — see the
+    caller. Killing by the section's own build directory is exact: the
+    launcher runs the Quartz CLI by absolute path, so the directory is on the
+    serve process's command line.
+
+    Stopping the node server is enough. Its Python parent waits on it with
+    `check=True`, so the parent exits when it dies, and the parent's sync
+    watcher — a daemon thread, and the actual cause of the race this closes —
+    goes with it.
+
+    Reads `/proc`, which exists wherever this runs on the mac (inside the
+    container) and on Linux. Natively on Windows there is no `/proc` and this
+    does nothing, exactly as `kill_existing_quartz` already does nothing there
+    without `lsof`; Windows has its own answer to make — see WINDOWS-HANDOFF.
+    """
+    marker = str(output_dir).rstrip("/") + "/"
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return 0
+    stopped = 0
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            command = (entry / "cmdline").read_bytes().replace(b"\x00", b" ").decode(
+                "utf-8", "replace")
+        except OSError:
+            continue
+        if marker not in command or "--serve" not in command:
+            continue
+        try:
+            os.kill(int(entry.name), signal.SIGKILL)
+            stopped += 1
+            print(f"🛑 Stopped the preview that was still serving this section "
+                  f"(PID {entry.name}), so it cannot overwrite this build.")
+        except (ValueError, ProcessLookupError, PermissionError) as error:
+            print(f"⚠️ Could not stop the preview process {entry.name}: {error}")
+    return stopped
+
+
 def kill_existing_quartz(port: int = 8081):
     # Only OUR port: several previews can run at once, one per port, and
     # starting one must never take down another window's preview.
@@ -1518,19 +1563,71 @@ def _format_created_timestamp_from_dt(dt: datetime) -> str:
             dt = dt.astimezone()
     return dt.strftime("%Y-%m-%dT%H:%M:%S") + ".000" + dt.strftime("%z")
 
-def _is_class_page(path: Path, title: str | None = None) -> bool:
+# ---------------------------------------------------------------------------
+# What THIS build's course calls a unit
+# ---------------------------------------------------------------------------
+#
+# The rule itself — the default, the regexes, and the rewrite used when a new
+# course is poured — lives in `class_pages.py`, because `setup_course.py` needs
+# it too and long before any build. What lives here is this build's ANSWER.
+#
+# Held at module level rather than threaded through six functions because this
+# script builds exactly one section of one course per process, so there is only
+# ever one answer. `set_unit_word` is called once, from `build_section_site`,
+# as soon as the configuration has been read.
+
+DEFAULT_UNIT_WORD = class_pages.DEFAULT_UNIT_WORD
+
+_unit_word = DEFAULT_UNIT_WORD
+
+
+def set_unit_word(word) -> str:
+    """Records what this build's course calls a unit, and returns it."""
+    global _unit_word
+    _unit_word = class_pages._cleaned(word)
+    return _unit_word
+
+
+def unit_word() -> str:
+    """What this build's course calls a unit."""
+    return _unit_word
+
+
+def unit_word_from_config(config: dict) -> str:
+    """The course's word, defaulting the way an absent key must."""
+    return class_pages.word_from_config(config)
+
+
+def class_page_pattern(word: str | None = None) -> str:
+    """This build's class-page pattern, or one for a word given outright."""
+    return class_pages.class_page_pattern(word if word is not None else _unit_word)
+
+
+def first_class_pattern(word: str | None = None) -> str:
+    """This build's first-class-of-the-year pattern."""
+    return class_pages.first_class_pattern(word if word is not None else _unit_word)
+
+
+def _is_class_page(path: Path, title: str | None = None, word: str | None = None) -> bool:
     """
     True if the file represents a class page (e.g., 'Unit 1, Day 1.md' or titled 'Unit 1, Day 1').
     Folder index files ('index.md'), Key Links, Curriculum Coverage, and other non-class files are never class pages.
+
+    `word` defaults to whatever this build's course calls it — see
+    `set_unit_word`. A course that says "Module" names its pages
+    "Module 2, Day 3", and a check still looking for "Unit" would decide the
+    course teaches nothing at all: the coverage map would fall back to counting
+    every published page, which is a wrong map that reports success.
     """
     if path.name.lower() in ("index.md", "key links.md", "curriculum coverage.md"):
         return False
+    pattern = class_page_pattern(word)
     stem = path.stem.strip()
-    if re.match(r"^Unit\s+\d+,\s*Day\s+\d+$", stem, re.IGNORECASE):
+    if re.match(pattern, stem, re.IGNORECASE):
         return True
     if title:
         trimmed_title = title.strip()
-        if re.match(r"^Unit\s+\d+,\s*Day\s+\d+$", trimmed_title, re.IGNORECASE):
+        if re.match(pattern, trimmed_title, re.IGNORECASE):
             return True
     return False
 
@@ -1569,8 +1666,9 @@ def _find_first_class_created(content_root: Path) -> datetime | None:
                     earliest_class_dt = dt
 
                 stem = fp.stem.strip()
-                if re.match(r"^Unit\s+0*1,\s*Day\s+0*1$", stem, re.IGNORECASE) or \
-                   re.match(r"^Unit\s+0*1,\s*Day\s+0*1$", title.strip(), re.IGNORECASE):
+                first_class = first_class_pattern()
+                if re.match(first_class, stem, re.IGNORECASE) or \
+                   re.match(first_class, title.strip(), re.IGNORECASE):
                     first_class_unit1_day1_dt = dt
 
     if first_class_unit1_day1_dt is not None:
@@ -3276,13 +3374,21 @@ def _ensure_media_symlink(content_root: Path, course_dir: Path):
     except Exception as e:
         print(f"❌ Failed to create Media symlink at {link_path}: {e}")
 
-def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
+def _sync_public_to_host(output_dir: Path, host_output_dir: Path) -> bool:
     """
     Sync built static assets (public/) and course_config.json from internal
     container ext4 storage to the host-mounted output directory.
+
+    Returns whether a built SITE was mirrored. The root `index.html` is the
+    test, and the guard on it is right: Quartz emits one only when the merged
+    tree has an `index.md`, and a pile of pages with no front page is not
+    something anybody can publish. What was wrong is that the answer went
+    nowhere — the build printed "Static build complete" either way. The caller
+    now decides what to say based on what actually happened.
     """
     src_public = output_dir / "public"
     dst_public = host_output_dir / "public"
+    mirrored_a_site = False
     if src_public.exists() and (src_public / "index.html").exists():
         dst_public.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -3298,6 +3404,7 @@ def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
             # No rsync on this host (Windows native): incremental mirror,
             # because this runs on every tick of the preview sync watcher.
             toolchain_paths.mirror_tree(src_public, dst_public)
+        mirrored_a_site = True
 
     if (output_dir / "course_config.json").exists():
         try:
@@ -3321,6 +3428,38 @@ def _sync_public_to_host(output_dir: Path, host_output_dir: Path):
             os.close(fd)
     except Exception:
         pass
+
+    return mirrored_a_site
+
+def _clear_stale_host_site(host_output_dir: Path, course_code: str, section_number) -> None:
+    """
+    Throw away the last built site when this build cannot replace it.
+
+    `_sync_public_to_host` mirrors nothing when the merged tree has no
+    `index.md`, and that guard is right — half a build must never be
+    published. What was wrong is what it left BEHIND. The previous build's
+    `public/` stayed on the host, and `deploy.py` publishes whatever it finds
+    there, so a teacher who deleted a front page, built, and published was
+    told the publish had succeeded and shipped LAST week's pages. Nothing
+    anywhere said so. That is the silent wrong answer this whole family of
+    checks exists to end, and it was being produced by the check's own guard.
+
+    Removing it turns a silent wrong answer into an honest refusal: `deploy`
+    says the built site is not there, and the build has already said why.
+    Nothing of the teacher's is lost — `.merged_output` is derived from their
+    notes, and every successful build rewrites this tree wholesale
+    (`rsync --delete`).
+    """
+    stale_public = host_output_dir / "public"
+    if not stale_public.exists():
+        return
+    try:
+        shutil.rmtree(stale_public)
+        print(f"🗑️  Removed the last built website for {course_code} Section {section_number}: "
+              f"without a front page this build cannot replace it, and publishing "
+              f"it again would have sent out the older pages.")
+    except Exception as error:
+        print(f"⚠️  Could not remove the last built website at {stale_public}: {error}")
 
 def _start_public_sync_watcher(output_dir: Path, host_output_dir: Path) -> threading.Thread:
     """
@@ -3463,14 +3602,54 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
         except Exception:
             pass
 
-def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path) -> dict:
+def _dropping_excluded_items(cfg: dict) -> dict:
+    """
+    A configuration with every excluded name taken out of the copy lists.
+
+    The same reconciliation preflight does when it writes, applied to a config
+    it is NOT going to write. Exists for the give-up path of preflight's
+    compare-and-swap: nothing downstream reads `excluded_items`, so a build
+    handed an unreconciled config publishes folders the teacher excluded.
+    """
+    excluded = cfg.get("excluded_items") or {}
+    shared_excluded = {str(n).lower() for n in (excluded.get("shared") or [])}
+    section_excluded = {str(n).lower() for n in (excluded.get("per_section") or [])}
+    corrected = dict(cfg)
+    for key, names in (("shared_folders", shared_excluded), ("shared_files", shared_excluded),
+                       ("per_section_folders", section_excluded),
+                       ("per_section_files", section_excluded)):
+        current = cfg.get(key)
+        if isinstance(current, list) and names:
+            kept = []
+            for entry in current:
+                if str(entry).lower() not in names:
+                    kept.append(entry)
+            corrected[key] = kept
+    return corrected
+
+
+def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path,
+                                   _attempt: int = 0) -> dict:
     """Discover new items and append them to course_config.json (add-only). Return updated config dict.
     Also: any newly discovered folders are marked not hidden and added to the expandable list.
     Excludes any items listed in excluded_items (skips discovery, does not un-hide, and manages index.md note).
     """
+    # Read the BYTES, not just the parsed object: the write at the end of this
+    # function is a compare-and-swap against exactly what was read here.
+    #
+    # This reads the configuration, spends a while scanning the course's
+    # folders, and then writes what it computed. The app can write the SAME
+    # file in that window — renaming a folder does, and it writes at once
+    # rather than at Save because the folder has really moved. The loser of
+    # that race used to be silent: preflight wrote its own older read back and
+    # the rename's keys simply vanished, leaving the folders moved and the
+    # configuration naming the old name. Redoing the discovery against the new
+    # contents is safe, because it is a pure function of (what is on disk,
+    # what the config says) and is add-only.
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
+        with open(config_path, "rb") as f:
+            config_bytes_when_read = f.read()
+        cfg = json.loads(config_bytes_when_read.decode("utf-8"))
     except Exception as e:
         print(f"❌ Could not read course_config.json for preflight: {e}")
         return {}
@@ -3602,6 +3781,34 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
             cfg["hidden"] = hidden_list
         if expandable_changed:
             cfg["expandable"] = expandable_list
+        # Compare-and-swap: only write if nothing else has written since the
+        # read at the top. See this function's docstring for what used to be
+        # lost.
+        try:
+            with open(config_path, "rb") as f:
+                config_bytes_now = f.read()
+        except Exception:
+            config_bytes_now = config_bytes_when_read
+        if config_bytes_now != config_bytes_when_read:
+            if _attempt >= 2:
+                print("⚠️ course_config.json kept changing while preflight ran; "
+                      "leaving the file alone and building with what is there now.")
+                try:
+                    latest = json.loads(config_bytes_now.decode("utf-8"))
+                except Exception:
+                    return cfg
+                # Returning the raw file would hand the build a configuration
+                # whose EXCLUSIONS have not been reconciled — and nothing
+                # downstream of preflight consults `excluded_items`, so a folder
+                # the teacher excluded would be published on this build. The
+                # file is still left alone; only what this build is given is
+                # corrected.
+                return _dropping_excluded_items(latest)
+            print("ℹ️ course_config.json changed while preflight was looking "
+                  "(a rename, most likely) — reading it again.")
+            return preflight_update_course_config(
+                course_dir, section_dir, config_path, _attempt + 1
+            )
         _atomic_write_json_with_backup(config_path, cfg)
     else:
         print("ℹ️ No new items discovered; course_config.json unchanged.")
@@ -3872,47 +4079,22 @@ def _is_draft(text: str) -> bool:
 
 def class_folder_name(config: dict) -> str:
     """
-    WHERE A NEW CLASS PAGE IS WRITTEN.
+    WHERE A NEW CLASS PAGE IS WRITTEN — see `class_pages.folder_name`.
 
-    Read from the course's own configured `per_section_folders`, never guessed
-    from what is on disk: the first entry whose name contains "class"
-    (case-insensitive), else the first entry, else the literal "All Classes".
-    Substring matching is safe here because the list is a short curated one the
-    teacher chose — it is NOT safe against arbitrary paths, which is what
-    `_is_class_page_path` below is careful about.
-
-    Pinned by contracts/class-planning.json -> classFolder.naming.
+    Kept as a name here because `test_class_folder.py` imports it and it is the
+    name every write-up refers to, but the RULE lives in `class_pages.py`,
+    which `setup_course.py` also reads. One rule, one home: four disagreeing
+    implementations of this question is what the whole `classFolder` contract
+    was written to end, and a fifth living here would be the same mistake.
     """
-    folders = config.get("per_section_folders") or []
-    for folder in folders:
-        if folder and "class" in str(folder).lower():
-            return str(folder)
-    if folders and folders[0]:
-        return str(folders[0])
-    return "All Classes"
+    return class_pages.folder_name(config)
 
 
 def class_folder_names(config: dict) -> list:
     """
-    WHICH FOLDERS COUNT as holding class pages — every configured
-    per-section folder whose name mentions classes, and failing that the single
-    name `class_folder_name` chose.
-
-    Naming and membership are the same question only when a course has ONE such
-    folder. A course configured ["Class Resources", "All Classes"] would
-    otherwise resolve to "Class Resources" for both, match zero pages, and drop
-    the coverage map back to "every published page" — reintroducing the exact
-    silent failure this rule was written to close.
-
-    Pinned by contracts/class-planning.json -> classFolder.membership.
+    WHICH FOLDERS COUNT as holding class pages — see `class_pages.folder_names`.
     """
-    names = []
-    for folder in config.get("per_section_folders") or []:
-        if folder and "class" in str(folder).lower():
-            names.append(str(folder))
-    if names:
-        return names
-    return [class_folder_name(config)]
+    return class_pages.folder_names(config)
 
 
 GRADED_FOLDERS_KEY = "graded_folders"
@@ -4533,6 +4715,14 @@ def build_section_site(
     config = preflight_update_course_config(course_dir, section_dir, config_file) or config
     # ========================================================================
 
+    # What this course calls a unit, before anything asks what a class page is.
+    # Set once here rather than passed through every caller — one process
+    # builds one section of one course, so there is only ever one answer.
+    chosen_unit_word = set_unit_word(unit_word_from_config(config))
+    if chosen_unit_word != DEFAULT_UNIT_WORD:
+        print(f"📘 This course calls its units “{chosen_unit_word}”, so a class page is "
+              f"“{chosen_unit_word} 2, Day 3”.")
+
     shared_folders = config.get("shared_folders", [])
     shared_files = config.get("shared_files", [])
     per_section_folders = config.get("per_section_folders", [])
@@ -4797,6 +4987,15 @@ def build_section_site(
     }
     site_health.announce_or_stay_quiet(health_facts, course_code, section_number)
 
+    # A section with no front page produces no root index.html, so this build
+    # cannot replace the one already sitting on the host. Clear it here rather
+    # than in the sync, because BOTH modes need it: a preview never reaches the
+    # sync at all (its watcher waits on an index.html that never appears), and
+    # a publish from the command line after a preview would otherwise upload
+    # the older pages.
+    if not health_facts["section_index_exists"]:
+        _clear_stale_host_site(host_output_dir, course_code, section_number)
+
     # === Curriculum coverage heat map =========================================
     first_class_dt = _find_first_class_created(content_root)
     first_class_stamp = _format_created_timestamp_from_dt(first_class_dt) if first_class_dt else None
@@ -4978,6 +5177,40 @@ def build_section_site(
     env.setdefault("SOURCE_DATE_EPOCH", "1704067200")  # 2024-01-01T00:00:00Z
 
     if build_only:
+        # A preview for THIS section may still be serving, and it does not stop
+        # when the launcher that started it is killed: the Python and the node
+        # server both live inside the container, and `_start_public_sync_watcher`
+        # keeps mirroring the SERVE build to the host every second. A build for
+        # publishing that runs alongside one is therefore overwritten within a
+        # second of finishing — the production pages land on the host and the
+        # preview's pages replace them, so what gets published is the preview,
+        # live-reload client and all.
+        #
+        # The APP never meets this, because publishing stops an active preview
+        # first. From the command line nothing did, and `deploy.sh`'s own
+        # rebuild-before-publishing lost this race every time. Stopping the
+        # preview here fixes it for every caller at once, and matches what the
+        # app already does rather than inventing a second rule.
+        #
+        # Matched by this section's OWN BUILD DIRECTORY, never by port.
+        #
+        # The first version of this killed `port`, and `port` is 8081 for every
+        # build-only run: `preview.sh` defaults it and the app's deploy passes
+        # no `--port` at all. So it killed whatever was serving on 8081 — the
+        # first section to have started previewing in this working folder,
+        # which is usually a DIFFERENT section from the one being published.
+        # Previewing section 1 while publishing section 2 took section 1's
+        # preview down, in the exact multi-section workflow the app is built
+        # around. Measured 2026-09-05 by doing it: "Killed existing process on
+        # port 8081", and section 1 stopped answering.
+        #
+        # The section's build directory is on the serve process's command line
+        # (the launcher runs the scaffold's CLI by absolute path, which is why
+        # it is there), so it identifies exactly one preview and cannot collide
+        # with another. The trailing separator matters: without it `section1`
+        # would also match `section10`.
+        stop_preview_serving(output_dir)
+
         # Static build ONLY (single build)
         print("\n🏗️  Building static site with Quartz → public/")
         safe_clean_public_dir(output_dir / "public")
@@ -4986,9 +5219,21 @@ def build_section_site(
         public_dir = output_dir / "public"
         if not public_dir.exists():
             print("❌ Quartz build did not emit a 'public' directory — cannot deploy.")
-            return
-        _sync_public_to_host(output_dir, host_output_dir)
-        print("✅ Static build complete.")
+            sys.exit(1)
+        # "Static build complete" used to be printed either way. It is the
+        # sentence that sent teachers round in a circle: the build said it had
+        # finished, `deploy` then said "Built site not found — build first",
+        # and they had just built. A build that produced nothing publishable
+        # now says so and FAILS, so a publish stops at the build with the
+        # reason in front of it instead of at the step that cannot know why.
+        if _sync_public_to_host(output_dir, host_output_dir):
+            print("✅ Static build complete.")
+        else:
+            print(f"❌ Nothing to publish for {course_code} Section {section_number}: "
+                  f"it has no front page, so no website was produced.")
+            print("   Put the front page back — Plantoir offers to do that for "
+                  "you — then build again.")
+            sys.exit(1)
     else:
         # Preview mode (default): do NOT pre-build. Build+serve once.
         # Quartz's dev server opens TWO ports: the site, and a live-reload

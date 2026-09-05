@@ -112,6 +112,14 @@ bundle from the Dock. Test, then build, then stop.
 - Anything architectural also gets a section in `WINDOWS-HANDOFF.md`, and any
   guidance the change made WRONG is corrected there in the same breath. Stale
   advice is worse than none, because it gets followed.
+- **Anything WINDOWS must now do gets a numbered item in that file's "What is
+  still genuinely outstanding", in the same session.** Standing instruction,
+  `CLAUDE.md` rule 3. The list is not a duplicate of the section: a Windows
+  session is told to read the list FIRST, so it is how they find out there is
+  work at all, while the section is the manual for doing it. Mark items done
+  where they stand — struck through, `✅ Done <date>` — rather than deleting
+  them. A change written up beautifully in a section nothing points at is, from
+  their side, a change nobody wrote up.
 - **An affordance that lives only in a context menu is invisible to everyone
   else.** A right-click menu, a double-click, a hover, a keyboard shortcut —
   each needs a handoff line even though nothing on screen changed. That is how
