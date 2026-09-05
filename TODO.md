@@ -37,25 +37,39 @@ an item when it ships (finished behaviour is recorded in
   it, and was checked the only way worth checking: with the guard disabled it
   fails with the key missing, exactly as the bug did.
 
-- **One rule, three implementations: stopping a section's preview.** Found by
-  review 2026-09-05. `preview.sh --stop` finds this section's processes by
-  working directory (a `/proc` walk it runs inside the container),
-  `preview.ps1 --stop` does the same natively via `Win32_Process` AND walks
-  descendants, and `build_site.py`'s new `stop_preview_serving` is a third,
-  written because the first two are HOST scripts and `build_site.py` runs
-  inside the container, so it cannot call them.
+- ~~**One rule, three implementations: stopping a section's preview.**~~ — ✅
+  **Done 2026-09-05**, row 407. Kept rather than deleted because the finding
+  that came out of doing it is worth recognising again, and it is not the one
+  this entry predicted.
 
-  The reason is sound; three copies of one question is still the shape this
-  project keeps having to undo, and they already differ: only the PowerShell
-  one walks descendants, which its own comment says is needed because a child
-  spawned with a relative path (npx does) carries no directory to match on.
-  The mac's copy has not needed it — the serving node is launched by absolute
-  path — but "has not needed it yet" is how these drift apart.
+  **The three were not three copies of one rule. They were three PARTIAL
+  rules.** This entry assumed the job was to pick one implementation, or to
+  hold three to one case list. Both would have shipped a blind spot, because
+  each of the three saw something the others could not: a working directory
+  catches a child launched by a RELATIVE path (`npm install` runs that way and
+  carries no directory at all), while a command line catches the Python
+  driver, which never chdirs — `build_site.py` passes `cwd=` to its children —
+  and so sits in the container's own folder for the whole build. Through every
+  in-process phase of a build the driver is the only process there is to find,
+  and the mac's sweep found nothing and said "Stopped 0 process(es)". Only the
+  PowerShell copy walked descendants, which this entry did spot.
 
-  Worth unifying, and the cheapest honest version is probably not one
-  implementation but one CONTRACT case listing the command-line shapes that
-  must and must not be stopped, run by all three. `scripts/test_stop_preview.py`
-  is half of that already.
+  So the shared rule is a disjunction of evidences plus a walk down the
+  process tree, and it stops strictly MORE than any of the three did alone.
+  The lesson to carry to the next "three implementations of one question":
+  **before unifying, find out what each copy can see that the others cannot.**
+  If the answer is "nothing", it is a refactor; if it is not, choosing any one
+  of them as the survivor spreads its blind spot everywhere, and the honest
+  unification is the union.
+
+  The prediction that a contract case list was the cheapest honest version was
+  right, with one correction: a case is a whole process SNAPSHOT, not one
+  process, because `Win32_Process` exposes no working directory and a
+  descendant walk is not a property of any single process. The rule is in
+  `scripts/stop_preview.py`, the cases in `contracts/shared-rules.json` →
+  `stopPreview`, and writing them down found two live prefix bugs in
+  `preview.ps1` (`section1` matching `section10`; `--section=1` matching
+  `--section=10`).
 
 - **~~Should Plantoir refuse to work in a cloud-synced folder?~~ Decided
   2026-09-05: no.** Russell's call, prompted by a reliability review finding

@@ -680,6 +680,81 @@ this side is expected to say so when the contract is wrong.
 
     Full write-up in "Built websites live outside the working folder" below.
 
+20. **Stopping a section's preview is now ONE rule, and two of your three
+    matching bugs are already fixed in `preview.ps1` — unverified on real
+    Windows (2026-09-05, row 407).** This is the `TODO.md` item "one rule,
+    three implementations", closed on the mac side. The rule — which
+    processes belong to a section's preview — lives once, in
+    `contracts/shared-rules.json` → `stopPreview`, with 17 cases as whole
+    process snapshots. Read that key before anything else here.
+
+    **What you inherit free.** The contract, the case list, and the
+    reasoning. Also `scripts/stop_preview.py`, which is shared Python and
+    already runs in your CONTAINER runtime unchanged; your `--build-only`
+    path gets the preview-stopping fix through it without you doing
+    anything. And the finding that made the whole piece worth doing: the
+    three implementations were three PARTIAL rules, not three copies of one.
+    A working directory sees a child launched by a relative path; a command
+    line sees the Python driver, which never chdirs. **Your version had the
+    better half already** — the descendant walk, which neither of the mac's
+    copies had, and which is now part of the shared rule because of you.
+
+    **What you owe, in order.**
+
+    - **Verify the two fixes I made to `preview.ps1` from this Mac.** They
+      are the only edits to your file, and this machine has no `pwsh`, so
+      the PowerShell was reasoned about and never executed. Both are the
+      same bug: `Test-NamesPath` replaces `$lower.Contains($sectionNeedle)`,
+      because `...\work\ADA1O\section1` is a PREFIX of `...\section10` and
+      stopping section 1 stopped section 10; `Test-ArgumentValue` replaces
+      `$lower.Contains('--section=1')`, because that is a prefix of
+      `--section=10` and does the same thing by a second route. Both need
+      ten or more sections in one course to bite, and
+      `course-management.json` → `sectionNumbers.entryProblems` refuses only
+      0, negatives, non-numbers and duplicates — so nothing prevents it. If
+      the script no longer parses, that is mine and I would rather hear it
+      as a bug than have you work around it.
+    - **Run the contract's cases against your matcher.** Nothing does yet on
+      your side, which means the two fixes above are asserted rather than
+      tested. The cheapest honest shape is a `windows-app/test_stop_preview.ps1`
+      that dot-sources the two functions and runs the case list, or an xUnit
+      test that invokes it — your call, and say which in `MAC-HANDOFF.md`.
+      **Do not retype the cases**; deserialise them. Note that every case
+      carries `cwd`, which `Win32_Process` cannot give you: those cases are
+      not yours to answer directly, and the fact that you still reach the
+      same verdict through the descendant walk is the thing worth proving.
+    - **Then decide about `--match-stdin`, and tell the mac.**
+      `stop_preview.py` has an entry point that reads a JSON process list on
+      stdin and prints the pids the rule names, touching nothing. It exists
+      so a platform that cannot read `/proc` can still use the ONE rule:
+      enumerate with `Get-CimInstance`, ask Python which, kill with
+      `Stop-Process`. That would leave one implementation and two ports
+      rather than two implementations. It is deliberately NOT adopted here,
+      because whether you can rely on Python being resolvable on that path
+      is a question only your machine can answer — `--stop` must never start
+      anything, and a Python that has to be found is a small risk you can
+      measure and I cannot.
+
+    **One trap, measured here.** `preview.sh` does NOT run the copy of the
+    rule baked into the image; it pipes the recipe's own copy in over stdin.
+    Stop mode must never build anything, so it runs against whatever
+    container is already there — which right after an upgrade is one built
+    from the PREVIOUS image, with no such file in it. Naming a baked path
+    fails with a message nobody reads, because both callers discard the
+    launcher's output and neither checks its exit code, and the build it was
+    asked to stop carries on. `verify.sh` section 6d proves the property by
+    deleting the file from a running container and stopping a preview
+    anyway. Your native path has no equivalent hazard — nothing is baked —
+    but if you ever adopt `--match-stdin`, you acquire it.
+
+    **A behaviour change to expect, not a regression.** The unified rule
+    stops strictly MORE than the mac's old sweep did: the `build_site.py`
+    driver and the children hanging off it. That also fixes cancelling a
+    deploy, which on the mac did not stop the deploy's own build. Yours
+    already matched the driver, so this is the mac catching up to you.
+
+    Full write-up in "One rule for stopping a section's preview" below.
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,
@@ -865,9 +940,13 @@ a judgement call on yours.
 - **Stopping a preview reclaims native processes** (entry 105): killing
   the host-side launcher orphans the build or server process it started
   (an orphaned build burns real CPU). `preview.ps1 CODE N --stop` matches
-  that section's `node.exe` / `python.exe` processes by command line and
-  working directory (so other sections are safe), walks their descendants,
-  and `Stop-Process`es them — and never starts anything itself. Call it
+  that section's `node.exe` / `python.exe` processes by COMMAND LINE —
+  never the working directory, which `Win32_Process` does not expose at
+  all — walks their descendants, and `Stop-Process`es them, and never
+  starts anything itself. (Corrected 2026-09-05: this said "command line
+  and working directory" for months, which is the mac's mechanism, not
+  this one. The rule both platforms must agree on is now written down
+  once, in `contracts/shared-rules.json` → `stopPreview`.) Call it
   fire-and-forget — output discarded — wherever a preview ends: stop
   button, navigating away, window close. (History: this used to reclaim
   the container-side processes an orphaned host script would otherwise
@@ -3721,19 +3800,21 @@ Two things to check on your side rather than assume:
   Windows process. Check that killing your launcher actually stops the node
   server — on the mac it demonstrably does not, and that is exactly the kind of
   difference that is assumed rather than measured.
-- **You have already written the algorithm — do not write it again.**
-  `preview.ps1`'s `--stop` block finds this section's processes by WORKING
-  DIRECTORY, walks their descendants, and its own comment says "not port,
-  … parity: preview.sh". That is the same rule, done better than the mac's new
-  copy, which does not walk descendants. What is missing on your side is not
-  the algorithm, it is **calling it from the build-only path before the
-  build**.
+- **You have already written most of the algorithm — do not write it again.**
+  `preview.ps1`'s `--stop` block finds this section's processes by COMMAND
+  LINE (this paragraph said WORKING DIRECTORY until 2026-09-05, and that was
+  simply wrong — `Win32_Process` exposes no working directory), walks their
+  descendants, and its own comment says "not port, … parity: preview.sh". The
+  descendant walk is the half you had and the mac did not. What is missing on
+  your side is not the algorithm, it is **calling it from the build-only path
+  before the build**.
 
   (The mac could not simply call `preview.sh --stop`, because `build_site.py`
   runs INSIDE the container and `--stop` is a host script — which is why a
-  third copy of this rule now exists. Three implementations of one question is
-  the shape this project keeps having to undo; it is in `TODO.md` as worth
-  unifying.)
+  third copy of this rule existed. **Resolved 2026-09-05**: the rule now lives
+  once, in `contracts/shared-rules.json` → `stopPreview` and
+  `scripts/stop_preview.py`, and item 20 in the outstanding list says what
+  this side owes.)
 
 - **What is and is not exposed on your side.** The Windows APP already stops a
   running preview before deploying (`SectionDetailView.xaml.cs`), exactly as
@@ -3753,6 +3834,100 @@ and the mirror is replaced file by file, so a clean front page can sit in front
 of two hundred stale preview pages. Publishing that MIXTURE is worse than
 publishing the preview wholesale, because the front page looks fine and nobody
 looks further. Wait on the whole tree; `deploy.ps1` already does.
+
+### One rule for stopping a section's preview
+
+New on 2026-09-05, and the closing of a `TODO.md` item. Read
+`contracts/shared-rules.json` → `stopPreview` first; this explains why it is
+shaped the way it is, and what was rejected.
+
+**What was wrong.** One question — *which processes belong to this section's
+preview?* — was answered in three places: `preview.sh --stop` (a `/proc` sweep
+by working directory, run inside the container), `preview.ps1 --stop`
+(`Win32_Process` by command line, plus a descendant walk, run natively), and
+`build_site.py` (command line plus `--serve`, inside the container, written
+because both of the others are HOST scripts and it is not). The reason for the
+third is sound and has not gone away; the problem was never that it existed,
+it was that nothing held the three to the same answer.
+
+**The finding that changed the design, and the reason a straight refactor
+would have been wrong.** They were not three copies of one rule. They were
+three PARTIAL rules, and each saw something the others could not:
+
+- A **working directory** catches a child launched by a RELATIVE path, which
+  carries no directory to match on. `npm install` runs exactly that way, and
+  so do the esbuild workers under it.
+- A **command line** catches the Python driver. `build_site.py` never calls
+  `os.chdir` — it passes `cwd=` to its CHILDREN — so the driver sits in the
+  container's `/teaching` for the whole build. Through every in-process phase
+  (copying the scaffold, copying content, social cards, the rsync mirror) it
+  is the only process there is to find, and the mac's sweep found nothing and
+  printed "Stopped 0 process(es)".
+- Only **`preview.ps1`** walked descendants — yours, and it was right.
+
+So picking any one of the three as "the" implementation would have shipped
+that one's blind spot to both platforms. The rule is a **disjunction of three
+evidences, plus a walk down the process tree**, and it stops strictly more
+than any of the three did alone.
+
+**Why the cases are process SNAPSHOTS rather than single processes.** The
+first design had each case describe one process — name, command line, working
+directory — with an expected verdict. That cannot be run on both platforms,
+for two independent reasons. `Win32_Process` exposes no working directory at
+all, so every cwd case would be unanswerable on your side. And the descendant
+walk is not a property of any single process: it is a rule over parent links
+across the whole list. A case is therefore a small process TABLE with `pid`,
+`ppid`, `name`, `commandLine` and `cwd`, and the expected answer is the list
+of pids to stop. A platform that cannot see one kind of evidence must still
+reach the same verdict — through the walk — and that is exactly the property
+worth testing rather than assuming.
+
+**Two modes, because there are genuinely two questions.** `everything` is the
+launcher's `--stop`: reclaim the server, the build, the driver, and everything
+under them. `servingOnly` is `build_site.py --build-only`: remove ONLY the
+preview server that would otherwise overwrite the publish build a second later
+through its own host mirror. A build must never be stopped in that mode,
+because the build being protected is itself a build of this section — and the
+process asking is the driver the rule would otherwise recognise.
+
+**The version-independence trap, which is the one to carry if you ever adopt
+`--match-stdin`.** `preview.sh` pipes the recipe's copy of the rule into the
+container over stdin rather than running the copy baked into the image. Stop
+mode must never build anything, so it runs against whatever container is
+ALREADY there — right after an upgrade, one built from the previous image,
+with no such file. Naming a baked path would make `docker exec` fail with a
+message nobody sees (both callers send the launcher's output to the null
+device and neither checks its exit code) while the build it was asked to stop
+carried on burning CPU. This is exactly once per teacher per upgrade, and only
+when something was running, which is the only time the mode matters at all.
+`verify.sh` section 6d proves it by deleting the file from a running container
+and stopping a preview anyway.
+
+**Rejected: making `preview.ps1` call the shared Python.** It would leave one
+implementation and two ports, which is better, and the `--match-stdin` entry
+point exists so you can. It was not done from here because `--stop` must never
+start anything and whether Python is reliably resolvable on that path at that
+moment is a question only your machine can answer. Yours to measure; say what
+you find.
+
+**Rejected: extracting `preview.ps1`'s matcher into a new `.ps1` file beside
+the launchers.** A test could then dot-source it without running the script.
+But a new file there has to be added to `ToolchainMirror.Launchers` and
+`RecipeRootFiles`, the Dockerfile's `COPY … /opt/export/` and its `unix2dos`
+line, `project.yml`, and the mac's own refresh lists — five hand-maintained
+lists, which is the precise failure `contracts/toolchain.json` →
+`recipeFolders` exists to record. The functions are defined inside
+`preview.ps1`'s stop block instead. If you want them dot-sourceable, that is a
+real cost to weigh, not a free tidy-up.
+
+**What was measured, not decided.** The two `preview.ps1` prefix bugs were
+found by reading, and both are real: `$lower.Contains($sectionNeedle)` with a
+needle ending `\section1` matches `\section10`, and
+`$lower.Contains('--section=1')` matches `--section=10`. Each was reproduced
+as a contract case, and each case was checked by putting the fault back into
+the shared Python and watching that case — and only that case — fail. The same
+was done for the descendant walk. A green suite proves nothing about a case
+that cannot fail.
 
 ### `verify-deploy.sh` — the publishing harness, and why it is not in the gate
 

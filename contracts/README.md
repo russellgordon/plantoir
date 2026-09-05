@@ -1,6 +1,9 @@
 # The Plantoir contract — what both apps must agree on
 
-Six JSON files, **generated from the macOS app** and read by both test suites.
+Ten JSON files, **most of them generated from the macOS app** and read by both
+test suites. (Three are written by `Plantoir --write-contracts`; the rest are
+authored, and `shared-rules.json` is one of those — see "What is generated and
+what is written by hand".)
 They exist so that "implement what changed on the mac" ends in a green Windows
 suite instead of a day of clicking.
 
@@ -20,7 +23,7 @@ mechanics, a measurement taken on one machine: not.
 | [`toolchain.json`](toolchain.json) | The image both platforms build from the same recipe: the four pins with the REASON each sits where it does, and what each of the seven Quartz patches changes and why it cannot be dropped. |
 | [`example-content.json`](example-content.json) | The ready-made courses: how a payload is discovered, the manifest's keys, and the allow-list rule that decides what actually installs. |
 | [`file-formats.json`](file-formats.json) | **The two files both apps WRITE and the Python then reads**: every `course_config.json` key with its type and default, and the frontmatter that decides whether students see a page — including the legacy `draft:` spelling, which means the opposite. |
-| [`shared-rules.json`](shared-rules.json) | Fourteen rule sets on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**. |
+| [`shared-rules.json`](shared-rules.json) | Fourteen rule sets on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**., and **which processes belong to a section's preview, and must therefore be stopped**. |
 | [`course-management.json`](course-management.json) | The names the three kinds of zip carry and how they are told apart, what section number is offered next and which entries are refused in whose words, and the grade a course code names. |
 | [`class-planning.json`](class-planning.json) | Which page titles carry numbers, what "the next class" would be called, and — the highest-stakes data here — the ORDER renames must run in when room is made for a class. |
 | [`schedule-rules.json`](schedule-rules.json) | How a teacher's own list of class dates is read: every accepted date form, how an ambiguous `08/09/2026` column is settled or asked about, and what a pasted Google Sheet address becomes. |
@@ -123,7 +126,11 @@ assistant's tests". Two of them matter enough to repeat:
 
 - **How the preview is stopped and started.** WSL2, ConPTY and the preview
   leases have real Windows mechanics; `assist-cases.json` says the ORDER the
-  events must occur in, not how to make them happen.
+  events must occur in, not how to make them happen. **Half of this moved on
+  2026-09-05**: WHICH processes belong to a section's preview is a shared rule
+  now (`shared-rules.json` → `stopPreview`), because three implementations of
+  that one question had drifted into three different answers, one of them a
+  live bug. Finding them and ending them is still yours.
 - **Anything the model decides.** Routing accuracy is measured, not asserted —
   see [`research/README.md`](../research/README.md). A contract can say that
   "deploy now" never reaches the model; it cannot say what the model would do
@@ -190,7 +197,7 @@ oversight:
 | Area | Tests | Why it stays local |
 |---|---|---|
 | Windows, sheets, layout, hit areas, fonts, chat bubbles | ~71 | Platform look and feel. The mac's numbers were measured against Messages; matching them on WinUI would produce something that looks foreign. What must be TRUE of the assistant's window is in `WINDOWS-HANDOFF.md`. |
-| Script runner and preview stopper mechanics | 34 + 2 | ConPTY against a pseudo-terminal, WSL2 against Colima. The OUTPUT they parse is shared (see `markerOrigins`); the machinery is not. |
+| Script runner and preview stopper mechanics | 34 + 2 | ConPTY against a pseudo-terminal, WSL2 against Colima. The OUTPUT they parse is shared (see `markerOrigins`); the machinery is not. **Narrowed 2026-09-05**: WHICH processes belong to a section's preview is now shared (`shared-rules.json` → `stopPreview`) — how they are found (`/proc` against `Win32_Process`) and how they are ended (SIGTERM-then-SIGKILL against `Stop-Process -Force`) remain platform mechanics. |
 | Scheduled deploys: the MECHANISM | ~14 | launchd against Task Scheduler — nothing about writing a plist or a task ports. The **refusals** are now shared (`shared-rules.json`), which is the half that matters. |
 | Model tiers, plan mode, activity | 30 | Measured on this hardware. See `research/`; a tier ladder measured on an M4 Pro says nothing about a teacher's laptop with integrated graphics. |
 | Restoring and archiving the FILES | ~8 | The zip NAMES are shared (above); unzipping, replacing a course folder and reporting what came back is filesystem work with different failure modes on each platform. |
