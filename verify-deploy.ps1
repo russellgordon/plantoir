@@ -320,7 +320,17 @@ if (-not $port) {
 # parent's sync watcher goes on mirroring the SERVE build into the section's
 # build directory about once a second. The next case publishes into exactly
 # that state.
-if ($previewProcess -and -not $previewProcess.HasExited) { Stop-Tree $previewProcess.Id }
+#
+# THIS ONE KILL MUST NOT WALK THE TREE, and that is the whole case. It briefly
+# used Stop-Tree, which is taskkill /T, and taskkill /T takes the node server
+# and the Python down with the launcher - so there was no orphaned preview
+# left, nothing for the publish to stop, and the assertion below failed
+# claiming the race was back. The harness had quietly stopped reproducing its
+# own precondition. Killing ONLY this process is what leaves the preview
+# serving, which is the state a teacher is really in.
+if ($previewProcess -and -not $previewProcess.HasExited) {
+    try { Stop-Process -Id $previewProcess.Id -Force -ErrorAction Stop } catch { }
+}
 Start-Sleep -Seconds 3
 
 Hdr "Publishing straight after a preview must not ship the live-reload client"
