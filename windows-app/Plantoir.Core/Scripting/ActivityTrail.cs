@@ -154,7 +154,7 @@ public static class ActivityTrail
     };
 
     public static string DefaultLogDirectory =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "Logs");
+        Plantoir.Core.Models.AppDataRoot.Combine("Logs");
 
     public static string DefaultLogPath => Path.Combine(DefaultLogDirectory, "activity.txt");
 

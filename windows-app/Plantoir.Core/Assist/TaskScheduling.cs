@@ -112,7 +112,7 @@ public static class TaskScheduling
     /// be the reason an overnight deploy silently does nothing.
     /// </summary>
     public static string ScheduledScriptsDirectory() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "scheduled");
+        Plantoir.Core.Models.AppDataRoot.Combine("scheduled");
 
     private static string WrapperScriptPath(string taskName) =>
         Path.Combine(ScheduledScriptsDirectory(), SafeName(taskName) + ".ps1");

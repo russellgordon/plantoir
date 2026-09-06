@@ -57,8 +57,8 @@ public static class ScheduledDeployCompletion
     /// nothing here should be swept away before the app gets a chance to
     /// look at it.
     /// </summary>
-    public static string PendingDirectory() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "scheduled", "pending");
+    public static string PendingDirectory() =>
+        Plantoir.Core.Models.AppDataRoot.Combine("scheduled", "pending");
 
     /// <summary>
     /// Applies every pending scheduled-deploy sentinel found on disk, then

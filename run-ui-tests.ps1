@@ -32,18 +32,22 @@
     working folder is built from scratch. Your own working folder, remembered
     windows and window positions are not read or written.
 
-    It REFUSES to run while Plantoir is open rather than closing it for you —
-    your copy may be mid-preview or mid-deploy. Close it, or pass -Force if you
-    know it is idle.
+    A RUNNING PLANTOIR IS CLOSED
+    ============================
+    Two copies would fight over the foreground, and a click meant for the
+    sidebar would land in whichever window happened to be in front. Russell's
+    standing instruction is to close his copy rather than stop and ask each
+    time - it is his development copy and holds no unsaved state of its own -
+    so this closes it, and SAYS so rather than doing it quietly. It is not
+    reopened afterwards; that part is his.
 
 .EXAMPLE
     .\run-ui-tests.ps1
 .EXAMPLE
-    .\run-ui-tests.ps1 -Force
+    .\run-ui-tests.ps1 -Filter "FullyQualifiedName~TheSheetCloses"
 #>
 [CmdletBinding()]
 param(
-    [switch]$Force,
     [string]$Filter = ""
 )
 
@@ -51,13 +55,9 @@ $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
 
 $running = Get-Process -Name Plantoir -ErrorAction SilentlyContinue
-if ($running -and -not $Force) {
-    Write-Host "Plantoir is running (pid $($running.Id -join ', '))." -ForegroundColor Yellow
-    Write-Host "These tests drive the real app and would fight it. Close it, or re-run with -Force." -ForegroundColor Yellow
-    exit 1
-}
-if ($running -and $Force) {
-    Write-Host "Closing the running Plantoir because -Force was given." -ForegroundColor Yellow
+if ($running) {
+    Write-Host "Closing your running Plantoir (pid $($running.Id -join ', ')) - two copies" -ForegroundColor Yellow
+    Write-Host "would fight over the foreground. It is not reopened afterwards." -ForegroundColor Yellow
     $running | Stop-Process -Force
     Start-Sleep -Milliseconds 800
 }

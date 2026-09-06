@@ -15,25 +15,38 @@ namespace Plantoir.UiTests;
 /// of its own, driven through UI Automation and torn down afterwards.
 ///
 /// <para><b>Nothing here touches the teacher's own state.</b> The app is
-/// launched with <c>--state-dir</c>, so its settings file and its breadcrumb
-/// trail live in a temporary folder that is deleted at the end. The working
-/// folder is built from scratch, not borrowed. What is NOT isolated, and is
-/// named here so nobody assumes otherwise: any WebView2 cache, and anything
-/// the app would write under its models or builds folders — none of which a
-/// Course Settings test reaches.</para>
+/// launched with <c>--state-dir</c>, which moves its ENTIRE Plantoir folder —
+/// settings, the breadcrumb trail, the startup log, scheduled-deploy
+/// sentinels, models, built sites — into a temporary folder deleted at the
+/// end. The working folder is built from scratch, not borrowed.</para>
 ///
-/// <para><b>It refuses to start while a Plantoir is already running</b> rather
-/// than killing it. Russell's own copy may be mid-preview or mid-deploy, and
-/// a test runner that quietly stops it is exactly the thing CLAUDE.md forbids.
-/// Close it first, or pass -Force to the script if you know it is idle.</para>
+/// <para>The one thing that made this more than tidiness: the app consumes
+/// pending scheduled-deploy sentinels on launch AND on every activation, and
+/// applying one writes publish state into the course folder the sentinel
+/// names — an absolute path to a REAL course. An earlier version redirected
+/// only settings and the trail, so a test run could have marked a teacher's
+/// section as published and put the line explaining it in the redirected
+/// trail, where nobody would ever look.</para>
+///
+/// <para>Still NOT isolated, so nobody assumes otherwise: Credential Manager,
+/// and anything a CHILD process resolves for itself — <c>plantoir-mcp.exe</c>
+/// and the scheduled-task wrapper do not inherit the redirect. None of it is
+/// reached by a Course Settings test.</para>
+///
+/// <para><b>A running Plantoir is closed, not worked around.</b> Russell's
+/// standing instruction (2026-09-06, and CLAUDE.md's Windows setup notes):
+/// stopping to ask every time is a hassle, and it is his own development copy
+/// with no unsaved state of its own. The one obligation that comes with it is
+/// to SAY so — <c>run-ui-tests.ps1</c> prints it, and so does the runner's
+/// output — so nobody is left wondering where their window went.</para>
 /// </summary>
 public sealed class DrivenApp : IDisposable
 {
-    private readonly Application _app;
+    private readonly Application? _app;
     private readonly UIA3Automation _automation;
     private readonly string _root;
 
-    public Window Window { get; }
+    public Window Window { get; } = null!;
     public string WorkspacePath { get; }
 
     /// <summary>How long to wait for the interface to catch up. Generous: a
@@ -63,10 +76,14 @@ public sealed class DrivenApp : IDisposable
 
     public DrivenApp(Action<string> buildCourses)
     {
-        if (Process.GetProcessesByName("Plantoir").Length > 0)
-            throw new InvalidOperationException(
-                "Plantoir is already running. These tests drive the real app and would fight it — " +
-                "close it first. (It is not stopped automatically on purpose: it may be mid-preview.)");
+        // Closed rather than refused: two copies would fight over the
+        // foreground, and a physical click meant for the sidebar would land in
+        // whichever window happened to be in front.
+        foreach (var other in Process.GetProcessesByName("Plantoir"))
+        {
+            Console.WriteLine($"Closing a running Plantoir (pid {other.Id}) so the tests can drive their own.");
+            try { other.Kill(true); other.WaitForExit(5000); } catch { }
+        }
 
         _root = Path.Combine(Path.GetTempPath(), "plantoir-ui-" + Guid.NewGuid().ToString("N")[..8]);
         WorkspacePath = Path.Combine(_root, "workspace");
@@ -93,14 +110,34 @@ public sealed class DrivenApp : IDisposable
         _app = Application.Launch(psi);
         _automation = new UIA3Automation();
 
-        Window = Retry.WhileNull(() => _app.GetMainWindow(_automation, TimeSpan.FromSeconds(2)),
-                                 Patience, TimeSpan.FromMilliseconds(400)).Result
-                 ?? throw new InvalidOperationException("Plantoir never showed its window.");
+        // Everything past the launch is inside a try: a constructor that
+        // throws is never Disposed, so without this a single failed launch
+        // strands the process AND makes every later test in the run fail with
+        // "Plantoir is already running" — a message about the wrong problem,
+        // which is the expensive kind of failure.
+        try
+        {
+            Window = Retry.WhileNull(() => _app.GetMainWindow(_automation, TimeSpan.FromSeconds(2)),
+                                     Patience, TimeSpan.FromMilliseconds(400)).Result
+                     ?? throw new InvalidOperationException("Plantoir never showed its window.");
 
-        // The sidebar is the proof the workspace was accepted; without it the
-        // app is sitting on the picker and every later failure is a red
-        // herring about a missing button.
-        _ = Find("ListControl", "the course list") ;
+            // Proof the workspace was ACCEPTED — without it the app is sitting
+            // on the folder picker and every later failure is a red herring
+            // about a missing button. The whole sidebar is inside the
+            // SplitView, which is collapsed until the folder is ready.
+            //
+            // Not the TreeView itself: WinUI's TreeView template replaces our
+            // `coursesSidebar` id with its own part name (`ListControl`), so
+            // the id we set never reaches the automation tree — measured, not
+            // assumed. `addCourseButton` is our own, on a plain Button, and is
+            // there only in the ready state.
+            _ = Find("addCourseButton", "the course list");
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
 
     // ---- Finding things ---------------------------------------------------
@@ -124,10 +161,25 @@ public sealed class DrivenApp : IDisposable
     public void SelectCourse(string code)
     {
         var node = Find("sidebar-" + code, $"the sidebar entry for {code}");
-        node.Click();
-        // The form is built on the selection, so wait for its own button
-        // rather than sleeping and hoping.
-        _ = Find("openFoldersHelpButton", $"Course Settings for {code}");
+
+        // Clicked, and checked, and clicked again if it did not take. This has
+        // to be a PHYSICAL click: the sidebar acts on TreeView.ItemInvoked,
+        // which SelectionItem.Select does not raise — so the selection travels
+        // by mouse, and a mouse click can land while the window is busy or
+        // while something else briefly holds the foreground. One missed click
+        // then fails a later assertion about the sheet, which is a lie about
+        // where the problem was.
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            node.Click();
+            var arrived = Retry.WhileNull(
+                () => Window.FindFirstDescendant(cf => cf.ByAutomationId("openFoldersHelpButton")),
+                TimeSpan.FromSeconds(6), TimeSpan.FromMilliseconds(250)).Result;
+            if (arrived is not null) return;
+        }
+
+        throw new InvalidOperationException(
+            $"Course Settings for {code} never opened after three clicks on its sidebar entry.");
     }
 
     /// <summary>Every Text element under an element, in tree order, with the
@@ -147,9 +199,12 @@ public sealed class DrivenApp : IDisposable
     public void Dispose()
     {
         try { _automation.Dispose(); } catch { }
+        // Ours by pid, not everything called Plantoir. The constructor
+        // refuses to start when one is already running, but a copy opened
+        // DURING a run is somebody's and is not ours to close.
         try
         {
-            foreach (var p in Process.GetProcessesByName("Plantoir")) { p.Kill(true); p.WaitForExit(5000); }
+            if (_app is not null && !_app.HasExited) { _app.Kill(); _app.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(2)); }
         }
         catch { }
         // Deleted last, and never fatally: a locked file must not turn a
