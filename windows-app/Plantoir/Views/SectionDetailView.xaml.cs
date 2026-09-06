@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -67,6 +69,42 @@ public sealed partial class SectionDetailView : UserControl
     /// </summary>
     private int _publishMarkerGeneration;
 
+    // ---- Folder problems --------------------------------------------------
+    //
+    // Held in view state rather than read off the runner when a dialog is
+    // built, so a teacher who dismisses it and carries on editing does not
+    // meet it again on the next redraw. A healthy course must see nothing at
+    // all: the failure mode for this whole feature is nagging, and a warning
+    // dismissed by habit is one that gets dismissed when it matters.
+
+    /// <summary>True while a folder-problem dialog is on screen.</summary>
+    private bool _healthDialogIsUp;
+
+    /// <summary>
+    /// What is waiting to be shown and what has been shown already.
+    ///
+    /// <para>Findings are HELD, not dropped, while a dialog is up: never swap
+    /// the contents of one that is already on screen — the title and the
+    /// message would change under the teacher's cursor and what they were
+    /// reading would vanish unacknowledged — but discarding them is not the
+    /// alternative either, since a failed deploy can report while an earlier
+    /// batch is still up.</para>
+    /// </summary>
+    private readonly FolderProblemQueue _healthQueue = new();
+
+    /// <summary>
+    /// True between a finding arriving and the dialog for it being built.
+    ///
+    /// <para>Presentation is posted to the dispatcher rather than run inside
+    /// the notification, and that is load-bearing: <c>site_health.py</c> prints
+    /// every finding in one burst, so they arrive in ONE pseudo-console flush
+    /// and the runner announces them one after another on the same stack.
+    /// Showing on the first announcement would put up a dialog naming one
+    /// problem and then a second naming both. By the time a posted
+    /// presentation runs, the whole flush has been collected.</para>
+    /// </summary>
+    private bool _healthPresentationQueued;
+
     public string CourseCode => _course.Code;
     public int SectionNumber => _sectionNumber;
 
@@ -126,6 +164,11 @@ public sealed partial class SectionDetailView : UserControl
             RefreshChrome();
             if (args.PropertyName == nameof(_previewRunner.IsRunning) && !_previewRunner.IsRunning)
                 _ = RefreshPublishedMarker();
+            // As the build reports them. preview.ps1 does not exit while it is
+            // serving, so waiting for this runner to FINISH would hold the
+            // dialog until the teacher pressed Stop.
+            if (args.PropertyName == nameof(_previewRunner.HealthFindings))
+                NoteHealthFindings(_previewRunner);
         };
         _deployRunner.PropertyChanged += (_, args) =>
         {
@@ -286,6 +329,210 @@ public sealed partial class SectionDetailView : UserControl
             App.LogDiagnostic($"Cannot show dialog '{dialog.Title}': No XamlRoot available.");
             return null;
         }
+    }
+
+    // ---- Folder problems -------------------------------------------------
+
+    /// <summary>
+    /// Put a run's folder problems in front of the teacher.
+    ///
+    /// <para>Called when the build REPORTS them, never when a preview finishes
+    /// — and that distinction is the whole reason this feature reaches anybody.
+    /// <c>preview.ps1</c> does not exit while it is serving, so a runner on the
+    /// preview path stays running until the teacher presses Stop; and a section
+    /// missing its <c>index.md</c> makes every request 404, so the server wait
+    /// never succeeds either. Gating on either one would hide the dialog behind
+    /// a preview that the very problem it reports prevents from completing: the
+    /// worse the course, the less likely the teacher was to be told.</para>
+    ///
+    /// <para>A healthy course reports nothing and sees nothing.</para>
+    /// </summary>
+    private void NoteHealthFindings(ScriptRunner? runner, bool cameFromPublishing = false)
+    {
+        if (runner is null) return;
+        NoteHealthFindings(runner.HealthFindings, cameFromPublishing);
+    }
+
+    private void NoteHealthFindings(IReadOnlyList<SiteHealthFinding> findings, bool cameFromPublishing)
+    {
+        if (_healthQueue.Note(findings, cameFromPublishing)) QueueHealthPresentation();
+    }
+
+    private void QueueHealthPresentation()
+    {
+        if (_healthPresentationQueued || _healthDialogIsUp) return;
+        _healthPresentationQueued = true;
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            _healthPresentationQueued = false;
+            await PresentPendingHealthFindingsAsync();
+        });
+    }
+
+    /// <summary>
+    /// Show what is waiting, then whatever arrived while it was on screen.
+    /// </summary>
+    private async Task PresentPendingHealthFindingsAsync()
+    {
+        if (_healthDialogIsUp) return;
+        if (_healthQueue.TakeNext() is not { } next) return;
+        var findings = next.Findings;
+        bool cameFromPublishing = next.CameFromPublishing;
+
+        _healthDialogIsUp = true;
+        try
+        {
+            var choice = await ShowHealthDialogAsync(FolderProblemsDialog.Findings(findings));
+            if (choice == ContentDialogResult.Primary)
+            {
+                var outcome = SiteHealthRepair.OutcomeOfRepairing(
+                    findings, _course,
+                    cameFromPublishing
+                        ? SiteHealthRepair.Occasion.Publishing
+                        : SiteHealthRepair.Occasion.Building);
+                // The marker is refreshed because a repair CHANGES the
+                // section's content on the teacher's behalf, and nothing else
+                // would: RefreshPublishedMarker runs when the section stops
+                // being busy and on window activation, and the section stopped
+                // being busy before this dialog appeared while a dialog does
+                // not make the window active again.
+                _ = RefreshPublishedMarker();
+                if (outcome is not null)
+                {
+                    // Shown only AFTER the dialog it was asked for from has
+                    // gone — contracts/shared-rules.json ->
+                    // siteHealth.repair.oneAlertAtATime.
+                    if (outcome.CanRebuild && WhyThePreviewCannotBeOfferedNow() is { } instead)
+                        outcome = instead;
+                    await PresentRepairOutcomeAsync(outcome);
+                }
+            }
+        }
+        finally
+        {
+            _healthDialogIsUp = false;
+        }
+
+        await PresentPendingHealthFindingsAsync();
+    }
+
+    private async Task PresentRepairOutcomeAsync(SiteHealthRepair.Outcome outcome)
+    {
+        var choice = await ShowHealthDialogAsync(FolderProblemsDialog.RepairOutcome(outcome));
+        if (choice == ContentDialogResult.Primary) await PreviewAgainAfterRepairAsync();
+    }
+
+    /// <summary>
+    /// Why "Preview Again" would not work just now, or null when it would.
+    ///
+    /// <para>Say so rather than swallowing the press. Every other gated control
+    /// here disables itself or explains; a button that quietly does nothing is
+    /// the silence this whole feature exists to remove, arriving in the button
+    /// meant to end it.</para>
+    ///
+    /// <para>The publish question is asked of <see cref="CourseActivity"/>, not
+    /// of this view's own deploy runner: the assistant publishes the same
+    /// section in the same process and is invisible to it. And it says "this
+    /// course", not "this section", because the check matches on the folder and
+    /// the course code and deliberately ignores the section number — publishing
+    /// section 2 would otherwise be reported as section 1 publishing.</para>
+    /// </summary>
+    private SiteHealthRepair.Outcome? WhyThePreviewCannotBeOfferedNow()
+    {
+        if (_window.Workspace.WorkspacePath is not { } workspacePath) return null;
+
+        if (_lease is null && PreviewLeases.Active.Any(
+                lease => lease.FolderPath == workspacePath
+                         && lease.CourseCode == _course.Code
+                         && lease.SectionNumber == _sectionNumber))
+        {
+            return new SiteHealthRepair.Outcome(
+                "This section is open in another window.",
+                "Preview it from there to see the change.",
+                false);
+        }
+
+        if (_deployRunner.IsRunning || _isPreparingDeploy
+            || CourseActivity.IsPublishing(workspacePath, _course.Code))
+        {
+            return new SiteHealthRepair.Outcome(
+                "Plantoir is publishing this course just now.",
+                // Deliberately not "press Preview Again": this is the outcome
+                // whose button is withheld, and naming a button that is not on
+                // screen is worse than saying nothing.
+                "You can preview it again once that has finished, and the change will be there.",
+                false);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Build the site again after a repair, so the teacher can see it.
+    ///
+    /// <para>A preview that is already up is stopped and started again rather
+    /// than left alone: <c>content/</c> is a one-off copy made during the
+    /// build, and the only watcher in preview mode syncs the built site out to
+    /// this PC — nothing carries a folder restored on disk into a preview that
+    /// is already serving. Live reload does not cover this.</para>
+    ///
+    /// <para>The LEASE decides whether to stop, not the window's appearance: a
+    /// preview whose wait timed out has cleared <c>_isWaitingForServer</c> and
+    /// never set <c>_previewUrl</c> while still holding the port, so asking
+    /// those two would skip the stop and then be refused the lease — raising a
+    /// refusal dialog out of a repair.</para>
+    ///
+    /// <para>One consequence worth knowing: a preview build is never
+    /// deploy-fresh (<c>app-rules.json</c> -&gt; <c>buildFreshness</c>), so
+    /// previewing after a successful publish means the NEXT publish rebuilds.
+    /// Correct rather than unfortunate, and largely moot — the repair puts
+    /// content back, which forces a rebuild anyway.</para>
+    /// </summary>
+    private async Task PreviewAgainAfterRepairAsync()
+    {
+        try
+        {
+            if (_lease is not null || _previewRunner.IsRunning) await StopPreviewAsync();
+            StartAutomatedPreview();
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"PreviewAgainAfterRepairAsync exception: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// <see cref="ShowDialogSafelyAsync"/>, but it does not give up on the
+    /// first refusal.
+    ///
+    /// <para>WinUI allows one <c>ContentDialog</c> on screen at a time, and
+    /// <c>ShowAsync</c> completes when the dialog BEGINS closing rather than
+    /// when it has gone — so asking for the outcome report immediately after
+    /// the findings dialog can be refused. Swallowing that (which
+    /// <see cref="ShowDialogSafelyAsync"/> does, correctly, for one-off
+    /// dialogs) would lose exactly the report the teacher just pressed a
+    /// button for, which is the failure path this feature exists to close.</para>
+    /// </summary>
+    private async Task<ContentDialogResult?> ShowHealthDialogAsync(ContentDialog dialog)
+    {
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            if (EffectiveXamlRoot is not { } root)
+            {
+                App.LogDiagnostic($"Cannot show '{dialog.Title}': no XamlRoot available.");
+                return null;
+            }
+            dialog.XamlRoot = root;
+            try
+            {
+                return await dialog.ShowAsync();
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"Folder-problem dialog refused (attempt {attempt + 1}): {ex.Message}");
+                await Task.Delay(150);
+            }
+        }
+        return null;
     }
 
     // ---- Preview ---------------------------------------------------------
@@ -779,6 +1026,19 @@ public sealed partial class SectionDetailView : UserControl
             outcomeMessage = MultiDestinationDeployRunner.Result(
                 _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome).Message;
             EndPublishActivity();
+
+            // What the build said about this course's folders, taken from the
+            // FIRST leg: every destination publishes the same built site, so a
+            // second leg only repeats the findings. A deploy that skipped the
+            // build (nothing had changed) reports none, which is correct — the
+            // checks run inside the build.
+            //
+            // AFTER EndPublishActivity, deliberately: the publish is off the
+            // books by now, so "Preview Again" is not refused on account of
+            // this view's own publish having just finished. And NOT awaited —
+            // the assistant awaits DeployAsync for its answer, and it must not
+            // wait on a teacher reading a dialog.
+            NoteHealthFindings(_deployRunner.Legs.FirstOrDefault()?.Runner, cameFromPublishing: true);
         }
         catch (Exception ex)
         {

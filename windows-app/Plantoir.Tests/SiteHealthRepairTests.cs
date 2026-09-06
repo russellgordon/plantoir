@@ -177,6 +177,67 @@ public class SiteHealthRepairTests : IDisposable
     }
 
     [Fact]
+    public void ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine()
+    {
+        // File.Exists answers false for a directory, so without an explicit
+        // check the write below fails and the teacher is told to see whether
+        // their disk is read-only — which is not the problem. The mac reports
+        // this one as ALREADY PUT RIGHT, which is worse: the site still has no
+        // front page. See MAC-HANDOFF.
+        var course = MakeCourse();
+        Directory.CreateDirectory(Path.Combine(course.SectionDirectory(1), "index.md"));
+
+        Assert.Equal(SiteHealthRepair.Result.Failed, SiteHealthRepair.RestoreIndex(1, course));
+    }
+
+    [Fact]
+    public void TwoRepairsAreNamedInOneSentence()
+    {
+        var course = MakeCourse();
+        var outcome = SiteHealthRepair.OutcomeOfRepairing(
+            new[] { Finding("mediaFolderMissing"), Finding("sectionIndexMissing") }, course);
+
+        Assert.Equal("Put the Media folder and the front page back.", outcome!.Headline);
+        Assert.Equal(SiteHealthRepair.NotOnTheSiteYet, outcome.Detail);
+        Assert.True(outcome.CanRebuild);
+    }
+
+    [Fact]
+    public void TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer()
+    {
+        // Both are repaired either way; what a name-keyed result loses is the
+        // REPORT. Section 1 restored and section 2 already fine would come back
+        // as "that is already put right", with no preview offered, because the
+        // second result overwrote the first.
+        var course = MakeCourse();
+        Directory.CreateDirectory(course.SectionDirectory(2));
+        File.WriteAllText(Path.Combine(course.SectionDirectory(2), "index.md"), "theirs");
+
+        var outcome = SiteHealthRepair.OutcomeOfRepairing(
+            new[] { Finding("sectionIndexMissing", section: 1), Finding("sectionIndexMissing", section: 2) },
+            course);
+
+        Assert.Equal("Put the front page back.", outcome!.Headline);
+        Assert.True(outcome.CanRebuild);
+        Assert.True(File.Exists(Path.Combine(course.SectionDirectory(1), "index.md")));
+        Assert.Equal("theirs", File.ReadAllText(Path.Combine(course.SectionDirectory(2), "index.md")));
+    }
+
+    [Fact]
+    public void BothHalvesOfAWholeFailureAreNamed()
+    {
+        var course = MakeCourse();
+        File.WriteAllText(Path.Combine(course.DirectoryPath, "Media"), "a file, not a folder");
+
+        var outcome = SiteHealthRepair.OutcomeOfRepairing(
+            new[] { Finding("mediaFolderMissing"), Finding("sectionIndexMissing", section: 9) }, course);
+
+        Assert.Equal("Plantoir could not put that back.", outcome!.Headline);
+        Assert.Equal("Could not put the Media folder and the front page back.",
+            SiteHealthRepair.WhatCouldNotBePutBack(new[] { "mediaFolderMissing", "sectionIndexMissing" }));
+    }
+
+    [Fact]
     public void AFileSittingWhereTheMediaFolderBelongsIsAFailureNotAnAlreadyFine()
     {
         var course = MakeCourse();

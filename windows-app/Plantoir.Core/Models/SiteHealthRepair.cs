@@ -197,12 +197,15 @@ public static class SiteHealthRepair
 
         var results = Repair(wanted, course);
 
+        // Named once each, however many findings produced them: two sections
+        // both missing a front page are two repairs and one sentence, and
+        // "Put the front page and the front page back." is not a sentence.
         var restored = new List<string>();
         var failed = new List<string>();
-        foreach (var (name, result) in results)
+        foreach (var (finding, result) in results)
         {
-            if (result == Result.Restored) restored.Add(name);
-            else if (result == Result.Failed) failed.Add(name);
+            if (result == Result.Restored) { if (!restored.Contains(finding.Name)) restored.Add(finding.Name); }
+            else if (result == Result.Failed) { if (!failed.Contains(finding.Name)) failed.Add(finding.Name); }
         }
         restored.Sort(StringComparer.Ordinal);
         failed.Sort(StringComparer.Ordinal);
@@ -235,17 +238,27 @@ public static class SiteHealthRepair
     /// button twice — or pressing it after fixing the problem in Obsidian —
     /// changes nothing.</para>
     /// </summary>
-    public static IReadOnlyDictionary<string, Result> Repair(
+    /// <remarks>
+    /// One entry per FINDING, not per check name — which is a deliberate
+    /// divergence from the mac, whose dictionary is keyed by name. Two sections
+    /// each missing a front page are two findings with one name: both get
+    /// repaired either way, but keyed by name only the last result is reported,
+    /// so "section 1 restored, section 2 was already there" becomes "that is
+    /// already put right" with no preview offered. Unreachable from the app
+    /// today (a view owns one runner, and the checks announce per section), and
+    /// cheaper to make impossible than to leave as a comment.
+    /// </remarks>
+    public static IReadOnlyList<(SiteHealthFinding Finding, Result Result)> Repair(
         IReadOnlyList<SiteHealthFinding> findings, Course course)
     {
-        var results = new Dictionary<string, Result>(StringComparer.Ordinal);
+        var results = new List<(SiteHealthFinding, Result)>();
         foreach (var finding in findings)
         {
             if (!CanRepair(finding)) continue;
             if (finding.Name == "mediaFolderMissing")
-                results[finding.Name] = RestoreMedia(course);
+                results.Add((finding, RestoreMedia(course)));
             else if (finding.Name == "sectionIndexMissing")
-                results[finding.Name] = RestoreIndex(finding.Section, course);
+                results.Add((finding, RestoreIndex(finding.Section, course)));
         }
         return results;
     }
@@ -300,6 +313,14 @@ public static class SiteHealthRepair
         string index = Path.Combine(sectionDirectory, "index.md");
         try
         {
+            // A FOLDER named index.md is not "already fine": Quartz needs a
+            // page there, and File.Exists answers false for a directory — so
+            // without this the write below fails and the teacher is told to
+            // check whether their disk is read-only, which is not the problem.
+            // (The mac asks fileExists, which is TRUE for a directory, and
+            // therefore reports this one as already put right — the worse of
+            // the two answers. See MAC-HANDOFF.)
+            if (Directory.Exists(index)) return Result.Failed;
             if (File.Exists(index)) return Result.AlreadyFine;
             Directory.CreateDirectory(sectionDirectory);
             // The course's own name, matching the mac character for character:

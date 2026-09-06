@@ -134,6 +134,98 @@ outstanding.
 
 ## Open — what the mac still owes
 
+- **The folder-problem front end landed on Windows, and it found two defects in
+  the mac's own repair** (Windows, 2026-09-06, branch
+  `issue/windows-folder-problems-front-end`, `GUI-IMPROVEMENTS.md` row 417).
+  Windows implemented `WINDOWS-HANDOFF.md` item 21 — the findings dialog, the
+  Fix button, the two repairs, the outcome report and "Preview Again". Mostly a
+  **know**; the two below are genuine **do**s for this side, both found by
+  porting the mac's code line by line and asking what each branch answers.
+
+  1. **A DIRECTORY named `index.md` is reported to the teacher as ALREADY PUT
+     RIGHT.** `SiteHealthRepair.restoreIndex` (`SiteHealthRepair.swift:294`)
+     asks `FileManager.fileExists(atPath:)`, which is TRUE for a directory, so
+     it returns `.alreadyFine` — "That is already put right. Nothing needed
+     changing." The section still has no front page, so the build still
+     produces no site and the publish still refuses; the one dialog written to
+     end silence says the problem is dealt with. `restoreMedia` two functions
+     above gets this right, with the `isDirectory:` form and a comment saying
+     why. **Windows returns `Failed` here**, which is the honest answer of the
+     two available (the teacher is at least told nothing was put back), though
+     its sentence — "check that the folder isn't locked or read-only" — is
+     still not quite the reason. If the mac wants a better sentence than
+     either, that is a contract case worth proposing back.
+     Windows reference: `SiteHealthRepair.RestoreIndex`, test
+     `ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine`.
+
+  2. **`repair(_:in:)` returns `[String: Result]`, keyed by check NAME, so two
+     findings with the same name collapse.** Two sections each missing a front
+     page are both repaired — the loop runs — but only the LAST result is
+     reported. Section 1 restored and section 2 already fine therefore reads as
+     "That is already put right", with `canRebuild: false` and no preview
+     offered, for a repair that really did put a page back. **Unreachable from
+     the app today** (a section view owns one runner, and
+     `announce_or_stay_quiet` is called once per section), which is why it is
+     listed second — but it is one line to make impossible and a paragraph to
+     explain if left. Windows returns one entry per FINDING and de-duplicates
+     the NAMES when building the sentence, so "Put the front page and the front
+     page back." cannot occur either. Reference: `SiteHealthRepair.Repair`,
+     test `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer`.
+
+  **Two places Windows is deliberately BROADER than the mac, and the mac may
+  want to match — a know rather than a do, but the second one is visible.**
+  The mac hides the marker line by `hasPrefix` after trimming
+  (`SiteHealthFinding.isMarkerLine`), so a marker glued to the tail of another
+  line — which happens when a preceding partial line lacked its newline — is
+  shown to the teacher as raw JSON. Windows hides on `Contains`. And the mac
+  filters only at push, so a half-arrived payload RENDERS in the console until
+  its newline turns up; Windows hides the line under construction too, because
+  a pseudo console hands over whatever bytes are ready and that wait is a
+  whole 150 ms flush. Both are rule 1 leaks on the mac, both are small, and
+  neither is worth a release on its own.
+
+  **What Windows rejected, so it is not re-proposed.** Showing the dialog when
+  the runner FINISHES: `preview.ps1` does not exit while it is serving, so that
+  is Stop-Preview time, hours later — and a section with no `index.md` 404s
+  every request, so the server wait never completes either. Both were tried on
+  the mac and written down (`SectionDetailView.swift:400-409`); Windows
+  attaches to the runner's `HealthFindings` notification instead. Also
+  rejected: showing on the FIRST finding to arrive. `site_health.py` prints its
+  findings in one burst, so they land in one flush and the runner announces
+  them one after another on the same stack — showing at once puts up a dialog
+  naming one problem and then a second naming both. Windows posts the
+  presentation to the dispatcher, so the whole flush is collected first; the
+  mac's held-batch queue produces the two dialogs, with the first finding in
+  both. Not filed as a defect above because it needs two findings in one build
+  to see, but it is the same code.
+
+  **One thing Windows did NOT build, and why.** The scheduled deploy still
+  surfaces nothing, because on `dev` the Windows Task Scheduler wrapper has no
+  build step at all — it publishes whatever is in the builds folder — so no
+  health check ever runs there and there is nothing to capture. The build step
+  lives on the unmerged branch `issue/windows-parity-tail` (commit 8e987693).
+  Written up as its own numbered item in `WINDOWS-HANDOFF.md`, with the design
+  and one measurement already done, so whoever picks it up after that merge
+  does not re-derive it. Nothing for the mac here beyond knowing that Windows
+  parity on `scheduledDeployPublishesAnyway` is still one step short.
+
+  **A measurement, on this machine.** Windows PowerShell 5.1.26100, Windows 11
+  Pro 26200: an inner script that runs a native command exiting 7 and then
+  `exit $LASTEXITCODE` still yields `$LASTEXITCODE = 7` in the caller through
+  `2>&1 | Tee-Object -FilePath`, `$v = & script 2>&1`, and
+  `*>&1 | Out-File -Encoding utf8`. So capturing a launcher's output in the
+  wrapper does not break the `if ($LASTEXITCODE -ne 0)` guard beside it —
+  which mattered, because breaking it would make an overnight deploy publish
+  nothing and say nothing. Two caveats found with it: `Tee-Object` in 5.1 has
+  no `-Encoding` and writes UTF-16LE, and `2>&1` misses `Write-Host` lines
+  where `*>&1` catches them.
+
+  Reference: `windows-app/Plantoir.Core/Models/SiteHealthRepair.cs`,
+  `windows-app/Plantoir/Views/FolderProblemsDialog.cs`,
+  `windows-app/Plantoir/Views/SectionDetailView.xaml.cs` (the "Folder problems"
+  section), `windows-app/Plantoir.Core/Scripting/TranscriptBuilder.cs`;
+  tests `SiteHealthRepairTests.cs`, `TranscriptHealthFilterTests.cs`.
+
 - **Windows now has the exclusions AND the protection model, and three things
   come back to the mac** (Windows, 2026-08-25, branch
   `issue/windows-special-folders-parity`, `GUI-IMPROVEMENTS.md` row 385).
