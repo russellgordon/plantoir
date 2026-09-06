@@ -66,10 +66,14 @@ is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code. The same goes for the four trail events below: the
 features that would raise them are these same two.
 
-## Four activity-trail events are declared but not yet emitted (2026-09-06; a fifth was, and now is)
+## SIX activity-trail events are declared but not yet emitted (2026-09-06; a seventh was, and now is)
 
 `ActivityTrail.Event` names `folder renamed`, `folder created`,
-`synced folder noticed` and `synced folder accepted`. All four are in
+`synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,
+`settings saved` and `settings could not be saved`, which belong to no
+unbuilt view at all: `CourseSettingsView.Save_Click` writes the config and
+records nothing, while the mac records both. That last pair is a small fix
+rather than a feature, and it is handoff item 28. The first four are in
 `contracts/shared-rules.json` → `activityTrail.mustRecord`, and
 `ContractTests.SharedRules_ActivityTrailEvents_Exist` compares that list
 against the enum — so declaring them is what makes the suite green.
@@ -215,8 +219,10 @@ plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
   the display's work area, clamped, so it looks right at any scale.
 - The preview accelerators exist — Ctrl+R, Alt+Left, Alt+Right, declared at
   view scope in `Views/SectionDetailView.xaml` and handled in its code-behind.
-  What is missing is a **Preview menu-bar item**; Back/Forward/Reload are on
-  the toolbar only.
+  ~~What is missing is a **Preview menu-bar item**~~ — added 2026-08-22
+  (`MainWindow.xaml`, handoff item 1). Corrected 2026-09-06: this paragraph
+  outlived the work by a fortnight, and anyone planning from it would have
+  built it twice.
 - Two paths proven underneath but never click-driven in-app: the wizard's
   Create button (the `setup.ps1` + answer-pump path ran to completion via
   PtyDriver), and the new-site dialog a BRAND-NEW section's deploy raises —

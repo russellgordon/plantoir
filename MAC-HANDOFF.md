@@ -153,6 +153,38 @@ outstanding.
 
 ## Open — what the mac still owes
 
+- **Windows' MCP server has drifted a dozen tools ahead of the mac's, and
+  nothing was going to tell either side** (found 2026-09-06 by an audit asking
+  whether the parity list was COMPLETE, not whether it was correct).
+  `plantoir-mcp.exe` declares **37** tools; the mac's `AssistToolSurface`
+  serves **25** (22 plus three MCP-only). So the same question asked of Claude
+  Code gets a different toolbox depending on the machine.
+
+  Roughly what the mac is missing, from the Windows server's own list:
+  `add_classes`, `make_room_for_classes`, `sync_page_dates`,
+  `roll_over_section`, `back_up_course`, `list_courses`,
+  `list_recent_changes`, `explain_publishing`, `read_timetable`, and several
+  `plan_` twins.
+
+  **Why nothing caught it, which is the part worth fixing first.** Windows'
+  `AssistCases_Tools_MatchesContract` only checks that the CONTRACT's lists are
+  a subset of what it serves — so a tool that exists on Windows and is in
+  neither the contract nor the mac passes both suites silently. A subset check
+  cannot notice an addition; that is what makes it the wrong shape here.
+
+  **What the mac owes is a decision before any code.** Not all twelve
+  necessarily belong on the mac — some may be Windows-shaped, and `TODO.md`
+  already names a few as the CSV-reschedule surface. What is owed is to look
+  at the list, decide which are product and which are local, and then put the
+  survivors in `assist-cases.json` → `toolSchemas` so the gap becomes a test
+  failure rather than an audit finding. Reference:
+  `windows-app/Plantoir.Mcp/PlantoirTools.cs` (the 37, each an
+  `[McpServerTool]`), `mac-app/QuartzTeachers/Models/Assist/AssistToolSurface.swift`.
+
+  Two stale counts were corrected on the way past: `CLAUDE.md` and
+  `documentation/10-local-ai-assistant.md` both said 23 tools against 13; the
+  mac's own test has pinned 22/13 since, making the MCP surface 25.
+
 - **The "Folders Plantoir uses" sheet is now shared, and the mac owes it two
   small changes** (Windows, 2026-09-06, branch
   `issue/windows-special-folders-help`, `GUI-IMPROVEMENTS.md` row 422). The

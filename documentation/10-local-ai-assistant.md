@@ -568,8 +568,10 @@ safety rules cannot drift between the two clients. The app answers this
 itself — `Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio <working-folder>` —
 rather than shipping a second binary.
 
-Claude Code is offered a **longer** list than the local model: 23 tools
-against 13 — the twenty that exist, plus three served only over MCP. The extra ones ask for judgement about meaning — reading the
+Claude Code is offered a **longer** list than the local model: 25 tools
+against 13 — the twenty-two that exist, plus three served only over MCP.
+(Windows' separate `plantoir-mcp.exe` serves 37; the gap is recorded in
+`MAC-HANDOFF.md`.) The extra ones ask for judgement about meaning — reading the
 curriculum and deciding which expectations a page addresses — which a large
 model does well and a 4B model does not. Anything shown to the local model has
 been measured against it, and a unit test pins the count so the list cannot
