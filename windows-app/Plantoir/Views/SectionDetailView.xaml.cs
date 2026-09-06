@@ -215,8 +215,15 @@ public sealed partial class SectionDetailView : UserControl
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
     {
-        if (args.WindowActivationState != WindowActivationState.Deactivated)
-            _ = RefreshPublishedMarker();
+        if (args.WindowActivationState == WindowActivationState.Deactivated) return;
+        _ = RefreshPublishedMarker();
+        // Also here, not only on Loaded. A teacher who leaves Plantoir open
+        // overnight — which the scheduled-deploy feature itself suggests, to
+        // keep the machine awake — keeps the SAME view instance on the same
+        // section, so Loaded never fires again and last night's findings would
+        // wait until they clicked away and back. It is a File.Exists when
+        // nothing is waiting.
+        TakeAnythingTheScheduledDeployFound();
     }
 
     /// <summary>
@@ -382,15 +389,18 @@ public sealed partial class SectionDetailView : UserControl
     /// run went out to students, so a repair made now is not on their site
     /// until the teacher publishes again, and that is the sentence they need.</para>
     ///
-    /// <para>Consuming is safe even with a dialog already up — the queue holds
-    /// what it cannot show yet, rather than dropping it. That is worth stating
-    /// because the record is DELETED as it is read, and the mac met exactly
-    /// this: taking it while a dialog was up threw the overnight findings away
-    /// permanently, and it had to guard before consuming. Here the holding is
-    /// the guard.</para>
+    /// <para><b>Guarded BEFORE consuming</b>, which is the mac's lesson and was
+    /// nearly not taken. The record is DELETED as it is read, and the queue
+    /// holding what it cannot show yet is ALMOST enough — but that queue is a
+    /// field of this view, and the view is discarded when the teacher selects
+    /// another section. So a batch consumed while a dialog was up, whose own
+    /// dialog then never got on screen, would live only in an object about to
+    /// be thrown away. Not consuming at all in that state costs one morning;
+    /// consuming and losing it costs the record for ever.</para>
     /// </summary>
     private void TakeAnythingTheScheduledDeployFound()
     {
+        if (_healthDialogIsUp || _healthQueue.PendingCount > 0) return;
         try
         {
             var waiting = ScheduledHealthFindings.Take(_course.Code, _sectionNumber);

@@ -319,16 +319,31 @@ outstanding.
   course reporting nothing is what stops this feature from becoming a thing
   teachers dismiss by habit, and it is not something a fixture can prove.
 
-  **A measurement, on this machine.** Windows PowerShell 5.1.26100, Windows 11
-  Pro 26200: an inner script that runs a native command exiting 7 and then
-  `exit $LASTEXITCODE` still yields `$LASTEXITCODE = 7` in the caller through
-  `2>&1 | Tee-Object -FilePath`, `$v = & script 2>&1`, and
-  `*>&1 | Out-File -Encoding utf8`. So capturing a launcher's output in the
-  wrapper does not break the `if ($LASTEXITCODE -ne 0)` guard beside it —
-  which mattered, because breaking it would make an overnight deploy publish
-  nothing and say nothing. Two caveats found with it: `Tee-Object` in 5.1 has
-  no `-Encoding` and writes UTF-16LE, and `2>&1` misses `Write-Host` lines
-  where `*>&1` catches them.
+  **A measurement, and the way it was WRONG, which is the more useful half.**
+  Windows PowerShell 5.1.26100, Windows 11 Pro 26200. `$LASTEXITCODE` does
+  survive a capture pipeline — an inner script exiting 7 yields 7 in the
+  caller through `2>&1 | Tee-Object`, `$v = & script 2>&1`, and
+  `*>&1 | Out-File`. That measurement was taken and believed, and it was
+  measuring the wrong thing: the callee had no
+  `$ErrorActionPreference = 'Stop'`, and every launcher here sets it on line
+  2. Under `Stop`, merging a native command's stderr into the pipeline turns
+  the first stderr LINE into a **terminating** `NativeCommandError` that
+  propagates out of the callee and kills its caller — measured: the piped
+  callee died at its first stderr line and took the caller with it, where the
+  same callee run plainly finished and returned 5. So an overnight deploy
+  would have published nothing and said nothing the first time npm wrote to
+  stderr. Caught by an adversarial review of the finished code, not by the
+  measurement, and this repo already lists it as a platform lesson.
+
+  **If the mac ever captures a launcher's output for the same purpose, the
+  shape to copy is a CHILD PROCESS with OS-level redirection**, not a shell
+  pipeline — on Windows that is `Start-Process
+  -RedirectStandardOutput/-RedirectStandardError`, whose `ExitCode` also
+  removes any dependence on a shell variable surviving. And its arguments go
+  as ONE STRING: an argument array is joined with spaces and quoted not at
+  all, so a working folder whose name contains a space is split at it. The
+  first fixture used a space-free temp path and passed; the real folder is
+  called "scheduled deploy test".
 
   Reference: `windows-app/Plantoir.Core/Models/SiteHealthRepair.cs`,
   `windows-app/Plantoir/Views/FolderProblemsDialog.cs`,

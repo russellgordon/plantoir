@@ -1071,23 +1071,43 @@ this side is expected to say so when the contract is wrong.
       that is precisely the run whose findings matter most. Save
       `$LASTEXITCODE` into a variable immediately after the launcher, scan,
       write the record, and only then test the saved code.
-    - **`$LASTEXITCODE` survives the redirect — measured, not assumed.**
-      Windows PowerShell 5.1.26100 on Windows 11 Pro 26200: an inner script
-      running a native command that exits 7 and then `exit $LASTEXITCODE`
-      still yields 7 in the caller through `2>&1 | Tee-Object -FilePath`,
-      `$v = & script 2>&1`, and `*>&1 | Out-File -Encoding utf8`. This
-      mattered enough to measure: breaking that guard would make an overnight
-      deploy publish nothing and say nothing. Two caveats found with it —
-      `Tee-Object` in 5.1 has no `-Encoding` and writes UTF-16LE, and `2>&1`
-      misses `Write-Host` lines where `*>&1` catches them.
+    - **Do NOT capture through a PowerShell pipeline, and the first version of
+      this item said to.** `$LASTEXITCODE` does survive `*>&1 | Out-File` —
+      measured, 7 came through — but that measurement used a callee WITHOUT
+      `$ErrorActionPreference = 'Stop'`, and `preview.ps1` sets it on line 2.
+      Under `Stop`, merging a native command's stderr into the pipeline makes
+      the first stderr LINE a TERMINATING `NativeCommandError` that propagates
+      out of the callee and kills the wrapper with it: no exit code, no scan,
+      no deploy, nothing said. Measured on 5.1.26100 — the piped callee died
+      at its first stderr line and took its caller with it, where the same
+      callee run plainly finished and returned 5. The build inherits stderr to
+      node and npm, and a Python traceback lands there too, so the failing run
+      whose findings matter most is exactly the one that would have been lost.
+      This is the trap `windows-app/PROGRESS.md` already lists as platform
+      lesson 3, walked into anyway.
+
+      The build is a CHILD PROCESS with OS-level redirection instead:
+      `Start-Process -RedirectStandardOutput/-RedirectStandardError`, whose
+      `ExitCode` also removes any dependence on `$LASTEXITCODE` surviving
+      anything. **Pass its arguments as ONE STRING, not an array** — 
+      `Start-Process` joins an array with spaces and quotes nothing, so a
+      working folder whose name contains a space is split and `powershell.exe`
+      answers "Processing -File 'C:\...\scheduled' failed because the file
+      does not have a '.ps1' extension", exit -196608, silently, every night.
+      Found by running it against a real folder called "scheduled deploy
+      test"; the first fixture used a space-free temp path and passed.
     - **A DIFFERENT directory from the completion sentinels, not beside
       them.** `ScheduledDeployCompletion.ConsumePendingFrom` enumerates
       `scheduled\pending\*.json` and deletes every file it touches, parsed or
       not — so a findings record filed there is swept away before anything
-      reads it, and both consumers are kicked off from `MainWindow` on every
-      activation, so which one wins is a race.
+      reads it. Both are read when the window becomes active, so which one
+      won would have been a race.
     - **Consumed when read, and cleared by a clean run.** One file per course
-      and section, taken by that section's own view when it loads, so a
+      and section, taken by that section's own view when it loads AND when the
+      window becomes active — the second is not optional, because a teacher
+      who leaves Plantoir open overnight (which this feature itself suggests,
+      to keep the machine awake) keeps the same view instance and `Loaded`
+      never fires again. Taken so a
       problem is reported once rather than every morning; a run that found
       nothing DELETES the record, so a problem the teacher has put right stops
       being reported. Guard before consuming.

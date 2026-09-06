@@ -154,7 +154,7 @@ public class ScheduledHealthFindingsTests : IDisposable
         // whatever the real ordering is. Written the naive way first, and a
         // mutation — moving the guard above the scan — passed, which is how
         // this was caught.
-        int scan = script.IndexOf("Select-String -LiteralPath $buildLog", StringComparison.Ordinal);
+        int scan = script.IndexOf("-SimpleMatch 'PLANTOIR_HEALTH:'", StringComparison.Ordinal);
         int guard = script.IndexOf("if ($buildExit -ne 0)", StringComparison.Ordinal);
 
         Assert.True(scan >= 0, "the wrapper does not scan for findings at all");
@@ -163,41 +163,85 @@ public class ScheduledHealthFindingsTests : IDisposable
     }
 
     [Fact]
-    public void TheBuildsExitCodeIsSavedBeforeAnythingElseRuns()
+    public void TheBuildsExitCodeIsSettledBeforeAnythingElseRuns()
     {
         // Everything between the build and the guard runs commands of its own,
         // and $LASTEXITCODE is whatever ran last. The guard that decides
         // whether anything is published must test THIS build's code.
+        //
+        // Anchored on the INVOCATION, not on "--build-only": that string also
+        // appears in the comment above the build, so anchoring on it made the
+        // ordering trivially true. Same defect as the one found in the test
+        // below, and worth stating twice because it is this file's whole risk.
+        string script = GenerateWrapper().Replace("\r\n", "\n");
+
+        int build = script.IndexOf("Start-Process -FilePath 'powershell.exe'", StringComparison.Ordinal);
+        int settle = script.IndexOf("$buildExit =", StringComparison.Ordinal);
+        int scan = script.IndexOf("-SimpleMatch 'PLANTOIR_HEALTH:'", StringComparison.Ordinal);
+
+        Assert.True(build >= 0, "the build is not run as a child process");
+        Assert.True(settle > build, "the exit code is not settled after the build");
+        Assert.True(settle < scan, "the exit code must be settled BEFORE the scan runs its own commands");
+        // And the guard must test the settled variable, never the live
+        // $LASTEXITCODE, which the scan's own commands have overwritten by then.
+        Assert.Contains("if ($buildExit -ne 0) {\n  Write-Host 'Could not build", script);
+    }
+
+    [Fact]
+    public void TheBuildRunsAsAChildProcessWithOsLevelRedirection()
+    {
+        // NOT through a PowerShell pipeline. preview.ps1 sets
+        // $ErrorActionPreference = 'Stop', and in Windows PowerShell 5.1
+        // merging a native command's stderr into the pipeline makes the first
+        // stderr LINE a terminating error that propagates out of the callee and
+        // kills the wrapper with it — no exit code, no scan, no deploy, nothing
+        // said. ScheduledWrapperRunTests proves the behaviour by running it;
+        // this pins the mechanism so a "tidy-up" cannot reintroduce the pipe.
         string script = GenerateWrapper();
 
-        int build = script.IndexOf("--build-only", StringComparison.Ordinal);
-        int save = script.IndexOf("$buildExit = $LASTEXITCODE", StringComparison.Ordinal);
-        int scan = script.IndexOf("Select-String", StringComparison.Ordinal);
+        Assert.Contains("-RedirectStandardOutput $buildLog", script);
+        Assert.Contains("-RedirectStandardError $buildErrLog", script);
 
-        Assert.True(build >= 0 && save > build, "the exit code is not saved after the build");
-        Assert.True(save < scan, "the exit code must be saved BEFORE the scan runs its own commands");
-        // And nothing may re-read the raw $LASTEXITCODE to make that decision.
-        Assert.DoesNotContain("if ($LASTEXITCODE -ne 0) {\n  Write-Host 'Could not build", script);
+        // Comments stripped first — the comment ABOVE the build names both
+        // operators in order to explain why they are not used, and asserting
+        // over the whole file failed on the explanation rather than on any code.
+        string code = string.Join("\n", script.Replace("\r\n", "\n").Split('\n')
+                                              .Where(line => !line.TrimStart().StartsWith("#")));
+        Assert.DoesNotContain("*>&1", code);
+        Assert.DoesNotContain("2>&1", code);
     }
 
     [Fact]
     public void ACleanRunClearsWhatAnEarlierRunLeft()
     {
         // A problem the teacher has since put right must stop being reported.
-        string script = GenerateWrapper();
-        Assert.Contains("Remove-Item -LiteralPath $healthFile", script);
+        // Pinned by POSITION, not by presence: the clear belongs in the branch
+        // taken when NO markers were found, and a presence check passes just as
+        // happily with it sitting in the other one.
+        string script = GenerateWrapper().Replace("\r\n", "\n");
+
+        int found = script.IndexOf("if ($markers.Count -gt 0) {", StringComparison.Ordinal);
+        int otherwise = script.IndexOf("} else {", found, StringComparison.Ordinal);
+        int clear = script.IndexOf("Remove-Item -LiteralPath $healthFile", StringComparison.Ordinal);
+
+        Assert.True(found >= 0 && otherwise > found, "the wrapper does not branch on whether anything was found");
+        Assert.True(clear > otherwise, "the clear must be in the NOTHING-FOUND branch");
     }
 
     [Fact]
     public void ACaptureThatCannotBeSetUpStillPublishes()
     {
         // Losing the findings is a pity; losing the publish is not acceptable.
-        string script = GenerateWrapper();
+        // The fallback must actually RUN the launcher, which a bare "} else {"
+        // check does not establish.
+        string script = GenerateWrapper().Replace("\r\n", "\n");
 
-        Assert.Contains("if ($buildLog) {", script);
-        Assert.Contains("} else {", script);
-        // The plain, uncaptured invocation is present as the fallback.
-        Assert.Contains("--build-only\n", script.Replace("\r\n", "\n"));
+        int captured = script.IndexOf("if ($buildLog) {", StringComparison.Ordinal);
+        int fallback = script.IndexOf("} else {", captured, StringComparison.Ordinal);
+        int plainRun = script.IndexOf("preview.ps1' 'ICS3U' '1' --build-only\n", StringComparison.Ordinal);
+
+        Assert.True(captured >= 0, "there is no captured branch");
+        Assert.True(plainRun > fallback, "the fallback branch does not run the launcher plainly");
     }
 
     [Fact]

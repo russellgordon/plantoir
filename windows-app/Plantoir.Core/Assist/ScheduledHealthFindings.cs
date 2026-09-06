@@ -25,8 +25,8 @@ namespace Plantoir.Core.Assist;
 /// not tidiness.</b> <see cref="ScheduledDeployCompletion.ConsumePendingFrom"/>
 /// enumerates <c>scheduled\pending\*.json</c> and deletes every file it
 /// touches, parsed or not — so a findings record filed beside a completion
-/// record would be swept away before anything read it, and since both
-/// consumers run from window activation, which one won would be a race.</para>
+/// record would be swept away before anything read it. Both are read when the
+/// window becomes active, so which one won would have been a race.</para>
 ///
 /// <para>Two properties shared with the mac's version, both load-bearing: the
 /// record is CONSUMED when read, so a problem is reported once rather than
@@ -93,6 +93,12 @@ public static class ScheduledHealthFindings
         // Consumed whether or not a single line parses. A record that cannot be
         // read is litter, and leaving it would have the app retry it every
         // morning for ever.
+        //
+        // One consequence shared with the mac, named rather than hidden: the
+        // wrapper treats "no markers in the output" as "nothing wrong", so a
+        // run that died BEFORE the checks — a missing runtime, an archived
+        // section, a crash — clears a genuine record from the night before.
+        // The alternative is worse: a record that only ever grows stale.
         try { File.Delete(path); } catch { }
 
         var findings = SiteHealthFinding.FindingsIn(lines);

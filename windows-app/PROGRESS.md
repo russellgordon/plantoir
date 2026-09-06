@@ -45,7 +45,7 @@ Two things that are NOT in that list and should be known:
   publishing — `verify.sh` and `verify-deploy.sh` are bash and do not run
   here.
 - **The unit suite is green**: 911 passed, 0 failed at the time this section
-  was written; 945 after the folder-problems front end, and 972 once
+  was written; 945 after the folder-problems front end, and 979 once
   parity-tail was merged into it and the overnight capture was added. `dev` stood
   at 668 passed with 5 failing contract tests before this series; those five
   were each a real gap between what the contract says Windows does and what it
