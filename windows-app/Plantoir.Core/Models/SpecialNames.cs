@@ -121,4 +121,72 @@ public static class SpecialNames
     /// every unrecognised code falls back to.
     /// </summary>
     public const string DefaultJurisdiction = "Ontario";
+
+    // ---- Renaming a folder ------------------------------------------
+    // Every sentence below is the contract's own, taken from it rather than
+    // retyped, and pinned by SpecialFolderRenamerTests. The refusals are all
+    // checked before anything on disk is touched.
+
+    public const string RenameProblemEmpty =
+        "Type the folder’s new name.";
+
+    public const string RenameProblemUnchanged =
+        "That is already this folder’s name.";
+
+    /// <summary>Windows adds the backslash to the two the contract names, because on this platform it is a separator too.</summary>
+    public const string RenameProblemHasSeparator =
+        "A folder’s name cannot contain “/” or “:”.";
+
+    public const string RenameProblemIsHidden =
+        "A name starting with a dot makes the folder hidden, and Plantoir would stop finding it.";
+
+    public const string RenameProblemIsMedia =
+        "Plantoir looks after the Media folder itself, so nothing else can be called Media.";
+
+    /// <summary>Carries {name}.</summary>
+    public const string RenameProblemAlreadyUsed =
+        "This course already has a folder called “{name}”.";
+
+    /// <summary>Carries {name}.</summary>
+    public const string RenameProblemLooksLikeASection =
+        "“{name}” is what Plantoir calls a section’s own folder, so it cannot be used here.";
+
+    /// <summary>Carries {name}.</summary>
+    public const string RenameProblemDestinationExists =
+        "There is already something called “{name}” beside it. Move or rename that first.";
+
+    /// <summary>The sheet's title. Carries {name}.</summary>
+    public const string RenameSheetTitle =
+        "Rename “{name}”";
+
+    /// <summary>
+    /// What the sheet explains before the teacher commits.
+    ///
+    /// <para>The contract's sentence says "on your Mac", which is that
+    /// platform's wording rather than a shared one — the same deliberate
+    /// difference as "Setting up this Mac" against "Setting up this PC" in
+    /// app-rules.json's markerOrigins. Said here as "on this PC". Flagged in
+    /// MAC-HANDOFF so the contract can mark it platform-specific, rather than
+    /// leaving the next reader to conclude that Windows drifted.</para>
+    /// </summary>
+    public const string RenameExplanation =
+        "This renames the folder on this PC — in every section that has one — and points your pages’ links at the new name. It happens straight away, so Cancel in Settings will not undo it.";
+
+    /// <summary>Carries {old} and {new}.</summary>
+    public const string RenameDone =
+        "“{old}” is now “{new}”.";
+
+    public const string RenameRelinkedOne =
+        "One page had links pointing into it, and they now point at the new name.";
+
+    /// <summary>Carries {count}.</summary>
+    public const string RenameRelinkedMany =
+        "{count} pages had links pointing into it, and they now point at the new name.";
+
+    public const string RenameRelinkedNone =
+        "No page linked into it by name, so nothing else needed changing.";
+
+    /// <summary>"your Mac" in the contract; "this PC" here, as above.</summary>
+    public const string RenameNothingWasThere =
+        "There was no folder by that name on this PC, so only this course’s settings changed. Make it in Obsidian when you need it.";
 }
