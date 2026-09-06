@@ -229,7 +229,11 @@ this side is expected to say so when the contract is wrong.
    exe, never a bare `dotnet publish`, even to build a quick throwaway copy
    for a local test.**
 
-5. **Two things to measure, not copy, on real Windows hardware** (see "Two
+5. ~~Two things to measure, not copy, on real Windows hardware~~ — ✅ Done,
+   BOTH halves (the marker half 2026-08-23, the Edge half 2026-08-23). The
+   headline said "outstanding" until 2026-09-06 while the two ticks sat
+   inside it, which is the failure this list exists to prevent. Original
+   wording, for the record (see "Two
    things to MEASURE on Windows rather than copy from the mac" below):
    whether the browser needs `127.0.0.1` instead of `localhost` for a preview
    address, and which of the 25 progress markers your own `.ps1`/native
@@ -477,7 +481,7 @@ this side is expected to say so when the contract is wrong.
    index, and re-check badge contrast on a highlighted row) apply whether you
    end up hand-building or wiring the real control's template.
 
-10. **Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check (2026-08-24).**
+10. ~~Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check~~ — ✅ Done, merged to `dev` 2026-09-06 (`GradedFolderRule.cs`, `SiteHealthFinding.cs`; GUI-IMPROVEMENTS rows 411-414). **PARSING AND THE TRAIL ONLY.** The bullet below says Windows "displays the contract-authored sentence and detail" — it does not. `ScriptRunner.HealthFindings` is the seam a front end would attach to, and that front end is item 21, which is not built. (Item 21 refers to "the correction in item 10"; this is it.)
     - **`setup_course.py:graded_folders_for` reconciliation** — When a new
       course is created, `graded_folders_for` now checks the declared pool
       against the actual folder lists (`shared_folders` +
@@ -497,7 +501,7 @@ this side is expected to say so when the contract is wrong.
       receives the finding in the `PLANTOIR_HEALTH:` transcript line and
       displays the contract-authored sentence and detail without re-wording.
 
-11. **Special folders hardening: `excluded_items`, preflight skip, and `index.md` sentinel notes (2026-08-24).**
+11. ~~Special folders hardening: `excluded_items`, preflight skip, and `index.md` sentinel notes~~ — ✅ Done, merged to `dev` 2026-09-06 (`ExcludedItemsTests.cs`).
     - **`excluded_items` key in `course_config.json`** — An object with optional
       `shared` and `per_section` arrays of strings:
       `{"shared": ["Tasks"], "per_section": ["Drafts"]}`. The key is ABSENT
@@ -553,7 +557,7 @@ this side is expected to say so when the contract is wrong.
       `excluded_items`; an ordinary add is not a re-inclusion, and a trail line
       that says it was would be believed.
 
-12. **Special folders hardening: The protection model — row states, curriculum resolution, marks floor, and wizard marks control (2026-08-24).**
+12. ~~Special folders hardening: the protection model~~ — ✅ Done, merged to `dev` 2026-09-06 (`ItemProtection.cs`, `CurriculumFolderRule.cs`, `SpecialNames.cs`). Extended 2026-09-06: the protection now also covers the RECORDED `class_folder`, not only the literal "All Classes" — see item 16.
     - **Item Protection in List Editors & Toggle Lists**:
       Folders and files with special meaning now have protection policies (`ItemProtection` in Swift, `ItemProtection` enum in C#):
       - `Ordinary`: standard direct removal.
@@ -589,7 +593,16 @@ this side is expected to say so when the contract is wrong.
       - *The contract holds 5 resolution cases*, not the 10 row 379 claimed.
       - *Size the flyout for the longest sentence.* The mac popover truncated to one line until it was given a fixed width and allowed to wrap; the `lastGradedFolderBlocked` sentence is the longest in `specialNames`, so test the flyout with that one.
 
-13. **Renaming a course folder from inside the app (2026-09-01).** The mac now
+13. **Renaming a course folder from inside the app — HALF DONE 2026-09-06.**
+    The model layer is built and under test: `FolderPathRewriter` (the link
+    rewriting, 22 tests) and `SpecialFolderRenamer` (the refusals, the move
+    list, the check-every-destination-first rule, 22 tests), plus the two
+    trail events, which are DECLARED AND NOT YET EMITTED because nothing
+    raises them until the sheet exists — see `windows-app/PROGRESS.md`.
+    **Still owed: the sheet itself**, the method that performs the moves, the
+    config keys carried across (`KeysThatCarryAcross` holds the list), the
+    MATERIALISATION of `class_folder`/`curriculum_folder`, and item 17's
+    interrupted-rename recovery. Original text: The mac now
     renames a folder on disk, in every section, rewriting the links that name
     it and every config key that mentioned it — plus the two foot-guns behind
     it: Add creates the folder, Remove says the folder stays. Sentences,
@@ -599,21 +612,22 @@ this side is expected to say so when the contract is wrong.
     alone (`Directory.Move` and open handles), is in "Renaming a course folder
     from inside the app" below** — read that rather than this summary.
 
-14. **A section with no front page no longer publishes yesterday's site
+14. ~~A section with no front page no longer publishes yesterday's site~~ — ✅ Done; `MissingFrontPageExplanation` is in `FailureExplainer.cs` and is asked before `MissingBuildExplanation`, as required. Verified 2026-09-06. Original text:
+    **A section with no front page no longer publishes yesterday's site
     (2026-09-01).** Shared Python, so you inherit the fix; the one thing you
     owe is `MissingFrontPageExplanation` in `FailureExplainer.cs`, asked BEFORE
     `MissingBuildExplanation`, which is already written on this side and is
     pinned by a contract case. See "A section with no index.md cannot be
     PUBLISHED" below.
 
-15. **What a course calls a unit (2026-09-01).** `unit_word` in
+15. ~~What a course calls a unit~~ — ✅ Done 2026-09-06 (`ClassPageTerm.cs`, `UnitDay.Parse(title, term)`, the wizard field, and every call site including the two that BUILD page titles; GUI-IMPROVEMENTS rows 415-416). Original text: `unit_word` in
     `course_config.json`, absent meaning "Unit". Shared Python does the rule
     and the payload rewrite; you owe the C# mirror, a wizard field, and the
     assistant's sentences. **Three new contract cases will fail your suite
     until you read `pageNaming`'s new `term` field with a default.** Full
     write-up in "What a course calls a unit" below.
 
-16. **What a course calls its class folder (2026-09-01).** `class_folder` in
+16. ~~What a course calls its class folder~~ — ✅ Done 2026-09-06 (`ClassFolderRule.Name/Names` with the recorded key, the wizard writing it, and `ItemProtectionRule` protecting it). **NOT yet done: the rename that MATERIALISES the key** — that belongs to item 13's sheet, which is still owed. Original text: `class_folder` in
     `course_config.json`, recorded rather than guessed, materialised by a
     rename along with `curriculum_folder`. Replaces the class-folder refusal
     item 13 described, which no longer exists. **Eight new contract cases will
@@ -626,7 +640,16 @@ this side is expected to say so when the contract is wrong.
     in "`course_config.json` has two writers" and "A rename interrupted after
     the folders moved was a dead end" below.
 
-18. **A working folder kept in sync by a cloud service is explained, never
+18. **A cloud-synced working folder — HALF DONE 2026-09-06.** The
+    detection is built and tested (`CloudSyncedFolder.cs`: OneDrive's three
+    published roots, Dropbox's `info.json`, iCloud for Windows; never from a
+    folder's NAME), the wording is pinned to the contract
+    (`CloudSyncWording.cs`), the remembered-per-folder store exists
+    (`AppSettings.AcceptedSyncedFolders`, keyed by resolved path), and both
+    trail events are declared — AND NOT YET EMITTED, for the same reason as
+    item 13. **Still owed: the two VIEWS** — the choice at the folder picker
+    and the dismissable notice for a folder the window restored. Original
+    text: **A working folder kept in sync by a cloud service is explained, never
     refused (2026-09-05, row 399).** Russell's decision on a question
     `TODO.md` had left open. You inherit the whole BEHAVIOUR as data —
     `shared-rules.json` → `cloudSyncedFolders`: the sentences, the two
@@ -642,7 +665,48 @@ this side is expected to say so when the contract is wrong.
     outside the folder. Full write-up in "A cloud-synced working folder:
     explain it, never refuse it" below.
 
-19. **The mac now builds outside the working folder too, and one sentence
+19. **Builds outside the working folder — ONE of the two owed things is done
+    (2026-09-06); the OTHER is still open.** The `appliesOn` filter is in
+    (`ContractTests`), the retired sentence is asserted absent
+    (`CloudSyncedFolderTests`), and Windows already built outside the folder
+    (row 290).
+
+    ✅ **Archiving and restoring a course now takes its build with it.**
+    `BuildOutputLocation` (new) names `%LOCALAPPDATA%\Plantoir\builds\{id}`,
+    taking the id from `FolderContainers.FolderIdentifier` — the value the
+    container name has always used, which is `preview.ps1`'s `$WORKDIR_ID` —
+    rather than hashing a second time. Builds are discarded at all FIVE
+    moments a course's content is replaced (archive a course, archive a
+    section, restore a section, restore a course, restore a backup), and the
+    build WORKSPACE goes with the built site, because that is the half a
+    preview serves from.
+
+    ⚠️ **STILL OPEN: the marker, and the sweep that would give it a point.**
+    Nothing on this side writes `working-folder.txt` or anything like it, and
+    there is no Windows equivalent of the mac's
+    `discardBuildsForMissingWorkingFolders`. **Writing the marker alone is
+    ceremony** — nothing would read it — so whoever picks this up should do
+    both or neither. Two Windows specifics for the sweep, neither of which the
+    mac's version has to handle: only sweep paths under `%USERPROFILE%`, and
+    treat ONLY `ERROR_FILE_NOT_FOUND` / `ERROR_PATH_NOT_FOUND` as "the folder
+    is gone" — `Directory.Exists` also returns false for access-denied, for an
+    unplugged drive letter, and for a OneDrive on-demand folder, and clearing
+    a build because a USB stick was unplugged would be worse than the litter.
+    The cheapest home for the marker itself is the launchers'
+    `Enter-NativeRuntime`, which already holds `$WORKDIR_PHYSICAL` — but note
+    it only sets environment variables and does NOT create the builds folder
+    (the Python's `mkdir` does, later), so a bare `Set-Content` there fails on
+    a first run. `New-Item -ItemType Directory -Force` first, then write.
+
+    **Two things found while doing the first half, both now fixed, both worth
+    knowing because they are the same shape:** `BuildFreshness` was reading
+    `<course>\.merged_output\…`, the pre-row-290 location, so the decision
+    about whether to rebuild and the artefact that actually gets published
+    came from two different places; and a scheduled deploy had NO build step
+    at all. See "Builds outside the working folder" below and
+    `MAC-HANDOFF.md`.
+
+    Original text: **The mac now builds outside the working folder too, and one sentence
     you were told to leave out is now gone from BOTH apps (2026-09-05,
     row 402).** You already do this half — `PLANTOIR_BUILD_ROOT` →
     `%LOCALAPPDATA%\Plantoir\builds\<id>`, row 290 — and **nothing about
@@ -680,7 +744,8 @@ this side is expected to say so when the contract is wrong.
 
     Full write-up in "Built websites live outside the working folder" below.
 
-20. **Stopping a section's preview is now ONE rule, and two of your three
+20. ~~Stopping a section's preview is now ONE rule~~ — ✅ Done 2026-09-06, merged to `dev`. Fixed one level DEEPER than this item asked (in `stop_preview.read_snapshot()` rather than in `preview.ps1`), because `deploy.py` reaches `build_site.py --build-only` without passing through the launcher — see MAC-HANDOFF. The two blind `preview.ps1` fixes are verified by execution, the 23 contract cases run against the matcher as a gate, and "section processes reclaimed" is emitted. Original text:
+    **Stopping a section's preview is now ONE rule, and two of your three
     matching bugs are already fixed in `preview.ps1` — unverified on real
     Windows (2026-09-05, row 407).** This is the `TODO.md` item "one rule,
     three implementations", closed on the mac side. The rule — which
@@ -908,7 +973,20 @@ this side is expected to say so when the contract is wrong.
 
     Full write-up in "One rule for stopping a section's preview" below.
 
-21. **The folder-problems FRONT END: the findings dialog, the Fix button,
+21. ~~**The folder-problems FRONT END: the findings dialog, the Fix button,
+    and the repair**~~ — ✅ Done 2026-09-06, branch
+    `issue/windows-folder-problems-front-end`, `GUI-IMPROVEMENTS.md` row 420.
+    The dialog, the Fix button, both repairs, the outcome report and "Preview
+    Again" are all built, along with a rule-1 leak this item did not name: the
+    `PLANTOIR_HEALTH:` JSON line had been rendering verbatim in the console a
+    teacher reads. Two defects were found in the MAC's own repair while
+    porting it and are in `MAC-HANDOFF.md`. **One half is NOT done and is now
+    item 23 below** — at the time, the scheduled deploy still surfaced
+    nothing, because the wrapper it would attach to had no build step at all.
+    (Item 23 was itself finished later the same day, once the merge that added
+    that build step landed.) Original text:
+
+    **The folder-problems FRONT END: the findings dialog, the Fix button,
     and the repair (owed since 2026-08-23; scoped 2026-08-25).** The shared
     Python has printed `PLANTOIR_HEALTH:` lines since the mac's row 357, and
     until 2026-08-25 nothing on this side read them — see the correction in
@@ -934,6 +1012,141 @@ this side is expected to say so when the contract is wrong.
     building is told nothing** — which is the exact failure the whole feature
     was written to end. The trail line is a diagnosis after the fact, not a
     warning at the time.
+
+22. **The "Folders Plantoir uses" sheet (mac row 361, 2026-08-23) — NEVER
+    PORTED, and it was in no list until 2026-09-06.** The mac's Course
+    Settings has a sheet explaining which folders Plantoir treats specially
+    and why (`Views/CourseSettings/SpecialFoldersHelpView.swift`, opened from
+    `CourseSettingsView.swift`). Nothing on this side has it: no
+    `SpecialFolderEntry`, no `SpecialFoldersHelp`, no such string anywhere in
+    `windows-app/`.
+
+    **How it went missing is the useful part.** Items 10-12 were scoped as
+    "special folders hardening, pieces 1-3", and this sheet was step 6 of the
+    EARLIER piece — so it fell in the gap between two scopings and appeared in
+    neither the outstanding list nor `WINDOWS-HANDOFF-COMPLETED.md`. Found by
+    an adversarial documentation review on 2026-09-06 that was asked whether
+    the list was COMPLETE rather than whether it was correct. Row 361's own
+    "Notes for Windows port" column says "Worth copying wholesale".
+
+    Medium. It is a teacher-facing explanation, so the wording matters more
+    than the mechanism.
+
+23. ~~**A scheduled deploy's folder problems reach nobody**~~ — ✅ Done
+    2026-09-06, once the merge that unblocked it landed.
+
+    **The blocker was never the surfacing, and that is the part worth
+    keeping.** The contract says a scheduled deploy NEVER refuses on a health
+    finding and surfaces it afterwards instead
+    (`siteHealth.scheduledDeployPublishesAnyway`). Item 21 built the
+    "afterwards" for the app's own preview and publish, and the obvious next
+    move was to point the same machinery at the overnight path. That would
+    have been dead code: the wrapper `TaskScheduling.WriteWrapperScript`
+    wrote went straight from the fingerprint to `deploy.ps1` per destination,
+    the checks live inside `build_site.py`, and `deploy.py` publishes an
+    EXISTING `public/` unless a live preview is attached — which overnight,
+    with the app closed, never is. **No check ran, so there was nothing to
+    capture**, and a capture written against that wrapper would have looked
+    finished and reported nothing for ever.
+
+    The build step arrived with `issue/windows-parity-tail` (merge
+    `38a181ee`), and the wrapper now runs `preview.ps1 CODE N --build-only`
+    before any deploy. Task Scheduler discards that output, so producing the
+    lines and CAPTURING them are two different things — which is what this
+    item then built. What follows is what it does, kept because every bullet
+    is a decision rather than a description:
+
+    - **Capture PER RUN, and delete the capture afterwards.** Redirect the
+      `--build-only` invocation to a GUID-named file under
+      `%LOCALAPPDATA%\Plantoir\scheduled\folder-problems\`, scan it with
+      `Select-String -SimpleMatch 'PLANTOIR_HEALTH:'`, and write the matching
+      lines verbatim to `<CODE>-section<N>.txt` beside it. Parse them in C#
+      with `SiteHealthFinding.FindingsIn`, never in PowerShell — no JSON is
+      interpreted in shell. A per-run capture means Windows does NOT inherit
+      the mac's bug here: launchd opens its log with `O_APPEND` and nothing
+      truncates it, so the mac had to record the log's SIZE beforehand or
+      re-find last week's markers every night.
+    - **The scan must come BEFORE the build-failure guard.** Since 2026-09-01
+      a section with no `index.md` exits NON-ZERO from `--build-only`, and
+      that is precisely the run whose findings matter most. Save
+      `$LASTEXITCODE` into a variable immediately after the launcher, scan,
+      write the record, and only then test the saved code.
+    - **Do NOT capture through a PowerShell pipeline, and the first version of
+      this item said to.** `$LASTEXITCODE` does survive `*>&1 | Out-File` —
+      measured, 7 came through — but that measurement used a callee WITHOUT
+      `$ErrorActionPreference = 'Stop'`, and `preview.ps1` sets it on line 2.
+      Under `Stop`, merging a native command's stderr into the pipeline makes
+      the first stderr LINE a TERMINATING `NativeCommandError` that propagates
+      out of the callee and kills the wrapper with it: no exit code, no scan,
+      no deploy, nothing said. Measured on 5.1.26100 — the piped callee died
+      at its first stderr line and took its caller with it, where the same
+      callee run plainly finished and returned 5. The build inherits stderr to
+      node and npm, and a Python traceback lands there too, so the failing run
+      whose findings matter most is exactly the one that would have been lost.
+      This is the trap `windows-app/PROGRESS.md` already lists as platform
+      lesson 3, walked into anyway.
+
+      The build is a CHILD PROCESS with OS-level redirection instead:
+      `Start-Process -RedirectStandardOutput/-RedirectStandardError`, whose
+      `ExitCode` also removes any dependence on `$LASTEXITCODE` surviving
+      anything. **Pass its arguments as ONE STRING, not an array** — 
+      `Start-Process` joins an array with spaces and quotes nothing, so a
+      working folder whose name contains a space is split and `powershell.exe`
+      answers "Processing -File 'C:\...\scheduled' failed because the file
+      does not have a '.ps1' extension", exit -196608, silently, every night.
+      Found by running it against a real folder called "scheduled deploy
+      test"; the first fixture used a space-free temp path and passed.
+    - **A DIFFERENT directory from the completion sentinels, not beside
+      them.** `ScheduledDeployCompletion.ConsumePendingFrom` enumerates
+      `scheduled\pending\*.json` and deletes every file it touches, parsed or
+      not — so a findings record filed there is swept away before anything
+      reads it. Both are read when the window becomes active, so which one
+      won would have been a race.
+    - **Consumed when read, and cleared by a clean run.** One file per course
+      and section, taken by that section's own view when it loads AND when the
+      window becomes active — the second is not optional, because a teacher
+      who leaves Plantoir open overnight (which this feature itself suggests,
+      to keep the machine awake) keeps the same view instance and `Loaded`
+      never fires again. Taken so a
+      problem is reported once rather than every morning; a run that found
+      nothing DELETES the record, so a problem the teacher has put right stops
+      being reported. Guard before consuming.
+    - **It owes a trail line, and the mac's does not write one.** Nothing else
+      records an overnight finding — the run happened with the app closed and
+      the console it printed to is gone. Note each one as
+      `FolderProblemFound` when the record is read, dated to the record's own
+      last-write time and not to the morning somebody opened the app, or the
+      trail puts it on the wrong night. `ActivityTrail.Note` takes a `moment`.
+      Propose this back to the mac when it lands.
+    - **The front end is already waiting for it.** `FolderProblemQueue` +
+      `SectionDetailView.NoteHealthFindings(findings, cameFromPublishing:
+      true)` is the whole attachment: the overnight run PUBLISHED, so the
+      sentence after a repair must be the one naming students.
+
+24. ~~**The assistant and `plantoir-mcp` parse no findings**~~ — ✅ Done
+    2026-09-06, in the same branch as item 21, once it turned out to be small
+    and to carry a live rule-1 leak of its own. Listed here rather than folded
+    into 21 because it is a genuinely different surface, and because the
+    reason it was nearly deferred is worth keeping: an assistant answers in
+    sentences and has no dialog to raise, so what it should SAY looked like a
+    design question. It is not — **the mac already answered it**, in
+    `SiteHealthFinding.appending(to:from:)`, which appends each finding's
+    sentence and detail to the outcome message. Copying that was ten minutes;
+    inventing a Windows answer would have been an afternoon and a divergence.
+    The lesson generalises: before treating a gap as a design question, grep
+    the mac for the type name.
+
+    **What it was hiding.** `LauncherRunner.Capture` passed every line
+    straight to `progress?.Report` and into the 12-line tail it reports back,
+    so the raw `PLANTOIR_HEALTH:` JSON went in front of a teacher through the
+    assistant — the same rule-1 leak item 21 fixed in the console, on a
+    surface nobody had looked at. And nothing on that path recorded a finding
+    on the trail, which matters more here than in the GUI: the MCP server is
+    headless, so a teacher who asks the assistant to publish leaves no console
+    behind at all.
+
+    Reference: `Plantoir.Mcp/LauncherRunner.cs`, `LaunchOutcome.Findings`,
+    `SiteHealthFinding.Appending`, `AssistFolderProblemTests.cs`.
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity

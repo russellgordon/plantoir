@@ -1122,7 +1122,13 @@ public sealed class AssistWorkspace
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
-            return new AssistResult(false, $"The build failed, so nothing was deployed. {build.Message}", null);
+            return new AssistResult(false,
+                // What the build said about the folders belongs HERE most of
+                // all: a build that failed because the front page is missing
+                // is the case where the finding is the cause.
+                Models.SiteHealthFinding.Appending(
+                    $"The build failed, so nothing was deployed. {build.Message}", build.Findings),
+                null);
 
         // Every destination's own deploy — one FAILING does not stop the
         // others, the whole point of a course having more than one.
@@ -1156,7 +1162,14 @@ public sealed class AssistWorkspace
         bool anySucceeded = outcomeLegs.Any(leg => leg.Succeeded);
         var failedDestinations = outcomeLegs.Where(leg => !leg.Succeeded).Select(leg => leg.Destination).ToList();
         var outcome = new MultiDestinationDeployRunner.Outcome(anySucceeded, failedDestinations);
-        return MultiDestinationDeployRunner.Result(course.Code, section.ToString(), destinations.Count, outcome);
+        var result = MultiDestinationDeployRunner.Result(course.Code, section.ToString(), destinations.Count, outcome);
+        // Findings come from the BUILD, not from a destination's upload: every
+        // destination publishes the same built site, and the checks run inside
+        // the build. Said after the outcome, never instead of it.
+        return result with
+        {
+            Message = Models.SiteHealthFinding.Appending(result.Message, build.Findings),
+        };
     }
 
     public async Task<AssistResult> RebuildPreview(string courseCode, int sectionNumber,
@@ -1173,9 +1186,12 @@ public sealed class AssistWorkspace
                                         _folder, progress, cancellation);
         return build.Succeeded
             ? new AssistResult(true,
-                $"Rebuilt the preview of {course.Code} Section {section}. No content was changed. " +
-                "Look it over in Plantoir, and deploy it there when you're happy.", null)
-            : new AssistResult(false, $"Nothing was changed, and the preview couldn’t be built. {build.Message}", null);
+                Models.SiteHealthFinding.Appending(
+                    $"Rebuilt the preview of {course.Code} Section {section}. No content was changed. " +
+                    "Look it over in Plantoir, and deploy it there when you're happy.", build.Findings), null)
+            : new AssistResult(false,
+                Models.SiteHealthFinding.Appending(
+                    $"Nothing was changed, and the preview couldn’t be built. {build.Message}", build.Findings), null);
     }
 
     /// <summary>
@@ -2891,7 +2907,18 @@ public interface ILauncherRunner
 }
 
 /// <summary>The result of one launcher run.</summary>
-public readonly record struct LaunchOutcome(bool Succeeded, string Message);
+///
+/// <remarks>
+/// <para><see cref="Findings"/> is what the build said about the course's
+/// FOLDERS — the same <c>PLANTOIR_HEALTH:</c> lines the app's own
+/// <c>ScriptRunner</c> collects. It is optional so that the two-argument shape
+/// every other caller uses keeps working; a runner that does not look for them
+/// simply reports none.</para>
+/// </remarks>
+public readonly record struct LaunchOutcome(
+    bool Succeeded,
+    string Message,
+    IReadOnlyList<Models.SiteHealthFinding>? Findings = null);
 
 /// <summary>The result of planning a whole unit publish/unpublish.</summary>
 public sealed record WholeUnitPlanResult(

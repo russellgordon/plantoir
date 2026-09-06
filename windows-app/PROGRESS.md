@@ -17,7 +17,55 @@ Docker Desktop) unless marked otherwise.
 | `PtyDriver/` | Console harness that drives the launchers under a ConPTY with scripted prompt replies — how the E2E runs below were performed. |
 | `Plantoir.Mcp/` | On `main` (`Plantoir.sln` lists it) and **it ships**: `publish.ps1` publishes it, copies `plantoir-mcp.exe` into the app's own output beside `Plantoir.exe`, and includes it in the signing list. A standalone MCP server exposing one working folder to an AI assistant. Load-bearing at runtime — `Plantoir/Services/ClaudeCodeLauncher.cs` looks for it beside the app, and `Plantoir/Services/McpClient.cs` launches it. See [its README](Plantoir.Mcp/README.md). |
 
-## Four activity-trail events are declared but not yet emitted (2026-09-06)
+## Where parity stands (2026-09-06)
+
+`WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
+date after drifting in both directions — item 5 had been finished since August
+with its headline still reading as open work. **Sixteen of its twenty-four
+items are done**, items 21, 23 and 24 having landed on 2026-09-06 (the
+folder-problems front end, the same findings reaching the assistant, and the
+overnight run's findings being captured and reported the next morning).
+What is genuinely left, smallest first:
+
+| Item | What is left | Size |
+|---|---|---|
+| 19 | The `working-folder.txt` marker AND a sweep that reads it. Do both or neither — the marker alone is ceremony. Two Windows specifics for the sweep are written into item 19. | Small |
+| 18 | The two VIEWS: the choice at the folder picker, and the dismissable notice for a folder the window restored. Detection, wording and the remembered-per-folder store are built — the store's API is `AppSettings.HasAcceptedSyncFor` / `RememberAcceptedSyncFor`, and the two moments belong in `WorkspacePickerView` (a folder just chosen) and `MainWindow`'s restore path (a folder the window reopened). | Medium |
+| 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
+| 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 52 test methods over 63 cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
+| 22 | The "Folders Plantoir uses" sheet (mac row 361) — never ported, and in no list until 2026-09-06. A teacher-facing explanation, so the wording matters more than the mechanism. | Medium |
+
+Two things that are NOT in that list and should be known:
+
+- **The deploy gate exists now.** `verify-deploy.ps1` publishes to every
+  destination and every pairing against real sites and fetches each one back:
+  36 passed, 0 failed on 2026-09-06. It needs credentials and the network, so
+  it is opt-in and wired into nothing. Run it when the publishing path
+  changes. It is the only automated check of the PowerShell half of
+  publishing — `verify.sh` and `verify-deploy.sh` are bash and do not run
+  here.
+- **The unit suite is green**: 911 passed, 0 failed at the time this section
+  was written; 945 after the folder-problems front end, and 979 once
+  parity-tail was merged into it and the overnight capture was added. `dev` stood
+  at 668 passed with 5 failing contract tests before this series; those five
+  were each a real gap between what the contract says Windows does and what it
+  did.
+
+## A model layer exists ahead of its UI — four types nothing calls yet (2026-09-06)
+
+`SpecialFolderRenamer`, `FolderPathRewriter`, `CloudSyncedFolder` and
+`CloudSyncWording` are built, documented and under test, and **nothing in
+`windows-app/Plantoir` calls any of them.** That is deliberate, not an
+oversight: items 13 and 18 were taken as far as they could go without
+inventing teacher-facing wording and dialogs, so the rules landed first and
+the views are what remains.
+
+Grep for callers and you will find none — that is the expected answer, and it
+is written here so nobody concludes they have missed a wiring step or deletes
+the types as dead code. The same goes for the four trail events below: the
+features that would raise them are these same two.
+
+## Four activity-trail events are declared but not yet emitted (2026-09-06; a fifth was, and now is)
 
 `ActivityTrail.Event` names `folder renamed`, `folder created`,
 `synced folder noticed` and `synced folder accepted`. All four are in
@@ -36,6 +84,15 @@ should be able to find. **When either feature's front end lands, the events
 must actually be recorded** — the count and the names are in the contract
 entries, and `ReclaimedProcesses` is the worked example of parsing something
 out and putting it on the trail.
+
+**There was a FIFTH, and this section did not name it: `folder problem
+repaired`.** Declared when the trail was built, still with no call site on
+2026-09-06 — it got one that day, when item 21's front end landed (`Models/
+SiteHealthRepair.cs`). It is recorded here because the omission is the
+interesting part: this section was written by listing the events somebody
+remembered were promised, and a fifth had been dead long enough to stop being
+remembered. The honest way to keep this list right is
+`grep -c` per enum member, not recollection.
 
 ## The subsystems that table does not name
 
@@ -60,6 +117,19 @@ out and putting it on the trail.
   one refusal path so the two cannot drift.
 - **Three publishing destinations**, not one: `deploy.ps1` handles Netlify,
   Cloudflare Pages and a plain folder.
+- **Folder-problem checks, surfaced in two of the three places they can
+  happen.** The shared Python checks a course's folders during every build and
+  prints one `PLANTOIR_HEALTH:` line per problem;
+  `Plantoir.Core/Models/SiteHealthFinding.cs` parses them,
+  `SiteHealthRepair.cs` puts right the two that can be put right, and
+  `Views/FolderProblemsDialog.cs` shows the rest. The app's preview and
+  publish are covered, and so is the assistant (`Plantoir.Mcp/
+  LauncherRunner.cs` lifts findings out and `SiteHealthFinding.Appending`
+  says them). **The scheduled deploy is covered too, differently**: it runs
+  with the app closed, so its wrapper captures the build's output per run,
+  copies the marker lines into a per-course-and-section record, and the
+  section's own view reads that record the next time it is opened — consumed
+  as it is read, and cleared by a clean run.
 
 ## Proven end to end
 

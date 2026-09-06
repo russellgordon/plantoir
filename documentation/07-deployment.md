@@ -1,6 +1,14 @@
 # 7. Publishing a built section (`deploy.py`)
 
-> A course chooses **where** it publishes with the `deploy_target` key
+> A course chooses **where** it publishes with the `deploy_target` key —
+> which the APP reads and turns into a `--target` argument. **No launcher
+> reads that key**: `deploy.sh`, `deploy.ps1` and `deploy.py` all default to
+> Netlify and change destination only on `--target`, so anything driving a
+> launcher directly — a script, a test harness, a scheduled wrapper — has to
+> pass the flag itself. Setting the key and calling the launcher publishes to
+> Netlify, silently; that is exactly how a deploy harness came to verify a
+> `netlify.app` address three times over and report three green Cloudflare
+> publishes (GUI-IMPROVEMENTS row 419)
 > (see [the config reference](08-course-config-reference.md)). There are
 > three destinations, and most of this page describes the first:
 >

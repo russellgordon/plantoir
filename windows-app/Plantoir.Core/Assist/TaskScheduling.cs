@@ -142,8 +142,26 @@ public static class TaskScheduling
     /// Internal (not private) so the test that pins this can reach it
     /// without spinning up a real scheduled task.
     /// </summary>
+    /// <summary>
+    /// How Task Scheduler runs the wrapper.
+    ///
+    /// <para><b>-NonInteractive is load-bearing, not tidiness.</b> Nobody is
+    /// there to answer a question at 6 a.m. Without it, a `Read-Host` in
+    /// anything the wrapper calls simply BLOCKS: the task sits at an invisible
+    /// prompt until Task Scheduler's own limit (three days, by default), and
+    /// the teacher's site is never updated and nothing says why. With it,
+    /// `Read-Host` throws instead, the wrapper exits non-zero, and the run
+    /// fails visibly.</para>
+    ///
+    /// <para>The question that made this real: <c>preview.ps1</c> asks
+    /// "Continue anyway?" when the section is not listed in
+    /// <c>course_config.json</c> — which is exactly the state a course is left
+    /// in when one of its sections is archived while a scheduled deploy for
+    /// that section still exists. That became reachable the moment the wrapper
+    /// started building before publishing.</para>
+    /// </summary>
     internal static string TaskRunCommand(string scriptPath) =>
-        $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\"";
+        $"powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{scriptPath}\"";
 
     /// <summary>
     /// Writes the wrapper: fingerprint the section first (via the bundled
@@ -155,7 +173,14 @@ public static class TaskScheduling
     /// pick up and apply the next time the app runs. Returns the script's
     /// path, or null if it could not be written.
     /// </summary>
-    private static string? WriteWrapperScript(
+    /// <summary>
+    /// Internal rather than private so the suite can read the script this
+    /// writes. There is no runner behind a generated wrapper — it is executed
+    /// by Task Scheduler at 6 a.m. with nobody watching — so the only gate
+    /// available is asserting the TEXT, and the ordering inside it is
+    /// load-bearing (see the health-capture block).
+    /// </summary>
+    internal static string? WriteWrapperScript(
         string taskName, string workingFolder, string launcherPath, string courseCode, int section,
         string courseDirectory, IReadOnlyList<string> excludedSelfPublishingSubpaths,
         IReadOnlyList<CourseConfiguration.DeployDestination> destinations, string cloudflareAccountID)
@@ -197,6 +222,118 @@ public static class TaskScheduling
                 "    }",
                 "  }",
                 "} catch { $fingerprint = $null }",
+                "",
+                "# ---- Build first, always -----------------------------------------------",
+                "# A scheduled deploy had NO build step at all: it published whatever",
+                "# happened to be in the builds folder, however old, and if nothing was",
+                "# there it failed. The mac's launchd script has always tested freshness",
+                "# and rebuilt when stale; this side simply never did.",
+                "#",
+                "# Unconditionally, rather than repeating the freshness test in shell.",
+                "# This runs while the teacher is asleep, so a minute of rebuilding that",
+                "# was not strictly needed costs nothing, and a freshness test written a",
+                "# THIRD time — after the app's and the launcher's — is a third thing to",
+                "# drift. --build-only also stops any preview still serving this section,",
+                "# so it cannot overwrite what is about to go out.",
+                "#",
+                "# The build's output is CAPTURED, because the folder checks run inside it",
+                "# and print PLANTOIR_HEALTH: lines that nothing would otherwise read: this",
+                "# runs with the app closed, so the console they go to is gone by morning.",
+                "# Per run, into a file deleted immediately afterwards — the mac reads its",
+                "# findings out of a launchd log opened with O_APPEND and had to record the",
+                "# log's SIZE beforehand to avoid re-finding last week's markers every",
+                "# night. A per-run capture cannot have that bug at all.",
+                "#",
+                "# If the capture cannot be set up, the build runs plainly. Losing the",
+                "# findings is a pity; losing the publish is not acceptable.",
+                "$healthDir = $null",
+                "$buildLog = $null",
+                "$buildErrLog = $null",
+                "try {",
+                $"  $healthDir = Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", "scheduled", "folder-problems"))}",
+                "  New-Item -ItemType Directory -Force -Path $healthDir | Out-Null",
+                $"  $buildLog = Join-Path $healthDir ({PsQuote(SafeName(taskName))} + '-' + [Guid]::NewGuid().ToString('N') + '.log')",
+                "} catch { $healthDir = $null; $buildLog = $null }",
+                "",
+                "# Redirected by the OPERATING SYSTEM, into a child process — never",
+                "# through a PowerShell pipeline. `preview.ps1` sets",
+                "# $ErrorActionPreference = 'Stop', and in Windows PowerShell 5.1 merging a",
+                "# native command's stderr into the pipeline (`2>&1`, `*>&1`, even",
+                "# `2>$null`) turns the first stderr LINE into a TERMINATING",
+                "# NativeCommandError that propagates out of the callee and kills this",
+                "# wrapper with it: no exit code, no scan, no deploy, and nothing said.",
+                "# The build inherits stderr to node and npm, and any Python traceback",
+                "# lands there too — which is exactly the failing run whose findings",
+                "# matter most. Measured on 5.1.26100: a piped callee died at its first",
+                "# stderr line and took its caller with it, where the same callee run",
+                "# plainly finished and returned 5.",
+                "#",
+                "# Start-Process also gives an exit code that does not depend on",
+                "# $LASTEXITCODE surviving a pipeline. stdout and stderr must go to",
+                "# DIFFERENT files (Start-Process refuses one file for both); the markers",
+                "# are on stdout, and the error file is scanned too rather than assumed",
+                "# empty.",
+                "if ($buildLog) {",
+                "  $buildErrLog = $buildLog + '.err'",
+                // Built as a variable rather than continued across lines: a
+                // backtick continuation in generated shell is one stray trailing
+                // space away from silently splitting the command.
+                // ONE STRING, with the quoting done here — not an ARRAY.
+                // Start-Process joins an array with spaces and quotes nothing,
+                // so a working folder whose name contains a space (every
+                // Desktop folder, most OneDrive paths, and the machine this was
+                // written on has one called "scheduled deploy test") is split
+                // at the space and powershell.exe reports "Processing -File
+                // 'C:\...\scheduled' failed because the file does not have a
+                // '.ps1' extension". Measured: exit -196608, no build, no
+                // findings, no deploy — every night, silently.
+                "  $buildArgs = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"' + " +
+                    $"{PsQuote(Path.Combine(workingFolder, "preview.ps1"))} + '\" \"' + {PsQuote(courseCode)} + '\" \"' + {PsQuote(section.ToString())} + '\" --build-only'",
+                "  $proc = Start-Process -FilePath 'powershell.exe' -ArgumentList $buildArgs -Wait -PassThru -NoNewWindow -RedirectStandardOutput $buildLog -RedirectStandardError $buildErrLog",
+                "  $buildExitFromChild = $proc.ExitCode",
+                "} else {",
+                $"  & {PsQuote(Path.Combine(workingFolder, "preview.ps1"))} {PsQuote(courseCode)} {PsQuote(section.ToString())} --build-only",
+                "  $buildExitFromChild = $null",
+                "}",
+                "# Saved AT ONCE. Everything below runs commands of its own, and the guard",
+                "# that decides whether anything is published must test THIS build's code.",
+                "# The captured path takes it from the child process rather than from",
+                "# $LASTEXITCODE, which is one fewer thing that has to survive.",
+                "if ($null -ne $buildExitFromChild) { $buildExit = $buildExitFromChild } else { $buildExit = $LASTEXITCODE }",
+                "",
+                "# ---- What the build said about the folders --------------------------------",
+                "# BEFORE the failure guard, deliberately. Since 2026-09-01 a section with no",
+                "# index.md exits NON-ZERO from --build-only, and that is exactly the run",
+                "# whose findings the teacher most needs in the morning: scanning after the",
+                "# guard would say nothing about the one failure that explains itself.",
+                "#",
+                "# The lines are copied VERBATIM and parsed in C# with the same parser a live",
+                "# build uses. No JSON is interpreted in shell.",
+                "if ($buildLog -and (Test-Path -LiteralPath $buildLog)) {",
+                "  try {",
+                $"    $healthFile = Join-Path $healthDir {PsQuote(HealthRecordName(courseCode, section))}",
+                "    $scanned = @($buildLog)",
+                "    if ($buildErrLog -and (Test-Path -LiteralPath $buildErrLog)) { $scanned += $buildErrLog }",
+                "    # -Encoding UTF8 because OS-level redirection writes the child's own",
+                "    # bytes with no BOM, and Select-String would otherwise read them as",
+                "    # ANSI and mangle any non-ASCII inside a sentence.",
+                "    $markers = @(Select-String -LiteralPath $scanned -SimpleMatch 'PLANTOIR_HEALTH:' -Encoding UTF8 | ForEach-Object { $_.Line })",
+                "    if ($markers.Count -gt 0) {",
+                "      Set-Content -LiteralPath $healthFile -Value $markers -Encoding utf8",
+                "    } else {",
+                "      # Nothing wrong this time: clear anything an earlier run left, so a",
+                "      # problem the teacher has since put right stops being reported.",
+                "      Remove-Item -LiteralPath $healthFile -Force -ErrorAction SilentlyContinue",
+                "    }",
+                "  } catch { }",
+                "  Remove-Item -LiteralPath $buildLog -Force -ErrorAction SilentlyContinue",
+                "  if ($buildErrLog) { Remove-Item -LiteralPath $buildErrLog -Force -ErrorAction SilentlyContinue }",
+                "}",
+                "",
+                "if ($buildExit -ne 0) {",
+                "  Write-Host 'Could not build this section, so nothing was published.'",
+                "  exit 1",
+                "}",
                 "",
                 "# ---- Deploy to every destination — un-chained, on purpose ---------------",
                 "$allSucceeded = $true",
@@ -240,6 +377,18 @@ public static class TaskScheduling
             return null;
         }
     }
+
+    /// <summary>
+    /// What the wrapper calls the file it leaves this section's folder problems
+    /// in, and what <see cref="ScheduledHealthFindings"/> looks for.
+    ///
+    /// <para>One function rather than two matching string literals, because a
+    /// mismatch between the writer and the reader fails in the quietest way
+    /// available: the record would be written faithfully every night and read
+    /// never, and everything else would look healthy.</para>
+    /// </summary>
+    public static string HealthRecordName(string courseCode, int sectionNumber) =>
+        $"{SafeName(courseCode)}-section{sectionNumber}.txt";
 
     private static string SafeName(string taskName) =>
         new string(taskName.Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());

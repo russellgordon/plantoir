@@ -134,6 +134,223 @@ outstanding.
 
 ## Open — what the mac still owes
 
+- **The folder-problem front end landed on Windows, and it found two defects in
+  the mac's own repair** (Windows, 2026-09-06, branch
+  `issue/windows-folder-problems-front-end`, `GUI-IMPROVEMENTS.md` row 420).
+  Windows implemented `WINDOWS-HANDOFF.md` item 21 — the findings dialog, the
+  Fix button, the two repairs, the outcome report and "Preview Again". Mostly a
+  **know**; the two below are genuine **do**s for this side, both found by
+  porting the mac's code line by line and asking what each branch answers.
+
+  1. **A DIRECTORY named `index.md` is reported to the teacher as ALREADY PUT
+     RIGHT.** `SiteHealthRepair.restoreIndex` (`SiteHealthRepair.swift:294`)
+     asks `FileManager.fileExists(atPath:)`, which is TRUE for a directory, so
+     it returns `.alreadyFine` — "That is already put right. Nothing needed
+     changing." The section still has no front page, so the build still
+     produces no site and the publish still refuses; the one dialog written to
+     end silence says the problem is dealt with. `restoreMedia` two functions
+     above gets this right, with the `isDirectory:` form and a comment saying
+     why. **Windows returns `Failed` here**, which is the honest answer of the
+     two available (the teacher is at least told nothing was put back), though
+     its sentence — "check that the folder isn't locked or read-only" — is
+     still not quite the reason. If the mac wants a better sentence than
+     either, that is a contract case worth proposing back.
+     Windows reference: `SiteHealthRepair.RestoreIndex`, test
+     `ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine`.
+
+  2. **`repair(_:in:)` returns `[String: Result]`, keyed by check NAME, so two
+     findings with the same name collapse.** Two sections each missing a front
+     page are both repaired — the loop runs — but only the LAST result is
+     reported. Section 1 restored and section 2 already fine therefore reads as
+     "That is already put right", with `canRebuild: false` and no preview
+     offered, for a repair that really did put a page back. **Unreachable from
+     the app today** (a section view owns one runner, and
+     `announce_or_stay_quiet` is called once per section), which is why it is
+     listed second — but it is one line to make impossible and a paragraph to
+     explain if left. Windows returns one entry per FINDING and de-duplicates
+     the NAMES when building the sentence, so "Put the front page and the front
+     page back." cannot occur either. Reference: `SiteHealthRepair.Repair`,
+     test `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer`.
+
+  **Two places Windows is deliberately BROADER than the mac, and the mac may
+  want to match — a know rather than a do, but the second one is visible.**
+  The mac hides the marker line by `hasPrefix` after trimming
+  (`SiteHealthFinding.isMarkerLine`), so a marker glued to the tail of another
+  line — which happens when a preceding partial line lacked its newline — is
+  shown to the teacher as raw JSON. Windows hides on `Contains`. And the mac
+  filters only at push, so a half-arrived payload RENDERS in the console until
+  its newline turns up; Windows hides the line under construction too, because
+  a pseudo console hands over whatever bytes are ready and that wait is a
+  whole 150 ms flush. Both are rule 1 leaks on the mac, both are small, and
+  neither is worth a release on its own.
+
+  **What Windows rejected, so it is not re-proposed.** Showing the dialog when
+  the runner FINISHES: `preview.ps1` does not exit while it is serving, so that
+  is Stop-Preview time, hours later — and a section with no `index.md` 404s
+  every request, so the server wait never completes either. Both were tried on
+  the mac and written down (`SectionDetailView.swift:400-409`); Windows
+  attaches to the runner's `HealthFindings` notification instead. Also
+  rejected: showing on the FIRST finding to arrive. `site_health.py` prints its
+  findings in one burst, so they land in one flush and the C# runner announces
+  them one after another on the same stack — showing at once would put up a
+  dialog naming one problem and then a second naming both. Windows posts the
+  presentation to the dispatcher, so the whole flush is collected first.
+  **The mac does not have this problem in practice**, and an earlier draft of
+  this paragraph said flatly that it did: SwiftUI's `onChange(of:)` observes
+  state at the next render, so two synchronous appends read as one change 0→2.
+  `GUI-IMPROVEMENTS.md` row 366 is the evidence — a real run with two findings,
+  watched, showing one dialog titled "2 things need your attention". Corrected
+  here rather than quietly dropped, because a handoff that sends the other side
+  after a non-defect costs them the same afternoon a real one would.
+
+  **What is worth knowing is the shape underneath it**, which is not free:
+  the mac keeps no record of which findings it has already SHOWN, so it is
+  relying on the burst arriving in one flush. If a PTY read ever split it,
+  `showHealthFindings` would hold `[F, G]` behind the dialog already showing
+  `[F]` and F would be shown twice. One `contains` check would close it, and
+  the same split is the thing Windows' own line buffering exists for — so this
+  is a "reasoned from the code, not observed", said plainly.
+
+  **The assistant surface had the same leak, and the mac should check its
+  own.** `LauncherRunner.Capture` on Windows passed every output line straight
+  to the progress reporter and into the 12-line tail the assistant reports
+  back — so the raw `PLANTOIR_HEALTH:` JSON reached a teacher through the
+  assistant, on a surface nobody had looked at. Fixed by lifting findings out
+  of the output before it is narrated, and the sentences now follow the answer
+  through the mac's own `SiteHealthFinding.appending` shape. **Worth checking
+  on the mac**: `AssistSiteWork` calls `SiteHealthFinding.appending(to:from:)`
+  with a `ScriptRunner`, whose transcript already drops the marker at push —
+  but the mac's progress reporting is a different path from its transcript,
+  and if anything there narrates raw lines the same leak is present. Windows
+  also records `FolderProblemFound` from the MCP process, which the mac does
+  not appear to: it matters more here than in the GUI, because a headless
+  server leaves no console behind for the teacher to have seen.
+
+  **The overnight run is covered too, and Windows solved it differently from
+  the mac — this one is worth reading.** It was nearly shipped as a gap: on
+  `dev` the Windows Task Scheduler wrapper had no build step at all, so no
+  health check ran overnight and there was nothing to capture. Pointing the
+  new machinery at it would have produced code that looked finished and
+  reported nothing for ever. Once the branch carrying that build step was
+  merged in, the capture was built.
+
+  **The difference from the mac is the part to consider adopting.** The mac
+  reads its findings out of the scheduled run's LOG FILE, and had to record
+  the log's SIZE before the run because launchd opens it with `O_APPEND` and
+  nothing truncates it — without the offset, last week's markers are re-found
+  every night, the record is rewritten with stale findings for ever, and the
+  "nothing wrong this time" branch becomes unreachable the moment one problem
+  has ever been logged. Windows captures the build's output to a GUID-named
+  file PER RUN and deletes it immediately afterwards, so that class of bug
+  cannot arise: there is no accumulating log to take an offset into. If the
+  mac ever revisits `recordFolderProblems`, a per-run capture removes the
+  offset dance rather than making it more careful.
+
+  Four decisions behind it, none obvious from the diff:
+
+  - **The scan runs BEFORE the build-failure guard.** Since 2026-09-01 a
+    section with no `index.md` exits non-zero from `--build-only`, and that is
+    exactly the run whose findings the teacher most needs in the morning. A
+    scan after the guard would say nothing about the one failure that explains
+    itself. The exit code is saved into a variable the instant the build
+    returns, because everything between it and the guard runs commands of its
+    own.
+  - **No JSON is parsed in PowerShell.** The wrapper copies matching lines
+    verbatim with `Select-String -SimpleMatch`; the app parses them with the
+    same parser a live build uses, so there is no second implementation to
+    keep in step.
+  - **A capture that cannot be set up still publishes.** Losing the findings
+    is a pity; losing the publish is not acceptable, so the build falls back
+    to running plainly.
+  - **The record's filename comes from ONE function** used by both the
+    generated wrapper and the reader. A mismatch there fails in the quietest
+    way available — written faithfully every night, read never.
+
+  **Run at the real thing, three times, because generated shell has no runner
+  behind it** (Windows 11 Pro 26200, Windows PowerShell 5.1.26100, native
+  runtime, course ICD2O section 1). The wrapper's capture block was extracted
+  verbatim and executed against the real `preview.ps1`:
+
+  1. `Media` renamed aside → build exited **0**, the record was written, and it
+     held the real `mediaFolderMissing` marker line.
+  2. `Media` AND `section1/index.md` aside → build exited **1**, and the record
+     still held BOTH markers, `sectionIndexMissing` included. That is the case
+     the whole ordering exists for: the finding that explains the failure is
+     the one a scan placed after the guard would have thrown away.
+  3. Both restored → build exited **0**, no markers, and the stale record from
+     run 2 was **deleted**.
+
+  Four things that could each only have failed at 6 a.m. were settled by
+  running it: `Out-File -LiteralPath` does exist in 5.1; `$LASTEXITCODE` does
+  carry the launcher's own code out through `*>&1 | Out-File`; `Set-Content
+  -Encoding utf8` writes a UTF-8 **BOM** (`EF BB BF`) in 5.1, and
+  `File.ReadAllLines` — the API the reader uses — strips it, verified by
+  reading the real record back and checking the first character is `P` and not
+  `U+FEFF`.
+
+  **And it writes a trail line the mac does not.** Each finding read out of
+  the record is noted as `folder problem found`, dated to when the RUN wrote
+  the record rather than to the morning somebody opened the app. Nothing else
+  records an overnight finding at all: the run happened with the app closed
+  and the console it printed to is gone. **Proposed back to the mac** — the
+  mac's `takeFolderProblems` returns findings to the view and notes nothing,
+  so an overnight problem there is invisible to a problem report. Small, and
+  `ActivityTrail.note` already takes a `moment`.
+
+  **One divergence that is deliberate and visible, so decide rather than
+  inherit it.** Windows forgets what it has shown when a new BUILD starts, so a
+  problem that is still there is reported again by the next preview and again
+  by the publish. The mac gets the same behaviour for free — its runner clears
+  its findings on each run and `onChange` fires afresh — so this is parity
+  rather than divergence; what is written down here is the REASON, because the
+  first Windows cut kept a per-view "already shown" set and it silently ate the
+  case that matters most. Preview reports a missing Media folder, the teacher
+  presses OK and publishes anyway, and the publish's identical finding is the
+  one carrying the sentence about what students can see. Suppressing it as
+  "already shown" loses precisely the sentence the occasion exists for.
+  "Show it once" means once per build, not once per view.
+
+  **Run against the real toolchain, not only against fixtures** (Windows 11 Pro
+  26200, native runtime, working folder `scheduled deploy test`, course ICD2O
+  section 1). With `Media` renamed aside, `preview.ps1 ICD2O 1 --build-only`
+  exited 0 and printed exactly one `PLANTOIR_HEALTH:` line — the real one, with
+  real line endings — beside its `⚠️` sentence. With `Media` restored, the same
+  build printed zero. That second half is the one worth having: a healthy
+  course reporting nothing is what stops this feature from becoming a thing
+  teachers dismiss by habit, and it is not something a fixture can prove.
+
+  **A measurement, and the way it was WRONG, which is the more useful half.**
+  Windows PowerShell 5.1.26100, Windows 11 Pro 26200. `$LASTEXITCODE` does
+  survive a capture pipeline — an inner script exiting 7 yields 7 in the
+  caller through `2>&1 | Tee-Object`, `$v = & script 2>&1`, and
+  `*>&1 | Out-File`. That measurement was taken and believed, and it was
+  measuring the wrong thing: the callee had no
+  `$ErrorActionPreference = 'Stop'`, and every launcher here sets it on line
+  2. Under `Stop`, merging a native command's stderr into the pipeline turns
+  the first stderr LINE into a **terminating** `NativeCommandError` that
+  propagates out of the callee and kills its caller — measured: the piped
+  callee died at its first stderr line and took the caller with it, where the
+  same callee run plainly finished and returned 5. So an overnight deploy
+  would have published nothing and said nothing the first time npm wrote to
+  stderr. Caught by an adversarial review of the finished code, not by the
+  measurement, and this repo already lists it as a platform lesson.
+
+  **If the mac ever captures a launcher's output for the same purpose, the
+  shape to copy is a CHILD PROCESS with OS-level redirection**, not a shell
+  pipeline — on Windows that is `Start-Process
+  -RedirectStandardOutput/-RedirectStandardError`, whose `ExitCode` also
+  removes any dependence on a shell variable surviving. And its arguments go
+  as ONE STRING: an argument array is joined with spaces and quoted not at
+  all, so a working folder whose name contains a space is split at it. The
+  first fixture used a space-free temp path and passed; the real folder is
+  called "scheduled deploy test".
+
+  Reference: `windows-app/Plantoir.Core/Models/SiteHealthRepair.cs`,
+  `windows-app/Plantoir/Views/FolderProblemsDialog.cs`,
+  `windows-app/Plantoir/Views/SectionDetailView.xaml.cs` (the "Folder problems"
+  section), `windows-app/Plantoir.Core/Scripting/TranscriptBuilder.cs`;
+  tests `SiteHealthRepairTests.cs`, `TranscriptHealthFilterTests.cs`.
+
 - **Windows now has the exclusions AND the protection model, and three things
   come back to the mac** (Windows, 2026-08-25, branch
   `issue/windows-special-folders-parity`, `GUI-IMPROVEMENTS.md` row 385).
@@ -408,6 +625,45 @@ rather than being deleted.
 > abandoned partway, so this section is the INDEX and the ledger below is the
 > manual. A change that creates an obligation for the other platform and does
 > not list it has, from their side, not been handed over at all.
+
+- ⚠️ **A COURSE CODE OF "work" COLLIDES WITH THE BUILD WORKSPACE — on WINDOWS
+  only; the mac has no such directory** (found on Windows, 2026-09-06).
+  Corrected the same day: an earlier version of this entry said "on both
+  platforms" and sent nobody anywhere useful, because the colliding folder is
+  created by the Windows launchers alone. `preview.ps1` and `deploy.ps1` set
+  `PLANTOIR_WORK_DIR` to `<buildRoot>\work`; `preview.sh` never sets it, so
+  the Python falls back to `/tmp/quartz-builds` and the mac's builds folder
+  holds only `<CODE>` directories and `working-folder.txt`. **There is nothing
+  for a mac session to look for.**
+
+  Windows now refuses to DELETE by that path
+  (`BuildOutputLocation.WouldCollideWithEveryCourse`), which is the cheap
+  half. **What IS shared is only the naming**: neither `CourseCodeValidator`
+  (Windows — letters, digits, spaces and dashes, up to twelve characters) nor
+  the mac's `CourseCodeRule` reserves the name, so a teacher can create a
+  course called "work" on either platform. On the mac that is harmless today;
+  it stops being harmless the moment anything there adopts a `work` sibling.
+  Worth a shared decision — a reserved-name refusal in both wizards, or a
+  deliberate "we accept this" — rather than leaving it to be rediscovered.
+
+- ⚠️ **DO NOT TELL ANYONE TO FIX A CREDENTIAL WITH `cmdkey` — Plantoir cannot
+  read what it writes** (Windows, 2026-09-06). Awareness rather than work, but
+  it cost an hour here and it would cost a support conversation the same.
+  `deploy.ps1`'s `CredApi` stores and reads the credential blob as **UTF-8**;
+  `cmdkey` writes **UTF-16**. A credential written with `cmdkey` therefore
+  shows up perfectly in `cmdkey /list` and is INVISIBLE to the app, which
+  falls through to asking the teacher for the token again — with no hint that
+  a credential is already sitting there.
+
+  Met twice in one evening: a Cloudflare token stored with `cmdkey` was
+  ignored by the launcher, and the machine's stored Cloudflare ACCOUNT ID had
+  evidently been written the same way long ago. Precisely: `ReadSecret`
+  returns null only when `CredRead` fails or the blob is empty — a UTF-16 blob
+  decodes instead into a NUL-riddled string, which is not the token and does
+  not authenticate. Either way the teacher is asked for a credential that is
+  already stored, with nothing to say so. The fix is to write through the
+  launcher's own `CredApi`. If the mac ever documents credential recovery for
+  Windows — or a support note does — this is the trap.
 
 - ⚠️ **TWO CONTRACT SENTENCES SAY "on your Mac" AND ARE SHOWN TO WINDOWS
   TEACHERS TOO** (Windows, 2026-09-06). `specialNames.renameFolder.explanation`
@@ -2153,6 +2409,69 @@ is what happened to the test-race item, sitting here for three days with
 Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
+
+- ✅ DONE (Windows, 2026-09-06). **The app can finally name where Windows keeps
+  a built website — which turned out to be why two different things were
+  wrong.**
+
+  **What was actually broken.** `BuildFreshness`, the one thing that decides
+  whether Deploy builds before publishing, read
+  `<course>/.merged_output/section<N>/public/index.html` — where builds lived
+  before row 290 moved them out of the working folder. Both of its answers
+  were wrong, and both were reproduced rather than reasoned about: on a course
+  made since the move that file never exists, so it always said "rebuild"
+  (safe, but every publish rebuilt); on a course carrying a leftover
+  `.merged_output`, it read the leftover, and one newer than the notes made it
+  answer "no rebuild needed" about a file that is not what Windows publishes.
+
+  The reason it went unnoticed is the useful part: **nothing in the C# knew
+  the build path at all.** Only the launchers and the Python did. That is also
+  why item 19's owed work had never been done — there was nothing in the app
+  that could name the folder to clear it.
+
+  **What was rejected.** Writing a second hash of the working folder's path.
+  The plan called for it and the plan was wrong: `FolderContainers` has
+  derived exactly that value for the container name since it was written, and
+  CLAUDE.md warns about this derivation by name. `FolderIdentifier` was
+  extracted from it instead — which is what the mac did too.
+
+  **Nothing for the mac to check here** — and an earlier version of this entry
+  wrongly asked it to. Windows clears a course's build at FIVE moments
+  (archive a course, archive a section, restore a section, restore a course,
+  restore a backup) because it has no symlink. The mac already clears
+  explicitly at four of them (`CourseArchiver.archive` for a course and for a
+  section, `CourseRestorer` for a section from an archive and from a backup),
+  and the two whole-course cases are covered by a rule that NAMES them:
+  `BuildOutputLocation.ensureLink`'s own comment says "archiving a course,
+  restoring one from a backup and replacing a course's contents all remove the
+  link… so a build folder found with no link pointing at it is cleared rather
+  than adopted". That is a decision with its reasoning written down, not luck,
+  and asking a mac session to "confirm" it would send them to re-derive
+  something already settled.
+
+  **A scheduled deploy had no build step**, which is a Windows-only gap the
+  mac closed long ago in its launchd script. Fixed by building
+  unconditionally; the reasoning and the hang it nearly introduced are in
+  GUI-IMPROVEMENTS row 418.
+
+  **Verified by publishing.** `verify-deploy.ps1` (new — Windows had no deploy
+  gate of any kind) ran every destination and every pairing against real
+  sites: **36 passed, 0 failed, 0 skipped**, each site fetched back and read.
+  Four harness faults had to be fixed to get a green worth trusting, and one
+  of them is the reason this entry exists at all: the three Cloudflare legs
+  were publishing to NETLIFY and passing, because `deploy.ps1` never reads
+  `deploy_target` from the configuration and needs `--target cloudflare`,
+  and the harness then verified a `netlify.app` address as proof of a
+  Cloudflare publish. **A false pass is worse than a skip**: a skip says
+  nothing ran; a false pass says something ran correctly.
+
+  **Reference:** `Plantoir.Core/Models/BuildOutputLocation.cs` (new),
+  `FolderContainers.FolderIdentifier`, `BuildFreshness.NeedsRebuild(course,
+  section, buildsRoot)`, `CourseArchiver.DiscardBuilds`, `CourseRestorer`,
+  `Assist/TaskScheduling.WriteWrapperScript`, `verify-deploy.ps1`. Tests:
+  `BuildOutputLocationTests` (14, including the contract's five
+  `buildFreshness` rules, never run on Windows before), `BuildFreshnessTests`
+  repointed, `TaskSchedulingTests`.
 
 - ✅ DONE (Windows, 2026-09-06). **Items 15 and 16 ported: a course's own
   words for a unit and for its class folder. Nothing is asked of the mac — this

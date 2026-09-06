@@ -146,3 +146,7 @@ GitHub automatically resolves `releases/latest/download/<filename>` to the newes
 2. On Mac: Run `./mac-app/publish.sh -Sign` -> produces `Plantoir-macOS.dmg`.
 3. In terminal / assistant: Ask Claude / Antigravity to **"Cut the release"**.
 4. The automated skill drafts teacher-friendly release notes, confirms SHA-256 hashes, creates the draft release, uploads both assets, publishes the release, updates `site.json`, redraws the social card, and pushes to `main`.
+
+---
+
+[◀ Previous: The Local AI Assistant](10-local-ai-assistant.md) · [Back to index](README.md) · [Next: The Windows App ▶](12-windows-app.md)

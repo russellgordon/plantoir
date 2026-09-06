@@ -22,9 +22,17 @@ an item when it ships (finished behaviour is recorded in
   A person at a keyboard answers that in two seconds. The harness had a stdin
   nobody was typing into, and waited forever.
 
+  **PARTLY CLOSED 2026-09-06, and the remaining half is the half this entry is
+  about.** The wrapper now runs with `-NonInteractive`
+  (`TaskScheduling.TaskRunCommand`), which makes PowerShell's own `Read-Host`
+  THROW instead of waiting — that closes `preview.ps1`'s "Continue anyway?"
+  question. It does **nothing** for the question described below, because
+  `deploy.py`'s `input()` runs in a PYTHON child and PowerShell's flag does not
+  reach it. What protects that one today is only `sys.stdin.isatty()` being
+  false, which takes the default silently rather than refusing.
+
   **Why it matters beyond the harness.** `TaskScheduling.WriteWrapperScript`
-  generates `& <deploy.ps1> <args>` with no stdin redirection and no
-  non-interactive flag. The mac's `launchd` path has the same shape. (Whether
+  generates `& <deploy.ps1> <args>` with no stdin redirection. The mac's `launchd` path has the same shape. (Whether
   Task Scheduler gives it a console is exactly the open question below, and it
   is not assumed here.) So the flagship "publish tomorrow's
   class" feature, on a course whose site has been deleted upstream — or on a

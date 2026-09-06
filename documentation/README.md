@@ -27,6 +27,7 @@ static-site generator.
 | 9 | [The macOS App — Plantoir](09-mac-app.md) | The native GUI (`mac-app/`), how it drives the same scripts, and how it delivers the toolchain itself |
 | 10 | [The Local AI Assistant](10-local-ai-assistant.md) | What the on-device model is and how it is configured, with enough background on language models to follow it — and how a typed sentence becomes a Swift function call |
 | 11 | [Release Strategy & Production Deployment](11-release-strategy.md) | The packaging, Developer ID code-signing, Apple Notarization, Azure Trusted Signing, Inno Setup, and cross-platform release pipeline |
+| 12 | [The Windows App — Plantoir](12-windows-app.md) | The WinUI 3 GUI (`windows-app/`), how it differs from the mac (no container, a native runtime, ConPTY, Credential Manager, Task Scheduler), and where it keeps things |
 
 ## The one-paragraph summary
 

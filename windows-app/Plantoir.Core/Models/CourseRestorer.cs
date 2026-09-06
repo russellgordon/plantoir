@@ -24,6 +24,10 @@ public static class CourseRestorer
                     $"Section {section} of {item.CourseCode} already exists. Remove it first if you want the archived copy back.");
             Extract(item.FilePath, "section" + section, course.DirectoryPath);
             PutSectionBack(course, section);
+            // The restored section's notes can be OLDER than a built site left
+            // standing outside the working folder, which would read as "already
+            // up to date" and publish the site this section used to have.
+            CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode, section);
         }
         else
         {
@@ -32,6 +36,7 @@ public static class CourseRestorer
                 throw new RestoreException(
                     $"{item.CourseCode} is already in Courses & Clubs. Remove it first if you want the archived copy back.");
             Extract(item.FilePath, item.CourseCode, coursesDirectory);
+            CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
         }
         // A restored thing is no longer archived (failure to delete is not fatal).
         try { File.Delete(item.FilePath); } catch { }
@@ -55,6 +60,7 @@ public static class CourseRestorer
         if (!Directory.Exists(destination))
         {
             Extract(item.FilePath, item.CourseCode, coursesDirectory);
+            CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
             return;
         }
 
@@ -77,6 +83,11 @@ public static class CourseRestorer
         }
         finally
         {
+            // Whatever happened to the contents, the built site no longer
+            // matches them: a backup's pages are by definition older than the
+            // ones just replaced, so a build left standing would read as newer
+            // and publish what the course used to say.
+            CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
             try { Directory.Delete(staging, recursive: true); } catch { }
         }
     }

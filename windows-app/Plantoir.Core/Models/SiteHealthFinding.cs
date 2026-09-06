@@ -144,4 +144,26 @@ public sealed record SiteHealthFinding(
     /// "folder problem found".</para>
     /// </summary>
     public string TrailSentence => $"found a problem with this course’s folders ({Name})";
+
+    /// <summary>
+    /// A message with what the build found about the folders added to the end
+    /// of it, or the message unchanged when it found nothing.
+    ///
+    /// <para>How a folder problem reaches somebody talking to the ASSISTANT,
+    /// which has no dialog to raise and no window to raise it in. The sentence
+    /// and the detail are the payload's own, exactly as in the app's dialog —
+    /// the whole point of the wording travelling in the line is that the same
+    /// problem cannot be worded three different ways.</para>
+    ///
+    /// <para>Appended rather than headlined: the teacher asked for something,
+    /// and the answer to what they asked comes first. Matches the mac's
+    /// <c>SiteHealthFinding.appending(to:from:)</c>.</para>
+    /// </summary>
+    public static string Appending(string message, IReadOnlyList<SiteHealthFinding>? findings)
+    {
+        if (findings is null || findings.Count == 0) return message;
+        var parts = new List<string> { message };
+        foreach (var finding in findings) parts.Add(finding.Sentence + " " + finding.Detail);
+        return string.Join("\n\n", parts);
+    }
 }

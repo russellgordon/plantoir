@@ -48,6 +48,22 @@ support files ──────┘                        │                  
    [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
    `buildOutputLocation`.
 
+   **"Every reader keeps naming the path it already names" is true on the MAC
+   only, and assuming otherwise cost a real bug.** The link is what makes it
+   true there. Windows has no link, so a reader that names
+   `courses/<CODE>/.merged_output` on that platform is naming a place nothing
+   writes to any more — and `BuildFreshness`, the one thing that decides
+   whether a publish rebuilds first, was exactly such a reader until
+   2026-09-06. It answered from a location Windows had abandoned while the
+   publish came from the real one: always "rebuild" on a course made since the
+   move, and — on a course still carrying a leftover `.merged_output` — "no
+   rebuild needed" about a file that was not what would be published. On
+   Windows the build path is now named once in C# by
+   `Plantoir.Core/Models/BuildOutputLocation.cs`, which takes the folder id
+   from `FolderContainers.FolderIdentifier` rather than deriving it a second
+   time. **Anything on that platform that needs to find a built site should
+   ask that type, and nothing should spell `.merged_output` by hand.**
+
 ## Stage 1: Validation and preflight discovery
 
 After checking that the course, section folder, and `course_config.json`
@@ -218,6 +234,15 @@ transcript they already read. The teacher-facing sentence travels INSIDE that
 line rather than being written again in Swift and C#, which is what stops the
 same problem being worded differently on the two platforms. The sentences
 themselves live in `contracts/shared-rules.json` → `siteHealth.checks`.
+
+**The marker line is hidden from every surface a teacher reads**, and printing
+the sentence separately is what makes that free. A JSON payload is machinery
+(`CLAUDE.md` rule 1), so each app drops the line on its way into the console —
+and on Windows also on its way into the assistant's progress messages and the
+tail it reports back, which is a second surface and was leaking until
+2026-09-06. Anything that narrates raw launcher output is such a surface; the
+question to ask of a new one is not whether it shows the transcript but whether
+it shows a LINE.
 
 Two of the checks stay quiet unless the other half of the map exists: a
 brand-new course has an empty curriculum folder and an empty class folder on
