@@ -2410,6 +2410,54 @@ Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
 
+- ✅ DONE (Windows, 2026-09-06). **Four stale branches triaged and deleted —
+  one merged, three superseded. Their tips are recorded here so the call can
+  be undone.**
+
+  Asked to work out whether four long-sitting branches were already in `dev`
+  and to merge the ones that were not. Every verdict was reached by diffing
+  each branch's own changes (`git diff dev...<branch>`) hunk by hunk against
+  `dev`'s CURRENT file, and each was then checked by an independent reviewer
+  on a different model before anything was merged or deleted — which was
+  worth it: the review corrected two of the triage's stated reasons, both
+  wrong, without changing any verdict.
+
+  | Branch | Tip | Verdict |
+  |---|---|---|
+  | `ai-assist` | `92f54a92` | Already wholly in `dev` (0 commits ahead). |
+  | `issue/windows-assist-model-in-use-guard` | `f80f2129` | **Merged** (`b2f159ea`). |
+  | `new-screenshots` | `c0cd82fe` | Superseded; 5 commits never in `dev`. |
+  | `perf/wsl2-ext4-build-acceleration` | `0f50ea65` | Superseded; 4 commits never in `dev`. |
+
+  **The two superseded branches' commits are NOT in `dev`**, so deleting the
+  branches made those commits unreachable. That is why the tips are written
+  down: `git fetch origin <sha>` still reaches them until the remote garbage-
+  collects, and the SHAs are the only way back afterwards. Recording them
+  cost one line each; reconstructing a judgement about work nobody can find
+  costs an afternoon.
+
+  - `perf/wsl2-ext4-build-acceleration` was the PROTOTYPE of the
+    container-internal ext4 staging that landed as `ed868215` and has
+    evolved well past it since — `_clear_stale_host_site`, an fsync on the
+    host directory, `stop_preview.py` taking two `--dir` arguments instead
+    of the branch's string-replace on the target path, and
+    `rebuild_for_production()` in place of the inline `npx quartz build`
+    that this file's own entry at "deploy.py failed when rebuilding for
+    production" records as having crashed. Merging it would have gone
+    backwards.
+  - `new-screenshots` has every one of its code changes in `dev` already,
+    plus a `-PassThru` exit-code fix in `capture_windows.py` the branch
+    never got. Its `site/img` binaries are two days OLDER than `dev`'s, so
+    merging would have reverted the screenshots rather than updating them.
+
+  **Two reasons given for the `perf` verdict were wrong, and are corrected
+  here rather than left to be repeated.** It was claimed that merging would
+  regress `_ensure_media_symlink` (branch absolute, `dev` relative) and the
+  npm-install freshness check. Neither is true: `dev` passes the same
+  resolved absolute path through `toolchain_paths.link_directory`, and `dev`
+  dropped the package-lock mtime comparison too. The verdict held on the
+  evidence that survived, which is the point of having the check.
+
 - ✅ DONE (Windows, 2026-09-06). **The app can finally name where Windows keeps
   a built website — which turned out to be why two different things were
   wrong.**
