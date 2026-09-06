@@ -151,9 +151,28 @@ function Run-Launcher {
         $stdin = Join-Path $work ("answers-" + [Guid]::NewGuid().ToString('N').Substring(0,6) + ".txt")
         Write-Utf8NoBom $stdin (($Answers -join "`r`n") + "`r`n")
     }
+    # The launcher is run from a generated .cmd rather than invoked directly,
+    # so that cmd records its OWN errorlevel to a file.
+    #
+    # Why not just read $process.ExitCode: `Start-Process -PassThru` combined
+    # with `-RedirectStandardInput` returns a process whose ExitCode is EMPTY
+    # even though HasExited is True. Measured on this machine - the identical
+    # call WITHOUT the redirect returns the code correctly, with it the
+    # property is blank. Two real Netlify publishes were reported as failures
+    # by this script for that reason alone, while the site they had just
+    # published answered HTTP 200. A harness that calls a success a failure is
+    # worse than no harness: the next person spends the evening looking for a
+    # bug in the product.
+    $codeFile = Join-Path $work ("code-" + [Guid]::NewGuid().ToString('N').Substring(0,6) + ".txt")
+    $runner = Join-Path $work ("run-" + [Guid]::NewGuid().ToString('N').Substring(0,6) + ".cmd")
+    Write-Utf8NoBom $runner (@(
+        "@echo off",
+        "call .\$Script $quoted > `"$LogFile`" 2>&1",
+        "echo %ERRORLEVEL% > `"$codeFile`""
+    ) -join "`r`n")
+
     $startArgs = @{
-        FilePath = "cmd.exe"
-        ArgumentList = @("/c", ".\$Script $quoted > `"$LogFile`" 2>&1")
+        FilePath = $runner
         WorkingDirectory = $WorkingFolder
         PassThru = $true
         WindowStyle = "Hidden"
@@ -163,12 +182,19 @@ function Run-Launcher {
     if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
         try { $process.Kill($true) } catch { }
         $partial = if (Test-Path $LogFile) { Get-Content $LogFile -Raw } else { "" }
-        # 124 is "timed out", kept distinct from any exit code the launcher
-        # itself can return, so a hang never reads as a refusal.
+        # 124 is "timed out", kept distinct from any code the launcher itself
+        # can return, so a hang never reads as a refusal.
         return @{ ExitCode = 124; Log = $partial }
     }
+    try { $process.WaitForExit() } catch { }
+
     $text = if (Test-Path $LogFile) { Get-Content $LogFile -Raw } else { "" }
-    return @{ ExitCode = $process.ExitCode; Log = $text }
+    $code = -1
+    if (Test-Path $codeFile) {
+        $raw = (Get-Content $codeFile -Raw).Trim()
+        if ($raw -match '^-?\d+$') { $code = [int]$raw }
+    }
+    return @{ ExitCode = $code; Log = $text }
 }
 
 function Check-Folder {
@@ -183,9 +209,21 @@ function Check-Folder {
 }
 
 function Check-Url {
-    param([string]$What, [string]$Url)
+    param([string]$What, [string]$Url, [int]$Attempts = 6)
+    # A site created moments ago does not answer immediately - the first run of
+    # this script reported a 404 for a Netlify site that answered 200 a few
+    # minutes later in the very next case. A publish is not wrong because DNS
+    # is slow, so this waits rather than judging on the first try.
+    $response = $null
+    foreach ($attempt in 1..$Attempts) {
+        try {
+            $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 60
+            if ($response.StatusCode -eq 200) { break }
+        } catch { $response = $null }
+        if ($attempt -lt $Attempts) { Start-Sleep -Seconds 20 }
+    }
     try {
-        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 60
+        if ($null -eq $response) { No "$What could not be fetched after $Attempts tries"; return }
         if ($response.StatusCode -ne 200) { No "$What answered HTTP $($response.StatusCode)"; return }
         Ok "$What answered HTTP 200"
         if ($response.Content -match 'ws://localhost:') { No "$What is serving the preview's live-reload client" }
