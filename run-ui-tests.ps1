@@ -27,10 +27,15 @@
 
     NOTHING OF YOURS IS TOUCHED
     ===========================
-    The app is launched with `--state-dir`, so its settings file and its
-    breadcrumb trail go to a temporary folder that is deleted afterwards; the
-    working folder is built from scratch. Your own working folder, remembered
-    windows and window positions are not read or written.
+    The app is launched with `--state-dir`, which moves its ENTIRE Plantoir
+    folder - settings, the breadcrumb trail, the startup log, scheduled-deploy
+    sentinels, models, built sites - to a temporary folder deleted afterwards;
+    the working folder is built from scratch. Your own working folder,
+    remembered windows and window positions are not read or written.
+
+    The exception worth knowing: the LAUNCHERS compute the builds root
+    themselves, so do not write a test that previews or schedules from a
+    redirected run without reading `AppDataRoot` first.
 
     A RUNNING PLANTOIR IS CLOSED
     ============================
