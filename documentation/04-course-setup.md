@@ -276,6 +276,43 @@ first. Both wizards write it at creation, and a rename in Course Settings
 writes it even on a course that never had one. The old guess is kept as the
 fallback, never replaced.
 
+## Which of a course's folders the build treats specially
+
+Most of a course folder is the teacher's to arrange however they like. A
+handful of names are not: the build reads them, and renaming or deleting one
+changes what appears on the site — usually without an error, because a folder
+that is not there simply contributes nothing.
+
+| What | Where the name comes from |
+|---|---|
+| The lessons folder | Every per-section folder the build counts as a class folder — the recorded `class_folder`, plus any whose name mentions classes. New class pages are written to one; the coverage map counts all of them. |
+| The curriculum folder | `curriculum_folder` if it names a folder the course has, otherwise the alphabetically first shared folder whose name mentions the curriculum. |
+| The folders that count for marks | `graded_folders`, or — for a course never asked — every folder whose name contains "task". An ABSENT key and an EMPTY list are different answers; see [`08-course-config-reference.md`](08-course-config-reference.md). |
+| `Media` | Managed by the build and kept out of the sidebar. |
+| `index.md` | The page a folder opens on, in every section and every folder. |
+| `Key Links.md` | The sidebar's shortcut list. The build adds the curriculum map to it and leaves the teacher's own entries alone. |
+| `Curriculum Coverage` | Written by the build on every run. A teacher's own page of that name would be replaced. |
+
+**Both apps can show a teacher this list for their own course**, from Course
+Settings → "What else does Plantoir use my folders for?". Two things about
+that sheet are deliberate and easy to undo by accident:
+
+- **It names the folders the course actually has, never the rule that finds
+  them.** "Your expectations live in Ontario Curriculum" is something a
+  teacher can act on; "any folder whose name mentions the curriculum" invites
+  them to get creative with it and turns an implementation detail into a
+  promise the product then has to keep. This is also why the sheet is
+  per-course rather than one static help page — the answers genuinely differ.
+- **The names come from the RESOLVED rules, not the raw configuration keys.**
+  A course whose `curriculum_folder` was never written still has a curriculum
+  folder as far as the build is concerned, and telling that teacher to create
+  one they already have is the one failure a sheet about folder names cannot
+  afford.
+
+The rows, the sentences and the cases are
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`specialFoldersHelp`, so both apps say the same thing about the same course.
+
 ---
 
 [◀ Previous: Launcher Scripts](03-launcher-scripts.md) · [Back to index](README.md) · [Next: The Build Pipeline ▶](05-build-pipeline.md)
