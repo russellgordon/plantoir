@@ -46,6 +46,20 @@ Two things that are NOT in that list and should be known:
   with 5 failing contract tests before this series; those five were each a
   real gap between what the contract says Windows does and what it did.
 
+## A model layer exists ahead of its UI — four types nothing calls yet (2026-09-06)
+
+`SpecialFolderRenamer`, `FolderPathRewriter`, `CloudSyncedFolder` and
+`CloudSyncWording` are built, documented and under test, and **nothing in
+`windows-app/Plantoir` calls any of them.** That is deliberate, not an
+oversight: items 13 and 18 were taken as far as they could go without
+inventing teacher-facing wording and dialogs, so the rules landed first and
+the views are what remains.
+
+Grep for callers and you will find none — that is the expected answer, and it
+is written here so nobody concludes they have missed a wiring step or deletes
+the types as dead code. The same goes for the four trail events below: the
+features that would raise them are these same two.
+
 ## Four activity-trail events are declared but not yet emitted (2026-09-06)
 
 `ActivityTrail.Event` names `folder renamed`, `folder created`,
