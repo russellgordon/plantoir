@@ -18,8 +18,13 @@ public class ClassPlanningContractTests
             string title = c["title"]!.ToString();
             int? expectUnit = c["expectUnit"]?.GetValue<int>();
             int? expectDay = c["expectDay"]?.GetValue<int>();
+            // A case with no `term` uses the DEFAULT word — which is what a
+            // course says when `unit_word` is absent, and what every course
+            // made before 2026-09-01 says. Read with a default rather than
+            // treated as a new shape, or every pre-existing case breaks.
+            string? term = c["term"]?.ToString();
 
-            var parsed = UnitDay.Parse(title);
+            var parsed = UnitDay.Parse(title, term);
             if (expectUnit is null)
             {
                 Assert.Null(parsed);

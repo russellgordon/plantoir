@@ -454,12 +454,19 @@ public sealed class AssistWorkspace
             string wanted = title.Trim();
             if (wanted.Length == 0) continue;
 
-            // Expand unit if title is like "Unit 4"
-            if (wanted.StartsWith("Unit ", StringComparison.OrdinalIgnoreCase) &&
-                int.TryParse(wanted[5..].Trim(), out int unitNum) && !wanted.Contains(','))
+            // Expand a whole unit if the title is like "Unit 4" - in the
+            // course's OWN word, so "publish Module 4" is understood at all.
+            // Reading only the literal "Unit" does not refuse: it matches
+            // nothing, the request quietly names no pages, and the teacher is
+            // told their unit is empty. The mac shipped exactly that for a few
+            // hours; it is the input half of this feature and the half that
+            // fails silently.
+            string unitWord = course.Configuration.UnitWord;
+            if (wanted.StartsWith(unitWord + " ", StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(wanted[(unitWord.Length + 1)..].Trim(), out int unitNum) && !wanted.Contains(','))
             {
                 var unitPages = pagesList.Where(p => p.IsClassPage &&
-                    p.Title.StartsWith($"Unit {unitNum},", StringComparison.OrdinalIgnoreCase)).ToList();
+                    p.Title.StartsWith($"{unitWord} {unitNum},", StringComparison.OrdinalIgnoreCase)).ToList();
                 var ordered = isDraft ? unitPages.OrderByDescending(p => p.Title) : unitPages.OrderBy(p => p.Title);
                 foreach (var up in ordered)
                 {
@@ -1002,7 +1009,7 @@ public sealed class AssistWorkspace
         // C:\Users\x\Classroom\ made every page in every course a class page.
         bool isClassPage = ClassFolderRule.IsClassPage(
             Relative(pagePath),
-            ClassFolderRule.Names(course.Configuration.PerSectionFolders));
+            ClassFolderRule.Names(course.Configuration.ClassFolder, course.Configuration.PerSectionFolders));
         return new PlannedPage(
             Title: Path.GetFileNameWithoutExtension(pagePath),
             RelativePath: Relative(pagePath),
@@ -1317,7 +1324,7 @@ public sealed class AssistWorkspace
         foreach (var p in allMarkdown)
         {
             var planned = Plan(course, section, p, draft: !publishing, viaLink: false);
-            if (planned.IsClassPage && UnitDay.Parse(planned.Title) is { } ud && ud.Unit == unit)
+            if (planned.IsClassPage && UnitDay.Parse(planned.Title, course.Configuration.UnitWord) is { } ud && ud.Unit == unit)
             {
                 unitPages.Add(planned);
             }
@@ -1331,11 +1338,11 @@ public sealed class AssistWorkspace
                 PlanText: null,
                 Summary: null,
                 AlreadyDoneSentence: null,
-                ErrorMessage: $"I can’t find any class pages in Unit {unit} of {course.Code} Section {section}.");
+                ErrorMessage: $"I can’t find any class pages in {course.Configuration.UnitWord} {unit} of {course.Code} Section {section}.");
         }
 
         // Only the ones that would actually move, ordered highest day first (matching Swift)
-        unitPages = unitPages.OrderByDescending(p => UnitDay.Parse(p.Title)?.Day ?? 0).ToList();
+        unitPages = unitPages.OrderByDescending(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList();
 
         var moving = new List<string>();
         foreach (var p in unitPages)
@@ -1349,8 +1356,8 @@ public sealed class AssistWorkspace
         if (moving.Count == 0)
         {
             string already = publishing
-                ? $"Unit {unit} has already been published."
-                : $"Unit {unit} is already hidden.";
+                ? $"{course.Configuration.UnitWord} {unit} has already been published."
+                : $"{course.Configuration.UnitWord} {unit} is already hidden.";
             return new WholeUnitPlanResult(
                 HasPages: true,
                 MovingCount: 0,
@@ -1366,7 +1373,7 @@ public sealed class AssistWorkspace
         string startingPhrase = publishing ? "starting at" : "starting from";
 
         var lines = new List<string>();
-        lines.Add($"{course.Code} Section {section}: {(publishing ? "publishing" : "unpublishing")} Unit {unit}.");
+        lines.Add($"{course.Code} Section {section}: {(publishing ? "publishing" : "unpublishing")} {course.Configuration.UnitWord} {unit}.");
         lines.Add("");
         lines.Add($"{moving.Count} {word} would become {becoming}, {startingPhrase} “{startPage}”.");
         if (publishing)
@@ -1378,7 +1385,7 @@ public sealed class AssistWorkspace
             lines.Add("Pages only they use come down too; anything still needed stays.");
         }
 
-        string summary = $"Worked out what {(publishing ? "publishing" : "unpublishing")} Unit {unit} would do.";
+        string summary = $"Worked out what {(publishing ? "publishing" : "unpublishing")} {course.Configuration.UnitWord} {unit} would do.";
         string planText = string.Join("\n", lines);
         return new WholeUnitPlanResult(
             HasPages: true,
@@ -1405,19 +1412,19 @@ public sealed class AssistWorkspace
         foreach (var p in allMarkdown)
         {
             var planned = Plan(course, section, p, draft: !publishing, viaLink: false);
-            if (planned.IsClassPage && UnitDay.Parse(planned.Title) is { Unit: var u } && u == unit)
+            if (planned.IsClassPage && UnitDay.Parse(planned.Title, course.Configuration.UnitWord) is { Unit: var u } && u == unit)
             {
                 unitPages.Add(planned);
             }
         }
 
         if (unitPages.Count == 0)
-            return new AssistResult(false, $"I can’t find any class pages in Unit {unit} of {course.Code} Section {section}.", null);
+            return new AssistResult(false, $"I can’t find any class pages in {course.Configuration.UnitWord} {unit} of {course.Code} Section {section}.", null);
 
         // Highest day first to take a unit down; Day 1 first to put it up.
         unitPages = publishing
-            ? unitPages.OrderBy(p => UnitDay.Parse(p.Title)?.Day ?? 0).ToList()
-            : unitPages.OrderByDescending(p => UnitDay.Parse(p.Title)?.Day ?? 0).ToList();
+            ? unitPages.OrderBy(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList()
+            : unitPages.OrderByDescending(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList();
 
         if (publishing) RefuseIfPlantoirIsBuilding(course);
 
@@ -1429,7 +1436,7 @@ public sealed class AssistWorkspace
         }
 
         string verb = publishing ? "published" : "unpublished";
-        _undo?.Begin($"{verb} Unit {unit} in {course.Code} Section {section}");
+        _undo?.Begin($"{verb} {course.Configuration.UnitWord} {unit} in {course.Code} Section {section}");
 
         bool changedAnything = false;
         var changed = new List<string>();
@@ -1482,12 +1489,12 @@ public sealed class AssistWorkspace
         if (!changedAnything)
         {
             string already = publishing
-                ? $"Unit {unit} has already been published."
-                : $"Unit {unit} is already hidden.";
+                ? $"{course.Configuration.UnitWord} {unit} has already been published."
+                : $"{course.Configuration.UnitWord} {unit} is already hidden.";
             return new AssistResult(true, already, backup);
         }
 
-        string summary = $"Unit {unit} was {verb}.";
+        string summary = $"{course.Configuration.UnitWord} {unit} was {verb}.";
 
         if (!preview)
             return new AssistResult(true, summary, backup);
@@ -2418,7 +2425,7 @@ public sealed class AssistWorkspace
         var added = new List<NewClass>();
         for (int i = 0; i < count; i++)
         {
-            string title = $"Unit {unit}, Day {atDay + i}";
+            string title = $"{course.Configuration.UnitWord} {unit}, Day {atDay + i}";
             added.Add(new NewClass(title, Relative(Path.Combine(folder, title + ".md")),
                                    runway[i], atDay + i));
         }
@@ -2428,7 +2435,7 @@ public sealed class AssistWorkspace
         var renames = new List<Rename>();
         foreach (var moving in shifted.Where(c => c.Unit == unit).OrderByDescending(c => c.Day))
         {
-            string to = $"Unit {unit}, Day {moving.Day + count}";
+            string to = $"{course.Configuration.UnitWord} {unit}, Day {moving.Day + count}";
             renames.Add(new Rename(moving.Title, to, moving.Path, Path.Combine(folder, to + ".md")));
         }
 
@@ -2441,7 +2448,7 @@ public sealed class AssistWorkspace
             var to = runway[count + i];
             if (moving.Date == to) continue;
 
-            string name = moving.Unit == unit ? $"Unit {unit}, Day {moving.Day + count}" : moving.Title;
+            string name = moving.Unit == unit ? $"{course.Configuration.UnitWord} {unit}, Day {moving.Day + count}" : moving.Title;
             moves.Add(new DateMove(name, Relative(moving.Path), moving.Date ?? to, to));
         }
 
@@ -2712,7 +2719,7 @@ public sealed class AssistWorkspace
             int highestDay = 0;
             foreach (var t in existingTitles)
             {
-                if (UnitDay.Parse(t) is { } ud && ud.Unit == specificUnit && ud.Day > highestDay)
+                if (UnitDay.Parse(t, course.Configuration.UnitWord) is { } ud && ud.Unit == specificUnit && ud.Day > highestDay)
                     highestDay = ud.Day;
             }
             return PlanAddClasses(courseCode, sectionNumber, specificUnit, highestDay + 1, howMany);
@@ -2720,8 +2727,8 @@ public sealed class AssistWorkspace
 
         bool startingANewUnit = string.Equals(unitAsked, "next", StringComparison.OrdinalIgnoreCase);
         UnitDay next = startingANewUnit
-            ? NextClassPlanner.FirstDayOfANewUnit(existingTitles)
-            : NextClassPlanner.NextUnitAndDay(existingTitles);
+            ? NextClassPlanner.FirstDayOfANewUnit(existingTitles, course.Configuration.UnitWord)
+            : NextClassPlanner.NextUnitAndDay(existingTitles, course.Configuration.UnitWord);
 
         return PlanAddClasses(courseCode, sectionNumber, next.Unit, next.Day, 1);
     }
@@ -2774,7 +2781,8 @@ public sealed class AssistWorkspace
         // The naming half of the shared rule
         // (contracts/class-planning.json -> classFolder.naming).
         return Path.Combine(course.SectionDirectory(sectionNumber),
-                            ClassFolderRule.Name(course.Configuration.PerSectionFolders));
+                            ClassFolderRule.Name(course.Configuration.ClassFolder,
+                                                 course.Configuration.PerSectionFolders));
     }
 
     /// <summary>
