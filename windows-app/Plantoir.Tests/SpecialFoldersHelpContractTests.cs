@@ -47,13 +47,21 @@ public class SpecialFoldersHelpContractTests
         return CourseConfiguration.FromBytes(Encoding.UTF8.GetBytes(json.ToJsonString()));
     }
 
-    private static string NameOfRow(CourseConfiguration config, string key) => key switch
+    /// <summary>
+    /// The row a case is talking about, found by the contract's own `key`
+    /// rather than by a position typed in here. Hard-coded indices would go on
+    /// passing after a row was inserted above them, testing the wrong row and
+    /// saying nothing — which is the failure this whole file exists to catch.
+    /// </summary>
+    private static string NameOfRow(CourseConfiguration config, string key)
     {
-        "lessons" => SpecialFoldersHelp.Entries(config)[0].Name,
-        "curriculum" => SpecialFoldersHelp.Entries(config)[1].Name,
-        "graded" => SpecialFoldersHelp.Entries(config)[2].Name,
-        _ => throw new Xunit.Sdk.XunitException($"the contract names a row this test cannot read: {key}"),
-    };
+        var rows = Contract()["rows"]!.AsArray();
+        for (int i = 0; i < rows.Count; i++)
+            if (rows[i]!["key"]!.ToString() == key)
+                return SpecialFoldersHelp.Entries(config)[i].Name;
+
+        throw new Xunit.Sdk.XunitException($"a case names a row the contract does not list: {key}");
+    }
 
     [Fact]
     public void TheSheetNamesEachCoursesOwnFolders()

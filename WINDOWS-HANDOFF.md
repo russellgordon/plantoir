@@ -1013,8 +1013,32 @@ this side is expected to say so when the contract is wrong.
     was written to end. The trail line is a diagnosis after the fact, not a
     warning at the time.
 
-22. **The "Folders Plantoir uses" sheet (mac row 361, 2026-08-23) — NEVER
-    PORTED, and it was in no list until 2026-09-06.** The mac's Course
+22. ~~**The "Folders Plantoir uses" sheet (mac row 361, 2026-08-23)**~~ —
+    ✅ Done 2026-09-06, branch `issue/windows-special-folders-help`,
+    `GUI-IMPROVEMENTS.md` row 422.
+
+    **Porting it turned out to mean writing the rules down first.** The mac's
+    version keeps its entire rule set inside a SwiftUI view, so there was
+    nothing shared to implement against and nothing a test on either side
+    could reach. `contracts/shared-rules.json` → `specialFoldersHelp` now
+    carries the title, the intro, the seven rows in order with their
+    sentences, the listing grammar, the banned vocabulary and six cases;
+    `Plantoir.Core/Models/SpecialFoldersHelp.cs` implements it and
+    `Plantoir/Views/SpecialFoldersHelpDialog.cs` draws it, writing no sentence
+    of its own. Two cases are PROPOSED for the mac rather than describing it —
+    see `MAC-HANDOFF.md`; the mac names the raw `curriculum_folder` key where
+    the build resolves past it, which affects every real course checked.
+
+    **The one thing worth carrying forward from doing it:** the banned-word
+    list here is not rule 1's list. It carries "substring", "segment" and
+    "case-insensitive" too, because the sheet's whole design is to name a
+    course's OWN folders rather than describe how they are matched — and
+    describing the rule in a sentence is the same leak as printing it in a
+    row. The mac's own placeholder text falls foul of exactly this, which is
+    how the rule earned its place.
+
+    *Original entry, kept because it is the reason the item existed:* The
+    mac's Course
     Settings has a sheet explaining which folders Plantoir treats specially
     and why (`Views/CourseSettings/SpecialFoldersHelpView.swift`, opened from
     `CourseSettingsView.swift`). Nothing on this side has it: no

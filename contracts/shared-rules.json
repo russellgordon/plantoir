@@ -1166,7 +1166,7 @@
         "placeholderWhenNone": "Your curriculum folder",
         "what": "Your curriculum expectations",
         "why": "One page per expectation. The curriculum map is built from these — without them there is nothing to measure your lessons against, and the map is left out.",
-        "whyPlaceholder": "A course with no curriculum folder at all is told what to make, in the one place where a name cannot be given. This is the single row allowed to describe rather than name, and only in that case."
+        "whyPlaceholder": "The NAME is the only thing that changes: \"Your curriculum folder\" is the single piece of text in the sheet allowed to describe rather than name, and only for a course that has no such folder at all. The explanation beside it does not change - a course with no expectations needs to hear the same thing about what they are for. The mac has a SECOND sentence here today (\"One page per expectation, in a folder whose name mentions the curriculum\") and it is deliberately NOT adopted: it publishes the matching rule in plain words, which is what saysNoMachinery exists to stop. Retiring it is one of the two things MAC-HANDOFF.md asks of the mac."
       },
       {
         "key": "graded",
@@ -1248,7 +1248,7 @@
       ]
     },
     "saysNoMachinery": {
-      "rule": "No text in the sheet - any name, heading or explanation - may name the machinery OR the matching rule.",
+      "rule": "No text the PRODUCT writes - the title, the intro, and every row's what and why - may name the machinery or the matching rule. A folder's NAME is excluded: it is the teacher's own word shown back to them as they typed it, and a computer studies course with a folder called \"Scripts\" is not a wording bug.",
       "why": "Rule one, plus the reason this sheet names configured folders in the first place. \"Substring\", \"segment\" and \"case-insensitive\" are banned alongside \"container\" and \"script\" because publishing the matching rule in words is the same mistake as printing it in a row, taken by another route.",
       "jargon": [
         "toolchain",
@@ -1346,6 +1346,27 @@
           "curriculum": "Ontario Curriculum"
         },
         "why": "PROPOSED FROM WINDOWS, 2026-09-06 - see MAC-HANDOFF.md. The build finds this course's curriculum folder perfectly well without the key being set, so the sheet must name it. Showing the placeholder here would tell a teacher to go and create a folder they already have, which is the one failure a sheet about folder names cannot afford."
+      },
+      {
+        "name": "a recorded name the course no longer has is not shown",
+        "perSectionFolders": [
+          "All Classes"
+        ],
+        "sharedFolders": [
+          "Concepts",
+          "Ontario Curriculum"
+        ],
+        "gradedFolders": [
+          "Tasks"
+        ],
+        "curriculumFolder": "Expectations",
+        "expectNames": {
+          "curriculum": "Ontario Curriculum"
+        },
+        "mustNotAppear": [
+          "Expectations"
+        ],
+        "why": "PROPOSED FROM WINDOWS, 2026-09-06 - the second half of the case above and the sharper one. The course renamed its folder and the recorded name went stale; the build resolves past it to the folder that is really there. A sheet reading the raw name shows \"Expectations\", which the teacher does not have and cannot find - worse than the placeholder, because it looks like an answer."
       },
       {
         "name": "more than one class folder is listed, not just the first",

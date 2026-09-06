@@ -33,7 +33,7 @@ What is genuinely left, smallest first:
 | 18 | The two VIEWS: the choice at the folder picker, and the dismissable notice for a folder the window restored. Detection, wording and the remembered-per-folder store are built — the store's API is `AppSettings.HasAcceptedSyncFor` / `RememberAcceptedSyncFor`, and the two moments belong in `WorkspacePickerView` (a folder just chosen) and `MainWindow`'s restore path (a folder the window reopened). | Medium |
 | 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
 | 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 52 test methods over 63 cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
-| 22 | The "Folders Plantoir uses" sheet (mac row 361) — never ported, and in no list until 2026-09-06. A teacher-facing explanation, so the wording matters more than the mechanism. | Medium |
+| ~~22~~ | ✅ Done 2026-09-06 — the "Folders Plantoir uses" sheet, now shared as `shared-rules.json` → `specialFoldersHelp` rather than living inside a view. Two cases proposed back to the mac. | — |
 
 Two things that are NOT in that list and should be known:
 

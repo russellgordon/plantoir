@@ -124,8 +124,13 @@ public static class SpecialFoldersHelp
     /// </summary>
     public static string Listed(IEnumerable<string>? names)
     {
+        // IsNullOrEmpty, not IsNullOrWhiteSpace, to match the mac exactly. The
+        // stricter test is tempting and would differ only on a folder named
+        // entirely of spaces, which Windows will not create — so it would buy
+        // nothing and leave the two apps disagreeing on an input no contract
+        // case can justify pinning.
         var kept = (names ?? Enumerable.Empty<string>())
-            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Where(name => !string.IsNullOrEmpty(name))
             .ToList();
 
         if (kept.Count == 0) return NoneChosen;

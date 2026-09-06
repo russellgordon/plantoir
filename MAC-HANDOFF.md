@@ -132,7 +132,59 @@ Remove the line when the mac implements it, and mark the matching entry below
 `✅ DONE` — the ledger keeps the history, this section keeps only what is
 outstanding.
 
+- `contracts/shared-rules.json` → `specialFoldersHelp` → `cases` →
+  **"the curriculum folder is named even when the course never recorded one"**
+  and **"a recorded name the course no longer has is not shown"**, both
+  proposed 2026-09-06. The "Folders Plantoir uses" sheet must name the
+  curriculum folder the BUILD would use, not the raw `curriculum_folder` key.
+  `SpecialFoldersHelpView.swift:36` reads the raw key, so a course that never
+  recorded one is shown the "Your curriculum folder" placeholder, and a course
+  whose recorded name has gone stale is shown a folder it does not have.
+  **This is not a corner case: every real course on the Windows machine has
+  the key absent and a real "Curriculum" folder** — two of two checked. The
+  mac already has the function it needs:
+  `SpecialNames.resolvedCurriculumFolder(for:)` (`SpecialNames.swift:167`),
+  used by `CourseSettingsView.swift:578` for folder protection. It is a
+  one-line swap at `SpecialFoldersHelpView.swift:36`. Reference:
+  `windows-app/Plantoir.Core/Models/SpecialFoldersHelp.cs`, tests
+  `windows-app/Plantoir.Tests/SpecialFoldersHelpContractTests.cs`.
+
 ## Open — what the mac still owes
+
+- **The "Folders Plantoir uses" sheet is now shared, and the mac owes it two
+  small changes** (Windows, 2026-09-06, branch
+  `issue/windows-special-folders-help`, `GUI-IMPROVEMENTS.md` row 422). The
+  sheet was a mac invention (row 361) that Windows never got — handoff item
+  22. Porting it meant lifting the rules out of `SpecialFoldersHelpView.swift`,
+  where nothing cross-platform could reach them, into
+  `contracts/shared-rules.json` → `specialFoldersHelp`. **Most of this is a
+  know, not a do:** the sentences in the contract are the mac's own, character
+  for character, so the mac can adopt the contract without changing a word a
+  teacher reads. Two exceptions, and both are the mac changing:
+
+  1. **Name the RESOLVED curriculum folder, not the raw key** — the contract
+     cases above, and the one-line fix named there. Do this one first; it is
+     the one that affects real courses today.
+  2. **Retire the placeholder's second sentence.** The mac has TWO `why`
+     texts for the curriculum row (`SpecialFoldersHelpView.swift:36-50`); the
+     placeholder branch says "One page per expectation, in a folder whose name
+     mentions the curriculum." The contract carries only the first, on
+     purpose: that second sentence **publishes the matching rule in plain
+     words**, which is the exact thing this sheet's own design principle
+     forbids — the whole reason it names configured folders instead of
+     describing how they are found. The mac's own jargon test never caught it
+     because "mentions" is not a banned word and its fixture course has a
+     curriculum folder, so the branch never runs. Adopting the contract
+     retires the sentence; the placeholder NAME still tells the teacher what
+     to make.
+
+  Everything else transfers unchanged: the row order, the listing grammar,
+  and a banned-vocabulary list that now carries "substring", "segment" and
+  "case-insensitive" alongside "container" — because publishing the matching
+  rule in words is the same mistake as printing it in a row, by another
+  route. The rule is scoped to text the PRODUCT writes; a teacher's own
+  folder called "Scripts" is their word, not a wording bug, and an adversarial
+  review caught the first draft forbidding it.
 
 - **The folder-problem front end landed on Windows, and it found two defects in
   the mac's own repair** (Windows, 2026-09-06, branch
