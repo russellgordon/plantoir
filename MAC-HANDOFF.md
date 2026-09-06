@@ -2041,6 +2041,53 @@ Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
 
+- ✅ DONE (Windows, 2026-09-06). **Items 15 and 16 ported: a course's own
+  words for a unit and for its class folder. Nothing is asked of the mac — this
+  entry exists for the two things the port learned that the write-up did not
+  say.**
+
+  The feature itself arrived as designed: `unit_word` and `class_folder`,
+  absent meaning what every existing course already does, with the rule in
+  shared Python and the cases in `class-planning.json`. `ClassPageTerm.cs`
+  mirrors `scripts/class_pages.py`; `ClassFolderRule` gained the recorded-key
+  overload; the wizard asks the question and writes both keys. Four of the
+  five contract tests that were red on this side now pass.
+
+  **What the handoff did not warn about, and cost the most time: the port is
+  not finished when the RULE is ported.** Item 15 names the assistant's
+  sentences and the wizard field, so those were expected. What was not listed
+  is that two call sites BUILD PAGE TITLES rather than sentences —
+  `"Unit {unit}, Day {atDay + i}"` when adding classes, and the same shape
+  when making room for them. In a Module course those write files the course's
+  own rule then refuses to recognise as class pages, which is the feature's
+  own silent failure arriving by a second route, from the app rather than from
+  the parser. Worth checking that the mac's equivalents (`AssistWorkspace`'s
+  add-classes and make-room paths) use `ClassPageTerm` rather than a literal —
+  this side had four such literals and the handoff's list of owed items
+  mentioned none of them.
+
+  **The second: `SectionIndex`'s date tie-break.** When two pages share a
+  date, the later page in the course wins, decided by parsing both names. In a
+  Module course neither name parses under the default word, so the tie-break
+  silently degrades to whichever file the walk reached first. Not mentioned
+  anywhere, found by grepping for every `UnitDay.Parse` rather than by
+  following the write-up.
+
+  **The general lesson, which is the part that travels:** for a feature whose
+  failure mode is "answers no instead of refusing", the owed-items list should
+  be produced by grepping for every CALL of the thing being made
+  configurable, not by listing the features a reader can think of. The mac's
+  own list was written the second way, and both misses above are the same
+  shape.
+
+  **Reference:** `Plantoir.Core/Models/ClassPageTerm.cs` (new),
+  `UnitDay.cs`, `ClassFolderRule.cs`, `CourseConfiguration.cs`,
+  `Assist/AssistWorkspace.cs`, `Assist/SectionIndex.cs`,
+  `Models/NextClassPlanner.cs`, `Views/NewCourseDialog.cs`. Tests:
+  `ClassPageTermTests.cs` (new), `ClassFolderContractTests.cs` and
+  `ClassPlanningContractTests.cs` (both now read the contract's optional
+  `classFolder` and `term` fields with a default).
+
 - ✅ DONE (Windows + shared, 2026-09-05). **A publish on Windows was
   overwritten by its own preview, silently — and, separately, publishing to a
   folder could not succeed there at all. Both found by publishing for real.**
