@@ -266,6 +266,28 @@ outstanding.
     generated wrapper and the reader. A mismatch there fails in the quietest
     way available — written faithfully every night, read never.
 
+  **Run at the real thing, three times, because generated shell has no runner
+  behind it** (Windows 11 Pro 26200, Windows PowerShell 5.1.26100, native
+  runtime, course ICD2O section 1). The wrapper's capture block was extracted
+  verbatim and executed against the real `preview.ps1`:
+
+  1. `Media` renamed aside → build exited **0**, the record was written, and it
+     held the real `mediaFolderMissing` marker line.
+  2. `Media` AND `section1/index.md` aside → build exited **1**, and the record
+     still held BOTH markers, `sectionIndexMissing` included. That is the case
+     the whole ordering exists for: the finding that explains the failure is
+     the one a scan placed after the guard would have thrown away.
+  3. Both restored → build exited **0**, no markers, and the stale record from
+     run 2 was **deleted**.
+
+  Four things that could each only have failed at 6 a.m. were settled by
+  running it: `Out-File -LiteralPath` does exist in 5.1; `$LASTEXITCODE` does
+  carry the launcher's own code out through `*>&1 | Out-File`; `Set-Content
+  -Encoding utf8` writes a UTF-8 **BOM** (`EF BB BF`) in 5.1, and
+  `File.ReadAllLines` — the API the reader uses — strips it, verified by
+  reading the real record back and checking the first character is `P` and not
+  `U+FEFF`.
+
   **And it writes a trail line the mac does not.** Each finding read out of
   the record is noted as `folder problem found`, dated to when the RUN wrote
   the record rather than to the morning somebody opened the app. Nothing else
