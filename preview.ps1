@@ -234,24 +234,27 @@ $WORKDIR_PHYSICAL = Get-PhysicalPath (Get-Location).Path
 $WORKDIR_ID = ([BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes("$WORKDIR_PHYSICAL`n"))) -replace '-','').Substring(0,8).ToLower()
 $CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"
 
-# ---- Stop mode -------------------------------------------------------
-# .\preview.ps1 CODE N --stop : kill this section's preview processes.
-# Ending the host-side script leaves the build or server running; this
-# reclaims those resources. It must never start anything — no engine
-# setup, no image build, no container creation.
+# ---- The shared rule: which processes belong to a section's preview ----
+# Defined at script scope rather than inside the stop branch, so that
+# windows-app/test_stop_preview.ps1 can run the contract's own cases
+# against these exact functions. A matcher nobody can run against the
+# cases is a matcher that drifts, which is the whole reason the rule was
+# written down.
 #
-# WHICH processes belong to this section is a SHARED rule, written down
-# in contracts/shared-rules.json -> stopPreview and implemented for the
+# WHICH processes belong to a section is a SHARED rule, in
+# contracts/shared-rules.json -> stopPreview, implemented for the
 # container side in scripts/stop_preview.py. It is implemented a second
-# time here because native Windows has no /proc to read and no container
-# to run Python in — the enumeration is Win32_Process and the killing is
-# Stop-Process, both of which are platform mechanics the contract
-# deliberately does not share. The RULE the two must agree on is:
+# time here because `--stop` must never START anything, and reaching the
+# Python copy would mean depending on the bundled interpreter at the
+# moment a teacher is closing a window. What keeps the two from drifting
+# is not that they share source - they cannot - but that they answer the
+# SAME 23 cases. See MAC-HANDOFF.md for the --match-stdin decision.
 #
-#   * three kinds of evidence, any one of which is enough — the process
-#     sits in the section's build folder, its command line NAMES that
-#     folder, or it is build_site.py with this course and this section on
-#     its command line;
+#   * three kinds of evidence, any one of which is enough - the process
+#     sits in the section's build folder (never visible here:
+#     Win32_Process has no working directory), its command line NAMES
+#     that folder, or it is build_site.py with this course and this
+#     section on its command line;
 #   * plus every descendant of a match, because a child spawned with a
 #     RELATIVE path (npx does) carries no evidence of its own;
 #   * and every comparison ends at a BOUNDARY, never a bare substring.
@@ -259,83 +262,162 @@ $CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"
 # That last clause was not true here until 2026-09-05, and the bug it
 # left is the reason the rule got written down: `...\section1` is a
 # prefix of `...\section10`, and `--section=1` is a prefix of
-# `--section=10`, so stopping section 1 also stopped section 10 — by
+# `--section=10`, so stopping section 1 also stopped section 10 - by
 # both routes at once. It needs a course with ten or more sections,
 # which nothing refuses.
-if ($NATIVE_RUNTIME -and $STOP_MODE) {
-    # A path is NAMED by a command line only when what follows it is a
-    # boundary: another path segment, a quote, whitespace, or the end of
-    # the line. Allowing the end is still safe against the section1 /
-    # section10 trap, because what follows `section1` in `section10` is
-    # `0`, which is not a boundary.
-    function Test-NamesPath {
-        param([string]$Line, [string]$PathToFind)
-        if (-not $Line -or -not $PathToFind) { return $false }
-        $needle = $PathToFind.TrimEnd('\', '/')
-        $boundaries = @('\', '/', ' ', "`t", '"', "'")
-        $index = $Line.IndexOf($needle, [StringComparison]::OrdinalIgnoreCase)
-        while ($index -ge 0) {
-            $after = $index + $needle.Length
-            if ($after -ge $Line.Length -or $boundaries -contains [string]$Line[$after]) {
-                return $true
-            }
-            $index = $Line.IndexOf($needle, $index + 1, [StringComparison]::OrdinalIgnoreCase)
-        }
-        return $false
-    }
 
-    # `--name=value` or `--name value`, read as an ARGUMENT. A substring
-    # test cannot tell `--section=1` from `--section=10`. Splitting on
-    # whitespace is safe for these two flags: a course code and a section
-    # number never contain a space, whatever the path beside them does.
-    function Test-ArgumentValue {
-        param([string]$Line, [string]$Name, [string]$Value)
-        if (-not $Line) { return $false }
-        $tokens = @($Line -split '\s+')
-        for ($i = 0; $i -lt $tokens.Count; $i++) {
-            $token = $tokens[$i]
-            if ($token.StartsWith("--$Name=", [StringComparison]::OrdinalIgnoreCase)) {
-                return ($token.Substring($Name.Length + 3) -ieq $Value)
-            }
-            if (($token -ieq "--$Name") -and (($i + 1) -lt $tokens.Count)) {
-                return ($tokens[$i + 1] -ieq $Value)
-            }
+# A path is NAMED by a command line only when what follows it is a
+# boundary: another path segment, a quote, whitespace, or the end of
+# the line. Allowing the end is still safe against the section1 /
+# section10 trap, because what follows `section1` in `section10` is
+# `0`, which is not a boundary.
+#
+# Separators are normalised because the contract says both count on both
+# platforms: a native Windows run passes POSIX spellings around in
+# places, and the two are the same folder. Without this, a command line
+# written with forward slashes silently failed to match a needle built
+# with Join-Path - measured 2026-09-05 against the contract's own cases.
+function Test-NamesPath {
+    param([string]$Line, [string]$PathToFind)
+    if (-not $Line -or -not $PathToFind) { return $false }
+    $haystack = $Line.Replace('/', '\')
+    $needle = $PathToFind.Replace('/', '\').TrimEnd('\')
+    if (-not $needle) { return $false }
+    $boundaries = @('\', ' ', "`t", '"', "'")
+    $index = $haystack.IndexOf($needle, [StringComparison]::OrdinalIgnoreCase)
+    while ($index -ge 0) {
+        $after = $index + $needle.Length
+        if ($after -ge $haystack.Length -or $boundaries -contains [string]$haystack[$after]) {
+            return $true
         }
-        return $false
+        $index = $haystack.IndexOf($needle, $index + 1, [StringComparison]::OrdinalIgnoreCase)
     }
+    return $false
+}
 
-    $buildRoot = Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)
-    $sectionNeedle = Join-Path $buildRoot ('work\' + $COURSE + '\section' + $SECTION)
-    Write-Host "Stopping preview processes for $COURSE section $SECTION ..."
-    $snapshot = @(Get-CimInstance Win32_Process)
+# `--name=value` or `--name value`, read as an ARGUMENT. A substring
+# test cannot tell `--section=1` from `--section=10`. Splitting on
+# whitespace is safe for these two flags: a course code and a section
+# number never contain a space, whatever the path beside them does.
+function Test-ArgumentValue {
+    param([string]$Line, [string]$Name, [string]$Value)
+    if (-not $Line) { return $false }
+    $tokens = @($Line -split '\s+')
+    for ($i = 0; $i -lt $tokens.Count; $i++) {
+        $token = $tokens[$i]
+        if ($token.StartsWith("--$Name=", [StringComparison]::OrdinalIgnoreCase)) {
+            return ($token.Substring($Name.Length + 3) -ieq $Value)
+        }
+        if (($token -ieq "--$Name") -and (($i + 1) -lt $tokens.Count)) {
+            return ($tokens[$i + 1] -ieq $Value)
+        }
+    }
+    return $false
+}
+
+# A preview SERVER rather than a build. `--serve` is what the launcher
+# adds to the Quartz CLI for a preview and never adds for a build, so it
+# is the one honest separator between the two. A whole token, never a
+# substring.
+function Test-IsServing {
+    param([string]$Line)
+    if (-not $Line) { return $false }
+    foreach ($token in ($Line -split '\s+')) { if ($token -ceq '--serve') { return $true } }
+    return $false
+}
+
+# The rule itself, over a whole SNAPSHOT: the last part of it is not a
+# property of any one process, since a child spawned by a relative path
+# carries no evidence at all and is reachable only through its parent.
+#
+# $Snapshot items need ProcessId, ParentProcessId and CommandLine - which
+# is what Get-CimInstance Win32_Process gives, and what the contract's
+# cases are shaped into by the test runner. No filter on process NAME:
+# the shared rule has none, and the `node.exe`/`python.exe` narrowing
+# this had until 2026-09-05 would have refused most of the contract's
+# own cases (`python3`, `npm`, `esbuild`, `sh`), as well as a cmd.exe
+# running npm.cmd with the section's folder on its command line.
+function Get-SectionProcessesToStop {
+    param(
+        [object[]]$Snapshot,
+        [string[]]$Directories,
+        [string]$Course,
+        [string]$Section,
+        [ValidateSet('everything', 'servingOnly')][string]$Mode = 'everything',
+        [uint32[]]$Exclude = @()
+    )
+    $excluded = New-Object System.Collections.Generic.HashSet[uint32]
+    foreach ($pid_ in $Exclude) { $null = $excluded.Add([uint32]$pid_) }
     $matched = New-Object System.Collections.Generic.HashSet[uint32]
-    foreach ($proc in $snapshot) {
-        if ($proc.Name -ne 'node.exe' -and $proc.Name -ne 'python.exe') { continue }
+
+    foreach ($proc in $Snapshot) {
+        $processId = [uint32]$proc.ProcessId
+        # pid 0 and 1 are never ours; the init process especially.
+        if ($processId -le 1 -or $excluded.Contains($processId)) { continue }
         $line = [string]$proc.CommandLine
-        if (-not $line) { continue }
-        $isBuild = ($line.ToLowerInvariant().Contains('build_site.py') -and `
-                    (Test-ArgumentValue $line 'course' $COURSE) -and `
-                    (Test-ArgumentValue $line 'section' $SECTION))
-        if ((Test-NamesPath $line $sectionNeedle) -or $isBuild) {
-            $null = $matched.Add($proc.ProcessId)
+        $namesDirectory = $false
+        foreach ($directory in $Directories) {
+            if (Test-NamesPath $line $directory) { $namesDirectory = $true; break }
         }
+        if ($Mode -eq 'servingOnly') {
+            # Serving only: the directory must be NAMED and the process
+            # must be a server. Never the driver - a build for publishing
+            # must not stop a build, because the build it is protecting
+            # is itself a build of this section.
+            if ($namesDirectory -and (Test-IsServing $line)) { $null = $matched.Add($processId) }
+            continue
+        }
+        $isDriver = ($line -and $line.ToLowerInvariant().Contains('build_site.py') -and
+                     (Test-ArgumentValue $line 'course' $Course) -and
+                     (Test-ArgumentValue $line 'section' $Section))
+        if ($namesDirectory -or $isDriver) { $null = $matched.Add($processId) }
     }
+
     # Descendants: repeat until no new child turns up (the chain is
-    # python -> cmd -> node, so one pass is not enough).
+    # driver -> npm -> node -> esbuild, so one pass is not enough).
     do {
         $grew = $false
-        foreach ($proc in $snapshot) {
-            if ($matched.Contains($proc.ProcessId)) { continue }
-            if ($proc.ParentProcessId -and $matched.Contains([uint32]$proc.ParentProcessId)) {
-                $null = $matched.Add($proc.ProcessId)
+        foreach ($proc in $Snapshot) {
+            $processId = [uint32]$proc.ProcessId
+            if ($processId -le 1 -or $excluded.Contains($processId)) { continue }
+            if ($matched.Contains($processId)) { continue }
+            $parent = $proc.ParentProcessId
+            if ($null -ne $parent -and $matched.Contains([uint32]$parent)) {
+                $null = $matched.Add($processId)
                 $grew = $true
             }
         }
     } while ($grew)
+
+    # Snapshot order, so a caller's output and a test's expectation can
+    # be compared directly.
+    $ordered = @()
+    foreach ($proc in $Snapshot) {
+        if ($matched.Contains([uint32]$proc.ProcessId)) { $ordered += [uint32]$proc.ProcessId }
+    }
+    return $ordered
+}
+
+# ---- Stop mode -------------------------------------------------------
+# .\preview.ps1 CODE N --stop : kill this section's preview processes.
+# Ending the host-side script leaves the build or server running; this
+# reclaims those resources. It must never start anything - no engine
+# setup, no image build, no container creation.
+if ($NATIVE_RUNTIME -and $STOP_MODE) {
+    $buildRoot = Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)
+    $sectionNeedle = Join-Path $buildRoot ('work\' + $COURSE + '\section' + $SECTION)
+    Write-Host "Stopping preview processes for $COURSE section $SECTION ..."
+    $snapshot = @(Get-CimInstance Win32_Process)
+    $toStop = Get-SectionProcessesToStop -Snapshot $snapshot -Directories @($sectionNeedle) `
+                                         -Course $COURSE -Section $SECTION -Mode 'everything' `
+                                         -Exclude @([uint32]$PID)
     $stopped = 0
-    foreach ($processId in $matched) {
+    foreach ($processId in $toStop) {
         try { Stop-Process -Id $processId -Force -ErrorAction Stop; $stopped++ } catch {}
     }
+    # The app reads this line and puts the number on the teacher's
+    # activity trail - see ReclaimedProcesses.Count. Changing the
+    # wording means changing that too.
     Write-Host "Stopped $stopped process(es)."
     exit 0
 }

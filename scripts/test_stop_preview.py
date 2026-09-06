@@ -362,6 +362,118 @@ class WhereThereIsNoProcThisDoesNothing(unittest.TestCase):
             [])
 
 
+class TheNativeWindowsSnapshot(unittest.TestCase):
+    """
+    The reader that closed the overwrite race on Windows (item 20).
+
+    These assert the SHAPE and the dispatch rather than a verdict: which
+    processes belong to a section is the contract's job, and it is answered
+    above against fixtures. What is left to prove here is that the rule is
+    handed a real process list on the platform that used to hand it nothing.
+    """
+
+    def test_the_dispatcher_asks_proc_when_a_root_is_named(self):
+        # The container, and every test that injects one. Never the native
+        # reader, whatever platform this happens to run on.
+        self.assertEqual(stop_preview.read_snapshot(Path("/definitely/not/here")), [])
+
+    @unittest.skipUnless(os.name == "nt", "native Windows only")
+    def test_it_returns_the_real_process_list_on_windows(self):
+        snapshot = stop_preview.read_windows_snapshot()
+        self.assertGreater(len(snapshot), 5, "Win32_Process returned almost nothing")
+        pids = set(process["pid"] for process in snapshot)
+        self.assertIn(os.getpid(), pids, "the running interpreter is not in its own snapshot")
+
+    @unittest.skipUnless(os.name == "nt", "native Windows only")
+    def test_every_process_carries_the_keys_the_rule_reads(self):
+        # `pids_to_stop` reads exactly these five. A missing key is a
+        # KeyError in the middle of a publish; a None is a silent non-match.
+        for process in stop_preview.read_windows_snapshot():
+            for key in ("pid", "ppid", "name", "commandLine", "cwd"):
+                self.assertIn(key, process)
+            self.assertIsInstance(process["pid"], int)
+            self.assertIsInstance(process["ppid"], int)
+            self.assertIsInstance(process["commandLine"], str)
+            self.assertEqual(process["cwd"], "", "Win32_Process has no cwd to give")
+
+    @unittest.skipUnless(os.name == "nt", "native Windows only")
+    def test_the_dispatcher_uses_it(self):
+        self.assertGreater(len(stop_preview.read_snapshot()), 5)
+
+    @unittest.skipUnless(os.name == "nt", "native Windows only")
+    def test_the_rule_can_actually_run_against_it(self):
+        # The whole point: a real snapshot through the real rule. Nothing on
+        # this machine is serving a course called ZZZ9Z, so the answer is
+        # empty — but it is empty by DECIDING, not by having nothing to read.
+        snapshot = stop_preview.read_windows_snapshot()
+        self.assertEqual(
+            stop_preview.pids_to_stop(
+                snapshot,
+                stop_preview.expand_directories(["C:/nowhere/work/ZZZ9Z/section1"]),
+                course="ZZZ9Z", section=1,
+                mode=stop_preview.MODE_SERVING_ONLY),
+            [])
+
+    @unittest.skipIf(os.name == "nt", "POSIX only")
+    def test_it_is_inert_off_windows(self):
+        self.assertEqual(stop_preview.read_windows_snapshot(), [])
+
+
+class TheSignalAPublishBuildSendsIsNotNegotiable(unittest.TestCase):
+    """
+    `servingOnly` insists at once; it does not ask first.
+
+    The contract gives the reason: a second spent waiting politely is a
+    second in which the preview's mirror can overwrite the build the kill
+    exists to protect. This is asserted because it was almost lost — the
+    Windows work replaced `os.kill(pid, SIGKILL)` with a helper that
+    defaulted to SIGTERM, which is right on Windows (there is nothing to ask
+    with) and a quiet downgrade everywhere else.
+    """
+
+    def test_build_site_asks_for_the_hardest_signal_available(self):
+        source = (REPO / "scripts" / "build_site.py").read_text(encoding="utf-8")
+        where = source.index("def stop_preview_serving")
+        body = source[where:where + 4000]
+        self.assertIn('getattr(signal, "SIGKILL", signal.SIGTERM)', body,
+                      "the publish build no longer insists at once")
+
+    @unittest.skipIf(os.name == "nt", "Windows has no signal to choose between")
+    def test_the_default_is_only_used_when_a_caller_has_no_opinion(self):
+        # Signature check rather than a kill: the point is that a caller CAN
+        # choose, which is what was missing.
+        import inspect
+        self.assertIn("signum", inspect.signature(stop_preview.stop_one).parameters)
+
+
+class EndingOneProcess(unittest.TestCase):
+    """
+    `stop_one`, which exists because the POSIX spelling crashes on Windows.
+    """
+
+    def test_a_pid_that_is_not_there_is_false_rather_than_an_exception(self):
+        # On Windows this raises OSError [WinError 87], not
+        # ProcessLookupError — the difference that would have taken a publish
+        # down with a traceback when a preview exited between the snapshot
+        # and the kill.
+        self.assertFalse(stop_preview.stop_one(0x7FFFFFF0))
+
+    def test_stopping_nothing_asks_nothing(self):
+        self.assertEqual(stop_preview.stop_pids([]), 0)
+
+    @unittest.skipUnless(os.name == "nt", "native Windows only")
+    def test_it_really_ends_a_process_on_windows(self):
+        import subprocess as sp
+        victim = sp.Popen([os.environ.get("COMSPEC", "cmd.exe"), "/c", "pause"],
+                          stdin=sp.DEVNULL, stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+        try:
+            self.assertTrue(stop_preview.stop_one(victim.pid))
+            self.assertIsNotNone(victim.wait(timeout=10))
+        finally:
+            if victim.poll() is None:
+                victim.kill()
+
+
 class ArgumentsAreReadAsArgumentsNotSubstrings(unittest.TestCase):
     """
     The second prefix bug, at the level it actually lives at. The contract

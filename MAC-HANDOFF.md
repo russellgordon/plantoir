@@ -108,6 +108,68 @@ rather than being deleted.
 > manual. A change that creates an obligation for the other platform and does
 > not list it has, from their side, not been handed over at all.
 
+- ⚠️ **THE CONTRACT'S `stopPreview` PROSE IS NOW WRONG ABOUT WINDOWS, and only
+  the mac can regenerate it** (Windows + shared, 2026-09-05). Three sentences
+  in `contracts/shared-rules.json` → `stopPreview` describe a state that
+  stopped being true today. They are generated from the mac, so this side
+  cannot fix them without hand-editing a generated key:
+
+  - `modes.servingOnly` ends "Implemented today by `build_site.py` inside the
+    container, and there ONLY: run natively on Windows there is no `/proc`,
+    the process list comes back empty and this does nothing, so the overwrite
+    race is still live on that platform. That is a gap, not a decision." **The
+    gap is closed.** `stop_preview.read_snapshot()` now dispatches to a native
+    `Get-CimInstance Win32_Process` reader, so `servingOnly` runs on Windows
+    exactly as it does in the container.
+  - `notShared` → "Which processes are even considered" says Windows filters
+    to `node.exe` and `python.exe` for direct evidence. **It no longer does.**
+    The filter is gone: it refused most of the contract's own fixtures
+    (`python3`, `npm`, `esbuild`, `sh`), and the judgement the contract left
+    to this side has been made — a process carrying this section's build
+    directory on its command line IS this section's process. The mac and
+    Windows now consider the same processes.
+  - `notShared` → "How a process is ended" and "How hard a publish build
+    insists" both say Windows ends things with `Stop-Process -Force`. Still
+    true of `preview.ps1`, but no longer the whole story: `build_site.py`'s
+    own `servingOnly` sweep now runs natively there too and ends processes
+    with `os.kill` (which is `TerminateProcess` on Windows, whatever signal
+    number it is handed).
+
+  Nothing is asked of the mac's CODE here — only that the generator be re-run
+  with these sentences corrected, since a contract that describes a race as
+  "still live" is exactly the kind of stale guidance `CLAUDE.md` rule 3 says
+  is worse than none. Reference: `scripts/stop_preview.py`
+  (`read_windows_snapshot`, `read_snapshot`, `stop_one`), `preview.ps1`
+  (`Get-SectionProcessesToStop`), `windows-app/test_stop_preview.ps1`.
+
+- ⚠️ **A SIGNAL WAS DOWNGRADED ON THE MAC FROM WINDOWS, AND IS NOW PUT BACK —
+  check nothing else rode on it** (Windows + shared, 2026-09-05). Worth ten
+  seconds of the mac's attention because the mistake was invisible and the
+  file is shared. Routing `build_site.py`'s `stop_preview_serving` through a
+  new `stop_one()` helper — written for Windows, where there is nothing to
+  ask with — silently changed the container's `servingOnly` kill from SIGKILL
+  to SIGTERM on every platform. The contract states the reason it must not
+  ask first (a second spent waiting politely is a second in which the
+  preview's mirror can overwrite the build being protected). Found by review
+  and fixed in the same session: `stop_one(pid, signum)` now takes the
+  signal, `build_site.py` passes `getattr(signal, "SIGKILL",
+  signal.SIGTERM)`, and `TheSignalAPublishBuildSendsIsNotNegotiable` in
+  `scripts/test_stop_preview.py` pins it. **The mac's behaviour is
+  unchanged from before this branch** — this is a note that it was briefly
+  otherwise on this branch, not an ask.
+
+- ⚠️ **`WINDOWS-HANDOFF.md` item 20's first owed bullet was answered a
+  different way than it asked, deliberately** (Windows, 2026-09-05). It said
+  to call `preview.ps1`'s own `--stop` matcher from the `--build-only` path.
+  That was not done, and should not be: `deploy.py` reaches
+  `build_site.py --build-only` directly (`rebuild_for_production`), never
+  through the launcher, so a fix living in `preview.ps1` leaves the Netlify
+  and Cloudflare route racing — which item 20 itself points out two
+  paragraphs later. Fixing it one level down in `stop_preview.read_snapshot()`
+  covers `preview.ps1 --build-only`, `deploy.ps1`'s folder branch,
+  `deploy.py`, scheduled deploys and `plantoir-mcp.exe` in one edit, and
+  every future caller for free. Item 20 can be marked done on that bullet.
+
 - ⚠️ **NEEDS A MAC BUILD + TEST — assistant system-prompt tweak fixes
   "undo over-salient"** (Windows, 2026-08-24, TODO.md item (c)). The
   Swift edit is made — `AssistAgent.swift`'s `systemPrompt(course:section:)`
@@ -1717,6 +1779,142 @@ is what happened to the test-race item, sitting here for three days with
 Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
+
+- ✅ DONE (Windows + shared, 2026-09-05). **A publish on Windows was
+  overwritten by its own preview, silently — and, separately, publishing to a
+  folder could not succeed there at all. Both found by publishing for real.**
+
+  **The first bug, which is the one item 20 sent me after.**
+  `build_site.py --build-only` has always asked for the section's preview
+  server to be stopped before it builds for publishing. On native Windows the
+  ask did nothing: `stop_preview.read_proc_snapshot()` reads `/proc`, Windows
+  has none, the list came back empty and `stop_preview_serving()` returned 0.
+  Meanwhile `_start_public_sync_watcher` — started in the SERVE branch and
+  therefore running natively on that platform too — went on mirroring the
+  serve build into the same directory about once a second. So a publish that
+  ran while that section was previewing was overwritten within a second of
+  finishing, and what went out was the PREVIEW, live-reload client and all.
+  Nothing errored and nothing was logged.
+
+  **What was chosen, and what was rejected.** Item 20 offered three shapes
+  and asked for the reasoning, so here it is. The fix went into
+  `stop_preview.py` as a native process-snapshot reader, because every
+  exposed route already funnels through the ONE call that reader feeds:
+  `preview.ps1 --build-only`, `deploy.ps1`'s folder branch (which shells
+  `preview.bat ... --build-only`), `deploy.py`'s `rebuild_for_production` —
+  the route a Netlify or Cloudflare publish takes — scheduled deploys, and
+  `plantoir-mcp.exe`'s `deploy_section`. One edit covers all five and every
+  caller nobody has written yet.
+
+  - **Rejected: `stop_preview.py --match-stdin`,** with PowerShell driving.
+    It inverts the control flow, so it reaches only PowerShell callers, and
+    `deploy.py` → `build_site.py` is not one of them. Choosing it alone would
+    have left the Netlify and Cloudflare route racing — the one a teacher is
+    most likely to be using.
+  - **Rejected: having `deploy.ps1` stop the preview itself.** The smallest
+    change, and the one that leaves every future caller free to reintroduce
+    the bug. `plantoir-mcp.exe` was already exactly such a caller.
+  - **Rejected: calling `preview.ps1`'s matcher from its own `--build-only`
+    path,** which is what item 20's first bullet literally asked for. Same
+    reason as the first rejection: the launcher cannot see the `deploy.py`
+    route.
+
+  **The `--match-stdin` question item 20 asked me to settle.** Not adopted,
+  and the reason has changed from the one item 20 anticipated. It worried
+  that Windows could not rely on Python being resolvable when `--stop` runs.
+  That worry is answered: stop mode already refuses to run without
+  `$NATIVE_RUNTIME`, whose `manifest.json` sits beside the bundled
+  `python\python.exe`, so the interpreter is exactly as available as the
+  runtime the mode already requires. The reason it is still not adopted is
+  different: `--stop` is what runs when a teacher closes a window or cancels
+  a publish, both callers discard its output, and neither checks its exit
+  code — so a Python that fails to start there would leak processes in total
+  silence. PowerShell enumerating, deciding and killing in one process has no
+  such step. **What removes the drift risk is not single-sourcing but the
+  cases**: `windows-app/test_stop_preview.ps1` now runs the contract's own 23
+  against the launcher's matcher, so the two implementations are held to one
+  rule by the thing that can actually check.
+
+  **Three details that would each have made the fix silently do nothing,
+  measured on Windows 11 Pro 26200, Intel i5-8365U, 275 processes.**
+  - PowerShell's default pipe encoding is the OEM code page. A teacher whose
+    user folder is named José gets byte 0x82 where the accent belongs —
+    either a decode error, or, with `errors="replace"`, a path that never
+    matches, so nothing is ever stopped for that teacher and nothing says so.
+    `[Console]::OutputEncoding` is set explicitly.
+  - `signal.SIGKILL` does not exist on Windows. Both kill sites would have
+    raised `AttributeError` the moment the snapshot stopped coming back
+    empty — which is precisely what this change does to it.
+  - `os.kill` on a pid that has already gone raises a plain `OSError`
+    (`[WinError 87]`) there, never `ProcessLookupError`. Catching only the
+    POSIX pair would have taken a publish down with a traceback the first
+    time a preview exited between the snapshot and the kill.
+
+  Cost of the new reader: **485/500/518 ms** for a full `Win32_Process` →
+  JSON round trip called from Python, three runs, against a build that takes
+  tens of seconds. An in-process `Get-CimInstance` is 521 ms, so essentially
+  all of that is the query rather than the shell.
+
+  **The second bug, which the first one uncovered: publishing to a folder
+  could not succeed on Windows, ever.** Found by running the publish rather
+  than reasoning about it. Every folder publish announced "This site was
+  built by a preview", rebuilt whether it needed to or not, waited the full
+  30 s for a condition that could never come true, and refused with "The
+  rebuilt site still carries the preview's live-reload script. Nothing was
+  published" — against a site whose 314 pages carried no live-reload client
+  at all.
+
+  The cause is a Windows PowerShell 5.1 semantic, and it is worth the mac
+  knowing about because the mac wrote this code (GUI-IMPROVEMENTS row 392,
+  mirroring `deploy.sh`) and could not run it:
+
+      if ($files | Select-String -Pattern "ws://localhost:" -List -Quiet)
+
+  `-Quiet` fed a PIPELINE of file objects emits one result PER FILE, not one
+  answer for the tree. 314 clean pages come back as a 314-element array of
+  `$null`, and **in PowerShell a non-empty array is TRUE whatever is in it**.
+  So the test was true whenever the site had two or more pages, which is every
+  real site — exactly one page is the single case it got right, by accident,
+  because a one-element array unwraps to the falsy scalar it holds. All three uses
+  were affected: the one deciding whether to rebuild, the one the 30 s wait
+  loop spins on, and the one that refuses to publish. `deploy.sh` is fine —
+  `grep -rq` returns one exit status for the whole tree, which is the answer
+  the check wants. **The general lesson for any PowerShell the mac writes
+  blind: `-Quiet` is not a scalar when the input is a pipeline.** It is now
+  one named function, `Test-CarriesLiveReload`, testing for a MatchInfo
+  rather than a Boolean, so the count cannot change the meaning.
+
+  **Proof, end to end, on the real launchers rather than in a unit test.** A
+  copy of a real working folder (ICS3U, 289 pages), never Russell's own:
+  started a preview, confirmed it served and carried the live-reload client,
+  killed only the LAUNCHER, and confirmed the preview was still serving —
+  the bug's precondition, reproduced. Then published: the log showed
+  `🛑 Stopped the preview that was still serving this section (PID …)` twice,
+  which had been impossible on that platform. With the folder-publish fix in
+  place the publish then exited 0 in **2 s** where it had taken 150 s to
+  fail, writing 328 files, 314 HTML pages, **0** carrying the live-reload
+  client, front page present.
+
+  **A test-isolation defect found on the way, which the mac should check for
+  its own suite.** `ScheduledDeployCompletionTests.Dispose` set the trail
+  override to null — which does not mean "no override", it means "use the
+  teacher's real activity.txt" — so every test class that ran after it wrote
+  there. On this machine that left **263 lines about fixture courses in the
+  real activity trail**, the same file a problem report gathers, where a
+  course that never existed reads as a fault that never happened. The field
+  holding the original path was already there and simply never used. The
+  written lines were left alone; they are Russell's log.
+
+  **Reference:** `scripts/stop_preview.py` (`read_windows_snapshot`,
+  `read_snapshot`, `stop_one`), `scripts/build_site.py`
+  (`stop_preview_serving`), `deploy.ps1` (`Test-CarriesLiveReload`),
+  `preview.ps1` (`Get-SectionProcessesToStop`, `Test-IsServing`),
+  `windows-app/Plantoir.Core/Scripting/ReclaimedProcesses.cs`,
+  `windows-app/Plantoir/Services/PreviewStopper.cs`. Tests:
+  `scripts/test_stop_preview.py` (35, 2 skipped),
+  `windows-app/test_stop_preview.ps1` (25 checks, 1 allowed skip, now run as
+  a gate by `TheLauncherMatcherAnswersTheContract`),
+  `windows-app/Plantoir.Tests/ReclaimedProcessesTests.cs`.
 
 - ✅ DONE (Windows, 2026-08-22). **Toggling on "Also publish to Cloudflare" as
   a redundancy target, with Netlify (or a local folder) as the primary

@@ -129,7 +129,21 @@ Two details of that guard are worth knowing, because both were got wrong once:
   See [the build pipeline](05-build-pipeline.md#a-build-for-publishing-stops-that-sections-preview).
 
 Both guards are exercised by `verify-deploy.sh`, which publishes to every
-destination and then fetches each site back and reads it.
+destination and then fetches each site back and reads it. **It is bash, and it
+runs on the mac only** — so the PowerShell half of these guards is not covered
+by it, which is how the next paragraph's defect survived.
+
+**A third detail, learned the expensive way on Windows.** The PowerShell port
+of the tree check was written from the mac, where it could not be run, and it
+used `Select-String -Quiet` on a pipeline of files. That returns one result
+PER FILE rather than one answer for the tree, and a non-empty array is TRUE in
+PowerShell whatever is in it — so the check was true for any site with two or
+more pages, which is every real site. Publishing to a folder therefore could not succeed on Windows at
+all: it always claimed the site was a preview build, always rebuilt, always
+waited the full timeout, and always refused. It is now `Test-CarriesLiveReload`
+in `deploy.ps1`, which tests for a match object rather than a Boolean. The
+general rule for PowerShell written from the mac: `-Quiet` is not a scalar when
+the input is a pipeline.
 
 ### Why determinism matters
 

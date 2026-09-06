@@ -1045,12 +1045,17 @@ def stop_preview_serving(output_dir: Path) -> int:
     never `everything` — a build for publishing must not stop a build), what
     to say about it, and the fact that a build never stops itself.
 
-    Natively on Windows there is no `/proc`, so the snapshot comes back empty
-    and this does nothing — exactly as `kill_existing_quartz` already does
-    nothing there without `lsof`. Windows stops its own previews from
-    `preview.ps1`; see WINDOWS-HANDOFF.
+    This works natively on Windows too, as of 2026-09-05. It did not before:
+    the snapshot came only from `/proc`, so on that platform the list was
+    empty and this returned without stopping anything, while the preview's
+    own sync watcher — which DOES run natively there — went on mirroring the
+    serve build over the top of this one about once a second. The publish
+    completed, reported success, and put the PREVIEW online, live-reload
+    client and all. `stop_preview.read_snapshot()` now asks the platform for
+    its own process list, so the rule reaches every caller on both platforms;
+    see WINDOWS-HANDOFF item 20.
     """
-    snapshot = stop_preview.read_proc_snapshot()
+    snapshot = stop_preview.read_snapshot()
     if not snapshot:
         return 0
     pids = stop_preview.pids_to_stop(
@@ -1061,15 +1066,28 @@ def stop_preview_serving(output_dir: Path) -> int:
         # driver, and this process IS a build driver for this very section.
         exclude=(os.getpid(),),
     )
+    # `stop_preview.stop_one` rather than `os.kill` directly: `signal.SIGKILL`
+    # does not exist on Windows at all, and a pid that has already gone raises
+    # a plain `OSError` there rather than `ProcessLookupError` — so the POSIX
+    # spelling would have crashed a publish with a traceback the first time a
+    # preview exited between the snapshot and the kill.
+    #
+    # SIGKILL where there IS one, though, and that is not a detail: the
+    # contract says `servingOnly` insists at once rather than asking first,
+    # because a second spent waiting politely is a second in which the
+    # preview's mirror can overwrite this build — which is the entire failure
+    # being prevented. Windows ignores the signal (there is nothing to ask
+    # with) and ends it outright either way.
+    insist = getattr(signal, "SIGKILL", signal.SIGTERM)
     stopped = 0
     for pid in pids:
-        try:
-            os.kill(pid, signal.SIGKILL)
+        if stop_preview.stop_one(pid, insist):
             stopped += 1
             print(f"🛑 Stopped the preview that was still serving this section "
                   f"(PID {pid}), so it cannot overwrite this build.")
-        except (ProcessLookupError, PermissionError) as error:
-            print(f"⚠️ Could not stop the preview process {pid}: {error}")
+        else:
+            print(f"⚠️ Could not stop the preview process {pid}; it may have "
+                  f"already finished.")
     return stopped
 
 
