@@ -278,6 +278,40 @@ while publishing another. Match on the directory plus a trailing separator, or
 `section1` also matches `section10`. It reads `/proc`, so it does nothing where
 there is none (Windows, natively) — see `WINDOWS-HANDOFF.md`.
 
+**Which processes belong to a section is one rule, and it lives in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`stopPreview`,** implemented once in `scripts/stop_preview.py`. Read that
+before changing anything here. It answers two different questions:
+
+| | Asked by | What it stops |
+|---|---|---|
+| `everything` | the launcher's `--stop` | the server, the build, the driver, and every child of them |
+| `servingOnly` | `build_site.py --build-only`, above | only the preview SERVER that would overwrite the build |
+
+The distinction is not fussiness: a build for publishing must never stop a
+build, because the build it is protecting is itself a build of this section,
+and the process asking is the one the rule would otherwise recognise.
+
+A process belongs to the section on any ONE of three kinds of evidence —
+its working directory is inside the section's build folder, its command line
+NAMES that folder, or it is `build_site.py` carrying this course and this
+section — **plus every descendant of a match.** It is a disjunction because
+until 2026-09-05 this question was answered in three separate places
+(`preview.sh`, `preview.ps1`, and here), and those three turned out not to be
+three copies of one rule but three PARTIAL ones: a working directory sees a
+child launched by a relative path, which carries no directory to match on
+(`npm install` runs exactly that way), while a command line sees the Python
+driver, which never calls `os.chdir` — it passes `cwd=` to its CHILDREN — and
+therefore sits in the container's `/teaching` for the whole build. Through
+every in-process phase of a build the driver is the only process there is to
+find, and a sweep by working directory found nothing and said so. Only the
+PowerShell copy walked descendants.
+
+Every comparison ends at a BOUNDARY rather than being a substring test. That
+is not a detail either: `…/section1` is a prefix of `…/section10` and
+`--section=1` is a prefix of `--section=10`, and both had already stopped the
+wrong section on one platform.
+
 
 - **Pre-baked dependencies:** If `node_modules` is not present in the workspace,
   it is symlinked instantly from `/opt/quartz/node_modules` in the image. `npm install`
@@ -287,7 +321,9 @@ there is none (Windows, natively) — see `WINDOWS-HANDOFF.md`.
   part of the [determinism strategy](07-deployment.md#why-determinism-matters)
   that keeps Netlify uploads small.
 - **Preview mode (default):** kills any process holding the requested
-  port (`lsof`, that port only — several previews can run at once). Starts a
+  port (`lsof`, that port only — several previews can run at once). This is
+  the one place a port is still the right handle, because here the port is
+  known and leased; everywhere else, see the rule above. Starts a
   lightweight background synchronization watcher thread that polls `public/` and
   mirrors changes to the host's `.merged_output/section<N>/public/`, then
   runs `npx quartz build --concurrency 1 --serve --port <8081-8084>
