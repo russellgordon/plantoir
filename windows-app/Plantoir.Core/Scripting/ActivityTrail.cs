@@ -44,11 +44,6 @@ public static class ActivityTrail
         /// </summary>
         SectionProcessesReclaimed,
         /// <summary>
-        /// A working folder was recognised as kept in sync by a cloud service.
-        /// Carries the service's name — never the folder's path, which is a
-        /// teacher's own filing and is redacted from the trail anyway.
-        /// </summary>
-        /// <summary>
         /// A course folder was renamed from inside Plantoir. Carries the OLD
         /// and NEW folder names and the course - never anything from inside
         /// the folder. A rename is the one moment Plantoir witnesses the
@@ -63,6 +58,11 @@ public static class ActivityTrail
         /// needs to be able to see which it was.
         /// </summary>
         FolderCreated,
+        /// <summary>
+        /// A working folder was recognised as kept in sync by a cloud service.
+        /// Carries the service's name — never the folder's path, which is a
+        /// teacher's own filing and is redacted from the trail anyway.
+        /// </summary>
         SyncedFolderNoticed,
         /// <summary>
         /// The teacher chose to use the synced folder anyway. Recorded because

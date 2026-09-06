@@ -100,7 +100,36 @@ function Write-Utf8NoBom([string]$path, [string]$text) {
 function Restore-Config {
     if ($originalConfig) { Write-Utf8NoBom $config $originalConfig }
 }
-trap { Restore-Config; break }
+
+# Kill a process AND ITS CHILDREN.
+#
+# `$process.Kill($true)` is what this used to call, and under Windows
+# PowerShell 5.1 it does not exist: System.Diagnostics.Process there offers
+# only `Kill()` — the boolean overload is .NET Core 3 and later. The call threw
+# and an empty catch swallowed it, so a timed-out launcher was never stopped at
+# all. Two runs of this script left a powershell.exe and its python.exe child
+# sitting at a prompt for forty-five minutes because of it.
+#
+# `Kill()` alone would not be enough either: it ends the shell and leaves the
+# Python and node underneath it running, which is the very orphaning this
+# repository's stop-preview work is about. taskkill /T walks the tree.
+function Stop-Tree([int]$processId) {
+    try { & taskkill.exe /PID $processId /T /F *> $null } catch { }
+}
+
+# The preview launched below, so it can be stopped on EVERY exit path.
+$script:PreviewProcess = $null
+function Stop-AnyPreview {
+    if ($script:PreviewProcess -and -not $script:PreviewProcess.HasExited) {
+        Stop-Tree $script:PreviewProcess.Id
+    }
+    # And the section's own processes, through the launcher's own stop mode -
+    # the same sweep the app uses, so a run that dies early does not leave a
+    # preview serving for the next one to trip over.
+    try {
+        & cmd.exe /c "cd /d `"$WorkingFolder`" && .\preview.bat $Course $Section --stop" *> $null
+    } catch { }
+}
 
 # Credentials decide what can be exercised. Read through the same Credential
 # Manager target names deploy.ps1 uses, and never printed.
@@ -134,18 +163,24 @@ function Run-Launcher {
     Remove-Item $LogFile -ErrorAction SilentlyContinue
     $quoted = ($LauncherArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
 
-    # A first publish to Netlify ASKS things - a surname, and a site name -
-    # and so does a publish whose saved site has been deleted upstream, which
-    # is what happened on the first real run of this script: the launcher fell
+    # A first publish to Netlify ASKS things - a surname, and a site name - and
+    # so does a publish whose saved site has been deleted upstream, which is
+    # what happened on the first real run of this script: the launcher fell
     # through to "create a fresh site", asked for a name, and the run sat there
-    # until the timeout. Without stdin the harness cannot tell "it hung" from
-    # "it asked", and those need different answers from a person.
+    # until the timeout.
     #
-    # The answers are fed as a file rather than typed at a pseudo-console. That
-    # is cruder than the mac's `expect`, which answers by PROMPT TEXT, and the
-    # difference is worth knowing: a blind feed cannot tell one question from
-    # another, so it is used ONLY for the destinations that ask, and the
-    # answers are the defaults the launcher itself offers.
+    # WHAT ACTUALLY FIXES IT IS NOT THE ANSWERS. `deploy.py` asks nothing when
+    # its stdin is not a terminal - `sys.stdin.isatty()` guards every prompt
+    # (deploy.py:285, :326, :430) and it takes the default instead. Redirecting
+    # stdin from a FILE is what makes isatty() false; the contents are never
+    # read on this path. An earlier version of this comment, and the commit
+    # that introduced it, both claimed the harness "answers prompts". It does
+    # not, and the difference matters: with no surname saved, the site is named
+    # without one, where the mac's `expect` would send "Testing".
+    #
+    # The lines are kept because `deploy.ps1`'s OWN `Read-Host` calls (the
+    # zero-fix question, the token pastes) are not isatty-guarded and would
+    # consume them - none fire in this flow, but a future one might.
     $stdin = $null
     if ($Answers.Count -gt 0) {
         $stdin = Join-Path $work ("answers-" + [Guid]::NewGuid().ToString('N').Substring(0,6) + ".txt")
@@ -180,7 +215,7 @@ function Run-Launcher {
     if ($stdin) { $startArgs["RedirectStandardInput"] = $stdin }
     $process = Start-Process @startArgs
     if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-        try { $process.Kill($true) } catch { }
+        Stop-Tree $process.Id
         $partial = if (Test-Path $LogFile) { Get-Content $LogFile -Raw } else { "" }
         # 124 is "timed out", kept distinct from any code the launcher itself
         # can return, so a hang never reads as a refusal.
@@ -237,12 +272,19 @@ function Url-FromLog([string]$log) {
     return ""
 }
 
+# Everything from here is wrapped so the course's own settings are put back on
+# EVERY exit path. It used to rely on `trap`, which does not run on Ctrl+C -
+# so interrupting a run left the course pointed at whichever destination the
+# script had been testing at the time.
+try {
+
 # --------------------------------------------------- the preview, and the race
 Hdr "Preview - serve mode, which is what a teacher actually uses"
 $previewLog = Join-Path $work "preview.log"
 $previewProcess = Start-Process -FilePath "cmd.exe" `
     -ArgumentList "/c", ".\preview.bat $Course $Section > `"$previewLog`" 2>&1" `
     -WorkingDirectory $WorkingFolder -PassThru -WindowStyle Hidden
+$script:PreviewProcess = $previewProcess
 
 $port = $null
 $deadline = (Get-Date).AddMinutes(10)
@@ -278,7 +320,7 @@ if (-not $port) {
 # parent's sync watcher goes on mirroring the SERVE build into the section's
 # build directory about once a second. The next case publishes into exactly
 # that state.
-if ($previewProcess -and -not $previewProcess.HasExited) { try { $previewProcess.Kill($true) } catch { } }
+if ($previewProcess -and -not $previewProcess.HasExited) { Stop-Tree $previewProcess.Id }
 Start-Sleep -Seconds 3
 
 Hdr "Publishing straight after a preview must not ship the live-reload client"
@@ -340,7 +382,7 @@ Hdr "Pairing 1 of 3 - Netlify primary, a folder also"
 if ($haveNetlify) {
     Remove-Item -Recurse -Force $folderTarget -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $folderTarget | Out-Null
-    Set-Destination -Primary "netlify" -AdditionalJson "[{`"type`":`"local_folder`",`"folder_path`":`"$($folderTarget -replace '\\','\\\\')`"}]"
+    Set-Destination -Primary "netlify" -AdditionalJson "[{`"type`":`"local_folder`",`"folder_path`":`"$($folderTarget.Replace('\','\\'))`"}]"
     $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair1-netlify.log") -Answers @("Testing", "", "y")
     $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "pair1-folder.log")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
@@ -354,7 +396,7 @@ Hdr "Pairing 2 of 3 - Cloudflare primary, a folder also"
 if ($haveCloudflare) {
     Remove-Item -Recurse -Force $folderTarget -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $folderTarget | Out-Null
-    Set-Destination -Primary "cloudflare_pages" -AdditionalJson "[{`"type`":`"local_folder`",`"folder_path`":`"$($folderTarget -replace '\\','\\\\')`"}]"
+    Set-Destination -Primary "cloudflare_pages" -AdditionalJson "[{`"type`":`"local_folder`",`"folder_path`":`"$($folderTarget.Replace('\','\\'))`"}]"
     $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair2-cf.log") -Answers @("Testing", "", "y")
     $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "pair2-folder.log")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
@@ -375,7 +417,6 @@ if ($haveNetlify -and $haveCloudflare) {
 } else { Skipped "Netlify + Cloudflare (needs both sets of credentials)" }
 
 # ------------------------------------------------------------------ finishing
-Restore-Config
 Hdr "Result"
 Write-Host "  $($script:Pass) passed, $($script:Fail) failed, $($script:Skip) skipped"
 Write-Host "  logs: $work"
@@ -385,3 +426,9 @@ if ($script:Fail -gt 0) {
     exit 1
 }
 exit 0
+
+}
+finally {
+    Restore-Config
+    Stop-AnyPreview
+}

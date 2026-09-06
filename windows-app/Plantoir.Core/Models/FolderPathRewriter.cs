@@ -70,8 +70,8 @@ public static class FolderPathRewriter
         if (string.IsNullOrWhiteSpace(oldName) || string.IsNullOrWhiteSpace(newName)) return text;
         if (oldName.Equals(newName, StringComparison.Ordinal)) return text;
 
-        string once = WikiLink.Replace(text, match => Replaced(match, oldName, newName));
-        return MarkdownLink.Replace(once, match => Replaced(match, oldName, newName));
+        string once = WikiLink.Replace(text, match => Replaced(match, oldName, newName, markdown: false));
+        return MarkdownLink.Replace(once, match => Replaced(match, oldName, newName, markdown: true));
     }
 
     /// <summary>
@@ -90,11 +90,11 @@ public static class FolderPathRewriter
         return found;
     }
 
-    private static string Replaced(Match match, string oldName, string newName)
+    private static string Replaced(Match match, string oldName, string newName, bool markdown)
     {
         string opening = match.Groups[1].Value;
         string target = match.Groups[2].Value;
-        return opening + RewrittenTarget(target, oldName, newName);
+        return opening + RewrittenTarget(target, oldName, newName, markdown);
     }
 
     /// <summary>
@@ -104,7 +104,7 @@ public static class FolderPathRewriter
     /// candidate, so a page called <c>Tasks.md</c> survives a rename of the
     /// folder <c>Tasks</c>.</para>
     /// </summary>
-    private static string RewrittenTarget(string target, string oldName, string newName)
+    private static string RewrittenTarget(string target, string oldName, string newName, bool markdown)
     {
         if (PointsOutsideTheCourse(target)) return target;
 
@@ -115,13 +115,48 @@ public static class FolderPathRewriter
         for (int i = 0; i < segments.Count - 1; i++)
         {
             if (!SegmentIs(segments[i], oldName)) continue;
-            // Keep the spelling style the link already used: a percent-encoded
-            // segment stays encoded, so a link Obsidian wrote in Markdown style
-            // is still a link Obsidian can follow.
-            segments[i] = WasEncoded(segments[i]) ? Uri.EscapeDataString(newName) : newName;
+            segments[i] = Spelled(newName, wasEncoded: WasEncoded(segments[i]), markdown: markdown);
             changed = true;
         }
         return changed ? string.Join("/", segments) : target;
+    }
+
+    /// <summary>
+    /// How the new name is spelled inside this particular link.
+    ///
+    /// <para>Keeping the style the link already used is the obvious rule and is
+    /// WRONG for Markdown links on its own. A Markdown destination ends at the
+    /// first space — the pattern above is literally <c>[^)\s]+</c> — so
+    /// renaming <c>Tasks</c> to <c>All Tasks</c> turned
+    /// <c>[q](Tasks/Quiz%201.md)</c> into <c>[q](All Tasks/Quiz%201.md)</c>,
+    /// which neither Obsidian nor Quartz can follow. The rename would have
+    /// broken every Markdown-style link into the folder, in a teacher's own
+    /// pages, silently. Found by adversarial review 2026-09-06 and reproduced
+    /// before being fixed; the mac has the identical rule and the identical
+    /// defect, which is why it is going to MAC-HANDOFF rather than being
+    /// treated as a port error.</para>
+    ///
+    /// <para>So: in a Markdown link, encode when the NEW name needs it,
+    /// whatever the old one looked like. In a wikilink, keep the old style —
+    /// <c>[[All Tasks/Quiz 1]]</c> is exactly how Obsidian writes a wikilink
+    /// with a space in it, and escaping there would be the mirror-image
+    /// mistake.</para>
+    /// </summary>
+    private static string Spelled(string newName, bool wasEncoded, bool markdown)
+    {
+        if (markdown && WouldBreakAMarkdownTarget(newName)) return Uri.EscapeDataString(newName);
+        return wasEncoded ? Uri.EscapeDataString(newName) : newName;
+    }
+
+    /// <summary>
+    /// Whether this name, dropped into a Markdown link destination unescaped,
+    /// would end the destination early or misparse it.
+    /// </summary>
+    private static bool WouldBreakAMarkdownTarget(string name)
+    {
+        foreach (char character in name)
+            if (char.IsWhiteSpace(character) || character == '(' || character == ')') return true;
+        return false;
     }
 
     private static bool NamesTheFolder(string target, string folderName)

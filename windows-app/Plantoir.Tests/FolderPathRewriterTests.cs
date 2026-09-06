@@ -169,4 +169,59 @@ public class FolderPathRewriterTests
     {
         Assert.Equal(0, FolderPathRewriter.Count("[h](https://example.com/Tasks/handout.pdf)", "Tasks"));
     }
+
+    // ------------------------------- a new name that needs escaping (2026-09-06)
+
+    [Fact]
+    public void ANewNameWithASpaceIsEscapedInAMarkdownLink()
+    {
+        // A Markdown destination ends at the first SPACE — the pattern is
+        // literally [^)\s]+ — so this rename used to produce
+        // "[q](All Tasks/Quiz%201.md)", which neither Obsidian nor Quartz can
+        // follow. It broke every Markdown-style link into the folder, in a
+        // teacher's own pages, and said nothing.
+        Assert.Equal("[q](All%20Tasks/Quiz%201.md)",
+                     FolderPathRewriter.Rewritten("[q](Tasks/Quiz%201.md)", "Tasks", "All Tasks"));
+        // ...and the same when the old segment was NOT encoded: what decides
+        // it is what the NEW name needs, not what the old one looked like.
+        Assert.Equal("[q](All%20Tasks/Quiz.md)",
+                     FolderPathRewriter.Rewritten("[q](Tasks/Quiz.md)", "Tasks", "All Tasks"));
+    }
+
+    [Fact]
+    public void BracketsInANewNameAreEscapedInAMarkdownLinkToo()
+    {
+        // A closing bracket would end the destination just as a space does.
+        Assert.Equal("[q](Work%28new%29/Quiz.md)",
+                     FolderPathRewriter.Rewritten("[q](Tasks/Quiz.md)", "Tasks", "Work(new)"));
+    }
+
+    [Fact]
+    public void AWikiLinkKeepsTheSpaceRatherThanEscapingIt()
+    {
+        // The mirror-image mistake. "[[All Tasks/Quiz 1]]" is exactly how
+        // Obsidian writes a wikilink with a space in it; escaping there would
+        // hand it a link it cannot follow.
+        Assert.Equal("[[All Tasks/Quiz 1]]",
+                     FolderPathRewriter.Rewritten("[[Tasks/Quiz 1]]", "Tasks", "All Tasks"));
+    }
+
+    [Fact]
+    public void APlainNewNameIsNotEscapedForNoReason()
+    {
+        // Escaping everything would be safe and unreadable. A name that needs
+        // nothing keeps its plain spelling.
+        Assert.Equal("[q](Assignments/Quiz.md)",
+                     FolderPathRewriter.Rewritten("[q](Tasks/Quiz.md)", "Tasks", "Assignments"));
+        Assert.Equal("[[Assignments/Quiz 1]]",
+                     FolderPathRewriter.Rewritten("[[Tasks/Quiz 1]]", "Tasks", "Assignments"));
+    }
+
+    [Fact]
+    public void AnAlreadyEncodedMarkdownSegmentStaysEncodedForAPlainNewName()
+    {
+        // The original rule, still right for this case.
+        Assert.Equal("[q](Assignments/Quiz%201.md)",
+                     FolderPathRewriter.Rewritten("[q](Tasks/Quiz%201.md)", "Tasks", "Assignments"));
+    }
 }

@@ -19,21 +19,18 @@ an item when it ships (finished behaviour is recorded in
        Creating a fresh Netlify site for this section…
        Enter Netlify site name [mcr3u-s1-2026-gordon]:
 
-  A person at a keyboard answers that in two seconds. A harness with no stdin
-  waits forever, which is what happened.
+  A person at a keyboard answers that in two seconds. The harness had a stdin
+  nobody was typing into, and waited forever.
 
   **Why it matters beyond the harness.** `TaskScheduling.WriteWrapperScript`
   generates `& <deploy.ps1> <args>` with no stdin redirection and no
-  non-interactive flag, and Task Scheduler runs it with no console. The mac's
-  `launchd` path has the same shape. So the flagship "publish tomorrow's
+  non-interactive flag. The mac's `launchd` path has the same shape. (Whether
+  Task Scheduler gives it a console is exactly the open question below, and it
+  is not assumed here.) So the flagship "publish tomorrow's
   class" feature, on a course whose site has been deleted upstream — or on a
   course whose FIRST publish is the scheduled one, which also asks — reaches a
-  question nobody will ever answer. What happens next is not knowable from
-  reading: `Read-Host` with no console may return empty (silently accepting
-  the default site name, which at least publishes), may throw, or may block
-  until the task's own limit. All three are bad in different ways, and the
-  silent-default case is the worst because it publishes to an address nobody
-  chose.
+  question nobody will ever answer. What happens next depends on one line, and
+  the paragraph after next says which.
 
   **What a fix looks like, and why it was not just done.** A
   `--non-interactive` flag that makes `deploy` REFUSE rather than ask, with a
@@ -44,26 +41,37 @@ an item when it ships (finished behaviour is recorded in
   contract change, wants agreeing on both sides, and is Russell's call rather
   than a Windows session's.
 
-  **Half of it is now measured, and the answer is the bad one.** Two runs of
-  the harness left their launcher processes sitting at that prompt for
-  **45 minutes** — a `powershell.exe` and its `python.exe` child from each run,
-  still alive and still waiting when they were finally swept up. Under a parent
-  with no usable stdin, `Read-Host` BLOCKS rather than returning empty. So on
-  that path the failure is "the overnight publish never happened, and nothing
-  said so" — the worse of the two shapes, because a teacher's site is simply
-  not updated in the morning and no line anywhere explains why. Two further
-  things follow, both worth knowing: the wedged processes survive their
-  parent being killed, INCLUDING `Process.Kill($true)` on the tree, so a
-  scheduled task that gives up leaves the launcher running; and nothing was
-  written to the activity trail while they waited, so the trail cannot tell
-  this apart from a deploy that was never scheduled.
+  **The mechanism, corrected.** An earlier version of this entry blamed
+  PowerShell's `Read-Host`. It is not: the question comes from `deploy.py`'s
+  own `prompt()` helper (`scripts/deploy.py:325`), which guards every ask with
+  `sys.stdin.isatty()`. That single line decides which of two different bugs a
+  teacher gets, and BOTH have now been seen:
 
-  **What is still worth checking**: whether Task Scheduler's own environment
-  differs from this one — it may hand the process a null stdin that returns
-  EOF immediately rather than a pipe that never delivers, in which case the
-  failure changes shape to "published to an address nobody chose". Both are
-  bad; they want different fixes, and the flag refusing to ask is the fix for
-  both.
+  * **stdin IS a terminal → Python's `input()` blocks, forever.** Measured:
+    two harness runs left a `powershell.exe` and its `python.exe` child waiting
+    at that prompt for **45 minutes**, still alive when they were swept up. We
+    know it was this branch and not the other because the prompt TEXT was
+    printed, and `prompt()` prints nothing at all when `isatty()` is false. The
+    failure is "the overnight publish never happened and nothing said so" — the
+    teacher's site is simply not updated in the morning.
+  * **stdin is NOT a terminal → the default is taken silently.** No prompt is
+    printed, the site is created at whatever address the default suggests, and
+    a name conflict auto-suffixes (`deploy.py:430`). The failure is "published
+    to an address nobody chose", and on a machine with no saved surname the
+    address has no surname in it either.
+
+  **So the open question is narrow and answerable**: does Task Scheduler give
+  the wrapper a console, making `isatty()` true? That decides which of the two
+  a teacher meets. Both are bad, and a `--non-interactive` flag that REFUSES
+  rather than asking is the fix for both.
+
+  **Two things that follow whichever branch it takes.** The wedged processes
+  survive their parent being killed — including `Process.Kill($true)` on the
+  whole tree, which does not even exist under Windows PowerShell 5.1 and threw
+  silently in this harness for three runs — so a scheduler that gives up leaves
+  the launcher running. And NOTHING reaches the activity trail while they wait,
+  so the trail cannot tell a wedged overnight publish from one that was never
+  scheduled.
 
 - ✅ **Done 2026-09-05 — the two reliability findings from that day's review.**
   Kept rather than deleted because the SHAPE of each is worth recognising

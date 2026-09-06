@@ -407,21 +407,40 @@ rather than being deleted.
   makes `deploy` refuse rather than ask, which changes what the app passes the
   launcher — pinned by `app-rules.json` → `deployArguments` and run by both
   suites. That is a contract change and wants agreeing rather than doing. What
-  is worth measuring first, on either platform: whether `Read-Host` with no
-  console returns EMPTY (silently accepting the default site name, publishing
-  to an address nobody chose) or BLOCKS (the overnight publish never happens
-  and nothing says so). Those are different bugs and want different urgency.
+**The mechanism, corrected — and it is not what the first version of this
+  entry said.** An earlier version of this entry blamed
+  PowerShell's `Read-Host`. It is not: the question comes from `deploy.py`'s
+  own `prompt()` helper (`scripts/deploy.py:325`), which guards every ask with
+  `sys.stdin.isatty()`. That single line decides which of two different bugs a
+  teacher gets, and BOTH have now been seen:
 
-  **Half of it is measured now, and it is the bad half.** Two harness runs left
-  their launcher processes waiting at that prompt for **45 minutes** — a
-  `powershell.exe` and its `python.exe` child from each — still alive when they
-  were swept up. With no usable stdin, `Read-Host` BLOCKS. Two things follow
-  that the mac will meet identically: the wedged processes survive their parent
-  being killed, `Process.Kill($true)` on the whole tree included, so a
-  scheduler that gives up leaves the launcher running; and NOTHING reaches the
-  activity trail while they wait, so the trail cannot tell a wedged overnight
-  publish from one that was never scheduled. Hardware: Windows 11 Pro 26200,
-  Intel i5-8365U.
+  * **stdin IS a terminal → Python's `input()` blocks, forever.** Measured:
+    two harness runs left a `powershell.exe` and its `python.exe` child waiting
+    at that prompt for **45 minutes**, still alive when they were swept up. We
+    know it was this branch and not the other because the prompt TEXT was
+    printed, and `prompt()` prints nothing at all when `isatty()` is false. The
+    failure is "the overnight publish never happened and nothing said so" — the
+    teacher's site is simply not updated in the morning.
+  * **stdin is NOT a terminal → the default is taken silently.** No prompt is
+    printed, the site is created at whatever address the default suggests, and
+    a name conflict auto-suffixes (`deploy.py:430`). The failure is "published
+    to an address nobody chose", and on a machine with no saved surname the
+    address has no surname in it either.
+
+  **So the open question is narrow and answerable**: does Task Scheduler give
+  the wrapper a console, making `isatty()` true? That decides which of the two
+  a teacher meets. Both are bad, and a `--non-interactive` flag that REFUSES
+  rather than asking is the fix for both.
+
+  **Two things that follow whichever branch it takes.** The wedged processes
+  survive their parent being killed — including `Process.Kill($true)` on the
+  whole tree, which does not even exist under Windows PowerShell 5.1 and threw
+  silently in this harness for three runs — so a scheduler that gives up leaves
+  the launcher running. And NOTHING reaches the activity trail while they wait,
+  so the trail cannot tell a wedged overnight publish from one that was never
+  scheduled.
+
+  Hardware: Windows 11 Pro 26200, Intel i5-8365U.
 
 - ⚠️ **THE CONTRACT'S `stopPreview` PROSE IS NOW WRONG ABOUT WINDOWS, and only
   the mac can regenerate it** (Windows + shared, 2026-09-05). Three sentences
