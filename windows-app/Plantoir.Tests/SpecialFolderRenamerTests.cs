@@ -279,4 +279,68 @@ public class SpecialFolderRenamerTests : IDisposable
         Assert.Equal("folder renamed", ActivityTrail.KeyFor(ActivityTrail.Event.FolderRenamed));
         Assert.Equal("folder created", ActivityTrail.KeyFor(ActivityTrail.Event.FolderCreated));
     }
+
+    // ------------------------------ names Windows itself refuses (2026-09-06)
+
+    [Theory]
+    [InlineData("CON")]
+    [InlineData("con")]
+    [InlineData("NUL")]
+    [InlineData("COM1")]
+    [InlineData("LPT9")]
+    [InlineData("PRN.md")]
+    public void AReservedWindowsDeviceNameIsRefused(string name)
+    {
+        // These pass every other check and then fail at the move with whatever
+        // the operating system says. Told plainly instead.
+        string? problem = SpecialFolderRenamer.Problem(name, "Tasks", new[] { "Tasks" });
+        Assert.NotNull(problem);
+        Assert.Contains(name, problem!);
+    }
+
+    [Theory]
+    [InlineData("Tasks.")]
+    [InlineData("Tasks ")]
+    public void ATrailingDotOrSpaceIsRefused(string name)
+    {
+        // The trailing dot is the one worth knowing about: Windows strips it,
+        // so "Tasks." resolves to "Tasks" and the destination check would have
+        // reported "there is already something called Tasks. beside it" about
+        // the very folder being renamed.
+        Assert.NotNull(SpecialFolderRenamer.Problem(name, "Handouts", new[] { "Tasks", "Handouts" }));
+    }
+
+    [Theory]
+    [InlineData("a<b")]
+    [InlineData("a>b")]
+    [InlineData("a|b")]
+    [InlineData("a?b")]
+    [InlineData("a*b")]
+    [InlineData("a\"b")]
+    public void ACharacterWindowsForbidsIsRefused(string name)
+    {
+        Assert.NotNull(SpecialFolderRenamer.Problem(name, "Tasks", new[] { "Tasks" }));
+    }
+
+    [Fact]
+    public void AnOrdinaryNameContainingAReservedWordIsStillFine()
+    {
+        // "CONTENTS" is not "CON". The check is on the whole stem.
+        Assert.Null(SpecialFolderRenamer.Problem("Contents", "Tasks", new[] { "Tasks" }));
+        Assert.Null(SpecialFolderRenamer.Problem("Console Games", "Tasks", new[] { "Tasks" }));
+    }
+
+    [Fact]
+    public void ARootedNameCannotMoveTheFolderOutOfTheCourse()
+    {
+        // Path.Combine with a rooted second argument DISCARDS the first, so
+        // this would otherwise move the folder to the root of the drive.
+        // Problem() refuses such a name and every caller is meant to ask first,
+        // but a move list is not the place to depend on that.
+        string course = Course("Tasks");
+        Assert.Empty(SpecialFolderRenamer.Moves(course, "Tasks", @"C:\Windows",
+                                                FolderScope.Shared, new[] { 1 }));
+        Assert.Empty(SpecialFolderRenamer.Moves(course, "Tasks", @"sub\folder",
+                                                FolderScope.Shared, new[] { 1 }));
+    }
 }

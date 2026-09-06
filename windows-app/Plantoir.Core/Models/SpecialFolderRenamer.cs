@@ -88,12 +88,46 @@ public static class SpecialFolderRenamer
             return SpecialNames.RenameProblemIsMedia;
         if (LooksLikeASectionFolder(wanted))
             return SpecialNames.RenameProblemLooksLikeASection.Replace("{name}", wanted);
+        if (WindowsWontAllow(wanted))
+            return SpecialNames.RenameProblemWindowsWontAllowIt.Replace("{name}", wanted);
         foreach (string used in namesInUse)
             if (!used.Equals(currentName, StringComparison.OrdinalIgnoreCase)
                 && used.Equals(wanted, StringComparison.OrdinalIgnoreCase))
                 return SpecialNames.RenameProblemAlreadyUsed.Replace("{name}", wanted);
         return null;
     }
+
+    /// <summary>
+    /// Names Windows itself will not accept, checked BEFORE anything is
+    /// touched so a teacher is told plainly rather than meeting the operating
+    /// system's own error half way through a rename.
+    ///
+    /// <para>The trailing dot is the one worth knowing about: Windows strips
+    /// it, so <c>Tasks.</c> resolves to <c>Tasks</c> and the destination check
+    /// would report "there is already something called Tasks. beside it" about
+    /// the very folder being renamed.</para>
+    /// </summary>
+    private static bool WindowsWontAllow(string name)
+    {
+        foreach (char invalid in Path.GetInvalidFileNameChars())
+            if (name.Contains(invalid)) return true;
+        if (name.EndsWith('.') || name.EndsWith(' ')) return true;
+
+        // The device names DOS reserved, with or without an extension.
+        string stem = name;
+        int dot = stem.IndexOf('.');
+        if (dot >= 0) stem = stem[..dot];
+        foreach (string reserved in ReservedDeviceNames)
+            if (stem.Equals(reserved, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    private static readonly string[] ReservedDeviceNames =
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    };
 
     /// <summary>
     /// <c>section3</c> and friends: what Plantoir calls a section's own folder,
@@ -119,6 +153,14 @@ public static class SpecialFolderRenamer
         FolderScope scope, IReadOnlyList<int> sectionNumbers)
     {
         var moves = new List<(string, string, int?)>();
+        // Path.Combine with a ROOTED second argument discards the first and
+        // returns the root - so a new name of "C:\Windows" would move the
+        // folder out of the course entirely. Problem() refuses such a name and
+        // every caller is meant to ask it first, but a move list is not the
+        // place to depend on that.
+        if (Path.IsPathRooted(newName) || newName.Contains('/') || newName.Contains('\\'))
+            return moves;
+
         if (scope == FolderScope.Shared)
         {
             string from = Path.Combine(courseDirectory, currentName);

@@ -155,6 +155,26 @@ public static class SpecialNames
     public const string RenameProblemDestinationExists =
         "There is already something called “{name}” beside it. Move or rename that first.";
 
+    /// <summary>
+    /// A name Windows itself will not accept. Carries {name}.
+    ///
+    /// <para>NOT in the contract, and written here knowingly — the handoff's
+    /// "Sentences the contract does not carry" list is where this kind
+    /// belongs. The contract's `hasSeparator` names only "/" and ":", because
+    /// those are the two that matter on the mac. Windows additionally refuses
+    /// <c>&lt; &gt; " | ? *</c>, a trailing dot or space, and the device names
+    /// (CON, PRN, NUL, AUX, COM1…) it has reserved since DOS.</para>
+    ///
+    /// <para>Without this, <c>CON</c> passes every check and fails at the move
+    /// with whatever the operating system says; and <c>Tasks.</c> is worse
+    /// still, because Windows strips the trailing dot, so
+    /// <c>Directory.Exists</c> finds the ORIGINAL folder and the teacher is
+    /// told "There is already something called Tasks. beside it" about the
+    /// folder they are renaming.</para>
+    /// </summary>
+    public const string RenameProblemWindowsWontAllowIt =
+        "Windows does not allow a folder to be called \u201c{name}\u201d. Try another name.";
+
     /// <summary>The sheet's title. Carries {name}.</summary>
     public const string RenameSheetTitle =
         "Rename “{name}”";
