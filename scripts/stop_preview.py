@@ -109,7 +109,15 @@ def _is_a_real_directory(target: str) -> bool:
     """
     if not target:
         return False
-    return target not in ("/", "\\")
+    if target in ("/", "\\"):
+        return False
+    # `C:\` strips to `c:`, and a drive root sweeps the whole drive — the
+    # same failure as `/`, in the spelling the other platform uses. No caller
+    # can pass one today; it is refused here because "no caller can" is a fact
+    # about today's callers, and this function is the public API.
+    if len(target) == 2 and target[1] == ":" and target[0].isalpha():
+        return False
+    return True
 
 
 def _normalise(text: str) -> str:

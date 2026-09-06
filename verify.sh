@@ -739,7 +739,14 @@ _start_stand_ins() {
   sleep 1
 }
 
-docker exec "$CONTAINER_NAME" mkdir -p /tmp/quartz-builds/EXC2O/section1 /tmp/quartz-builds/EXC2O/section2 >/dev/null 2>&1 || true
+# Only section 1, which the cwd stand-in needs for `docker exec -w`. NOT
+# section 2: `build_site.py` skips the scaffold copy whenever the output
+# directory already exists, so an empty one left behind here makes a later
+# `./preview.sh EXC2O 2` fail on a missing bootstrap-cli.mjs — in the very
+# container this script leaves running and invites you to poke at. That is
+# the "litter that reads as a broken toolchain" this section warns about,
+# committed by the section itself.
+docker exec "$CONTAINER_NAME" mkdir -p /tmp/quartz-builds/EXC2O/section1 >/dev/null 2>&1 || true
 _start_stand_ins
 if [[ "$(_count_matching cq4t-probe-serve-1)" == "1" && "$(_count_matching cq4t-probe-cwd)" == "1" \
       && "$(_count_matching cq4t-probe-serve-2)" == "1" ]]; then

@@ -685,7 +685,7 @@ this side is expected to say so when the contract is wrong.
     Windows (2026-09-05, row 407).** This is the `TODO.md` item "one rule,
     three implementations", closed on the mac side. The rule — which
     processes belong to a section's preview — lives once, in
-    `contracts/shared-rules.json` → `stopPreview`, with 17 cases as whole
+    `contracts/shared-rules.json` → `stopPreview`, with 23 cases as whole
     process snapshots. Read that key before anything else here.
 
     **What you inherit free.** The contract, the case list, and the
@@ -734,10 +734,18 @@ this side is expected to say so when the contract is wrong.
       tested. The cheapest honest shape is a `windows-app/test_stop_preview.ps1`
       that dot-sources the two functions and runs the case list, or an xUnit
       test that invokes it — your call, and say which in `MAC-HANDOFF.md`.
-      **Do not retype the cases**; deserialise them. Note that every case
-      carries `cwd`, which `Win32_Process` cannot give you: those cases are
-      not yours to answer directly, and the fact that you still reach the
-      same verdict through the descendant walk is the thing worth proving.
+      **Do not retype the cases**; deserialise them. **Exactly ONE of the 23
+      may be skipped**, and only the one that says so: a case carrying
+      `needsEvidence: ["workingDirectory"]` cannot be decided without a
+      working directory, which `Win32_Process` does not expose, so a runner
+      without that evidence skips it and NAMES what was missing. Every other
+      case must reach the listed verdict with the `cwd` field blank — and
+      they can, which is proved rather than hoped: the mac's suite blinds
+      each case, removing the working directories, and asserts that a marked
+      case's verdict changes and an unmarked case's does not. (An earlier
+      draft of this bullet said every case carries `cwd` and so none were
+      yours to answer directly. Read literally that excused all 23, which is
+      the quiet version of this going wrong: a green suite that ran nothing.)
     - **Two things about your matcher that the contract now records rather
       than hides.** `preview.ps1:313` considers only `node.exe` and
       `python.exe` for direct evidence; the shared rule has no such filter,
