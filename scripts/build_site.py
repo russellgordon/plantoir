@@ -1071,9 +1071,17 @@ def stop_preview_serving(output_dir: Path) -> int:
     # a plain `OSError` there rather than `ProcessLookupError` — so the POSIX
     # spelling would have crashed a publish with a traceback the first time a
     # preview exited between the snapshot and the kill.
+    #
+    # SIGKILL where there IS one, though, and that is not a detail: the
+    # contract says `servingOnly` insists at once rather than asking first,
+    # because a second spent waiting politely is a second in which the
+    # preview's mirror can overwrite this build — which is the entire failure
+    # being prevented. Windows ignores the signal (there is nothing to ask
+    # with) and ends it outright either way.
+    insist = getattr(signal, "SIGKILL", signal.SIGTERM)
     stopped = 0
     for pid in pids:
-        if stop_preview.stop_one(pid):
+        if stop_preview.stop_one(pid, insist):
             stopped += 1
             print(f"🛑 Stopped the preview that was still serving this section "
                   f"(PID {pid}), so it cannot overwrite this build.")

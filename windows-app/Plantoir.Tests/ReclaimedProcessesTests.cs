@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
@@ -14,6 +15,11 @@ namespace Plantoir.Tests;
 /// and "a build was still going and was ended", and nothing else on either
 /// platform's trail can tell those apart.
 /// </summary>
+// Writes to the activity trail, which is process-wide state: xUnit
+// parallelises test CLASSES, so a class that reads the trail file before and
+// after an action needs every other trail-writing class held off. CLAUDE.md
+// names this explicitly for Windows.
+[Collection(SharedActivityState.Name)]
 public class ReclaimedProcessesTests
 {
     [Theory]
@@ -83,11 +89,16 @@ public class ReclaimedProcessesTests
         // line would be indistinguishable from a sweep that ran and found
         // nothing, which is the exact distinction this event exists to make.
         string path = ActivityTrail.CurrentLogPath;
-        string before = File.Exists(path) ? File.ReadAllText(path) : "";
+        // Counts THIS course's lines rather than comparing the whole file:
+        // a whole-file comparison fails if anything else writes a line in
+        // the same instant, which is a flake rather than a finding.
+        int Lines() => File.Exists(path)
+            ? File.ReadAllLines(path).Count(l => l.Contains("VVH2Q/9"))
+            : 0;
+        int before = Lines();
         ReclaimedProcesses.Note("ERROR: This copy of Plantoir is missing its website builder.",
-                                "VVH2O", 1);
-        string after = File.Exists(path) ? File.ReadAllText(path) : "";
-        Assert.Equal(before, after);
+                                "VVH2Q", 9);
+        Assert.Equal(before, Lines());
     }
 
     [Fact]
@@ -96,5 +107,52 @@ public class ReclaimedProcessesTests
         ReclaimedProcesses.Note("Stopped 3 process(es).", "VVH2O", 2);
         string written = File.ReadAllText(ActivityTrail.CurrentLogPath);
         Assert.Contains("VVH2O/2 · reclaimed 3 leftover website-builder processes", written);
+    }
+}
+
+/// <summary>
+/// Makes the launcher's own contract runner a GATE rather than a script
+/// somebody remembers to run.
+///
+/// `windows-app/test_stop_preview.ps1` runs the shared stopPreview cases
+/// against `preview.ps1`'s matcher — the second implementation of the rule on
+/// this platform, and the one nothing else can reach. It was written, it
+/// passed, and nothing ran it: not `dotnet test`, and not `verify.sh`, which
+/// does not run on Windows at all. A check nobody runs is a check that stops
+/// being true.
+/// </summary>
+public class TheLauncherMatcherAnswersTheContract
+{
+    [Fact]
+    public void TheContractCasesPassAgainstPreviewPs1()
+    {
+        string? dir = AppContext.BaseDirectory;
+        while (dir is not null && !File.Exists(Path.Combine(dir, "windows-app", "test_stop_preview.ps1")))
+            dir = Path.GetDirectoryName(dir);
+        Assert.True(dir is not null, "could not find windows-app/test_stop_preview.ps1 above the test binary");
+        string script = Path.Combine(dir!, "windows-app", "test_stop_preview.ps1");
+
+        var info = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = dir!,
+        };
+        foreach (string argument in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script })
+            info.ArgumentList.Add(argument);
+
+        using var process = Process.Start(info);
+        Assert.NotNull(process);
+        string output = process!.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+        Assert.True(process.WaitForExit(120_000), "the launcher's contract runner did not finish");
+
+        // The count is asserted as well as the exit code: a runner that
+        // skipped everything would also exit 0.
+        Assert.Contains("0 failed", output);
+        Assert.DoesNotContain("FAIL", output);
+        Assert.Equal(0, process.ExitCode);
     }
 }

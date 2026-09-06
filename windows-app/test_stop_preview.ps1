@@ -114,6 +114,39 @@ foreach ($case in $cases) {
     }
 }
 
+# --- Two guarantees the contract's cases cannot reach ---
+# Both are real properties of this matcher that no fixture exercises: the
+# cases never pass -Exclude, and the pid<=1 rule is decided on Windows by
+# absent evidence rather than by the guard. Removing either guard still
+# passed all 23, so they are asserted here directly.
+$guard = @(
+    [PSCustomObject]@{ ProcessId = 4242; ParentProcessId = 1; Name = 'node'; CommandLine = 'node C:\builds\work\ADA1O\section1\quartz\bootstrap-cli.mjs build --serve' },
+    [PSCustomObject]@{ ProcessId = 4243; ParentProcessId = 4242; Name = 'esbuild'; CommandLine = 'esbuild --service' }
+)
+$withoutExclusion = @(Get-SectionProcessesToStop -Snapshot $guard -Directories @('C:\builds\work\ADA1O\section1') -Course 'ADA1O' -Section '1' -Mode 'everything')
+if (($withoutExclusion -join ',') -eq '4242,4243') {
+    $passed++; Write-Host "ok    (local) the server and its child are both found" -ForegroundColor DarkGray
+} else {
+    $failed++; $failures += "(local) server and child found"
+    Write-Host "FAIL  (local) expected [4242, 4243], got [$($withoutExclusion -join ', ')]" -ForegroundColor Red
+}
+$withExclusion = @(Get-SectionProcessesToStop -Snapshot $guard -Directories @('C:\builds\work\ADA1O\section1') -Course 'ADA1O' -Section '1' -Mode 'everything' -Exclude @([uint32]4242))
+if ($withExclusion.Count -eq 0) {
+    $passed++; Write-Host "ok    (local) an excluded process is not stopped, and neither are its children through it" -ForegroundColor DarkGray
+} else {
+    $failed++; $failures += "(local) exclusion"
+    Write-Host "FAIL  (local) exclusion ignored: got [$($withExclusion -join ', ')]" -ForegroundColor Red
+}
+# pid 1, named directly by the same evidence, must still be refused.
+$initLike = @([PSCustomObject]@{ ProcessId = 1; ParentProcessId = 0; Name = 'init'; CommandLine = 'init C:\builds\work\ADA1O\section1 --serve' })
+$initResult = @(Get-SectionProcessesToStop -Snapshot $initLike -Directories @('C:\builds\work\ADA1O\section1') -Course 'ADA1O' -Section '1' -Mode 'everything')
+if ($initResult.Count -eq 0) {
+    $passed++; Write-Host "ok    (local) pid 1 is never stopped, however well it matches" -ForegroundColor DarkGray
+} else {
+    $failed++; $failures += "(local) pid 1"
+    Write-Host "FAIL  (local) pid 1 was stopped" -ForegroundColor Red
+}
+
 # --- The one skip is a budget, not a licence ---
 if ($skipped -gt 1) {
     Write-Host "More than one case was skipped; only the workingDirectory case may be." -ForegroundColor Red

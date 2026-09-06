@@ -133,6 +133,14 @@ public static class PreviewStopper
             process.EnableRaisingEvents = true;
             process.Exited += (sender, _) =>
             {
+                // Marked finished FIRST. The kill is complete once the sweep's
+                // process has exited; the flush below is only about reading
+                // its last line. Waiting for stdout EOF before releasing the
+                // waiter would mean that one inherited handle held anywhere
+                // makes this sweep "in flight" forever, and every later
+                // preview or publish of that section then pays the full 20 s
+                // WaitForStopsToFinish deadline until the app restarts.
+                exited.TrySetResult();
                 if (sender is Process finished)
                 {
                     // Exited can fire BEFORE the last OutputDataReceived, so
@@ -146,7 +154,6 @@ public static class PreviewStopper
                     ReclaimedProcesses.Note(output, courseCode, sectionNumber);
                     finished.Dispose();
                 }
-                exited.TrySetResult();
             };
             if (process.HasExited) exited.TrySetResult();
 

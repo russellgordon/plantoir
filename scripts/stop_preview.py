@@ -493,9 +493,16 @@ def read_snapshot(proc_root=None) -> list:
     return read_proc_snapshot()
 
 
-def stop_one(pid: int) -> bool:
+def stop_one(pid: int, signum=None) -> bool:
     """
     End one process, in whatever way this platform has. True if it was asked.
+
+    `signum` is for a caller that has already decided how hard to insist —
+    `servingOnly` sends SIGKILL at once rather than asking first, because a
+    second spent waiting politely is a second in which the preview's mirror
+    can overwrite the build the kill is protecting. It is ignored on Windows,
+    which has nothing to ask with, and defaults to SIGTERM where a caller has
+    no opinion.
 
     Windows has no signal to ask with: `os.kill` there is `TerminateProcess`
     whatever signal number it is handed, so this asks once and it is over.
@@ -506,7 +513,7 @@ def stop_one(pid: int) -> bool:
     with a traceback. Verified on Windows 11 26200.
     """
     try:
-        os.kill(pid, signal.SIGTERM)
+        os.kill(pid, signum if signum is not None else signal.SIGTERM)
         return True
     except OSError:
         return False

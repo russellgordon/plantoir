@@ -419,6 +419,33 @@ class TheNativeWindowsSnapshot(unittest.TestCase):
         self.assertEqual(stop_preview.read_windows_snapshot(), [])
 
 
+class TheSignalAPublishBuildSendsIsNotNegotiable(unittest.TestCase):
+    """
+    `servingOnly` insists at once; it does not ask first.
+
+    The contract gives the reason: a second spent waiting politely is a
+    second in which the preview's mirror can overwrite the build the kill
+    exists to protect. This is asserted because it was almost lost — the
+    Windows work replaced `os.kill(pid, SIGKILL)` with a helper that
+    defaulted to SIGTERM, which is right on Windows (there is nothing to ask
+    with) and a quiet downgrade everywhere else.
+    """
+
+    def test_build_site_asks_for_the_hardest_signal_available(self):
+        source = (REPO / "scripts" / "build_site.py").read_text(encoding="utf-8")
+        where = source.index("def stop_preview_serving")
+        body = source[where:where + 4000]
+        self.assertIn('getattr(signal, "SIGKILL", signal.SIGTERM)', body,
+                      "the publish build no longer insists at once")
+
+    @unittest.skipIf(os.name == "nt", "Windows has no signal to choose between")
+    def test_the_default_is_only_used_when_a_caller_has_no_opinion(self):
+        # Signature check rather than a kill: the point is that a caller CAN
+        # choose, which is what was missing.
+        import inspect
+        self.assertIn("signum", inspect.signature(stop_preview.stop_one).parameters)
+
+
 class EndingOneProcess(unittest.TestCase):
     """
     `stop_one`, which exists because the POSIX spelling crashes on Windows.
