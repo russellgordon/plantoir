@@ -1143,6 +1143,230 @@
       "hideDetailsButton": "Hide Details"
     }
   },
+  "specialFoldersHelp": {
+    "note": "The in-app answer to \"What else does Plantoir use my folders for?\" - a sheet reached from Course Settings that lists the folders and files THIS course has which the build treats specially. Shared because it is a rule with inputs and outputs wrapped around a set of sentences a teacher reads, and the two apps must give the same answers about the same course. Deliberately NOT here: the layout, and how the sheet is dismissed - a sheet on the mac, a dialog on Windows.",
+    "title": "Folders Plantoir uses",
+    "intro": "Renaming or deleting one of these changes what appears on your site. Everything else in your course is yours to arrange however you like.",
+    "namesTheCoursesOwnFolders": {
+      "rule": "Every row that CAN be named from the course is named from the course, never from the rule that finds it. A row names a real folder, or it names nothing.",
+      "why": "Saying \"any folder whose name mentions the curriculum\" invites a teacher to get creative with it, and turns an implementation detail into a promise the product then has to keep. Saying \"your expectations live in Ontario Curriculum\" tells them the thing they can act on. It is also why the sheet is per-COURSE rather than one static help page: the answers genuinely differ. One course grades \"Tasks\", another \"Tests\" and \"Thinking Tasks\"; one calls its class folder \"All Classes\", another \"Lessons\"."
+    },
+    "rows": [
+      {
+        "key": "lessons",
+        "namedFrom": "course",
+        "source": "every per-section folder the build counts as a class folder",
+        "what": "Your lessons",
+        "why": "Each day's class page lives here. Plantoir puts new classes in this folder, keeps them in date order, and uses them to work out which pages your course actually teaches."
+      },
+      {
+        "key": "curriculum",
+        "namedFrom": "course",
+        "source": "the curriculum folder the build would actually use for this course",
+        "placeholderWhenNone": "Your curriculum folder",
+        "what": "Your curriculum expectations",
+        "why": "One page per expectation. The curriculum map is built from these — without them there is nothing to measure your lessons against, and the map is left out.",
+        "whyPlaceholder": "A course with no curriculum folder at all is told what to make, in the one place where a name cannot be given. This is the single row allowed to describe rather than name, and only in that case."
+      },
+      {
+        "key": "graded",
+        "namedFrom": "course",
+        "source": "the folders whose work counts for marks, including for a course never asked",
+        "what": "Work that counts for marks",
+        "why": "The curriculum map shows an expectation as evaluated when a page in one of these addresses it. You choose these above."
+      },
+      {
+        "key": "media",
+        "namedFrom": "fixed",
+        "name": "Media",
+        "what": "Images and files you add to pages",
+        "why": "Plantoir looks after this one itself and keeps it out of your sidebar. If it goes missing, pictures stop appearing on your site."
+      },
+      {
+        "key": "folderIndex",
+        "namedFrom": "fixed",
+        "name": "index.md",
+        "what": "The page a folder opens on",
+        "why": "Every section has one, and so does each folder. It is the way in, not a lesson."
+      },
+      {
+        "key": "keyLinks",
+        "namedFrom": "fixed",
+        "name": "Key Links.md",
+        "what": "The shortcuts in your sidebar",
+        "why": "Plantoir adds the curriculum map to this list when it builds your site. Your own copy is left exactly as you wrote it."
+      },
+      {
+        "key": "coverage",
+        "namedFrom": "fixed",
+        "name": "Curriculum Coverage",
+        "what": "Written for you, every time you build",
+        "why": "Do not write your own page with this name — it is replaced each time, so anything you put there would be lost."
+      }
+    ],
+    "rowsAreOrdered": {
+      "rule": "The rows appear in the order above, and no row is ever omitted - the curriculum row uses its placeholder rather than disappearing.",
+      "why": "A row that vanishes when it has nothing to say is the case a teacher most needs to see: a course with no curriculum folder is exactly the course whose map is missing."
+    },
+    "listing": {
+      "rule": "Several names are joined the way a person says them: \"A\", \"A and B\", \"A, B and C\". An empty list reads \"None chosen\".",
+      "why": "These lists are read aloud in a teacher's head. A bracketed, comma-separated list is a data structure showing through.",
+      "cases": [
+        {
+          "names": [
+            "Tasks"
+          ],
+          "expect": "Tasks"
+        },
+        {
+          "names": [
+            "Tasks",
+            "Tests"
+          ],
+          "expect": "Tasks and Tests"
+        },
+        {
+          "names": [
+            "Tasks",
+            "Tests",
+            "Quizzes"
+          ],
+          "expect": "Tasks, Tests and Quizzes"
+        },
+        {
+          "names": [],
+          "expect": "None chosen"
+        },
+        {
+          "names": [
+            "Tasks",
+            ""
+          ],
+          "expect": "Tasks",
+          "why": "An empty name is dropped before the joining, not rendered as a gap."
+        }
+      ]
+    },
+    "saysNoMachinery": {
+      "rule": "No text in the sheet - any name, heading or explanation - may name the machinery OR the matching rule.",
+      "why": "Rule one, plus the reason this sheet names configured folders in the first place. \"Substring\", \"segment\" and \"case-insensitive\" are banned alongside \"container\" and \"script\" because publishing the matching rule in words is the same mistake as printing it in a row, taken by another route.",
+      "jargon": [
+        "toolchain",
+        "script",
+        "docker",
+        "container",
+        "wsl",
+        "python",
+        "json",
+        "quartz",
+        "config",
+        "repository",
+        "substring",
+        "regex",
+        "case-insensitive",
+        "segment"
+      ]
+    },
+    "cases": [
+      {
+        "name": "a course names its own folders, not the defaults",
+        "perSectionFolders": [
+          "Lessons"
+        ],
+        "sharedFolders": [
+          "Concepts",
+          "Tests",
+          "Expectations"
+        ],
+        "gradedFolders": [
+          "Tests"
+        ],
+        "curriculumFolder": "Expectations",
+        "expectNames": {
+          "lessons": "Lessons",
+          "curriculum": "Expectations",
+          "graded": "Tests"
+        },
+        "mustNotAppear": [
+          "All Classes"
+        ],
+        "why": "The whole point. A course that renamed everything is told what ITS folders are called."
+      },
+      {
+        "name": "never asked about marks: shown what the build counts today",
+        "perSectionFolders": [
+          "All Classes"
+        ],
+        "sharedFolders": [
+          "Concepts",
+          "Tasks",
+          "Ontario Curriculum"
+        ],
+        "gradedFolders": null,
+        "curriculumFolder": "Ontario Curriculum",
+        "expectNames": {
+          "lessons": "All Classes",
+          "curriculum": "Ontario Curriculum",
+          "graded": "Tasks"
+        },
+        "why": "An absent pool is not an empty one - see gradedFolders.absentIsNotEmpty. The sheet shows what counts today rather than a blank list or a guess."
+      },
+      {
+        "name": "asked and cleared: an empty pool is a real answer",
+        "perSectionFolders": [
+          "All Classes"
+        ],
+        "sharedFolders": [
+          "Concepts",
+          "Tasks"
+        ],
+        "gradedFolders": [],
+        "curriculumFolder": null,
+        "expectNames": {
+          "lessons": "All Classes",
+          "curriculum": "Your curriculum folder",
+          "graded": "None chosen"
+        },
+        "why": "A teacher who cleared the pool is not shown \"Tasks\" as though they had never been asked, and a course with no curriculum folder gets the placeholder rather than losing the row."
+      },
+      {
+        "name": "the curriculum folder is named even when the course never recorded one",
+        "perSectionFolders": [
+          "All Classes"
+        ],
+        "sharedFolders": [
+          "Concepts",
+          "Ontario Curriculum"
+        ],
+        "gradedFolders": [
+          "Tasks"
+        ],
+        "curriculumFolder": null,
+        "expectNames": {
+          "curriculum": "Ontario Curriculum"
+        },
+        "why": "PROPOSED FROM WINDOWS, 2026-09-06 - see MAC-HANDOFF.md. The build finds this course's curriculum folder perfectly well without the key being set, so the sheet must name it. Showing the placeholder here would tell a teacher to go and create a folder they already have, which is the one failure a sheet about folder names cannot afford."
+      },
+      {
+        "name": "more than one class folder is listed, not just the first",
+        "perSectionFolders": [
+          "All Classes",
+          "Class Notes"
+        ],
+        "sharedFolders": [
+          "Concepts"
+        ],
+        "gradedFolders": [
+          "Tasks"
+        ],
+        "curriculumFolder": null,
+        "expectNames": {
+          "lessons": "All Classes and Class Notes"
+        },
+        "why": "The build counts every class folder when working out what a course teaches, so the sheet names every one."
+      }
+    ]
+  },
   "specialNames": {
     "excludedFolderIndexNote": {
       "noteBody": "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your published site. To include it again, add it back in Course Settings.",
