@@ -29,9 +29,13 @@ public class ClassFolderContractTests
             var folders = c["perSectionFolders"]!.AsArray().Select(x => x!.ToString()).ToList();
             string expected = c["expect"]!.ToString();
             string name = c["name"]?.ToString() ?? "unnamed";
+            // A case WITHOUT `classFolder` is a course that never recorded
+            // one, so it is read with a default rather than treated as a new
+            // shape — the same trap as pageNaming's `term`.
+            string? recorded = c["classFolder"]?.ToString();
 
-            Assert.True(ClassFolderRule.Name(folders) == expected,
-                $"{name}: expected '{expected}', got '{ClassFolderRule.Name(folders)}'");
+            Assert.True(ClassFolderRule.Name(recorded, folders) == expected,
+                $"{name}: expected '{expected}', got '{ClassFolderRule.Name(recorded, folders)}'");
         }
     }
 
@@ -48,10 +52,11 @@ public class ClassFolderContractTests
             var folders = c["perSectionFolders"]!.AsArray().Select(x => x!.ToString()).ToList();
             var expected = c["expect"]!.AsArray().Select(x => x!.ToString()).ToList();
             string name = c["name"]?.ToString() ?? "unnamed";
+            string? recorded = c["classFolder"]?.ToString();
 
-            Assert.True(ClassFolderRule.Names(folders).SequenceEqual(expected),
+            Assert.True(ClassFolderRule.Names(recorded, folders).SequenceEqual(expected),
                 $"{name}: expected [{string.Join(", ", expected)}], got " +
-                $"[{string.Join(", ", ClassFolderRule.Names(folders))}]");
+                $"[{string.Join(", ", ClassFolderRule.Names(recorded, folders))}]");
         }
     }
 

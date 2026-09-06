@@ -1114,7 +1114,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private CallToolResult? WholeUnitPlan(string course, int section, string[]? pages, bool publishing)
     {
         if (pages == null || pages.Length != 1) return null;
-        int? unit = PublishPlan.UnitNamed(pages[0]);
+        int? unit = PublishPlan.UnitNamed(pages[0], workspace.UnitWordForCourse(course));
         if (unit == null) return null;
 
         var result = workspace.PlanWholeUnit(course, section, unit.Value, publishing);
@@ -1415,7 +1415,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         IProgress<ProgressNotificationValue> progress, CancellationToken cancellation)
     {
         if (pages == null || pages.Length != 1) return null;
-        int? unit = PublishPlan.UnitNamed(pages[0]);
+        int? unit = PublishPlan.UnitNamed(pages[0], workspace.UnitWordForCourse(course));
         if (unit == null) return null;
 
         var result = await workspace.ApplyWholeUnit(course, section, unit.Value, publishing, preview,

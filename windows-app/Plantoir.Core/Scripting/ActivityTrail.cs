@@ -44,6 +44,34 @@ public static class ActivityTrail
         /// </summary>
         SectionProcessesReclaimed,
         /// <summary>
+        /// A course folder was renamed from inside Plantoir. Carries the OLD
+        /// and NEW folder names and the course - never anything from inside
+        /// the folder. A rename is the one moment Plantoir witnesses the
+        /// change, so it is the one line that can explain a course whose
+        /// configuration stopped matching what is on disk.
+        /// </summary>
+        FolderRenamed,
+        /// <summary>
+        /// Adding a name to a course's folder list CREATED the folder. Recorded
+        /// because the old behaviour was to write a configuration entry
+        /// pointing at nothing, and a teacher who remembers the old behaviour
+        /// needs to be able to see which it was.
+        /// </summary>
+        FolderCreated,
+        /// <summary>
+        /// A working folder was recognised as kept in sync by a cloud service.
+        /// Carries the service's name — never the folder's path, which is a
+        /// teacher's own filing and is redacted from the trail anyway.
+        /// </summary>
+        SyncedFolderNoticed,
+        /// <summary>
+        /// The teacher chose to use the synced folder anyway. Recorded because
+        /// it is a decision Plantoir then remembers and stops asking about,
+        /// and a teacher reporting "it never warned me" is asking about
+        /// exactly this line.
+        /// </summary>
+        SyncedFolderAccepted,
+        /// <summary>
         /// A folder a feature depends on was missing, renamed or emptied.
         /// Carries the check's NAME, never its wording.
         /// </summary>
@@ -112,6 +140,10 @@ public static class ActivityTrail
         Event.AssistantConfirmationChanged => "assistant confirmation changed",
         Event.SectionContentMarkedPublished => "section content marked published",
         Event.SectionProcessesReclaimed => "section processes reclaimed",
+        Event.FolderRenamed => "folder renamed",
+        Event.FolderCreated => "folder created",
+        Event.SyncedFolderNoticed => "synced folder noticed",
+        Event.SyncedFolderAccepted => "synced folder accepted",
         Event.FolderProblemFound => "folder problem found",
         Event.FolderProblemRepaired => "folder problem repaired",
         Event.AssistantEngineSaid => "assistant engine said",

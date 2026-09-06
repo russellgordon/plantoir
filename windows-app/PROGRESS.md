@@ -17,6 +17,26 @@ Docker Desktop) unless marked otherwise.
 | `PtyDriver/` | Console harness that drives the launchers under a ConPTY with scripted prompt replies — how the E2E runs below were performed. |
 | `Plantoir.Mcp/` | On `main` (`Plantoir.sln` lists it) and **it ships**: `publish.ps1` publishes it, copies `plantoir-mcp.exe` into the app's own output beside `Plantoir.exe`, and includes it in the signing list. A standalone MCP server exposing one working folder to an AI assistant. Load-bearing at runtime — `Plantoir/Services/ClaudeCodeLauncher.cs` looks for it beside the app, and `Plantoir/Services/McpClient.cs` launches it. See [its README](Plantoir.Mcp/README.md). |
 
+## Four activity-trail events are declared but not yet emitted (2026-09-06)
+
+`ActivityTrail.Event` names `folder renamed`, `folder created`,
+`synced folder noticed` and `synced folder accepted`. All four are in
+`contracts/shared-rules.json` → `activityTrail.mustRecord`, and
+`ContractTests.SharedRules_ActivityTrailEvents_Exist` compares that list
+against the enum — so declaring them is what makes the suite green.
+
+**Nothing raises any of them yet**, because the features that would are only
+half built: WINDOWS-HANDOFF item 13's rename sheet does not exist (the model
+layer — `SpecialFolderRenamer`, `FolderPathRewriter` — does), and item 18's
+two views do not exist (the detection and the wording do).
+
+This is written here rather than left in a commit message because a green
+suite that is green on a promise is exactly the kind of thing a later session
+should be able to find. **When either feature's front end lands, the events
+must actually be recorded** — the count and the names are in the contract
+entries, and `ReclaimedProcesses` is the worked example of parsing something
+out and putting it on the trail.
+
 ## The subsystems that table does not name
 
 - **A built-in local AI assistant.** `Views/AssistWindow.xaml` holds the

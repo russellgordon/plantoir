@@ -4,6 +4,75 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- ⚠️ **A scheduled deploy has nobody to answer a question, and `deploy` still
+  asks them — found on Windows, 2026-09-06, and it is the same shape on both
+  platforms.** Not fixed, because the fix touches the launcher's argument
+  contract and that is a decision rather than a repair.
+
+  **How it was found.** `verify-deploy.ps1`'s Netlify leg hung until its own
+  900-second timeout. The log says why: the site saved in
+  `.netlify_sites/section1.json` no longer exists on Netlify (deleted at the
+  other end at some point), so `deploy.ps1` did the sensible thing and fell
+  through to creating a fresh one — and asked for a name:
+
+      ⚠️ Saved Netlify site (e8ded3b5-…) was not found on Netlify.
+       Creating a fresh Netlify site for this section…
+       Enter Netlify site name [mcr3u-s1-2026-gordon]:
+
+  A person at a keyboard answers that in two seconds. The harness had a stdin
+  nobody was typing into, and waited forever.
+
+  **Why it matters beyond the harness.** `TaskScheduling.WriteWrapperScript`
+  generates `& <deploy.ps1> <args>` with no stdin redirection and no
+  non-interactive flag. The mac's `launchd` path has the same shape. (Whether
+  Task Scheduler gives it a console is exactly the open question below, and it
+  is not assumed here.) So the flagship "publish tomorrow's
+  class" feature, on a course whose site has been deleted upstream — or on a
+  course whose FIRST publish is the scheduled one, which also asks — reaches a
+  question nobody will ever answer. What happens next depends on one line, and
+  the paragraph after next says which.
+
+  **What a fix looks like, and why it was not just done.** A
+  `--non-interactive` flag that makes `deploy` REFUSE rather than ask, with a
+  trail line saying which question it could not ask, and the app then telling
+  the teacher their scheduled publish needs one answer before it can run
+  unattended. That changes what the app passes the launcher, which is pinned by
+  `app-rules.json` → `deployArguments` and run by both suites — so it is a
+  contract change, wants agreeing on both sides, and is Russell's call rather
+  than a Windows session's.
+
+  **The mechanism, corrected.** An earlier version of this entry blamed
+  PowerShell's `Read-Host`. It is not: the question comes from `deploy.py`'s
+  own `prompt()` helper (`scripts/deploy.py:325`), which guards every ask with
+  `sys.stdin.isatty()`. That single line decides which of two different bugs a
+  teacher gets, and BOTH have now been seen:
+
+  * **stdin IS a terminal → Python's `input()` blocks, forever.** Measured:
+    two harness runs left a `powershell.exe` and its `python.exe` child waiting
+    at that prompt for **45 minutes**, still alive when they were swept up. We
+    know it was this branch and not the other because the prompt TEXT was
+    printed, and `prompt()` prints nothing at all when `isatty()` is false. The
+    failure is "the overnight publish never happened and nothing said so" — the
+    teacher's site is simply not updated in the morning.
+  * **stdin is NOT a terminal → the default is taken silently.** No prompt is
+    printed, the site is created at whatever address the default suggests, and
+    a name conflict auto-suffixes (`deploy.py:430`). The failure is "published
+    to an address nobody chose", and on a machine with no saved surname the
+    address has no surname in it either.
+
+  **So the open question is narrow and answerable**: does Task Scheduler give
+  the wrapper a console, making `isatty()` true? That decides which of the two
+  a teacher meets. Both are bad, and a `--non-interactive` flag that REFUSES
+  rather than asking is the fix for both.
+
+  **Two things that follow whichever branch it takes.** The wedged processes
+  survive their parent being killed — including `Process.Kill($true)` on the
+  whole tree, which does not even exist under Windows PowerShell 5.1 and threw
+  silently in this harness for three runs — so a scheduler that gives up leaves
+  the launcher running. And NOTHING reaches the activity trail while they wait,
+  so the trail cannot tell a wedged overnight publish from one that was never
+  scheduled.
+
 - ✅ **Done 2026-09-05 — the two reliability findings from that day's review.**
   Kept rather than deleted because the SHAPE of each is worth recognising
   again: both were races nobody would meet often, and both ended in a state a

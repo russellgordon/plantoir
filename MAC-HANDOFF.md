@@ -67,10 +67,50 @@ product, not of one platform.
 > list below is green.
 
 
-**Nothing is outstanding.** Both cases proposed for v1.1.0 were cleared on
-2026-08-20 — one implemented, three retired — and the reasoning for each is in
-the ledger below under "The teacher-made-link case is implemented, and the
-three setup cases are retired".
+**One is outstanding, proposed 2026-09-06: a folder rename breaks Markdown
+links when the new name contains a space — on BOTH platforms.**
+
+`FolderPathRewriter` decides whether to percent-encode the new name from
+whether the OLD segment was encoded. That is the obvious rule and it is wrong,
+because a Markdown link destination ends at the first SPACE. Renaming `Tasks`
+to `All Tasks` turns
+
+    [q](Tasks/Quiz%201.md)   into   [q](All Tasks/Quiz%201.md)
+
+which neither Obsidian nor Quartz can follow. The folder segment `Tasks` has no
+`%` in it, so `wasEncoded` is false and the new name goes in plain — the `%20`
+in the example belongs to the FILE name, which is what makes this easy to miss
+by eye. Every Markdown-style link into that folder is broken, in a teacher's
+own pages, and nothing says so.
+
+**The mac has the same defect**, and it was read rather than assumed:
+`FolderPathRewriter.encoded(_:likeThe:)`
+(`mac-app/QuartzTeachers/Models/FolderPathRewriter.swift:261-270`) returns the
+name unchanged whenever `wasEncoded` is false. Windows is fixed as of
+2026-09-06 and its rule is: **in a Markdown link, escape when the NEW name
+needs it — whitespace or brackets — whatever the old segment looked like; in a
+WIKILINK keep the plain spelling**, because `[[All Tasks/Quiz 1]]` is exactly
+how Obsidian writes a wikilink containing a space, and escaping there would be
+the mirror-image mistake.
+
+**The cases, for whichever contract file the mac decides they belong in.**
+`class-planning.json` has no rewriter block today and inventing a new top-level
+key from this side seemed worse than describing them here, since only the mac
+can regenerate. Five, each `rename Tasks → All Tasks` unless it says otherwise:
+
+| given | expect |
+|---|---|
+| `[q](Tasks/Quiz%201.md)` | `[q](All%20Tasks/Quiz%201.md)` |
+| `[q](Tasks/Quiz.md)` | `[q](All%20Tasks/Quiz.md)` |
+| `[[Tasks/Quiz 1]]` | `[[All Tasks/Quiz 1]]` — a wikilink keeps the space |
+| `[q](Tasks/Quiz.md)`, renamed to `Work(new)` | `[q](Work%28new%29/Quiz.md)` — a bracket ends a destination too |
+| `[q](Tasks/Quiz.md)`, renamed to `Assignments` | `[q](Assignments/Quiz.md)` — a name needing nothing is not escaped for the sake of it |
+
+Windows runs all five in `FolderPathRewriterTests`.
+
+The two cases proposed for v1.1.0 were cleared on 2026-08-20 — one implemented,
+three retired — and the reasoning for each is in the ledger below under "The
+teacher-made-link case is implemented, and the three setup cases are retired".
 
 The mechanism, in one paragraph. `Plantoir --write-contracts` runs on the mac,
 so the Windows side cannot regenerate the derived halves of
@@ -368,6 +408,79 @@ rather than being deleted.
 > abandoned partway, so this section is the INDEX and the ledger below is the
 > manual. A change that creates an obligation for the other platform and does
 > not list it has, from their side, not been handed over at all.
+
+- ⚠️ **TWO CONTRACT SENTENCES SAY "on your Mac" AND ARE SHOWN TO WINDOWS
+  TEACHERS TOO** (Windows, 2026-09-06). `specialNames.renameFolder.explanation`
+  and `.doneNothingWasThere` both name the platform:
+
+  > This renames the folder on your Mac — in every section that has one — …
+  > There was no folder by that name on your Mac, so only this course's
+  > settings changed.
+
+  Windows says "on this PC" instead, which is the same deliberate difference as
+  "Setting up this Mac" against "Setting up this PC" in `app-rules.json` →
+  `markerOrigins`. **What the mac owes is only a note in the contract** — a
+  `platformWorded` marker, or the treatment `markerOrigins` already gets — so
+  that the next reader sees a recorded difference rather than concluding
+  Windows drifted, and so a future contract-driven test does not put the mac's
+  word in front of a Windows teacher. `SpecialFolderRenamerTests.
+  TheTwoPlatformWordedSentencesSayThisPcRatherThanYourMac` asserts it in both
+  directions on this side.
+
+- ⚠️ **A SCHEDULED DEPLOY HAS NOBODY TO ANSWER A QUESTION, AND `deploy` STILL
+  ASKS THEM — the same shape on both platforms** (found on Windows,
+  2026-09-06). Written up in full in `TODO.md`; summarised here because the mac
+  is affected identically and neither side should assume the other has it in
+  hand.
+
+  Found by the new `verify-deploy.ps1`, whose Netlify leg hung until its own
+  timeout: the site saved in `.netlify_sites/section1.json` no longer existed
+  on Netlify, so the launcher fell through to creating a fresh one and asked
+  for a name. A person answers that in two seconds; a scheduled task has no
+  console. `TaskScheduling.WriteWrapperScript` generates `& deploy.ps1 <args>`
+  with no stdin and no non-interactive flag, and the mac's `launchd` path has
+  the same shape — so "publish tomorrow's class" on a course whose site was
+  deleted upstream, or whose FIRST publish is the scheduled one, reaches a
+  question nobody will answer.
+
+  **Not fixed here on purpose.** The fix is a `--non-interactive` flag that
+  makes `deploy` refuse rather than ask, which changes what the app passes the
+  launcher — pinned by `app-rules.json` → `deployArguments` and run by both
+  suites. That is a contract change and wants agreeing rather than doing. What
+**The mechanism, corrected — and it is not what the first version of this
+  entry said.** An earlier version of this entry blamed
+  PowerShell's `Read-Host`. It is not: the question comes from `deploy.py`'s
+  own `prompt()` helper (`scripts/deploy.py:325`), which guards every ask with
+  `sys.stdin.isatty()`. That single line decides which of two different bugs a
+  teacher gets, and BOTH have now been seen:
+
+  * **stdin IS a terminal → Python's `input()` blocks, forever.** Measured:
+    two harness runs left a `powershell.exe` and its `python.exe` child waiting
+    at that prompt for **45 minutes**, still alive when they were swept up. We
+    know it was this branch and not the other because the prompt TEXT was
+    printed, and `prompt()` prints nothing at all when `isatty()` is false. The
+    failure is "the overnight publish never happened and nothing said so" — the
+    teacher's site is simply not updated in the morning.
+  * **stdin is NOT a terminal → the default is taken silently.** No prompt is
+    printed, the site is created at whatever address the default suggests, and
+    a name conflict auto-suffixes (`deploy.py:430`). The failure is "published
+    to an address nobody chose", and on a machine with no saved surname the
+    address has no surname in it either.
+
+  **So the open question is narrow and answerable**: does Task Scheduler give
+  the wrapper a console, making `isatty()` true? That decides which of the two
+  a teacher meets. Both are bad, and a `--non-interactive` flag that REFUSES
+  rather than asking is the fix for both.
+
+  **Two things that follow whichever branch it takes.** The wedged processes
+  survive their parent being killed — including `Process.Kill($true)` on the
+  whole tree, which does not even exist under Windows PowerShell 5.1 and threw
+  silently in this harness for three runs — so a scheduler that gives up leaves
+  the launcher running. And NOTHING reaches the activity trail while they wait,
+  so the trail cannot tell a wedged overnight publish from one that was never
+  scheduled.
+
+  Hardware: Windows 11 Pro 26200, Intel i5-8365U.
 
 - ⚠️ **THE CONTRACT'S `stopPreview` PROSE IS NOW WRONG ABOUT WINDOWS, and only
   the mac can regenerate it** (Windows + shared, 2026-09-05). Three sentences
@@ -2040,6 +2153,66 @@ is what happened to the test-race item, sitting here for three days with
 Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
+
+- ✅ DONE (Windows, 2026-09-06). **Items 15 and 16 ported: a course's own
+  words for a unit and for its class folder. Nothing is asked of the mac — this
+  entry exists for the two things the port learned that the write-up did not
+  say.**
+
+  The feature itself arrived as designed: `unit_word` and `class_folder`,
+  absent meaning what every existing course already does, with the rule in
+  shared Python and the cases in `class-planning.json`. `ClassPageTerm.cs`
+  mirrors `scripts/class_pages.py`; `ClassFolderRule` gained the recorded-key
+  overload; the wizard asks the question and writes both keys. Four of the
+  five contract tests that were red on this side now pass.
+
+  **What the handoff did not warn about, and cost the most time: the port is
+  not finished when the RULE is ported.** Item 15 names the assistant's
+  sentences and the wizard field, so those were expected. What was not listed
+  is that two call sites BUILD PAGE TITLES rather than sentences —
+  `"Unit {unit}, Day {atDay + i}"` when adding classes, and the same shape
+  when making room for them. In a Module course those write files the course's
+  own rule then refuses to recognise as class pages, which is the feature's
+  own silent failure arriving by a second route, from the app rather than from
+  the parser.
+
+  **Corrected the same day, and the correction is the useful part.** An
+  earlier version of this entry said "every call site now passes the course's
+  values" and asked the mac to check `AssistWorkspace`'s equivalents. Both
+  halves were wrong. A review found FOUR more literals on this side, two of
+  which made the feature worse than not having it — new pages were still NAMED
+  "Unit 1, Day 3", and make-room's READER matched a literal pattern so it
+  refused a Module course outright before the corrected title-building could
+  run. And the mac has no `AssistWorkspace`: its equivalents
+  (`NextClassPlanner`, `PlaceholderClassPlanner`, `ClassInsertionPlanner`)
+  already pass `term`, so there is nothing there to check. **Nothing is asked
+  of the mac by this paragraph** — it is here because a handoff entry that
+  overstates what was done is worse than none, and because the reason for the
+  miss travels: the owed-items list was produced by thinking of features
+  rather than by grepping for every CALL of the thing being made
+  configurable.
+
+  **The second: `SectionIndex`'s date tie-break.** When two pages share a
+  date, the later page in the course wins, decided by parsing both names. In a
+  Module course neither name parses under the default word, so the tie-break
+  silently degrades to whichever file the walk reached first. Not mentioned
+  anywhere, found by grepping for every `UnitDay.Parse` rather than by
+  following the write-up.
+
+  **The general lesson, which is the part that travels:** for a feature whose
+  failure mode is "answers no instead of refusing", the owed-items list should
+  be produced by grepping for every CALL of the thing being made
+  configurable, not by listing the features a reader can think of. The mac's
+  own list was written the second way, and both misses above are the same
+  shape.
+
+  **Reference:** `Plantoir.Core/Models/ClassPageTerm.cs` (new),
+  `UnitDay.cs`, `ClassFolderRule.cs`, `CourseConfiguration.cs`,
+  `Assist/AssistWorkspace.cs`, `Assist/SectionIndex.cs`,
+  `Models/NextClassPlanner.cs`, `Views/NewCourseDialog.cs`. Tests:
+  `ClassPageTermTests.cs` (new), `ClassFolderContractTests.cs` and
+  `ClassPlanningContractTests.cs` (both now read the contract's optional
+  `classFolder` and `term` fields with a default).
 
 - ✅ DONE (Windows + shared, 2026-09-05). **A publish on Windows was
   overwritten by its own preview, silently — and, separately, publishing to a

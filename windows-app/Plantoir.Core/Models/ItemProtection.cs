@@ -89,7 +89,13 @@ public sealed record ProtectionContext(
     string Jurisdiction,
     string? ResolvedCurriculumFolder,
     IReadOnlyList<string> GradedFolders,
-    IReadOnlyList<string> PerSectionFolders);
+    IReadOnlyList<string> PerSectionFolders,
+    /// <summary>
+    /// The folder this course actually uses for class pages — the recorded
+    /// <c>class_folder</c> where there is one, otherwise the guess. Optional
+    /// so every existing caller keeps its behaviour.
+    /// </summary>
+    string? ResolvedClassFolder = null);
 
 /// <summary>
 /// The protection rules themselves: given a name, which list it is in, and
@@ -138,7 +144,15 @@ public static class ItemProtectionRule
         // so a confirmation would be asking the teacher to break both. Every
         // other per-section folder — including other names that mention
         // classes — stays as removable as it ever was.
-        if (name.Equals(ClassFolderRule.FallbackName, StringComparison.OrdinalIgnoreCase))
+        // The folder this course actually uses, and the literal "All Classes"
+        // for every course that never recorded one. Blocking only the literal
+        // was right until `class_folder` existed; now that a course can call
+        // its class folder "All Days", blocking only "All Classes" would let a
+        // teacher remove the very folder the next-class button and the
+        // schedule write into.
+        if (name.Equals(ClassFolderRule.FallbackName, StringComparison.OrdinalIgnoreCase)
+            || (context.ResolvedClassFolder is { } used
+                && name.Equals(used, StringComparison.OrdinalIgnoreCase)))
             return ItemProtection.Blocked(SpecialNames.ClassFolderBlocked);
 
         // Never `per_section_folders: []`: a section with no folder has

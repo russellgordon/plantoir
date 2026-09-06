@@ -44,15 +44,59 @@ public static class ClassFolderRule
     /// which is what <see cref="IsClassPage"/> is careful about.</para>
     /// </summary>
     public static string Name(IEnumerable<string>? perSectionFolders)
+        => Name(null, perSectionFolders);
+
+    /// <summary>
+    /// The class folder's name, preferring what the course RECORDED over what
+    /// can be guessed from the folder list.
+    ///
+    /// <para><paramref name="classFolder"/> is <c>class_folder</c> from
+    /// <c>course_config.json</c>. It wins whenever it is set AND still names
+    /// one of the per-section folders; otherwise the old guess applies
+    /// unchanged, because every course made before the key existed depends on
+    /// it. The key exists because the guess quietly decided what a teacher was
+    /// allowed to CALL this folder: somebody whose vocabulary is "Thread 2,
+    /// Day 3" would sensibly call it "All Days", and the guess then returns it
+    /// only by the accident of its being first.</para>
+    ///
+    /// <para>Two rules that are easy to get backwards, both pinned by cases:
+    /// a STALE key — one naming a folder no longer in the list — must LOSE to
+    /// the guess, or the next-class button writes into a folder that is not
+    /// there; and when the key matches only by case, the LIST's spelling is
+    /// what comes back, because everything downstream builds file paths out of
+    /// this answer and a case-sensitive volume would not find the key's.</para>
+    /// </summary>
+    public static string Name(string? classFolder, IEnumerable<string>? perSectionFolders)
     {
         // A null ELEMENT is reachable: these lists come from JSON, including
         // the contract's own case data. Swift and Python coerce; unguarded
         // LINQ would throw a NullReferenceException here instead.
         var folders = (perSectionFolders ?? Enumerable.Empty<string>())
             .Where(f => !string.IsNullOrEmpty(f)).ToList();
+
+        string? recorded = Recorded(classFolder, folders);
+        if (recorded is not null) return recorded;
+
         return folders.FirstOrDefault(f => f.Contains("class", StringComparison.OrdinalIgnoreCase))
                ?? folders.FirstOrDefault()
                ?? FallbackName;
+    }
+
+    /// <summary>
+    /// The list's spelling of the recorded folder, or null when nothing was
+    /// recorded or the record has gone stale.
+    /// </summary>
+    private static string? Recorded(string? classFolder, IReadOnlyList<string> folders)
+    {
+        if (string.IsNullOrWhiteSpace(classFolder)) return null;
+        // Trimmed, as the mac does: a key written with stray whitespace names
+        // the same folder, and falling back to the guess over a space would be
+        // a stale-key failure with no stale key.
+        string wanted = classFolder!.Trim();
+        foreach (string folder in folders)
+            if (folder.Equals(wanted, StringComparison.OrdinalIgnoreCase))
+                return folder;
+        return null;
     }
 
     /// <summary>
@@ -68,14 +112,41 @@ public static class ClassFolderRule
     /// Writing goes to one folder; counting looks at all of them.</para>
     /// </summary>
     public static IReadOnlyList<string> Names(IEnumerable<string>? perSectionFolders)
+        => Names(null, perSectionFolders);
+
+    /// <summary>
+    /// WHICH FOLDERS COUNT, with a recorded class folder taken into account.
+    ///
+    /// <para><b>Membership widens, it never shrinks.</b> The recorded folder
+    /// counts AND every class-mentioning folder still does. Dropping the
+    /// latter would shrink what a course is seen to teach — the direction that
+    /// produces a wrong coverage map — so a course that had "Class Resources"
+    /// counting yesterday must not lose it by recording a class folder today.
+    /// Adding the recorded one can only widen it.</para>
+    /// </summary>
+    public static IReadOnlyList<string> Names(string? classFolder, IEnumerable<string>? perSectionFolders)
     {
         var folders = (perSectionFolders ?? Enumerable.Empty<string>())
             .Where(f => !string.IsNullOrEmpty(f)).ToList();
         var mentioningClasses = folders
             .Where(f => f.Contains("class", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        string? recorded = Recorded(classFolder, folders);
+        if (recorded is not null)
+        {
+            // Recorded first, then the guess's answers, deduplicated
+            // case-insensitively: a recorded folder that also mentions classes
+            // is one folder, not two.
+            var counted = new List<string> { recorded };
+            foreach (string folder in mentioningClasses)
+                if (!folder.Equals(recorded, StringComparison.OrdinalIgnoreCase))
+                    counted.Add(folder);
+            return counted;
+        }
+
         return mentioningClasses.Count > 0
             ? mentioningClasses
-            : new List<string> { Name(folders) };
+            : new List<string> { Name(null, folders) };
     }
 
     /// <summary>

@@ -74,6 +74,50 @@ public sealed class AppSettings
     /// </summary>
     public Dictionary<string, string> AssistPromptHistories { get; set; } = new();
 
+    /// <summary>
+    /// Working folders the teacher has already been told are kept in sync by a
+    /// cloud service, and said to carry on with anyway.
+    ///
+    /// <para>Keyed by RESOLVED path, so the same folder reached by a different
+    /// spelling is the same folder. Going ahead is remembered for that folder
+    /// and neither the choice nor the notice is shown for it again: a folder
+    /// that opens on every launch must not interrupt every launch, and the
+    /// teacher already answered.</para>
+    ///
+    /// <para>A list rather than a single flag because a teacher can have
+    /// several working folders, and answering for one says nothing about
+    /// another.</para>
+    /// </summary>
+    public List<string> AcceptedSyncedFolders { get; set; } = new();
+
+    /// <summary>
+    /// Whether this folder's sync has already been explained and accepted.
+    /// Case-insensitive, because Windows paths are.
+    /// </summary>
+    public bool HasAcceptedSyncFor(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        string resolved = ResolvedForComparison(path!);
+        foreach (string accepted in AcceptedSyncedFolders)
+            if (ResolvedForComparison(accepted).Equals(resolved, StringComparison.OrdinalIgnoreCase))
+                return true;
+        return false;
+    }
+
+    /// <summary>Remember that this folder's sync was explained and accepted.</summary>
+    public void RememberAcceptedSyncFor(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        if (HasAcceptedSyncFor(path)) return;
+        AcceptedSyncedFolders.Add(path!);
+    }
+
+    private static string ResolvedForComparison(string path)
+    {
+        try { return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
+        catch { return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
+    }
+
     public static string DefaultPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                      "Plantoir", "settings.json");

@@ -376,6 +376,52 @@ public sealed class CourseConfiguration
     }
 
     /// <summary>
+    /// Which per-section folder holds this course's class pages, or empty when
+    /// the course never recorded one.
+    ///
+    /// <para>ABSENT or unmatched falls back to the old GUESS — see
+    /// <see cref="ClassFolderRule.Name(string?, IEnumerable{string})"/> — which
+    /// is what every course made before this key existed relies on. The key
+    /// exists because the guess quietly decided what a teacher was allowed to
+    /// CALL this folder: a teacher whose vocabulary is "Thread 2, Day 3" would
+    /// sensibly call it "All Days", and under the guess alone that folder is
+    /// found only by the accident of being first — the moment the list is
+    /// ordered the other way, class pages are written somewhere else and the
+    /// curriculum map counts the wrong pages. The map does not FAIL when that
+    /// happens: it falls back to counting every published page, which is a
+    /// wrong map that reports success.</para>
+    ///
+    /// <para>Written by the wizard at creation, and MATERIALISED by a rename —
+    /// renaming the class folder writes this key even on a course that never
+    /// had one, because a rename is the one moment Plantoir witnesses the
+    /// change.</para>
+    /// </summary>
+    public string ClassFolder
+    {
+        get => StringValue("class_folder");
+        set => _values["class_folder"] = value;
+    }
+
+    /// <summary>
+    /// What this course calls the first half of a class page's name — "Unit 2,
+    /// Day 3", or "Module 2, Day 3".
+    ///
+    /// <para>ABSENT means "Unit", which is what every course made before this
+    /// key existed says. Empty means the same, and the two are deliberately
+    /// NOT distinguished the way <see cref="GradedFolders"/> distinguishes
+    /// them: there is no sensible reading of "the teacher cleared the word",
+    /// and a course whose class pages had no name could not be built.</para>
+    ///
+    /// <para>"Day" is deliberately not configurable — a teacher who says
+    /// "Thread" almost certainly still says "Day 3".</para>
+    /// </summary>
+    public string UnitWord
+    {
+        get { var raw = StringValue("unit_word"); return raw.Length == 0 ? ClassPageTerm.DefaultWord : raw; }
+        set => _values["unit_word"] = value;
+    }
+
+    /// <summary>
     /// The folder this app protects as the curriculum folder, or null.
     /// Name-only — see <see cref="CurriculumFolderRule"/>.
     /// </summary>

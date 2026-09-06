@@ -74,8 +74,13 @@ public static class SectionIndex
             }
             else if (when == bestDate && best is not null)
             {
-                var currentUd = UnitDay.Parse(Path.GetFileNameWithoutExtension(best));
-                var newUd = UnitDay.Parse(Path.GetFileNameWithoutExtension(page));
+                // The course's own word: a tie on date is broken by which page
+                // is LATER in the course, and in a Module course neither name
+                // parses under the default word, so the tie-break would fall
+                // back to whichever file was walked first.
+                string unitWord = course.Configuration.UnitWord;
+                var currentUd = UnitDay.Parse(Path.GetFileNameWithoutExtension(best), unitWord);
+                var newUd = UnitDay.Parse(Path.GetFileNameWithoutExtension(page), unitWord);
                 if (newUd is not null && (currentUd is null || newUd.Value.CompareTo(currentUd.Value) > 0))
                 {
                     best = page;
