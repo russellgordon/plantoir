@@ -84,8 +84,10 @@ pure data and will show you the shape.
    Replace it with `wording.deployApproval` followed by `wording.deployQuestion`.
    Machinery must never appear in front of a teacher.
 4. **The activity trail** — `shared-rules.json` → `activityTrail.mustRecord`.
-   Nothing on this side writes `%LOCALAPPDATA%\Plantoir\Logs` yet, and it
-   comes before the rest of the backlog for one reason: every feature after
+   **Built — this was true when it was written and has not been since.**
+   `ActivityTrail.cs` writes the trail, and its location now comes from
+   `AppDataRoot`, so `--state-dir` moves it. What is still true is the reason
+   it came first: every feature after
    it owes a line, and adding a trail to a dozen finished features costs
    several times what having it first does.
 5. **The local model** — move it out of the container onto a hardware-accelerated
@@ -168,6 +170,18 @@ cd windows-app
 dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
+
+**There is a second suite, and it is opt-in.** `run-ui-tests.ps1` (repo root)
+drives the REAL app through UI Automation, for the things `dotnet test` cannot
+see: whether a control can be REACHED, whether clicking it opens anything,
+whether what is RENDERED matches what the model said, whether a scrolling
+panel is cut off at the bottom, and whether a view follows the course a
+teacher selected rather than going stale. Run it when you change any of those
+things about a view. It needs a desktop session and the foreground, takes a
+few minutes, and CLOSES a running Plantoir (saying so, and not reopening it).
+It touches nothing of the teacher's: `--state-dir` moves the whole state
+folder for the run. See the testing table in `CLAUDE.md` and "Driving the real
+interface" in `documentation/12-windows-app.md`.
 
 **Quit any running copy of Plantoir first**, or the build fails with
 `MSB3027 … locked by "Plantoir"`, which reads like a corrupt build rather than

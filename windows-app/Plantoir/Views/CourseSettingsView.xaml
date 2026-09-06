@@ -28,7 +28,8 @@
             </Button>
         </Grid>
 
-        <ScrollViewer x:Name="FormScroll" Grid.Row="1" Padding="16,0,16,16">
+        <ScrollViewer x:Name="FormScroll" Grid.Row="1" Padding="16,0,16,16"
+                      AutomationProperties.AutomationId="courseSettingsForm">
             <StackPanel x:Name="Form" Spacing="8" MaxWidth="720" HorizontalAlignment="Left" />
         </ScrollViewer>
 

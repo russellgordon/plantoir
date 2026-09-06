@@ -40,9 +40,8 @@ public static class ScheduledHealthFindings
     /// wrapper scripts rather than in a temp folder, for the same reason they
     /// are: nothing here should be swept away before the app looks at it.
     /// </summary>
-    public static string Directory() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Plantoir", "scheduled", "folder-problems");
+    public static string Directory() =>
+        Plantoir.Core.Models.AppDataRoot.Combine("scheduled", "folder-problems");
 
     /// <summary>
     /// One record per course and section, because that is how it is read: a

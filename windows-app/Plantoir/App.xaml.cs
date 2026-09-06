@@ -29,7 +29,7 @@ public partial class App : Application
     {
         try
         {
-            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir");
+            string dir = Plantoir.Core.Models.AppDataRoot.Current;
             Directory.CreateDirectory(dir);
             File.AppendAllText(Path.Combine(dir, "startup.log"), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}\n");
         }
@@ -38,7 +38,38 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        // FIRST, before the diagnostic line, before the trail line, and before
+        // anything reads settings — each of those resolves its location the
+        // moment it is touched, so a redirect applied afterwards is a redirect
+        // that missed the first write.
+        //
+        // `--state-dir` moves this run's ENTIRE Plantoir folder — settings,
+        // the breadcrumb trail, the startup log, scheduled-deploy sentinels,
+        // models, built sites. A UI test drives the REAL shipped executable,
+        // and without it the test would rewrite the teacher's working folder,
+        // remembered windows and window geometry, file its fixture courses in
+        // the trail as though a person had opened them, and — the one that
+        // took an adversarial review to spot — CONSUME their pending
+        // scheduled-deploy sentinels on launch, writing publish state into
+        // their real course folders while the line explaining it went to the
+        // redirected trail where nobody would look.
+        //
+        // Redirecting %LOCALAPPDATA% for the child process does not work and
+        // was tried: GetFolderPath asks Windows for the known folder and
+        // ignores the variable.
+        //
+        // Also read in Program.Main, which logs before this runs.
+        //
+        // QUOTE the path when passing it. `ArgumentAfter`'s raw-string
+        // fallback splits on spaces, so an unquoted path containing one is
+        // read as two arguments.
+        string stateDir = ArgumentAfter(
+            Environment.GetCommandLineArgs(), args.Arguments ?? "", "--state-dir");
+        if (!string.IsNullOrEmpty(stateDir)) AppDataRoot.RedirectTo(stateDir);
+
         LogDiagnostic("App.OnLaunched starting");
+        if (!string.IsNullOrEmpty(stateDir)) LogDiagnostic($"State redirected to {stateDir}");
+
         Plantoir.Core.Scripting.ActivityTrail.NoteLaunch();
         try
         {

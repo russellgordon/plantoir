@@ -118,9 +118,23 @@ public sealed class AppSettings
         catch { return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
     }
 
-    public static string DefaultPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                     "Plantoir", "settings.json");
+    /// <summary>
+    /// One settings FILE, when a caller wants to name it directly.
+    ///
+    /// <para><b>This is NOT how a run is isolated.</b> <c>--state-dir</c>
+    /// moves the whole <see cref="AppDataRoot"/>, and settings follow it
+    /// through <see cref="DefaultPath"/> along with everything else Plantoir
+    /// keeps on this PC. Redirecting only the settings file was the first
+    /// attempt and it was the wrong shape: it left a UI test consuming the
+    /// teacher's real scheduled-deploy sentinels on launch. Reach for
+    /// <c>AppDataRoot.RedirectTo</c>, not for this.</para>
+    ///
+    /// <para>What remains here is the narrow case of a unit test that wants
+    /// one named file and nothing else moved.</para>
+    /// </summary>
+    public static string? PathOverride { get; set; }
+
+    public static string DefaultPath => PathOverride ?? AppDataRoot.Combine("settings.json");
 
     public static AppSettings Load(string? path = null)
     {

@@ -27,6 +27,7 @@ happens. This page is not a status report and should not be read as one.
 | `Plantoir.Tests/` | xUnit, and it runs without Docker or a network: `dotnet test`. Classes touching process-wide state share a serialized collection — see `SharedActivityState`. |
 | `PtyDriver/` | A console harness that runs a command under a ConPTY and answers prompts from scripted rules. It exercises the same `ConPtyProcess` the app uses, which is the point: it tests the launchers the way the app drives them. |
 | `Plantoir.Mcp/` | A standalone MCP server exposing one working folder to an AI assistant. It SHIPS: `publish.ps1` copies `plantoir-mcp.exe` beside `Plantoir.exe` and signs it. |
+| `Plantoir.UiTests/` | Drives the REAL built app through UI Automation (FlaUI/UIA3), for what a unit test cannot reach — see "Driving the real interface" below. Opt-in: skipped unless `PLANTOIR_UI_TESTS=1`, and compiled by a SOLUTION build (not by the per-project commands used day to day). References `Plantoir.Core` only, never the app project — the Windows App SDK has no business in a test host. |
 
 The one house-style rule worth stating: **this is ordinary idiomatic C#, LINQ
 included, and that is deliberate.** The Swift follows Russell's machine-wide
@@ -78,7 +79,9 @@ Three consequences that catch people out:
 
 ## Where Windows keeps things
 
-Everything the app owns lives under `%LOCALAPPDATA%\Plantoir\`:
+Everything the app owns lives under `%LOCALAPPDATA%\Plantoir\` — or wherever
+`--state-dir` points, since every row below hangs off `AppDataRoot` rather than
+computing its own path (see "The flags the app answers"):
 
 | Folder | What |
 |---|---|
@@ -221,6 +224,81 @@ dotnet build Plantoir/Plantoir.csproj -c Debug -p:Platform=x64
 A plain `dotnet build` does not write there.
 
 ---
+
+## The flags the app answers
+
+None of these is for a teacher; each exists so something can drive the app.
+
+| Flag | What it does |
+|---|---|
+| `--capture-marketing-shots <dir> [--theme light\|dark]` | Photographs the app's windows for plantoir.app. One appearance per process, with the OS switched into it first. |
+| `--hero-window <theme>` | Stages a real window for the hero composite and stops, so the Python harness can photograph it beside Obsidian and Edge. |
+| `--state-dir <dir>` | Keeps this run's ENTIRE Plantoir folder somewhere else. |
+| `--auto-select CODE N`, `--auto-preview CODE N`, `--auto-deploy CODE N`, `--auto-course CODE`, `--auto-wizard`, `--auto-createcourse CODE [SECTIONS]`, `--auto-addsection CODE`, `--details` | Older test hooks that drive the interface from the command line — select a section, press Preview, open the wizard. |
+
+The `--auto-*` family is read in `MainWindow`'s `RunAutomationHooks`, at WINDOW
+construction rather than in `OnLaunched`, which is why they compose with
+`--state-dir`: the state is redirected before the first window exists.
+
+
+**`--state-dir` is what makes a UI test safe to run**, and it is worth knowing
+exactly how far it reaches. It moves everything under
+`%LOCALAPPDATA%\Plantoir` for that run: settings, the breadcrumb trail, the
+startup log, downloaded models, built sites, scheduled-deploy wrappers and
+their finished sentinels. It does NOT move Credential Manager, and it does not
+reach a CHILD process. **Quote the path**: the raw-argument fallback splits on
+spaces.
+
+**The LAUNCHERS are the sharp edge, and they are the exception most likely to
+catch somebody out.** `preview.ps1`, `deploy.ps1` and `setup.ps1` compute the
+builds root from `$env:LOCALAPPDATA` themselves, and `TaskScheduling` bakes the
+same into the wrapper script it registers. So a redirected run that PREVIEWED
+would look for its build where the launcher did not put it, and one that
+SCHEDULED a deploy would register a REAL Task Scheduler task whose sentinels
+land in the teacher's real pending folder. Nothing in the UI suite goes near
+either today — but a test that drives Preview is the obvious next thing
+somebody writes, and this is the paragraph they will have read first.
+`plantoir-mcp.exe` resolves its own paths too.
+
+Two things about it are worth more than the flag itself.
+
+**Redirecting `%LOCALAPPDATA%` for the child process does not work**, and was
+tried first: `Environment.GetFolderPath` asks Windows for the known folder and
+ignores the environment variable entirely.
+
+**It redirects ONE root rather than a list of places.** The first
+implementation moved the settings file and the trail — the two things anyone
+would think of. It missed that the app consumes pending scheduled-deploy
+sentinels on launch and on every activation, and that applying one writes
+publish state into the course folder the sentinel names, an absolute path to a
+real course. So a test run could have marked a teacher's section as published
+while the line explaining it went to the redirected trail, where nobody would
+look. Everything now derives from `AppDataRoot`, so the next thing somebody
+adds inherits the isolation instead of leaking.
+
+## Driving the real interface
+
+`run-ui-tests.ps1` launches the x64 Debug build and drives it with UI
+Automation. It exists for the things a unit test cannot see: that a control can
+be REACHED (invoking a button fires it whether or not it is on screen), that
+clicking it opens something, that the RENDERED text is what the model said in
+the order the contract fixes, that a scrolling list is not cut off at the
+bottom, and that a panel follows the course a teacher selected rather than
+going stale.
+
+**It is opt-in and belongs to no gate.** Every test carries `[UiFact]`, which
+skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds six and
+runs none. The project is in the solution so a SOLUTION build compiles it —
+compile-rot is what actually kills a suite nothing builds. Be honest about the
+limit, though: the per-project commands used day to day (`dotnet build
+Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
+do not build it, so it can still stop compiling without anyone noticing until
+the next solution build. It needs a desktop session and
+the foreground, takes a few minutes, and CLOSES a running Plantoir (saying so,
+and not reopening it — that part is the teacher's).
+
+It does **not** judge anything visual: colour, contrast, dark-mode legibility,
+how a long name wraps. That is a screenshot pass, not this.
 
 ## What this page does not cover
 

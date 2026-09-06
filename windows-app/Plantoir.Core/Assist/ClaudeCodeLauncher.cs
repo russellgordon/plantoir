@@ -189,9 +189,7 @@ public static class ClaudeCodeLauncher
     /// </summary>
     internal static string WriteConfig(string workspacePath, string courseCode, string server)
     {
-        string directory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Plantoir", "assist");
+        string directory = Plantoir.Core.Models.AppDataRoot.Combine("assist");
         Directory.CreateDirectory(directory);
 
         var config = new
