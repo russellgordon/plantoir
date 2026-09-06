@@ -696,7 +696,7 @@ this side is expected to say so when the contract is wrong.
     better half already** — the descendant walk, which neither of the mac's
     copies had, and which is now part of the shared rule because of you.
 
-    **What you do NOT inherit — this bullet was WRONG until 2026-09-06.** It
+    **What you do NOT inherit — this bullet was WRONG until 2026-09-05.** It
     said `scripts/stop_preview.py` "already runs in your CONTAINER runtime
     unchanged", and therefore that "your `--build-only` path gets the
     preview-stopping fix through it without you doing anything". Both halves
@@ -726,10 +726,23 @@ this side is expected to say so when the contract is wrong.
       finishing, and what goes out is the preview — live-reload client and
       all. Nothing errors, nothing is logged, and the site looks plausible.
 
-      Your APP is safe and always was (`SectionDetailView.xaml.cs` stops a
-      running preview before deploying, exactly as the mac's does). The hole
-      is the COMMAND LINE — `preview.ps1 CODE N --build-only`,
-      `deploy.ps1`'s own rebuild-before-publishing, and anything scheduled.
+      Your app is safe **against previews it started itself**, and always
+      was: `SectionDetailView.xaml.cs:728` stops a running preview before
+      deploying, exactly as the mac's does. Note the condition, though — it
+      stops only `if (_previewRunner.IsRunning)`. A preview a teacher started
+      from `preview.bat`, published from the app, is NOT caught by that
+      check, and on your side nothing downstream catches it either; on the
+      mac `build_site.py`'s own stop does.
+
+      Everything else is exposed: `preview.ps1 CODE N --build-only`,
+      `deploy.ps1`'s rebuild-before-publishing, a scheduled deploy
+      (`TaskScheduling.cs:68` runs `deploy.ps1` from a wrapper that stops
+      nothing), and **`plantoir-mcp.exe`** — `PlantoirTools.cs`'
+      `deploy_section` reaches `AssistWorkspace.Deploy`, which runs
+      `preview --build-only` and then `deploy`, and `StopPreviewInApp` is
+      wired only in `AssistWindow.xaml.cs`, never in `Plantoir.Mcp`. That
+      last one is an argument for putting the fix in the LAUNCHER rather than
+      in app code: one edit covers the MCP binary too.
 
       **You already have the matcher; it is simply never called from there.**
       `preview.ps1`'s stop block enumerates `Win32_Process`, matches by
@@ -749,31 +762,49 @@ this side is expected to say so when the contract is wrong.
         no `--port` at all) — so previewing section 1 while publishing
         section 2 killed section 1's preview. Measured 2026-09-05 by doing
         it. The build directory is on the serve process's command line
-        because the launcher runs the Quartz CLI by absolute path.
+        because `build_site.py` runs the Quartz CLI by ABSOLUTE path
+        (`build_site.py:5304`) — that is where it comes from, not from the
+        launcher.
       - **Exclude your own process**, and end every comparison at a
         boundary — the `section1`/`section10` trap, which `Test-NamesPath`
         already handles for `--stop`.
 
-      **And there are TWO routes into a production build on your side, not
-      one — putting it in `preview.ps1` alone covers only the first.**
-      `deploy.ps1`'s folder branch shells `.\preview.bat CODE N --build-only`
-      (`deploy.ps1:306`), so that one inherits the fix for free. But
-      `deploy.py` runs `build_site.py --build-only` DIRECTLY
-      (`rebuild_for_production`, called from `ensure_base_url_and_rebuild`
-      and from the `--rebuild` path), and that is the route a Netlify or
-      Cloudflare publish takes — `deploy.ps1:743` invokes `deploy.py` for
-      those. It never passes through your launcher, so it would still race.
+      **Those callers reach the production build by TWO different routes,
+      though, and `preview.ps1` is only on one of them.** `deploy.ps1`'s
+      folder branch shells `.\preview.bat CODE N --build-only`
+      (`deploy.ps1:306`), so it inherits whatever you put in the launcher.
+      But `deploy.py` runs `build_site.py --build-only` DIRECTLY —
+      `rebuild_for_production`, called both from `ensure_base_url_and_rebuild`
+      and from `main`'s own live-reload detection at `deploy.py:1042` (there
+      is no `--rebuild` flag to grep for). That is the route a Netlify or
+      Cloudflare publish takes, since `deploy.ps1:743` hands those to
+      `deploy.py`, and it never passes through your launcher at all — so a
+      fix that lives only in `preview.ps1` leaves it racing.
 
       Both routes need covering, and HOW is yours to judge because it is
-      platform mechanics. The two shapes worth weighing: teach
-      `stop_preview.py` to read a native process snapshot on Windows (a
-      `Get-CimInstance` shell-out, or `stop_preview.py --match-stdin`, which
-      already exists and is raised again further down this item — enumerate
-      in PowerShell, decide with the shared rule, kill with `Stop-Process`),
-      which fixes every caller at once the way the mac's did; or have `deploy.ps1` stop the section's
-      preview itself before invoking `deploy.py`, which is smaller but leaves
-      a third caller free to reintroduce the bug. Say which you chose, and
-      why, in `MAC-HANDOFF.md`.
+      platform mechanics. Three shapes, and **they do not cover the same
+      ground — that difference is the whole decision:**
+
+      - **Teach `stop_preview.py` to read a native process snapshot on
+        Windows** (a `Get-CimInstance` shell-out from Python, say). This is
+        the only one that fixes EVERY caller at once, the way the mac's did,
+        because it makes `build_site.py`'s own `stop_preview_serving()` work
+        — so `deploy.py` is covered without `deploy.py` knowing anything
+        about it.
+      - **`stop_preview.py --match-stdin`** — it already exists, and is
+        raised again further down this item. It takes a JSON process list and
+        returns the pids, so `Get-CimInstance` enumerates, the shared rule
+        decides, and `Stop-Process` kills: one rule, two ports. **But it
+        inverts the control flow — PowerShell drives — so it reaches only
+        PowerShell callers, and `deploy.py` → `build_site.py` is not one of
+        them.** Choose this one alone and the Netlify and Cloudflare route
+        above is still racing.
+      - **Have `deploy.ps1` stop the preview itself** before invoking
+        `deploy.py`. The smallest change, and the one that leaves every
+        future caller free to reintroduce the bug — `plantoir-mcp.exe` is
+        already such a caller.
+
+      Say which you chose, and why, in `MAC-HANDOFF.md`.
 
       When it is done, say so in `MAC-HANDOFF.md`; this item stays open here
       until then.
@@ -3944,7 +3975,7 @@ Two things to check on your side rather than assume:
   hole is the COMMAND LINE, on both.
 
   **And on Windows the command line is still open, because the shared fix
-  cannot reach it** (corrected 2026-09-06; this said "in your CONTAINER
+  cannot reach it** (corrected 2026-09-05; this said "in your CONTAINER
   runtime `/proc` exists, so the mac's new code works there unchanged", which
   described a container path Windows no longer has). `preview.ps1` refuses to
   run at all without the bundled native runtime, `read_proc_snapshot()` in `stop_preview.py`
