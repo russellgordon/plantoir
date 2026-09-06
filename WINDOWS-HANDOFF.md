@@ -689,17 +689,94 @@ this side is expected to say so when the contract is wrong.
     process snapshots. Read that key before anything else here.
 
     **What you inherit free.** The contract, the case list, and the
-    reasoning. Also `scripts/stop_preview.py`, which is shared Python and
-    already runs in your CONTAINER runtime unchanged; your `--build-only`
-    path gets the preview-stopping fix through it without you doing
-    anything. And the finding that made the whole piece worth doing: the
+    reasoning. And the finding that made the whole piece worth doing: the
     three implementations were three PARTIAL rules, not three copies of one.
     A working directory sees a child launched by a relative path; a command
     line sees the Python driver, which never chdirs. **Your version had the
     better half already** — the descendant walk, which neither of the mac's
     copies had, and which is now part of the shared rule because of you.
 
+    **What you do NOT inherit — this bullet was WRONG until 2026-09-06.** It
+    said `scripts/stop_preview.py` "already runs in your CONTAINER runtime
+    unchanged", and therefore that "your `--build-only` path gets the
+    preview-stopping fix through it without you doing anything". Both halves
+    are false, and the second is the one that costs something: there is no
+    container runtime on Windows any more (`preview.ps1` refuses outright
+    without the bundled native one — "This copy of Plantoir is missing its
+    website builder"), and `stop_preview.read_proc_snapshot()` reads `/proc`,
+    which native Windows does not have. It returns an empty list, so
+    `build_site.py`'s `stop_preview_serving()` stops nothing there — by
+    design, and documented as such in that function, but the consequence is
+    that **the race it closes is still open on your side.** Closing it is now
+    the first item below. This is exactly the failure mode CLAUDE.md rule 3
+    names: guidance a change made wrong is worse than no guidance, because
+    this list is the INDEX a Windows session reads first, and it was telling
+    you there was nothing here to do.
+
     **What you owe, in order.**
+
+    - **Call your own `--stop` matcher from the `--build-only` path, before
+      the build starts.** The bug it fixes: killing the launcher does not
+      stop a preview, and `build_site.py`'s sync watcher
+      (`_start_public_sync_watcher`, started unconditionally in the SERVE
+      branch and therefore running natively on your side too) keeps mirroring
+      the serve build into the section's build directory about once a second.
+      A build for publishing writes to that SAME directory, so a publish that
+      runs while that section is previewing is overwritten within a second of
+      finishing, and what goes out is the preview — live-reload client and
+      all. Nothing errors, nothing is logged, and the site looks plausible.
+
+      Your APP is safe and always was (`SectionDetailView.xaml.cs` stops a
+      running preview before deploying, exactly as the mac's does). The hole
+      is the COMMAND LINE — `preview.ps1 CODE N --build-only`,
+      `deploy.ps1`'s own rebuild-before-publishing, and anything scheduled.
+
+      **You already have the matcher; it is simply never called from there.**
+      `preview.ps1`'s stop block enumerates `Win32_Process`, matches by
+      command line, and walks descendants. What is missing is a call, not an
+      algorithm: lift that block into a function and invoke it from the
+      build-only path as well as from `--stop`. Three things to carry over
+      rather than re-decide:
+
+      - **Ask the `servingOnly` question, not `everything`.** A build for
+        publishing must never stop a build — the build it is protecting is
+        itself a build of this section, and the process asking is the one an
+        `everything` sweep would recognise. See `contracts/shared-rules.json`
+        → `stopPreview` for the two modes.
+      - **Match on the section's BUILD DIRECTORY, never on the port.** The
+        mac's first version killed by port, and every build-only run carries
+        the default 8081 (`preview.sh` defaults it; the app's deploy passes
+        no `--port` at all) — so previewing section 1 while publishing
+        section 2 killed section 1's preview. Measured 2026-09-05 by doing
+        it. The build directory is on the serve process's command line
+        because the launcher runs the Quartz CLI by absolute path.
+      - **Exclude your own process**, and end every comparison at a
+        boundary — the `section1`/`section10` trap, which `Test-NamesPath`
+        already handles for `--stop`.
+
+      **And there are TWO routes into a production build on your side, not
+      one — putting it in `preview.ps1` alone covers only the first.**
+      `deploy.ps1`'s folder branch shells `.\preview.bat CODE N --build-only`
+      (`deploy.ps1:306`), so that one inherits the fix for free. But
+      `deploy.py` runs `build_site.py --build-only` DIRECTLY
+      (`rebuild_for_production`, called from `ensure_base_url_and_rebuild`
+      and from the `--rebuild` path), and that is the route a Netlify or
+      Cloudflare publish takes — `deploy.ps1:743` invokes `deploy.py` for
+      those. It never passes through your launcher, so it would still race.
+
+      Both routes need covering, and HOW is yours to judge because it is
+      platform mechanics. The two shapes worth weighing: teach
+      `stop_preview.py` to read a native process snapshot on Windows (a
+      `Get-CimInstance` shell-out, or `stop_preview.py --match-stdin`, which
+      already exists and is raised again further down this item — enumerate
+      in PowerShell, decide with the shared rule, kill with `Stop-Process`),
+      which fixes every caller at once the way the mac's did; or have `deploy.ps1` stop the section's
+      preview itself before invoking `deploy.py`, which is smaller but leaves
+      a third caller free to reintroduce the bug. Say which you chose, and
+      why, in `MAC-HANDOFF.md`.
+
+      When it is done, say so in `MAC-HANDOFF.md`; this item stays open here
+      until then.
 
     - **`activityTrail.mustRecord` gains "section processes reclaimed", and
       your `ContractTests` will go RED until you emit it.** No `appliesOn`
@@ -3864,9 +3941,21 @@ Two things to check on your side rather than assume:
 - **What is and is not exposed on your side.** The Windows APP already stops a
   running preview before deploying (`SectionDetailView.xaml.cs`), exactly as
   the mac's does — so the app is safe on both platforms and always was. The
-  hole is the COMMAND LINE, on both. And in your CONTAINER runtime `/proc`
-  exists, so the mac's new code works there unchanged; it is only the NATIVE
-  Windows runtime that gets nothing.
+  hole is the COMMAND LINE, on both.
+
+  **And on Windows the command line is still open, because the shared fix
+  cannot reach it** (corrected 2026-09-06; this said "in your CONTAINER
+  runtime `/proc` exists, so the mac's new code works there unchanged", which
+  described a container path Windows no longer has). `preview.ps1` refuses to
+  run at all without the bundled native runtime, `read_proc_snapshot()` in `stop_preview.py`
+  reads `/proc`, and native Windows has none — so it returns an empty list
+  and `stop_preview_serving()` stops nothing. The watcher that
+  causes the race, though, runs everywhere: `_start_public_sync_watcher` is
+  started unconditionally in the SERVE branch, so a Windows preview mirrors
+  over a Windows publish exactly as a mac one does. **The fix is to call
+  `preview.ps1`'s own matcher from the build-only path before the build** —
+  see item 20 in the outstanding list, which carries the three details worth
+  copying rather than re-deciding.
 
 - **The wait is bounded at 30 seconds** (150 × 0.2 s), not the 15 that
   `GUI-IMPROVEMENTS.md` row 392 says — that row predates the change and the log
