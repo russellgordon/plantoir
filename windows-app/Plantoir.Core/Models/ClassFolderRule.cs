@@ -89,8 +89,12 @@ public static class ClassFolderRule
     private static string? Recorded(string? classFolder, IReadOnlyList<string> folders)
     {
         if (string.IsNullOrWhiteSpace(classFolder)) return null;
+        // Trimmed, as the mac does: a key written with stray whitespace names
+        // the same folder, and falling back to the guess over a space would be
+        // a stale-key failure with no stale key.
+        string wanted = classFolder!.Trim();
         foreach (string folder in folders)
-            if (folder.Equals(classFolder, StringComparison.OrdinalIgnoreCase))
+            if (folder.Equals(wanted, StringComparison.OrdinalIgnoreCase))
                 return folder;
         return null;
     }

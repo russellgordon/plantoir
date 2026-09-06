@@ -760,7 +760,8 @@ public sealed class NewCourseDialog : ContentDialog
         // it protects too little, never the wrong folder.
         ResolvedCurriculumFolder: CurriculumFolderRule.Resolve(null, _sharedFolders),
         GradedFolders: CurrentGradedFolders(),
-        PerSectionFolders: _perSectionFolders);
+        PerSectionFolders: _perSectionFolders,
+        ResolvedClassFolder: ClassFolderRule.Name(null, _perSectionFolders));
 
     /// <summary>
     /// Which province's curriculum the switch offers, so the blocked sentence

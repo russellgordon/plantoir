@@ -462,8 +462,7 @@ public sealed class AssistWorkspace
             // hours; it is the input half of this feature and the half that
             // fails silently.
             string unitWord = course.Configuration.UnitWord;
-            if (wanted.StartsWith(unitWord + " ", StringComparison.OrdinalIgnoreCase) &&
-                int.TryParse(wanted[(unitWord.Length + 1)..].Trim(), out int unitNum) && !wanted.Contains(','))
+            if (PublishPlan.UnitNamed(wanted, unitWord) is { } unitNum)
             {
                 var unitPages = pagesList.Where(p => p.IsClassPage &&
                     p.Title.StartsWith($"{unitWord} {unitNum},", StringComparison.OrdinalIgnoreCase)).ToList();
@@ -1813,7 +1812,7 @@ public sealed class AssistWorkspace
         catch { return new List<string>(); }
 
         var classPages = ClassPages(course, section);
-        var problems = DateAudit.Run(classPages, graph, Resolve, Relative);
+        var problems = DateAudit.Run(classPages, graph, Resolve, Relative, course.Configuration.UnitWord);
 
         var newDates = dates.Select(d => d.New).ToList();
         if (newDates.Count > 0)
@@ -2345,13 +2344,16 @@ public sealed class AssistWorkspace
         foreach (string path in ClassPages(course, section))
         {
             string title = Path.GetFileNameWithoutExtension(path);
-            var match = System.Text.RegularExpressions.Regex.Match(
-                title, @"^Unit\s+(\d+),\s*Day\s+(\d+)$",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!match.Success) { unnumbered++; continue; }
+            // The course's OWN word. Reading a literal "Unit" here made the
+            // whole make-room feature unreachable for a Module course: every
+            // page counted as unnumbered, the plan found no classes, and it
+            // refused with "has no pages named ...". The title-building below
+            // was converted first and could therefore never run.
+            var parsed = UnitDay.Parse(title, course.Configuration.UnitWord);
+            if (parsed is null) { unnumbered++; continue; }
 
             found.Add(new ClassRef(
-                int.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value),
+                parsed.Value.Unit, parsed.Value.Day,
                 path, DateOf(course, section, path), title));
         }
 
@@ -2506,7 +2508,7 @@ public sealed class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so nothing was moved: {error.Message}");
         }
 
-        _undo?.Begin($"made room for {plan.Added.Count} classes at Unit {plan.Unit}, Day {plan.AtDay} " +
+        _undo?.Begin($"made room for {plan.Added.Count} classes at {UnitWordFor(plan.CourseCode)} {plan.Unit}, Day {plan.AtDay} " +
                      $"in {course.Code} Section {section}");
 
         // Highest day first, so a rename never lands on a name still in use.
@@ -2558,7 +2560,7 @@ public sealed class AssistWorkspace
         }
 
         return new AssistResult(true,
-            $"Made room for {plan.Added.Count} class{(plan.Added.Count == 1 ? "" : "es")} at Unit " +
+            $"Made room for {plan.Added.Count} class{(plan.Added.Count == 1 ? "" : "es")} at {UnitWordFor(plan.CourseCode)} " +
             $"{plan.Unit}, Day {plan.AtDay}. Renamed {plan.Renames.Count}, moved {plan.Moves.Count} onto " +
             $"later class days, and updated {plan.LinksToRewrite} link" +
             $"{(plan.LinksToRewrite == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
@@ -2665,7 +2667,7 @@ public sealed class AssistWorkspace
         for (int i = 0; i < count; i++)
         {
             int day = firstDay + i;
-            string title = $"Unit {unit}, Day {day}";
+            string title = $"{UnitWordFor(courseCode)} {unit}, Day {day}";
             string path = Path.Combine(folder, title + ".md");
 
             // Never written over. A page with this name may be a lesson the
@@ -2751,7 +2753,7 @@ public sealed class AssistWorkspace
                 $"{course.Code} couldn’t be backed up, so no pages were created: {error.Message}");
         }
 
-        _undo?.Begin($"added {plan.Classes.Count} class pages to Unit {plan.Unit} of " +
+        _undo?.Begin($"added {plan.Classes.Count} class pages to {UnitWordFor(plan.CourseCode)} {plan.Unit} of " +
                      $"{course.Code} Section {section}");
 
         // Match the time of day and UTC offset the section's existing classes
@@ -2776,6 +2778,18 @@ public sealed class AssistWorkspace
     }
 
     /// <summary>Where a section's class pages live.</summary>
+    /// <summary>
+    /// What this course calls a unit. By CODE, because several planning paths
+    /// carry the code rather than the course.
+    /// </summary>
+    public string UnitWordForCourse(string courseCode) => UnitWordFor(courseCode);
+
+    private string UnitWordFor(string courseCode)
+    {
+        try { return Course(courseCode).Configuration.UnitWord; }
+        catch (AssistRefusal) { return ClassPageTerm.DefaultWord; }
+    }
+
     private static string ClassFolder(Course course, int sectionNumber)
     {
         // The naming half of the shared rule

@@ -2061,10 +2061,23 @@ where.
   when making room for them. In a Module course those write files the course's
   own rule then refuses to recognise as class pages, which is the feature's
   own silent failure arriving by a second route, from the app rather than from
-  the parser. Worth checking that the mac's equivalents (`AssistWorkspace`'s
-  add-classes and make-room paths) use `ClassPageTerm` rather than a literal —
-  this side had four such literals and the handoff's list of owed items
-  mentioned none of them.
+  the parser.
+
+  **Corrected the same day, and the correction is the useful part.** An
+  earlier version of this entry said "every call site now passes the course's
+  values" and asked the mac to check `AssistWorkspace`'s equivalents. Both
+  halves were wrong. A review found FOUR more literals on this side, two of
+  which made the feature worse than not having it — new pages were still NAMED
+  "Unit 1, Day 3", and make-room's READER matched a literal pattern so it
+  refused a Module course outright before the corrected title-building could
+  run. And the mac has no `AssistWorkspace`: its equivalents
+  (`NextClassPlanner`, `PlaceholderClassPlanner`, `ClassInsertionPlanner`)
+  already pass `term`, so there is nothing there to check. **Nothing is asked
+  of the mac by this paragraph** — it is here because a handoff entry that
+  overstates what was done is worse than none, and because the reason for the
+  miss travels: the owed-items list was produced by thinking of features
+  rather than by grepping for every CALL of the thing being made
+  configurable.
 
   **The second: `SectionIndex`'s date tie-break.** When two pages share a
   date, the later page in the course wins, decided by parsing both names. In a

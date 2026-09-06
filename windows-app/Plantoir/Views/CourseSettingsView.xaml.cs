@@ -172,7 +172,8 @@ public sealed partial class CourseSettingsView : UserControl
         Jurisdiction: SpecialNames.DefaultJurisdiction,
         ResolvedCurriculumFolder: Config.ResolvedCurriculumFolder,
         GradedFolders: Config.MaterializedGradedFolders(),
-        PerSectionFolders: Config.PerSectionFolders);
+        PerSectionFolders: Config.PerSectionFolders,
+        ResolvedClassFolder: ClassFolderRule.Name(Config.ClassFolder, Config.PerSectionFolders));
 
     // ---- Font sample text ------------------------------------------------
 
