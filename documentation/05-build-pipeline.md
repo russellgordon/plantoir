@@ -18,7 +18,8 @@ section<N>/ ────────┼─▶ /tmp/quartz-builds/ ─┤        
 patched Quartz ─────┤    (internal ext4)     │                    │
 support files ──────┘                        │                    ▼
                                              └─▶ rsync ──▶ .merged_output/section<N>/public/
-                                                 (mirror)         │
+                                                 (mirror)   (a link, OUTSIDE
+                                                                  │  the working folder)
                                                                   └─▶ deploy: deploy.py / deploy.ps1
 ```
 
@@ -31,6 +32,21 @@ support files ──────┘                        │                  
    differential `rsync -a --delete` (with `shutil.copytree` fallback). Host-side
    components (`BuildFreshness`, `SectionDetailView`, `ScheduledDeploy`, and `deploy.py`)
    read from this path directly on the host filesystem.
+
+   **That path is a link, and the built site is not inside the working
+   folder.** Since 2026-09-05 `courses/<CODE>/.merged_output` is a symlink to
+   `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>` on
+   macOS, and Windows writes to `%LOCALAPPDATA%\Plantoir\builds\<folder id>`
+   through `PLANTOIR_BUILD_ROOT` (no link and no `.merged_output` level —
+   `toolchain_paths.merged_output_root()` is the one place that knows). The
+   built site is derived and can always be made again, but a synced folder
+   uploads every build of it, Time Machine backs it up, and a zip or a Finder
+   copy of the course carries it. The link means every reader above keeps
+   naming the path it already names; the launchers bind-mount the builds
+   folder into the container at the SAME absolute path so it resolves
+   identically on both sides. The rule, and what was rejected, is in
+   [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+   `buildOutputLocation`.
 
 ## Stage 1: Validation and preflight discovery
 
@@ -65,7 +81,8 @@ Because staging happens on native ext4 storage within the container, copying the
 scaffold takes **< 0.1 seconds**, and `/opt/quartz/node_modules` is symlinked
 directly into the build folder. The host output folder
 `courses/<CODE>/.merged_output/section<N>/` is created to receive the mirrored
-`public/` build outputs.
+`public/` build outputs — inside the builds folder the link points at, not
+inside the working folder.
 
 On a fresh scaffold, the script immediately applies the **first-build
 patches** (Graph removal, locales, date-handling config, folder-page
@@ -244,6 +261,66 @@ site-build time* to know which folders are expandable.
 
 ## Stage 5: Dependencies and the actual Quartz build
 
+**A build for publishing stops that section's preview.**
+<a id="a-build-for-publishing-stops-that-sections-preview"></a>
+A preview does not stop when the launcher that started it is killed: on the mac
+the Python and the node server both live inside the container, and the Python's
+sync watcher keeps mirroring the SERVE build to the host every second. A
+`--build-only` run alongside one is therefore overwritten within a second of
+finishing, and what gets published is the preview — live-reload client and all.
+So `--build-only` stops the preview serving that section first.
+
+It is matched by the section's own BUILD DIRECTORY, which is on the serve
+process's command line, and deliberately **not** by port: a build-only run is
+never given one, so an earlier version killed whatever held the default 8081 —
+a different section's preview, in the ordinary case of previewing one section
+while publishing another. Match on the directory plus a trailing separator, or
+`section1` also matches `section10`.
+
+The process list comes from `stop_preview.read_snapshot()`, which asks the
+platform: `/proc` on Linux and inside the container, `Get-CimInstance
+Win32_Process` natively on Windows. Until 2026-09-05 `/proc` was the only
+reader, so on Windows the list came back empty, this stopped nothing, and the
+overwrite race above was live on that platform for every publish made while a
+preview was running. That is why the reader is a dispatcher rather than a
+constant: a rule that silently answers "nothing" on one platform is worse than
+one that is missing there, because it looks implemented.
+
+**Which processes belong to a section is one rule, and it lives in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`stopPreview`,** implemented once in `scripts/stop_preview.py`. Read that
+before changing anything here. It answers two different questions:
+
+| | Asked by | What it stops |
+|---|---|---|
+| `everything` | the launcher's `--stop` | the server, the build, the driver, and every child of them |
+| `servingOnly` | `build_site.py --build-only`, above | only the preview SERVER that would overwrite the build |
+
+The distinction is not fussiness: a build for publishing must never stop a
+build, because the build it is protecting is itself a build of this section,
+and the process asking is the one the rule would otherwise recognise.
+
+A process belongs to the section on any ONE of three kinds of evidence —
+its working directory is inside the section's build folder, its command line
+NAMES that folder, or it is `build_site.py` carrying this course and this
+section — **plus every descendant of a match.** It is a disjunction because
+until 2026-09-05 this question was answered in three separate places
+(`preview.sh`, `preview.ps1`, and here), and those three turned out not to be
+three copies of one rule but three PARTIAL ones: a working directory sees a
+child launched by a relative path, which carries no directory to match on
+(`npm install` runs exactly that way), while a command line sees the Python
+driver, which never calls `os.chdir` — it passes `cwd=` to its CHILDREN — and
+therefore sits in the container's `/teaching` for the whole build. Through
+every in-process phase of a build the driver is the only process there is to
+find, and a sweep by working directory found nothing and said so. Only the
+PowerShell copy walked descendants.
+
+Every comparison ends at a BOUNDARY rather than being a substring test. That
+is not a detail either: `…/section1` is a prefix of `…/section10` and
+`--section=1` is a prefix of `--section=10`, and both had already stopped the
+wrong section on one platform.
+
+
 - **Pre-baked dependencies:** If `node_modules` is not present in the workspace,
   it is symlinked instantly from `/opt/quartz/node_modules` in the image. `npm install`
   is only invoked if explicitly requested with `--force-npm-install`.
@@ -252,7 +329,9 @@ site-build time* to know which folders are expandable.
   part of the [determinism strategy](07-deployment.md#why-determinism-matters)
   that keeps Netlify uploads small.
 - **Preview mode (default):** kills any process holding the requested
-  port (`lsof`, that port only — several previews can run at once). Starts a
+  port (`lsof`, that port only — several previews can run at once). This is
+  the one place a port is still the right handle, because here the port is
+  known and leased; everywhere else, see the rule above. Starts a
   lightweight background synchronization watcher thread that polls `public/` and
   mirrors changes to the host's `.merged_output/section<N>/public/`, then
   runs `npx quartz build --concurrency 1 --serve --port <8081-8084>

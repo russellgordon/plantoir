@@ -183,6 +183,19 @@ enum CourseRenamer {
             throw Problem.folderCouldNotBeMoved(error.localizedDescription)
         }
 
+        // The built website lives outside the working folder and is named
+        // after the course CODE, so the folder that just moved carries a link
+        // pointing at the old name. Carried across here rather than left to
+        // `BuildOutputLocation.ensureLink`, whose answer to a link pointing
+        // somewhere else is to start again from nothing — which would throw
+        // away a site that renaming the course never used to cost.
+        BuildOutputLocation.moveBuild(
+            forWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
+            fromCourseCode: previousCode,
+            toCourseCode: newCode,
+            renamedCourseDirectory: destinationURL
+        )
+
         var stopped: [Int] = []
         var unstopped: [Int] = []
         for sectionNumber in scheduledSections {

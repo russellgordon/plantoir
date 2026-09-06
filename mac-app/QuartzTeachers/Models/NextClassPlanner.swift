@@ -89,8 +89,8 @@ enum NextClassPlanner {
 
         let existing: [ClassPageSummary] = ClassPages.list(forSection: sectionNumber, in: course)
         let next: UnitDay = startingANewUnit
-            ? firstDayOfANewUnit(after: existing)
-            : nextUnitAndDay(after: existing)
+            ? firstDayOfANewUnit(after: existing, term: course.configuration.unitWord)
+            : nextUnitAndDay(after: existing, term: course.configuration.unitWord)
 
         // Position, not numbering: the class after this section's 15th class
         // takes the 16th date, whatever the 15 pages happen to be called.
@@ -135,7 +135,9 @@ enum NextClassPlanner {
     /// numbers and are passed over here, exactly as they are everywhere else
     /// that renumbers classes. A section with no numbered class at all starts
     /// at Unit 1, Day 1.
-    static func nextUnitAndDay(after pages: [ClassPageSummary]) -> UnitDay {
+    static func nextUnitAndDay(
+        after pages: [ClassPageSummary], term: String = ClassPageTerm.standard
+    ) -> UnitDay {
         var highestUnit: Int = 0
         for page in pages {
             if let numbers = page.unitAndDay, numbers.unit > highestUnit {
@@ -143,7 +145,7 @@ enum NextClassPlanner {
             }
         }
         if highestUnit == 0 {
-            return UnitDay(unit: 1, day: 1)
+            return UnitDay(unit: 1, day: 1, term: term)
         }
 
         var highestDay: Int = 0
@@ -155,7 +157,7 @@ enum NextClassPlanner {
                 highestDay = numbers.day
             }
         }
-        return UnitDay(unit: highestUnit, day: highestDay + 1)
+        return UnitDay(unit: highestUnit, day: highestDay + 1, term: term)
     }
 
     /// Several more days on the end of a unit that already exists.
@@ -201,7 +203,9 @@ enum NextClassPlanner {
 
         for step in 1...max(1, howMany) {
             let day: Int = highestDay + step
-            let title: String = UnitDay(unit: unit, day: day).title
+            let title: String = UnitDay(
+                unit: unit, day: day, term: course.configuration.unitWord
+            ).title
             let pageURL: URL = folder.appendingPathComponent(title + ".md")
             if FileManager.default.fileExists(atPath: pageURL.path) {
                 alreadyThere.append(title)
@@ -268,7 +272,9 @@ enum NextClassPlanner {
     ///
     /// A section with no numbered class at all gets Unit 1, Day 1: there is no
     /// unit yet, so there is none to move past.
-    static func firstDayOfANewUnit(after pages: [ClassPageSummary]) -> UnitDay {
+    static func firstDayOfANewUnit(
+        after pages: [ClassPageSummary], term: String = ClassPageTerm.standard
+    ) -> UnitDay {
         var highestUnit: Int = 0
         for page in pages {
             if let numbers = page.unitAndDay, numbers.unit > highestUnit {
@@ -276,8 +282,8 @@ enum NextClassPlanner {
             }
         }
         if highestUnit == 0 {
-            return UnitDay(unit: 1, day: 1)
+            return UnitDay(unit: 1, day: 1, term: term)
         }
-        return UnitDay(unit: highestUnit + 1, day: 1)
+        return UnitDay(unit: highestUnit + 1, day: 1, term: term)
     }
 }

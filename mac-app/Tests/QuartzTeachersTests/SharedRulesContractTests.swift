@@ -706,6 +706,130 @@ final class SharedRulesContractTests: XCTestCase {
         let remCurriculum: [String: Any] = try XCTUnwrap(section["removeCurriculumFolderConfirmation"] as? [String: Any])
         XCTAssertEqual(SpecialNames.removeCurriculumFolderMessage, remCurriculum["message"] as? String)
         XCTAssertEqual(SpecialNames.removeCurriculumFolderTitle(for: "Curriculum"), (remCurriculum["title"] as? String)?.replacingOccurrences(of: "{name}", with: "Curriculum"))
+
+        let rename: [String: Any] = try XCTUnwrap(section["renameFolder"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.renameFolderExplanation, rename["explanation"] as? String)
+        XCTAssertEqual(
+            SpecialNames.renameFolderTitle(for: "Tasks"),
+            (rename["sheetTitle"] as? String)?.replacingOccurrences(of: "{name}", with: "Tasks")
+        )
+        XCTAssertEqual(
+            SpecialNames.renameFolderDone(from: "Tasks", to: "Assessments"),
+            (rename["done"] as? String)?
+                .replacingOccurrences(of: "{old}", with: "Tasks")
+                .replacingOccurrences(of: "{new}", with: "Assessments")
+        )
+        XCTAssertEqual(SpecialNames.renameFolderRelinked(pages: 0), rename["doneRelinkedNone"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderNothingWasThere, rename["doneNothingWasThere"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderRelinked(pages: 1), rename["doneRelinkedOne"] as? String)
+        XCTAssertEqual(
+            SpecialNames.renameFolderRelinked(pages: 4),
+            (rename["doneRelinkedMany"] as? String)?.replacingOccurrences(of: "{count}", with: "4")
+        )
+
+        let renameProblems: [String: Any] = try XCTUnwrap(rename["problems"] as? [String: Any])
+        XCTAssertEqual(SpecialNames.renameFolderProblemEmpty, renameProblems["empty"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderProblemUnchanged, renameProblems["unchanged"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderProblemHasSeparator, renameProblems["hasSeparator"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderProblemIsHidden, renameProblems["isHidden"] as? String)
+        XCTAssertEqual(SpecialNames.renameFolderProblemIsMedia, renameProblems["isMedia"] as? String)
+        XCTAssertEqual(
+            SpecialNames.renameFolderProblemAlreadyUsed(name: "Tasks"),
+            (renameProblems["alreadyUsed"] as? String)?.replacingOccurrences(of: "{name}", with: "Tasks")
+        )
+        XCTAssertEqual(
+            SpecialNames.renameFolderProblemLooksLikeASection(name: "section3"),
+            (renameProblems["looksLikeASection"] as? String)?.replacingOccurrences(of: "{name}", with: "section3")
+        )
+        XCTAssertEqual(
+            SpecialNames.renameFolderProblemDestinationExists(name: "Tasks"),
+            (renameProblems["destinationExists"] as? String)?.replacingOccurrences(of: "{name}", with: "Tasks")
+        )
+
+        let added: [String: Any] = try XCTUnwrap(section["addCreatesTheFolder"] as? [String: Any])
+        XCTAssertEqual(
+            SpecialNames.addCreatesTheFolderMessage(name: "Tests"),
+            (added["message"] as? String)?.replacingOccurrences(of: "{name}", with: "Tests")
+        )
+
+        let removed: [String: Any] = try XCTUnwrap(section["removeLeavesTheFolderOnDisk"] as? [String: Any])
+        XCTAssertEqual(
+            SpecialNames.removeLeavesTheFolderOnDiskMessage(name: "Tests"),
+            (removed["message"] as? String)?.replacingOccurrences(of: "{name}", with: "Tests")
+        )
+    }
+
+    /// Every key the contract says a rename carries across is one the renamer
+    /// actually rewrites. A key added to the list and not to the code is the
+    /// failure this catches — the config would then name a folder that is not
+    /// there, which is the state the whole feature exists to make impossible.
+    func testEveryKeyARenameCarriesAcrossIsActuallyRewritten() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let rename: [String: Any] = try XCTUnwrap(section["renameFolder"] as? [String: Any])
+        let keys: [String] = try XCTUnwrap(rename["carriesAcross"] as? [String])
+
+        let before: [String: Any] = [
+            "shared_folders": ["Tasks"],
+            "per_section_folders": ["Tasks"],
+            "graded_folders": ["Tasks"],
+            "curriculum_folder": "Tasks",
+            "class_folder": "Tasks",
+            "hidden": ["Tasks", "Private Notes.md"],
+            "expandable": ["Tasks", "Concepts"],
+            "excluded_items": ["shared": ["Tasks"], "per_section": ["Tasks"]],
+        ]
+        let afterShared: [String: Any] = SpecialFolderRenamer.renaming(
+            "Tasks", to: "Assessments", scope: .shared, in: before
+        )
+        let afterPerSection: [String: Any] = SpecialFolderRenamer.renaming(
+            "Tasks", to: "Assessments", scope: .perSection, in: before
+        )
+
+        for key in keys {
+            switch key {
+            case "shared_folders":
+                XCTAssertEqual(afterShared[key] as? [String], ["Assessments"])
+            case "per_section_folders":
+                XCTAssertEqual(afterPerSection[key] as? [String], ["Assessments"])
+            case "graded_folders":
+                XCTAssertEqual(afterShared[key] as? [String], ["Assessments"])
+            case "hidden":
+                // The dangerous one: left naming the old folder, a rename
+                // un-hides it and the next publish shows students pages the
+                // teacher hid.
+                XCTAssertEqual(afterShared[key] as? [String], ["Assessments", "Private Notes.md"])
+                XCTAssertEqual(afterPerSection[key] as? [String], ["Assessments", "Private Notes.md"])
+            case "expandable":
+                XCTAssertEqual(afterShared[key] as? [String], ["Assessments", "Concepts"])
+            case "curriculum_folder":
+                XCTAssertEqual(afterShared[key] as? String, "Assessments")
+                XCTAssertEqual(
+                    afterPerSection[key] as? String, "Tasks",
+                    "The curriculum folder is SHARED; a per-section rename must not touch it"
+                )
+            case "class_folder":
+                // Carried by the per-section rename: a class folder is a
+                // per-section folder, and a SHARED rename of a name that
+                // happens to match must not touch it.
+                XCTAssertEqual(afterPerSection[key] as? String, "Assessments")
+                XCTAssertEqual(
+                    afterShared[key] as? String, "Tasks",
+                    "The class folder is PER-SECTION; a shared rename must not touch it"
+                )
+            case "excluded_items":
+                // Each scope's list is rewritten by a rename in THAT scope and
+                // left alone by the other — the whole reason the key is keyed
+                // by scope is that the same bare name can exist in both.
+                let shared: [String: Any] = try XCTUnwrap(afterShared[key] as? [String: Any])
+                XCTAssertEqual(shared["shared"] as? [String], ["Assessments"])
+                XCTAssertEqual(shared["per_section"] as? [String], ["Tasks"])
+                let perSection: [String: Any] = try XCTUnwrap(afterPerSection[key] as? [String: Any])
+                XCTAssertEqual(perSection["per_section"] as? [String], ["Assessments"])
+                XCTAssertEqual(perSection["shared"] as? [String], ["Tasks"])
+            default:
+                XCTFail("The contract says a rename carries \(key) across, and nothing here checks it.")
+            }
+        }
     }
 
     func testCurriculumFolderResolutionCases() throws {
@@ -824,6 +948,172 @@ final class SharedRulesContractTests: XCTestCase {
         try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
             .write(to: courseURL.appendingPathComponent("course_config.json"))
     }
+
+    // MARK: - Where built websites are kept
+
+    /// The contract states the two paths a built website is found at, with
+    /// `{home}` and `{folder id}` standing in — and the app computes exactly
+    /// those. Written out rather than left implicit because the launchers are
+    /// a second implementation of this rule and the contract is what they are
+    /// both written against: if the app's answer drifts, the app and the
+    /// command line build into different places and every build reads as
+    /// stale, which is precisely the failure this section exists to stop.
+    func testTheBuiltWebsiteIsWhereTheContractSaysItIs() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("buildOutputLocation")
+        let macLocation: [String: Any] = try XCTUnwrap(section["macLocation"] as? [String: Any])
+
+        let home: URL = FileManager.default.homeDirectoryForCurrentUser
+        let folder: URL = URL(fileURLWithPath: "/tmp/some working folder")
+        let identifier: String = BuildOutputLocation.folderIdentifier(forWorkingFolder: folder.path)
+
+        func filledIn(_ key: String) throws -> String {
+            return try XCTUnwrap(macLocation[key] as? String)
+                .replacingOccurrences(of: "{home}", with: home.path)
+                .replacingOccurrences(of: "{folder id}", with: identifier)
+                .replacingOccurrences(of: "{COURSE}", with: "ICS3U")
+        }
+
+        // The REAL rule, as a pure function of the home folder: the live
+        // buildsRoot answers a temporary folder while the suite runs so that
+        // no test can write into the teacher's own Application Support.
+        let real: URL = BuildOutputLocation.buildsRoot(inHomeFolder: home)
+            .appendingPathComponent(identifier)
+        XCTAssertEqual(real.path, try filledIn("buildsRoot"))
+        XCTAssertEqual(real.appendingPathComponent("ICS3U").path, try filledIn("perCourse"))
+        XCTAssertEqual(
+            BuildOutputLocation.workingFolderMarkerName,
+            "working-folder.txt",
+            "the contract's macLocation.workingFolderMarker names this file"
+        )
+        XCTAssertTrue(
+            try XCTUnwrap(macLocation["workingFolderMarker"] as? String)
+                .contains(BuildOutputLocation.workingFolderMarkerName)
+        )
+    }
+
+    /// Every launcher carries the same rule, because a teacher at the command
+    /// line and a publish scheduled with launchd have no app to do it for
+    /// them. Checked against the shell itself: all three must define the
+    /// builds root, create it before the container, mount it at its own
+    /// absolute path, and recreate a container that was made without it.
+    func testEveryLauncherCarriesTheSameRule() throws {
+        let repository: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        for launcher in ["setup.sh", "preview.sh", "deploy.sh"] {
+            let text: String = try String(
+                contentsOf: repository.appendingPathComponent(launcher), encoding: .utf8
+            )
+            XCTAssertTrue(
+                text.contains("Library/Application Support/Plantoir/builds/${WORKDIR_ID}"),
+                "\(launcher) does not know where built websites go"
+            )
+            XCTAssertTrue(
+                text.contains("-v \"$BUILD_ROOT\":\"$BUILD_ROOT\""),
+                "\(launcher) does not mount the builds folder at its own absolute path, so the link would dangle inside the container"
+            )
+            // The DEFINITION is not the behaviour. An earlier version of this
+            // test matched only the function names and the mount flag, and
+            // passed with `setup.sh` never calling the function at all — so
+            // each of these asks for the CALL, on its own line.
+            XCTAssertTrue(
+                text.contains("\n  elif ! container_has_builds_mount; then"),
+                "\(launcher) defines the check but never branches on it, so a container made before this change keeps running without the mount — and a mount cannot be added to a container that exists"
+            )
+            XCTAssertTrue(
+                text.contains("\n  ensure_build_root\n  docker run -dit"),
+                "\(launcher) creates the container without making the builds folder first — a bind mount whose source is missing gives the container an empty folder of its own, and the built website goes nowhere"
+            )
+            XCTAssertTrue(
+                text.contains("\nlink_course_build_output \"$")
+                    || text.contains("\n  link_course_build_output \"$"),
+                "\(launcher) never calls link_course_build_output, so it does nothing about where the built website goes"
+            )
+        }
+    }
+
+    // MARK: - Stopping a section's preview
+
+    /// The mac app does not implement this rule — it shells out to
+    /// `preview.sh --stop`, and the rule itself lives in
+    /// `scripts/stop_preview.py`, run against these cases by
+    /// `scripts/test_stop_preview.py`. What the mac suite is for here is the
+    /// SHAPE: that the cases exist, that they are well formed, and that the
+    /// launcher on this side still delegates rather than growing a fourth
+    /// copy of the question. The same precedent as `gradedFolders`.
+    func testStopPreviewCasesAreWellFormed() throws {
+        let rule: [String: Any] = try Self.section("stopPreview")
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 23,
+            "the stopPreview case list has lost cases; it is the only gate on a rule that "
+                + "used to be written out three times"
+        )
+        var modesSeen: Set<String> = []
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            let mode: String = try XCTUnwrap(oneCase["mode"] as? String, "\(name) has no mode")
+            modesSeen.insert(mode)
+            XCTAssertNotNil(oneCase["why"] as? String, "\(name) does not say why it exists")
+            let section: [String: Any] = try XCTUnwrap(
+                oneCase["section"] as? [String: Any], "\(name) names no section"
+            )
+            let directories: [String] = try XCTUnwrap(section["directories"] as? [String])
+            XCTAssertFalse(directories.isEmpty, "\(name) gives no build directory")
+            // A blank directory is a prefix of every path, so a case carrying
+            // one would sweep an entire container — that was a real hole in
+            // the rule, found by review. One case tests it ON PURPOSE and
+            // says so in its name; anything else with a blank is a mistake.
+            if !name.contains("blank build directory") {
+                for directory in directories {
+                    XCTAssertFalse(
+                        directory.isEmpty,
+                        "\(name) carries a blank build directory, which matches everything"
+                    )
+                }
+            }
+            // A case that only some platforms can answer must SAY so, and
+            // may name only evidence a platform can genuinely lack.
+            if let needs = oneCase["needsEvidence"] as? [String] {
+                XCTAssertFalse(needs.isEmpty, "\(name) has an empty needsEvidence")
+                for evidence in needs {
+                    XCTAssertEqual(
+                        evidence, "workingDirectory",
+                        "\(name) excuses a runner from '\(evidence)', which every platform "
+                            + "can see; the only evidence a platform genuinely lacks is a "
+                            + "working directory, and Windows is the platform"
+                    )
+                }
+            }
+            let snapshot: [[String: Any]] = try XCTUnwrap(
+                oneCase["snapshot"] as? [[String: Any]], "\(name) has no process snapshot"
+            )
+            XCTAssertFalse(snapshot.isEmpty, "\(name) has an empty snapshot")
+            let pids: Set<Int> = Set(snapshot.compactMap { process in process["pid"] as? Int })
+            XCTAssertEqual(pids.count, snapshot.count, "\(name) reuses a process id")
+            let stops: [Int] = try XCTUnwrap(oneCase["stops"] as? [Int], "\(name) has no verdict")
+            for stopped in stops {
+                XCTAssertTrue(
+                    pids.contains(stopped),
+                    "\(name) expects pid \(stopped) to be stopped and its snapshot has no such process"
+                )
+            }
+        }
+        XCTAssertEqual(
+            modesSeen, ["everything", "servingOnly"],
+            "both questions must be covered: what `--stop` reclaims, and what a build for "
+                + "publishing removes from its own way"
+        )
+    }
+
+    // The launcher's own half of this — that `preview.sh` delegates to the
+    // shared rule, keeps no sweep of its own, and pipes the code in rather
+    // than naming a path baked into the image — is asserted ONCE, in
+    // `scripts/test_stop_preview.py` (`ThereIsOnlyOneCopyOfTheRule`), which
+    // runs in `verify.sh` beside the rule it protects. It was asserted here
+    // too for a while; two gates checking the same three substrings of the
+    // same file is the shape that drifts, and the toolchain's gate is the
+    // right home for a claim about a toolchain file.
 
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)

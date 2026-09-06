@@ -89,6 +89,55 @@ nonisolated enum ActivityTrail {
         /// the folder" is a report support will receive, and the line says
         /// which rule refused and what the teacher was told.
         case removalBlocked = "removal blocked"
+        /// A folder was renamed from inside Plantoir — on disk, in every
+        /// section that had one, with the config keys that named it carried
+        /// across. Recorded because a rename is invisible afterwards: a folder
+        /// called "Class Pages" looks exactly like one that was always called
+        /// that, and the question a report will ask months later — "when did
+        /// this course stop having a Tasks folder?" — has no other answer.
+        case folderRenamed = "folder renamed"
+        /// A folder was created on disk because a teacher added its name in
+        /// Course Settings. Separate from the rename because it answers a
+        /// different question: a folder appearing in a teacher's vault that
+        /// they did not make in Obsidian is otherwise unexplained.
+        case folderCreated = "folder created"
+        /// The working folder just opened is kept in sync by a cloud service
+        /// (iCloud Drive, Dropbox, OneDrive, Google Drive…), and the teacher
+        /// had not yet been told about this folder. Carries the service's
+        /// name and the folder, redacted. Recorded because the effects of a
+        /// synced folder — a slow build, a rename that takes minutes, a move
+        /// that failed once — arrive weeks later as unrelated reports, and
+        /// this one line is what connects them.
+        case syncedFolderNoticed = "synced folder noticed"
+        /// The teacher read the note about a synced folder and went ahead —
+        /// pressed "Use This Folder Anyway" in the picker, or dismissed the
+        /// notice in the window. Carries which of the two it was and the
+        /// service's name. Separate from `syncedFolderNoticed` because it is
+        /// a different fact: one says Plantoir saw it, the other says the
+        /// teacher did, and a report of "nobody warned me" is answered by
+        /// the second.
+        case syncedFolderAccepted = "synced folder accepted"
+        /// A course's built website was moved out of the working folder, to
+        /// where built sites now live. Carries the course code. Recorded
+        /// because it is a one-off change a teacher can SEE: a folder they
+        /// may have looked at in Finder is an alias afterwards, their working
+        /// folder suddenly weighs much less, and a folder they sync stops
+        /// uploading builds. Each of those arrives as a separate report
+        /// ("where has my site gone?", "did something delete my files?"), and
+        /// this line — dated, per course — is what answers all three at once.
+        case builtSiteMovedOutOfTheFolder = "built site moved out of the working folder"
+        /// A section's leftover website-builder processes were reclaimed —
+        /// after a preview was stopped, a window closed, or a publish was
+        /// cancelled. Carries the course, the section, and HOW MANY were
+        /// ended. The count is the whole value: nothing else in the trail
+        /// distinguishes "the preview had already finished" (nothing to
+        /// stop) from "a build was still running and was ended", and those
+        /// are the two competing explanations for a teacher reporting that
+        /// their publish stopped halfway through. Added when this sweep
+        /// began ending a mid-flight BUILD and its driver rather than only a
+        /// server — a real change in what a teacher can lose, which had no
+        /// line describing it.
+        case sectionProcessesReclaimed = "section processes reclaimed"
     }
 
     // MARK: - Stored properties

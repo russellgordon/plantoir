@@ -32,8 +32,10 @@ go, without stopping to ask permission for each step.
 
 ## 1. Read these, in this order
 
-1. **`CLAUDE.md`** — the rules that override default behaviour. Rules 2 and 4
-   bind you as much as the mac side.
+1. **`CLAUDE.md`** — the rules that override default behaviour. Rules 2, 4
+   and 11 bind you as much as the mac side (11's model names are Claude
+   Code's; its last two clauses — handoff as you go, documentation before
+   "ready" — are unconditional).
 2. **`WINDOWS-HANDOFF.md`** — and inside it, **"Where Windows actually
    stands"** is the section to read FIRST. It was pruned on 2026-08-22 once a
    code-level pass confirmed most of the old work list had shipped; those
@@ -124,6 +126,13 @@ order; it was chosen so each item makes the next one cheaper.
   working. Name the case so it reads as a proposal and log it in
   `MAC-HANDOFF.md` under "Contract cases waiting on the mac".
 - **Do not run `--write-contracts`.** That is macOS-only.
+- **Anything the MAC must now do goes in `MAC-HANDOFF.md`'s "Open — what the
+  mac still owes", at the TOP of that section, in the same session.** Standing
+  instruction, `CLAUDE.md` rule 4. That section is the mac's to-do list from
+  you, exactly as `WINDOWS-HANDOFF.md`'s numbered list is yours from them —
+  both files are read top-down and abandoned partway, so an obligation that
+  lives only in prose lower down is one nobody picks up. Move it to the ledger
+  when it is done rather than deleting it.
 - **Write every change up before moving on**, to the template at the top of
   `MAC-HANDOFF.md`: what changed, why, what you rejected, and — for anything
   measured — the numbers **with the hardware they came from**. "The Vulkan
@@ -133,6 +142,22 @@ order; it was chosen so each item makes the next one cheaper.
   else.** If you add a right-click menu, a double-click, a hover or a keyboard
   shortcut, it needs a handoff line **even though nothing on screen changed** —
   that is exactly how the path-bar menu went unnoticed for months.
+- **Get each logical chunk looked at by something that is not the thing that
+  wrote it** — the plan (after Russell has agreed it, per §0), then the
+  implementation, then the fixes. `CLAUDE.md`
+  rule 11 names Claude Code's models (Opus, Fable) because that is what the
+  mac side runs; on your harness it means the most capable model you have,
+  plus a genuinely independent review. A
+  review of the finished thing arrives too late to change its shape, and the
+  shape is usually what is wrong. Verify what a review claims rather than
+  acting on it; reviewers are wrong often enough to matter.
+- **Finish with a documentation pass, before you say it is ready.** Rule 11's
+  last clause, and it is unconditional on both platforms. Grep for what you
+  changed rather than trusting your memory of where it is described, and fix
+  every place the change made WRONG — starting with `documentation/`, which
+  is the folder nothing in the daily rhythm points at. `GUI-IMPROVEMENTS.md`
+  rows and completed `TODO.md` entries are the exception: append-only records
+  of what was true on their day, never edited.
 
 ---
 

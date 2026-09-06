@@ -41,6 +41,19 @@ this side is expected to say so when the contract is wrong.
 
 ### What is still genuinely outstanding
 
+> **Keeping this list is a standing instruction, not a courtesy** (`CLAUDE.md`
+> rule 3). A macOS session that creates work for Windows adds an item HERE, in
+> the same session — one short paragraph saying what the change is, what
+> Windows inherits free, what they owe, and where the section explaining it is.
+> Done items are struck through in place with `✅ Done <date>`, never deleted,
+> so the list keeps its own history.
+>
+> The reason is what this list IS. A Windows session is told to read it first,
+> so it is the INDEX — how they find out there is work at all — while the
+> sections further down are the manual. A change written up beautifully in a
+> section nothing points at is, from their side, indistinguishable from a
+> change nobody wrote up.
+
 1. ~~A Preview item in a menu bar~~ — ✅ Done 2026-08-22. `MainWindow.xaml`
    gained a top-level "Preview" menu (Back / Forward / Reload Page) between
    File and Help, mirroring `mac-app/QuartzTeachers/App/PreviewCommands.swift`.
@@ -480,22 +493,9 @@ this side is expected to say so when the contract is wrong.
       the unconfigured rule). Emits `PLANTOIR_HEALTH:` JSON line. It is
       deliberately unfixable (in `neverOffered.checks`) — an existence fix
       would not assign marks to pages.
-    - **Shared Python**: both scripts run on Windows identically, so the
-      `PLANTOIR_HEALTH:` line is printed into a Windows build console exactly
-      as it is into a mac one.
-    - **CORRECTION (2026-08-25).** This bullet used to end "Windows receives
-      the finding in the `PLANTOIR_HEALTH:` transcript line and displays the
-      contract-authored sentence and detail without re-wording." **That was
-      never true of any Windows build, released or unreleased.** Written on the
-      mac as a description of what the shared Python makes POSSIBLE, it reads
-      as a statement of what Windows already does — and it was believed. At the
-      time it was written, `PLANTOIR_HEALTH` appeared nowhere under
-      `windows-app/` at all: no parser, no dialog, no check registry. So this
-      check, and the five before it, were printed into a Windows console and
-      read by nobody. Windows now PARSES the line and records
-      `folder problem found` on the trail; it still displays nothing. See
-      "Folder problems … Where Windows actually stands with this (2026-08-25)"
-      below, and item 13 further down this same list.
+    - **Shared Python**: both scripts run on Windows identically. Windows
+      receives the finding in the `PLANTOIR_HEALTH:` transcript line and
+      displays the contract-authored sentence and detail without re-wording.
 
 11. **Special folders hardening: `excluded_items`, preflight skip, and `index.md` sentinel notes (2026-08-24).**
     - **`excluded_items` key in `course_config.json`** — An object with optional
@@ -589,7 +589,326 @@ this side is expected to say so when the contract is wrong.
       - *The contract holds 5 resolution cases*, not the 10 row 379 claimed.
       - *Size the flyout for the longest sentence.* The mac popover truncated to one line until it was given a fixed width and allowed to wrap; the `lastGradedFolderBlocked` sentence is the longest in `specialNames`, so test the flyout with that one.
 
-13. **The folder-problems FRONT END: the findings dialog, the Fix button,
+13. **Renaming a course folder from inside the app (2026-09-01).** The mac now
+    renames a folder on disk, in every section, rewriting the links that name
+    it and every config key that mentioned it — plus the two foot-guns behind
+    it: Add creates the folder, Remove says the folder stays. Sentences,
+    refusal rules and the list of keys a rename must carry across are all in
+    `shared-rules.json` → `specialNames`. Two new trail events. **The full
+    write-up, including the three decisions and the one trap that is yours
+    alone (`Directory.Move` and open handles), is in "Renaming a course folder
+    from inside the app" below** — read that rather than this summary.
+
+14. **A section with no front page no longer publishes yesterday's site
+    (2026-09-01).** Shared Python, so you inherit the fix; the one thing you
+    owe is `MissingFrontPageExplanation` in `FailureExplainer.cs`, asked BEFORE
+    `MissingBuildExplanation`, which is already written on this side and is
+    pinned by a contract case. See "A section with no index.md cannot be
+    PUBLISHED" below.
+
+15. **What a course calls a unit (2026-09-01).** `unit_word` in
+    `course_config.json`, absent meaning "Unit". Shared Python does the rule
+    and the payload rewrite; you owe the C# mirror, a wizard field, and the
+    assistant's sentences. **Three new contract cases will fail your suite
+    until you read `pageNaming`'s new `term` field with a default.** Full
+    write-up in "What a course calls a unit" below.
+
+16. **What a course calls its class folder (2026-09-01).** `class_folder` in
+    `course_config.json`, recorded rather than guessed, materialised by a
+    rename along with `curriculum_folder`. Replaces the class-folder refusal
+    item 13 described, which no longer exists. **Eight new contract cases will
+    fail your suite until `ClassFolderRule.cs` reads the key.** Full write-up
+    in "What a course calls its class folder" below.
+
+17. **`course_config.json`'s two writers, and the interrupted-rename dead end
+    (2026-09-05).** The Python half of the first is shared and you inherit it;
+    the app-side writer and the whole of the second are yours. Full write-ups
+    in "`course_config.json` has two writers" and "A rename interrupted after
+    the folders moved was a dead end" below.
+
+18. **A working folder kept in sync by a cloud service is explained, never
+    refused (2026-09-05, row 399).** Russell's decision on a question
+    `TODO.md` had left open. You inherit the whole BEHAVIOUR as data —
+    `shared-rules.json` → `cloudSyncedFolders`: the sentences, the two
+    moments they are shown (a choice in the folder picker for a folder just
+    chosen, a dismissable notice for one the window restored), the
+    remembered-per-folder rule, and eleven detection cases to run against
+    your own path function. You owe the detection itself (OneDrive's
+    environment variables, Dropbox's `info.json`, iCloud for Windows — listed
+    in `detection.windowsMarkers`), the two views, and the two new trail
+    events (`synced folder noticed`, `synced folder accepted`), which your
+    `ContractTests` will already be failing on. One sentence is NOT yours:
+    `buildFilesAreCopied` applies on the mac only, because you already build
+    outside the folder. Full write-up in "A cloud-synced working folder:
+    explain it, never refuse it" below.
+
+19. **The mac now builds outside the working folder too, and one sentence
+    you were told to leave out is now gone from BOTH apps (2026-09-05,
+    row 402).** You already do this half — `PLANTOIR_BUILD_ROOT` →
+    `%LOCALAPPDATA%\Plantoir\builds\<id>`, row 290 — and **nothing about
+    your implementation should change**: the symlink the mac uses is a mac
+    answer to a mac problem (a container that mounts only `courses/`, plus
+    three launchers and three Swift readers that name the path), not a better
+    idea to copy. What you owe is small and specific:
+
+    - **`cloudSyncedFolders.wording.buildFilesAreCopied` is RETIRED**, from
+      the contract and from both apps. If you were showing it, stop; if you
+      were skipping it on the strength of `buildFilesAreCopiedAppliesOn`, that
+      key is gone and its words now live under `buildFilesAreCopiedRetired`,
+      which exists so nobody puts them back. `explanationOrder` is four
+      sentences now, not five.
+    - **`activityTrail.mustRecord` gains "built site moved out of the working
+      folder", and it carries `appliesOn: ["mac"]`** — the first entry in that
+      list ever to do so. Your `ContractTests` compares the contract's events
+      against your own enum and WILL go red until it filters on `appliesOn`
+      the way the wording cases already do. Filtering is the right fix, not
+      declaring an event you can never emit: you have nothing to move, because
+      you have never built inside the folder. (If you ever migrate a folder
+      that predates row 290, the event is there to use.)
+    - **Read `buildOutputLocation`** in `shared-rules.json` for the rest —
+      what was measured, what was rejected, the rule that a build with no link
+      pointing at it is cleared rather than adopted, and the upgrade path. Two
+      parts of it are yours in spirit even though the mechanism differs:
+      **archiving or restoring a course must take its build with it** (a
+      restored course's pages can be OLDER than the site built from them, so
+      an adopted build reads as "already up to date" and publishes last
+      month's pages — check what `%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>`
+      does on your side when a course is archived and restored), and
+      **a build folder for a working folder that no longer exists is litter
+      nobody can name** — the mac writes `working-folder.txt` beside each one
+      so a sweep can recognise it, and you have exactly the same problem.
+
+    Full write-up in "Built websites live outside the working folder" below.
+
+20. **Stopping a section's preview is now ONE rule, and two of your three
+    matching bugs are already fixed in `preview.ps1` — unverified on real
+    Windows (2026-09-05, row 407).** This is the `TODO.md` item "one rule,
+    three implementations", closed on the mac side. The rule — which
+    processes belong to a section's preview — lives once, in
+    `contracts/shared-rules.json` → `stopPreview`, with 23 cases as whole
+    process snapshots. Read that key before anything else here.
+
+    **What you inherit free.** The contract, the case list, and the
+    reasoning. And the finding that made the whole piece worth doing: the
+    three implementations were three PARTIAL rules, not three copies of one.
+    A working directory sees a child launched by a relative path; a command
+    line sees the Python driver, which never chdirs. **Your version had the
+    better half already** — the descendant walk, which neither of the mac's
+    copies had, and which is now part of the shared rule because of you.
+
+    **What you do NOT inherit — this bullet was WRONG until 2026-09-05.** It
+    said `scripts/stop_preview.py` "already runs in your CONTAINER runtime
+    unchanged", and therefore that "your `--build-only` path gets the
+    preview-stopping fix through it without you doing anything". Both halves
+    are false, and the second is the one that costs something: there is no
+    container runtime on Windows any more (`preview.ps1` refuses outright
+    without the bundled native one — "This copy of Plantoir is missing its
+    website builder"), and `stop_preview.read_proc_snapshot()` reads `/proc`,
+    which native Windows does not have. It returns an empty list, so
+    `build_site.py`'s `stop_preview_serving()` stops nothing there — by
+    design, and documented as such in that function, but the consequence is
+    that **the race it closes is still open on your side.** Closing it is now
+    the first item below. This is exactly the failure mode CLAUDE.md rule 3
+    names: guidance a change made wrong is worse than no guidance, because
+    this list is the INDEX a Windows session reads first, and it was telling
+    you there was nothing here to do.
+
+    **What you owe, in order.**
+
+    - **Call your own `--stop` matcher from the `--build-only` path, before
+      the build starts.** The bug it fixes: killing the launcher does not
+      stop a preview, and `build_site.py`'s sync watcher
+      (`_start_public_sync_watcher`, started unconditionally in the SERVE
+      branch and therefore running natively on your side too) keeps mirroring
+      the serve build into the section's build directory about once a second.
+      A build for publishing writes to that SAME directory, so a publish that
+      runs while that section is previewing is overwritten within a second of
+      finishing, and what goes out is the preview — live-reload client and
+      all. Nothing errors, nothing is logged, and the site looks plausible.
+
+      Your app is safe **against previews it started itself**, and always
+      was: `SectionDetailView.xaml.cs:728` stops a running preview before
+      deploying, exactly as the mac's does. Note the condition, though — it
+      stops only `if (_previewRunner.IsRunning)`. A preview a teacher started
+      from `preview.bat`, published from the app, is NOT caught by that
+      check, and on your side nothing downstream catches it either; on the
+      mac `build_site.py`'s own stop does.
+
+      Everything else is exposed: `preview.ps1 CODE N --build-only`,
+      `deploy.ps1`'s rebuild-before-publishing, a scheduled deploy
+      (`TaskScheduling.cs:68` runs `deploy.ps1` from a wrapper that stops
+      nothing), and **`plantoir-mcp.exe`** — `PlantoirTools.cs`'
+      `deploy_section` reaches `AssistWorkspace.Deploy`, which runs
+      `preview --build-only` and then `deploy`, and `StopPreviewInApp` is
+      wired only in `AssistWindow.xaml.cs`, never in `Plantoir.Mcp`. That
+      last one is an argument for putting the fix in the LAUNCHER rather than
+      in app code: one edit covers the MCP binary too.
+
+      **You already have the matcher; it is simply never called from there.**
+      `preview.ps1`'s stop block enumerates `Win32_Process`, matches by
+      command line, and walks descendants. What is missing is a call, not an
+      algorithm: lift that block into a function and invoke it from the
+      build-only path as well as from `--stop`. Three things to carry over
+      rather than re-decide:
+
+      - **Ask the `servingOnly` question, not `everything`.** A build for
+        publishing must never stop a build — the build it is protecting is
+        itself a build of this section, and the process asking is the one an
+        `everything` sweep would recognise. See `contracts/shared-rules.json`
+        → `stopPreview` for the two modes.
+      - **Match on the section's BUILD DIRECTORY, never on the port.** The
+        mac's first version killed by port, and every build-only run carries
+        the default 8081 (`preview.sh` defaults it; the app's deploy passes
+        no `--port` at all) — so previewing section 1 while publishing
+        section 2 killed section 1's preview. Measured 2026-09-05 by doing
+        it. The build directory is on the serve process's command line
+        because `build_site.py` runs the Quartz CLI by ABSOLUTE path
+        (`build_site.py:5304`) — that is where it comes from, not from the
+        launcher.
+      - **Exclude your own process**, and end every comparison at a
+        boundary — the `section1`/`section10` trap, which `Test-NamesPath`
+        already handles for `--stop`.
+
+      **Those callers reach the production build by TWO different routes,
+      though, and `preview.ps1` is only on one of them.** `deploy.ps1`'s
+      folder branch shells `.\preview.bat CODE N --build-only`
+      (`deploy.ps1:306`), so it inherits whatever you put in the launcher.
+      But `deploy.py` runs `build_site.py --build-only` DIRECTLY —
+      `rebuild_for_production`, called both from `ensure_base_url_and_rebuild`
+      and from `main`'s own live-reload detection at `deploy.py:1042` (there
+      is no `--rebuild` flag to grep for). That is the route a Netlify or
+      Cloudflare publish takes, since `deploy.ps1:743` hands those to
+      `deploy.py`, and it never passes through your launcher at all — so a
+      fix that lives only in `preview.ps1` leaves it racing.
+
+      Both routes need covering, and HOW is yours to judge because it is
+      platform mechanics. Three shapes, and **they do not cover the same
+      ground — that difference is the whole decision:**
+
+      - **Teach `stop_preview.py` to read a native process snapshot on
+        Windows** (a `Get-CimInstance` shell-out from Python, say). This is
+        the only one that fixes EVERY caller at once, the way the mac's did,
+        because it makes `build_site.py`'s own `stop_preview_serving()` work
+        — so `deploy.py` is covered without `deploy.py` knowing anything
+        about it.
+      - **`stop_preview.py --match-stdin`** — it already exists, and is
+        raised again further down this item. It takes a JSON process list and
+        returns the pids, so `Get-CimInstance` enumerates, the shared rule
+        decides, and `Stop-Process` kills: one rule, two ports. **But it
+        inverts the control flow — PowerShell drives — so it reaches only
+        PowerShell callers, and `deploy.py` → `build_site.py` is not one of
+        them.** Choose this one alone and the Netlify and Cloudflare route
+        above is still racing.
+      - **Have `deploy.ps1` stop the preview itself** before invoking
+        `deploy.py`. The smallest change, and the one that leaves every
+        future caller free to reintroduce the bug — `plantoir-mcp.exe` is
+        already such a caller.
+
+      Say which you chose, and why, in `MAC-HANDOFF.md`.
+
+      When it is done, say so in `MAC-HANDOFF.md`; this item stays open here
+      until then.
+
+    - **`activityTrail.mustRecord` gains "section processes reclaimed", and
+      your `ContractTests` will go RED until you emit it.** No `appliesOn`
+      key: unlike the built-site event in item 19, this one is genuinely
+      yours too — you run the same `--stop` and it prints the same count.
+      It carries the course, the section and HOW MANY processes were ended,
+      and the count is the whole point: nothing else on either platform's
+      trail separates "there was nothing left to stop" from "a build was
+      still running and was ended", which are the two explanations a teacher
+      reporting a half-finished publish is choosing between. `PreviewStopper`
+      on the mac discarded the launcher's stdout for months; check whether
+      `PreviewStopper.cs` does the same. Two details worth copying rather
+      than re-deciding: a sweep that never RAN (no container, no recipe)
+      leaves NO line, because a line claiming zero would not be true; and
+      the line says "reclaimed 3 leftover website-builder processes", never
+      the launcher's own "Stopped 3 process(es)".
+    - **Verify the two fixes I made to `preview.ps1` from this Mac.** They
+      are the only edits to your file, and this machine has no `pwsh`, so
+      the PowerShell was reasoned about and never executed. Both are the
+      same bug: `Test-NamesPath` replaces `$lower.Contains($sectionNeedle)`,
+      because `...\work\ADA1O\section1` is a PREFIX of `...\section10` and
+      stopping section 1 stopped section 10; `Test-ArgumentValue` replaces
+      `$lower.Contains('--section=1')`, because that is a prefix of
+      `--section=10` and does the same thing by a second route. Both need
+      ten or more sections in one course to bite, and
+      `course-management.json` → `sectionNumbers.entryProblems` refuses only
+      0, negatives, non-numbers and duplicates — so nothing prevents it. If
+      the script no longer parses, that is mine and I would rather hear it
+      as a bug than have you work around it.
+    - **Run the contract's cases against your matcher.** Nothing does yet on
+      your side, which means the two fixes above are asserted rather than
+      tested. The cheapest honest shape is a `windows-app/test_stop_preview.ps1`
+      that dot-sources the two functions and runs the case list, or an xUnit
+      test that invokes it — your call, and say which in `MAC-HANDOFF.md`.
+      **Do not retype the cases**; deserialise them. **Exactly ONE of the 23
+      may be skipped**, and only the one that says so: a case carrying
+      `needsEvidence: ["workingDirectory"]` cannot be decided without a
+      working directory, which `Win32_Process` does not expose, so a runner
+      without that evidence skips it and NAMES what was missing. Every other
+      case must reach the listed verdict with the `cwd` field blank — and
+      they can, which is proved rather than hoped: the mac's suite blinds
+      each case, removing the working directories, and asserts that a marked
+      case's verdict changes and an unmarked case's does not. (An earlier
+      draft of this bullet said every case carries `cwd` and so none were
+      yours to answer directly. Read literally that excused all 23, which is
+      the quiet version of this going wrong: a green suite that ran nothing.)
+    - **Two things about your matcher that the contract now records rather
+      than hides.** `preview.ps1:313` considers only `node.exe` and
+      `python.exe` for direct evidence; the shared rule has no such filter,
+      so a `cmd.exe` running `npm.cmd` with the section's folder on its
+      command line is direct evidence on the mac and reaches you only through
+      the descendant walk. It is written down in `stopPreview.notShared`
+      ("Which processes are even considered") rather than quietly fixed from
+      here, because whether it can be dropped safely on Windows is yours to
+      judge. And both implementations read a repeated `--section` as the
+      FIRST occurrence while argparse takes the LAST — nothing produces a
+      repeated flag today, so it is recorded, not fixed.
+    - **`PreviewStopper.cs:14-20` says the launcher "kills the section's
+      processes by working directory".** It never has, on your platform —
+      that is the mac's mechanism and `Win32_Process` has no such field. The
+      same wrong sentence was in two places in THIS file and has been
+      corrected; yours is a code comment and is yours to fix.
+    - **Then decide about `--match-stdin`, and tell the mac.**
+      `stop_preview.py` has an entry point that reads a JSON process list on
+      stdin and prints the pids the rule names, touching nothing — and it is
+      exercised by the mac's suite as a real subprocess against every
+      contract case, including one that proves it kills nothing, so it is a
+      working route rather than a docstring. It exists so a platform that
+      cannot read `/proc` can still use the ONE rule: enumerate with
+      `Get-CimInstance`, ask Python which, kill with `Stop-Process`. That
+      would leave one implementation and two ports rather than two
+      implementations, and would make the two `preview.ps1` functions
+      unnecessary. Note your native runtime already requires `python.exe`
+      before stop mode runs, so the dependency is not new. It is deliberately
+      NOT adopted here,
+      because whether you can rely on Python being resolvable on that path
+      is a question only your machine can answer — `--stop` must never start
+      anything, and a Python that has to be found is a small risk you can
+      measure and I cannot.
+
+    **One trap, measured here.** `preview.sh` does NOT run the copy of the
+    rule baked into the image; it pipes the recipe's own copy in over stdin.
+    Stop mode must never build anything, so it runs against whatever
+    container is already there — which right after an upgrade is one built
+    from the PREVIOUS image, with no such file in it. Naming a baked path
+    fails with a message nobody reads, because both callers discard the
+    launcher's output and neither checks its exit code, and the build it was
+    asked to stop carries on. `verify.sh` section 6d proves the property by
+    deleting the file from a running container and stopping a preview
+    anyway. Your native path has no equivalent hazard — nothing is baked —
+    but if you ever adopt `--match-stdin`, you acquire it.
+
+    **A behaviour change to expect, not a regression.** The unified rule
+    stops strictly MORE than the mac's old sweep did: the `build_site.py`
+    driver and the children hanging off it. That also fixes cancelling a
+    deploy, which on the mac did not stop the deploy's own build. Yours
+    already matched the driver, so this is the mac catching up to you.
+
+    Full write-up in "One rule for stopping a section's preview" below.
+
+21. **The folder-problems FRONT END: the findings dialog, the Fix button,
     and the repair (owed since 2026-08-23; scoped 2026-08-25).** The shared
     Python has printed `PLANTOIR_HEALTH:` lines since the mac's row 357, and
     until 2026-08-25 nothing on this side read them — see the correction in
@@ -615,6 +934,17 @@ this side is expected to say so when the contract is wrong.
     building is told nothing** — which is the exact failure the whole feature
     was written to end. The trail line is a diagnosis after the fact, not a
     warning at the time.
+
+**Everything else this section used to list as an ordered work plan —
+contracts wiring, the approval wording, the deploy/preview race, the activity
+trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,
+`plan_remember_timetable`, the `LinkGraph` exclusions, `assistantConfirmation`),
+the `ReDatePlan` overflow fix, asking for the schedule, course renaming, the
+native local model, the assistant-choice Settings panel, the credential
+dialogs, and the two small fixes (`AutoFillCourseName`, the Curriculum
+Coverage toggle) — was verified DONE in `windows-app/` on 2026-08-22 and its
+write-up now lives in
+[`WINDOWS-HANDOFF-COMPLETED.md`](WINDOWS-HANDOFF-COMPLETED.md).**
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
@@ -801,9 +1131,13 @@ a judgement call on yours.
 - **Stopping a preview reclaims native processes** (entry 105): killing
   the host-side launcher orphans the build or server process it started
   (an orphaned build burns real CPU). `preview.ps1 CODE N --stop` matches
-  that section's `node.exe` / `python.exe` processes by command line and
-  working directory (so other sections are safe), walks their descendants,
-  and `Stop-Process`es them — and never starts anything itself. Call it
+  that section's `node.exe` / `python.exe` processes by COMMAND LINE —
+  never the working directory, which `Win32_Process` does not expose at
+  all — walks their descendants, and `Stop-Process`es them, and never
+  starts anything itself. (Corrected 2026-09-05: this said "command line
+  and working directory" for months, which is the mac's mechanism, not
+  this one. The rule both platforms must agree on is now written down
+  once, in `contracts/shared-rules.json` → `stopPreview`.) Call it
   fire-and-forget — output discarded — wherever a preview ends: stop
   button, navigating away, window close. (History: this used to reclaim
   the container-side processes an orphaned host script would otherwise
@@ -2634,7 +2968,7 @@ the flag as dead; read it as untested.
   already shipped.
 - [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — THE spec (179 entries as of
   2026-08-15). Its **Windows status** section is where coverage is tracked.
-- [`documentation/`](documentation/README.md) — toolchain deep dives 01–10.
+- [`documentation/`](documentation/README.md) — toolchain deep dives 01–11.
 - [`CLAUDE.md`](CLAUDE.md) — the repository's entry point: conventions,
   testing, setup, and the traps that cost time.
 - [`RELEASING.md`](RELEASING.md) — cutting a release, both platforms.
@@ -3170,12 +3504,8 @@ unambiguous and carries structure a sentence cannot.
 
 ### Offering to put it right
 
-Two of the six findings are repairable — a missing `Media` folder and a missing
-section front page — and four are NOT. (This read "two of the FIVE … and three
-are NOT" until 2026-08-25; `noGradedFolders` was added on 2026-08-24 as a sixth
-check and a fourth unrepairable one, and this sentence was not updated with it.
-Count them in `siteHealth.repair` rather than trusting a number in prose —
-`offered.checks` and `neverOffered.checks` are the two lists that decide it.) The line is the whole design: **a fix
+Two of the five findings are repairable — a missing `Media` folder and a missing
+section front page — and three are NOT. The line is the whole design: **a fix
 must restore the FEATURE, not merely satisfy the check.** Recreating an empty
 curriculum folder would silence "the curriculum map could not be built" and
 leave the map missing, because that folder only counts once it holds a page
@@ -3245,31 +3575,620 @@ it, and a trail that could not tell them apart leaves "did they ever fix it?"
 unanswerable. Both are in `contracts/shared-rules.json` → `activityTrail`, and
 the repair rules themselves are in `siteHealth.repair`.
 
-### A section with no index.md cannot be PUBLISHED — shared Python, so it is yours too
+### A section with no index.md cannot be PUBLISHED — ✅ FIXED 2026-09-01, in shared Python, so you inherit it
 
-Found while testing the deploy path on the mac, and it breaks identically on
-Windows because it is in `scripts/`.
+Found while testing the deploy path on the mac; it broke identically on Windows
+because it is in `scripts/`. Left open by the special-folders branch as a
+separate piece, and closed on 2026-09-01. The reasoning is kept because the
+second half of it was never on anybody's list.
 
-`_sync_public_to_host` (`build_site.py`) copies the built site back to the host
-only when `public/index.html` exists — and Quartz emits no root `index.html`
-without an `index.md`. So the build SUCCEEDS and prints "Static build complete",
-the sync is silently skipped, and `deploy.py` then reports "Built site not
-found … Build first: ./preview.sh CODE N --build-only" — telling the teacher to
-do the thing they have just done.
+**What it was.** `_sync_public_to_host` (`build_site.py`) copies the built site
+back to the host only when `public/index.html` exists — and Quartz emits no root
+`index.html` without an `index.md`. So the build SUCCEEDED and printed "Static
+build complete", the sync was silently skipped, and `deploy.py` then reported
+"Built site not found … Build first: ./preview.sh CODE N --build-only",
+telling the teacher to do the thing they had just done.
 
-The guard itself is right (do not publish half a build). What is wrong is that
-nothing says why, and the message sends them in a circle. Two one-line fixes
-were available and neither is done yet, so this is an open item rather than a
-solved one:
+**The guard is still right** — do not publish half a build. What was wrong is
+that its answer went nowhere. The sync now RETURNS whether it mirrored a site,
+and a `--build-only` run that mirrored nothing prints "Nothing to publish …
+it has no front page, so no website was produced" and **exits non-zero**. That
+matters more than the sentence: a publish runs `preview.sh --build-only` and
+then `deploy`, so failing the build stops the run at the step that KNOWS the
+reason. The mac already shows the folder-problem dialog on a failed build, so
+the teacher gets **Put them back** → **Preview Again**; check that your own
+failed-build path does the same rather than swallowing the findings.
 
-- print a warning in the else-branch of the sync, so the build says why it did
-  not produce a publishable site;
-- or have the deploy's "Built site not found" message name the likely cause.
+**The half nobody had named, and the worse one.** The skipped sync left the
+PREVIOUS build's `public/` on the host, and `deploy.py` uploads whatever it
+finds there. So: delete a front page, build, publish — and the teacher is told
+the publish succeeded while students get last week's pages. Nothing anywhere
+said so. `_clear_stale_host_site` now removes that mirror whenever the merged
+tree has no `index.md`, in BOTH preview and build modes, which turns a silent
+wrong answer into an honest refusal. Nothing of the teacher's is lost:
+`.merged_output` is derived from their notes and every successful build
+rewrites it wholesale with `rsync --delete`.
 
-Meanwhile the `sectionIndexMissing` health check understates it: "the site will
-open on whatever page happens to come first" is true of a PREVIEW, and for
-publishing there is no site at all. Worth strengthening in
-`shared-rules.json` → `siteHealth.checks`.
+**What you owe.** The Python is shared, so (almost) nothing. The exception is
+`FailureExplainer.cs`, which gains `MissingFrontPageExplanation` — already
+written on this side — and it must be asked **BEFORE** `MissingBuildExplanation`.
+A publish puts both lines in one transcript, and "hasn't been built yet" is the
+wrong thing to say to somebody who just watched it build. That ordering is a
+contract case (`app-rules.json` → `failureExplanations`, the case whose
+`output` carries both lines), so chaining it the other way round fails your
+suite rather than shipping quietly.
+
+**One thing to check rather than copy.** `_clear_stale_host_site` calls
+`shutil.rmtree` on the host's `public/` — which under `PLANTOIR_BUILD_ROOT` is
+outside the working folder, so outside OneDrive, which is the point of that
+variable. If a scanner or an open handle makes the removal fail, the build says
+so and carries on rather than dying; but the stale-publish risk returns for
+that run. Worth one real test on a machine with OneDrive running, and tell the
+mac what you find.
+
+The `sectionIndexMissing` health check understated the same thing — "the site
+will open on whatever page happens to come first" is true of a PREVIEW, and for
+publishing there is no site at all. Its detail in `shared-rules.json` →
+`siteHealth.checks` now names both outcomes, so a teacher can tell whether they
+may carry on for now or must fix it before they publish.
+
+### Renaming a course folder from inside the app — mac shipped 2026-09-01, Windows still to build
+
+The `TODO.md` item deferred on 2026-08-23 while planning the special-folders
+work, built on the mac once Russell chose the full scope. **You do not have it
+yet**, and the contract carries most of what you need.
+
+**Item 13 said "sentences, refusal rules and the list of keys … are all in
+`shared-rules.json`". That was wrong** — four teacher-facing sentences from
+this work live only in the mac's Swift, and they are listed under "Sentences
+the contract does not carry" below. Corrected 2026-09-01 after adversarial
+review; `GUI-IMPROVEMENTS.md` row 388.
+
+**What it does.** A pencil on each folder row in Course Settings opens a sheet
+that renames the folder ON DISK — in every section that has one — rewrites the
+links that name it, and carries across every `course_config.json` key that
+mentioned it. The keys are listed in the contract rather than here, at
+`shared-rules.json` → `specialNames.renameFolder.carriesAcross`, and the mac
+has a test that FAILS if a key is added to that list and not to the code. Copy
+that test; it is the one that catches the failure this feature exists to
+prevent (a config naming a folder that is not there).
+
+**Two foot-guns closed in the same change**, and both are yours to mirror:
+adding a name now CREATES the folder — it used to write a config entry pointing
+at nothing — and removing one now says the folder and everything in it stays on
+the teacher's machine, which nobody could tell before. Sentences:
+`specialNames.addCreatesTheFolder` and `specialNames.removeLeavesTheFolderOnDisk`.
+
+**Three decisions, with the reasoning, because none is obvious from the code.**
+
+1. **It commits to disk immediately, not at Save.** Your Settings holds edits in
+   memory and reverts them on Cancel, exactly as the mac's does. A folder that
+   has really moved cannot be un-moved by a Cancel, so a rename that waited for
+   Save would let Cancel appear to undo something it cannot. The mac writes the
+   rename to a FRESH read of `course_config.json` (`CourseConfiguration.recordOnDisk`)
+   so the teacher's other unsaved edits stay unsaved. That type is a mac type;
+   the RULE is what to copy.
+2. **~~The class folder must keep the word "class" in its new name.~~
+   REVERSED the same day — do NOT build this refusal.** It shipped for a few
+   hours because `ClassFolder` FOUND that folder by looking for the word.
+   Russell's point: that is Plantoir's vocabulary imposed on a teacher's, and
+   somebody whose units are Threads and whose classes are Days calls the folder
+   "All Days". The lookup was what was at fault. `class_folder` is now a
+   recorded key — the thing this entry called "the proper fix, deliberately NOT
+   done" — and the rename MATERIALISES it. See "What a course calls its class
+   folder" below; the sentence
+   `specialNames.renameFolder.problems.classFolderMustSayClass` no longer
+   exists.
+3. **Nothing moves until every destination has been checked.** A per-section
+   rename is several moves, and one that got half way through four sections
+   would leave a course nobody could reason about.
+
+**The trap that is yours alone.** Point 3 matters more on Windows than it does
+here, because `Directory.Move` refuses a folder with an open handle and both
+OneDrive and Obsidian hold them. Check every destination up front, and if a move
+still fails, say WHICH section it failed in — the mac's message names the count
+moved and the section that stopped it, and a bare exception would leave a
+teacher with a course renamed in two sections out of four and no idea which.
+
+**The trail.** Two new events, `folder renamed` and `folder created`, are in
+`activityTrail.mustRecord`; the test that pins your `ActivityTrail` against that
+list will fail until you add them. What they carry is in the contract — folder
+NAMES, never anything from inside the folder.
+
+**One thing the mac learned that changes how risky this looks.** The `TODO`
+entry deferred this feature because it feared a rename would strand every
+wikilink pointing into the folder, and that is wrong: Obsidian resolves
+`[[Quiz 1]]` by searching the vault, so a bare page link survives the folder
+moving. Only QUALIFIED links break — `[[Tasks/Quiz 1]]`, a full vault path, and
+Obsidian's Markdown link style with its percent-encoded spaces. That is why this
+shipped without the undo the deferral assumed it needed, and why you can build
+it without one too. `FolderPathRewriter` is about 200 lines; its tests say
+exactly which forms must change and which must not, and the "must not" half is
+the important one — a rewriter that matched substrings would rename folders the
+teacher never touched.
+
+### What a course calls a unit — mac shipped 2026-09-01, and your suite goes RED first
+
+The `TODO.md` item deferred on 2026-08-23. Russell chose the scope on
+2026-09-01: **new courses plus configurable parsing, NOT renaming a course
+already in use.** Read the "red suite" paragraph before you read anything else
+here, because you will meet it before you meet the feature.
+
+**Your suite will fail, and that is the mechanism working.** Three cases were
+added to `contracts/class-planning.json` → `pageNaming`, each carrying a new
+`term` field. A case WITHOUT that field means the DEFAULT word, "Unit" — so
+read `term` with a default rather than treating its absence as a new shape, or
+every existing case breaks. The case that matters most is the one where a
+Module course must NOT read "Unit 2, Day 3" as a class page.
+
+**What the feature is.** `unit_word` in `course_config.json` (documented in
+`file-formats.json`), ABSENT meaning "Unit", so every course in the field is
+untouched. A ready-made course holds **84–87** class pages (42 for the two
+half-credit courses), not the ~3,000 an earlier draft of this section said —
+that is the total across all 38 payloads. Corrections: `GUI-IMPROVEMENTS.md`
+rows 388 and 389. The wizard asks "What do you call a unit?" of EVERY course,
+ready-made ones included, and the payload is written in that word as it is
+poured rather than renamed afterwards.
+
+**Two of the three halves are shared Python and arrive free.**
+`scripts/class_pages.py` is the rule — the default, the regexes, and the
+rewrite — and `setup_course.py` applies it to the payload. You run both.
+
+**What you owe:** a C# mirror of `ClassPageTerm` and of `UnitDay`'s `term`, a
+field in your wizard, and the wizard writing `unit_word` into the config it
+creates. Plus the assistant, in BOTH directions — and the input half is the one
+that was got wrong here first: the mac's output sentences now say "Module 4 was
+published", and `AssistPublishPlanner.unitNamed` now reads the course's word so
+that "publish Module 4" is understood at all. Reading only the literal "unit"
+meant the whole feature was missing for that course, silently, and it shipped
+that way for a few hours. The assistant's unit sentences are hardcoded on both
+sides and are not in `assist-wording.json`; they are listed below with the
+others.
+
+**Why the parsing half mattered more than the naming half, and why the cheap
+option was rejected.** "New courses only, with the parsing left hardcoded" was
+on the table and is wrong, for a reason worth carrying: `_is_class_page`
+answering "no" does not FAIL. `_pages_the_course_teaches` returns nothing and
+the curriculum map falls back to counting every published page — so a Module
+course would have got a map that looked healthy and was wrong. That is the same
+silent-success failure the whole special-names family exists to end.
+
+**Four decisions, with the reasoning.**
+
+1. **"Day" stays fixed.** A teacher who says "Thread" almost certainly still
+   says "Day 3", and a second configurable word would double the migration for
+   something nobody asked for.
+2. **The word is escaped before it becomes a regex.** It comes from a teacher's
+   own configuration; one containing "(" would otherwise match something else
+   entirely, or fail to compile in the middle of a build. `Regex.Escape` is
+   your equivalent.
+3. **A number or a comma in the word is refused by the WIZARD**, which will not
+   create the course until it is fixed. The command-line setup does something
+   weaker on purpose — it says the name will not work and falls back to "Unit"
+   rather than re-asking — because it is a single-pass script with no way back
+   to a question. Either way the pages are never written under a name nothing
+   can read back: built successfully, and silently outside every feature that
+   works on class pages. **The sentences for both are Swift and Python
+   respectively and are NOT in the contract** — see "Sentences the contract
+   does not carry" below.
+4. **The payload rewrite matches "Unit" only when a NUMBER follows.** That is
+   what separates a unit reference from the ordinary English word, and it is
+   run ONLY over content Plantoir itself ships, on the way into a brand-new
+   course. Never let it near a teacher's own writing, where "Unit 3 of the
+   textbook" would be a false positive nobody could undo. It deliberately
+   catches the ~574 payload files that say "by the end of Unit 3" in prose,
+   which would otherwise leave a Module course talking about Units.
+
+**One design detail to copy rather than reinvent:** the word travels ON the
+parsed value (`UnitDay.term`) and on the page summary, not looked up per call.
+A page read out of a Module course is then written back as a Module page
+without every planner needing the course handed to it as well — and the two
+halves of a rename cannot disagree about which word they are in.
+
+**What is deliberately NOT built, on either side:** renaming an existing
+course's word. It means rewriting every class page's name, its frontmatter
+title and every wikilink pointing at it, across every section and shared
+folder, and a half-finished pass leaves a broken site with no way back. It
+needs its own design pass and its own undo, and it stays in `TODO.md`. Do not
+add it to your side alone.
+
+### What a course calls its class folder — mac shipped 2026-09-01
+
+Russell's ask, in his words: *"So we could have 'Thread' instead of 'Unit' and
+'Day' instead of 'Class'?"* Yes — and the answer is a recorded key, not a
+looser guess.
+
+**`class_folder` in `course_config.json`**, documented in `file-formats.json`.
+The recorded name wins when it is set and still one of the per-section folders;
+otherwise the OLD GUESS applies unchanged — the first folder whose name
+contains "class", else the first folder, else the literal "All Classes". Keep
+the guess. Every course made before this key existed depends on it, and this is
+additive by design.
+
+**The part that is easy to get wrong: a rename MATERIALISES the key.** Carrying
+an existing key across is not enough. A course made from scratch has NO
+`class_folder` and `curriculum_folder: null`, so both folders are found by
+guessing at their names. Rename `Curriculum` to `Expectations` without WRITING
+the key and the guess stops finding it: the map is built from nothing, and
+nobody is told — the coverage health check cannot fire, because from its point
+of view the folder was never there. Pinned as
+`specialNames.renameFolder.materialisesOnRename`, and the same rule covers
+`class_folder` and `curriculum_folder` together.
+
+**Six new naming cases and two membership cases** in `class-planning.json` →
+`classFolder`, each carrying an optional `classFolder` field. **A case without
+that field is a course that never recorded one**, so read it with a default
+rather than treating its absence as a new shape — the same trap as `pageNaming`'s
+`term`. Two of the cases are worth reading before you implement: a STALE key
+(naming a folder no longer in the list) must lose to the guess, or the
+next-class button writes into a folder that is not there; and a key differing
+only in CASE from the list entry must return the LIST's spelling, because
+everything downstream builds file paths out of the answer and a case-sensitive
+volume would not find the key's.
+
+**Membership widens, never shrinks.** The recorded folder is counted AND every
+class-mentioning folder still is. Dropping the latter would shrink what a
+course is seen to teach, which is the direction that produces the wrong map; a
+course that had "Class Resources" counting yesterday must not lose it by
+recording a class folder today.
+
+**The removal block follows the recorded folder too**, so renaming
+"All Classes" no longer leaves a course's class folder removable. The literal
+"All Classes" is still blocked as well, for courses that never recorded one.
+
+### Sentences the contract does not carry — write your own, knowingly
+
+`contracts/` holds every sentence it can, and the handoff sections above say so
+about the ones it does. These are the exceptions as of 2026-09-01, found by
+adversarial review after an earlier draft of item 13 told you "sentences …
+are all in `shared-rules.json`", which was not true. Each is teacher-facing,
+each lives only in the mac's Swift, and each is one you will have to word
+yourself — so word it deliberately rather than discovering the gap:
+
+- **`ClassPageTerm.problem(with:)`** — the two wizard refusals for a unit word
+  containing a digit or a comma.
+- **`SpecialFolderRenamer.rename`'s half-failure sentence** — "Plantoir renamed
+  N of M copies of 'X' and then could not rename the one in section3: …". The
+  SHAPE is what matters and is worth copying: the count moved, and the section
+  that stopped it. A bare exception here leaves a teacher with a course renamed
+  in two sections out of four and no idea which.
+- **`CourseSettingsView.renameFolder`'s bookkeeping-failure sentence** — the
+  folder moved but the configuration could not be written. Do not report this
+  as "the rename failed": it did not, and saying so sends the teacher looking
+  for a folder under its old name.
+- **The wizard's unit-word caption** — "Class pages will be named '… 1, Day 1'".
+- **The assistant's unit sentences**, which item 13 wrongly said were "listed
+  below with the others" until this line was added: "{word} N was published",
+  "{word} N has already been published", "{word} N is already hidden", "{word} N
+  was only partly published", and "I can't find any class pages in {word} N of
+  …". They are hardcoded in `AssistToolRunner` and are in NO contract — not
+  even `assist-wording.json`, which carries the rest of the assistant's words.
+  That is a pre-existing gap this work inherited rather than made, and it is
+  named here so you do not go looking for them.
+
+**Three things the contract DOES carry that you must not copy verbatim.**
+`specialNames.renameFolder.explanation`,
+`specialNames.renameFolder.doneNothingWasThere` and
+`specialNames.removeLeavesTheFolderOnDisk.message` all say "on your Mac".
+Substitute "on this PC", the same way you already do for `app-rules.json`'s
+"this Mac" — `contracts/README.md` documents that substitution. Your contract
+test must compare on the substituted form or it will fail on a difference that
+is correct.
+
+### `course_config.json` has two writers, and they can erase each other
+
+Fixed on the mac 2026-09-05; **half of it is shared Python you inherit and half
+is yours.**
+
+`preflight_update_course_config` reads the configuration, spends a while
+scanning the course's folders, and writes what it computed. The APP writes the
+same file inside that window — a folder rename does, and it writes at ONCE
+rather than at Save, because the folder has really moved and a Cancel could not
+undo it. Whoever wrote second won, and said nothing. The state that leaves is
+the dead end in the next section: folders moved, configuration naming the old
+name.
+
+- **The Python half you get for free.** Preflight now re-reads the file
+  immediately before writing and, if it changed, redoes the whole discovery
+  against the new contents — bounded at three tries, then it carries on with
+  what is there rather than spinning. Redoing is safe because discovery is a
+  pure function of (what is on disk, what the config says) and is add-only.
+- **The other writer is yours.** Whatever writes `course_config.json` from the
+  Windows app must do the same read-compare-write, or the race is only half
+  closed on your side. The mac's is `CourseConfiguration.recordOnDisk`. One
+  deliberate asymmetry to copy: preflight backs off, the APP ends by writing
+  anyway after three tries — a folder that has MOVED with a configuration that
+  does not say so is the worse of the two states, so the app finishes by
+  recording the truth rather than by giving up on it.
+
+`scripts/test_config_write_race.py` forces the race with a scan that mutates the
+file mid-flight; it runs on your side too if you run the Python suites.
+
+### A rename interrupted after the folders moved was a dead end
+
+**Entirely yours to port** — this exists wherever a rename moves folders before
+writing the configuration, which yours will.
+
+The state: the folders are under the new name, the configuration still says the
+old one. The next build DISCOVERS the moved folder and appends it, so the list
+holds BOTH names — and retrying the rename is then refused as a clash. If the
+folder was the class folder it is unremovable as well, so there is no way out
+of Settings at all; the teacher has to hand-edit `course_config.json`.
+
+**The rule to copy is: RECORD the rename before moving.** The first version of
+this on the mac decided from the disk alone — old folder gone, new one present
+— and that was wrong in a way worth understanding, because it looks right. It
+is also the state of a configuration entry whose folder was never created (or
+was deleted in Obsidian) being renamed onto a genuine SECOND folder. Bypassing
+there hands the real folder the phantom entry's attributes, `hidden` among
+them, and takes its pages off the next publish with nobody told. The two cases
+are indistinguishable on disk, so the disk cannot be the evidence.
+
+So: write a small record before anything moves, delete it once the
+configuration has been written, and relax the clash check only when BOTH the
+record and the disk agree. The mac keeps it at
+`courses/.internal/renames/<CODE>.json` — the `.internal` convention you
+already share — and deliberately NOT as a `course_config.json` key, because the
+failure being handled is that the configuration write did not happen. Carry the
+TARGET in the record, not just a flag, so a teacher who opens the sheet and
+types something else gets the ordinary refusal back; filling the field in with
+it also makes finishing an interrupted rename one keypress.
+
+Two more details that are not optional:
+
+- **No section may still hold the old folder.** A per-section rename moves
+  every section's copy, so a mixture means something other than an interrupted
+  rename, and the ordinary refusal must stand.
+- **De-duplicate the list when you finish one.** The starting state holds both
+  names by definition, so a naive rename leaves the new name in twice — which
+  on the mac renders two rows with one identity, and which no later rename can
+  undo.
+
+**One more thing your own config writer must not do**, learned the same day:
+when it loses the compare-and-swap race enough times to give up and write
+anyway, it must recompute from the FRESHEST bytes. The mac's first version fell
+through and wrote the computation derived from the read it had just proved
+stale, clobbering the other writer's keys — the exact failure the loop exists
+to stop.
+
+### Publishing while a preview is running — the race, and the harness that found it
+
+Two defects on 2026-09-05, both in the publish path, both invisible to every
+test that does not publish and then LOOK at what came out.
+
+**The race, which is the one that matters.** Killing the preview LAUNCHER does
+not stop the preview. On the mac the Python and the node server both live
+inside the container, and `_start_public_sync_watcher` keeps mirroring the
+SERVE build to the host every second — so a build for publishing lands and the
+preview overwrites it within a second, and what gets published is the preview,
+live-reload client and all. `kill_existing_quartz` was only ever called from
+the SERVE branch, so `--build-only` never stopped anything.
+
+`build_site.py`'s `--build-only` now stops the preview serving THIS SECTION
+before building, matched by the section's own build directory.
+**That is shared Python and you inherit it.**
+
+**It was written by PORT first, and that was wrong — do not go back to it.**
+`kill_existing_quartz(port)` looked like the obvious tool and is the right one
+for the SERVE path, where the port is known and leased. A build-only run is
+never given a port: `preview.sh` defaults it to 8081 and the app's deploy
+passes no `--port` at all. So the first version killed whatever was serving on
+8081 — the first section to have previewed in that working folder, which is
+usually a DIFFERENT section from the one being published. Measured 2026-09-05
+by doing it: previewing section 1 and publishing section 2 printed "Killed
+existing process on port 8081" and section 1 stopped answering. A scheduled
+overnight deploy would have done the same to any preview left running.
+
+What works instead is the section's BUILD DIRECTORY, which is on the serve
+process's command line because the launcher runs the Quartz CLI by absolute
+path. It identifies exactly one preview and cannot collide with another. One
+detail that is easy to miss: match on the directory plus a trailing separator,
+or `section1` also matches `section10`.
+
+Two things to check on your side rather than assume:
+
+- **Your preview is not in a container**, so an orphaned server is a plain
+  Windows process. Check that killing your launcher actually stops the node
+  server — on the mac it demonstrably does not, and that is exactly the kind of
+  difference that is assumed rather than measured.
+- **You have already written most of the algorithm — do not write it again.**
+  `preview.ps1`'s `--stop` block finds this section's processes by COMMAND
+  LINE (this paragraph said WORKING DIRECTORY until 2026-09-05, and that was
+  simply wrong — `Win32_Process` exposes no working directory), walks their
+  descendants, and its own comment says "not port, … parity: preview.sh". The
+  descendant walk is the half you had and the mac did not. What is missing on
+  your side is not the algorithm, it is **calling it from the build-only path
+  before the build**.
+
+  (The mac could not simply call `preview.sh --stop`, because `build_site.py`
+  runs INSIDE the container and `--stop` is a host script — which is why a
+  third copy of this rule existed. **Resolved 2026-09-05**: the rule now lives
+  once, in `contracts/shared-rules.json` → `stopPreview` and
+  `scripts/stop_preview.py`, and item 20 in the outstanding list says what
+  this side owes.)
+
+- **What is and is not exposed on your side.** The Windows APP already stops a
+  running preview before deploying (`SectionDetailView.xaml.cs`), exactly as
+  the mac's does — so the app is safe on both platforms and always was. The
+  hole is the COMMAND LINE, on both.
+
+  **And on Windows the command line is still open, because the shared fix
+  cannot reach it** (corrected 2026-09-05; this said "in your CONTAINER
+  runtime `/proc` exists, so the mac's new code works there unchanged", which
+  described a container path Windows no longer has). `preview.ps1` refuses to
+  run at all without the bundled native runtime, `read_proc_snapshot()` in `stop_preview.py`
+  reads `/proc`, and native Windows has none — so it returns an empty list
+  and `stop_preview_serving()` stops nothing. The watcher that
+  causes the race, though, runs everywhere: `_start_public_sync_watcher` is
+  started unconditionally in the SERVE branch, so a Windows preview mirrors
+  over a Windows publish exactly as a mac one does. **The fix is to call
+  `preview.ps1`'s own matcher from the build-only path before the build** —
+  see item 20 in the outstanding list, which carries the three details worth
+  copying rather than re-deciding.
+
+- **The wait is bounded at 30 seconds** (150 × 0.2 s), not the 15 that
+  `GUI-IMPROVEMENTS.md` row 392 says — that row predates the change and the log
+  is append-only, so this is the current number.
+
+**The other one was a partial fix of mine, and is worth knowing as a shape.**
+The first version of the preview guard in `deploy.sh` waited for `index.html`
+to lose the live-reload client. Serve mode bakes that client into EVERY page
+and the mirror is replaced file by file, so a clean front page can sit in front
+of two hundred stale preview pages. Publishing that MIXTURE is worse than
+publishing the preview wholesale, because the front page looks fine and nobody
+looks further. Wait on the whole tree; `deploy.ps1` already does.
+
+### One rule for stopping a section's preview
+
+New on 2026-09-05, and the closing of a `TODO.md` item. Read
+`contracts/shared-rules.json` → `stopPreview` first; this explains why it is
+shaped the way it is, and what was rejected.
+
+**What was wrong.** One question — *which processes belong to this section's
+preview?* — was answered in three places: `preview.sh --stop` (a `/proc` sweep
+by working directory, run inside the container), `preview.ps1 --stop`
+(`Win32_Process` by command line, plus a descendant walk, run natively), and
+`build_site.py` (command line plus `--serve`, inside the container, written
+because both of the others are HOST scripts and it is not). The reason for the
+third is sound and has not gone away; the problem was never that it existed,
+it was that nothing held the three to the same answer.
+
+**The finding that changed the design, and the reason a straight refactor
+would have been wrong.** They were not three copies of one rule. They were
+three PARTIAL rules, and each saw something the others could not:
+
+- A **working directory** catches a child launched by a RELATIVE path, which
+  carries no directory to match on. `npm install` runs exactly that way, and
+  so do the esbuild workers under it.
+- A **command line** catches the Python driver. `build_site.py` never calls
+  `os.chdir` — it passes `cwd=` to its CHILDREN — so the driver sits in the
+  container's `/teaching` for the whole build. Through every in-process phase
+  (copying the scaffold, copying content, social cards, the rsync mirror) it
+  is the only process there is to find, and the mac's sweep found nothing and
+  printed "Stopped 0 process(es)".
+- Only **`preview.ps1`** walked descendants — yours, and it was right.
+
+So picking any one of the three as "the" implementation would have shipped
+that one's blind spot to both platforms. The rule is a **disjunction of three
+evidences, plus a walk down the process tree**, and it stops strictly more
+than any of the three did alone.
+
+**Why the cases are process SNAPSHOTS rather than single processes.** The
+first design had each case describe one process — name, command line, working
+directory — with an expected verdict. That cannot be run on both platforms,
+for two independent reasons. `Win32_Process` exposes no working directory at
+all, so every cwd case would be unanswerable on your side. And the descendant
+walk is not a property of any single process: it is a rule over parent links
+across the whole list. A case is therefore a small process TABLE with `pid`,
+`ppid`, `name`, `commandLine` and `cwd`, and the expected answer is the list
+of pids to stop. A platform that cannot see one kind of evidence must still
+reach the same verdict — through the walk — and that is exactly the property
+worth testing rather than assuming.
+
+**Two modes, because there are genuinely two questions.** `everything` is the
+launcher's `--stop`: reclaim the server, the build, the driver, and everything
+under them. `servingOnly` is `build_site.py --build-only`: remove ONLY the
+preview server that would otherwise overwrite the publish build a second later
+through its own host mirror. A build must never be stopped in that mode,
+because the build being protected is itself a build of this section — and the
+process asking is the driver the rule would otherwise recognise.
+
+**The version-independence trap, which is the one to carry if you ever adopt
+`--match-stdin`.** `preview.sh` pipes the recipe's copy of the rule into the
+container over stdin rather than running the copy baked into the image. Stop
+mode must never build anything, so it runs against whatever container is
+ALREADY there — right after an upgrade, one built from the previous image,
+with no such file. Naming a baked path would make `docker exec` fail with a
+message nobody sees (both callers send the launcher's output to the null
+device and neither checks its exit code) while the build it was asked to stop
+carried on burning CPU. This is exactly once per teacher per upgrade, and only
+when something was running, which is the only time the mode matters at all.
+`verify.sh` section 6d proves it by deleting the file from a running container
+and stopping a preview anyway.
+
+**Rejected: making `preview.ps1` call the shared Python.** It would leave one
+implementation and two ports, which is better, and the `--match-stdin` entry
+point exists so you can. It was not done from here because `--stop` must never
+start anything and whether Python is reliably resolvable on that path at that
+moment is a question only your machine can answer. Yours to measure; say what
+you find.
+
+**Rejected: extracting `preview.ps1`'s matcher into a new `.ps1` file beside
+the launchers.** A test could then dot-source it without running the script.
+But a new file there has to be added to `ToolchainMirror.Launchers` and
+`RecipeRootFiles`, the Dockerfile's `COPY … /opt/export/` and its `unix2dos`
+line, `project.yml`, and the mac's own refresh lists — five hand-maintained
+lists, which is the precise failure `contracts/toolchain.json` →
+`recipeFolders` exists to record. The functions are defined inside
+`preview.ps1`'s stop block instead. If you want them dot-sourceable, that is a
+real cost to weigh, not a free tidy-up.
+
+**A case a platform may skip, and why that is not a loophole.** One case —
+"a process is caught by its working directory alone" — can be decided ONLY
+with a working directory, which `Win32_Process` does not expose. Rather than
+delete it (it pins the evidence that catches `npm install`) or let it fail on
+Windows, cases carry `needsEvidence`, and a runner without that evidence skips
+it naming what was missing. The loophole this could obviously become is closed
+by a test rather than by discipline: the mac's suite BLINDS every case — takes
+the working directories away — and asserts that a marked case's verdict
+changes and an unmarked case's does not. It caught a case wearing the marker
+that did not need it on the first run, which is exactly the drift the marker
+would otherwise invite.
+
+**Three holes the second review found, all in the rule itself, all the same
+family as the bug being fixed.** A blank or root build directory was evidence
+for EVERY process, because an empty string is a prefix of everything — a
+caller that lost track of which section it was asking about would have swept
+the whole container rather than failed. A target that is a SUFFIX of a longer
+absolute path matched as well, so `/x/tmp/quartz-builds/ADA1O/section1` was
+evidence for `/tmp/quartz-builds/ADA1O/section1`. Both are the section1 /
+section10 mistake pointed in different directions: one about where a path
+ends, one about where it begins, one about whether it is a path at all. The
+lesson worth keeping is that fixing a boundary bug in one direction is not
+finishing it — check every edge of the match, and check that the thing being
+matched is a real value.
+
+**One harness lesson, learned twice in one afternoon.** A process that scans
+other processes for a marker string finds ITSELF — the marker is on its own
+command line. In `verify.sh` 6d this first inflated a count so that every
+check in the section failed while the code under test was correct, and then,
+in the cleanup, made the script SIGKILL itself part-way through: it printed
+nothing, exited quietly, and left behind the very processes it was written to
+collect. The second one was found only by checking the container afterwards
+rather than trusting a green run. Exclude your own process id, and treat
+"scanning for a string I am myself carrying" as a shape worth recognising —
+the same trap that `stop_preview.py` already guards against for the real rule.
+
+**What was measured, not decided.** The two `preview.ps1` prefix bugs were
+found by reading, and both are real: `$lower.Contains($sectionNeedle)` with a
+needle ending `\section1` matches `\section10`, and
+`$lower.Contains('--section=1')` matches `--section=10`. Each was reproduced
+as a contract case, and each case was checked by putting the fault back into
+the shared Python and watching that case — and only that case — fail. The same
+was done for the descendant walk. A green suite proves nothing about a case
+that cannot fail.
+
+### `verify-deploy.sh` — the publishing harness, and why it is not in the gate
+
+New on 2026-09-05, at the repository root. It publishes to a folder, to Netlify
+and to Cloudflare, and runs all three primary+secondary pairings, then **fetches
+every published site back and reads it** — the launcher's own output only
+proves the launcher is happy with itself. 42 checks.
+
+**It is deliberately NOT part of `verify.sh`.** The gate must be runnable at any
+moment, on any machine, without credentials and without touching anything
+outside the repository. This needs a Netlify token, a Cloudflare token and an
+account ID, it needs the network, and it CREATES REAL SITES. Build the Windows
+equivalent the same way — opt-in, run when the publishing path changes — rather
+than folding it into whatever you gate on.
+
+One thing it does NOT cover, stated so nobody assumes otherwise:
+`additional_deploy_targets` is not handled by `deploy.sh` at all — the APP loops
+and calls the launcher once per destination. The harness exercises the pairings
+by running that same sequence, which tests the launcher half; that the app
+produces exactly those argument lists is pinned separately by
+`app-rules.json` → `deployArguments`, which your suite already runs. Between the
+two the pairing is covered; neither half covers it alone.
 
 ### The scheduled task NEVER refuses
 
@@ -3325,91 +4244,6 @@ then.
 **The mac suite fails a declared trail event that has no call site** — which is
 what forced the front end to be written rather than promised. Worth checking
 whether your suite does the same; if not, it is a cheap test to add.
-
-**Answered, 2026-08-25: it does not, and that is how the two events sat dead
-here.** The Windows equivalent,
-`ContractTests.SharedRules_ActivityTrailEvents_Exist`, compares
-`ActivityTrail.Event` to `activityTrail.mustRecord` as a SET of names. A
-declared event with no caller anywhere satisfies it perfectly. So
-`FolderProblemFound` and `FolderProblemRepaired` were added to the enum on
-2026-08-23, to satisfy that set comparison against the contract, and had zero
-call sites anywhere in the C# until 2026-08-25 — with the suite green
-throughout. Two days, read out of `git log -S` rather than estimated — and the
-point is not the duration but that nothing on this side would EVER have said
-so. The cheap test the mac suggests is still worth adding and is not yet
-written: it would assert that every `Event` member appears somewhere in the
-product source, which is a grep rather than a behaviour, but it is the grep
-that would have caught this.
-
-### Where Windows actually stands with this (2026-08-25)
-
-Stated plainly because item 10 above previously implied the opposite, and a
-wrong status is worse than none.
-
-- **Landed.** `SiteHealthFinding` parses the `PLANTOIR_HEALTH:` line;
-  `ScriptRunner` collects findings as output arrives and records
-  `folder problem found` per finding, carrying the stable check NAME and never
-  the product wording. Whether a Fix button MAY be offered is decided from the
-  check's name against `siteHealth.repair.offered.checks` — never from the
-  `fixable` flag — so `noGradedFolders` can never acquire one. 23 contract
-  tests + 13 runner tests.
-- **Of the three traps above: the first is honoured, the third is half-done,
-  and the second is not done at all.** Findings are collected as output ARRIVES
-  rather than from a tail (trap one). "Show it once" (trap three) is satisfied
-  as far as it can be without a dialog — findings are de-duplicated on
-  name + course + section, and the collection is handed out as a snapshot
-  rather than as the live list, so a future dialog binding to it cannot be
-  emptied under itself; the rest of that trap is about holding findings in VIEW
-  state, which cannot be done until there is a view. **Trap two is NOT done: the raw
-  `PLANTOIR_HEALTH:` JSON line is still visible in the console a teacher
-  reads.** The mac drops it in
-  `TranscriptBuilder.appendUnlessMachineReadable`, which tests
-  `SiteHealthFinding.isMarkerLine` and simply does not append the line; the
-  findings are read from the RAW text before it is handed there. Windows also
-  reads from the raw text, but nothing removes the line afterwards, so it
-  lands in the transcript a teacher sees. **Copy the mac's shape including its
-  scar**: that function carries the comment *"One function called from BOTH
-  line endings, because having the check in only one of them is exactly the
-  bug this replaced."* Windows'
-  `TranscriptBuilder.Append` has the same two paths — a lone `
-` and a
-  `
-` pair both reach `PushLine` — so the check belongs in `PushLine`
-  itself rather than at either call site. That is rule 1 — machinery in front of a teacher —
-  and it is the cheapest piece of what remains. **It is PRE-EXISTING rather
-  than newly introduced**: `scripts/site_health.py` has printed that line —
-  from inside `build_site.py`, not from the launchers — since the checks
-  shipped on 2026-08-23, and nothing on this side has ever removed it. So a
-  Windows teacher has been seeing a raw JSON blob in the console for as long
-  as the checks have existed.
-
-  **And no test on either platform would catch it**, which is worth more than
-  the bug. The rule "hide the marker line from the console a teacher reads"
-  exists only as prose in this section. `shared-rules.json` →
-  `transcriptStripping` covers ANSI colour, OSC titles and control characters,
-  and says nothing about `PLANTOIR_HEALTH:`. By rule 2 it belongs there — it is
-  a rule with an input and one right output, which is the definition the
-  contract uses — and a case would fail on Windows today while passing on the
-  mac, which is exactly the signal wanted. Not proposed here, because adding a
-  case is a decision about the contract rather than a port detail, and because
-  a Windows session should not land a case its own suite then fails.
-- **Not landed.** The dialog, the Fix button, both repairs, the outcome report,
-  "Preview Again", the scheduled-task stash, and the first-leg-only rule for
-  multi-destination deploys. `FolderProblemRepaired` therefore still has no
-  call site, which is honest: nothing on this side can repair anything yet.
-
-One measured note for the mac, since this side had to work it out: the Windows
-`ScriptRunner` coalesces pseudo-console output on a **150 ms** cadence
-(`BufferOutput`), so a health line genuinely can arrive in two pieces. The
-collector buffers by LINE and carries an unterminated tail forward. A draft of
-it — caught in adversarial review and never committed, so there is no shipped
-regression to go looking for — trimmed that carry to its last 4000 characters
-when it outgrew 8 KB —
-copied from the milestone scanner's sliding window, and inverted for a line
-buffer, because after the newline loop the carry is the HEAD of one line and
-the marker sits at the front. A long unterminated line therefore lost its
-finding entirely. It now drops the carry only when the carry cannot contain a
-marker.
 
 ## "Where do the class pages live?" had four answers — and yours was the worst (2026-08-23)
 
@@ -3574,6 +4408,428 @@ is the check people skip. **If you add a recipe folder on your side, add it to
 was there, and it is what failed); and having each platform's own suite check
 only its own copy (two green suites, still drifted).
 
+
+## A cloud-synced working folder: explain it, never refuse it (2026-09-05)
+
+**The decision, and who made it.** Russell, 2026-09-05, on the question
+`TODO.md` had carried since a reliability review found that renaming a
+folder reads every page in the course — which on an iCloud-backed vault means
+downloading every offloaded page, one blocking read at a time. The question
+was whether Plantoir should refuse a working folder that a cloud service
+keeps in sync. The answer is **no**: recognise it, say once and in plain
+words what it costs, give the teacher the choice, and leave their notes
+exactly where they put them. `GUI-IMPROVEMENTS.md` row 399 is the log entry;
+`shared-rules.json` → `cloudSyncedFolders` is the specification; this
+section is the reasoning.
+
+**Why not refuse.** Three reasons, and each alone would have been enough:
+
+- Teachers keep their vaults in iCloud or OneDrive *on purpose* — it is how
+  the notes reach an iPad and a second machine. A refusal tells them to give
+  up cross-device access to their own teaching material, and a hard block is
+  the one answer they cannot opt out of.
+- Detection is unreliable in both directions. A teacher can have a folder
+  literally called "Dropbox" that is not one; a folder can be synced by a
+  service neither app knows. A false refusal on a hard block is
+  unrecoverable for them, whereas a synced folder Plantoir fails to notice
+  still works — more slowly.
+- **You already rejected refusal, by building something better.** When
+  OneDrive locked build output mid-build, the Windows answer was
+  `PLANTOIR_BUILD_ROOT` — move the churn out, leave the content in. That
+  precedent settled the argument here: the same problem, met once, answered
+  by relocating rather than refusing.
+
+**The two moments, and why they are different things.** This was Russell's
+own question — shown when a synced folder is suspected, when the working
+folder is created, or both? — and the answer is both, as two forms:
+
+- **A folder the teacher just CHOSE, or an empty one about to be set up,
+  stops at the folder picker.** This is the one moment the choice is free:
+  nothing has been written into the folder yet. The picker shows the
+  headline, the five-sentence explanation, and two buttons — "Use This
+  Folder Anyway" and "Choose a Different Folder…". Setting up the empty
+  folder IS going ahead (the note was beside the button; pressing it is the
+  answer). **Neither button is the Return-key default**: a Return pressed
+  out of habit must not decide this.
+- **A folder the window RESTORED gets a quiet notice inside the window**,
+  above the working-folder bar: headline, one-line summary, a way to open
+  the full explanation in place, and "Got It". Never a dialog and never a
+  sheet, because a folder can become synced *after* it was set up (moved
+  into iCloud; Desktop & Documents turned on) and a folder that opens on
+  every launch must not interrupt every launch. On the mac this is a strip
+  above the path bar with a `.quaternary` background; build yours as an
+  InfoBar or the nearest WinUI equivalent — the placement and the
+  dismissability are the contract, the control is yours.
+- **Going ahead is remembered PER FOLDER**, and neither form is shown for
+  that folder again. A second synced folder gets its own note. The mac
+  keeps the list in preferences under `acknowledgedSyncedFolders`; keep
+  yours wherever you keep per-app preferences, keyed by the folder's path.
+- **The check runs on EVERY adoption of a folder**, not only the first —
+  folders move into cloud services after they are made, and the check costs
+  nothing.
+
+**Detection: markers, never names.** The mac reads three things, and all
+three are in `detection.macMarkers`: `~/Library/Mobile Documents` (iCloud
+Drive's real location), `~/Library/CloudStorage/<Service>-<Account>/` (where
+macOS 12.3+ keeps every File Provider service — OneDrive, Google Drive,
+Dropbox, Box — with the service named by the part of the folder name before
+the first hyphen), and the item's own `isUbiquitousItem` flag, trusted ONLY
+under `~/Desktop` and `~/Documents` — the two folders iCloud syncs in place.
+**That flag is not iCloud-specific**: the adversarial review (row 401)
+probed a real `~/Library/CloudStorage/Dropbox` and found it set there too,
+so trusted anywhere else it would call a Dropbox folder "iCloud Drive".
+Whatever Windows exposes for "this item is cloud-managed", assume the same
+until proven otherwise. **Symlinks are resolved before any rule runs** —
+Dropbox and OneDrive both leave a link at the old place (`~/Dropbox` →
+`~/Library/CloudStorage/Dropbox`), and a path arriving through it matched
+nothing while the folder behind it matched Dropbox; on Windows, resolve
+junctions and reparse points the same way, since Known Folder Move leaves
+exactly that indirection. The resolved path is also the acknowledgement's
+key, so one folder is one key whichever spelling it arrives by. Your
+markers are listed in `detection.windowsMarkers`: the OneDrive roots the
+client publishes as `%OneDrive%`, `%OneDriveConsumer%` and
+`%OneDriveCommercial%` (a Desktop moved by Known Folder Move physically lives
+under one of them, so a prefix rule catches it), Dropbox's `info.json`
+(`%APPDATA%\Dropbox\info.json`, `path` entries), and iCloud for Windows
+(`%USERPROFILE%\iCloudDrive` by default). A service you cannot see is
+allowed — see "why not refuse". **Run the eleven `detection.cases` against
+your path function** with `{home}` as `%USERPROFILE%` and the mac's reserved
+paths translated to yours; the cases that matter most are the negative ones:
+a folder CALLED Dropbox on the Desktop, and the reserved root itself. When
+the service is recognisably syncing but not one you name, the contract's
+`unknownServiceName` ("your cloud service") is the honest word.
+
+**The sentences, and the one that is not yours.** All in `wording`, word for
+word, `{service}` filled in. They name EFFECTS a teacher can recognise —
+"building can be slower", "renaming a folder can take a while" — and never
+machinery: no "sync client", no "file provider", no "dataless", no "build
+root". A mac test forbids those words; write the same test. The ORDER is
+part of it (`explanationOrder`): reassurance first, because "kept in sync"
+beside a warning reads as "your notes are at risk" and they are not; the
+choice last, after the reasons. **`buildFilesAreCopied` applies on the mac
+only** (`buildFilesAreCopiedAppliesOn`): it says the built site's thousands
+of files are written inside the folder and copied to the cloud, which is
+true on the mac today — `.merged_output` still lands in the working folder —
+and false on Windows, where row 290 already builds into
+`%LOCALAPPDATA%\Plantoir\builds\<id>`. Show the other four. When the mac
+moves its output out too (a separate piece; the research is in `TODO.md`
+under "Move the mac's build output OUT of a synced working folder", and it
+is bigger on the mac because the build runs in a container that mounts only
+`courses/`), that field will change and the contract diff is how you will
+hear.
+
+**The trail.** Two events, both in `activityTrail.mustRecord` and so already
+failing your `ContractTests` until you add them: `synced folder noticed`
+(the service and the redacted path — recorded because the effects of a
+synced folder arrive weeks later as unrelated reports, and this line is what
+connects them) and `synced folder accepted` (which of the two forms, and the
+service — because "nobody warned me" is answered by this one, not the
+first). The mac's lines read "noticed the working folder is kept in sync
+with iCloud Drive — ~/…" and "chose to use the working folder anyway, kept
+in sync with iCloud Drive"; say the same things in the same words.
+
+**Rejected, so it is not proposed again:** refusing (above); detecting by
+folder name (the case that would catch a real Dropbox folder is the case
+that mislabels a teacher's folder called Dropbox); a dialog or sheet on
+launch (interrupts every launch of a folder that cannot be un-synced from
+inside the app); a single app-wide "don't show again" (a teacher with two
+synced folders was told about one). Not measured: nothing here was timed.
+The iCloud read-on-download slowness that started the question is real but
+was observed, not clocked; if you time a rename on an offloaded OneDrive
+folder, write the number here with the hardware.
+
+**What driving it against a real iCloud Drive folder found** (row 400), in
+the order you are likely to meet the same things:
+
+- **The notice pushed the whole bottom band of the window off screen**, at
+  every window height. The mechanism is SwiftUI's (a text pinned to its
+  vertical size answers a minimum-size probe with a word per line — 1,548
+  points, measured, whether 700 points or no height at all is proposed;
+  the modifier ignores the height either way), but the SHAPE is WinUI's too: a
+  wrapping `TextBlock` in a horizontal `StackPanel` gets unbounded width and
+  never wraps, or bounded width and grows tall. Measure your InfoBar's
+  height with the real sentences at a narrow width before shipping it, and
+  measure with a width PROPOSED — the mac's first test asked for the ideal
+  size with no width and passed the faulty layout.
+- **The path bar cut off the folder's own name.** An iCloud path always runs
+  through `~/Library/Mobile Documents/com~apple~CloudDocs/…`, so the last
+  crumb — the only one that differs between a teacher's folders — was the
+  one lost. Now a contract rule, `workingFolderPathBar.tooLongForTheSpace`:
+  a path too long for the space shows its END. Your bar needs the same.
+- **The folder must be NAMED before it is explained.** The picker showed the
+  five sentences and then the path bar; a teacher reads "this folder" and
+  looks for which folder. Path bar first, in both the empty-folder and the
+  existing-folder states.
+- **Enter still set up the empty folder while the note was showing**, which
+  the contract's own `whenShown.chosen` forbids. The set-up button loses its
+  default-action status while a decision is pending; make sure yours does.
+- **A folder the picker will not take anyway** — neither a working folder
+  nor empty — is not asked about. The rule is in the contract's `whenShown`;
+  the teacher is about to choose again, and the guidance saying what to
+  choose is the message.
+
+**What the adversarial review then found** (row 401), beyond the detection
+points folded in above:
+
+- **Finishing a set-up must acknowledge the folder that was SET UP**, not
+  whichever folder is current when the copy ends. The copy runs off the
+  main thread and the Open Working Folder command stays enabled meanwhile;
+  a second synced folder chosen during it has its own decision pending, and
+  the first folder's completion must not answer it. Guard on the path.
+- **"Synced folder noticed" is recorded by a window only.** The assistant
+  and the MCP server adopt folders on models nothing shows; a "noticed" from
+  those says the teacher was told something they were not, and on the mac it
+  produced six lines for one folder in ten minutes. Your `plantoir-mcp.exe`
+  adopts folders too — same rule.
+- **One folder, every window.** Got It in one window clears the same
+  folder's notice in any other window showing it. Rarer on Windows, where
+  one `MainWindow` shows one folder; verify and say so if it cannot happen.
+- **Re-choosing the open folder is a restore**, not a new choice
+  (`whenShown.reChoosingTheOpenFolder`), or the courses vanish behind the
+  picker for a folder the teacher did not change.
+- **The acknowledgement list is keyed by resolved path and never pruned.** A
+  renamed or moved folder is a new key and is asked again — on purpose,
+  since it may have moved INTO a synced location. A deleted folder's key
+  stays, harmlessly.
+- **Three labels are now in the contract** — `chooseDifferentFolderButton`,
+  `showDetailsButton`, `hideDetailsButton` — so nothing on the picker or the
+  notice is left for you to word.
+
+## Built websites live outside the working folder (2026-09-05)
+
+**You did this first, in row 290, and the mac has now caught up.** This section
+exists because the mac's answer looks nothing like yours, and somebody reading
+the two side by side will wonder which is right. Both are: the difference is
+the machinery, and copying either one onto the other platform would be a
+mistake.
+
+### What changed on the mac, and what it did NOT change on Windows
+
+A section's built site used to be written to `courses/<CODE>/.merged_output`,
+inside the working folder. It is derived — every file comes from the teacher's
+notes and can be produced again — and Plantoir's own backups already skipped it
+by name, but nothing OUTSIDE Plantoir did: a synced folder uploads every build
+and charges it against the teacher's quota, Time Machine backs it up, a zip or
+a Finder copy of the course carries it, Get Info counts it.
+
+Measured on the small `EXC2O` course the mac's verification suite builds:
+**331 files and 9.8 MB for one section**, and the cost is paid on EVERY build
+rather than once, because Quartz emits its whole output fresh each time and the
+mirror copies every file that has a new timestamp. A real course with media is
+many times that.
+
+**Your side is unchanged and should stay unchanged.** `PLANTOIR_BUILD_ROOT` →
+`%LOCALAPPDATA%\Plantoir\builds\<folder id>`, honoured by
+`scripts/toolchain_paths.py` → `merged_output_root()`, which does not nest a
+`.merged_output` level when the variable is set. That flat layout is already
+pinned by `scripts/test_deploy_course_dir_resolution.py` and is the reason
+`deploy.py` derives the course directory from `COURSES_ROOT / <code>` rather
+than by climbing from the built section — the fix that was YOURS, and the shape
+this piece reused.
+
+### Why the mac could not just set the variable
+
+Three reasons, and each of them is a mac fact:
+
+1. **The build runs in a container that mounts only `courses/`.** A build root
+   outside the working folder is invisible in there until a second mount
+   exists — and `preview.sh`'s "does this container need recreating" check
+   compared only the courses mount, so an added mount needed its own recreate
+   rule as well.
+2. **Six readers name the path today**, on both sides of the mount:
+   `deploy.sh` (`MERGED_DIR_HOST`, `SECTION_DIR_IN_CONTAINER`), `preview.sh`
+   (`OUTPUT_PATH`, and stop mode), and in Swift `BuildFreshness`,
+   `ScheduledDeploy` and `SectionDetailView` — plus the shell freshness check
+   `ScheduledDeploy` WRITES OUT for launchd, `verify.sh`, `verify-deploy.sh`
+   and the screenshot harness.
+3. **A launchd deploy and a teacher at the command line have no app.** If the
+   app set a variable and they did not, the two would build into different
+   places and `BuildFreshness` would call every build stale.
+
+So: `courses/<CODE>/.merged_output` is a **symlink** to
+`~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`, and the
+launchers bind-mount that builds folder into the container **at the same
+absolute path**, unconditionally, so the link resolves identically inside and
+out and all six readers keep working untouched. The folder id is the same
+`pwd -P | shasum -a 256 | cut -c1-8` that already names the folder's container,
+so a folder's container and its builds folder cannot disagree about which
+folder they belong to. It has to be under `$HOME` because the Colima VM mounts
+only the home folder.
+
+**Done for every working folder, not only the synced ones.** The benefit is not
+confined to syncing — a backup, a copy, a zip and a folder size are all smaller
+for it — and one code path is one code path: a rule that ran only for folders
+Plantoir believes are synced would be a rule tested in one case and running in
+another, and the detection is deliberately not certain enough to hang behaviour
+on.
+
+### Rejected, so nobody re-proposes them
+
+- **One environment variable, as on Windows.** The three reasons above.
+- **Computing the path at every reader.** Ten places name it; each one is a
+  chance for two of them to disagree, and the failure mode of disagreeing is a
+  publish that ships the wrong bytes.
+- **A `.nosync` suffix.** iCloud-only — Dropbox and OneDrive ignore it — and it
+  moves the path just as much as this does.
+
+### What was MEASURED rather than read
+
+The open question was whether a sync client would follow the link and upload
+the target anyway, which would have defeated the whole thing. Tested on a real
+Mac on 2026-09-05, giving a real iCloud Drive folder and a real
+`~/Library/CloudStorage/Dropbox` a throwaway course folder holding a real note
+and a `.merged_output` symlink to an outside folder with a 3 MB file in it:
+
+- **iCloud** kept it as a link and reported the LINK as uploaded, at **82
+  bytes** — the length of the target path — with `isUbiquitousItem` true and
+  the 3 MB nowhere.
+- **Dropbox** kept it as a link, tagged the LINK with its own extended
+  attributes, and left the target folder outside Dropbox with none at all, so
+  it had not reached through it.
+- `du` of the synced folder counted 4 KB either way.
+- **OneDrive is not installed on that Mac and was not tested.** If you can
+  test the Windows equivalent cheaply it is worth knowing, even though your
+  layout does not depend on it.
+
+The consequence is worth knowing on your side too: the LINK syncs, so a teacher
+with two Macs receives one naming a home folder that does not exist there. A
+link pointing anywhere other than this machine's own builds folder is replaced
+before anything builds.
+
+### The finding nobody had listed, and the one that is yours in spirit
+
+**Archiving, restoring or replacing a course removes the link, but not the
+build standing outside it.** And a course restored from a backup carries the
+timestamps it had when it was archived, which can be OLDER than the site that
+was built from it. So an adopted build would read as "already up to date" and
+publish last month's pages, with every check agreeing. The rule that answers it
+is one line: **a build folder with no link pointing at it is CLEARED, never
+adopted** — the link is what says a build belongs to this course. Archiving a
+course or a section discards its build outright as well, so the clearing is a
+safety net rather than the only defence. Renaming a course is the exception:
+its build is carried across, because a rename used to cost nothing and should
+still cost nothing.
+
+**Your layout has the same hole in a different shape.** You have no link, so
+the "no link means clear it" rule cannot be copied — but
+`%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>` outlives an archived course
+exactly the way the mac's did, and a restore into that code will find it. Worth
+checking; worth a `MAC-HANDOFF.md` line if it turns out you are already safe,
+because "we checked and it cannot happen here" is as useful to this side as a
+fix.
+
+**And a builds folder for a working folder that no longer exists is litter
+nobody can name**, because the id is a hash and cannot be read backwards. The
+mac writes `working-folder.txt` beside each builds folder and sweeps the ones
+whose folder is gone — **only when that path was under the home folder**, since
+"the folder is not there" and "the disk is not plugged in" look identical from
+there and only the home volume is always mounted. You have the same problem and
+can use the same answer.
+
+### What an adversarial review found afterwards, and what travels
+
+Row 403. Three of the thirteen findings are worth your attention rather than
+just ours:
+
+- **An access DENIAL must never read as "the folder is gone".** The launch
+  sweep asked `fileExists`, which answers false for a folder Plantoir is not
+  ALLOWED to look at exactly as readily as for one that has been deleted — and
+  a working folder on the Desktop or in Documents sits behind a permission
+  grant that can be absent at launch or reset by a re-signed build. Every
+  launch would have deleted that folder's built websites. It asks `lstat` now
+  and treats only `ENOENT`/`ENOTDIR` as deletion. Whatever you use before
+  deleting a builds folder, ask the same question of it.
+- **A test that matches a function's DEFINITION passes on a launcher that never
+  calls it.** The contract test here matched the strings
+  `container_has_builds_mount` and the mount flag — both satisfied by the
+  definition and a comment — and `setup.sh` had no call site at all and passed
+  anyway. Assert the CALL, on its own line.
+- **If anything other than your app can move build output, it owes the trail
+  the same line.** Only the app recorded the move, so a move done at the
+  command line, or by a publish launchd ran at six in the morning weeks before
+  the app was next opened, left no line ever. The launchers append it
+  themselves now.
+
+A fourth finding was made, acted on, and then REVERSED by the next review, and
+the reversal is the part worth carrying: it was proposed that a link naming
+ANOTHER Mac's builds folder should let this Mac ADOPT its own existing build
+rather than clear it, saving a rebuild on every switch between two machines.
+That is unsafe. A Mac cannot tell "the folder came back unchanged" from "the
+folder was archived and restored while I was shut", and in the second case the
+pages it would adopt a build for are OLDER than that build — so the freshness
+check says up to date and the teacher publishes what they undid. Clearing costs
+one rebuild, which is cheap and visible. **The general rule, which is yours as
+much as ours: never adopt a build you cannot prove belongs to the content as it
+now stands.** A generation stamp — a UUID written beside the link and copied
+into the build, adopted only when the two match — would buy both, and is
+written down in the contract as the design to build if it is ever worth it.
+
+And one that cannot happen to you at all, noted so nobody goes looking: your
+build root is per-machine and never travels, so there is no foreign link to
+read.
+
+The second review also found the trap worth remembering about TESTING any
+"we put it back" branch: the first version of the test made the course folder
+read-only, which fails the MOVE rather than the link, so the branch never ran
+and the test passed with the put-back deleted. Fail the step in the MIDDLE, and
+re-check by putting the fault back.
+
+### Two mac-specific traps, recorded because they cost time
+
+- **`preview.sh --stop` finds a preview's processes by WORKING DIRECTORY**, and
+  `/proc/<pid>/cwd` is the RESOLVED path — never the spelling a process used to
+  get there. The sweep had to learn the resolved form as well, or `--stop`
+  would report success and leave the build running. Your `--stop` uses
+  `Win32_Process` on command lines and paths; if any part of it compares a path
+  the teacher's process arrived by rather than the one it is in, it has the
+  same bug waiting.
+- **`shutil.rmtree` refuses a symlink**, which the research had flagged as a
+  blocker for `--full-rebuild`. It turned out not to matter: that path removes
+  the CONTAINER's `/tmp/quartz-builds` tree, not the host output. Written down
+  because the research said otherwise and somebody will read it.
+
+### The one thing a release note must carry: BOTH Macs have to be updated
+
+A working folder synced between two Macs now needs both of them on this version
+or later, and this is not a nicety. The mac's OLD `build_site.py` fails outright
+on a link whose target is missing — `mkdir` raises `File exists` — and nothing
+that shipped before 2026-09-05 can repair it. It is worse than one stale machine
+failing on its own, because the launchers and `.toolchain/` live INSIDE the
+synced folder: an older app "refreshes any launcher that differs" back to its
+own copies, and a publish scheduled with launchd on the up-to-date Mac then runs
+whatever `deploy.sh` is in the folder that morning — an old one recreates the
+container without the mount and fails the same way. Before this change a version
+mismatch between two Macs was harmless.
+
+The lesson is portable even though the mechanism is not, and it is worth asking
+on your side before you assume you are clear: **what does an OLD
+`plantoir-mcp.exe`, or an old app, do with a working folder a NEW one has
+touched?** The answer here was "it cannot recover, and it drags the good machine
+back with it".
+
+### The upgrade path, which is the part that ships to real teachers
+
+Everything a teacher already has survives, and nothing is one-way: the built
+site is MOVED, never rebuilt from scratch and never deleted; `.netlify_sites/`
+and `.cloudflare_sites/` are untouched because they live BESIDE
+`.merged_output`, not inside it; the launchd scripts already written out keep
+naming the old path and keep working through the link; and a container without
+the mount is recreated once, which a toolchain change does anyway.
+
+The rule that makes it safe is worth stating plainly, because your side will
+need the same discipline whenever you change where builds go: **every step is
+allowed to fail without stopping the run, and the fallback is the OLD
+behaviour.** The mac launchers run under `set -euo pipefail`, so an unguarded
+`ln`, `mv` or `mkdir` would have turned "the built website could not be moved"
+into "publishing is broken", silently, on a read-only folder or a full disk. If
+the move succeeds and the link then fails, the move is put BACK — a course with
+its site in the old place still publishes; a course with neither has lost its
+website for nothing.
+
+`scripts/test_build_output_link.sh` runs the real launcher block against every
+one of those states and is wired into `verify.sh`. It is shell rather than
+Python, so it does not run on your side, but the STATES it lists are the ones
+worth checking on any platform that moves build output.
 
 ## The course-code picker is a hand-built combo box — and you probably should NOT build one (2026-08-23)
 

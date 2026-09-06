@@ -45,6 +45,63 @@ Beyond the actions, the app owns delivery and resources:
 - **Resources are freed.** Each working folder has its own container,
   stopped when the folder's last window closes and at quit; Colima itself
   is stopped at quit only when nothing else is running in it.
+- **A folder a cloud service keeps in sync is explained, never refused.**
+  A working folder in iCloud Drive, Dropbox, OneDrive, Google Drive or Box
+  is recognised from the markers macOS exposes (`~/Library/Mobile Documents`,
+  `~/Library/CloudStorage/<Service>-…`, and iCloud's own flag on a Desktop or
+  Documents synced in place) — never from a folder's name. A folder the
+  teacher just chose stops at the picker with a plain-words explanation and
+  the choice to go ahead or pick another; a folder a window restored gets a
+  dismissable notice above the path bar. Either is shown once per folder.
+  The sentences, the detection cases and the timing are in
+  `contracts/shared-rules.json` → `cloudSyncedFolders`.
+- **The built website is kept outside the working folder** — every working
+  folder, not only the synced ones. `courses/<CODE>/.merged_output` is a
+  symlink to `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`,
+  where the folder id is the same `pwd -P | shasum` hash that names the
+  folder's container, and the launchers bind-mount that folder into the
+  container at the same absolute path so the link resolves identically on both
+  sides. A built site is derived and can always be made again; keeping it in
+  the folder meant a synced folder uploaded every build, Time Machine backed
+  it up, and a zip or a Finder copy of the course carried it. The rule, the
+  migration of a folder that already has built sites, and what was rejected
+  are in `contracts/shared-rules.json` → `buildOutputLocation`; the app is one
+  of its two implementations (`BuildOutputLocation.swift`), the three
+  launchers are the other, for a teacher at the command line and for a
+  publish scheduled with launchd.
+
+## Renaming a course folder
+
+Folder rows in Course Settings carry a pencil. It renames the folder **on
+disk** — in every section that has one — rewrites the qualified links that name
+it, and carries across every `course_config.json` key that mentioned it
+(`shared_folders`/`per_section_folders`, `graded_folders`, `curriculum_folder`,
+`class_folder`, `hidden`, `expandable`, `excluded_items`). Renaming the class
+folder or the curriculum folder also WRITES its key, even on a course that
+never had one — a rename is the one moment Plantoir witnesses the change, and
+without it the guess that finds those folders stops finding them with nobody
+told.
+
+Three things about it are deliberate:
+
+- **It commits to disk immediately, not at Save**, and the sheet says so.
+  Settings otherwise holds edits in memory with Cancel reverting them, and a
+  folder that has really moved cannot be un-moved by a Cancel.
+- **Nothing moves until every destination has been checked**, so a per-section
+  rename cannot get half way through four sections and stop.
+- **It runs off the main actor.** The move is quick; reading every page in the
+  course to rewrite links is not, on an iCloud-backed vault where an evicted
+  file downloads on read.
+
+Two neighbouring behaviours changed with it: adding a folder name now CREATES
+the folder (it used to write an entry pointing at nothing), and removing one
+says the folder and its contents stay on the teacher's Mac — removal has never
+deleted anything and nobody could tell.
+
+`hidden` is the entry in that carry-across list worth remembering: it holds what
+is kept OUT of the built site, so a rename that missed it silently un-hid the
+folder and the next publish put pages the teacher had hidden in front of
+students.
 
 ## Reporting a problem
 

@@ -17,6 +17,15 @@ is genuinely Russell's — a product decision, a trade-off with no obviously
 right answer, or something hard to undo. He works interactively here and has
 said plainly that he does not want to be asked for permission step by step.
 
+**On the rhythm of the work — `CLAUDE.md` rule 11, and it governs both jobs
+below** (in B it applies from the moment you start implementing, at B.3). Implement with the strongest model available (Opus in Claude Code).
+Have each logical chunk reviewed by something that is not the thing that wrote
+it (Fable in Claude Code) — the PLAN first, then the implementation, then the
+fixes, because a review of the finished thing arrives too late to change its
+shape. Write the Windows handoff AS YOU GO rather than from memory at the end.
+And **finish with a documentation pass before you say it is ready**, which is
+step 7 below.
+
 ---
 
 ## A. Adding a feature or changing a behaviour
@@ -112,11 +121,46 @@ bundle from the Dock. Test, then build, then stop.
 - Anything architectural also gets a section in `WINDOWS-HANDOFF.md`, and any
   guidance the change made WRONG is corrected there in the same breath. Stale
   advice is worse than none, because it gets followed.
+- **Anything WINDOWS must now do gets a numbered item in that file's "What is
+  still genuinely outstanding", in the same session.** Standing instruction,
+  `CLAUDE.md` rule 3. The list is not a duplicate of the section: a Windows
+  session is told to read the list FIRST, so it is how they find out there is
+  work at all, while the section is the manual for doing it. Mark items done
+  where they stand — struck through, `✅ Done <date>` — rather than deleting
+  them. A change written up beautifully in a section nothing points at is, from
+  their side, a change nobody wrote up.
 - **An affordance that lives only in a context menu is invisible to everyone
   else.** A right-click menu, a double-click, a hover, a keyboard shortcut —
   each needs a handoff line even though nothing on screen changed. That is how
   the path bar's menu went unnoticed for months.
 - Commit code changes as they are made, not in one lump at the end.
+
+### 7. Then update the documentation — the LAST thing before "it is ready"
+
+`CLAUDE.md` rule 11. Step 6 covers the records that exist because a rule
+demands them; this covers the ones that exist because somebody remembered, and
+they are the ones that rot.
+
+- **Grep for what you changed**, rather than trusting your memory of where it
+  is described. A behaviour is nearly always written down in more places than
+  the one you edited.
+- **`documentation/` is the folder that gets forgotten**, because nothing in
+  the daily rhythm points at it. The deep dives 01–11 describe how the
+  toolchain, the launchers, the build pipeline and the assistant actually
+  work, and a change to any of those has almost certainly made a sentence
+  there wrong. On the session rule 11 came from, four places in
+  `documentation/` described the rule that had just been replaced and THREE
+  needed correcting — one flatly wrong, one merely incomplete, and one that
+  had never documented a launcher flag the app has called since August.
+- **A doc that links to the canonical description rather than restating the
+  mechanism does not need touching** — which is the argument for writing them
+  that way. `07-deployment.md` needed nothing for exactly this reason, while
+  the three files that restated the mechanism themselves all did.
+- **Do NOT update `GUI-IMPROVEMENTS.md` rows or completed `TODO.md`
+  entries.** Both are append-only records of what was true on their day.
+
+Then say it is ready, say what it contains, and stop. Merging into `dev` is
+Russell's call every time (`CLAUDE.md` rule 6).
 
 ---
 

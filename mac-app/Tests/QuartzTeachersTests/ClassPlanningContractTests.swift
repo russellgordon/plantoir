@@ -18,9 +18,12 @@ final class ClassPlanningContractTests: XCTestCase {
     func testTitlesAreNumberedOrLeftAloneAsTheContractSays() throws {
         for testCase in try ClassPlanningContractTests.cases(in: "pageNaming") {
             let title: String = try XCTUnwrap(testCase["title"] as? String)
-            let numbers: UnitDay? = UnitDay(pageTitle: title)
-            XCTAssertEqual(numbers?.unit, testCase["expectUnit"] as? Int, title)
-            XCTAssertEqual(numbers?.day, testCase["expectDay"] as? Int, title)
+            // A case with no `term` uses the default word, which is what a
+            // course says when `unit_word` is absent from its configuration.
+            let term: String = ClassPageTerm.cleaned(testCase["term"] as? String)
+            let numbers: UnitDay? = UnitDay(pageTitle: title, term: term)
+            XCTAssertEqual(numbers?.unit, testCase["expectUnit"] as? Int, "\(term): \(title)")
+            XCTAssertEqual(numbers?.day, testCase["expectDay"] as? Int, "\(term): \(title)")
         }
     }
 

@@ -23,6 +23,13 @@ struct FinderPathBarView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             pathRow
         }
+        // A path too long for the space shows its END, not its start:
+        // the folder itself is the part a teacher is looking for, and the
+        // start ("Macintosh HD › Users › …") is the same for every folder
+        // they own. Seen first with an iCloud Drive folder, whose real path
+        // runs through ~/Library/Mobile Documents/com~apple~CloudDocs and
+        // was cut off before reaching the folder's own name.
+        .defaultScrollAnchor(.trailing)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Folder location: \(folderURL.path)")
         .accessibilityIdentifier("finderPathBar")

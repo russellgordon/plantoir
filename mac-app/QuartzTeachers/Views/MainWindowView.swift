@@ -30,7 +30,7 @@ struct MainWindowView: View {
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .accessibilityIdentifier("restoringFolderPlaceholder")
-            } else if workspace.workspaceURL == nil || workspace.workspaceProblem != nil || workspace.workspaceCanBeInitialized || workspace.workspaceIsUnrecognized {
+            } else if workspace.workspaceURL == nil || workspace.workspaceProblem != nil || workspace.workspaceCanBeInitialized || workspace.workspaceIsUnrecognized || workspace.needsCloudSyncDecision {
                 WorkspacePickerView()
             } else {
                 NavigationSplitView {
@@ -42,6 +42,11 @@ struct MainWindowView: View {
                     VStack(spacing: 0) {
                         detailView
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        // The note about a synced folder the window
+                        // restored, when there is one to show — above the
+                        // path bar, which is where the folder it is about
+                        // is named.
+                        CloudSyncNoticeView()
                         workingFolderPathBar
                     }
                 }

@@ -262,7 +262,18 @@ public class ContractTests
         var doc = ContractLoader.LoadJson("shared-rules.json");
         var events = doc["activityTrail"]!["mustRecord"]!.AsArray();
 
-        var contractKeys = events.Select(e => e!["event"]!.ToString()).ToHashSet();
+        // `appliesOn` names the platforms an event belongs to; an entry
+        // without it belongs to both. Honouring it is not a loosening: the
+        // assertion below is still equality, so an event this app records
+        // and the contract does not still fails. Without it, "built site
+        // moved out of the working folder" (appliesOn: mac) held this test
+        // red on Windows no matter what was implemented here, and a test
+        // that cannot go green stops being read.
+        var contractKeys = events
+            .Where(e => e!["appliesOn"] is null
+                        || e!["appliesOn"]!.AsArray().Any(p => p!.ToString() == "windows"))
+            .Select(e => e!["event"]!.ToString())
+            .ToHashSet();
 
         var codeKeys = Enum.GetValues<ActivityTrail.Event>()
             .Select(ActivityTrail.KeyFor)

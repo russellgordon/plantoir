@@ -42,6 +42,26 @@ Every launcher derives the image from the folder's build recipe: the tag is
   this to preview sections side by side in separate windows. Each preview
   only ever stops a server on its own port.
 
+  A build for publishing (`--build-only`) also stops a preview, but matches
+  the section's build DIRECTORY rather than a port — it is never given one,
+  and guessing the default took down other sections' previews. See
+  [the build pipeline](05-build-pipeline.md#a-build-for-publishing-stops-that-sections-preview).
+- `--stop` (preview only) — end this section's leftover processes and exit.
+  Ending the host-side launcher does not stop the build or server it started
+  inside the container: idle for a server, real CPU for a mid-flight build.
+  This reclaims them, and **must never start anything** — no engine
+  bootstrap, no image build, no container creation, because if nothing is
+  running there is nothing to stop. The app runs it behind Stop Preview,
+  navigating away, closing a window, and cancelling a publish.
+
+  It ships the rule INTO the container over stdin rather than running a copy
+  baked into the image, and that is deliberate: stop mode runs against
+  whatever container is already there, which right after an upgrade was built
+  from the previous image and has no such file. Naming a baked path fails
+  with a message nobody sees — both callers discard this launcher's output
+  and neither checks its exit code — while the build it was asked to stop
+  carries on.
+
 ### One container per working folder
 
 Each working folder gets its own container, named
@@ -224,7 +244,8 @@ Recreating the container is cheap because all state lives in the bind mount.
 - Takes `COURSE SECTION` as positional arguments, plus pass-through flags
   understood by `build_site.py`: `--include-social-media-previews`,
   `--force-npm-install`, `--full-rebuild`, `--build-only` — plus its own
-  `--port N` (container port 8081–8084) and `--image REF`.
+  `--port N` (container port 8081–8084), `--image REF`, and `--stop`, which
+  is handled entirely by the launcher and never reaches `build_site.py`.
 - Checks host-side that the course is set up (`course_config.json` exists)
   and that the section folder is there. The `section_numbers` check itself
   runs in the container once it is up (`docker exec … python3 -`), so a typo

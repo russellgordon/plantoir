@@ -203,6 +203,42 @@ if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
   Write-Host ""
 }
 
+function Test-CarriesLiveReload([string]$root) {
+  # Does any page under $root still carry the preview's live-reload client?
+  #
+  # WHY THIS IS A FUNCTION AND NOT THE OBVIOUS ONE-LINER. Windows PowerShell
+  # 5.1's `Select-String -Quiet`, fed a PIPELINE of file objects, emits one
+  # result PER FILE rather than one answer overall. A clean site of 314 pages
+  # therefore comes back as a 314-element array of $null - and in PowerShell
+  # a non-empty array is TRUE whatever is in it. So
+  #
+  #     if ($files | Select-String -Pattern ... -List -Quiet) { ... }
+  #
+  # was true whenever the site had TWO OR MORE pages, which is every real
+  # site. (Exactly one page is the one case it got right, by accident: a
+  # single-element array unwraps to the scalar it holds, which is falsy.)
+  # The consequences were both invisible and total: every publish to a folder
+  # announced "This site was built by a preview", rebuilt whether or not it
+  # needed to, waited the full 30 s for a condition that could never become
+  # false, and then refused with "The rebuilt site still carries the
+  # preview's live-reload script. Nothing was published." Publishing to a
+  # folder could not succeed on Windows, ever. Measured 2026-09-05 by
+  # publishing a site whose 314 pages contained no live-reload client at all
+  # and watching it be refused three times running.
+  #
+  # `deploy.sh` is not affected: `grep -rq` returns one exit status for the
+  # whole tree, which is the answer this needs. The bug is entirely in the
+  # PowerShell port of that check.
+  #
+  # Testing for a MatchInfo instead of a Boolean is the fix: -List stops at
+  # the first match in each file, Select-Object -First 1 stops at the first
+  # file, and $null -ne is an unambiguous test whatever the pipeline count.
+  if (-not (Test-Path -LiteralPath $root)) { return $false }
+  $hit = Get-ChildItem -LiteralPath $root -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
+         Select-String -Pattern "ws://localhost:" -List | Select-Object -First 1
+  return ($null -ne $hit)
+}
+
 # ======================
 # Preflight checks
 # ======================
@@ -268,6 +304,9 @@ if (-not $builtFound) {
   Write-Host "Built site not found at:"
   Write-Host " $PUBLIC_DIR_HOST"
   Write-Host ""
+  Write-Host " If you have just built, check this section still has its front page."
+  Write-Host " A section without one produces no website, so there is nothing to publish."
+  Write-Host ""
   Write-Host "Build first:"
   Write-Host (" .\preview.bat {0} {1} --build-only" -f $COURSE_CODE, $SECTION_NUM)
   exit 1
@@ -284,6 +323,57 @@ if (-not $builtFound) {
 if ($TO_FOLDER) {
   $targetDir = Join-Path -Path ($TO_FOLDER.TrimEnd('\','/')) -ChildPath ("section{0}" -f $SECTION_NUM)
   New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+  # A PREVIEW build must never reach a published site. Serve mode bakes a
+  # live-reload client into every page, and on a published site that script
+  # makes a student's browser ask permission to access other apps and
+  # services on this device. deploy.py already refuses this, but ONLY for
+  # Netlify and Cloudflare: this branch publishes host-to-host and never
+  # enters the container, so deploy.py never runs. The app's own publish path
+  # is protected by BuildFreshness; the command line was not. Mirrors the fix
+  # made in deploy.sh on 2026-09-05 — see GUI-IMPROVEMENTS row 392.
+  # The whole HTML tree, not just the front page — see the same comment in
+  # deploy.sh. Detection that read only `index.html` could not see the one
+  # state the wait below exists for.
+  $publishedIndex = Join-Path $PUBLIC_DIR_HOST "index.html"
+  if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
+    Write-Host "This site was built by a preview, which bakes in a live-reload script"
+    Write-Host "  that students' browsers would ask about. Rebuilding it for publishing..."
+    & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only"
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "Could not rebuild this site for publishing."
+      exit 1
+    }
+    # Wait for the rebuild to become VISIBLE here before copying. On the mac
+    # the lag is the container's bind mount; natively on Windows it is the
+    # filesystem settling after a large write, and OneDrive can add to it.
+    # Waits on the condition (a front page without the live-reload client),
+    # not a guessed interval, and is bounded.
+    # The WHOLE TREE, not the front page. Serve mode bakes the client into
+    # every page and the mirror is replaced file by file, so a clean front page
+    # with stale pages behind it is a real state — and publishing that mixture
+    # is worse than publishing the preview wholesale, because the front page
+    # looks fine. See the same comment in deploy.sh.
+    for ($w = 0; $w -lt 150; $w++) {
+      if ((Test-Path -LiteralPath $publishedIndex) -and
+          -not (Test-CarriesLiveReload $PUBLIC_DIR_HOST)) { break }
+      Start-Sleep -Milliseconds 200
+    }
+    if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
+      Write-Host "The rebuilt site still carries the preview's live-reload script."
+      Write-Host "  Nothing was published, rather than publishing pages students'"
+      Write-Host "  browsers would ask about."
+      exit 1
+    }
+    # deploy.sh has had this since the empty-publish bug; this side did not,
+    # so after a timeout with no front page the HTML scan found nothing, the
+    # loop fell through, and robocopy mirrored an empty directory while
+    # reporting success. Found by review on 2026-09-05.
+    if (-not (Test-Path -LiteralPath $publishedIndex)) {
+      Write-Host "The rebuilt site has not appeared. Nothing was published."
+      exit 1
+    }
+  }
+
   Write-Host ("Publishing {0} section {1} to a folder..." -f $COURSE_CODE, $SECTION_NUM)
   # /MIR mirrors (copies changes, deletes removals); robocopy exit codes
   # below 8 all mean success.

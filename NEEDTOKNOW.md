@@ -1,9 +1,16 @@
 # Need to know
 
 Things Russell asked to have written down as well as said, from the
-special-folders hardening work (branch `issue/special-folders-hardening`).
-Newest first. This is a HANDOVER note, not a log — `GUI-IMPROVEMENTS.md` is the
-log, and where a row and this file disagree, check the code.
+special-folders hardening work (branch `issue/special-folders-hardening`,
+merged into `dev` on 2026-08-25) and its 2026-09-01 follow-ups. Newest first.
+This is a HANDOVER note, not a log — `GUI-IMPROVEMENTS.md` is the log, and
+where a row and this file disagree, check the code.
+
+**Its one known-open defect is now closed**: a section with no `index.md` used
+to build "successfully" and then refuse to publish with a message that sent the
+teacher round in a circle. Fixed 2026-09-01, along with a worse one beside it.
+The section below says what changed and keeps the old behaviour on the record,
+because the trap is easy to reintroduce.
 
 ## All three deploy destinations were tested for real (2026-08-23, overnight)
 
@@ -30,7 +37,7 @@ Netlify asked two questions the first time (surname, then a site address);
 Cloudflare asked none, because the account ID was already saved. The account ID
 was correctly redacted out of the activity trail.
 
-## A section with no `index.md` cannot be published at all (2026-08-23)
+## A section with no `index.md` cannot be published at all (2026-08-23) — ✅ FIXED 2026-09-01
 
 Found while testing the deploy path, and it is worse than the health check's
 wording suggests. `_sync_public_to_host` (`scripts/build_site.py:3138`) only
@@ -48,9 +55,20 @@ restoring `index.md`, which is what the repair button does — verified end to
 end: repair → Preview Again → `public/index.html` appears on the host → deploy
 succeeds.
 
-The `sectionIndexMissing` check currently says the site "will open on whatever
-page happens to come first". That is true of a PREVIEW and understates the
-consequence for publishing. Worth strengthening.
+The `sectionIndexMissing` check understated it: its detail was true of a
+PREVIEW and said nothing about publishing. It now names both outcomes — the
+wording itself is `shared-rules.json` → `siteHealth.checks`, not repeated here,
+because a sentence copied into a document is the copy that keeps reading right
+after the product's words change.
+
+**Fixed 2026-09-01, and the fix found a worse defect beside it.** The build no
+longer claims to be complete when it produced nothing: it says "Nothing to
+publish … it has no front page, so no website was produced" and exits non-zero,
+so a publish stops at the build with the reason in front of it. And the skipped
+sync used to leave the PREVIOUS build's `public/` on the host, which `deploy`
+uploads — so a publish after deleting a front page reported success and shipped
+last week's pages. That mirror is now cleared. See `GUI-IMPROVEMENTS.md` row
+384 and `WINDOWS-HANDOFF.md`.
 
 ## The repair dialog asked the wrong "is it busy" question (2026-08-23)
 
@@ -225,10 +243,19 @@ marker, by design — nothing to be "edited since".
 13. Delete `section1/index.md` again, press Preview, dismiss the dialog with
     **OK** (do not repair), wait for the build, then press **Deploy**.
 
-**Expect:** *"Built site not found … Build first"* — even though you just built.
-A section with no `index.md` cannot be published at all, and the message sends
-you round in a circle. This is pre-existing, is shared Python so Windows has it
-too, and is written up in `WINDOWS-HANDOFF.md` as an open item.
+**Expect, since 2026-09-01:** the PREVIEW still runs — nothing about a preview
+changed, and it will open on whatever page comes first. It is pressing
+**Deploy** that is different: the publish's own build stops, saying it produced
+no website because the section has no front page, and the folder-problem dialog
+comes back with **Put them back**. What a teacher is told about the failure is
+`app-rules.json` → `failureExplanations`, the case whose output names a missing
+front page. It no longer says "Built site not found — build first" to somebody
+who just built.
+
+**What it used to do**, kept because the trap is easy to reintroduce: the build
+said "Static build complete", the publish then said *"Built site not found …
+Build first"*, and — worse — if that section had ever been published before,
+the publish would have succeeded and sent out the OLDER pages.
 
 Repairing the front page and previewing again fixes it.
 
@@ -241,9 +268,28 @@ Repairing the front page and previewing again fixes it.
     the "What counts" section should now say your course's own folders rather
     than always saying "Tasks".
 
+## 6. Publishing, for real, to everything (opt-in)
+
+`./verify-deploy.sh` publishes this course to a folder, to Netlify and to
+Cloudflare, runs all three primary+secondary pairings, previews it in serve
+mode, and checks the no-front-page refusal — then **fetches every published
+site back and reads it**, because a launcher's own output only proves the
+launcher is happy with itself. 42 checks.
+
+It is deliberately NOT part of `verify.sh`: it needs three credentials, the
+network, and it creates real sites on real accounts. Run it when the publishing
+path changes. It restores the course's settings and its front page on any exit,
+including Ctrl-C.
+
+Two things it found on its first two runs, both of which are the reason it
+exists: publishing straight after a preview shipped the live-reload client to
+students, and a rebuild for publishing lost a race against the preview's own
+sync watcher.
+
 ## If something looks wrong
 
-The activity trail is `~/Library/Logs/Plantoir/Logs/activity.txt`
-(`~/Library/Logs/Plantoir/activity.txt`). A folder problem writes
+The activity trail is `~/Library/Logs/Plantoir/activity.txt`, which is the
+path `CLAUDE.md` rule 5 gives. (An earlier draft of this file offered two
+paths a line apart; this is the one.) A folder problem writes
 `found a problem with this course's folders (name)` and a repair writes
 `put the Media folder back` / `put the front page back`.

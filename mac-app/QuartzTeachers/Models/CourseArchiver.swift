@@ -130,6 +130,16 @@ enum CourseArchiver {
     static func archiveAndRemoveCourse(_ course: Course, coursesDirectoryURL: URL) throws -> URL {
         let archiveURL: URL = try archiveCourse(course, coursesDirectoryURL: coursesDirectoryURL)
         try FileManager.default.removeItem(at: course.directoryURL)
+        // The built website lives OUTSIDE the working folder now, so removing
+        // the course folder no longer removes it — see `BuildOutputLocation`.
+        // Two reasons it has to go with the course: it is otherwise invisible
+        // litter in Application Support that nothing will ever name again, and
+        // a course of the same code restored later would find a built site
+        // older than its own pages and be told it was up to date.
+        BuildOutputLocation.discardBuild(
+            forWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
+            courseCode: course.code
+        )
         return archiveURL
     }
 
@@ -151,6 +161,16 @@ enum CourseArchiver {
         if FileManager.default.fileExists(atPath: sectionURL.path) {
             try FileManager.default.removeItem(at: sectionURL)
         }
+        // This section's built website goes with it, for the same reason the
+        // whole course's does: a section restored later carries the timestamps
+        // it had when it was archived, which can be OLDER than the site built
+        // from it — so a build left standing would read as up to date and
+        // publish pages the teacher had already replaced.
+        BuildOutputLocation.discardSectionBuild(
+            forWorkingFolder: coursesDirectoryURL.deletingLastPathComponent(),
+            courseCode: course.code,
+            sectionNumber: sectionNumber
+        )
 
         var remainingSections: [Int] = []
         for existingSection in course.sectionNumbers {

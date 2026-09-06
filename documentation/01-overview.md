@@ -65,17 +65,32 @@ This toolchain lets a teacher:
 | Command (macOS / Windows) | Script pair | What actually happens |
 |---|---|---|
 | `./setup.sh` / `.\setup.bat` | [`setup_course.py`](04-course-setup.md) | Ensures the container is running with the right folder mounted, then runs an interactive wizard that scaffolds `courses/<CODE>/` and writes `course_config.json` |
-| `./preview.sh ICS3U 1` / `.\preview.bat ICS3U 1` | [`build_site.py`](05-build-pipeline.md) | Merges shared + section-1 content into `.merged_output/section1/`, patches the Quartz scaffold, draws the section's social sharing card, and serves the site — the launcher prints the address (each working folder has its own probed host port block) |
+| `./preview.sh ICS3U 1` / `.\preview.bat ICS3U 1` | [`build_site.py`](05-build-pipeline.md) | Merges shared + section-1 content into `.merged_output/section1/` (a shortcut to a builds folder outside the working folder), patches the Quartz scaffold, draws the section's social sharing card, and serves the site — the launcher prints the address (each working folder has its own probed host port block) |
 | `./deploy.sh ICS3U 1` / `.\deploy.bat ICS3U 1` | [`deploy.py`](07-deployment.md) | Publishes an EXISTING static build — it never builds one: if `public/` is missing or empty the launcher stops and tells the teacher to run preview with `--build-only` first. Then publishes `public/` to the course's chosen destination: delta-upload to a Netlify site (the default), `--target cloudflare` for a Cloudflare Pages project, or `--to-folder` to copy it into a folder on the teacher's own machine |
 
 ## Key design decisions worth understanding
 
 **Per-section output directories.** Each section gets a complete, independent
-Quartz installation at `courses/<CODE>/.merged_output/section<N>/` (a hidden
-folder, so it does not clutter the Obsidian vault). This costs disk space but
-buys total isolation: each section has its own colour scheme, fonts, emoji,
-page title, and `node_modules`, and a broken build for one section cannot
-affect another.
+Quartz installation — its own colour scheme, fonts, emoji, page title and
+`node_modules` — so a broken build for one section cannot affect another. It
+costs disk space and buys total isolation.
+
+**Where that installation actually lives is worth being precise about, because
+two older descriptions of it were wrong.** It is built on the container's own
+fast storage (`/tmp/quartz-builds/<CODE>/section<N>/`), and only the finished
+`public/` and a copy of `course_config.json` are mirrored back out — so the
+scaffold and `node_modules` have never been on the teacher's disk since the
+build moved to container-internal storage. And since 2026-09-05 what IS mirrored
+back is kept OUTSIDE the working folder:
+`courses/<CODE>/.merged_output` is a shortcut to
+`~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>` on macOS, and
+Windows writes to `%LOCALAPPDATA%\Plantoir\builds\<folder id>`. A built site is
+derived and can always be made again, but keeping it in the working folder meant
+a cloud service uploaded every build of it, Time Machine backed it up, and a zip
+or a Finder copy of the course carried it. Every script and every reader still
+names the same path; the shortcut is what makes that true. See
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`buildOutputLocation`.
 
 **Patch-at-build-time, not fork.** Rather than maintaining a fork of Quartz,
 the toolchain keeps a pristine `v4.5.0` checkout and applies small, mostly

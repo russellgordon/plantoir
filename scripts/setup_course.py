@@ -8,6 +8,7 @@ from pathlib import Path
 # be added by hand before sibling imports. Harmless everywhere else.
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
+import class_pages
 import toolchain_paths
 import re
 import sys
@@ -1700,6 +1701,57 @@ def per_section_frontmatter(text: str, section_numbers: list) -> str:
     return "---\n" + "\n".join(out) + rest
 
 
+def prompt_unit_word(saved_config: dict, has_been_set_up_before: bool) -> str:
+    """
+    Ask what this course calls a unit, defaulting to "Unit".
+
+    Only the first word is offered. A teacher who says "Thread" almost
+    certainly still says "Day 3", and a second configurable word would double
+    the migration for something nobody asked for.
+
+    **Not asked at all once the course has a configuration.** The word is applied to the
+    ready-made pages as they are POURED, so changing it on a re-run would
+    rewrite the configuration and rename nothing: the pages would still say
+    "Unit 2, Day 3" and the build would have stopped recognising them —
+    "built, and then recognised by nothing", the exact state this whole piece
+    exists to prevent. Renaming an existing course's word is deliberately not
+    on offer anywhere; it is in TODO.md with the reasons.
+    """
+    current = class_pages.word_from_config(saved_config)
+    if has_been_set_up_before:
+        if current != class_pages.DEFAULT_UNIT_WORD:
+            print(f"\n📘 This course calls its units “{current}”. Changing that now would "
+                  f"rename nothing, so it is not offered.")
+        return current
+    print("\nClass pages are named like “Unit 1, Day 1”.")
+    print("Some teachers organise by Module or Thread instead.")
+    entry = input(f"What do you call a unit? [Default: {current}]: ").strip()
+    chosen = entry if entry else current
+    # A word with a digit in it would make "Module2 1, Day 1", and a word with
+    # a comma would make a name no rule can read back. Refusing is kinder than
+    # accepting and producing pages nothing recognises.
+    if not chosen or any(character.isdigit() for character in chosen) or "," in chosen:
+        print("That name would make class pages Plantoir cannot read back. Using "
+              f"“{class_pages.DEFAULT_UNIT_WORD}”.")
+        return class_pages.DEFAULT_UNIT_WORD
+    return chosen
+
+
+def renamed_for_unit_word(destination: Path, unit_word: str) -> Path:
+    """
+    Where a payload page lands once the course's own word is applied.
+
+    Only the file's own NAME changes, never a folder along the way: payload
+    folders are called things like "All Classes" and "Tasks", and a folder
+    beginning with the word would be renamed by the page rule for no reason.
+    The date lookup upstream keys off the SOURCE stem, so renaming the
+    destination cannot disturb which class date a page is given.
+    """
+    if unit_word == class_pages.DEFAULT_UNIT_WORD:
+        return destination
+    return destination.with_name(class_pages.renamed(destination.name, unit_word))
+
+
 def install_payload_file(source: Path, destination: Path, now_str: str,
                          include_curriculum: bool, page_names: set,
                          section_number: int | None = None,
@@ -1709,11 +1761,18 @@ def install_payload_file(source: Path, destination: Path, now_str: str,
                          course_code: str | None = None,
                          course_name: str | None = None,
                          weekday_step: int = DEFAULT_CLASS_WEEKDAY_STEP,
-                         start_school_day: int = 1) -> bool:
+                         start_school_day: int = 1,
+                         unit_word: str = class_pages.DEFAULT_UNIT_WORD) -> bool:
     """
     One file from payload to course. Markdown is adjusted on the way
     through; everything else is copied as-is. Existing files are never
     touched. Returns True when a file was written.
+
+    `unit_word` is the teacher's word for a unit. A course that says "Module"
+    gets its pages named, titled and linked "Module 2, Day 3" as they are
+    poured, which is the whole reason the choice is offered at setup and not
+    afterwards: renaming three thousand pages and their wikilinks in a course
+    already in use is a different and far more dangerous piece of work.
     """
     if destination.exists():
         return False
@@ -1738,6 +1797,7 @@ def install_payload_file(source: Path, destination: Path, now_str: str,
         text = text.replace("__COURSE_CODE__", course_code)
     if course_name:
         text = text.replace("__COURSE_NAME__", course_name)
+    text = class_pages.rewritten(text, unit_word)
     text = strip_curriculum_blocks(text, keep_content=include_curriculum)
     if not include_curriculum:
         text = unlink_curriculum_references(text, page_names)
@@ -1755,7 +1815,8 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
                             per_section_folders: list, per_section_files: list,
                             reference=None,
                             course_code: str | None = None,
-                            course_name: str | None = None) -> int:
+                            course_name: str | None = None,
+                            unit_word: str = class_pages.DEFAULT_UNIT_WORD) -> int:
     """
     Pour the payload into the course. Only top-level items the teacher kept
     in the structure lists are installed; the curriculum folder also needs
@@ -1796,13 +1857,16 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
             for source in sources:
                 if source.is_dir():
                     continue
-                destination = course_path / source.relative_to(shared_root)
+                destination = renamed_for_unit_word(
+                    course_path / source.relative_to(shared_root), unit_word
+                )
                 if install_payload_file(source, destination, now_str,
                                         include_curriculum, page_names,
                                         first_use_date=class_use_dates.get(source.stem) or first_class_date,
                                         shared_sections=section_numbers,
                                         course_code=course_code,
-                                        course_name=course_name):
+                                        course_name=course_name,
+                                        unit_word=unit_word):
                     written += 1
 
     per_section_root = payload_dir / "per_section"
@@ -1816,7 +1880,9 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
                 for source in sources:
                     if source.is_dir():
                         continue
-                    destination = section_path / source.relative_to(per_section_root)
+                    destination = renamed_for_unit_word(
+                        section_path / source.relative_to(per_section_root), unit_word
+                    )
                     if install_payload_file(source, destination, now_str,
                                             include_curriculum, page_names,
                                             section_number=sec,
@@ -1825,7 +1891,8 @@ def install_example_content(course_path: Path, payload_dir: Path, manifest: dict
                                             course_code=course_code,
                                             course_name=course_name,
                                             weekday_step=weekday_step,
-                                            start_school_day=start_school_day):
+                                            start_school_day=start_school_day,
+                                            unit_word=unit_word):
                         written += 1
 
     return written
@@ -2124,6 +2191,23 @@ def setup_course(no_backup: bool = False):
             else:
                 skeleton_manifest = None
 
+    # ---------- What this course calls a unit -------------------------------
+    # Asked of EVERY course, ready-made or not: the payload is poured in the
+    # teacher's own word rather than renamed afterwards, and the choice is
+    # offered here rather than in Settings because renaming three thousand
+    # pages and their wikilinks in a course already in use is a different and
+    # far more dangerous piece of work.
+    # Whether this course has been set up BEFORE — which is not the same as
+    # whether its folder exists. `course_path.mkdir` runs a couple of hundred
+    # lines above, so testing the folder made the answer always "yes" and a
+    # teacher setting up from the command line could never choose the word at
+    # all. Found by adversarial review, 2026-09-01, having been introduced as
+    # the fix for the opposite problem. A saved CONFIGURATION is what "has been
+    # set up before" means — and it is also what the macOS app leaves behind
+    # before it runs this script, which is exactly right: the app has already
+    # asked, so its answer is read rather than asked for a second time.
+    chosen_unit_word = prompt_unit_word(saved_config, has_been_set_up_before=bool(saved_config))
+
     # ---------- Structure: from the example content, or from prompts --------
     if example_manifest:
         # The example content decides the structure WHOLE: which folders and
@@ -2308,6 +2392,21 @@ def setup_course(no_backup: bool = False):
         "fonts": fonts_config,
         # NEW: per-section section-marker visibility for site title
         "show_section_marker": section_marker_config,
+        # What this course calls a unit, so the build's idea of a class page
+        # follows the teacher rather than the other way round. ABSENT means
+        # "Unit", which is what every course made before this key existed
+        # says — see contracts/file-formats.json.
+        "unit_word": chosen_unit_word,
+        # Which per-section folder holds class pages, RECORDED rather than left
+        # to be guessed from the word "class". A teacher whose vocabulary is
+        # "Thread 2, Day 3" would sensibly call it "All Days"; under the guess
+        # alone that folder is not found and the curriculum map counts the
+        # wrong pages without failing. Written from the same rule that used to
+        # do the guessing, so a course made today records what it would have
+        # been given anyway.
+        "class_folder": class_pages.folder_name(
+            {"per_section_folders": per_section_folders}
+        ),
         # NEW: example-content choices, remembered for future re-runs
         "prepopulate_example_content": prepopulate_example,
         "use_skeleton": use_skeleton,
@@ -2364,6 +2463,14 @@ def setup_course(no_backup: bool = False):
         now_dt = datetime.now().astimezone()
     now_str = now_dt.strftime("%Y-%m-%dT%H:%M:%S.000%z")
 
+    # Written into the configuration above; re-read from it so a value the
+    # desktop apps put there wins over this script's own prompt, which they
+    # never run.
+    chosen_unit_word = class_pages.word_from_config(config)
+    if chosen_unit_word != class_pages.DEFAULT_UNIT_WORD:
+        print(f"\n📘 This course calls its units “{chosen_unit_word}”, so its class pages "
+              f"will be named “{chosen_unit_word} 1, Day 1” and so on.")
+
     # ---------- Install example content (before scaffolding) ----------------
     # The payload lands first so the scaffold below, which only writes files
     # that do not exist yet, fills in around it rather than over it.
@@ -2376,7 +2483,8 @@ def setup_course(no_backup: bool = False):
                 per_section_folders, per_section_files,
                 reference=now_dt,
                 course_code=course_code,
-                course_name=course_name
+                course_name=course_name,
+                unit_word=chosen_unit_word
             )
             if files_written > 0:
                 print(f"\n📖 Example content installed: {files_written} pages.")
@@ -2399,7 +2507,8 @@ def setup_course(no_backup: bool = False):
                 per_section_folders, per_section_files,
                 reference=now_dt,
                 course_code=course_code,
-                course_name=course_name
+                course_name=course_name,
+                unit_word=chosen_unit_word
             )
             if files_written > 0:
                 print(f"\n🧱 Starting pages added: {files_written}.")

@@ -128,6 +128,21 @@ requirement.
   `SkeletonCatalog.structureToAdopt` (never overwrite a list the teacher has
   edited) and `SkeletonCatalog.sidebar` (curriculum hidden, every other
   shared folder gets a chevron, per-section folders stay plain links).
+- **Built websites are kept OUTSIDE the working folder**, and
+  `courses/<CODE>/.merged_output` is a shortcut to
+  `~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>`
+  (`BuildOutputLocation`). The shortcut is what lets `BuildFreshness`,
+  `ScheduledDeploy`, `SectionDetailView`, the three launchers and a launchd
+  deploy all keep naming the path they already named. The folder id is the
+  same `pwd -P | shasum` hash that names the folder's container, derived once
+  in `BuildOutputLocation.folderIdentifier` and used by `FolderContainers`
+  too. The rule is implemented a second time in the launchers' shell, because
+  a teacher at the command line and a scheduled publish have no app — the two
+  are pinned against `contracts/shared-rules.json` → `buildOutputLocation`.
+  **The one thing to know before touching it**: a builds folder with no
+  shortcut pointing at it is CLEARED rather than reused, because archiving,
+  restoring or replacing a course removes the shortcut and can leave content
+  older than the site built from it.
 - The colour scheme picker's choices come from the repository's own
   `support/colour_schemes.json`, bundled as a resource at build time — and
   the font previews register the TTFs from `support/fonts/`, the same

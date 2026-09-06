@@ -91,7 +91,25 @@ struct CourseSettingsView: View {
                                 ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
                             }
                         },
-                        protection: sharedFolderProtection
+                        protection: sharedFolderProtection,
+                        renameProblem: { oldName, newName, finishing in
+                            return folderRenameProblem(
+                                oldName, to: newName, scope: .shared, finishing: finishing
+                            )
+                        },
+                        interruptedRenameTarget: { oldName in
+                            return SpecialFolderRenamer.interruptedRenameTarget(
+                                from: oldName, scope: .shared,
+                                courseDirectory: course.directoryURL,
+                                sectionNumbers: course.configuration.sectionNumbers
+                            )
+                        },
+                        onRename: { oldName, newName in
+                            return await renameFolder(oldName, to: newName, scope: .shared)
+                        },
+                        noticeAfterChange: { name, change in
+                            return noticeAfterFolderChange(name, change: change, scope: .shared)
+                        }
                     )
                     StringListEditorView(
                         title: "Shared files (all sections)",
@@ -120,7 +138,25 @@ struct CourseSettingsView: View {
                                 ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
                             }
                         },
-                        protection: perSectionFolderProtection
+                        protection: perSectionFolderProtection,
+                        renameProblem: { oldName, newName, finishing in
+                            return folderRenameProblem(
+                                oldName, to: newName, scope: .perSection, finishing: finishing
+                            )
+                        },
+                        interruptedRenameTarget: { oldName in
+                            return SpecialFolderRenamer.interruptedRenameTarget(
+                                from: oldName, scope: .perSection,
+                                courseDirectory: course.directoryURL,
+                                sectionNumbers: course.configuration.sectionNumbers
+                            )
+                        },
+                        onRename: { oldName, newName in
+                            return await renameFolder(oldName, to: newName, scope: .perSection)
+                        },
+                        noticeAfterChange: { name, change in
+                            return noticeAfterFolderChange(name, change: change, scope: .perSection)
+                        }
                     )
                     StringListEditorView(
                         title: "Per-section files",
@@ -376,6 +412,168 @@ struct CourseSettingsView: View {
         gradedFoldersBinding.wrappedValue = remaining
     }
 
+    // MARK: - Renaming a folder
+
+    /// Why this folder cannot take that name, or nil when it can.
+    ///
+    /// The names it is checked against are the ones in its OWN scope. A shared
+    /// folder and a per-section folder may legitimately share a name — they
+    /// live in different places on disk, and `discover_shared_items` and
+    /// `discover_section_items` scan for them separately — so checking both
+    /// lists would refuse a rename that is perfectly fine.
+    func folderRenameProblem(
+        _ oldName: String, to newName: String, scope: FolderScope, finishing: Bool = false
+    ) -> String? {
+        let namesInScope: [String]
+        switch scope {
+        case .shared:
+            namesInScope = course.configuration.sharedFolders
+        case .perSection:
+            namesInScope = course.configuration.perSectionFolders
+        }
+        // `finishing` is settled once when the sheet opens, not here: it
+        // touches the filesystem, and this runs on every keystroke.
+        return SpecialFolderRenamer.problem(
+            renaming: oldName, to: newName, existingNames: namesInScope,
+            isFinishingAnInterruptedRename: finishing
+        )
+    }
+
+    /// Renames the folder on disk and rewrites the configuration keys that
+    /// named it, in that order.
+    ///
+    /// Disk first on purpose: if the move fails, nothing has been written and
+    /// the course is exactly as it was. The other way round would leave a
+    /// configuration naming a folder that is not there — which is the state
+    /// this whole feature exists to make impossible.
+    func renameFolder(_ oldName: String, to newName: String, scope: FolderScope) async -> RenameResult {
+        let outcome: FolderRenameOutcome
+        // OFF the main thread. The move is quick; reading every page in the
+        // course to rewrite links is not, on an iCloud-backed vault where an
+        // evicted file downloads on read. The configuration write below stays
+        // on the main actor, because it touches the observable model.
+        let courseDirectory: URL = course.directoryURL
+        let sectionNumbers: [Int] = course.configuration.sectionNumbers
+        do {
+            outcome = try await Task.detached(priority: .userInitiated) {
+                return try SpecialFolderRenamer.rename(
+                    oldName, to: newName, scope: scope,
+                    courseDirectory: courseDirectory,
+                    sectionNumbers: sectionNumbers
+                )
+            }.value
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+        do {
+            try course.configuration.recordOnDisk({ values in
+                return SpecialFolderRenamer.renaming(oldName, to: newName, scope: scope, in: values)
+            }, at: course.configFileURL)
+        } catch {
+            // Recorded BEFORE returning, and that ordering is the point: this
+            // is the one outcome the trail exists for. The folder has moved
+            // and the settings do not know, which is the state somebody will
+            // be asked to explain later — and it was the one case with no line
+            // at all, because the note used to sit after this block.
+            ActivityTrail.note(
+                .folderRenamed,
+                "renamed the folder " + oldName + " to " + newName + " in " + course.code
+                + " but could not write it to this course's settings — "
+                + error.localizedDescription
+            )
+            // The folder HAS moved, so this is not "the rename failed" — it is
+            // a rename whose bookkeeping did not land, and saying otherwise
+            // would send the teacher looking for a folder under its old name.
+            return .failed(
+                "“\(oldName)” was renamed to “\(newName)”, but Plantoir could not write the "
+                + "change to this course's settings: \(error.localizedDescription)"
+            )
+        }
+        // The configuration is written, so the rename is whole and the record
+        // of it having started can go. Anything that leaves this record behind
+        // is, by definition, a rename that did not finish.
+        SpecialFolderRenamer.clearRenameRecord(courseDirectory: course.directoryURL)
+        ActivityTrail.note(
+            .folderRenamed,
+            "renamed the folder " + oldName + " to " + newName + " in " + course.code
+            + " (" + scope.configurationKey + ", " + String(outcome.foldersMoved) + " moved, "
+            + String(outcome.pagesRelinked) + " pages relinked)"
+        )
+        // A rename that moved nothing is not a failure — a per-section folder
+        // may legitimately be missing from a section a teacher never filled in
+        // — but it must not be reported as though folders had moved. Told
+        // plainly, because the alternative is a teacher going to Obsidian to
+        // look for a folder that was never there.
+        //
+        // Guarded on the LINKS as well as the folders: a page can carry a
+        // qualified link into a folder no section actually has, and saying
+        // "only this course's settings changed" while pages were rewritten
+        // would be false. Rare, and this sentence exists to be exact.
+        if outcome.foldersMoved == 0 && outcome.pagesRelinked == 0 {
+            return .renamed(
+                SpecialNames.renameFolderDone(from: oldName, to: newName)
+                + " " + SpecialNames.renameFolderNothingWasThere
+            )
+        }
+        return .renamed(
+            SpecialNames.renameFolderDone(from: oldName, to: newName)
+            + " " + SpecialNames.renameFolderRelinked(pages: outcome.pagesRelinked)
+        )
+    }
+
+    /// What a teacher is told after adding or removing a folder — including
+    /// the folder Plantoir has just made for them, which would otherwise
+    /// appear in their vault unexplained.
+    func noticeAfterFolderChange(_ name: String, change: ListChange, scope: FolderScope) -> String? {
+        switch change {
+        case .added:
+            if createFoldersOnDisk(named: name, scope: scope) {
+                ActivityTrail.note(
+                    .folderCreated,
+                    "created the folder " + name + " in " + course.code
+                    + " (" + scope.configurationKey + ")"
+                )
+                return SpecialNames.addCreatesTheFolderMessage(name: name)
+            }
+            return nil
+        case .removed:
+            return SpecialNames.removeLeavesTheFolderOnDiskMessage(name: name)
+        }
+    }
+
+    /// Makes the folder the teacher just named, wherever its scope says it
+    /// lives, and reports whether anything was actually created.
+    ///
+    /// Adding a name used to write a configuration entry pointing at nothing,
+    /// so the folder had to be made in Obsidian afterwards or the entry named
+    /// something that did not exist. Nothing is put INSIDE it: an empty folder
+    /// is the honest starting state, and inventing a page would put words in
+    /// the teacher's mouth.
+    func createFoldersOnDisk(named name: String, scope: FolderScope) -> Bool {
+        let locations: [URL] = SpecialFolderRenamer.folderLocations(
+            named: name, scope: scope,
+            courseDirectory: course.directoryURL,
+            sectionNumbers: course.configuration.sectionNumbers
+        )
+        var created: Bool = false
+        for location in locations {
+            if FileManager.default.fileExists(atPath: location.path) {
+                continue
+            }
+            do {
+                try FileManager.default.createDirectory(at: location, withIntermediateDirectories: true)
+                created = true
+            } catch {
+                // Re-adding a name whose folder is already there is the common
+                // case and is not worth a word; a genuine failure shows up as
+                // the folder simply not being there, which the build's own
+                // checks already report in the teacher's own terms.
+                continue
+            }
+        }
+        return created
+    }
+
     func sharedFolderProtection(for folder: String) -> ItemProtection {
         let resolvedCurriculum: String? = CurriculumFolderRule.resolvedCurriculumFolder(for: course)
         if let resolvedCurriculum, folder == resolvedCurriculum {
@@ -414,7 +612,7 @@ struct CourseSettingsView: View {
         // 2026-08-24): the next-class button and the schedule write pages
         // into it, so a confirmation would be asking the teacher to break
         // both. Every other per-section folder can be added or removed.
-        if ClassFolder.isTheAllClassesFolder(folder) {
+        if ClassFolder.isTheAllClassesFolder(folder, configured: course.configuration.classFolder) {
             return .blocked(reason: SpecialNames.classFolderBlocked)
         }
         if currentGraded.contains(folder) {

@@ -37,7 +37,11 @@ over the deploy method.
 - The static site must already exist at
   `courses/<CODE>/.merged_output/section<N>/public/`. The deploy launcher
   never builds it: if that folder is missing or empty it stops and tells the
-  teacher to run preview with `--build-only` first.
+  teacher to run preview with `--build-only` first. On macOS that path is a
+  shortcut out of the working folder (see
+  [the build pipeline](05-build-pipeline.md)); `deploy.py` follows it for the
+  work but names the `courses/…` spelling in everything it says, because that
+  is the path the teacher knows.
 - `NETLIFY_AUTH_TOKEN` must be in the environment. The deploy **launcher**
   owns the token (macOS Keychain / Windows Credential Manager — see
   [launcher scripts](03-launcher-scripts.md#deploysh)) and injects it; the
@@ -101,6 +105,45 @@ signature in `public/index.html` (or checks if `baseUrl` in `quartz.config.ts` n
 updating for the deployed domain) and automatically re-executes a clean static
 build inside the container-internal workspace (`/tmp/quartz-builds/...`),
 mirroring the production assets back to `public/` before uploading.
+
+**`deploy.py` does not cover every destination, and the gap was real.**
+Publishing to a folder never enters the container — the built site already sits
+on the host, so `deploy.sh` / `deploy.ps1` mirror it across directly and
+`deploy.py` is never reached. That destination therefore had no such check at
+all until 2026-09-05, and publishing straight after a preview shipped the
+live-reload client: measured at 230 of 244 files. The app was never exposed,
+because build freshness (`contracts/app-rules.json` → `buildFreshness`) forces a
+rebuild when the built site was made by a preview — but from the command line nothing did.
+The launchers now make the check themselves before mirroring, and rebuild.
+
+Two details of that guard are worth knowing, because both were got wrong once:
+
+- **It waits on the WHOLE TREE, not the front page.** Serve mode bakes the
+  client into every page and the host mirror is replaced file by file, so a
+  clean front page can sit in front of hundreds of stale preview pages.
+  Publishing that mixture is worse than publishing the preview wholesale,
+  because the front page looks right and nobody looks further.
+- **The rebuild stops a preview that is still serving that section**, because
+  the preview's sync watcher mirrors the serve build to the host every second
+  and would otherwise overwrite the rebuild within a second of it finishing.
+  See [the build pipeline](05-build-pipeline.md#a-build-for-publishing-stops-that-sections-preview).
+
+Both guards are exercised by `verify-deploy.sh`, which publishes to every
+destination and then fetches each site back and reads it. **It is bash, and it
+runs on the mac only** — so the PowerShell half of these guards is not covered
+by it, which is how the next paragraph's defect survived.
+
+**A third detail, learned the expensive way on Windows.** The PowerShell port
+of the tree check was written from the mac, where it could not be run, and it
+used `Select-String -Quiet` on a pipeline of files. That returns one result
+PER FILE rather than one answer for the tree, and a non-empty array is TRUE in
+PowerShell whatever is in it — so the check was true for any site with two or
+more pages, which is every real site. Publishing to a folder therefore could not succeed on Windows at
+all: it always claimed the site was a preview build, always rebuilt, always
+waited the full timeout, and always refused. It is now `Test-CarriesLiveReload`
+in `deploy.ps1`, which tests for a match object rather than a Boolean. The
+general rule for PowerShell written from the mac: `-Quiet` is not a scalar when
+the input is a pipeline.
 
 ### Why determinism matters
 
@@ -243,7 +286,15 @@ and bandwidth are unmetered on the free plan.
 Chosen with `deploy_target: "local_folder"` plus `deploy_folder_path`. This
 one never reaches the container: the launcher mirrors the already-built
 `public/` folder into `<chosen folder>/section<N>` on the host, copying only
-what changed and propagating deletions. It exists for teachers whose board or
+what changed and propagating deletions.
+
+**Never reaching the container is the thing to remember about this
+destination.** Everything `deploy.py` does for the other two — most importantly
+[refusing to publish a preview build](#automatic-production-rebuilds-live-reload-detection)
+— simply does not happen here, and each such guard has to be repeated in
+`deploy.sh` and `deploy.ps1` or it does not exist for this path. That is not
+hypothetical: the preview-build refusal was missing here for as long as the
+destination has existed. It exists for teachers whose board or
 university already gives them web space — they upload the folder however they
 normally do (SFTP, a network share, a sync client), and no third-party
 account is involved at all.

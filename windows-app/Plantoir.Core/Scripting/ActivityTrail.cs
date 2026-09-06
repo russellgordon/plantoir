@@ -33,6 +33,17 @@ public static class ActivityTrail
         AssistantConfirmationChanged,
         SectionContentMarkedPublished,
         /// <summary>
+        /// A section's leftover website-builder processes were ended.
+        /// Carries the course, the section, and HOW MANY — the count is the
+        /// point. Stopping a preview, closing a window or cancelling a
+        /// publish asks the launcher to end whatever that section still has
+        /// running, and nothing else on the trail separates "there was
+        /// nothing left to stop" from "a build was still going and was
+        /// ended". Those are the two competing explanations when a teacher
+        /// reports a publish that stopped halfway.
+        /// </summary>
+        SectionProcessesReclaimed,
+        /// <summary>
         /// A folder a feature depends on was missing, renamed or emptied.
         /// Carries the check's NAME, never its wording.
         /// </summary>
@@ -100,6 +111,7 @@ public static class ActivityTrail
         Event.AssistantModelDownloadStopped => "assistant model download stopped",
         Event.AssistantConfirmationChanged => "assistant confirmation changed",
         Event.SectionContentMarkedPublished => "section content marked published",
+        Event.SectionProcessesReclaimed => "section processes reclaimed",
         Event.FolderProblemFound => "folder problem found",
         Event.FolderProblemRepaired => "folder problem repaired",
         Event.AssistantEngineSaid => "assistant engine said",

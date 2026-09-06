@@ -15,6 +15,13 @@ this skill automates its steps 5–6 and the note-writing.
 1. Last release: `git describe --tags --abbrev=0` (if no tag exists,
    this is the first release — summarize the product, not the delta).
 2. The story since: `git log <last-tag>..HEAD --pretty=format:'%s%n%b%n---'`
+2a. **`RELEASING.md` → "Warnings the release notes MUST carry".** Read it
+   before drafting, and carry every row into the notes in the teacher's own
+   words. These are things a teacher must DO — usually before updating — as
+   against the things they gain, and drafting from the commits alone will
+   summarise them away: a caution lives in a commit BODY, and a body is what
+   gets compressed. Clear the list in the same commit that moves the version
+   line, exactly as the "Landed since" table is cleared.
 3. The bundle(s) to attach:
    - `mac-app/dist/Plantoir-macOS.dmg` (freshly built & notarized by `mac-app/publish.sh -Sign`)
    - `windows-app/dist/PlantoirSetup.exe` (freshly built & signed by `publish.ps1 -Sign`)
