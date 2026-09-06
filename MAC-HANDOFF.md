@@ -67,10 +67,50 @@ product, not of one platform.
 > list below is green.
 
 
-**Nothing is outstanding.** Both cases proposed for v1.1.0 were cleared on
-2026-08-20 — one implemented, three retired — and the reasoning for each is in
-the ledger below under "The teacher-made-link case is implemented, and the
-three setup cases are retired".
+**One is outstanding, proposed 2026-09-06: a folder rename breaks Markdown
+links when the new name contains a space — on BOTH platforms.**
+
+`FolderPathRewriter` decides whether to percent-encode the new name from
+whether the OLD segment was encoded. That is the obvious rule and it is wrong,
+because a Markdown link destination ends at the first SPACE. Renaming `Tasks`
+to `All Tasks` turns
+
+    [q](Tasks/Quiz%201.md)   into   [q](All Tasks/Quiz%201.md)
+
+which neither Obsidian nor Quartz can follow. The folder segment `Tasks` has no
+`%` in it, so `wasEncoded` is false and the new name goes in plain — the `%20`
+in the example belongs to the FILE name, which is what makes this easy to miss
+by eye. Every Markdown-style link into that folder is broken, in a teacher's
+own pages, and nothing says so.
+
+**The mac has the same defect**, and it was read rather than assumed:
+`FolderPathRewriter.encoded(_:likeThe:)`
+(`mac-app/QuartzTeachers/Models/FolderPathRewriter.swift:261-270`) returns the
+name unchanged whenever `wasEncoded` is false. Windows is fixed as of
+2026-09-06 and its rule is: **in a Markdown link, escape when the NEW name
+needs it — whitespace or brackets — whatever the old segment looked like; in a
+WIKILINK keep the plain spelling**, because `[[All Tasks/Quiz 1]]` is exactly
+how Obsidian writes a wikilink containing a space, and escaping there would be
+the mirror-image mistake.
+
+**The cases, for whichever contract file the mac decides they belong in.**
+`class-planning.json` has no rewriter block today and inventing a new top-level
+key from this side seemed worse than describing them here, since only the mac
+can regenerate. Five, each `rename Tasks → All Tasks` unless it says otherwise:
+
+| given | expect |
+|---|---|
+| `[q](Tasks/Quiz%201.md)` | `[q](All%20Tasks/Quiz%201.md)` |
+| `[q](Tasks/Quiz.md)` | `[q](All%20Tasks/Quiz.md)` |
+| `[[Tasks/Quiz 1]]` | `[[All Tasks/Quiz 1]]` — a wikilink keeps the space |
+| `[q](Tasks/Quiz.md)`, renamed to `Work(new)` | `[q](Work%28new%29/Quiz.md)` — a bracket ends a destination too |
+| `[q](Tasks/Quiz.md)`, renamed to `Assignments` | `[q](Assignments/Quiz.md)` — a name needing nothing is not escaped for the sake of it |
+
+Windows runs all five in `FolderPathRewriterTests`.
+
+The two cases proposed for v1.1.0 were cleared on 2026-08-20 — one implemented,
+three retired — and the reasoning for each is in the ledger below under "The
+teacher-made-link case is implemented, and the three setup cases are retired".
 
 The mechanism, in one paragraph. `Plantoir --write-contracts` runs on the mac,
 so the Windows side cannot regenerate the derived halves of
