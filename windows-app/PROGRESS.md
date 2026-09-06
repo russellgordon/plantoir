@@ -15,6 +15,7 @@ Docker Desktop) unless marked otherwise.
 | `Plantoir.Core/` | All logic, UI-free: config round-trip, container naming, port leases, build freshness, archiver/restorer, section adder, ConPTY process, transcript builder, script runner, milestones, question parsing, failure explainer, catalogs, workspace/toolchain services — **and the whole assist subsystem** under `Assist/` (18 files): `AssistWorkspace`, `AssistAgent`, the plans (`PublishPlan`, `ReDatePlan`, `SyncPlan`, `InsertPlan`, `NewClassesPlan`, `CurriculumMentionsPlan`), `LinkGraph`, `SectionIndex`, `Timetable` and `TimetableMemory`, `DateAudit`, `UndoHistory`, `ScheduledDeploy` and `TaskScheduling`, `Briefing`, and `WorkLease`. |
 | `Plantoir.Tests/` | xUnit suite that runs **without Docker**: `dotnet test`. No count is given here on purpose — it rots. Classes touching process-wide state (preview leases, the publish registry) share a serialized collection — see `SharedActivityState`. |
 | `PtyDriver/` | Console harness that drives the launchers under a ConPTY with scripted prompt replies — how the E2E runs below were performed. |
+| `Plantoir.UiTests/` | Drives the REAL built app through UI Automation (FlaUI/UIA3), for what a unit test cannot reach — see "Driving the real interface" below. Opt-in: skipped unless `PLANTOIR_UI_TESTS=1`, and compiled by a SOLUTION build (not by the per-project commands used day to day). References `Plantoir.Core` only, never the app project — the Windows App SDK has no business in a test host. |
 | `Plantoir.Mcp/` | On `main` (`Plantoir.sln` lists it) and **it ships**: `publish.ps1` publishes it, copies `plantoir-mcp.exe` into the app's own output beside `Plantoir.exe`, and includes it in the signing list. A standalone MCP server exposing one working folder to an AI assistant. Load-bearing at runtime — `Plantoir/Services/ClaudeCodeLauncher.cs` looks for it beside the app, and `Plantoir/Services/McpClient.cs` launches it. See [its README](Plantoir.Mcp/README.md). |
 
 ## Where parity stands (2026-09-06)
@@ -33,7 +34,7 @@ What is genuinely left, smallest first:
 | 18 | The two VIEWS: the choice at the folder picker, and the dismissable notice for a folder the window restored. Detection, wording and the remembered-per-folder store are built — the store's API is `AppSettings.HasAcceptedSyncFor` / `RememberAcceptedSyncFor`, and the two moments belong in `WorkspacePickerView` (a folder just chosen) and `MainWindow`'s restore path (a folder the window reopened). | Medium |
 | 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
 | 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 52 test methods over 63 cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
-| 22 | The "Folders Plantoir uses" sheet (mac row 361) — never ported, and in no list until 2026-09-06. A teacher-facing explanation, so the wording matters more than the mechanism. | Medium |
+| ~~22~~ | ✅ Done 2026-09-06 — the "Folders Plantoir uses" sheet, now shared as `shared-rules.json` → `specialFoldersHelp` rather than living inside a view. Two cases proposed back to the mac. | — |
 
 Two things that are NOT in that list and should be known:
 
@@ -65,10 +66,14 @@ is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code. The same goes for the four trail events below: the
 features that would raise them are these same two.
 
-## Four activity-trail events are declared but not yet emitted (2026-09-06; a fifth was, and now is)
+## SIX activity-trail events are declared but not yet emitted (2026-09-06; a seventh was, and now is)
 
 `ActivityTrail.Event` names `folder renamed`, `folder created`,
-`synced folder noticed` and `synced folder accepted`. All four are in
+`synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,
+`settings saved` and `settings could not be saved`, which belong to no
+unbuilt view at all: `CourseSettingsView.Save_Click` writes the config and
+records nothing, while the mac records both. That last pair is a small fix
+rather than a feature, and it is handoff item 28. The first four are in
 `contracts/shared-rules.json` → `activityTrail.mustRecord`, and
 `ContractTests.SharedRules_ActivityTrailEvents_Exist` compares that list
 against the enum — so declaring them is what makes the suite green.
@@ -214,8 +219,10 @@ plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
   the display's work area, clamped, so it looks right at any scale.
 - The preview accelerators exist — Ctrl+R, Alt+Left, Alt+Right, declared at
   view scope in `Views/SectionDetailView.xaml` and handled in its code-behind.
-  What is missing is a **Preview menu-bar item**; Back/Forward/Reload are on
-  the toolbar only.
+  ~~What is missing is a **Preview menu-bar item**~~ — added 2026-08-22
+  (`MainWindow.xaml`, handoff item 1). Corrected 2026-09-06: this paragraph
+  outlived the work by a fortnight, and anyone planning from it would have
+  built it twice.
 - Two paths proven underneath but never click-driven in-app: the wizard's
   Create button (the `setup.ps1` + answer-pump path ran to completion via
   PtyDriver), and the new-site dialog a BRAND-NEW section's deploy raises —

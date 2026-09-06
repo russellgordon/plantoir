@@ -82,7 +82,7 @@ public sealed class LocalModel : IChatModel, IDisposable
     /// <summary>Where model weights live on the host.</summary>
     public static string ModelDirectory =>
         ModelDirectoryOverride ??
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "models");
+        Plantoir.Core.Models.AppDataRoot.Combine("models");
 
     /// <summary>The port llama-server answers on.</summary>
     public int Port { get; private set; } = 8099;

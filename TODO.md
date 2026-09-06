@@ -4,6 +4,30 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **The UI-test runner closes a running Plantoir without checking whether it
+  is BUSY, and leaves its leases behind** (Windows, 2026-09-06). Deliberate as
+  far as it goes: Russell's instruction that day was "kill my copy, I don't
+  care", and `run-ui-tests.ps1` and `DrivenApp` both do, and say so. But
+  CLAUDE.md's standing permission keeps one condition this does not honour —
+  not out from under work he can SEE happening, a build or a preview or a
+  deploy running in the app's own console.
+
+  **The signal already exists, which is what makes this cheap.** A busy app
+  writes `<COURSE>.<kind>.<pid>.lease` into
+  `<working folder>/courses/.internal/activity/` (`WorkLease`). The runner
+  could read the remembered working folders out of `settings.json`, look for a
+  live lease, and refuse THAT case only — leaving the ordinary "an idle window
+  is open" case killed silently as it is now.
+
+  **And a kill orphans those leases**, which CLAUDE.md asks the killer to
+  delete: a lease whose process is gone is ignored, so nothing locks up, but a
+  recycled process id whose name happens to match is the one case the
+  staleness check cannot see through. The runner should sweep the leases it
+  orphaned.
+
+  Not done now because neither half is reachable from the six tests that
+  exist: they drive Course Settings, which starts nothing.
+
 - ⚠️ **A scheduled deploy has nobody to answer a question, and `deploy` still
   asks them — found on Windows, 2026-09-06, and it is the same shape on both
   platforms.** Not fixed, because the fix touches the launcher's argument

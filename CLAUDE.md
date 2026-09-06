@@ -679,10 +679,12 @@ Four things that cost a day each if you do not know them:
   probe, took the promise-card score from 110/110 to 90/110 and broke three
   probes that had been perfect. A small model reads a sentence naming another
   tool as a recommendation, not a boundary. The rule went into Swift instead.
-- **Adding a tool is a routing change.** The local model is shown 13 of the 20
-  tools that exist (`AssistToolRunner.localTools`); an MCP client is shown 23
-  (`.mcpTools`, the 20 plus three that ask for judgement about meaning). More
-  choices is the classic way a router degrades.
+- **Adding a tool is a routing change.** On the mac the local model is shown
+  13 of the 22 tools that exist (`AssistToolRunner.localTools`); an MCP client
+  is shown 25 (`.mcpTools`, the 22 plus three that ask for judgement about
+  meaning). More choices is the classic way a router degrades. **Windows'
+  `plantoir-mcp.exe` serves 37**, so the two MCP surfaces are no longer the
+  same product — see `MAC-HANDOFF.md`.
 
 On the mac the MCP server IS the app: `Plantoir --mcp-stdio <working-folder>`
 serves the same tools to Claude Code, so there is no second binary to sign or
@@ -718,6 +720,7 @@ mistake there is a mistake in nineteen hundred courses.
 | Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
 | macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests` |
 | Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` |
+| Windows app, **through the real interface** | `.\run-ui-tests.ps1` — launches the x64 Debug `Plantoir.exe` with `--state-dir` and drives it with UI Automation, for what a unit test cannot see: that a control can be REACHED, that clicking it opens something, that the RENDERED text is what the model said in the order the contract fixes, that a scrolling list is not cut off at the bottom, and that a panel follows the course a teacher selected rather than going stale. **Opt-in and part of no gate**: every test carries `[UiFact]` and skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and runs none. It is in the solution, so a SOLUTION build compiles it — the per-project commands this table names do not, which is the honest limit of the compile-rot protection. Needs a desktop session and the foreground, takes minutes, and CLOSES a running Plantoir (saying so, and not reopening it). Nothing of the teacher's is touched: `--state-dir` moves the whole state folder for the run. |
 | Assistant routing | **Nothing.** Measured by hand — see below. |
 | Publishing (any destination, `deploy.sh`/`deploy.py`, the preview→publish path) | `./verify-deploy.sh` — publishes to a folder, Netlify and Cloudflare, and every primary+secondary pairing, then FETCHES EACH SITE BACK and reads it. Deliberately NOT part of `verify.sh`: it needs three credentials, the network, and it creates real sites. Run it when the publishing path changes. |
 

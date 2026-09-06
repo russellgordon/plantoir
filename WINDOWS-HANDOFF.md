@@ -1013,8 +1013,32 @@ this side is expected to say so when the contract is wrong.
     was written to end. The trail line is a diagnosis after the fact, not a
     warning at the time.
 
-22. **The "Folders Plantoir uses" sheet (mac row 361, 2026-08-23) — NEVER
-    PORTED, and it was in no list until 2026-09-06.** The mac's Course
+22. ~~**The "Folders Plantoir uses" sheet (mac row 361, 2026-08-23)**~~ —
+    ✅ Done 2026-09-06, branch `issue/windows-special-folders-help`,
+    `GUI-IMPROVEMENTS.md` row 422.
+
+    **Porting it turned out to mean writing the rules down first.** The mac's
+    version keeps its entire rule set inside a SwiftUI view, so there was
+    nothing shared to implement against and nothing a test on either side
+    could reach. `contracts/shared-rules.json` → `specialFoldersHelp` now
+    carries the title, the intro, the seven rows in order with their
+    sentences, the listing grammar, the banned vocabulary and six cases;
+    `Plantoir.Core/Models/SpecialFoldersHelp.cs` implements it and
+    `Plantoir/Views/SpecialFoldersHelpDialog.cs` draws it, writing no sentence
+    of its own. Two cases are PROPOSED for the mac rather than describing it —
+    see `MAC-HANDOFF.md`; the mac names the raw `curriculum_folder` key where
+    the build resolves past it, which affects every real course checked.
+
+    **The one thing worth carrying forward from doing it:** the banned-word
+    list here is not rule 1's list. It carries "substring", "segment" and
+    "case-insensitive" too, because the sheet's whole design is to name a
+    course's OWN folders rather than describe how they are matched — and
+    describing the rule in a sentence is the same leak as printing it in a
+    row. The mac's own placeholder text falls foul of exactly this, which is
+    how the rule earned its place.
+
+    *Original entry, kept because it is the reason the item existed:* The
+    mac's Course
     Settings has a sheet explaining which folders Plantoir treats specially
     and why (`Views/CourseSettings/SpecialFoldersHelpView.swift`, opened from
     `CourseSettingsView.swift`). Nothing on this side has it: no
@@ -1178,6 +1202,116 @@ having before you touch `TaskScheduling.cs`: register a scheduled job as the
 APP, not as the shell it happens to run, or the operating system tells the
 teacher that "bash" — or, on the second attempt here, a person's name — wants
 to run in the background.
+
+25. **The wizard never asks the skeleton question, so ~1,900 course codes get
+    an answer nobody chose (found 2026-09-06).** `use_skeleton` appears
+    NOWHERE in `windows-app/` — verified by search, zero hits. The mac asks it
+    (`NewCourseWizardView.swift`, "Start from a … skeleton") and writes the
+    answer; `NewCourseDialog.cs` goes straight to the "no example content"
+    note, and `SkeletonCatalog.cs` is ported but referenced only from a
+    comment. `setup_course.py` defaults a missing answer to TRUE, so a Windows
+    teacher silently gets the skeleton either way — which is the RIGHT default
+    and still not the same product.
+
+    **How it went missing is the point, and it is item 22's shape exactly.**
+    It was DECIDED on 2026-08-16 — "match the mac: ask the question and write
+    the answer" — and written into this file's body, and recorded as a
+    `knownDivergence` in `contracts/file-formats.json` →
+    `courseConfigKeys.wizardAnswerKeys`. It was never put on this numbered
+    list, which is the only thing a Windows session reads first. Two places
+    described it and neither was an index.
+
+    The test that would have announced it is `wizardAnswerKeys.keys`, which
+    the mac suite runs and Windows does not — see item 29. Medium: a wizard
+    field, the key, and one contract test.
+
+26. **The marks checklist offers only TOP-LEVEL folders, so a nested one
+    cannot be ticked and loses its marks silently (found 2026-09-06).**
+    `CourseSettingsView.xaml.cs` builds the pool from
+    `SharedFolders.Concat(PerSectionFolders)`. The mac unions those with
+    `nestedFolderNames`, four levels deep, and says why in a comment above it:
+    **the first tick freezes the pool**, so any folder the build would have
+    counted but the list did not offer is dropped from that moment on, with
+    nothing said.
+
+    A teacher who files assessed work in `Portfolios/Tasks` cannot tick it,
+    and every expectation it addresses reads as never evaluated on the
+    coverage map. Written up NOWHERE before today — not in either handoff, not
+    in `GUI-IMPROVEMENTS.md`. Medium, and it interacts with the graded-folder
+    rules already ported, so read `GradedFolderRule` before starting.
+
+27. **The assistant offers no way back for a whole conversation (found
+    2026-09-06).** The mac shows a "restore this section" banner once a
+    conversation has changed something, behind a destructive confirmation
+    (`AssistWindowView.swift`, backed by `Models/Assist/AssistSectionRestore.swift`).
+    `AssistSectionRestore` appears nowhere in `windows-app/` — zero hits.
+    `UndoHistory.cs` gives per-change undo, which is not the same promise: a
+    teacher who let the assistant make six changes and wants the section as it
+    was has to undo six times and know that is what they are doing. Written up
+    nowhere before today. Medium.
+
+28. **Four small gaps, each too slight for an item of its own and none of them
+    written down before today (found 2026-09-06).**
+
+    - **A scheduled deploy is arranged without the teacher seeing the plan.**
+      `ScheduledDeploy.Describe()` already composes it — destination, machine
+      requirements, and the class pages NOT yet published — and carries
+      `UnpublishedClasses`. Nothing in the UI project calls it;
+      `SidebarPane.xaml.cs` shows a fixed paragraph. So a teacher schedules
+      6:30 AM without being told tomorrow's page is unpublished, which is the
+      one thing the description exists to tell them. The text is written; this
+      is wiring.
+    - **The main window never comes forward when the assistant starts a
+      preview or a deploy.** `MainWindow.xaml.cs` contains no `Activate()`
+      call at all — while two of its own doc comments describe the behaviour
+      as though it did ("the window still comes forward so the teacher
+      actually sees it"). The assistant is a separate top-level window, so the
+      build runs behind it. Row 300 on the mac.
+    - **`settings saved` and `settings could not be saved` are declared and
+      never emitted.** `Save_Click` writes the config and records nothing; the
+      mac records both. That brings the count of declared-but-unemitted events
+      on this side to SIX, not the four `PROGRESS.md` claims — the other four
+      belong to items 13 and 18, whose views do not exist yet.
+    - **The assistant window's size and position are not remembered.** Only
+      `MainWindow` has a frame in `AppSettings`. Row 164's note says "Windows
+      has its own placement memory", which is true of the main window only.
+
+29. **~20 contract case lists the mac suite runs and the Windows suite does
+    not, which is why gaps like item 25 go unannounced (found 2026-09-06).**
+    None is unreachable — `Contracts.cs` is a plain JSON loader — each is
+    simply a test never written. **This is the highest-leverage item on the
+    list**: wiring it is mechanical, and it would have caught item 25 and half
+    of item 28 by itself, without anybody thinking to look.
+
+    Worth doing first, roughly in this order:
+
+    - `app-rules.json` → `markerOrigins.origins` (26) and `milestones` (57).
+      `contracts/README.md` calls `markerOrigins` "the one easiest to get
+      wrong", and getting it wrong stops the progress bar moving, which reads
+      as a slow build rather than a bug.
+    - `file-formats.json` → `wizardAnswerKeys.keys` (3) — item 25.
+    - `app-rules.json` → `credentialPrompts.everyRequest` (7): whether a typed
+      token is echoed on screen. Windows runs `credentialPrompts.cases` only.
+    - `app-rules.json` → `publishedFreshness.whenShown` (9) / `whenRecorded`
+      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/25, the
+      descriptions the model actually sees); `course-management.json` →
+      `courseCode.renameEffects` (6); `shared-rules.json` →
+      `buildOutputLocation.windowsLocation.buildsRoot` (asserted by nobody on
+      either side), `problemReportDialog.askAboutPromptsWhen`,
+      `workingFolderPathBar.ancestorPaths` (Windows hardcodes its own crumbs),
+      `assistantModelChoice.comfortFraction`/`guidance`;
+      `file-formats.json` → `firstDeployMarkers.paths` (3);
+      `example-content.json` → `rules` (5).
+    - **Neither side** tests `cloudSyncedFolders.detection.windowsMarkers` (4),
+      which item 18 depends on.
+    - `stopPreview.cases` (23) ARE covered, but by `test_stop_preview.ps1`,
+      outside `dotnet test` — so they do not run in the gate.
+
+30. **Smaller still, and listed only so they are not rediscovered as
+    surprises**: the Archived/Backup detail pane offers Restore but not Delete
+    (Delete exists in the sidebar menu); the empty-folder picker's breadcrumbs
+    have none of the main window's icons, tooltip or menu; and there is no Edit
+    menu or keyboard route to Rename Course — it is context-menu only.
 
 ## Windows no longer runs any of this in a container
 

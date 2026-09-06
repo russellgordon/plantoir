@@ -53,9 +53,7 @@ public static class BuildOutputLocation
         string? overridden = Environment.GetEnvironmentVariable("PLANTOIR_BUILD_ROOT");
         if (!string.IsNullOrWhiteSpace(overridden)) return overridden!;
 
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Plantoir", "builds", FolderContainers.FolderIdentifier(workingFolderPath));
+        return AppDataRoot.Combine("builds", FolderContainers.FolderIdentifier(workingFolderPath));
     }
 
     /// <summary>
