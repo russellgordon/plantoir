@@ -54,6 +54,15 @@ public sealed class NewCourseDialog : ContentDialog
     private readonly TextBox _shortBox = new() { MaxLength = 12 };
     private readonly StackPanel _shortRow;
     private readonly TextBox _sectionsBox = new() { Text = "1" };
+    // What this course calls a unit. Asked of EVERY course, ready-made ones
+    // included: a payload is poured in the teacher's word rather than renamed
+    // afterwards, because renaming a course already in use means rewriting
+    // every wikilink to every renamed page, and a half-finished pass leaves a
+    // broken site with no way back.
+    private readonly TextBox _unitWordBox = new() { PlaceholderText = ClassPageTerm.DefaultWord };
+    private readonly TextBlock _unitWordCaption = FormBuilders.ExampleCaption(
+        ClassPageTerm.Caption(null));
+    private readonly TextBlock _unitWordWarning = FormBuilders.WarningCaption("");
     private readonly TextBlock _sectionsCaption;
     private readonly ComboBox _localeBox = new() { MinWidth = 300 };
     private readonly StackPanel _suggestionsRow = new() { Spacing = 4, Visibility = Visibility.Collapsed };
@@ -268,7 +277,7 @@ public sealed class NewCourseDialog : ContentDialog
         bool codeOk = _codeBox.Text.Trim().Length > 0 && CourseCodeProblem() is null;
         bool sectionsOk = SectionNumbersProblem(_sectionsBox.Text) is null;
         bool publishingOk = _publishingChoice?.Problem is null;   // a bad folder blocks Create (row 102)
-        IsPrimaryButtonEnabled = codeOk && sectionsOk && publishingOk;
+        IsPrimaryButtonEnabled = codeOk && sectionsOk && publishingOk && UnitWordIsUsable;
     }
 
     /// <summary>
@@ -360,6 +369,13 @@ public sealed class NewCourseDialog : ContentDialog
         sectionsRow.Children.Add(_sectionsCaption);
         form.Children.Add(sectionsRow);
         _sectionsBox.TextChanged += (_, _) => { RefreshSectionsValidation(); RefreshCreateEnabled(); RefreshFontSample(); };
+
+        var unitWordRow = FormBuilders.LabeledRow("What do you call a unit?", _unitWordBox);
+        unitWordRow.Children.Add(_unitWordCaption);
+        unitWordRow.Children.Add(_unitWordWarning);
+        form.Children.Add(unitWordRow);
+        _unitWordBox.TextChanged += (_, _) => { RefreshUnitWord(); RefreshCreateEnabled(); };
+        RefreshUnitWord();
 
         foreach (string code in LocaleCatalog.Codes) _localeBox.Items.Add(LocaleCatalog.DisplayName(code));
         _localeBox.SelectedIndex = LocaleCatalog.Codes.ToList().IndexOf(WizardDefaults.DefaultLocale);
@@ -936,6 +952,25 @@ public sealed class NewCourseDialog : ContentDialog
         _suggestionsRow.Children.Add(buttons);
     }
 
+    /// <summary>
+    /// The live caption under the unit-word field, and its two refusals.
+    ///
+    /// <para>Shows the teacher what their word produces before they commit to
+    /// it, because the word is chosen once — at creation — and renaming a
+    /// course already in use is deliberately not offered.</para>
+    /// </summary>
+    private void RefreshUnitWord()
+    {
+        string typed = _unitWordBox.Text;
+        _unitWordCaption.Text = ClassPageTerm.Caption(typed);
+        string? problem = ClassPageTerm.Problem(typed);
+        _unitWordWarning.Text = problem ?? "";
+        _unitWordWarning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>Whether the unit word is usable, for the Create button.</summary>
+    private bool UnitWordIsUsable => ClassPageTerm.Problem(_unitWordBox.Text) is null;
+
     private void RefreshSectionsValidation()
     {
         string? problem = SectionNumbersProblem(_sectionsBox.Text);
@@ -1122,6 +1157,13 @@ public sealed class NewCourseDialog : ContentDialog
             },
             ["show_section_marker"] = PerSection(_ => _showsMarker),
             ["color_schemes"] = flatSchemes,
+
+            // Recorded rather than guessed, both of them. `unit_word` is asked
+            // of every course; `class_folder` is what the guess would pick
+            // TODAY, written down so that reordering the folder list later
+            // cannot silently move where class pages are written.
+            ["unit_word"] = ClassPageTerm.Cleaned(_unitWordBox.Text),
+            ["class_folder"] = ClassFolderRule.Name(null, _perSectionFolders),
         };
 
         // The marks pool is written ONLY when the teacher chose it — which
