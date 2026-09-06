@@ -229,7 +229,11 @@ this side is expected to say so when the contract is wrong.
    exe, never a bare `dotnet publish`, even to build a quick throwaway copy
    for a local test.**
 
-5. **Two things to measure, not copy, on real Windows hardware** (see "Two
+5. ~~Two things to measure, not copy, on real Windows hardware~~ — ✅ Done,
+   BOTH halves (the marker half 2026-08-23, the Edge half 2026-08-23). The
+   headline said "outstanding" until 2026-09-06 while the two ticks sat
+   inside it, which is the failure this list exists to prevent. Original
+   wording, for the record (see "Two
    things to MEASURE on Windows rather than copy from the mac" below):
    whether the browser needs `127.0.0.1` instead of `localhost` for a preview
    address, and which of the 25 progress markers your own `.ps1`/native
@@ -477,7 +481,7 @@ this side is expected to say so when the contract is wrong.
    index, and re-check badge contrast on a highlighted row) apply whether you
    end up hand-building or wiring the real control's template.
 
-10. **Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check (2026-08-24).**
+10. ~~Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check~~ — ✅ Done, merged to `dev` 2026-09-06 (`GradedFolderRule.cs`, `SiteHealthFinding.cs`; GUI-IMPROVEMENTS rows 411-414).
     - **`setup_course.py:graded_folders_for` reconciliation** — When a new
       course is created, `graded_folders_for` now checks the declared pool
       against the actual folder lists (`shared_folders` +
@@ -497,7 +501,7 @@ this side is expected to say so when the contract is wrong.
       receives the finding in the `PLANTOIR_HEALTH:` transcript line and
       displays the contract-authored sentence and detail without re-wording.
 
-11. **Special folders hardening: `excluded_items`, preflight skip, and `index.md` sentinel notes (2026-08-24).**
+11. ~~Special folders hardening: `excluded_items`, preflight skip, and `index.md` sentinel notes~~ — ✅ Done, merged to `dev` 2026-09-06 (`ExcludedItemsTests.cs`).
     - **`excluded_items` key in `course_config.json`** — An object with optional
       `shared` and `per_section` arrays of strings:
       `{"shared": ["Tasks"], "per_section": ["Drafts"]}`. The key is ABSENT
@@ -553,7 +557,7 @@ this side is expected to say so when the contract is wrong.
       `excluded_items`; an ordinary add is not a re-inclusion, and a trail line
       that says it was would be believed.
 
-12. **Special folders hardening: The protection model — row states, curriculum resolution, marks floor, and wizard marks control (2026-08-24).**
+12. ~~Special folders hardening: the protection model~~ — ✅ Done, merged to `dev` 2026-09-06 (`ItemProtection.cs`, `CurriculumFolderRule.cs`, `SpecialNames.cs`). Extended 2026-09-06: the protection now also covers the RECORDED `class_folder`, not only the literal "All Classes" — see item 16.
     - **Item Protection in List Editors & Toggle Lists**:
       Folders and files with special meaning now have protection policies (`ItemProtection` in Swift, `ItemProtection` enum in C#):
       - `Ordinary`: standard direct removal.
@@ -589,7 +593,16 @@ this side is expected to say so when the contract is wrong.
       - *The contract holds 5 resolution cases*, not the 10 row 379 claimed.
       - *Size the flyout for the longest sentence.* The mac popover truncated to one line until it was given a fixed width and allowed to wrap; the `lastGradedFolderBlocked` sentence is the longest in `specialNames`, so test the flyout with that one.
 
-13. **Renaming a course folder from inside the app (2026-09-01).** The mac now
+13. **Renaming a course folder from inside the app — HALF DONE 2026-09-06.**
+    The model layer is built and under test: `FolderPathRewriter` (the link
+    rewriting, 22 tests) and `SpecialFolderRenamer` (the refusals, the move
+    list, the check-every-destination-first rule, 22 tests), plus the two
+    trail events, which are DECLARED AND NOT YET EMITTED because nothing
+    raises them until the sheet exists — see `windows-app/PROGRESS.md`.
+    **Still owed: the sheet itself**, the method that performs the moves, the
+    config keys carried across (`KeysThatCarryAcross` holds the list), the
+    MATERIALISATION of `class_folder`/`curriculum_folder`, and item 17's
+    interrupted-rename recovery. Original text: The mac now
     renames a folder on disk, in every section, rewriting the links that name
     it and every config key that mentioned it — plus the two foot-guns behind
     it: Add creates the folder, Remove says the folder stays. Sentences,
@@ -599,21 +612,22 @@ this side is expected to say so when the contract is wrong.
     alone (`Directory.Move` and open handles), is in "Renaming a course folder
     from inside the app" below** — read that rather than this summary.
 
-14. **A section with no front page no longer publishes yesterday's site
+14. ~~A section with no front page no longer publishes yesterday's site~~ — ✅ Done; `MissingFrontPageExplanation` is in `FailureExplainer.cs` and is asked before `MissingBuildExplanation`, as required. Verified 2026-09-06. Original text:
+    **A section with no front page no longer publishes yesterday's site
     (2026-09-01).** Shared Python, so you inherit the fix; the one thing you
     owe is `MissingFrontPageExplanation` in `FailureExplainer.cs`, asked BEFORE
     `MissingBuildExplanation`, which is already written on this side and is
     pinned by a contract case. See "A section with no index.md cannot be
     PUBLISHED" below.
 
-15. **What a course calls a unit (2026-09-01).** `unit_word` in
+15. ~~What a course calls a unit~~ — ✅ Done 2026-09-06 (`ClassPageTerm.cs`, `UnitDay.Parse(title, term)`, the wizard field, and every call site including the two that BUILD page titles; GUI-IMPROVEMENTS rows 415-416). Original text: `unit_word` in
     `course_config.json`, absent meaning "Unit". Shared Python does the rule
     and the payload rewrite; you owe the C# mirror, a wizard field, and the
     assistant's sentences. **Three new contract cases will fail your suite
     until you read `pageNaming`'s new `term` field with a default.** Full
     write-up in "What a course calls a unit" below.
 
-16. **What a course calls its class folder (2026-09-01).** `class_folder` in
+16. ~~What a course calls its class folder~~ — ✅ Done 2026-09-06 (`ClassFolderRule.Name/Names` with the recorded key, the wizard writing it, and `ItemProtectionRule` protecting it). **NOT yet done: the rename that MATERIALISES the key** — that belongs to item 13's sheet, which is still owed. Original text: `class_folder` in
     `course_config.json`, recorded rather than guessed, materialised by a
     rename along with `curriculum_folder`. Replaces the class-folder refusal
     item 13 described, which no longer exists. **Eight new contract cases will
@@ -626,7 +640,16 @@ this side is expected to say so when the contract is wrong.
     in "`course_config.json` has two writers" and "A rename interrupted after
     the folders moved was a dead end" below.
 
-18. **A working folder kept in sync by a cloud service is explained, never
+18. **A cloud-synced working folder — HALF DONE 2026-09-06.** The
+    detection is built and tested (`CloudSyncedFolder.cs`: OneDrive's three
+    published roots, Dropbox's `info.json`, iCloud for Windows; never from a
+    folder's NAME), the wording is pinned to the contract
+    (`CloudSyncWording.cs`), the remembered-per-folder store exists
+    (`AppSettings.AcceptedSyncedFolders`, keyed by resolved path), and both
+    trail events are declared — AND NOT YET EMITTED, for the same reason as
+    item 13. **Still owed: the two VIEWS** — the choice at the folder picker
+    and the dismissable notice for a folder the window restored. Original
+    text: **A working folder kept in sync by a cloud service is explained, never
     refused (2026-09-05, row 399).** Russell's decision on a question
     `TODO.md` had left open. You inherit the whole BEHAVIOUR as data —
     `shared-rules.json` → `cloudSyncedFolders`: the sentences, the two
@@ -642,7 +665,16 @@ this side is expected to say so when the contract is wrong.
     outside the folder. Full write-up in "A cloud-synced working folder:
     explain it, never refuse it" below.
 
-19. **The mac now builds outside the working folder too, and one sentence
+19. **Builds outside the working folder — MOSTLY DONE; two small things left
+    (2026-09-06).** The `appliesOn` filter this item asks for is in
+    (`ContractTests`), the retired sentence is asserted absent
+    (`CloudSyncedFolderTests`), and Windows already built outside the folder
+    (row 290). **Still owed, both named at the end of this item and neither
+    checked yet: whether archiving and restoring a course takes its build
+    with it**, and **a marker beside each build folder naming the working
+    folder it belongs to**, so a build for a folder that no longer exists is
+    litter somebody can recognise. The mac writes `working-folder.txt`;
+    nothing on this side writes anything. Original text: **The mac now builds outside the working folder too, and one sentence
     you were told to leave out is now gone from BOTH apps (2026-09-05,
     row 402).** You already do this half — `PLANTOIR_BUILD_ROOT` →
     `%LOCALAPPDATA%\Plantoir\builds\<id>`, row 290 — and **nothing about
@@ -680,7 +712,8 @@ this side is expected to say so when the contract is wrong.
 
     Full write-up in "Built websites live outside the working folder" below.
 
-20. **Stopping a section's preview is now ONE rule, and two of your three
+20. ~~Stopping a section's preview is now ONE rule~~ — ✅ Done 2026-09-06, merged to `dev`. Fixed one level DEEPER than this item asked (in `stop_preview.read_snapshot()` rather than in `preview.ps1`), because `deploy.py` reaches `build_site.py --build-only` without passing through the launcher — see MAC-HANDOFF. The two blind `preview.ps1` fixes are verified by execution, the 23 contract cases run against the matcher as a gate, and "section processes reclaimed" is emitted. Original text:
+    **Stopping a section's preview is now ONE rule, and two of your three
     matching bugs are already fixed in `preview.ps1` — unverified on real
     Windows (2026-09-05, row 407).** This is the `TODO.md` item "one rule,
     three implementations", closed on the mac side. The rule — which
