@@ -27,7 +27,7 @@ public class TaskSchedulingTests
         // immediately after "-File " and immediately at the end instead.
         Assert.DoesNotContain("\\\"", command);
         Assert.Equal(
-            "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\lenov\\AppData\\Local\\Plantoir\\scheduled\\test.ps1\"",
+            "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\lenov\\AppData\\Local\\Plantoir\\scheduled\\test.ps1\"",
             command);
     }
 
@@ -39,7 +39,23 @@ public class TaskSchedulingTests
         string command = TaskScheduling.TaskRunCommand(@"C:\Users\lenov\Desktop\Developer\scheduled deploy test\wrapper.ps1");
 
         Assert.DoesNotContain("\\\"", command);
-        Assert.StartsWith("powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"", command);
+        Assert.StartsWith("powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"", command);
         Assert.EndsWith("wrapper.ps1\"", command);
+    }
+
+    [Fact]
+    public void TaskRunCommand_IsNonInteractive()
+    {
+        // Nobody is there to answer a question at 6 a.m. `preview.ps1` asks
+        // "Continue anyway?" when a section is not listed in
+        // course_config.json - which is exactly the state a course is left in
+        // when one of its sections is archived while a scheduled deploy for
+        // that section still exists. Without -NonInteractive the task sits at
+        // an invisible prompt until Task Scheduler's own limit (three days by
+        // default): the teacher's site is never updated and nothing says why.
+        // With it, Read-Host throws, the wrapper exits non-zero, and the run
+        // fails visibly.
+        Assert.Contains("-NonInteractive",
+            TaskScheduling.TaskRunCommand(@"C:\\x\\y.ps1"));
     }
 }

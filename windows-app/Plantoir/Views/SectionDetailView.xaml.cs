@@ -1092,7 +1092,13 @@ public sealed partial class SectionDetailView : UserControl
             // own. The click-time answer is stale; ask again.
             if (await TheAssistantIsBuilding()) return outcomeMessage;
 
-            bool needsBuild = BuildFreshness.NeedsRebuild(_course, _sectionNumber);
+            // Where THIS working folder's built websites are kept. The app
+            // has to be able to name that path to answer the question at all;
+            // until 2026-09-06 nothing in the app could, so this asked about
+            // <course>\.merged_output, which Windows stopped writing to when
+            // builds moved out of the working folder.
+            bool needsBuild = BuildFreshness.NeedsRebuild(
+                _course, _sectionNumber, BuildOutputLocation.BuildsRootFor(workspacePath));
 
             // The publish is on the books for its WHOLE life — the quiet build
             // included — and comes off them on every exit path: the normal

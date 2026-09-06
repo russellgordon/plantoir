@@ -142,8 +142,26 @@ public static class TaskScheduling
     /// Internal (not private) so the test that pins this can reach it
     /// without spinning up a real scheduled task.
     /// </summary>
+    /// <summary>
+    /// How Task Scheduler runs the wrapper.
+    ///
+    /// <para><b>-NonInteractive is load-bearing, not tidiness.</b> Nobody is
+    /// there to answer a question at 6 a.m. Without it, a `Read-Host` in
+    /// anything the wrapper calls simply BLOCKS: the task sits at an invisible
+    /// prompt until Task Scheduler's own limit (three days, by default), and
+    /// the teacher's site is never updated and nothing says why. With it,
+    /// `Read-Host` throws instead, the wrapper exits non-zero, and the run
+    /// fails visibly.</para>
+    ///
+    /// <para>The question that made this real: <c>preview.ps1</c> asks
+    /// "Continue anyway?" when the section is not listed in
+    /// <c>course_config.json</c> — which is exactly the state a course is left
+    /// in when one of its sections is archived while a scheduled deploy for
+    /// that section still exists. That became reachable the moment the wrapper
+    /// started building before publishing.</para>
+    /// </summary>
     internal static string TaskRunCommand(string scriptPath) =>
-        $"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\"";
+        $"powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{scriptPath}\"";
 
     /// <summary>
     /// Writes the wrapper: fingerprint the section first (via the bundled
@@ -197,6 +215,24 @@ public static class TaskScheduling
                 "    }",
                 "  }",
                 "} catch { $fingerprint = $null }",
+                "",
+                "# ---- Build first, always -----------------------------------------------",
+                "# A scheduled deploy had NO build step at all: it published whatever",
+                "# happened to be in the builds folder, however old, and if nothing was",
+                "# there it failed. The mac's launchd script has always tested freshness",
+                "# and rebuilt when stale; this side simply never did.",
+                "#",
+                "# Unconditionally, rather than repeating the freshness test in shell.",
+                "# This runs while the teacher is asleep, so a minute of rebuilding that",
+                "# was not strictly needed costs nothing, and a freshness test written a",
+                "# THIRD time — after the app's and the launcher's — is a third thing to",
+                "# drift. --build-only also stops any preview still serving this section,",
+                "# so it cannot overwrite what is about to go out.",
+                $"& {PsQuote(Path.Combine(workingFolder, "preview.ps1"))} {PsQuote(courseCode)} {PsQuote(section.ToString())} --build-only",
+                "if ($LASTEXITCODE -ne 0) {",
+                "  Write-Host 'Could not build this section, so nothing was published.'",
+                "  exit 1",
+                "}",
                 "",
                 "# ---- Deploy to every destination — un-chained, on purpose ---------------",
                 "$allSucceeded = $true",

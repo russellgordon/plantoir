@@ -614,3 +614,5 @@ one was removed for exactly that reason.
 ---
 
 [◀ Previous: The macOS App](09-mac-app.md) · [Back to index](README.md)
+
+[◀ Previous: The macOS App](09-mac-app.md) · [Back to index](README.md) · [Next: Release Strategy ▶](11-release-strategy.md)

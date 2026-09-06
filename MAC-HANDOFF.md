@@ -136,7 +136,7 @@ outstanding.
 
 - **The folder-problem front end landed on Windows, and it found two defects in
   the mac's own repair** (Windows, 2026-09-06, branch
-  `issue/windows-folder-problems-front-end`, `GUI-IMPROVEMENTS.md` row 417).
+  `issue/windows-folder-problems-front-end`, `GUI-IMPROVEMENTS.md` row 420).
   Windows implemented `WINDOWS-HANDOFF.md` item 21 — the findings dialog, the
   Fix button, the two repairs, the outcome report and "Preview Again". Mostly a
   **know**; the two below are genuine **do**s for this side, both found by
@@ -549,6 +549,45 @@ rather than being deleted.
 > abandoned partway, so this section is the INDEX and the ledger below is the
 > manual. A change that creates an obligation for the other platform and does
 > not list it has, from their side, not been handed over at all.
+
+- ⚠️ **A COURSE CODE OF "work" COLLIDES WITH THE BUILD WORKSPACE — on WINDOWS
+  only; the mac has no such directory** (found on Windows, 2026-09-06).
+  Corrected the same day: an earlier version of this entry said "on both
+  platforms" and sent nobody anywhere useful, because the colliding folder is
+  created by the Windows launchers alone. `preview.ps1` and `deploy.ps1` set
+  `PLANTOIR_WORK_DIR` to `<buildRoot>\work`; `preview.sh` never sets it, so
+  the Python falls back to `/tmp/quartz-builds` and the mac's builds folder
+  holds only `<CODE>` directories and `working-folder.txt`. **There is nothing
+  for a mac session to look for.**
+
+  Windows now refuses to DELETE by that path
+  (`BuildOutputLocation.WouldCollideWithEveryCourse`), which is the cheap
+  half. **What IS shared is only the naming**: neither `CourseCodeValidator`
+  (Windows — letters, digits, spaces and dashes, up to twelve characters) nor
+  the mac's `CourseCodeRule` reserves the name, so a teacher can create a
+  course called "work" on either platform. On the mac that is harmless today;
+  it stops being harmless the moment anything there adopts a `work` sibling.
+  Worth a shared decision — a reserved-name refusal in both wizards, or a
+  deliberate "we accept this" — rather than leaving it to be rediscovered.
+
+- ⚠️ **DO NOT TELL ANYONE TO FIX A CREDENTIAL WITH `cmdkey` — Plantoir cannot
+  read what it writes** (Windows, 2026-09-06). Awareness rather than work, but
+  it cost an hour here and it would cost a support conversation the same.
+  `deploy.ps1`'s `CredApi` stores and reads the credential blob as **UTF-8**;
+  `cmdkey` writes **UTF-16**. A credential written with `cmdkey` therefore
+  shows up perfectly in `cmdkey /list` and is INVISIBLE to the app, which
+  falls through to asking the teacher for the token again — with no hint that
+  a credential is already sitting there.
+
+  Met twice in one evening: a Cloudflare token stored with `cmdkey` was
+  ignored by the launcher, and the machine's stored Cloudflare ACCOUNT ID had
+  evidently been written the same way long ago. Precisely: `ReadSecret`
+  returns null only when `CredRead` fails or the blob is empty — a UTF-16 blob
+  decodes instead into a NUL-riddled string, which is not the token and does
+  not authenticate. Either way the teacher is asked for a credential that is
+  already stored, with nothing to say so. The fix is to write through the
+  launcher's own `CredApi`. If the mac ever documents credential recovery for
+  Windows — or a support note does — this is the trap.
 
 - ⚠️ **TWO CONTRACT SENTENCES SAY "on your Mac" AND ARE SHOWN TO WINDOWS
   TEACHERS TOO** (Windows, 2026-09-06). `specialNames.renameFolder.explanation`
@@ -2294,6 +2333,69 @@ is what happened to the test-race item, sitting here for three days with
 Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
+
+- ✅ DONE (Windows, 2026-09-06). **The app can finally name where Windows keeps
+  a built website — which turned out to be why two different things were
+  wrong.**
+
+  **What was actually broken.** `BuildFreshness`, the one thing that decides
+  whether Deploy builds before publishing, read
+  `<course>/.merged_output/section<N>/public/index.html` — where builds lived
+  before row 290 moved them out of the working folder. Both of its answers
+  were wrong, and both were reproduced rather than reasoned about: on a course
+  made since the move that file never exists, so it always said "rebuild"
+  (safe, but every publish rebuilt); on a course carrying a leftover
+  `.merged_output`, it read the leftover, and one newer than the notes made it
+  answer "no rebuild needed" about a file that is not what Windows publishes.
+
+  The reason it went unnoticed is the useful part: **nothing in the C# knew
+  the build path at all.** Only the launchers and the Python did. That is also
+  why item 19's owed work had never been done — there was nothing in the app
+  that could name the folder to clear it.
+
+  **What was rejected.** Writing a second hash of the working folder's path.
+  The plan called for it and the plan was wrong: `FolderContainers` has
+  derived exactly that value for the container name since it was written, and
+  CLAUDE.md warns about this derivation by name. `FolderIdentifier` was
+  extracted from it instead — which is what the mac did too.
+
+  **Nothing for the mac to check here** — and an earlier version of this entry
+  wrongly asked it to. Windows clears a course's build at FIVE moments
+  (archive a course, archive a section, restore a section, restore a course,
+  restore a backup) because it has no symlink. The mac already clears
+  explicitly at four of them (`CourseArchiver.archive` for a course and for a
+  section, `CourseRestorer` for a section from an archive and from a backup),
+  and the two whole-course cases are covered by a rule that NAMES them:
+  `BuildOutputLocation.ensureLink`'s own comment says "archiving a course,
+  restoring one from a backup and replacing a course's contents all remove the
+  link… so a build folder found with no link pointing at it is cleared rather
+  than adopted". That is a decision with its reasoning written down, not luck,
+  and asking a mac session to "confirm" it would send them to re-derive
+  something already settled.
+
+  **A scheduled deploy had no build step**, which is a Windows-only gap the
+  mac closed long ago in its launchd script. Fixed by building
+  unconditionally; the reasoning and the hang it nearly introduced are in
+  GUI-IMPROVEMENTS row 418.
+
+  **Verified by publishing.** `verify-deploy.ps1` (new — Windows had no deploy
+  gate of any kind) ran every destination and every pairing against real
+  sites: **36 passed, 0 failed, 0 skipped**, each site fetched back and read.
+  Four harness faults had to be fixed to get a green worth trusting, and one
+  of them is the reason this entry exists at all: the three Cloudflare legs
+  were publishing to NETLIFY and passing, because `deploy.ps1` never reads
+  `deploy_target` from the configuration and needs `--target cloudflare`,
+  and the harness then verified a `netlify.app` address as proof of a
+  Cloudflare publish. **A false pass is worse than a skip**: a skip says
+  nothing ran; a false pass says something ran correctly.
+
+  **Reference:** `Plantoir.Core/Models/BuildOutputLocation.cs` (new),
+  `FolderContainers.FolderIdentifier`, `BuildFreshness.NeedsRebuild(course,
+  section, buildsRoot)`, `CourseArchiver.DiscardBuilds`, `CourseRestorer`,
+  `Assist/TaskScheduling.WriteWrapperScript`, `verify-deploy.ps1`. Tests:
+  `BuildOutputLocationTests` (14, including the contract's five
+  `buildFreshness` rules, never run on Windows before), `BuildFreshnessTests`
+  repointed, `TaskSchedulingTests`.
 
 - ✅ DONE (Windows, 2026-09-06). **Items 15 and 16 ported: a course's own
   words for a unit and for its class folder. Nothing is asked of the mac — this

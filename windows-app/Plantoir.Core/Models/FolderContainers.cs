@@ -17,12 +17,26 @@ namespace Plantoir.Core.Models;
 /// </summary>
 public static class FolderContainers
 {
-    public static string ContainerName(string folderPath)
+    public static string ContainerName(string folderPath) =>
+        "teaching-quartz-" + FolderIdentifier(folderPath);
+
+    /// <summary>
+    /// The eight hex characters that identify a working folder — SHA-256 over
+    /// its PHYSICAL path plus a trailing newline, which is exactly
+    /// <c>pwd -P | shasum -a 256 | cut -c1-8</c> and exactly what
+    /// <c>preview.ps1</c> computes as <c>$WORKDIR_ID</c>.
+    ///
+    /// <para>Named separately because it identifies the folder for TWO things
+    /// that must agree: the container (historically) and the folder its built
+    /// websites are kept in (<see cref="BuildOutputLocation"/>). Deriving it
+    /// twice is how the two would come apart, and CLAUDE.md warns about this
+    /// derivation by name.</para>
+    /// </summary>
+    public static string FolderIdentifier(string folderPath)
     {
         string physical = PhysicalPath(folderPath);
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(physical + "\n"));
-        string hex = Convert.ToHexString(hash).ToLowerInvariant();
-        return "teaching-quartz-" + hex[..8];
+        return Convert.ToHexString(hash).ToLowerInvariant()[..8];
     }
 
     /// <summary>

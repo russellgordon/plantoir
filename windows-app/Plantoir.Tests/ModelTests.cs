@@ -660,6 +660,20 @@ public class CourseActivityTests
 
 public class BuildFreshnessTests
 {
+    // The builds root is a TEMP directory handed to every call. These fixtures
+    // used to be built under <course>\.merged_output, which is where builds
+    // lived before row 290 moved them out of the working folder - so they were
+    // testing a location the product had stopped reading. Repointed rather
+    // than deleted: three of these rules are the contract's, and
+    // HiddenEntriesNeverTriggerRebuilds covers something nothing else does.
+    private static string BuiltIndex(string buildsRoot, string code, int section)
+    {
+        string publicDir = Path.Combine(
+            BuildOutputLocation.ForSection(buildsRoot, code, section), "public");
+        Directory.CreateDirectory(publicDir);
+        return Path.Combine(publicDir, "index.html");
+    }
+
     [Fact]
     public void NeverBuiltNeedsRebuild()
     {
@@ -667,7 +681,7 @@ public class BuildFreshnessTests
         try
         {
             var course = SectionAdderTests.MakeCourse(root, "ICS3U", """{"course_code":"ICS3U"}""");
-            Assert.True(BuildFreshness.NeedsRebuild(course, 1));
+            Assert.True(BuildFreshness.NeedsRebuild(course, 1, Path.Combine(root, "builds")));
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
     }
@@ -679,17 +693,17 @@ public class BuildFreshnessTests
         try
         {
             var course = SectionAdderTests.MakeCourse(root, "ICS3U", """{"course_code":"ICS3U"}""");
-            string publicDir = Path.Combine(course.DirectoryPath, ".merged_output", "section1", "public");
-            Directory.CreateDirectory(publicDir);
+            string buildsRoot = Path.Combine(root, "builds");
             string content = Path.Combine(course.DirectoryPath, "section1");
             Directory.CreateDirectory(content);
             File.WriteAllText(Path.Combine(content, "index.md"), "x");
-            File.WriteAllText(Path.Combine(publicDir, "index.html"), "built");
-            File.SetLastWriteTimeUtc(Path.Combine(publicDir, "index.html"), DateTime.UtcNow.AddMinutes(5));
-            Assert.False(BuildFreshness.NeedsRebuild(course, 1));
+            string index = BuiltIndex(buildsRoot, "ICS3U", 1);
+            File.WriteAllText(index, "built");
+            File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
+            Assert.False(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
 
             File.SetLastWriteTimeUtc(Path.Combine(content, "index.md"), DateTime.UtcNow.AddMinutes(10));
-            Assert.True(BuildFreshness.NeedsRebuild(course, 1));
+            Assert.True(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
     }
@@ -701,17 +715,19 @@ public class BuildFreshnessTests
         try
         {
             var course = SectionAdderTests.MakeCourse(root, "ICS3U", """{"course_code":"ICS3U"}""");
-            string publicDir = Path.Combine(course.DirectoryPath, ".merged_output", "section1", "public");
-            Directory.CreateDirectory(publicDir);
-            File.WriteAllText(Path.Combine(publicDir, "index.html"), "built");
-            File.SetLastWriteTimeUtc(Path.Combine(publicDir, "index.html"), DateTime.UtcNow.AddMinutes(5));
+            string buildsRoot = Path.Combine(root, "builds");
+            string index = BuiltIndex(buildsRoot, "ICS3U", 1);
+            File.WriteAllText(index, "built");
+            File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
 
+            // Obsidian rewrites its own settings constantly; a teacher opening
+            // the vault is not a content change.
             string obsidian = Path.Combine(course.DirectoryPath, ".obsidian");
             Directory.CreateDirectory(obsidian);
             File.WriteAllText(Path.Combine(obsidian, "workspace.json"), "{}");
             File.SetLastWriteTimeUtc(Path.Combine(obsidian, "workspace.json"), DateTime.UtcNow.AddMinutes(30));
 
-            Assert.False(BuildFreshness.NeedsRebuild(course, 1));
+            Assert.False(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
     }
@@ -725,20 +741,19 @@ public class BuildFreshnessTests
         try
         {
             var course = SectionAdderTests.MakeCourse(root, "ICS3U", """{"course_code":"ICS3U"}""");
-            string publicDir = Path.Combine(course.DirectoryPath, ".merged_output", "section1", "public");
-            Directory.CreateDirectory(publicDir);
-            string index = Path.Combine(publicDir, "index.html");
+            string buildsRoot = Path.Combine(root, "builds");
+            string index = BuiltIndex(buildsRoot, "ICS3U", 1);
             File.WriteAllText(index,
                 "<script>const socket = new WebSocket('ws://localhost:9081')</script>");
             File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
 
             Assert.True(BuildFreshness.BuiltForPreview(index));
-            Assert.True(BuildFreshness.NeedsRebuild(course, 1));
+            Assert.True(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
 
             File.WriteAllText(index, "a clean production page");
             File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
             Assert.False(BuildFreshness.BuiltForPreview(index));
-            Assert.False(BuildFreshness.NeedsRebuild(course, 1));
+            Assert.False(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
     }
