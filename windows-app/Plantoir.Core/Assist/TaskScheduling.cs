@@ -173,7 +173,14 @@ public static class TaskScheduling
     /// pick up and apply the next time the app runs. Returns the script's
     /// path, or null if it could not be written.
     /// </summary>
-    private static string? WriteWrapperScript(
+    /// <summary>
+    /// Internal rather than private so the suite can read the script this
+    /// writes. There is no runner behind a generated wrapper — it is executed
+    /// by Task Scheduler at 6 a.m. with nobody watching — so the only gate
+    /// available is asserting the TEXT, and the ordering inside it is
+    /// load-bearing (see the health-capture block).
+    /// </summary>
+    internal static string? WriteWrapperScript(
         string taskName, string workingFolder, string launcherPath, string courseCode, int section,
         string courseDirectory, IReadOnlyList<string> excludedSelfPublishingSubpaths,
         IReadOnlyList<CourseConfiguration.DeployDestination> destinations, string cloudflareAccountID)
@@ -228,8 +235,58 @@ public static class TaskScheduling
                 "# THIRD time — after the app's and the launcher's — is a third thing to",
                 "# drift. --build-only also stops any preview still serving this section,",
                 "# so it cannot overwrite what is about to go out.",
-                $"& {PsQuote(Path.Combine(workingFolder, "preview.ps1"))} {PsQuote(courseCode)} {PsQuote(section.ToString())} --build-only",
-                "if ($LASTEXITCODE -ne 0) {",
+                "#",
+                "# The build's output is CAPTURED, because the folder checks run inside it",
+                "# and print PLANTOIR_HEALTH: lines that nothing would otherwise read: this",
+                "# runs with the app closed, so the console they go to is gone by morning.",
+                "# Per run, into a file deleted immediately afterwards — the mac reads its",
+                "# findings out of a launchd log opened with O_APPEND and had to record the",
+                "# log's SIZE beforehand to avoid re-finding last week's markers every",
+                "# night. A per-run capture cannot have that bug at all.",
+                "#",
+                "# If the capture cannot be set up, the build runs plainly. Losing the",
+                "# findings is a pity; losing the publish is not acceptable.",
+                "$healthDir = $null",
+                "$buildLog = $null",
+                "try {",
+                $"  $healthDir = Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", "scheduled", "folder-problems"))}",
+                "  New-Item -ItemType Directory -Force -Path $healthDir | Out-Null",
+                $"  $buildLog = Join-Path $healthDir ({PsQuote(SafeName(taskName))} + '-' + [Guid]::NewGuid().ToString('N') + '.log')",
+                "} catch { $healthDir = $null; $buildLog = $null }",
+                "",
+                "if ($buildLog) {",
+                $"  & {PsQuote(Path.Combine(workingFolder, "preview.ps1"))} {PsQuote(courseCode)} {PsQuote(section.ToString())} --build-only *>&1 | Out-File -LiteralPath $buildLog -Encoding utf8",
+                "} else {",
+                $"  & {PsQuote(Path.Combine(workingFolder, "preview.ps1"))} {PsQuote(courseCode)} {PsQuote(section.ToString())} --build-only",
+                "}",
+                "# Saved AT ONCE. Everything below runs commands of its own, and the guard",
+                "# that decides whether anything is published must test THIS build's code.",
+                "$buildExit = $LASTEXITCODE",
+                "",
+                "# ---- What the build said about the folders --------------------------------",
+                "# BEFORE the failure guard, deliberately. Since 2026-09-01 a section with no",
+                "# index.md exits NON-ZERO from --build-only, and that is exactly the run",
+                "# whose findings the teacher most needs in the morning: scanning after the",
+                "# guard would say nothing about the one failure that explains itself.",
+                "#",
+                "# The lines are copied VERBATIM and parsed in C# with the same parser a live",
+                "# build uses. No JSON is interpreted in shell.",
+                "if ($buildLog -and (Test-Path -LiteralPath $buildLog)) {",
+                "  try {",
+                $"    $healthFile = Join-Path $healthDir {PsQuote(HealthRecordName(courseCode, section))}",
+                "    $markers = @(Select-String -LiteralPath $buildLog -SimpleMatch 'PLANTOIR_HEALTH:' | ForEach-Object { $_.Line })",
+                "    if ($markers.Count -gt 0) {",
+                "      Set-Content -LiteralPath $healthFile -Value $markers -Encoding utf8",
+                "    } else {",
+                "      # Nothing wrong this time: clear anything an earlier run left, so a",
+                "      # problem the teacher has since put right stops being reported.",
+                "      Remove-Item -LiteralPath $healthFile -Force -ErrorAction SilentlyContinue",
+                "    }",
+                "  } catch { }",
+                "  Remove-Item -LiteralPath $buildLog -Force -ErrorAction SilentlyContinue",
+                "}",
+                "",
+                "if ($buildExit -ne 0) {",
                 "  Write-Host 'Could not build this section, so nothing was published.'",
                 "  exit 1",
                 "}",
@@ -276,6 +333,18 @@ public static class TaskScheduling
             return null;
         }
     }
+
+    /// <summary>
+    /// What the wrapper calls the file it leaves this section's folder problems
+    /// in, and what <see cref="ScheduledHealthFindings"/> looks for.
+    ///
+    /// <para>One function rather than two matching string literals, because a
+    /// mismatch between the writer and the reader fails in the quietest way
+    /// available: the record would be written faithfully every night and read
+    /// never, and everything else would look healthy.</para>
+    /// </summary>
+    public static string HealthRecordName(string courseCode, int sectionNumber) =>
+        $"{SafeName(courseCode)}-section{sectionNumber}.txt";
 
     private static string SafeName(string taskName) =>
         new string(taskName.Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());

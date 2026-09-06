@@ -201,6 +201,11 @@ public sealed partial class SectionDetailView : UserControl
         };
         Preview.NavigationCompleted += (_, _) => RefreshChrome();
         _window.Activated += OnWindowActivated;
+        // Anything last night's scheduled deploy found. It ran with the app
+        // closed, so this is the first moment there is anywhere to say it.
+        // On Loaded rather than in the constructor: presenting needs a
+        // XamlRoot, and the view has none until it is in the tree.
+        Loaded += (_, _) => TakeAnythingTheScheduledDeployFound();
         Unloaded += (_, _) => { _isTornDown = true; StopPreview(); _window.Activated -= OnWindowActivated; };
         RefreshChrome();
         _ = RefreshPublishedMarker();
@@ -370,6 +375,33 @@ public sealed partial class SectionDetailView : UserControl
     ///
     /// <para>A healthy course reports nothing and sees nothing.</para>
     /// </summary>
+    /// <summary>
+    /// Read out whatever last night's scheduled deploy left for this section.
+    ///
+    /// <para>Marked as having come from a PUBLISH, because it did: the overnight
+    /// run went out to students, so a repair made now is not on their site
+    /// until the teacher publishes again, and that is the sentence they need.</para>
+    ///
+    /// <para>Consuming is safe even with a dialog already up — the queue holds
+    /// what it cannot show yet, rather than dropping it. That is worth stating
+    /// because the record is DELETED as it is read, and the mac met exactly
+    /// this: taking it while a dialog was up threw the overnight findings away
+    /// permanently, and it had to guard before consuming. Here the holding is
+    /// the guard.</para>
+    /// </summary>
+    private void TakeAnythingTheScheduledDeployFound()
+    {
+        try
+        {
+            var waiting = ScheduledHealthFindings.Take(_course.Code, _sectionNumber);
+            if (waiting.Count > 0) NoteHealthFindings(waiting, cameFromPublishing: true);
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"TakeAnythingTheScheduledDeployFound exception: {ex}");
+        }
+    }
+
     private void NoteHealthFindings(ScriptRunner? runner, bool cameFromPublishing = false)
     {
         if (runner is null) return;

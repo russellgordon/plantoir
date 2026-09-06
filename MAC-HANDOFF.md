@@ -226,15 +226,54 @@ outstanding.
   not appear to: it matters more here than in the GUI, because a headless
   server leaves no console behind for the teacher to have seen.
 
-  **One thing Windows did NOT build, and why.** The scheduled deploy still
-  surfaces nothing, because on `dev` the Windows Task Scheduler wrapper has no
-  build step at all — it publishes whatever is in the builds folder — so no
-  health check ever runs there and there is nothing to capture. The build step
-  lives on the unmerged branch `issue/windows-parity-tail` (commit 8e987693).
-  Written up as its own numbered item in `WINDOWS-HANDOFF.md`, with the design
-  and one measurement already done, so whoever picks it up after that merge
-  does not re-derive it. Nothing for the mac here beyond knowing that Windows
-  parity on `scheduledDeployPublishesAnyway` is still one step short.
+  **The overnight run is covered too, and Windows solved it differently from
+  the mac — this one is worth reading.** It was nearly shipped as a gap: on
+  `dev` the Windows Task Scheduler wrapper had no build step at all, so no
+  health check ran overnight and there was nothing to capture. Pointing the
+  new machinery at it would have produced code that looked finished and
+  reported nothing for ever. Once the branch carrying that build step was
+  merged in, the capture was built.
+
+  **The difference from the mac is the part to consider adopting.** The mac
+  reads its findings out of the scheduled run's LOG FILE, and had to record
+  the log's SIZE before the run because launchd opens it with `O_APPEND` and
+  nothing truncates it — without the offset, last week's markers are re-found
+  every night, the record is rewritten with stale findings for ever, and the
+  "nothing wrong this time" branch becomes unreachable the moment one problem
+  has ever been logged. Windows captures the build's output to a GUID-named
+  file PER RUN and deletes it immediately afterwards, so that class of bug
+  cannot arise: there is no accumulating log to take an offset into. If the
+  mac ever revisits `recordFolderProblems`, a per-run capture removes the
+  offset dance rather than making it more careful.
+
+  Four decisions behind it, none obvious from the diff:
+
+  - **The scan runs BEFORE the build-failure guard.** Since 2026-09-01 a
+    section with no `index.md` exits non-zero from `--build-only`, and that is
+    exactly the run whose findings the teacher most needs in the morning. A
+    scan after the guard would say nothing about the one failure that explains
+    itself. The exit code is saved into a variable the instant the build
+    returns, because everything between it and the guard runs commands of its
+    own.
+  - **No JSON is parsed in PowerShell.** The wrapper copies matching lines
+    verbatim with `Select-String -SimpleMatch`; the app parses them with the
+    same parser a live build uses, so there is no second implementation to
+    keep in step.
+  - **A capture that cannot be set up still publishes.** Losing the findings
+    is a pity; losing the publish is not acceptable, so the build falls back
+    to running plainly.
+  - **The record's filename comes from ONE function** used by both the
+    generated wrapper and the reader. A mismatch there fails in the quietest
+    way available — written faithfully every night, read never.
+
+  **And it writes a trail line the mac does not.** Each finding read out of
+  the record is noted as `folder problem found`, dated to when the RUN wrote
+  the record rather than to the morning somebody opened the app. Nothing else
+  records an overnight finding at all: the run happened with the app closed
+  and the console it printed to is gone. **Proposed back to the mac** — the
+  mac's `takeFolderProblems` returns findings to the view and notes nothing,
+  so an overnight problem there is invisible to a problem report. Small, and
+  `ActivityTrail.note` already takes a `moment`.
 
   **One divergence that is deliberate and visible, so decide rather than
   inherit it.** Windows forgets what it has shown when a new BUILD starts, so a

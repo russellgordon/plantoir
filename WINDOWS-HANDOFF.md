@@ -981,9 +981,10 @@ this side is expected to say so when the contract is wrong.
     `PLANTOIR_HEALTH:` JSON line had been rendering verbatim in the console a
     teacher reads. Two defects were found in the MAC's own repair while
     porting it and are in `MAC-HANDOFF.md`. **One half is NOT done and is now
-    item 23 below** — the scheduled deploy still surfaces nothing, because on
-    this branch's base the wrapper it would attach to has no build step at
-    all. Original text:
+    item 23 below** — at the time, the scheduled deploy still surfaced
+    nothing, because the wrapper it would attach to had no build step at all.
+    (Item 23 was itself finished later the same day, once the merge that added
+    that build step landed.) Original text:
 
     **The folder-problems FRONT END: the findings dialog, the Fix button,
     and the repair (owed since 2026-08-23; scoped 2026-08-25).** The shared
@@ -1031,25 +1032,29 @@ this side is expected to say so when the contract is wrong.
     Medium. It is a teacher-facing explanation, so the wording matters more
     than the mechanism.
 
-23. **A scheduled deploy's folder problems still reach nobody, and the reason
-    is one step further back than it looks (2026-09-06).** The contract says a
-    scheduled deploy NEVER refuses on a health finding and surfaces it
-    afterwards instead (`siteHealth.scheduledDeployPublishesAnyway`). Item 21
-    built the "afterwards" for the app's own preview and publish; the
-    overnight path has nothing.
+23. ~~**A scheduled deploy's folder problems reach nobody**~~ — ✅ Done
+    2026-09-06, once the merge that unblocked it landed.
 
-    **But the blocker is not the surfacing — it is that no health check runs
-    overnight at all.** The wrapper `TaskScheduling.WriteWrapperScript` writes
-    goes straight from the fingerprint to `deploy.ps1` per destination. The
-    checks live inside `build_site.py`, and `deploy.py` publishes an EXISTING
-    `public/` — it only rebuilds when a live preview is attached, which
-    overnight, with the app closed, never happens. So there is no
-    `PLANTOIR_HEALTH:` output to capture, and building a capture against this
-    wrapper would be dead code that looks finished.
+    **The blocker was never the surfacing, and that is the part worth
+    keeping.** The contract says a scheduled deploy NEVER refuses on a health
+    finding and surfaces it afterwards instead
+    (`siteHealth.scheduledDeployPublishesAnyway`). Item 21 built the
+    "afterwards" for the app's own preview and publish, and the obvious next
+    move was to point the same machinery at the overnight path. That would
+    have been dead code: the wrapper `TaskScheduling.WriteWrapperScript`
+    wrote went straight from the fingerprint to `deploy.ps1` per destination,
+    the checks live inside `build_site.py`, and `deploy.py` publishes an
+    EXISTING `public/` unless a live preview is attached — which overnight,
+    with the app closed, never is. **No check ran, so there was nothing to
+    capture**, and a capture written against that wrapper would have looked
+    finished and reported nothing for ever.
 
-    **The build step exists on the unmerged branch
-    `issue/windows-parity-tail` (commit 8e987693).** Do this item AFTER that
-    merges, not before. Then it is small, and the design is already done:
+    The build step arrived with `issue/windows-parity-tail` (merge
+    `38a181ee`), and the wrapper now runs `preview.ps1 CODE N --build-only`
+    before any deploy. Task Scheduler discards that output, so producing the
+    lines and CAPTURING them are two different things — which is what this
+    item then built. What follows is what it does, kept because every bullet
+    is a decision rather than a description:
 
     - **Capture PER RUN, and delete the capture afterwards.** Redirect the
       `--build-only` invocation to a GUID-named file under

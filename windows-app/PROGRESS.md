@@ -21,9 +21,10 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Fifteen of its twenty-four
-items are done**, items 21 and 24 having landed on 2026-09-06 (the
-folder-problems front end, and the same findings reaching the assistant).
+with its headline still reading as open work. **Sixteen of its twenty-four
+items are done**, items 21, 23 and 24 having landed on 2026-09-06 (the
+folder-problems front end, the same findings reaching the assistant, and the
+overnight run's findings being captured and reported the next morning).
 What is genuinely left, smallest first:
 
 | Item | What is left | Size |
@@ -33,7 +34,6 @@ What is genuinely left, smallest first:
 | 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
 | 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 52 test methods over 63 cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
 | 22 | The "Folders Plantoir uses" sheet (mac row 361) — never ported, and in no list until 2026-09-06. A teacher-facing explanation, so the wording matters more than the mechanism. | Medium |
-| 23 | A scheduled deploy's folder problems reach nobody. **Blocked until this branch's own build step is in place, not by the surfacing** — with no build overnight, no check runs and there is nothing to capture. The design, and the one measurement it needs, are written into item 23. | Small, after that |
 
 Two things that are NOT in that list and should be known:
 
@@ -45,7 +45,8 @@ Two things that are NOT in that list and should be known:
   publishing — `verify.sh` and `verify-deploy.sh` are bash and do not run
   here.
 - **The unit suite is green**: 911 passed, 0 failed at the time this section
-  was written; 945 after the folder-problems front end merged in. `dev` stood
+  was written; 945 after the folder-problems front end, and 972 once
+  parity-tail was merged into it and the overnight capture was added. `dev` stood
   at 668 passed with 5 failing contract tests before this series; those five
   were each a real gap between what the contract says Windows does and what it
   did.
@@ -124,9 +125,11 @@ remembered. The honest way to keep this list right is
   `Views/FolderProblemsDialog.cs` shows the rest. The app's preview and
   publish are covered, and so is the assistant (`Plantoir.Mcp/
   LauncherRunner.cs` lifts findings out and `SiteHealthFinding.Appending`
-  says them). **The scheduled deploy is NOT** — `WINDOWS-HANDOFF.md` item 23,
-  and the reason is that nothing checks the folders overnight in the first
-  place: that wrapper has no build step yet.
+  says them). **The scheduled deploy is covered too, differently**: it runs
+  with the app closed, so its wrapper captures the build's output per run,
+  copies the marker lines into a per-course-and-section record, and the
+  section's own view reads that record the next time it is opened — consumed
+  as it is read, and cleared by a clean run.
 
 ## Proven end to end
 
