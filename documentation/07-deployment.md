@@ -135,10 +135,10 @@ by it, which is how the next paragraph's defect survived.
 
 **A third detail, learned the expensive way on Windows.** The PowerShell port
 of the tree check was written from the mac, where it could not be run, and it
-used `Select-String -Quiet` on a pipeline of files. That returns one Boolean
+used `Select-String -Quiet` on a pipeline of files. That returns one result
 PER FILE rather than one answer for the tree, and a non-empty array is TRUE in
-PowerShell — so the check was true for any site with any HTML in it, which is
-every site. Publishing to a folder therefore could not succeed on Windows at
+PowerShell whatever is in it — so the check was true for any site with two or
+more pages, which is every real site. Publishing to a folder therefore could not succeed on Windows at
 all: it always claimed the site was a preview build, always rebuilt, always
 waited the full timeout, and always refused. It is now `Test-CarriesLiveReload`
 in `deploy.ps1`, which tests for a match object rather than a Boolean. The

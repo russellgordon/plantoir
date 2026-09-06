@@ -208,13 +208,15 @@ function Test-CarriesLiveReload([string]$root) {
   #
   # WHY THIS IS A FUNCTION AND NOT THE OBVIOUS ONE-LINER. Windows PowerShell
   # 5.1's `Select-String -Quiet`, fed a PIPELINE of file objects, emits one
-  # Boolean PER FILE rather than one answer overall. A clean site of 314
-  # pages therefore comes back as a 314-element array of $false - and in
-  # PowerShell a non-empty array is TRUE. So
+  # result PER FILE rather than one answer overall. A clean site of 314 pages
+  # therefore comes back as a 314-element array of $null - and in PowerShell
+  # a non-empty array is TRUE whatever is in it. So
   #
   #     if ($files | Select-String -Pattern ... -List -Quiet) { ... }
   #
-  # was true whenever the site had any HTML in it at all, which is always.
+  # was true whenever the site had TWO OR MORE pages, which is every real
+  # site. (Exactly one page is the one case it got right, by accident: a
+  # single-element array unwraps to the scalar it holds, which is falsy.)
   # The consequences were both invisible and total: every publish to a folder
   # announced "This site was built by a preview", rebuilt whether or not it
   # needed to, waited the full 30 s for a condition that could never become

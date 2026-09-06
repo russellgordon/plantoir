@@ -1870,10 +1870,12 @@ where.
 
       if ($files | Select-String -Pattern "ws://localhost:" -List -Quiet)
 
-  `-Quiet` fed a PIPELINE of file objects emits one Boolean PER FILE, not one
+  `-Quiet` fed a PIPELINE of file objects emits one result PER FILE, not one
   answer for the tree. 314 clean pages come back as a 314-element array of
-  `$false`, and **in PowerShell a non-empty array is TRUE**. So the test was
-  true whenever the site contained any HTML, which is always. All three uses
+  `$null`, and **in PowerShell a non-empty array is TRUE whatever is in it**.
+  So the test was true whenever the site had two or more pages, which is every
+  real site — exactly one page is the single case it got right, by accident,
+  because a one-element array unwraps to the falsy scalar it holds. All three uses
   were affected: the one deciding whether to rebuild, the one the 30 s wait
   loop spins on, and the one that refuses to publish. `deploy.sh` is fine —
   `grep -rq` returns one exit status for the whole tree, which is the answer

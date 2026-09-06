@@ -146,8 +146,24 @@ public class TheLauncherMatcherAnswersTheContract
 
         using var process = Process.Start(info);
         Assert.NotNull(process);
-        string output = process!.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
-        Assert.True(process.WaitForExit(120_000), "the launcher's contract runner did not finish");
+
+        // Read BOTH pipes asynchronously, and wait on the process rather than
+        // on a stream. Two reasons, and the timeout is only honest with both:
+        // a sequential ReadToEnd on stdout then stderr deadlocks if stderr
+        // fills its ~4 KB pipe before stdout closes, and either ReadToEnd
+        // blocks forever on a wedged child no matter what timeout is passed to
+        // WaitForExit afterwards. A test that can hang the suite indefinitely
+        // is worse than no test.
+        var standardOutput = process!.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(120_000))
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            Assert.Fail("the launcher's contract runner did not finish within 120 s");
+        }
+        string output = string.Concat(
+            standardOutput.GetAwaiter().GetResult(),
+            standardError.GetAwaiter().GetResult());
 
         // The count is asserted as well as the exit code: a runner that
         // skipped everything would also exit 0.

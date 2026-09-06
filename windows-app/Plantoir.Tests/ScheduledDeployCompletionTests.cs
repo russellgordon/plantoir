@@ -27,7 +27,7 @@ public class ScheduledDeployCompletionTests : IDisposable
     // Restore the path this class FOUND, never null. Null does not mean
     // "no override", it means "use the teacher's real activity.txt" - so
     // this line used to switch every test class that ran after it onto
-    // %LOCALAPPDATA%\Plantoir\Logsctivity.txt, defeating the
+    // %LOCALAPPDATA%\Plantoir\Logs\activity.txt, defeating the
     // [ModuleInitializer] redirect in TestTrailRedirect for the rest of the
     // process. It had already put 263 lines about fixture courses into the
     // real trail on this machine - the same file a problem report gathers,
