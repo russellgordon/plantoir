@@ -24,8 +24,16 @@ namespace Plantoir.Core.Models;
 /// and ignores the environment variable entirely.</para>
 ///
 /// <para>Set once, from <c>--state-dir</c>, before anything reads anything.
-/// It does NOT reach other processes — <c>plantoir-mcp.exe</c> and the
-/// scheduled-task wrapper each resolve their own.</para>
+/// <b>It does NOT reach other processes.</b> The LAUNCHERS are the sharp edge and are worth
+/// naming separately: <c>preview.ps1</c> and <c>deploy.ps1</c> compute the
+/// builds root from the environment themselves, and the scheduled-task
+/// wrapper bakes the same into the script it registers. So a redirected run
+/// that PREVIEWED would look for its build where the launcher did not put it,
+/// and one that SCHEDULED a deploy would register a REAL Task Scheduler task
+/// whose sentinels land in the teacher's real pending folder. Nothing in the
+/// suite does either today — but a UI test that drives Preview is the obvious
+/// next thing somebody writes.
+/// <c>plantoir-mcp.exe</c> resolves its own too.</para>
 /// </summary>
 public static class AppDataRoot
 {

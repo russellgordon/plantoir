@@ -268,10 +268,14 @@ the order the contract fixes, that a scrolling list is not cut off at the
 bottom, and that a panel follows the course a teacher selected rather than
 going stale.
 
-**It is opt-in and belongs to no gate.** The project is in the solution so it
-always compiles — compile-rot is what actually kills a suite nothing builds —
-and every test carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`. A
-plain `dotnet test` builds six and runs none. It needs a desktop session and
+**It is opt-in and belongs to no gate.** Every test carries `[UiFact]`, which
+skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds six and
+runs none. The project is in the solution so a SOLUTION build compiles it —
+compile-rot is what actually kills a suite nothing builds. Be honest about the
+limit, though: the per-project commands used day to day (`dotnet build
+Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
+do not build it, so it can still stop compiling without anyone noticing until
+the next solution build. It needs a desktop session and
 the foreground, takes a few minutes, and CLOSES a running Plantoir (saying so,
 and not reopening it — that part is the teacher's).
 

@@ -69,11 +69,11 @@ dotnet build "$repo\windows-app\Plantoir\Plantoir.csproj" -c Debug -p:Platform=x
 if ($LASTEXITCODE -ne 0) { Write-Host "The app did not build." -ForegroundColor Red; exit 1 }
 
 $env:PLANTOIR_UI_TESTS = "1"
-$args = @("test", "$repo\windows-app\Plantoir.UiTests\Plantoir.UiTests.csproj", "-c", "Debug", "-p:Platform=x64", "--nologo")
-if ($Filter) { $args += @("--filter", $Filter) }
+$dotnetArgs = @("test", "$repo\windows-app\Plantoir.UiTests\Plantoir.UiTests.csproj", "-c", "Debug", "-p:Platform=x64", "--nologo")
+if ($Filter) { $dotnetArgs += @("--filter", $Filter) }
 
 Write-Host "Driving the interface..." -ForegroundColor Cyan
-& dotnet @args
+& dotnet @dotnetArgs
 $code = $LASTEXITCODE
 
 $env:PLANTOIR_UI_TESTS = $null

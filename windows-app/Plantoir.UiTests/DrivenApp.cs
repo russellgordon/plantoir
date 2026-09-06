@@ -29,9 +29,16 @@ namespace Plantoir.UiTests;
 /// trail, where nobody would ever look.</para>
 ///
 /// <para>Still NOT isolated, so nobody assumes otherwise: Credential Manager,
-/// and anything a CHILD process resolves for itself — <c>plantoir-mcp.exe</c>
-/// and the scheduled-task wrapper do not inherit the redirect. None of it is
-/// reached by a Course Settings test.</para>
+/// and anything a CHILD process resolves for itself. The LAUNCHERS are the sharp edge and are worth
+/// naming separately: <c>preview.ps1</c> and <c>deploy.ps1</c> compute the
+/// builds root from the environment themselves, and the scheduled-task
+/// wrapper bakes the same into the script it registers. So a redirected run
+/// that PREVIEWED would look for its build where the launcher did not put it,
+/// and one that SCHEDULED a deploy would register a REAL Task Scheduler task
+/// whose sentinels land in the teacher's real pending folder. Nothing in the
+/// suite does either today — but a UI test that drives Preview is the obvious
+/// next thing somebody writes.
+/// None of it is reached by a Course Settings test.</para>
 ///
 /// <para><b>A running Plantoir is closed, not worked around.</b> Russell's
 /// standing instruction (2026-09-06, and CLAUDE.md's Windows setup notes):
@@ -199,12 +206,12 @@ public sealed class DrivenApp : IDisposable
     public void Dispose()
     {
         try { _automation.Dispose(); } catch { }
-        // Ours by pid, not everything called Plantoir. The constructor
-        // refuses to start when one is already running, but a copy opened
-        // DURING a run is somebody's and is not ours to close.
+        // Ours by pid, not everything called Plantoir. The constructor closes
+        // whatever was running when it STARTED; a copy opened during the run is
+        // somebody else's and is not ours to close.
         try
         {
-            if (_app is not null && !_app.HasExited) { _app.Kill(); _app.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(2)); }
+            if (_app is not null && !_app.HasExited) _app.Kill();   // Kill waits for exit
         }
         catch { }
         // Deleted last, and never fatally: a locked file must not turn a

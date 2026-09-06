@@ -153,99 +153,6 @@ outstanding.
 
 ## Open — what the mac still owes
 
-- **A UI test suite that drives the real app, and `--state-dir`, the product
-  change that made it safe** (Windows, 2026-09-06, branch
-  `issue/windows-special-folders-help`, `GUI-IMPROVEMENTS.md` row 423).
-  Mostly a **know**. The mac owes nothing unless it wants the same coverage —
-  but if it ever does, everything below was learned the expensive way and the
-  design transfers almost unchanged.
-
-  **What the tests are FOR, which is the part worth copying.** The unit suite
-  already runs every contract case against the rule, and the view writes no
-  sentence of its own, so re-running that sweep through a real window proves a
-  pure function slowly. Six tests cover only what a unit test cannot see:
-
-  1. **The control can be REACHED.** Invoking a button fires its action
-     whether or not it is on screen, so "the element exists" passes for a
-     button scrolled off the bottom of a long form and never seen by anyone.
-     The test scrolls the form until the button is really visible, and checks
-     it against the FORM's viewport rather than the window's — a control below
-     the fold is inside the window and still invisible.
-  2. **Clicking it opens anything at all.**
-  3. **The RENDERED text equals the contract's rows in the contract's order** —
-     as one ordered sequence, not row by row. This is the strongest assertion
-     in the suite and it subsumes several weaker ones: it catches a duplicated
-     row, a missing one, and two that have swapped places.
-  4. **The bottom of a scrolling list is not cut off.** The sheet's scroller
-     is capped, so the last rows START off screen. Scroll to the end, then
-     assert the last row is inside the SCROLLER's rectangle.
-  5. **It follows the selected course rather than going stale** — the one
-     genuine gap, since the window reuses a settings view when the code
-     matches.
-  6. **It can be dismissed** by its own button.
-
-  **What was tried and dropped, so the mac does not spend the afternoon
-  again.** Testing Escape: a keystroke goes to whatever holds the foreground,
-  which a test machine cannot promise, and it failed a DIFFERENT test each run
-  for reasons unrelated to what that test checked. Closing a sheet on Escape
-  is the FRAMEWORK's behaviour anyway, not the app's. Dismissal in the suite
-  is now the boring reliable button.
-
-  **Three measured facts about the automation layer**, all of which cost a
-  cycle here and at least the first two of which have AppKit equivalents:
-
-  - **A plain stack of views has no automation element.** The dialog's seven
-    "rows" do not exist as far as UI Automation is concerned — its contents
-    arrive as one flat run of text elements. That is why case 3 is a sequence.
-  - **A dialog's own element covers the whole window**, because it carries the
-    dimming layer. So "is this text inside the dialog" is very nearly "is it
-    inside the window", and a row clipped by the scroller satisfied it. Assert
-    against the SCROLLER.
-  - **A container's automation identifier can be replaced by its own template
-    part name.** The sidebar's tree carries an id in the markup and reports a
-    framework part name instead, so an identifier set on a complex control is
-    worth MEASURING before a test relies on it.
-
-  **`--state-dir`, and why it is one flag rather than two.** A UI test drives
-  the SHIPPED binary, so without isolation it rewrites the teacher's working
-  folder, remembered windows and window geometry, and files its fixture
-  courses in the breadcrumb trail as though a person had opened them. The flag
-  moves the app's ENTIRE state folder for that run.
-
-  Rejected, with reasons: redirecting the environment variable (does not work
-  on Windows — the API asks the OS for the known folder and ignores it; check
-  before assuming the mac differs); a test-only build (it would test the wrong
-  binary); and refusing to run while the app is open (Russell's instruction on
-  the day was the opposite — close his copy, say so, do not reopen it).
-
-  **The mistake worth inheriting rather than repeating.** The first cut
-  redirected only the settings file and the trail. An adversarial review found
-  that the app consumes pending scheduled-deploy sentinels on launch AND on
-  every activation, and that applying one writes publish state into the course
-  folder the sentinel names — an absolute path to a REAL course. A test run
-  could therefore have marked a teacher's section as published, with the line
-  explaining it going to the redirected trail where nobody would look. The fix
-  was one `AppDataRoot` that everything derives from, so the next thing
-  somebody adds inherits the isolation instead of leaking. **If the mac builds
-  this, redirect the whole Application Support folder from the start**, not
-  the two files you first think of.
-
-  **Reference:** `windows-app/Plantoir.UiTests/` (`DrivenApp.cs` is the
-  harness, `SpecialFoldersHelpUiTests.cs` the six cases),
-  `run-ui-tests.ps1`, `Plantoir.Core/Models/AppDataRoot.cs`,
-  `Plantoir/App.xaml.cs` and `Program.cs` (the flag is read in BOTH — `Main`
-  logs four times before the app class exists, so a redirect that waited would
-  already have written to the teacher's own log).
-
-  **Opt-in, and it must stay that way**: the project is in the solution so it
-  always compiles, and every test carries an attribute that skips unless an
-  environment variable is set. A bare `dotnet test` builds six and runs none.
-  On the mac the equivalent is a separate UI-testing target, launch arguments
-  for the flag, and something that keeps it out of the ordinary gate.
-
-  **Nothing is proposed to the contract**: none of this is a sentence a
-  teacher reads, so no mac suite should go red because of it.
-
 - **The "Folders Plantoir uses" sheet is now shared, and the mac owes it two
   small changes** (Windows, 2026-09-06, branch
   `issue/windows-special-folders-help`, `GUI-IMPROVEMENTS.md` row 422). The
@@ -1588,6 +1495,99 @@ rather than being deleted.
   green suite as proof.
 
 ## For awareness — no mac code needed
+
+- **A UI test suite that drives the real app, and `--state-dir`, the product
+  change that made it safe** (Windows, 2026-09-06, branch
+  `issue/windows-special-folders-help`, `GUI-IMPROVEMENTS.md` row 423).
+  Mostly a **know**. The mac owes nothing unless it wants the same coverage —
+  but if it ever does, everything below was learned the expensive way and the
+  design transfers almost unchanged.
+
+  **What the tests are FOR, which is the part worth copying.** The unit suite
+  already runs every contract case against the rule, and the view writes no
+  sentence of its own, so re-running that sweep through a real window proves a
+  pure function slowly. Six tests cover only what a unit test cannot see:
+
+  1. **The control can be REACHED.** Invoking a button fires its action
+     whether or not it is on screen, so "the element exists" passes for a
+     button scrolled off the bottom of a long form and never seen by anyone.
+     The test scrolls the form until the button is really visible, and checks
+     it against the FORM's viewport rather than the window's — a control below
+     the fold is inside the window and still invisible.
+  2. **Clicking it opens anything at all.**
+  3. **The RENDERED text equals the contract's rows in the contract's order** —
+     as one ordered sequence, not row by row. This is the strongest assertion
+     in the suite and it subsumes several weaker ones: it catches a duplicated
+     row, a missing one, and two that have swapped places.
+  4. **The bottom of a scrolling list is not cut off.** The sheet's scroller
+     is capped, so the last rows START off screen. Scroll to the end, then
+     assert the last row is inside the SCROLLER's rectangle.
+  5. **It follows the selected course rather than going stale** — the one
+     genuine gap, since the window reuses a settings view when the code
+     matches.
+  6. **It can be dismissed** by its own button.
+
+  **What was tried and dropped, so the mac does not spend the afternoon
+  again.** Testing Escape: a keystroke goes to whatever holds the foreground,
+  which a test machine cannot promise, and it failed a DIFFERENT test each run
+  for reasons unrelated to what that test checked. Closing a sheet on Escape
+  is the FRAMEWORK's behaviour anyway, not the app's. Dismissal in the suite
+  is now the boring reliable button.
+
+  **Three measured facts about the automation layer**, all of which cost a
+  cycle here and at least the first two of which have AppKit equivalents:
+
+  - **A plain stack of views has no automation element.** The dialog's seven
+    "rows" do not exist as far as UI Automation is concerned — its contents
+    arrive as one flat run of text elements. That is why case 3 is a sequence.
+  - **A dialog's own element covers the whole window**, because it carries the
+    dimming layer. So "is this text inside the dialog" is very nearly "is it
+    inside the window", and a row clipped by the scroller satisfied it. Assert
+    against the SCROLLER.
+  - **A container's automation identifier can be replaced by its own template
+    part name.** The sidebar's tree carries an id in the markup and reports a
+    framework part name instead, so an identifier set on a complex control is
+    worth MEASURING before a test relies on it.
+
+  **`--state-dir`, and why it is one flag rather than two.** A UI test drives
+  the SHIPPED binary, so without isolation it rewrites the teacher's working
+  folder, remembered windows and window geometry, and files its fixture
+  courses in the breadcrumb trail as though a person had opened them. The flag
+  moves the app's ENTIRE state folder for that run.
+
+  Rejected, with reasons: redirecting the environment variable (does not work
+  on Windows — the API asks the OS for the known folder and ignores it; check
+  before assuming the mac differs); a test-only build (it would test the wrong
+  binary); and refusing to run while the app is open (Russell's instruction on
+  the day was the opposite — close his copy, say so, do not reopen it).
+
+  **The mistake worth inheriting rather than repeating.** The first cut
+  redirected only the settings file and the trail. An adversarial review found
+  that the app consumes pending scheduled-deploy sentinels on launch AND on
+  every activation, and that applying one writes publish state into the course
+  folder the sentinel names — an absolute path to a REAL course. A test run
+  could therefore have marked a teacher's section as published, with the line
+  explaining it going to the redirected trail where nobody would look. The fix
+  was one `AppDataRoot` that everything derives from, so the next thing
+  somebody adds inherits the isolation instead of leaking. **If the mac builds
+  this, redirect the whole Application Support folder from the start**, not
+  the two files you first think of.
+
+  **Reference:** `windows-app/Plantoir.UiTests/` (`DrivenApp.cs` is the
+  harness, `SpecialFoldersHelpUiTests.cs` the six cases),
+  `run-ui-tests.ps1`, `Plantoir.Core/Models/AppDataRoot.cs`,
+  `Plantoir/App.xaml.cs` and `Program.cs` (the flag is read in BOTH — `Main`
+  logs four times before the app class exists, so a redirect that waited would
+  already have written to the teacher's own log).
+
+  **Opt-in, and it must stay that way**: the project is in the solution so it
+  always compiles, and every test carries an attribute that skips unless an
+  environment variable is set. A bare `dotnet test` builds six and runs none.
+  On the mac the equivalent is a separate UI-testing target, launch arguments
+  for the flag, and something that keeps it out of the ordinary gate.
+
+  **Nothing is proposed to the contract**: none of this is a sentence a
+  teacher reads, so no mac suite should go red because of it.
 
 - **Windows caught up to the mac's three deploy-after-preview console-race
   fixes** (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 381, closing
