@@ -1928,6 +1928,23 @@ sidebar already uses.
 > deletes weights out from under a running engine. One open assistant, no
 > removals.
 
+**Correction, 2026-09-06 — this paragraph was moved into this file before it
+was true on Windows.** The 2026-08-22 code-level verification named in this
+file's header passed it wrongly: the mac had the guard, Windows had nothing.
+`AssistModelStore.Remove()` deleted the weights unconditionally, and its own
+doc comment said so ("Deliberately does no 'is it safe' check"). It was
+implemented on `issue/windows-assist-model-in-use-guard` on 2026-08-22, but
+that branch then sat unmerged and only reached `dev` on 2026-09-06; the
+paragraph above describes Windows accurately from that date. Left in place
+rather than moved back, per this file's own rule — the note is the record.
+
+**The lesson is about the verification, not about this feature.** A sweep
+that reads a handoff paragraph and asks "does this look done?" will pass
+anything whose DESCRIPTION is confident. What caught it was a code search
+for the type the paragraph implies — `AssistActivity`, `mayRemove` — which
+returned nothing anywhere in `windows-app`. Any future pass over this file
+should search for the named symbol, not read for plausibility.
+
 **Removing the one currently in use is allowed**, and the panel then says what
 happens next. It is not a broken state — it is the state every machine is in
 before its first download — and the alternative traps a teacher who wants their

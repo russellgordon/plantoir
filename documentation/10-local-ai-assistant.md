@@ -228,6 +228,19 @@ assistant" and "the larger assistant", described by what they cost in disk and
 in memory. A hand-picked rung that would take more than a third of the
 machine carries a caution naming both numbers and stays selectable.
 
+**Removing one is refused while any assistant window is open**, and the
+refusal names the section to close rather than saying it is unavailable
+("Close the assistant for ICS3U Section 2 before removing this."). The guard
+is deliberately about ANY open assistant, not about whether that window is
+using that particular rung: working out which file is genuinely mapped into a
+running engine means tracking state neither app keeps, and getting it wrong
+deletes the weights out from under it. Removing the rung a teacher has CHOSEN
+is allowed on purpose — it is the state every machine is in before its first
+download, and refusing would trap somebody who wants their disk space back
+behind a choice they did not want to change. The rule is
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`assistantModelChoice.removal`, and both suites run it.
+
 One consequence worth knowing when reading the code: the tier decides the
 context size, so anything that starts the engine must be given the CHOSEN
 tier, never `AssistHardwareBudget.tier`.
