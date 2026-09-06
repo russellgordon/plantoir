@@ -79,7 +79,9 @@ Three consequences that catch people out:
 
 ## Where Windows keeps things
 
-Everything the app owns lives under `%LOCALAPPDATA%\Plantoir\`:
+Everything the app owns lives under `%LOCALAPPDATA%\Plantoir\` — or wherever
+`--state-dir` points, since every row below hangs off `AppDataRoot` rather than
+computing its own path (see "The flags the app answers"):
 
 | Folder | What |
 |---|---|
