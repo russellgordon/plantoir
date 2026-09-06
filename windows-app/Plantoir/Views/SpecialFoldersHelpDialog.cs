@@ -86,11 +86,18 @@ public static class SpecialFoldersHelpDialog
 
         // Capped so the dialog cannot grow past a short laptop screen; the
         // seven rows exceed it on every machine, so this always scrolls.
-        return new ScrollViewer
+        //
+        // The automation id is load-bearing rather than decorative: the last
+        // rows START offscreen, so a UI test cannot see whether they are
+        // legible or cut off without scrolling to them, and it needs a handle
+        // on this scroller to do it.
+        var scroller = new ScrollViewer
         {
             Content = stack,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             MaxHeight = 460,
         };
+        AutomationProperties.SetAutomationId(scroller, "specialFoldersHelpScroll");
+        return scroller;
     }
 }

@@ -25,11 +25,16 @@ public partial class App : Application
         };
     }
 
+    /// <summary>Set by <c>--state-dir</c>, so a harness run's startup log goes
+    /// with the rest of its state instead of into the teacher's.</summary>
+    private static string? _diagnosticDirectory;
+
     public static void LogDiagnostic(string message)
     {
         try
         {
-            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir");
+            string dir = _diagnosticDirectory
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir");
             Directory.CreateDirectory(dir);
             File.AppendAllText(Path.Combine(dir, "startup.log"), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}\n");
         }
@@ -38,7 +43,37 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        // FIRST, before the diagnostic line, before the trail line, and before
+        // anything reads settings — each of those resolves its location the
+        // moment it is touched, so a redirect applied afterwards is a redirect
+        // that missed the first write.
+        //
+        // `--state-dir` keeps this run's own state somewhere of its own: the
+        // settings file and the breadcrumb trail. A UI test drives the REAL
+        // shipped executable, and without this it would rewrite the teacher's
+        // working folder, their remembered windows and the geometry of every
+        // window they had open, and would file its fixture courses in the
+        // trail as though a person had opened them. Redirecting %LOCALAPPDATA%
+        // for the child process does not work and was tried: GetFolderPath
+        // asks Windows for the known folder and ignores the variable.
+        //
+        // QUOTE the path when passing it. `ArgumentAfter`'s raw-string
+        // fallback splits on spaces, so an unquoted path containing one is
+        // read as two arguments.
+        string stateDir = ArgumentAfter(
+            Environment.GetCommandLineArgs(), args.Arguments ?? "", "--state-dir");
+        if (!string.IsNullOrEmpty(stateDir))
+        {
+            try { Directory.CreateDirectory(stateDir); } catch { }
+            AppSettings.PathOverride = Path.Combine(stateDir, "settings.json");
+            Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(
+                Path.Combine(stateDir, "activity.txt"));
+            _diagnosticDirectory = stateDir;
+        }
+
         LogDiagnostic("App.OnLaunched starting");
+        if (!string.IsNullOrEmpty(stateDir)) LogDiagnostic($"State redirected to {stateDir}");
+
         Plantoir.Core.Scripting.ActivityTrail.NoteLaunch();
         try
         {

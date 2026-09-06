@@ -118,7 +118,29 @@ public sealed class AppSettings
         catch { return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
     }
 
+    /// <summary>
+    /// Where settings are read and written, when something has asked for
+    /// somewhere other than this machine's own.
+    ///
+    /// <para>This exists for ONE caller: a UI test driving the real app. Those
+    /// tests launch the shipped executable and click through it, and without
+    /// this they would read and rewrite the teacher's own settings — their
+    /// working folder, their remembered windows, the size and position of
+    /// every window they had open. Redirecting <c>%LOCALAPPDATA%</c> for the
+    /// child process does NOT work and was tried first:
+    /// <c>Environment.GetFolderPath</c> asks Windows for the known folder and
+    /// ignores the environment variable entirely.</para>
+    ///
+    /// <para>It is set once, from <c>--state-dir</c>, before anything reads
+    /// settings. Because <see cref="DefaultPath"/> honours it, every existing
+    /// <c>Load()</c> and <c>Save()</c> follows without a single call site
+    /// changing — which is the point: an isolation that depends on remembering
+    /// to pass a path at ten call sites is one that leaks at the eleventh.</para>
+    /// </summary>
+    public static string? PathOverride { get; set; }
+
     public static string DefaultPath =>
+        PathOverride ??
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                      "Plantoir", "settings.json");
 

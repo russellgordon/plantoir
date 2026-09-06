@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Drives the REAL built Plantoir.exe through UI Automation.
+
+    In the solution so it always COMPILES — compile-rot is what actually kills
+    a suite nothing builds — but every test carries [UiFact], which skips
+    unless PLANTOIR_UI_TESTS=1. So a bare `dotnet test` builds these and runs
+    none of them, and running them is a deliberate act: `run-ui-tests.ps1`.
+
+    Why it cannot live in Plantoir.Tests: that project is net9.0 and cannot
+    reference the WinUI app or anything that needs a desktop session.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <UseWindowsForms>false</UseWindowsForms>
+    <UseWPF>false</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlaUI.UIA3" Version="5.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!--
+    Core only. Referencing the WinUI app project would drag the Windows App SDK
+    into a test host that has no use for it; the fixtures need only
+    ToolchainMirror and CourseConfiguration, both of which live in Core.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Plantoir.Core\Plantoir.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\contracts\*.json" CopyToOutputDirectory="PreserveNewest" Link="contracts\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>
