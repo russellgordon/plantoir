@@ -44,10 +44,17 @@ outright without the bundled runtime — *"This copy of Plantoir is missing its
 website builder. Reinstall Plantoir, then try again."* — and there is no
 container branch left to fall back to.
 
-The runtime lives at `%LOCALAPPDATA%\Programs\Plantoir\runtime`, recognised by
-a `manifest.json` beside it, and carries its own Python, Node and Quartz. The
-launchers point the shared Python at it in `Enter-NativeRuntime`, which sets
-environment variables and returns the interpreter's path — it starts nothing,
+**The runtime travels beside the executable.** `NativeRuntime` resolves
+`<the folder Plantoir.exe is in>\runtime` — so a Debug build uses the copy
+under `bin\`, not an installed one — and `ScriptRunner` passes it to every
+launcher child as `PLANTOIR_RUNTIME`. A launcher run by hand honours that
+variable first and only then falls back to
+`%LOCALAPPDATA%\Programs\Plantoir\runtime`, which is where the installer puts
+it. Either way the folder is recognised by a `manifest.json` INSIDE it, and it
+carries its own Python, Node and Quartz.
+
+`Enter-NativeRuntime` in the launchers points the shared Python at it: it sets
+environment variables and returns the interpreter's path, and starts nothing,
 because `--stop` mode must never start anything.
 
 Three consequences that catch people out:
@@ -78,22 +85,26 @@ Everything the app owns lives under `%LOCALAPPDATA%\Plantoir\`:
 | `builds\<folder id>\` | Built websites, OUTSIDE the working folder. `<CODE>\section<N>\public` is the built site; `work\<CODE>\section<N>` is the Quartz project a preview serves from. |
 | `Logs\` | The activity trail — the breadcrumb file a problem report gathers. |
 | `scheduled\` | The wrapper script each scheduled deploy runs. |
-| `assist\`, `models\` | The assistant's MCP configuration and its downloaded weights. |
+| `scheduled\pending\` | Sentinels a finished scheduled deploy leaves for the app to pick up next time it runs. |
+| `assist\`, `models\` | The assistant's MCP configuration (`mcp-<CODE>.json`) and the model weights it downloads. |
+| `WebView2\` | The embedded preview's user-data folder. |
+| `settings.json` | The app's own settings — and, since Windows has no system window restoration, the remembered-windows list IS the restoration mechanism. |
 
-**The folder id is a hash and must never be derived twice.** It is the first
-eight hex characters of SHA-256 over the working folder's PHYSICAL path plus a
-trailing newline — `preview.ps1`'s `$WORKDIR_ID`, and the same value the
-container name used. In C# it is `FolderContainers.FolderIdentifier`, and
-`BuildOutputLocation` composes every build path from it. **Ask
-`BuildOutputLocation`; never spell `.merged_output` by hand** — that was where
-builds lived before they moved out, and a reader still naming it is reading a
-place nothing writes to. That is not hypothetical: it is exactly how the
-freshness check came to decide whether to rebuild from one location while the
-publish came from another.
+**The folder id is a hash, and it must never be derived twice.** The launcher
+computes it as `$WORKDIR_ID` and the app as
+`FolderContainers.FolderIdentifier`; the derivation itself is documented at
+that method, which is the one place to change it. It hashes the folder's
+PHYSICAL path — true on-disk casing with symlinks, junctions and SUBST drives
+resolved through `GetFinalPathNameByHandleW`, not `Path.GetFullPath`, which
+keeps the caller's casing and the junction.
 
-"Physical path" means true on-disk casing with symlinks, junctions and SUBST
-drives resolved, via `GetFinalPathNameByHandleW` — not `Path.GetFullPath`,
-which keeps the caller's casing and the junction.
+**Ask `BuildOutputLocation` for a build path; never spell `.merged_output` by
+hand.** Builds lived inside the working folder before they moved out, so code
+still naming that path is reading somewhere nothing writes to. That is not
+hypothetical: the check deciding whether a publish needs to rebuild was doing
+exactly this, answering from the old location while the publish came from the
+new one. (The launchers' own help text still mentions `.merged_output`; those
+are container-era defaults, overwritten once a native runtime is found.)
 
 ---
 
@@ -118,17 +129,22 @@ support note.
 The app shells the same `setup.ps1` / `preview.ps1` / `deploy.ps1` a
 command-line teacher runs, under a **ConPTY**, so the launchers behave as they
 do in a real console — progress markers, prompts and all. `ScriptRunner`
-watches the output for the progress markers listed in
-[`contracts/app-rules.json`](../contracts/app-rules.json) → `markerOrigins`.
+watches the output for progress markers and advances the stage bar as each one
+appears.
 
-**Read your own `.ps1` files rather than copying the mac's marker list.** Of
-the markers, some come from shared Python and must match to the character, and
-some come from the launchers and deliberately differ — "Setting up this Mac"
-against "Setting up this PC". This has already failed silently once: four
-markers copied verbatim from the mac's `.sh` scripts described events (a
-container starting) that no longer happen here, so the first stages of most
-progress bars could never be reached and the bar sat at 0% until a later marker
-jumped it forward.
+**Read your own `.ps1` files rather than copying the mac's marker list**, and
+note that `markerOrigins` in the contract is the MAC's set — it still lists
+markers about containers starting, which nothing here prints. The list this app
+actually matches is `TaskMilestones.cs`, and `TaskMilestoneLauncherMarkerTests`
+reads the real `.ps1` files so a launcher rewrite that drops a line fails the
+suite instead of silently stalling a teacher's progress bar.
+
+That test exists because this failed silently once: four markers had been
+copied verbatim from the mac's `.sh` scripts, describing events — a one-time
+machine setup, a container starting — that stopped happening here when the
+native runtime replaced the container. The first two or three stages of most
+progress bars could never be reached, so the bar sat at 0% until a later, real
+marker jumped it forward several steps at once.
 
 ---
 
@@ -140,11 +156,16 @@ There is no `launchd`. `TaskScheduling` writes a wrapper script into
 destination un-chained (one failing must not stop the others), and writes a
 sentinel the app picks up next time it runs.
 
-Two rules learned the hard way:
+What it registers is the SHELL: `schtasks /TR` gets
+`powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File
+"<wrapper>"`. (The mac's equivalent lesson — register the job as the APP, or
+the operating system announces that "bash" wants to run in the background —
+belongs to macOS Background Items and has no counterpart here. It is recorded
+in `WINDOWS-HANDOFF.md` as something to weigh, not as something this code
+does; do not go looking for app-registration code.)
 
-- **Register the job as the APP, not as the shell it runs**, or the operating
-  system tells the teacher that "bash" — or a person's name — wants to run in
-  the background.
+One rule learned the hard way:
+
 - **Run it `-NonInteractive`.** Nobody answers a question at 6 a.m. Without
   it, a `Read-Host` anywhere in the chain blocks until Task Scheduler's own
   limit and the site is simply never updated, with nothing to say why. Note
@@ -157,9 +178,10 @@ Two rules learned the hard way:
 ## Publishing: the destination is an argument
 
 `deploy_target` in `course_config.json` is read by the **app**, which turns it
-into a `--target` flag. **No launcher reads that key** — `deploy.ps1`,
-`deploy.sh` and `deploy.py` all default to Netlify and change destination only
-on `--target`. Anything driving a launcher directly must pass the flag itself;
+into a `--target` flag. **No launcher reads that key to choose a
+destination** — `deploy.ps1`, `deploy.sh` and `deploy.py` all default to
+Netlify and change destination only on `--target`. (`build_site.py` does read
+it, but for working out a site's domain, not for deciding where to publish.) Anything driving a launcher directly must pass the flag itself;
 see [deployment](07-deployment.md), where the failure that sentence caused is
 recorded.
 
@@ -167,11 +189,21 @@ recorded.
 
 ## Working on this app
 
+**A fresh clone needs the runtime fetched first.** It is roughly 600 MB and is
+deliberately not committed — this repository ships recipes, not binaries — and
+the build mirrors it beside the executable:
+
 ```powershell
 cd windows-app
+.\Vendor\fetch-runtime.ps1        # REQUIRED once per clone
 dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
+
+Skip the fetch and everything still BUILDS — and then every launcher refuses
+with "This copy of Plantoir is missing its website builder", which reads like a
+broken install rather than a missing step. (`Vendor/fetch-llama.ps1` is the
+same arrangement for the assistant's engine.)
 
 **Stop any running copy before building** — a running app holds
 `Plantoir.Core.dll` open and the build fails with `MSB3027 … file is locked
@@ -186,9 +218,30 @@ Desktop shortcut runs it:
 dotnet build Plantoir/Plantoir.csproj -c Debug -p:Platform=x64
 ```
 
-A plain `dotnet build` does not write there. Relaunching the app is Russell's,
-not yours: a rebuild that reopens it steals focus from whatever he has moved
-on to.
+A plain `dotnet build` does not write there.
+
+---
+
+## What this page does not cover
+
+Deliberately, so there is one home for each and not two that drift. The macOS
+page explains several of these for that platform; the Windows equivalents live
+in [`windows-app/PROGRESS.md`](../windows-app/PROGRESS.md), which is maintained
+as work happens:
+
+- **The embedded preview** — WebView2, and the `127.0.0.1` question that was
+  measured and found to be a no-op here.
+- **The assistant's own window**, the model running natively with Vulkan, and
+  the second door: `ClaudeCodeLauncher` writes an MCP configuration and starts
+  `claude` with `--strict-mcp-config`, so a teacher's own servers are neither
+  used nor disturbed. See [the assistant](10-local-ai-assistant.md) for what
+  the assistant IS.
+- **Window and state restoration**, archived courses, problem reporting, and
+  the `WorkLease` protocol that keeps two windows from building the same
+  section at once.
+- **What is built and what is missing.** `PROGRESS.md` carries the parity
+  table; `WINDOWS-HANDOFF.md` carries the numbered list of outstanding work
+  and the reasoning behind past decisions.
 
 ---
 
