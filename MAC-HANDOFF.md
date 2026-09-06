@@ -412,6 +412,17 @@ rather than being deleted.
   to an address nobody chose) or BLOCKS (the overnight publish never happens
   and nothing says so). Those are different bugs and want different urgency.
 
+  **Half of it is measured now, and it is the bad half.** Two harness runs left
+  their launcher processes waiting at that prompt for **45 minutes** — a
+  `powershell.exe` and its `python.exe` child from each — still alive when they
+  were swept up. With no usable stdin, `Read-Host` BLOCKS. Two things follow
+  that the mac will meet identically: the wedged processes survive their parent
+  being killed, `Process.Kill($true)` on the whole tree included, so a
+  scheduler that gives up leaves the launcher running; and NOTHING reaches the
+  activity trail while they wait, so the trail cannot tell a wedged overnight
+  publish from one that was never scheduled. Hardware: Windows 11 Pro 26200,
+  Intel i5-8365U.
+
 - ⚠️ **THE CONTRACT'S `stopPreview` PROSE IS NOW WRONG ABOUT WINDOWS, and only
   the mac can regenerate it** (Windows + shared, 2026-09-05). Three sentences
   in `contracts/shared-rules.json` → `stopPreview` describe a state that

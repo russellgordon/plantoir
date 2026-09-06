@@ -44,12 +44,26 @@ an item when it ships (finished behaviour is recorded in
   contract change, wants agreeing on both sides, and is Russell's call rather
   than a Windows session's.
 
-  **What to check first if this is picked up**, because it decides how urgent
-  it is: run a scheduled deploy on a course with no saved site and watch what
-  `Read-Host` actually does under Task Scheduler. If it returns empty and
-  accepts the default, the bug is "published to an address nobody chose"; if it
-  blocks, the bug is "the overnight publish never happened and nothing said
-  so". Measured, not guessed.
+  **Half of it is now measured, and the answer is the bad one.** Two runs of
+  the harness left their launcher processes sitting at that prompt for
+  **45 minutes** — a `powershell.exe` and its `python.exe` child from each run,
+  still alive and still waiting when they were finally swept up. Under a parent
+  with no usable stdin, `Read-Host` BLOCKS rather than returning empty. So on
+  that path the failure is "the overnight publish never happened, and nothing
+  said so" — the worse of the two shapes, because a teacher's site is simply
+  not updated in the morning and no line anywhere explains why. Two further
+  things follow, both worth knowing: the wedged processes survive their
+  parent being killed, INCLUDING `Process.Kill($true)` on the tree, so a
+  scheduled task that gives up leaves the launcher running; and nothing was
+  written to the activity trail while they waited, so the trail cannot tell
+  this apart from a deploy that was never scheduled.
+
+  **What is still worth checking**: whether Task Scheduler's own environment
+  differs from this one — it may hand the process a null stdin that returns
+  EOF immediately rather than a pipe that never delivers, in which case the
+  failure changes shape to "published to an address nobody chose". Both are
+  bad; they want different fixes, and the flag refusing to ask is the fix for
+  both.
 
 - ✅ **Done 2026-09-05 — the two reliability findings from that day's review.**
   Kept rather than deleted because the SHAPE of each is worth recognising
