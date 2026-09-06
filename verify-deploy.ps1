@@ -129,15 +129,43 @@ function Set-Destination {
 }
 
 function Run-Launcher {
-    param([string]$Script, [string[]]$LauncherArgs, [string]$LogFile, [int]$TimeoutSeconds = 900)
+    param([string]$Script, [string[]]$LauncherArgs, [string]$LogFile, [int]$TimeoutSeconds = 900,
+          [string[]]$Answers = @())
     Remove-Item $LogFile -ErrorAction SilentlyContinue
     $quoted = ($LauncherArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
-    $process = Start-Process -FilePath "cmd.exe" `
-        -ArgumentList "/c", ".\$Script $quoted > `"$LogFile`" 2>&1" `
-        -WorkingDirectory $WorkingFolder -PassThru -WindowStyle Hidden
+
+    # A first publish to Netlify ASKS things - a surname, and a site name -
+    # and so does a publish whose saved site has been deleted upstream, which
+    # is what happened on the first real run of this script: the launcher fell
+    # through to "create a fresh site", asked for a name, and the run sat there
+    # until the timeout. Without stdin the harness cannot tell "it hung" from
+    # "it asked", and those need different answers from a person.
+    #
+    # The answers are fed as a file rather than typed at a pseudo-console. That
+    # is cruder than the mac's `expect`, which answers by PROMPT TEXT, and the
+    # difference is worth knowing: a blind feed cannot tell one question from
+    # another, so it is used ONLY for the destinations that ask, and the
+    # answers are the defaults the launcher itself offers.
+    $stdin = $null
+    if ($Answers.Count -gt 0) {
+        $stdin = Join-Path $work ("answers-" + [Guid]::NewGuid().ToString('N').Substring(0,6) + ".txt")
+        Write-Utf8NoBom $stdin (($Answers -join "`r`n") + "`r`n")
+    }
+    $startArgs = @{
+        FilePath = "cmd.exe"
+        ArgumentList = @("/c", ".\$Script $quoted > `"$LogFile`" 2>&1")
+        WorkingDirectory = $WorkingFolder
+        PassThru = $true
+        WindowStyle = "Hidden"
+    }
+    if ($stdin) { $startArgs["RedirectStandardInput"] = $stdin }
+    $process = Start-Process @startArgs
     if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
         try { $process.Kill($true) } catch { }
-        return @{ ExitCode = 124; Log = "" }
+        $partial = if (Test-Path $LogFile) { Get-Content $LogFile -Raw } else { "" }
+        # 124 is "timed out", kept distinct from any exit code the launcher
+        # itself can return, so a hang never reads as a refusal.
+        return @{ ExitCode = 124; Log = $partial }
     }
     $text = if (Test-Path $LogFile) { Get-Content $LogFile -Raw } else { "" }
     return @{ ExitCode = $process.ExitCode; Log = $text }
@@ -249,7 +277,7 @@ Check-Folder "folder" (Join-Path $folderTarget "section$Section")
 Hdr "Destination 2 of 3 - Netlify"
 if ($haveNetlify) {
     Set-Destination -Primary "netlify"
-    $netlifyRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "deploy-netlify.log")
+    $netlifyRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "deploy-netlify.log") -Answers @("Testing", "", "y")
     if ($netlifyRun.ExitCode -eq 0) { Ok "publish to Netlify exited 0" } else { No "publish to Netlify exited $($netlifyRun.ExitCode)" }
     $netlifyUrl = Url-FromLog $netlifyRun.Log
     if ($netlifyUrl) { Check-Url "Netlify" $netlifyUrl } else { No "no Netlify address in the output" }
@@ -258,7 +286,7 @@ if ($haveNetlify) {
 Hdr "Destination 3 of 3 - Cloudflare Pages"
 if ($haveCloudflare) {
     Set-Destination -Primary "cloudflare_pages"
-    $cloudflareRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "deploy-cloudflare.log")
+    $cloudflareRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "deploy-cloudflare.log") -Answers @("Testing", "", "y")
     if ($cloudflareRun.ExitCode -eq 0) { Ok "publish to Cloudflare exited 0" } else { No "publish to Cloudflare exited $($cloudflareRun.ExitCode)" }
     $cloudflareUrl = Url-FromLog $cloudflareRun.Log
     if ($cloudflareUrl) { Check-Url "Cloudflare Pages" $cloudflareUrl } else { No "no Cloudflare address in the output" }
@@ -275,7 +303,7 @@ if ($haveNetlify) {
     Remove-Item -Recurse -Force $folderTarget -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $folderTarget | Out-Null
     Set-Destination -Primary "netlify" -AdditionalJson "[{`"type`":`"local_folder`",`"folder_path`":`"$($folderTarget -replace '\\','\\\\')`"}]"
-    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair1-netlify.log")
+    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair1-netlify.log") -Answers @("Testing", "", "y")
     $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "pair1-folder.log")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (netlify $($legOne.ExitCode), folder $($legTwo.ExitCode))" }
@@ -289,7 +317,7 @@ if ($haveCloudflare) {
     Remove-Item -Recurse -Force $folderTarget -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $folderTarget | Out-Null
     Set-Destination -Primary "cloudflare_pages" -AdditionalJson "[{`"type`":`"local_folder`",`"folder_path`":`"$($folderTarget -replace '\\','\\\\')`"}]"
-    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair2-cf.log")
+    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair2-cf.log") -Answers @("Testing", "", "y")
     $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "pair2-folder.log")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (cloudflare $($legOne.ExitCode), folder $($legTwo.ExitCode))" }
@@ -299,9 +327,9 @@ if ($haveCloudflare) {
 Hdr "Pairing 3 of 3 - Netlify primary, Cloudflare also"
 if ($haveNetlify -and $haveCloudflare) {
     Set-Destination -Primary "netlify" -AdditionalJson '[{"type":"cloudflare_pages"}]'
-    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair3-netlify.log")
+    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair3-netlify.log") -Answers @("Testing", "", "y")
     Set-Destination -Primary "cloudflare_pages"
-    $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair3-cf.log")
+    $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair3-cf.log") -Answers @("Testing", "", "y")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (netlify $($legOne.ExitCode), cloudflare $($legTwo.ExitCode))" }
     $u1 = Url-FromLog $legOne.Log; if ($u1) { Check-Url "Netlify (paired with Cloudflare)" $u1 }

@@ -369,6 +369,49 @@ rather than being deleted.
 > manual. A change that creates an obligation for the other platform and does
 > not list it has, from their side, not been handed over at all.
 
+- ⚠️ **TWO CONTRACT SENTENCES SAY "on your Mac" AND ARE SHOWN TO WINDOWS
+  TEACHERS TOO** (Windows, 2026-09-06). `specialNames.renameFolder.explanation`
+  and `.doneNothingWasThere` both name the platform:
+
+  > This renames the folder on your Mac — in every section that has one — …
+  > There was no folder by that name on your Mac, so only this course's
+  > settings changed.
+
+  Windows says "on this PC" instead, which is the same deliberate difference as
+  "Setting up this Mac" against "Setting up this PC" in `app-rules.json` →
+  `markerOrigins`. **What the mac owes is only a note in the contract** — a
+  `platformWorded` marker, or the treatment `markerOrigins` already gets — so
+  that the next reader sees a recorded difference rather than concluding
+  Windows drifted, and so a future contract-driven test does not put the mac's
+  word in front of a Windows teacher. `SpecialFolderRenamerTests.
+  TheTwoPlatformWordedSentencesSayThisPcRatherThanYourMac` asserts it in both
+  directions on this side.
+
+- ⚠️ **A SCHEDULED DEPLOY HAS NOBODY TO ANSWER A QUESTION, AND `deploy` STILL
+  ASKS THEM — the same shape on both platforms** (found on Windows,
+  2026-09-06). Written up in full in `TODO.md`; summarised here because the mac
+  is affected identically and neither side should assume the other has it in
+  hand.
+
+  Found by the new `verify-deploy.ps1`, whose Netlify leg hung until its own
+  timeout: the site saved in `.netlify_sites/section1.json` no longer existed
+  on Netlify, so the launcher fell through to creating a fresh one and asked
+  for a name. A person answers that in two seconds; a scheduled task has no
+  console. `TaskScheduling.WriteWrapperScript` generates `& deploy.ps1 <args>`
+  with no stdin and no non-interactive flag, and the mac's `launchd` path has
+  the same shape — so "publish tomorrow's class" on a course whose site was
+  deleted upstream, or whose FIRST publish is the scheduled one, reaches a
+  question nobody will answer.
+
+  **Not fixed here on purpose.** The fix is a `--non-interactive` flag that
+  makes `deploy` refuse rather than ask, which changes what the app passes the
+  launcher — pinned by `app-rules.json` → `deployArguments` and run by both
+  suites. That is a contract change and wants agreeing rather than doing. What
+  is worth measuring first, on either platform: whether `Read-Host` with no
+  console returns EMPTY (silently accepting the default site name, publishing
+  to an address nobody chose) or BLOCKS (the overnight publish never happens
+  and nothing says so). Those are different bugs and want different urgency.
+
 - ⚠️ **THE CONTRACT'S `stopPreview` PROSE IS NOW WRONG ABOUT WINDOWS, and only
   the mac can regenerate it** (Windows + shared, 2026-09-05). Three sentences
   in `contracts/shared-rules.json` → `stopPreview` describe a state that

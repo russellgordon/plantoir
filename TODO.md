@@ -4,6 +4,53 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- ⚠️ **A scheduled deploy has nobody to answer a question, and `deploy` still
+  asks them — found on Windows, 2026-09-06, and it is the same shape on both
+  platforms.** Not fixed, because the fix touches the launcher's argument
+  contract and that is a decision rather than a repair.
+
+  **How it was found.** `verify-deploy.ps1`'s Netlify leg hung until its own
+  900-second timeout. The log says why: the site saved in
+  `.netlify_sites/section1.json` no longer exists on Netlify (deleted at the
+  other end at some point), so `deploy.ps1` did the sensible thing and fell
+  through to creating a fresh one — and asked for a name:
+
+      ⚠️ Saved Netlify site (e8ded3b5-…) was not found on Netlify.
+       Creating a fresh Netlify site for this section…
+       Enter Netlify site name [mcr3u-s1-2026-gordon]:
+
+  A person at a keyboard answers that in two seconds. A harness with no stdin
+  waits forever, which is what happened.
+
+  **Why it matters beyond the harness.** `TaskScheduling.WriteWrapperScript`
+  generates `& <deploy.ps1> <args>` with no stdin redirection and no
+  non-interactive flag, and Task Scheduler runs it with no console. The mac's
+  `launchd` path has the same shape. So the flagship "publish tomorrow's
+  class" feature, on a course whose site has been deleted upstream — or on a
+  course whose FIRST publish is the scheduled one, which also asks — reaches a
+  question nobody will ever answer. What happens next is not knowable from
+  reading: `Read-Host` with no console may return empty (silently accepting
+  the default site name, which at least publishes), may throw, or may block
+  until the task's own limit. All three are bad in different ways, and the
+  silent-default case is the worst because it publishes to an address nobody
+  chose.
+
+  **What a fix looks like, and why it was not just done.** A
+  `--non-interactive` flag that makes `deploy` REFUSE rather than ask, with a
+  trail line saying which question it could not ask, and the app then telling
+  the teacher their scheduled publish needs one answer before it can run
+  unattended. That changes what the app passes the launcher, which is pinned by
+  `app-rules.json` → `deployArguments` and run by both suites — so it is a
+  contract change, wants agreeing on both sides, and is Russell's call rather
+  than a Windows session's.
+
+  **What to check first if this is picked up**, because it decides how urgent
+  it is: run a scheduled deploy on a course with no saved site and watch what
+  `Read-Host` actually does under Task Scheduler. If it returns empty and
+  accepts the default, the bug is "published to an address nobody chose"; if it
+  blocks, the bug is "the overnight publish never happened and nothing said
+  so". Measured, not guessed.
+
 - ✅ **Done 2026-09-05 — the two reliability findings from that day's review.**
   Kept rather than deleted because the SHAPE of each is worth recognising
   again: both were races nobody would meet often, and both ended in a state a
