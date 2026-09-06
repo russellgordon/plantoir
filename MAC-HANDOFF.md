@@ -191,13 +191,17 @@ outstanding.
   the mac and written down (`SectionDetailView.swift:400-409`); Windows
   attaches to the runner's `HealthFindings` notification instead. Also
   rejected: showing on the FIRST finding to arrive. `site_health.py` prints its
-  findings in one burst, so they land in one flush and the runner announces
-  them one after another on the same stack — showing at once puts up a dialog
-  naming one problem and then a second naming both. Windows posts the
-  presentation to the dispatcher, so the whole flush is collected first; the
-  mac's held-batch queue produces the two dialogs, with the first finding in
-  both. Not filed as a defect above because it needs two findings in one build
-  to see, but it is the same code.
+  findings in one burst, so they land in one flush and the C# runner announces
+  them one after another on the same stack — showing at once would put up a
+  dialog naming one problem and then a second naming both. Windows posts the
+  presentation to the dispatcher, so the whole flush is collected first.
+  **The mac does not have this problem**, and an earlier draft of this
+  paragraph said it did: SwiftUI's `onChange(of:)` observes state at the next
+  render, so two synchronous appends read as one change 0→2. `GUI-IMPROVEMENTS.md`
+  row 366 is the evidence — a real run with two findings, watched, showing one
+  dialog titled "2 things need your attention". Corrected here rather than
+  quietly dropped, because a handoff that sends the other side after a
+  non-defect costs them the same afternoon a real one would.
 
   **The assistant surface had the same leak, and the mac should check its
   own.** `LauncherRunner.Capture` on Windows passed every output line straight
@@ -223,6 +227,28 @@ outstanding.
   and one measurement already done, so whoever picks it up after that merge
   does not re-derive it. Nothing for the mac here beyond knowing that Windows
   parity on `scheduledDeployPublishesAnyway` is still one step short.
+
+  **One divergence that is deliberate and visible, so decide rather than
+  inherit it.** Windows forgets what it has shown when a new BUILD starts, so a
+  problem that is still there is reported again by the next preview and again
+  by the publish. The mac gets the same behaviour for free — its runner clears
+  its findings on each run and `onChange` fires afresh — so this is parity
+  rather than divergence; what is written down here is the REASON, because the
+  first Windows cut kept a per-view "already shown" set and it silently ate the
+  case that matters most. Preview reports a missing Media folder, the teacher
+  presses OK and publishes anyway, and the publish's identical finding is the
+  one carrying the sentence about what students can see. Suppressing it as
+  "already shown" loses precisely the sentence the occasion exists for.
+  "Show it once" means once per build, not once per view.
+
+  **Run against the real toolchain, not only against fixtures** (Windows 11 Pro
+  26200, native runtime, working folder `scheduled deploy test`, course ICD2O
+  section 1). With `Media` renamed aside, `preview.ps1 ICD2O 1 --build-only`
+  exited 0 and printed exactly one `PLANTOIR_HEALTH:` line — the real one, with
+  real line endings — beside its `⚠️` sentence. With `Media` restored, the same
+  build printed zero. That second half is the one worth having: a healthy
+  course reporting nothing is what stops this feature from becoming a thing
+  teachers dismiss by habit, and it is not something a fixture can prove.
 
   **A measurement, on this machine.** Windows PowerShell 5.1.26100, Windows 11
   Pro 26200: an inner script that runs a native command exiting 7 and then

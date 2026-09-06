@@ -78,13 +78,91 @@ public class FolderProblemQueueTests
         // while an earlier batch is still up.
         var queue = new FolderProblemQueue();
         queue.Note(new[] { Finding("mediaFolderMissing") }, false);
-        var onScreen = queue.TakeNext();
+        queue.TakeNext();
 
         Assert.True(queue.Note(new[] { Finding("noGradedFolders") }, false));
-        Assert.Single(onScreen!.Value.Findings);
 
         var afterwards = queue.TakeNext();
-        Assert.Equal("noGradedFolders", afterwards!.Value.Findings[0].Name);
+        Assert.Single(afterwards!.Value.Findings);
+        Assert.Equal("noGradedFolders", afterwards.Value.Findings[0].Name);
+    }
+
+    [Fact]
+    public void TheNextBuildSaysItAgainIfItIsStillWrong()
+    {
+        // "Show it once" means once per BUILD, not once for the life of the
+        // view. A teacher who dismissed the warning, went to Obsidian and
+        // previewed again has asked a fresh question.
+        var queue = new FolderProblemQueue();
+        var finding = Finding("mediaFolderMissing");
+        queue.Note(new[] { finding }, false);
+        queue.TakeNext();
+
+        queue.ForgetShown();
+
+        Assert.True(queue.Note(new[] { finding }, false));
+        Assert.Single(queue.TakeNext()!.Value.Findings);
+    }
+
+    [Fact]
+    public void APublishRepeatsWhatAPreviewSaidBecauseTheSentenceIsDifferent()
+    {
+        // The case that matters most: the publish's copy of the same finding
+        // is the one carrying what students can see. Suppressing it as
+        // "already shown" loses precisely the sentence the occasion exists for.
+        var queue = new FolderProblemQueue();
+        var finding = Finding("mediaFolderMissing");
+        queue.Note(new[] { finding }, cameFromPublishing: false);
+        Assert.False(queue.TakeNext()!.Value.CameFromPublishing);
+
+        queue.ForgetShown();
+        queue.Note(new[] { finding }, cameFromPublishing: true);
+
+        Assert.True(queue.TakeNext()!.Value.CameFromPublishing);
+    }
+
+    [Fact]
+    public void ForgettingWhatWasShownDoesNotDiscardWhatIsStillWaiting()
+    {
+        // A dialog that has not been read yet is not stale.
+        var queue = new FolderProblemQueue();
+        queue.Note(new[] { Finding("mediaFolderMissing") }, false);
+
+        queue.ForgetShown();
+
+        Assert.Equal(1, queue.PendingCount);
+    }
+
+    [Fact]
+    public void APublishThatRepeatsItselfDoesNotRelabelTheNextBuildsFindings()
+    {
+        // Setting the flag on a batch that contributed nothing would tell the
+        // NEXT build's findings they are not on the students' site yet.
+        var queue = new FolderProblemQueue();
+        var finding = Finding("mediaFolderMissing");
+        queue.Note(new[] { finding }, cameFromPublishing: false);
+        queue.Note(new[] { finding }, cameFromPublishing: true);   // nothing new
+        queue.TakeNext();
+
+        queue.Note(new[] { Finding("noGradedFolders") }, cameFromPublishing: false);
+        Assert.False(queue.TakeNext()!.Value.CameFromPublishing);
+    }
+
+    [Fact]
+    public void ABatchHandedBackIsShownAfterAll()
+    {
+        // TakeNext marks a batch shown as it hands it over, which is right
+        // while a dialog is going up — but one that never appeared has told
+        // nobody anything.
+        var queue = new FolderProblemQueue();
+        queue.Note(new[] { Finding("mediaFolderMissing") }, cameFromPublishing: true);
+        var taken = queue.TakeNext();
+
+        queue.PutBack(taken!.Value.Findings, taken.Value.CameFromPublishing);
+
+        var again = queue.TakeNext();
+        Assert.Single(again!.Value.Findings);
+        Assert.True(again.Value.CameFromPublishing);
     }
 
     [Fact]

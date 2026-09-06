@@ -164,6 +164,11 @@ public sealed partial class SectionDetailView : UserControl
             RefreshChrome();
             if (args.PropertyName == nameof(_previewRunner.IsRunning) && !_previewRunner.IsRunning)
                 _ = RefreshPublishedMarker();
+            // A new build asks the question again, so a problem it still finds
+            // is told again — "show it once" means once per BUILD, not once
+            // for the life of this view.
+            if (args.PropertyName == nameof(_previewRunner.IsRunning) && _previewRunner.IsRunning)
+                _healthQueue.ForgetShown();
             // As the build reports them. preview.ps1 does not exit while it is
             // serving, so waiting for this runner to FINISH would hold the
             // dialog until the teacher pressed Stop.
@@ -362,11 +367,15 @@ public sealed partial class SectionDetailView : UserControl
     {
         if (_healthPresentationQueued || _healthDialogIsUp) return;
         _healthPresentationQueued = true;
-        DispatcherQueue.TryEnqueue(async () =>
+        bool accepted = DispatcherQueue.TryEnqueue(async () =>
         {
             _healthPresentationQueued = false;
             await PresentPendingHealthFindingsAsync();
         });
+        // A refused enqueue (the dispatcher is shutting down) would otherwise
+        // leave the flag set forever, and every later finding would be dropped
+        // by the guard above rather than shown.
+        if (!accepted) _healthPresentationQueued = false;
     }
 
     /// <summary>
@@ -380,10 +389,20 @@ public sealed partial class SectionDetailView : UserControl
         bool cameFromPublishing = next.CameFromPublishing;
 
         _healthDialogIsUp = true;
+        bool putBack = false;
         try
         {
             var choice = await ShowHealthDialogAsync(FolderProblemsDialog.Findings(findings));
-            if (choice == ContentDialogResult.Primary)
+            if (choice is null)
+            {
+                // It never got on screen — another dialog held the one slot
+                // WinUI allows, for longer than the retries covered. Hand the
+                // batch back rather than losing it: TakeNext marked it shown,
+                // and a dialog nobody saw has told nobody anything.
+                _healthQueue.PutBack(findings, cameFromPublishing);
+                putBack = true;
+            }
+            else if (choice == ContentDialogResult.Primary)
             {
                 var outcome = SiteHealthRepair.OutcomeOfRepairing(
                     findings, _course,
@@ -411,6 +430,17 @@ public sealed partial class SectionDetailView : UserControl
         finally
         {
             _healthDialogIsUp = false;
+        }
+
+        if (putBack)
+        {
+            // Try again once whatever is holding the slot has had time to go,
+            // rather than recursing straight back into the same refusal. It
+            // stops of its own accord: the batch is presented the first time
+            // the slot is free.
+            await Task.Delay(2000);
+            QueueHealthPresentation();
+            return;
         }
 
         await PresentPendingHealthFindingsAsync();
@@ -491,7 +521,29 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
+            // Asked AGAIN, at the press. The button was offered when the
+            // outcome dialog was built, and a teacher reads for as long as
+            // they like — a publish can start in that time, from the assistant
+            // as easily as from this window, and starting a build into a
+            // course being published is the race DeployAsync spends thirty
+            // lines avoiding. Withheld here means saying so, in the same
+            // dialog shape, rather than swallowing the press.
+            if (WhyThePreviewCannotBeOfferedNow() is { } instead)
+            {
+                await PresentRepairOutcomeAsync(instead);
+                return;
+            }
+            if (await TheAssistantIsBuilding()) return;
+
             if (_lease is not null || _previewRunner.IsRunning) await StopPreviewAsync();
+
+            // The stop can take ~20 seconds with the dialog already gone, and
+            // the teacher is free to click another section meanwhile — which
+            // replaces this view. Starting a preview from a view nobody can
+            // see leaves a running preview.ps1 on a runner with no window and
+            // a lease that refuses the section's own Preview button
+            // afterwards.
+            if (!IsLoaded) return;
             StartAutomatedPreview();
         }
         catch (Exception ex)
@@ -1011,6 +1063,12 @@ public sealed partial class SectionDetailView : UserControl
             // await, and that notification is what calls RefreshChrome (see
             // the constructor's _deployRunner.PropertyChanged subscription).
             _isPreparingDeploy = false;
+
+            // This build asks the folder question again, and its answer is the
+            // one carrying the sentence about what students can see — so a
+            // finding a preview already reported must not be suppressed here
+            // as "already shown".
+            _healthQueue.ForgetShown();
 
             // The whole sequence — an optional shared build, then each
             // destination's own deploy — happens inside RunAsync, which

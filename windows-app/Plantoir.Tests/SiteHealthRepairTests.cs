@@ -224,8 +224,12 @@ public class SiteHealthRepairTests : IDisposable
     }
 
     [Fact]
-    public void BothHalvesOfAWholeFailureAreNamed()
+    public void WhenEverythingFailedTheHeadlineDoesNotTryToNameThem()
     {
+        // Deliberate: with nothing put back there is no "Put X back." sentence
+        // to lead with, and the explanation is the same for either. The helper
+        // that DOES name two is pinned beside it, because the two-name join is
+        // otherwise only exercised on the success path.
         var course = MakeCourse();
         File.WriteAllText(Path.Combine(course.DirectoryPath, "Media"), "a file, not a folder");
 
@@ -233,6 +237,9 @@ public class SiteHealthRepairTests : IDisposable
             new[] { Finding("mediaFolderMissing"), Finding("sectionIndexMissing", section: 9) }, course);
 
         Assert.Equal("Plantoir could not put that back.", outcome!.Headline);
+        Assert.Equal(SiteHealthRepair.CouldNotExplanation, outcome.Detail);
+        Assert.False(outcome.CanRebuild);
+
         Assert.Equal("Could not put the Media folder and the front page back.",
             SiteHealthRepair.WhatCouldNotBePutBack(new[] { "mediaFolderMissing", "sectionIndexMissing" }));
     }

@@ -44,8 +44,43 @@ public sealed class FolderProblemQueue
         // sentence is the one naming who has not seen the change yet
         // (students), and leaving that out of a batch that really did follow a
         // publish is the more costly of the two mistakes.
-        if (cameFromPublishing) _pendingCameFromPublishing = true;
+        // Only when this batch actually contributed something. A publish that
+        // reported nothing new would otherwise leave the flag set, and the
+        // NEXT unrelated build's findings would be told they are not on the
+        // students' site yet.
+        if (cameFromPublishing && anythingNew) _pendingCameFromPublishing = true;
         return anythingNew;
+    }
+
+    /// <summary>
+    /// Forget what has been shown, because a new run is starting.
+    ///
+    /// <para>"Show it once" means once per BUILD, not once per section view.
+    /// A teacher who dismissed a warning, went to Obsidian, and previewed
+    /// again has asked a fresh question and deserves a fresh answer — and the
+    /// case that matters most is the one after that: preview reports a missing
+    /// Media folder, the teacher publishes anyway, and the publish's identical
+    /// finding is the one carrying the sentence about what students can see.
+    /// Suppressing it as "already shown" loses precisely the sentence the
+    /// occasion exists for.</para>
+    ///
+    /// <para>What it does NOT forget is anything still waiting: a dialog that
+    /// has not been read yet is not stale.</para>
+    /// </summary>
+    public void ForgetShown() => _shown.Clear();
+
+    /// <summary>
+    /// Hand a batch back, because it could not be shown after all.
+    ///
+    /// <para><see cref="TakeNext"/> marks a batch shown as it hands it over,
+    /// which is right while a dialog is going up — but a dialog that never
+    /// appeared has told nobody anything, and leaving it marked would drop the
+    /// findings for good with only a log line behind them.</para>
+    /// </summary>
+    public void PutBack(IReadOnlyList<SiteHealthFinding> findings, bool cameFromPublishing)
+    {
+        foreach (var finding in findings) _shown.Remove(finding.Identity);
+        Note(findings, cameFromPublishing);
     }
 
     /// <summary>
