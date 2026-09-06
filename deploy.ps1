@@ -203,6 +203,40 @@ if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
   Write-Host ""
 }
 
+function Test-CarriesLiveReload([string]$root) {
+  # Does any page under $root still carry the preview's live-reload client?
+  #
+  # WHY THIS IS A FUNCTION AND NOT THE OBVIOUS ONE-LINER. Windows PowerShell
+  # 5.1's `Select-String -Quiet`, fed a PIPELINE of file objects, emits one
+  # Boolean PER FILE rather than one answer overall. A clean site of 314
+  # pages therefore comes back as a 314-element array of $false - and in
+  # PowerShell a non-empty array is TRUE. So
+  #
+  #     if ($files | Select-String -Pattern ... -List -Quiet) { ... }
+  #
+  # was true whenever the site had any HTML in it at all, which is always.
+  # The consequences were both invisible and total: every publish to a folder
+  # announced "This site was built by a preview", rebuilt whether or not it
+  # needed to, waited the full 30 s for a condition that could never become
+  # false, and then refused with "The rebuilt site still carries the
+  # preview's live-reload script. Nothing was published." Publishing to a
+  # folder could not succeed on Windows, ever. Measured 2026-09-05 by
+  # publishing a site whose 314 pages contained no live-reload client at all
+  # and watching it be refused three times running.
+  #
+  # `deploy.sh` is not affected: `grep -rq` returns one exit status for the
+  # whole tree, which is the answer this needs. The bug is entirely in the
+  # PowerShell port of that check.
+  #
+  # Testing for a MatchInfo instead of a Boolean is the fix: -List stops at
+  # the first match in each file, Select-Object -First 1 stops at the first
+  # file, and $null -ne is an unambiguous test whatever the pipeline count.
+  if (-not (Test-Path -LiteralPath $root)) { return $false }
+  $hit = Get-ChildItem -LiteralPath $root -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
+         Select-String -Pattern "ws://localhost:" -List | Select-Object -First 1
+  return ($null -ne $hit)
+}
+
 # ======================
 # Preflight checks
 # ======================
@@ -299,8 +333,7 @@ if ($TO_FOLDER) {
   # deploy.sh. Detection that read only `index.html` could not see the one
   # state the wait below exists for.
   $publishedIndex = Join-Path $PUBLIC_DIR_HOST "index.html"
-  if (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
-      Select-String -Pattern "ws://localhost:" -List -Quiet) {
+  if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
     Write-Host "This site was built by a preview, which bakes in a live-reload script"
     Write-Host "  that students' browsers would ask about. Rebuilding it for publishing..."
     & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only"
@@ -320,12 +353,10 @@ if ($TO_FOLDER) {
     # looks fine. See the same comment in deploy.sh.
     for ($w = 0; $w -lt 150; $w++) {
       if ((Test-Path -LiteralPath $publishedIndex) -and
-          -not (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
-                Select-String -Pattern "ws://localhost:" -List -Quiet)) { break }
+          -not (Test-CarriesLiveReload $PUBLIC_DIR_HOST)) { break }
       Start-Sleep -Milliseconds 200
     }
-    if (Get-ChildItem -LiteralPath $PUBLIC_DIR_HOST -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
-        Select-String -Pattern "ws://localhost:" -List -Quiet) {
+    if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
       Write-Host "The rebuilt site still carries the preview's live-reload script."
       Write-Host "  Nothing was published, rather than publishing pages students'"
       Write-Host "  browsers would ask about."
