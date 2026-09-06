@@ -170,8 +170,9 @@ Neither app contains toolchain logic of its own: they write the same
      Russell saying so.** Start sessions from `dev` and branch off it. The
      merge back is HIS call, every time: see "Autonomy moves with the
      model" below, which was narrowed on 2026-08-22 for exactly this.
-     A piece is ready to merge only with its tests green and its write-ups
-     done (rules 2–5) — say it is ready and stop there.
+     A piece is ready to merge only with its tests green, its write-ups
+     done (rules 2–5) and its documentation pass made (rule 11) — say it is
+     ready and stop there.
 
      **The push rule now applies to the ISSUE BRANCH: work is not finished
      until `git push -u origin issue/<slug>` — push in the same session, as
@@ -344,6 +345,65 @@ Neither app contains toolchain logic of its own: they write the same
     second, separate chain to travel besides ("Editing the toolchain: two traps
     that cost real time", below); rebuilding the app is the first link of it,
     not a substitute for it.
+
+11. **How a piece of work is done here: implement, review each chunk, write up
+    for Windows as you go, and finish with the documentation.** Standing order
+    from Russell, 2026-09-05, after a session where every one of these paid for
+    itself and the last one had to be asked for.
+
+    - **Implement with the strongest model available.** In Claude Code that
+      means Opus; on another harness, the most capable model you have. This is
+      not a preference about style: the work in this repository is mostly
+      judgement — which of three implementations is
+      right, what a teacher would recognise, what a rule's REASON was — and
+      that is exactly where a weaker model produces something that passes its
+      tests and is wrong.
+    - **Have each logical chunk checked by a genuinely independent reviewer
+      before moving on. In Claude Code, use Fable** — a DIFFERENT model where
+      one is available, and a fresh context at the very least, because a
+      reviewer that is the same mind with the same assumptions agrees with
+      itself. **At least three reviews per coherent piece** (rule 6's sense of
+      "piece"), and more if it has separable parts: the PLAN, then the
+      implementation, then the fixes. A review of the finished thing arrives
+      too late to change its shape, and the shape is usually what is wrong.
+      Brief the reviewer adversarially — tell it to find where the work is
+      wrong, incomplete, or has created a new problem, and tell it that
+      "nothing to act on" is an acceptable answer, or it will invent findings
+      to justify its existence.
+
+      **Verify what a review claims rather than acting on it.** A reviewer is
+      wrong often enough to matter, and a finding accepted without checking is
+      just a second opinion with extra steps. Equally, when it is right about
+      something you decided, say so plainly and change the decision — on the
+      session this rule came from, a recorded decision about the activity
+      trail was reversed on review and the reversal was correct.
+    - **Write it up for the other platform AS YOU GO, not at the end.** This
+      is rule 3 (and rule 4 pointing the other way); it is named here because
+      it belongs to the rhythm of the work rather than to its ending. A
+      handoff written at the end is written from memory, and the reasons —
+      which is the part that travels — are what memory loses first.
+    - **ALWAYS end with a documentation update, BEFORE asking to merge** —
+      after the rebuild rule 10 asks for, since a documentation pass needs no
+      further build. The last act before "this is ready" is to go looking for
+      every place that describes what you changed, and fix the ones the change
+      made wrong. Start with `documentation/`, which is the one most easily forgotten
+      because nothing in the daily rhythm points at it: the handoffs and
+      `GUI-IMPROVEMENTS.md` get written because rules 3 to 5 demand them, and
+      the deep dives get written because somebody remembers. On the session
+      this rule came from, four places in `documentation/` described the rule
+      that had just been replaced, three of them wrongly, and one of them did
+      not document a launcher flag the app has been calling for weeks.
+
+      **Grep for the thing you changed rather than trusting your memory of
+      where it is described.** A behaviour is usually written down in more
+      places than the one you edited, and the copies that are now wrong are
+      worse than no copy at all, because they will be believed. Two things
+      are deliberately NOT updated: `GUI-IMPROVEMENTS.md` rows and completed
+      `TODO.md` entries are append-only records of what was true on their
+      day.
+
+    Then say it is ready, say what it contains, and stop — rule 6 still
+    decides what happens next, and the merge is his.
 
 ## Setting up on a new machine
 
@@ -771,7 +831,7 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 
 | Read this | When |
 |---|---|
-| [`documentation/`](documentation/README.md) | How the toolchain works, numbered 01–10: overview, image, launchers, course setup, build pipeline, Quartz customizations, deployment, config reference, mac app, local AI assistant. |
+| [`documentation/`](documentation/README.md) | How the toolchain works, numbered 01–11: overview, image, launchers, course setup, build pipeline, Quartz customizations, deployment, config reference, mac app, local AI assistant, release strategy. |
 | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change, with a required "Notes for Windows port" column. Append here for any GUI change — and read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
@@ -780,7 +840,7 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | [`MAC-HANDOFF.md`](MAC-HANDOFF.md) | The mirror: work that originated on Windows or in shared `scripts/` and needs the mac's attention. Ordered by STATUS — contract cases waiting, then what is still owed, then awareness, then the finished ledger — so it can be read top-down and abandoned at any point. |
 | [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, and the frozen asset names both platforms depend on. |
 | [`website/`](website/README.md) | **plantoir.app.** The marketing site's SOURCES — a layout, a stylesheet, one file per page, and the screenshot harness. `python3 website/build.py` writes `site/`, and `--deploy` publishes it to Netlify — the site is not Git-connected, so nothing deploys on push. `site/` is a build output and hand-edits to it are overwritten. The release version line lives in `website/site.json`. Screenshots are captured from the real app and the real class sites by `website/shots/capture.py`, in both colour schemes. |
-| [`TODO.md`](TODO.md) | Deferred work, with the research already done so picking one up is cheap. |
+| [`TODO.md`](TODO.md) | Deferred work, with the research already done so picking one up is cheap. A COMPLETED entry is marked done in place rather than deleted, and is then append-only history like a `GUI-IMPROVEMENTS.md` row: it records what was true and what the entry got wrong, and is not rewritten when the behaviour changes again. |
 | [`AGENTS.md`](AGENTS.md) · `.agents/rules/` | How this file reaches an agent that reads `AGENTS.md` rather than `CLAUDE.md` — Google Antigravity, among others. `.agents/rules/*.md` is a GENERATED copy of THIS file, split into parts because Antigravity silently truncates a rule file that is too long. **After changing CLAUDE.md, run `python3 .agents/sync-rules.py`** or the copy goes stale. |
 | [`research/`](research/README.md) | Measurement records the code cites as evidence — the assistant's model choices, the preview-staleness findings. Not an automated gate; each file states its own conditions. |
 | [`mac-app/README.md`](mac-app/README.md) · [`windows-app/PROGRESS.md`](windows-app/PROGRESS.md) | Per-app build, test and layout notes. |

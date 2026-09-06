@@ -2822,7 +2822,7 @@ the flag as dead; read it as untested.
   already shipped.
 - [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — THE spec (179 entries as of
   2026-08-15). Its **Windows status** section is where coverage is tracked.
-- [`documentation/`](documentation/README.md) — toolchain deep dives 01–10.
+- [`documentation/`](documentation/README.md) — toolchain deep dives 01–11.
 - [`CLAUDE.md`](CLAUDE.md) — the repository's entry point: conventions,
   testing, setup, and the traps that cost time.
 - [`RELEASING.md`](RELEASING.md) — cutting a release, both platforms.
