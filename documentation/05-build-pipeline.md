@@ -219,6 +219,15 @@ line rather than being written again in Swift and C#, which is what stops the
 same problem being worded differently on the two platforms. The sentences
 themselves live in `contracts/shared-rules.json` → `siteHealth.checks`.
 
+**The marker line is hidden from every surface a teacher reads**, and printing
+the sentence separately is what makes that free. A JSON payload is machinery
+(`CLAUDE.md` rule 1), so each app drops the line on its way into the console —
+and on Windows also on its way into the assistant's progress messages and the
+tail it reports back, which is a second surface and was leaking until
+2026-09-06. Anything that narrates raw launcher output is such a surface; the
+question to ask of a new one is not whether it shows the transcript but whether
+it shows a LINE.
+
 Two of the checks stay quiet unless the other half of the map exists: a
 brand-new course has an empty curriculum folder and an empty class folder on
 day one, and warning about both would nag every build of a course nobody has

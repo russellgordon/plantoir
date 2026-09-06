@@ -199,6 +199,21 @@ outstanding.
   both. Not filed as a defect above because it needs two findings in one build
   to see, but it is the same code.
 
+  **The assistant surface had the same leak, and the mac should check its
+  own.** `LauncherRunner.Capture` on Windows passed every output line straight
+  to the progress reporter and into the 12-line tail the assistant reports
+  back — so the raw `PLANTOIR_HEALTH:` JSON reached a teacher through the
+  assistant, on a surface nobody had looked at. Fixed by lifting findings out
+  of the output before it is narrated, and the sentences now follow the answer
+  through the mac's own `SiteHealthFinding.appending` shape. **Worth checking
+  on the mac**: `AssistSiteWork` calls `SiteHealthFinding.appending(to:from:)`
+  with a `ScriptRunner`, whose transcript already drops the marker at push —
+  but the mac's progress reporting is a different path from its transcript,
+  and if anything there narrates raw lines the same leak is present. Windows
+  also records `FolderProblemFound` from the MCP process, which the mac does
+  not appear to: it matters more here than in the GUI, because a headless
+  server leaves no console behind for the teacher to have seen.
+
   **One thing Windows did NOT build, and why.** The scheduled deploy still
   surfaces nothing, because on `dev` the Windows Task Scheduler wrapper has no
   build step at all — it publishes whatever is in the builds folder — so no

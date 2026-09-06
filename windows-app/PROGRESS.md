@@ -17,7 +17,7 @@ Docker Desktop) unless marked otherwise.
 | `PtyDriver/` | Console harness that drives the launchers under a ConPTY with scripted prompt replies — how the E2E runs below were performed. |
 | `Plantoir.Mcp/` | On `main` (`Plantoir.sln` lists it) and **it ships**: `publish.ps1` publishes it, copies `plantoir-mcp.exe` into the app's own output beside `Plantoir.exe`, and includes it in the signing list. A standalone MCP server exposing one working folder to an AI assistant. Load-bearing at runtime — `Plantoir/Services/ClaudeCodeLauncher.cs` looks for it beside the app, and `Plantoir/Services/McpClient.cs` launches it. See [its README](Plantoir.Mcp/README.md). |
 
-## Four activity-trail events are declared but not yet emitted (2026-09-06)
+## Four activity-trail events are declared but not yet emitted (2026-09-06; a fifth was, and now is)
 
 `ActivityTrail.Event` names `folder renamed`, `folder created`,
 `synced folder noticed` and `synced folder accepted`. All four are in
@@ -36,6 +36,15 @@ should be able to find. **When either feature's front end lands, the events
 must actually be recorded** — the count and the names are in the contract
 entries, and `ReclaimedProcesses` is the worked example of parsing something
 out and putting it on the trail.
+
+**There was a FIFTH, and this section did not name it: `folder problem
+repaired`.** Declared when the trail was built, still with no call site on
+2026-09-06 — it got one that day, when item 21's front end landed (`Models/
+SiteHealthRepair.cs`). It is recorded here because the omission is the
+interesting part: this section was written by listing the events somebody
+remembered were promised, and a fifth had been dead long enough to stop being
+remembered. The honest way to keep this list right is
+`grep -c` per enum member, not recollection.
 
 ## The subsystems that table does not name
 
@@ -60,6 +69,17 @@ out and putting it on the trail.
   one refusal path so the two cannot drift.
 - **Three publishing destinations**, not one: `deploy.ps1` handles Netlify,
   Cloudflare Pages and a plain folder.
+- **Folder-problem checks, surfaced in two of the three places they can
+  happen.** The shared Python checks a course's folders during every build and
+  prints one `PLANTOIR_HEALTH:` line per problem;
+  `Plantoir.Core/Models/SiteHealthFinding.cs` parses them,
+  `SiteHealthRepair.cs` puts right the two that can be put right, and
+  `Views/FolderProblemsDialog.cs` shows the rest. The app's preview and
+  publish are covered, and so is the assistant (`Plantoir.Mcp/
+  LauncherRunner.cs` lifts findings out and `SiteHealthFinding.Appending`
+  says them). **The scheduled deploy is NOT** — `WINDOWS-HANDOFF.md` item 22,
+  and the reason is that nothing checks the folders overnight in the first
+  place: that wrapper has no build step yet.
 
 ## Proven end to end
 

@@ -908,7 +908,19 @@ this side is expected to say so when the contract is wrong.
 
     Full write-up in "One rule for stopping a section's preview" below.
 
-21. **The folder-problems FRONT END: the findings dialog, the Fix button,
+21. ~~**The folder-problems FRONT END: the findings dialog, the Fix button,
+    and the repair**~~ — ✅ Done 2026-09-06, branch
+    `issue/windows-folder-problems-front-end`, `GUI-IMPROVEMENTS.md` row 417.
+    The dialog, the Fix button, both repairs, the outcome report and "Preview
+    Again" are all built, along with a rule-1 leak this item did not name: the
+    `PLANTOIR_HEALTH:` JSON line had been rendering verbatim in the console a
+    teacher reads. Two defects were found in the MAC's own repair while
+    porting it and are in `MAC-HANDOFF.md`. **One half is NOT done and is now
+    item 22 below** — the scheduled deploy still surfaces nothing, because on
+    this branch's base the wrapper it would attach to has no build step at
+    all. Original text:
+
+    **The folder-problems FRONT END: the findings dialog, the Fix button,
     and the repair (owed since 2026-08-23; scoped 2026-08-25).** The shared
     Python has printed `PLANTOIR_HEALTH:` lines since the mac's row 357, and
     until 2026-08-25 nothing on this side read them — see the correction in
@@ -934,6 +946,98 @@ this side is expected to say so when the contract is wrong.
     building is told nothing** — which is the exact failure the whole feature
     was written to end. The trail line is a diagnosis after the fact, not a
     warning at the time.
+
+22. **A scheduled deploy's folder problems still reach nobody, and the reason
+    is one step further back than it looks (2026-09-06).** The contract says a
+    scheduled deploy NEVER refuses on a health finding and surfaces it
+    afterwards instead (`siteHealth.scheduledDeployPublishesAnyway`). Item 21
+    built the "afterwards" for the app's own preview and publish; the
+    overnight path has nothing.
+
+    **But the blocker is not the surfacing — it is that no health check runs
+    overnight at all.** The wrapper `TaskScheduling.WriteWrapperScript` writes
+    goes straight from the fingerprint to `deploy.ps1` per destination. The
+    checks live inside `build_site.py`, and `deploy.py` publishes an EXISTING
+    `public/` — it only rebuilds when a live preview is attached, which
+    overnight, with the app closed, never happens. So there is no
+    `PLANTOIR_HEALTH:` output to capture, and building a capture against this
+    wrapper would be dead code that looks finished.
+
+    **The build step exists on the unmerged branch
+    `issue/windows-parity-tail` (commit 8e987693).** Do this item AFTER that
+    merges, not before. Then it is small, and the design is already done:
+
+    - **Capture PER RUN, and delete the capture afterwards.** Redirect the
+      `--build-only` invocation to a GUID-named file under
+      `%LOCALAPPDATA%\Plantoir\scheduled\folder-problems\`, scan it with
+      `Select-String -SimpleMatch 'PLANTOIR_HEALTH:'`, and write the matching
+      lines verbatim to `<CODE>-section<N>.txt` beside it. Parse them in C#
+      with `SiteHealthFinding.FindingsIn`, never in PowerShell — no JSON is
+      interpreted in shell. A per-run capture means Windows does NOT inherit
+      the mac's bug here: launchd opens its log with `O_APPEND` and nothing
+      truncates it, so the mac had to record the log's SIZE beforehand or
+      re-find last week's markers every night.
+    - **The scan must come BEFORE the build-failure guard.** Since 2026-09-01
+      a section with no `index.md` exits NON-ZERO from `--build-only`, and
+      that is precisely the run whose findings matter most. Save
+      `$LASTEXITCODE` into a variable immediately after the launcher, scan,
+      write the record, and only then test the saved code.
+    - **`$LASTEXITCODE` survives the redirect — measured, not assumed.**
+      Windows PowerShell 5.1.26100 on Windows 11 Pro 26200: an inner script
+      running a native command that exits 7 and then `exit $LASTEXITCODE`
+      still yields 7 in the caller through `2>&1 | Tee-Object -FilePath`,
+      `$v = & script 2>&1`, and `*>&1 | Out-File -Encoding utf8`. This
+      mattered enough to measure: breaking that guard would make an overnight
+      deploy publish nothing and say nothing. Two caveats found with it —
+      `Tee-Object` in 5.1 has no `-Encoding` and writes UTF-16LE, and `2>&1`
+      misses `Write-Host` lines where `*>&1` catches them.
+    - **A DIFFERENT directory from the completion sentinels, not beside
+      them.** `ScheduledDeployCompletion.ConsumePendingFrom` enumerates
+      `scheduled\pending\*.json` and deletes every file it touches, parsed or
+      not — so a findings record filed there is swept away before anything
+      reads it, and both consumers are kicked off from `MainWindow` on every
+      activation, so which one wins is a race.
+    - **Consumed when read, and cleared by a clean run.** One file per course
+      and section, taken by that section's own view when it loads, so a
+      problem is reported once rather than every morning; a run that found
+      nothing DELETES the record, so a problem the teacher has put right stops
+      being reported. Guard before consuming.
+    - **It owes a trail line, and the mac's does not write one.** Nothing else
+      records an overnight finding — the run happened with the app closed and
+      the console it printed to is gone. Note each one as
+      `FolderProblemFound` when the record is read, dated to the record's own
+      last-write time and not to the morning somebody opened the app, or the
+      trail puts it on the wrong night. `ActivityTrail.Note` takes a `moment`.
+      Propose this back to the mac when it lands.
+    - **The front end is already waiting for it.** `FolderProblemQueue` +
+      `SectionDetailView.NoteHealthFindings(findings, cameFromPublishing:
+      true)` is the whole attachment: the overnight run PUBLISHED, so the
+      sentence after a repair must be the one naming students.
+
+23. ~~**The assistant and `plantoir-mcp` parse no findings**~~ — ✅ Done
+    2026-09-06, in the same branch as item 21, once it turned out to be small
+    and to carry a live rule-1 leak of its own. Listed here rather than folded
+    into 21 because it is a genuinely different surface, and because the
+    reason it was nearly deferred is worth keeping: an assistant answers in
+    sentences and has no dialog to raise, so what it should SAY looked like a
+    design question. It is not — **the mac already answered it**, in
+    `SiteHealthFinding.appending(to:from:)`, which appends each finding's
+    sentence and detail to the outcome message. Copying that was ten minutes;
+    inventing a Windows answer would have been an afternoon and a divergence.
+    The lesson generalises: before treating a gap as a design question, grep
+    the mac for the type name.
+
+    **What it was hiding.** `LauncherRunner.Capture` passed every line
+    straight to `progress?.Report` and into the 12-line tail it reports back,
+    so the raw `PLANTOIR_HEALTH:` JSON went in front of a teacher through the
+    assistant — the same rule-1 leak item 21 fixed in the console, on a
+    surface nobody had looked at. And nothing on that path recorded a finding
+    on the trail, which matters more here than in the GUI: the MCP server is
+    headless, so a teacher who asks the assistant to publish leaves no console
+    behind at all.
+
+    Reference: `Plantoir.Mcp/LauncherRunner.cs`, `LaunchOutcome.Findings`,
+    `SiteHealthFinding.Appending`, `AssistFolderProblemTests.cs`.
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
