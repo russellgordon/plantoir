@@ -3013,6 +3013,7 @@ because it must (a redirected pipe has to be read), while the mac writes to a
 file because it can. Do not "bring the mac into line" by switching it to a
 pipe — the file is what makes the no-blocking-read property structural rather
 than a promise about always having a reader attached.
+
 ## WinUI scroll bars overlay content — always reserve a trailing gutter
 
 Found 2026-08-22, testing the model-in-use guard written up in

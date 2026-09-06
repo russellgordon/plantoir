@@ -2865,6 +2865,7 @@ where.
   merges. The stale branch itself (`issue/mac-site-shots-unmerged`) was left
   for Russell to delete rather than deleted here, since deleting a pushed
   branch is his call.
+
 - ✅ DONE (Windows, 2026-08-22). **A teacher could delete the local
   assistant's model file from Settings while an assistant window was still
   using it — fixed by porting the mac's `AssistActivity`/`AssistModelLibrary.
@@ -2883,7 +2884,7 @@ where.
   the delete would find the weights gone, with nothing telling a teacher why.
 
   **Root cause: this exact guard was believed to already exist and did not.**
-  The row-313 entry above (2026-08-17) lists "safe model removal (disabled
+  The row-313 entry below (2026-08-17) lists "safe model removal (disabled
   when any assistant window is open)" as done. It was not — confirmed by
   direct code search before writing a line of the fix: no `AssistActivity`
   type, no `mayRemove`, nothing tracking which windows were open, anywhere in
@@ -2892,7 +2893,7 @@ where.
   to remove is a question about which windows are open, which this type
   cannot see." `WINDOWS-HANDOFF.md` had already told a Windows session to
   port the mac's `AssistActivity` for exactly this reason; it had simply never
-  been done. That row-313 line has been corrected in place above rather than
+  been done. That row-313 line has been corrected in place below rather than
   quietly rewritten, so the record shows it was wrong for five days, not that
   it was always right.
 
@@ -2948,7 +2949,7 @@ where.
   and the existing WorkLease already carries the real-world risk down to
   "advisory click-time window," not "routinely happens."
 
-  **Test coverage**: 8 new tests in `AssistModelStoreTests.cs` — sharing/
+  **Test coverage**: 7 new tests in `AssistModelStoreTests.cs` — sharing/
   disk-state coverage already existed; new tests cover `MayRemove`/
   `ReasonItCannotBeRemoved` with no assistant open, with one open (blocking
   removal and naming the section), release-on-`End`, a rung not currently in
@@ -3546,7 +3547,7 @@ where.
   3. **Assistant Choice & Settings Panel (`AssistantSettingsDialog`)**:
      - "Before it changes your pages" toggle + small assistant caution.
      - "Which assistant runs on this PC" (automatic, smaller, larger) with hardware budget memory derivation and cautions.
-     - "On this PC" housekeeping list with download status and a download trigger. **Correction (2026-08-22): "safe model removal (disabled when any assistant window is open)" was NOT actually true as of this 2026-08-17 entry** — the Remove button deleted the file unconditionally, with no guard of any kind. It was fixed for real on 2026-08-22 and reached `dev` on 2026-09-06; see that entry ABOVE in this file's done ledger for what shipped and why this line was wrong for a fortnight without anyone noticing, which is itself the argument for writing "not yet done" rather than describing the intended end state as if it already existed.
+     - "On this PC" housekeeping list with download status and a download trigger. **Correction (2026-08-22): "safe model removal (disabled when any assistant window is open)" was NOT actually true as of this 2026-08-17 entry** — the Remove button deleted the file unconditionally, with no guard of any kind. It was fixed for real on 2026-08-22 and reached `dev` on 2026-09-06; see that entry ABOVE in this file's done ledger for what shipped and why this line was wrong for twenty days without anyone noticing, which is itself the argument for writing "not yet done" rather than describing the intended end state as if it already existed.
      - Connected to `AppSettings` and `MainWindow` menu (`File -> Settings…` / `Ctrl+,`).
   4. **Curriculum Coverage Map & Notes Toggles (Row 130 parity)**:
      - Added `include_curriculum_coverage` and `include_coverage_notes` per-section configuration accessors and `CoverageNotesEnabled` pure rule to `CourseConfiguration.cs`.
