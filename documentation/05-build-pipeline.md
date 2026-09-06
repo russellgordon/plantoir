@@ -275,8 +275,16 @@ process's command line, and deliberately **not** by port: a build-only run is
 never given one, so an earlier version killed whatever held the default 8081 —
 a different section's preview, in the ordinary case of previewing one section
 while publishing another. Match on the directory plus a trailing separator, or
-`section1` also matches `section10`. It reads `/proc`, so it does nothing where
-there is none (Windows, natively) — see `WINDOWS-HANDOFF.md`.
+`section1` also matches `section10`.
+
+The process list comes from `stop_preview.read_snapshot()`, which asks the
+platform: `/proc` on Linux and inside the container, `Get-CimInstance
+Win32_Process` natively on Windows. Until 2026-09-05 `/proc` was the only
+reader, so on Windows the list came back empty, this stopped nothing, and the
+overwrite race above was live on that platform for every publish made while a
+preview was running. That is why the reader is a dispatcher rather than a
+constant: a rule that silently answers "nothing" on one platform is worse than
+one that is missing there, because it looks implemented.
 
 **Which processes belong to a section is one rule, and it lives in
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
