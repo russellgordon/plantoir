@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Catalogs;
@@ -138,6 +139,41 @@ public sealed partial class CourseSettingsView : UserControl
     {
         ActivityTrail.Note(ActivityTrail.Event.RemovalBlocked,
             $"{_course.Code}: could not remove \u201C{name}\u201D from {list} - {reason}");
+    }
+
+    /// <summary>
+    /// "What else does Plantoir use my folders for?" — opens the sheet that
+    /// names this course's own special folders.
+    ///
+    /// <para><b>Nothing is written to the trail when this opens, and that
+    /// matches the mac deliberately.</b> The trail exists so a problem
+    /// reported next week can be looked into; a read-only sheet changes no
+    /// state and leaves nothing to diagnose. Recording it would also mean a
+    /// new event in <c>activityTrail.mustRecord</c>, which is pinned across
+    /// both platforms — so a help sheet would turn the mac suite red. If it
+    /// ever earns a line, it earns one on both sides at once.</para>
+    ///
+    /// <para>The configuration is read at CLICK time, not captured when the
+    /// button is built: a teacher who ticks a graded folder and then opens
+    /// this must be shown what they just chose, not what the form was showing
+    /// when it was drawn.</para>
+    /// </summary>
+    private Button FoldersHelpButton()
+    {
+        var button = new Button
+        {
+            Content = "What else does Plantoir use my folders for?",
+            Margin = new Thickness(0, 4, 0, 0),
+        };
+        AutomationProperties.SetAutomationId(button, "openFoldersHelpButton");
+        button.Click += async (_, _) =>
+        {
+            if (XamlRoot is null) return;
+            var dialog = SpecialFoldersHelpDialog.For(Config);
+            dialog.XamlRoot = XamlRoot;
+            await dialog.ShowAsync();
+        };
+        return button;
     }
 
     /// <summary>
@@ -380,6 +416,12 @@ public sealed partial class CourseSettingsView : UserControl
             () => { MarkChanged(); RebuildProtectedRows(); },
             name => ItemProtectionRule.For(name, ItemList.GradedFolders, Protection()),
             (name, reason) => RecordRemovalBlocked("the marks list", name, reason)));
+
+        // The marks list is where a teacher is first told that a folder's NAME
+        // decides what the site does with it, so it is where they are most
+        // likely to wonder what else is being read that way. Same placement as
+        // the mac's, directly under this section's caption.
+        Form.Children.Add(FoldersHelpButton());
 
         // -------- Per-section settings --------
         foreach (int section in Config.SectionNumbers)
