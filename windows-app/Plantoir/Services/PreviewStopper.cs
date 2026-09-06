@@ -2,24 +2,32 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using Plantoir.Core.Scripting;
 
 namespace Plantoir.Services;
 
 /// <summary>
-/// Reclaims a stopped preview's CONTAINER-side processes. Ending the host
-/// launcher alone leaves the serve chain (python3 → npm exec quartz → node →
-/// esbuild) running inside the container — idling servers hold node's RAM,
-/// and an orphaned mid-flight build burns real CPU until it completes. The
-/// working folder's preview launcher carries a --stop mode that kills the
-/// section's processes by working directory and never starts anything; this
-/// runs it fire-and-forget, output discarded, exactly as the mac app's
-/// PreviewStopper does (row 105).
+/// Reclaims a stopped preview's leftover processes. Ending the launcher
+/// alone leaves the serve chain (python → npm exec quartz → node → esbuild)
+/// running — idling servers hold node's RAM, and an orphaned mid-flight
+/// build burns real CPU until it completes. The working folder's preview
+/// launcher carries a --stop mode that ends the section's processes and
+/// never starts anything; this runs it and reads back only the count.
 ///
-/// The sweep is NOT instantaneous, and it kills by WORKING DIRECTORY — so a
-/// build started for the same section while a sweep is still in flight dies
-/// with the processes the sweep was actually after. Anything about to start
-/// a build must therefore await <see cref="WaitForStopsToFinish"/> first.
+/// WHICH processes belong to the section is a shared rule, written down once
+/// in contracts/shared-rules.json → stopPreview. On this platform they are
+/// matched by COMMAND LINE, never by working directory: Win32_Process does
+/// not expose a working directory at all. (Both this comment and two places
+/// in WINDOWS-HANDOFF.md said "by working directory" until 2026-09-05. That
+/// is the mac's mechanism, where the rule reads /proc; it has never been
+/// true here, and a wrong sentence about how a kill chooses its targets is
+/// exactly the kind that gets believed.)
+///
+/// The sweep is NOT instantaneous, so a build started for the same section
+/// while a sweep is still in flight dies with the processes the sweep was
+/// actually after. Anything about to start a build must therefore await
+/// <see cref="WaitForStopsToFinish"/> first.
 /// The wait is scoped to one section, as on the mac: waiting for every stop
 /// everywhere would be safe but would let one window's Stop delay another
 /// window's Preview for no reason.
@@ -110,17 +118,35 @@ public static class PreviewStopper
             var process = Process.Start(info);
             if (process is null) return;
             var exited = new TaskCompletionSource();
-            // Drain and discard output so the pipes can never fill and block
-            // the kill; the process object frees itself when the stop ends.
-            process.OutputDataReceived += (_, _) => { };
+            // Drain so the pipes can never fill and block the kill - but KEEP
+            // stdout, which carries the one thing about the sweep a teacher's
+            // trail can use: how many processes it ended. This used to be
+            // discarded, exactly as the mac's did for months.
+            var printed = new StringBuilder();
+            process.OutputDataReceived += (_, line) =>
+            {
+                if (line.Data is not null) { lock (printed) { printed.AppendLine(line.Data); } }
+            };
             process.ErrorDataReceived += (_, _) => { };
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             process.EnableRaisingEvents = true;
             process.Exited += (sender, _) =>
             {
+                if (sender is Process finished)
+                {
+                    // Exited can fire BEFORE the last OutputDataReceived, so
+                    // the count would be missed about as often as not. The
+                    // parameterless WaitForExit is the FLUSHING overload: it
+                    // waits for the async readers to drain, which the one
+                    // taking a timeout explicitly does not.
+                    try { finished.WaitForExit(); } catch { }
+                    string output;
+                    lock (printed) { output = printed.ToString(); }
+                    ReclaimedProcesses.Note(output, courseCode, sectionNumber);
+                    finished.Dispose();
+                }
                 exited.TrySetResult();
-                (sender as Process)?.Dispose();
             };
             if (process.HasExited) exited.TrySetResult();
 
@@ -140,4 +166,5 @@ public static class PreviewStopper
             // Best-effort: a failed cleanup must never break the stop itself.
         }
     }
+
 }
