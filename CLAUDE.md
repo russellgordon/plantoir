@@ -679,10 +679,12 @@ Four things that cost a day each if you do not know them:
   probe, took the promise-card score from 110/110 to 90/110 and broke three
   probes that had been perfect. A small model reads a sentence naming another
   tool as a recommendation, not a boundary. The rule went into Swift instead.
-- **Adding a tool is a routing change.** The local model is shown 13 of the 20
-  tools that exist (`AssistToolRunner.localTools`); an MCP client is shown 23
-  (`.mcpTools`, the 20 plus three that ask for judgement about meaning). More
-  choices is the classic way a router degrades.
+- **Adding a tool is a routing change.** On the mac the local model is shown
+  13 of the 22 tools that exist (`AssistToolRunner.localTools`); an MCP client
+  is shown 25 (`.mcpTools`, the 22 plus three that ask for judgement about
+  meaning). More choices is the classic way a router degrades. **Windows'
+  `plantoir-mcp.exe` serves 37**, so the two MCP surfaces are no longer the
+  same product — see `MAC-HANDOFF.md`.
 
 On the mac the MCP server IS the app: `Plantoir --mcp-stdio <working-folder>`
 serves the same tools to Claude Code, so there is no second binary to sign or
