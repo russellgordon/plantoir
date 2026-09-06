@@ -94,6 +94,267 @@ outstanding.
 
 ## Open — what the mac still owes
 
+- **Windows now has the exclusions AND the protection model, and three things
+  come back to the mac** (Windows, 2026-08-25, branch
+  `issue/windows-special-folders-parity`, `GUI-IMPROVEMENTS.md` row 385).
+  Windows implemented handoff items 11 and 12: `excluded_items`,
+  `graded_folders` and `curriculum_folder` in `CourseConfiguration.cs`, the
+  `ItemProtection` model in the list editors and the marks checklist, a Marks
+  section in Course Settings (which this app never had), and the wizard's marks
+  control. Mostly a **know, not a do** — but three items below are genuine
+  questions for this side.
+
+  **The one finding worth the mac's attention: the two pieces could not be
+  shipped separately, and an adversarial review is what caught it.** Item 11
+  (exclusions) and item 12 (protection) read as independent pieces of work, and
+  Windows implemented item 11 first. That was wrong, and quietly so. Before
+  `excluded_items` existed, a Windows teacher who removed `All Classes` got it
+  back at the next preview, because `preflight_update_course_config`
+  rediscovers folders — the missing protection model was survivable. The moment
+  the app writes `excluded_items`, row 377 makes that key AUTHORITATIVE, the
+  folder never comes back, and the next-class button and the schedule write
+  into a folder that no longer publishes. Same for the resolved curriculum
+  folder (the map silently stops building) and a section's `index.md` (the
+  section cannot be published at all). **Item 11 without item 12 turns a
+  recoverable gap into an unrecoverable one**, and nothing in either item says
+  so. Worth a line in `WINDOWS-HANDOFF.md` if anyone ever ports these
+  separately again.
+
+  **1. The Course Settings tip sentence is contract-pinned on NEITHER
+  platform, and now the two apps word the same rule differently.** Row 375 says
+  the mac "amended Course Settings tip callout to except removed names". That
+  is a sentence a teacher READS, so by CLAUDE.md rule 2 it belongs in
+  `contracts/`; `grep -rn "added to your site automatically" contracts/`
+  returns nothing. Windows therefore wrote its own — "…The exception is
+  anything you remove here: it stays off your site, even if you make it again
+  in Obsidian, until you add it back on this page." **No case has been
+  proposed**, deliberately: proposing one would redden the mac suite over
+  wording the mac already ships, and choosing WHICH sentence becomes the
+  contract is the mac's call. If the mac agrees it belongs there, add it under
+  `specialNames` and Windows will take the mac's wording verbatim.
+
+  **2. `reconciledGradedFolders` on the MAC does not match the Python, and
+  that is a finding rather than a question.** This entry originally asked which
+  way the mac resolves a case collision. The answer, checked since: it resolves
+  it neither way — `NewCourseWizardView.reconciledGradedFolders` is an exact
+  `validChoices.contains(folder)` filter with no case-insensitive lookup at
+  all, so a declared `tasks` against an actual `Tasks` is DROPPED. Both
+  `setup_course.py:graded_folders_for` (via `actual_lookup`) and Windows's
+  `GradedFolderRule.Reconciled` map it to the actual folder instead. So the mac
+  silently narrows a pool the build would have kept. Windows also had a bug
+  here — `Dictionary.TryAdd` keeps the FIRST match where the Python's dict
+  comprehension keeps the LAST — and it is fixed. There is no contract case
+  pinning any of this, which is why it survived on both sides; adding one is
+  the mac's call, and Windows will run whatever it says.
+
+  **3. Revert leaves a trail line for a removal that did not happen — and the
+  mac has the identical shape.** Proven here: `Exclude("shared", "A")` then
+  `DiscardChanges()` puts the config back, but `item excluded` is already on
+  disk. Windows writes the note inside the editor's remove callback; the mac
+  writes it inside `onRemove` and has a Revert too. So this is **parity, not a
+  Windows regression** — but CLAUDE.md rule 5 says "a line describing what the
+  feature used to do is worse than no line, because it will be believed", and a
+  teacher who removes a folder, thinks better of it, and Reverts leaves a trail
+  claiming they excluded it. The honest fix is to record on SAVE rather than on
+  click, on both sides. Flagged rather than fixed unilaterally, because
+  changing when the mac records an event is not a Windows decision.
+
+  **4. Does the mac's wizard block on a coverage switch a teacher cannot
+  reach?** Windows's `CourseConfiguration.CurriculumCoverageEnabled` was
+  written as an identity function on the switch; the mac's takes five
+  arguments. Restored to five here, because the wizard only CREATES that
+  switch for a code with example content that includes curriculum, and only
+  ENABLES it while pre-populate and curriculum pages are on — so on the
+  commonest from-scratch path the ⓘ named a control that was not on the
+  screen, and there was no way out inside the wizard. The mac's version has
+  the gates, so the mac is probably fine; what is worth CHECKING is the second
+  half. `NewCourseDialog.BuildConfiguration` writes
+  `include_curriculum_coverage` from the RAW switch, so a from-scratch course
+  is created with the map on while the protection rule says it is off — the
+  wizard will let its curriculum folder go after a confirmation, and the build
+  then reports `curriculumCoverageFoundNothing`. Windows chose that failure
+  deliberately over a deadlock: the teacher is told something and has a way
+  forward. **If the mac writes the same key the same way, it has the same
+  tension**, and whether the honest fix is a reachable coverage switch on the
+  from-scratch path is a product decision rather than a port detail. Not taken
+  unilaterally here.
+
+  **5. Two wizard inputs where Windows knowingly does less than the mac.**
+  Both are written down rather than hidden, per rule 4. (a) The wizard passes
+  `null` for the configured curriculum folder — the mac passes
+  `ExampleContentCatalog.curriculumFolder(forCode:) ?? SkeletonCatalog...`,
+  and this app has neither helper. So a skeleton family whose curriculum
+  folder is called something without the word "curriculum" in it is protected
+  on the mac and NOT on Windows. It protects too little; it never protects the
+  wrong folder. (b) `JurisdictionForCode()` reads the PROVINCE DROPDOWN, where
+  the mac derives it from the course CODE. Windows's choice keeps the switch's
+  own label and the sentence naming it in agreement, which is the property
+  that matters for an ⓘ — but an Ontario-selected teacher typing a BC code
+  gets a different sentence on each platform.
+
+  **6. A test on this side was writing into the REAL activity trail, and the
+  mac should check whether its own suite can.** `SiteHealthRunnerTests.Dispose`
+  restored `ActivityTrail`'s log path to `null`, which is the REAL trail, so
+  `TestTrailRedirect`'s module-initializer redirect was defeated for every
+  test that ran afterwards. Fixture courses and lines such as "removed the
+  small assistant — 1.12 GB freed" were written into this machine's
+  `%LOCALAPPDATA%\Plantoir\Logs\activity.txt`. Nothing was actually removed —
+  the 1.04 GB model file is untouched, last written 2026-08-22 — but a
+  diagnostic record carrying events that never happened is worse than no
+  record, and it is the exact failure rule 5 is about. Fixed by restoring the
+  suite's scratch path instead of null, and by putting the class in the
+  serialized collection: the trail path is a process-wide static, and xUnit
+  parallelises test CLASSES. **If any mac test sets that path and restores
+  nil, the mac has the same leak.**
+
+  **7. The acceptance was DRIVEN, not reasoned about, and the method is worth
+  having.** `System.Windows.Automation` from stock Windows PowerShell 5.1
+  drives WinUI 3 well enough to open an ⓘ flyout, read its text, and
+  photograph it — which is exactly how the mac found its truncated popover,
+  and how this side confirmed the same bug does not reproduce: the longest
+  `specialNames` sentence wraps to five full lines at 600×187 device px. A
+  fresh ICS3U with example content declined showed the ⓘ on exactly `Tasks`,
+  `Ontario Curriculum` and `All Classes`; the written config carried
+  `graded_folders: ["Tasks"]` and `per_section_folders: ["All Classes"]`; and
+  a real `preview.ps1 --build-only` after removing `Discussions` in Settings
+  printed the skip line and emitted a `public/` with zero occurrences of it,
+  the teacher's own folder still in the vault. **What the drive caught that no
+  test did** was the deadlock in item 4 above — and, humblingly, the drive had
+  already photographed that flyout without noticing the switch it named was
+  unreachable. Driving proves the pixels; it does not by itself prove the
+  sentence is actionable.
+
+  **What was rejected on this side, and why.** (a) Case-INSENSITIVE matching
+  for `excluded_items` — the neighbouring "Media" refusal is case-insensitive,
+  so matching it felt consistent, but `preflight_update_course_config` builds a
+  plain Python `set` and tests exact membership; the app must agree with the
+  BUILD, not with its neighbouring control. (b) Writing `excluded_items` and
+  leaving the name in `shared_folders`, on the grounds that row 377 made the
+  key authoritative — rejected because that reconciliation runs at the NEXT
+  build, and between the save and that build Settings would show a folder the
+  teacher had just removed. (c) Reading the blocked sentences out of
+  `contracts/shared-rules.json` at RUNTIME rather than writing them into
+  `SpecialNames.cs` — rejected for the reason `AssistWording` is written out:
+  the contract is generated from the macOS app, so a changed sentence must fail
+  a Windows BUILD, not change a teacher's screen on a machine the tests never
+  ran on. It earned its keep immediately — the contract test caught a
+  transcription slip where `curriculumFolderBlockedByCoverageMap` had lost the
+  words "for the coverage map".
+
+  **Three switch labels were RENAMED on Windows to match the contract's
+  sentences.** This is the one place Windows changed teacher-visible wording,
+  and the reason is that the blocked sentences name a switch BY NAME: an ⓘ
+  saying "turn off *Publish the curriculum coverage map*" is worse than useless
+  when the app's toggle says "Include Curriculum Coverage map". Course
+  Settings' coverage toggle is now `SpecialNames.CoverageSwitchLabelInSettings`
+  ("Publish the curriculum coverage map"), the wizard's is
+  `CoverageSwitchLabelInWizard` ("Include the curriculum coverage map"), and
+  the wizard's curriculum-pages toggle is built per-province, so a BC teacher
+  is told about a switch a BC teacher can see rather than always "Ontario". The
+  contract's wording won over the Windows label in every case, because the
+  contract is generated from the mac and a Windows-only paraphrase is drift
+  rather than a decision. **If the mac's own labels differ from these, the mac
+  has the same bug** — a test (`EveryBlockedSentenceNamesASwitchTheAppActuallyHas`)
+  now pins label against sentence on this side, and the mac has no equivalent.
+
+  **Numbers, from this hardware** (Windows 11 Pro 26200, x64): the Windows
+  suite went from **673 tests with 2 failing** on the mac's merge to **765
+  passing, 0 failing**. The two failures were
+  `FileFormats_CourseConfigKeys_MatchesContract` — which fails on
+  `curriculum_folder`, NOT `excluded_items`, worth knowing if the mac ever
+  reads that failure as a smaller job than it is — and
+  `SharedRules_ActivityTrailEvents_Exist`. One honest caveat on the first: it
+  asserts `Assert.Contains($"\"{key}\"", source)` against the raw TEXT of
+  `CourseConfiguration.cs`, so it goes green on a key mentioned in a comment.
+  Its greenness is evidence the keys are spelled in that file, not that they
+  are implemented; the behaviour is covered by `ExcludedItemsTests` and
+  `GradedFolderContractTests` instead.
+
+  Reference: `windows-app/Plantoir.Core/Models/` — `CourseConfiguration.cs`,
+  `GradedFolderRule.cs`, `CurriculumFolderRule.cs`, `SpecialNames.cs`,
+  `ItemProtection.cs`; `windows-app/Plantoir/Views/FormBuilders.cs`,
+  `CourseSettingsView.xaml.cs`, `NewCourseDialog.cs`;
+  `windows-app/Plantoir.Tests/` — `ExcludedItemsTests.cs`,
+  `GradedFolderContractTests.cs`, `SpecialNamesContractTests.cs`,
+  `ItemProtectionTests.cs`.
+
+- **The site-health FINDINGS DIALOG does not exist on Windows, and the mac
+  side should know it is not there** (Windows, 2026-08-25, branch
+  `issue/windows-special-folders-parity`, `GUI-IMPROVEMENTS.md` row 384).
+  This is a **know, not a do** for the mac — nothing here asks the mac to
+  change — but `WINDOWS-HANDOFF.md` item 10 currently reads as though Windows
+  already surfaces these findings ("Windows receives the finding in the
+  `PLANTOIR_HEALTH:` transcript line and displays the contract-authored
+  sentence and detail without re-wording"), and on 2026-08-25 that was not
+  true of any released or unreleased Windows build. Grepping `windows-app/`
+  for `PLANTOIR_HEALTH` returned nothing at all, and
+  `ActivityTrail.Event.FolderProblemFound` / `FolderProblemRepaired` had been
+  declared since the trail was built with **no call site anywhere in the C#**.
+  So every check the mac has shipped since row 357 — `curriculumCoverageFoundNothing`,
+  `courseTeachesNothing`, `mediaFolderMissing`, `sectionIndexMissing`,
+  `handWrittenCoveragePage`, and now `noGradedFolders` — has been printed into
+  a Windows build console and read by nobody.
+
+  **What landed this session** is the half a contract can gate: a
+  `SiteHealthFinding` parser (`windows-app/Plantoir.Core/Models/SiteHealthFinding.cs`),
+  its collection in `ScriptRunner`, and a `folder problem found` trail line per
+  finding. **What did NOT land** is the teacher-facing dialog, the Fix button,
+  the repair itself, and the "Preview Again" afterwards — mac rows 357–358,
+  362–364, 367–372. That is a feature, not a port detail, and doing it inside a
+  parity session would have meant inventing Windows wording for six mac dialogs
+  without the mac's own review history to hand. It is owed by Windows to
+  Windows; it is listed here so the next mac session does not read item 10 and
+  assume parity that is not there.
+
+  **What was rejected, and why.** Making `RepairableChecks` read
+  `contracts/shared-rules.json` at RUNTIME was rejected: the contract is
+  bundled into the app today, but a runtime read means a teacher's machine can
+  disagree with the test suite about which checks get a Fix button, and the
+  house rule here is the opposite — hardcode the answer in code and let a test
+  pin it against the contract, so drift fails a build rather than a teacher.
+  Deciding repairability from the finding's `fixable` FLAG was also rejected,
+  for the reason `siteHealth.repair.neverOffered.why` already gives: the flag
+  means "this kind of thing is repairable", not "this app has a repair for it".
+
+  **Reasoned from the code, NOT measured** — said plainly because an
+  adversarial review caught this paragraph claiming otherwise, and a
+  code-reading dressed as a measurement is the failure CLAUDE.md rule 4 exists
+  to prevent. No split was observed in the field; what IS on the record is that
+  `ScriptRunner.BufferOutput` coalesces pseudo-console output on a **150 ms**
+  cadence and hands `ReceiveOutput` whatever bytes are ready, so a
+  `PLANTOIR_HEALTH:` line CAN be split across two flushes. The findings are
+  therefore collected **line-buffered, not per output chunk**;
+  `SiteHealthRunnerTests.AFindingSplitAcrossTwoChunksIsStillFound` splits a
+  real line in half and pins it. If the mac ever parses these from a live
+  stream rather than a finished transcript, the same trap is waiting.
+
+  **Two defects the adversarial review found in the first cut, both worth
+  knowing on the mac.** (1) The carry buffer trimmed to its TAIL when it
+  outgrew 8 KB, copied from the milestone scanner's sliding window — which is
+  INVERTED for a line buffer: after the newline loop the carry is the HEAD of
+  one unterminated line, so the marker sits at the front and a tail-trim throws
+  the finding away. It now drops the carry only when the carry cannot contain a
+  marker, with `AVeryLongUnterminatedLineDoesNotLoseItsMarker` pinning it —
+  and that test was confirmed to FAIL against the old code, not merely to pass
+  against the new. (2) The findings property handed out the live mutable list
+  that `Run(keepTranscript: false)` calls `.Clear()` on; it returns a snapshot
+  now. Neither was reachable today, because nothing reads the collection yet,
+  but both sit exactly on the seam a dialog attaches to.
+
+  **The three new trail events** — `item excluded`, `item re-included`,
+  `removal blocked` — are declared in `ActivityTrail.Event` with this piece,
+  because `activityTrail.mustRecord` names them and the Windows suite pins the
+  enum against that list as a SET, so the suite cannot be green without them.
+  Their call sites arrive with the Course Settings work. That is the same
+  declare-with-no-caller shape that left `FolderProblemFound` dead for months,
+  so the enum carries a comment saying so rather than repeating it silently.
+
+  Reference: `windows-app/Plantoir.Core/Models/SiteHealthFinding.cs`,
+  `windows-app/Plantoir.Core/Scripting/ScriptRunner.cs` (`CollectHealthFindings`),
+  `windows-app/Plantoir.Tests/SiteHealthContractTests.cs`,
+  `windows-app/Plantoir.Tests/SiteHealthRunnerTests.cs`.
+
+
 New items go at the TOP of this section, and move to the ledger when done
 rather than being deleted.
 

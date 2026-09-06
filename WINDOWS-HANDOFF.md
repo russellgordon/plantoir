@@ -908,6 +908,44 @@ this side is expected to say so when the contract is wrong.
 
     Full write-up in "One rule for stopping a section's preview" below.
 
+21. **The folder-problems FRONT END: the findings dialog, the Fix button,
+    and the repair (owed since 2026-08-23; scoped 2026-08-25).** The shared
+    Python has printed `PLANTOIR_HEALTH:` lines since the mac's row 357, and
+    until 2026-08-25 nothing on this side read them — see the correction in
+    item 10. What landed on 2026-08-25 is the half a contract can gate:
+    `Plantoir.Core/Models/SiteHealthFinding.cs` parses the marker line and
+    classifies it, `ScriptRunner.CollectHealthFindings` collects findings as
+    output arrives (line-buffered, not per chunk — a pseudo console splits a
+    line across two 150 ms flushes and a per-chunk scan drops exactly those),
+    and each new finding records `folder problem found` on the activity trail.
+    `ScriptRunner.HealthFindings` is the seam the front end attaches to.
+
+    **What is still owed is everything a teacher can see**: the dialog, the
+    Fix button, the two repairs, the outcome report, and "Preview Again". The
+    whole design is already written down for you in "Folder problems: the
+    checks, and the four places they have to surface" below — read that
+    section, not this item, for how to build it. It was left out of the
+    2026-08-25 parity work deliberately: it is a FEATURE (mac rows 357–358,
+    362–364, 367–372), not a port detail, and building it inside a parity
+    session would have meant inventing Windows wording for six mac dialogs
+    without the review history that produced them.
+
+    **Until it exists, a Windows teacher whose curriculum map silently stops
+    building is told nothing** — which is the exact failure the whole feature
+    was written to end. The trail line is a diagnosis after the fact, not a
+    warning at the time.
+
+**Everything else this section used to list as an ordered work plan —
+contracts wiring, the approval wording, the deploy/preview race, the activity
+trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,
+`plan_remember_timetable`, the `LinkGraph` exclusions, `assistantConfirmation`),
+the `ReDatePlan` overflow fix, asking for the schedule, course renaming, the
+native local model, the assistant-choice Settings panel, the credential
+dialogs, and the two small fixes (`AutoFillCourseName`, the Curriculum
+Coverage toggle) — was verified DONE in `windows-app/` on 2026-08-22 and its
+write-up now lives in
+[`WINDOWS-HANDOFF-COMPLETED.md`](WINDOWS-HANDOFF-COMPLETED.md).**
+
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
 trail, the problem report, the 2026-08-16 assistant batch (`add_next_class`,

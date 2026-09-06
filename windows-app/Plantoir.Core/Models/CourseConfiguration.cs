@@ -361,6 +361,180 @@ public sealed class CourseConfiguration
     public List<string> HiddenItems { get => StringList("hidden"); set => SetStringList("hidden", value); }
     public List<string> ExpandableItems { get => StringList("expandable"); set => SetStringList("expandable", value); }
 
+    // ---- Marks and the curriculum folder --------------------------------
+
+    /// <summary>
+    /// What this course calls the folder holding one page per curriculum
+    /// expectation. Declared by every payload and skeleton manifest and
+    /// carried here at creation; empty for a course made from scratch, which
+    /// has no manifest to declare anything.
+    /// </summary>
+    public string CurriculumFolder
+    {
+        get => StringValue("curriculum_folder");
+        set => _values["curriculum_folder"] = value;
+    }
+
+    /// <summary>
+    /// The folder this app protects as the curriculum folder, or null.
+    /// Name-only — see <see cref="CurriculumFolderRule"/>.
+    /// </summary>
+    public string? ResolvedCurriculumFolder =>
+        CurriculumFolderRule.Resolve(CurriculumFolder, SharedFolders);
+
+    /// <summary>
+    /// The folders whose contents count for marks, or <b>null</b> when the key
+    /// is ABSENT — a course that has never been asked, to which the historical
+    /// substring rule still applies.
+    ///
+    /// <para>An explicit JSON <c>null</c> reads as a CLEARED list rather than
+    /// an unset one: the key is present, and the absent case is reserved for a
+    /// course nobody has asked. Pinned by <c>gradedFolders</c>'s case "an
+    /// explicit null is a CLEARED list, not an unset one", which exists
+    /// because the two implementations once agreed by accident and nothing
+    /// said which answer was intended.</para>
+    /// </summary>
+    public List<string>? GradedFolders
+    {
+        get
+        {
+            var token = _values["graded_folders"];
+            if (token is null) return null;
+            var result = new List<string>();
+            if (token is JArray array)
+                foreach (var element in array)
+                    if (element is JValue { Type: JTokenType.String } v) result.Add((string)v!);
+            return result;
+        }
+        set
+        {
+            if (value is null) _values.Remove("graded_folders");
+            else _values["graded_folders"] = new JArray(value);
+        }
+    }
+
+    /// <summary>
+    /// The marks pool as a list that can be edited — materialising the pool a
+    /// never-asked course is ALREADY working to, rather than starting from
+    /// empty.
+    ///
+    /// <para>Without this, a teacher's first tick on a legacy course would
+    /// silently narrow it from "every folder mentioning tasks" to the one box
+    /// they touched, taking the assessed marks off every other one. Called on
+    /// the way in to any edit of the pool — a tick, an untick, or a folder
+    /// leaving the list.</para>
+    /// </summary>
+    public List<string> MaterializedGradedFolders() =>
+        GradedFolders ?? GradedFolderRule.InferredPool(
+            SharedFolders.Concat(PerSectionFolders));
+
+    /// <summary>Whether a page counts for marks in this course.</summary>
+    public bool CountsForMarks(string relativePath) =>
+        GradedFolderRule.CountsForMarks(GradedFolders, relativePath);
+
+    // ---- Excluded items -------------------------------------------------
+
+    /// <summary>The scope keys inside <c>excluded_items</c>.</summary>
+    public const string SharedScope = "shared";
+    public const string PerSectionScope = "per_section";
+
+    /// <summary>
+    /// How a scope is written on the activity trail. NOT the JSON key: the
+    /// contract asks for "per-section" in a teacher-readable line and
+    /// <c>per_section</c> in the file, and writing the file's spelling into a
+    /// sentence is how machinery leaks in front of a teacher.
+    /// </summary>
+    public static string ScopeInWords(string scope) =>
+        scope == PerSectionScope ? "per-section" : "shared";
+
+    /// <summary>
+    /// Names this course has excluded from previews and deploys, by scope.
+    ///
+    /// <para>An OBJECT keyed by scope rather than a flat list, because the two
+    /// scopes are matched by different scans in the build and the same bare
+    /// name can legitimately exist in both. The key is ABSENT — never
+    /// <c>{}</c> — when nothing is excluded, so a course nobody has touched
+    /// writes the same file it always has.</para>
+    ///
+    /// <para>Matching is EXACT, case included, because
+    /// <c>preflight_update_course_config</c> tests membership of a plain
+    /// Python set. A case-insensitive answer here would have the app believe a
+    /// folder is excluded while the build cheerfully publishes it — the two
+    /// must agree or the feature reports a state that is not real.</para>
+    /// </summary>
+    public List<string> ExcludedItems(string scope)
+    {
+        var result = new List<string>();
+        if (_values["excluded_items"] is JObject map && map[scope] is JArray array)
+            foreach (var element in array)
+                if (element is JValue { Type: JTokenType.String } v) result.Add((string)v!);
+        return result;
+    }
+
+    public bool IsExcluded(string scope, string name) =>
+        ExcludedItems(scope).Contains(name, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Record that a name is excluded. Idempotent.
+    ///
+    /// <para>The CALLER must also take the name out of its copy list
+    /// (<c>shared_folders</c> and friends). Absence from the copy list is the
+    /// actual mechanism of exclusion; this key is what stops preflight putting
+    /// it back. Preflight does reconcile the two, but only at the next build —
+    /// a teacher reading the list in Settings before then would see a folder
+    /// they had just removed.</para>
+    /// </summary>
+    public void Exclude(string scope, string name)
+    {
+        if (string.IsNullOrEmpty(name)) return;
+        var items = ExcludedItems(scope);
+        if (items.Contains(name, StringComparer.Ordinal)) return;
+        items.Add(name);
+        SetExcludedItems(scope, items);
+    }
+
+    /// <summary>
+    /// Stop excluding a name, and say whether it HAD been excluded.
+    ///
+    /// <para>The answer is the point. An ordinary new folder is not a
+    /// re-inclusion, and a trail line saying it was would be believed — the
+    /// caller records "item re-included" only on a true here.</para>
+    /// </summary>
+    public bool ReInclude(string scope, string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        var items = ExcludedItems(scope);
+        int removed = items.RemoveAll(i => string.Equals(i, name, StringComparison.Ordinal));
+        if (removed == 0) return false;
+        SetExcludedItems(scope, items);
+        return true;
+    }
+
+    /// <summary>
+    /// Writes one scope's list, dropping the scope when it empties and the
+    /// whole key when every scope has. Absent, not empty — see the property
+    /// above and <c>contracts/file-formats.json</c>.
+    ///
+    /// <para>Scopes this app does not know about are PRESERVED: handoff item
+    /// 11 promises the object is additive, so a future
+    /// <c>"sections": {"4": [...]}</c> has to survive a teacher removing a
+    /// folder in a build that has never heard of it. An <c>excluded_items</c>
+    /// that is not an object AT ALL is replaced rather than read around —
+    /// there is nothing here that could preserve it meaningfully, and this
+    /// class is a careful guest in the toolchain's file rather than a
+    /// validator of it.</para>
+    /// </summary>
+    private void SetExcludedItems(string scope, IReadOnlyList<string> items)
+    {
+        if (_values["excluded_items"] is not JObject map) { map = new JObject(); }
+
+        if (items.Count == 0) map.Remove(scope);
+        else map[scope] = new JArray(items);
+
+        if (map.Count == 0) _values.Remove("excluded_items");
+        else _values["excluded_items"] = map;
+    }
+
     /// <summary>sharedFolders + sharedFiles + perSectionFolders + perSectionFiles, in that order.</summary>
     public List<string> AllSidebarItems =>
         SharedFolders.Concat(SharedFiles).Concat(PerSectionFolders).Concat(PerSectionFiles).ToList();
@@ -551,6 +725,51 @@ public sealed class CourseConfiguration
 
     public static bool CoverageNotesEnabled(bool coverageEnabled, bool notesEnabled) =>
         coverageEnabled && notesEnabled;
+
+    /// <summary>
+    /// Whether the wizard's curriculum-coverage switch is one the teacher can
+    /// actually REACH — which is the only sense in which a blocked-removal
+    /// sentence may name it.
+    ///
+    /// <para><b>All four gates matter, and dropping them deadlocks the
+    /// wizard.</b> The switch is only created when the code has example
+    /// content that includes curriculum, and it is only enabled while
+    /// pre-populate and curriculum pages are both on. The first cut of this
+    /// helper returned the switch value alone, so on the commonest
+    /// from-scratch path — a code with no example content, where the switch is
+    /// never created at all — the ⓘ told a teacher to turn off a control that
+    /// was not on the screen, and there was no way out of it inside the
+    /// wizard. Found by adversarial review, after a real drive of the app had
+    /// walked into it without noticing.</para>
+    ///
+    /// <para><b>A tension worth knowing about, deliberately left alone.</b>
+    /// `NewCourseDialog.BuildConfiguration` writes `include_curriculum_coverage`
+    /// from the raw switch, so a from-scratch course is created with the map
+    /// ON while this returns false — meaning the wizard will let its curriculum
+    /// folder be removed after a confirmation. That is the better failure:
+    /// the build's `curriculumCoverageFoundNothing` health check tells the
+    /// teacher the map could not be built, whereas a deadlock tells them
+    /// nothing and offers no way forward. Changing what the config CARRIES is
+    /// a product decision rather than a port detail, and is raised in
+    /// `MAC-HANDOFF.md` instead of being taken here.</para>
+    /// </summary>
+    public static bool CurriculumCoverageEnabled(bool hasExampleContent, bool prepopulating,
+                                                 bool contentIncludesCurriculum,
+                                                 bool curriculumPagesSwitchIsOn,
+                                                 bool coverageSwitchIsOn) =>
+        hasExampleContent && prepopulating && contentIncludesCurriculum &&
+        curriculumPagesSwitchIsOn && coverageSwitchIsOn;
+
+    /// <summary>
+    /// The EFFECTIVE value of "include curriculum pages", which unlike the
+    /// coverage map IS gated on there being example content to take them from
+    /// and on the teacher pre-populating with it. Mirrors what
+    /// `NewCourseDialog.BuildConfiguration` writes for
+    /// `include_curriculum_pages`.
+    /// </summary>
+    public static bool CurriculumPagesEnabled(bool hasExampleContent, bool prepopulating,
+                                              bool contentIncludesCurriculum, bool curriculumSwitchIsOn) =>
+        hasExampleContent && prepopulating && contentIncludesCurriculum && curriculumSwitchIsOn;
 
     /// <summary>color_schemes is FLAT — {"color_schemes": {"sectionN": "id"}}, no "sections" wrapper.</summary>
     public string ColourSchemeId(int section) =>

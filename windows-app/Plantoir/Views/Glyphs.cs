@@ -29,6 +29,15 @@ public static class Glyphs
     public const string CheckMark = "\uE73E";   // Done
     public const string Cancel = "\uE711";   // cancelled / failed
     public const string Search = "\uE721";
+
+    /// <summary>
+    /// The ⓘ that REPLACES the minus on a row that cannot be removed.
+    /// Checked present in the installed Segoe Fluent Icons on this machine by
+    /// rendering it and counting ink pixels (63, against 33 for the known-good
+    /// Cancel glyph) — "documented" is not the same as "there", as the absent
+    /// Sparkle at U+E45E already taught this file.
+    /// </summary>
+    public const string Info = "\uE946";
     public const string QuestionBubble = "\uE897";   // awaiting your answer
 
     /// <summary>
