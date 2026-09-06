@@ -44,6 +44,15 @@ public readonly record struct SpecialFolderEntry(string Name, string What, strin
 /// </summary>
 public static class SpecialFoldersHelp
 {
+    /// <summary>The button in Course Settings that opens the sheet. Here
+    /// rather than in the view because it is a sentence a teacher reads, and
+    /// the mac says the same words — see the contract.</summary>
+    public const string OpenedBy = "What else does Plantoir use my folders for?";
+
+    /// <summary>The button that closes it. The MECHANISM differs (a sheet on
+    /// the mac, a dialog here); the label does not.</summary>
+    public const string DismissedBy = "Done";
+
     /// <summary>The sheet's title. Shared wording — see the contract.</summary>
     public const string Title = "Folders Plantoir uses";
 

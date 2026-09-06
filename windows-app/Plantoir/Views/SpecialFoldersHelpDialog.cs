@@ -38,7 +38,7 @@ public static class SpecialFoldersHelpDialog
         {
             Title = SpecialFoldersHelp.Title,
             Content = Body(config),
-            CloseButtonText = "Done",
+            CloseButtonText = SpecialFoldersHelp.DismissedBy,
             DefaultButton = ContentDialogButton.Close,
         };
         AutomationProperties.SetAutomationId(dialog, "specialFoldersHelpDialog");

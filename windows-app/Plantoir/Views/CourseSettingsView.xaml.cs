@@ -162,7 +162,7 @@ public sealed partial class CourseSettingsView : UserControl
     {
         var button = new Button
         {
-            Content = "What else does Plantoir use my folders for?",
+            Content = SpecialFoldersHelp.OpenedBy,
             Margin = new Thickness(0, 4, 0, 0),
         };
         AutomationProperties.SetAutomationId(button, "openFoldersHelpButton");

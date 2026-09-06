@@ -1144,7 +1144,9 @@
     }
   },
   "specialFoldersHelp": {
-    "note": "The in-app answer to \"What else does Plantoir use my folders for?\" - a sheet reached from Course Settings that lists the folders and files THIS course has which the build treats specially. Shared because it is a rule with inputs and outputs wrapped around a set of sentences a teacher reads, and the two apps must give the same answers about the same course. Deliberately NOT here: the layout, and how the sheet is dismissed - a sheet on the mac, a dialog on Windows.",
+    "note": "The in-app answer to \"What else does Plantoir use my folders for?\" - a sheet reached from Course Settings that lists the folders and files THIS course has which the build treats specially. Shared because it is a rule with inputs and outputs wrapped around a set of sentences a teacher reads, and the two apps must give the same answers about the same course. Deliberately NOT here: the layout, and the MECHANISM of dismissal - a sheet on the mac, a dialog on Windows. The two button LABELS are here, because a label is a sentence a teacher reads and both apps already say the same words; only the thing the button is attached to differs.",
+    "openedBy": "What else does Plantoir use my folders for?",
+    "dismissedBy": "Done",
     "title": "Folders Plantoir uses",
     "intro": "Renaming or deleting one of these changes what appears on your site. Everything else in your course is yours to arrange however you like.",
     "namesTheCoursesOwnFolders": {
@@ -1162,7 +1164,7 @@
       {
         "key": "curriculum",
         "namedFrom": "course",
-        "source": "the curriculum folder the build would actually use for this course",
+        "source": "the curriculum folder the build resolves BY NAME for this course - the same first-the-recorded-name-then-the-scan order the build uses. Only the name half: the build also wants an expectation page inside the folder, which neither app can see from configuration, so the sheet can name a folder the build would go on to skip. Naming it is still righter than naming one that is not there.",
         "placeholderWhenNone": "Your curriculum folder",
         "what": "Your curriculum expectations",
         "why": "One page per expectation. The curriculum map is built from these — without them there is nothing to measure your lessons against, and the map is left out.",

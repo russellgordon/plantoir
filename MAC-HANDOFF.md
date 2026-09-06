@@ -143,8 +143,10 @@ outstanding.
   **This is not a corner case: every real course on the Windows machine has
   the key absent and a real "Curriculum" folder** — two of two checked. The
   mac already has the function it needs:
-  `SpecialNames.resolvedCurriculumFolder(for:)` (`SpecialNames.swift:167`),
-  used by `CourseSettingsView.swift:578` for folder protection. It is a
+  `CurriculumFolderRule.resolvedCurriculumFolder(for:)` — declared in
+  `SpecialNames.swift:167`, but owned by `enum CurriculumFolderRule`, NOT by
+  `SpecialNames`; grepping for the file name as a type finds nothing. Already
+  used at `CourseSettingsView.swift:578` for folder protection, so this is a
   one-line swap at `SpecialFoldersHelpView.swift:36`. Reference:
   `windows-app/Plantoir.Core/Models/SpecialFoldersHelp.cs`, tests
   `windows-app/Plantoir.Tests/SpecialFoldersHelpContractTests.cs`.

@@ -119,9 +119,16 @@ public class SpecialFoldersHelpContractTests
     {
         Assert.Equal(Contract()["title"]!.ToString(), SpecialFoldersHelp.Title);
         Assert.Equal(Contract()["intro"]!.ToString(), SpecialFoldersHelp.Intro);
-        Assert.Equal(
-            Contract()["rows"]!.AsArray()[1]!["placeholderWhenNone"]!.ToString(),
-            SpecialFoldersHelp.NoCurriculumFolderYet);
+        Assert.Equal(Contract()["openedBy"]!.ToString(), SpecialFoldersHelp.OpenedBy);
+        Assert.Equal(Contract()["dismissedBy"]!.ToString(), SpecialFoldersHelp.DismissedBy);
+
+        // Found by key, not by position: a hard-coded index goes on passing
+        // while testing the wrong row once one is inserted above it - the same
+        // trap NameOfRow was already fixed for.
+        foreach (JsonNode? row in Contract()["rows"]!.AsArray())
+            if (row!["key"]!.ToString() == "curriculum")
+                Assert.Equal(row["placeholderWhenNone"]!.ToString(),
+                    SpecialFoldersHelp.NoCurriculumFolderYet);
     }
 
     [Fact]
