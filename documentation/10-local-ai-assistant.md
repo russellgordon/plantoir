@@ -420,8 +420,15 @@ A deploy also does what the teacher would do first: if a preview is running,
 it is **stopped, and waited for**, before the deploy begins. The window's
 Deploy button is greyed out while a preview runs, so pressing Stop Preview is
 the actual human procedure; and the wait is not politeness, because stopping a
-preview kills that section's processes by working directory and would
-otherwise take the deploy's build with it.
+preview kills that section's processes — by working directory, by the build
+folder on their command line, or by their being `build_site.py` for this
+course and section, plus everything under them — and would otherwise take the
+deploy's build with it. That last part is the reason the wait is not
+politeness, and it became MORE true on 2026-09-05: until then the sweep could
+not see a `build_site.py` driver at all, so cancelling a deploy left the
+deploy's own build running inside the container. The rule is in
+[`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+`stopPreview`.
 
 **With no window open, the LOCAL assistant opens one** rather than running
 silently — this used to be unconditional, and a teacher who asked the local
