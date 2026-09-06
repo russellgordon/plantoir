@@ -51,20 +51,46 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
-> **v1.1.0 cut sheet (Windows assets ready, 2026-08-20).** The verified
-> Windows artifacts live on the Windows machine and will be uploaded FROM
-> there (`gh` is authed there) once the tag exists — so cut the release as a
-> DRAFT, tell Russell, and publish after the assets attach. Hashes for the
-> notes' SHA-256 table:
-> `PlantoirSetup.exe` 224.5 MB
-> `9990bcacade548a35cbd5b11f65dbf79d4a0236eeeee4d4d0e5322204c96527e` ·
-> `Plantoir-win-x64.zip` 379.9 MB
-> `b141c7ac30116c9836334e90472e5a2527fb4e50629c56d4c2f258f437cbb1ba`.
-> Built from commit 8e9faab0, proven by five clean-machine smoke tests
-> (install → course → preview → assistant → deploy, no .NET/WSL/Docker on
-> the machine). The macOS DMG does NOT ship in this cut — see RELEASING.md
-> "Two platforms, one version series": the mac joins v1.1.0 after the gate
-> list below is green.
+> **v1.1.0 cut sheet — ✅ Done 2026-08-20.** Released the same day this sheet
+> was written: tag `v1.1.0`, release "Plantoir 1.1.0", published
+> 2026-08-20T21:20:09Z and marked Latest, not a draft. All three assets are
+> attached and they are the artifacts described below — `PlantoirSetup.exe`
+> 235,449,648 bytes (224.5 MB) and `Plantoir-win-x64.zip` 398,389,660 bytes
+> (379.9 MB), both matching the sizes recorded here. Confirmed against the
+> live release 2026-09-06.
+>
+> **Two things did not go the way this sheet predicted, and they are the part
+> worth keeping.** The DMG shipped in the same cut — `Plantoir-macOS.dmg`
+> (53,220,868 bytes) is attached to v1.1.0 — so the mac did NOT join a later
+> release the way "the macOS DMG does NOT ship in this cut" expected; the gate
+> list came green in time. And the draft-then-attach dance was not needed in
+> the end. Neither is a fault; both are why a prediction in a handoff gets
+> marked done rather than deleted.
+>
+> **It sat here as an open instruction for seventeen days**, telling any mac
+> session that read the top of this file to cut a release that had already
+> shipped. That is the failure this section is most prone to, because it is
+> read first and abandoned partway: a completed item left unmarked is
+> indistinguishable from a pending one. Mark the cut sheet the day the release
+> publishes.
+>
+> <details><summary>The sheet as written, 2026-08-20</summary>
+>
+> > The verified Windows artifacts live on the Windows machine and will be
+> > uploaded FROM there (`gh` is authed there) once the tag exists — so cut the
+> > release as a DRAFT, tell Russell, and publish after the assets attach.
+> > Hashes for the notes' SHA-256 table:
+> > `PlantoirSetup.exe` 224.5 MB
+> > `9990bcacade548a35cbd5b11f65dbf79d4a0236eeeee4d4d0e5322204c96527e` ·
+> > `Plantoir-win-x64.zip` 379.9 MB
+> > `b141c7ac30116c9836334e90472e5a2527fb4e50629c56d4c2f258f437cbb1ba`.
+> > Built from commit 8e9faab0, proven by five clean-machine smoke tests
+> > (install → course → preview → assistant → deploy, no .NET/WSL/Docker on
+> > the machine). The macOS DMG does NOT ship in this cut — see RELEASING.md
+> > "Two platforms, one version series": the mac joins v1.1.0 after the gate
+> > list below is green.
+>
+> </details>
 
 
 **One is outstanding, proposed 2026-09-06: a folder rename breaks Markdown
