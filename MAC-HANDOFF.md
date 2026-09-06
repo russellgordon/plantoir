@@ -195,13 +195,21 @@ outstanding.
   them one after another on the same stack — showing at once would put up a
   dialog naming one problem and then a second naming both. Windows posts the
   presentation to the dispatcher, so the whole flush is collected first.
-  **The mac does not have this problem**, and an earlier draft of this
-  paragraph said it did: SwiftUI's `onChange(of:)` observes state at the next
-  render, so two synchronous appends read as one change 0→2. `GUI-IMPROVEMENTS.md`
-  row 366 is the evidence — a real run with two findings, watched, showing one
-  dialog titled "2 things need your attention". Corrected here rather than
-  quietly dropped, because a handoff that sends the other side after a
-  non-defect costs them the same afternoon a real one would.
+  **The mac does not have this problem in practice**, and an earlier draft of
+  this paragraph said flatly that it did: SwiftUI's `onChange(of:)` observes
+  state at the next render, so two synchronous appends read as one change 0→2.
+  `GUI-IMPROVEMENTS.md` row 366 is the evidence — a real run with two findings,
+  watched, showing one dialog titled "2 things need your attention". Corrected
+  here rather than quietly dropped, because a handoff that sends the other side
+  after a non-defect costs them the same afternoon a real one would.
+
+  **What is worth knowing is the shape underneath it**, which is not free:
+  the mac keeps no record of which findings it has already SHOWN, so it is
+  relying on the burst arriving in one flush. If a PTY read ever split it,
+  `showHealthFindings` would hold `[F, G]` behind the dialog already showing
+  `[F]` and F would be shown twice. One `contains` check would close it, and
+  the same split is the thing Windows' own line buffering exists for — so this
+  is a "reasoned from the code, not observed", said plainly.
 
   **The assistant surface had the same leak, and the mac should check its
   own.** `LauncherRunner.Capture` on Windows passed every output line straight

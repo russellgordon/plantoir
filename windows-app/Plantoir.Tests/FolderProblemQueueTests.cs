@@ -134,18 +134,31 @@ public class FolderProblemQueueTests
     }
 
     [Fact]
-    public void APublishThatRepeatsItselfDoesNotRelabelTheNextBuildsFindings()
+    public void AHealthyPublishDoesNotRelabelTheNextBuildsFindings()
     {
-        // Setting the flag on a batch that contributed nothing would tell the
-        // NEXT build's findings they are not on the students' site yet.
+        // A deploy reports its findings unconditionally, so a healthy course —
+        // or a deploy that skipped the build — hands over an EMPTY batch. That
+        // must not leave the flag set for the next build's findings.
         var queue = new FolderProblemQueue();
-        var finding = Finding("mediaFolderMissing");
-        queue.Note(new[] { finding }, cameFromPublishing: false);
-        queue.Note(new[] { finding }, cameFromPublishing: true);   // nothing new
-        queue.TakeNext();
+        queue.Note(System.Array.Empty<SiteHealthFinding>(), cameFromPublishing: true);
 
         queue.Note(new[] { Finding("noGradedFolders") }, cameFromPublishing: false);
         Assert.False(queue.TakeNext()!.Value.CameFromPublishing);
+    }
+
+    [Fact]
+    public void APublishRepeatingSomethingStillWaitingStillCountsAsAPublish()
+    {
+        // The mixing rule, and the direction that matters. A preview's finding
+        // can still be waiting — another dialog held the one slot WinUI allows
+        // — when the teacher publishes. The publish really did happen, so the
+        // batch must carry the sentence that names students.
+        var queue = new FolderProblemQueue();
+        var finding = Finding("mediaFolderMissing");
+        queue.Note(new[] { finding }, cameFromPublishing: false);
+        queue.Note(new[] { finding }, cameFromPublishing: true);   // nothing NEW, but a publish
+
+        Assert.True(queue.TakeNext()!.Value.CameFromPublishing);
     }
 
     [Fact]

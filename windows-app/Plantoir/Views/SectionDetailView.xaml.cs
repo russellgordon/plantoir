@@ -81,6 +81,24 @@ public sealed partial class SectionDetailView : UserControl
     private bool _healthDialogIsUp;
 
     /// <summary>
+    /// Set the moment this view is taken off screen, so an operation that was
+    /// awaiting something slow can tell that it is now working on behalf of a
+    /// section nobody is looking at.
+    ///
+    /// <para><b>It is not earlier than <c>IsLoaded</c>, and an earlier comment
+    /// here claimed it was.</b> Both change on <c>Unloaded</c>, which WinUI
+    /// dispatches rather than raising the instant
+    /// <c>DetailHost.Content</c> is reassigned — so a just-replaced view
+    /// briefly reports itself loaded, and this flag does not close that
+    /// window. What it buys is a signal that can be checked from a background
+    /// continuation without touching a XAML property, and one place to put the
+    /// reason. The window is a dispatcher tick against awaits measured in
+    /// seconds, which is why it is left as it is rather than replaced with a
+    /// visual-tree walk.</para>
+    /// </summary>
+    private bool _isTornDown;
+
+    /// <summary>
     /// What is waiting to be shown and what has been shown already.
     ///
     /// <para>Findings are HELD, not dropped, while a dialog is up: never swap
@@ -183,7 +201,7 @@ public sealed partial class SectionDetailView : UserControl
         };
         Preview.NavigationCompleted += (_, _) => RefreshChrome();
         _window.Activated += OnWindowActivated;
-        Unloaded += (_, _) => { StopPreview(); _window.Activated -= OnWindowActivated; };
+        Unloaded += (_, _) => { _isTornDown = true; StopPreview(); _window.Activated -= OnWindowActivated; };
         RefreshChrome();
         _ = RefreshPublishedMarker();
     }
@@ -421,7 +439,7 @@ public sealed partial class SectionDetailView : UserControl
                     // Shown only AFTER the dialog it was asked for from has
                     // gone — contracts/shared-rules.json ->
                     // siteHealth.repair.oneAlertAtATime.
-                    if (outcome.CanRebuild && WhyThePreviewCannotBeOfferedNow() is { } instead)
+                    if (outcome.CanRebuild && WhyTheRepairCannotBePreviewedNow() is { } instead)
                         outcome = instead;
                     await PresentRepairOutcomeAsync(outcome);
                 }
@@ -439,6 +457,11 @@ public sealed partial class SectionDetailView : UserControl
             // stops of its own accord: the batch is presented the first time
             // the slot is free.
             await Task.Delay(2000);
+            // Not onto a section nobody is looking at. EffectiveXamlRoot falls
+            // back to the WINDOW's root, so a replaced view would go on
+            // retrying and eventually put a dialog about the old section over
+            // whatever the teacher switched to.
+            if (_isTornDown || !IsLoaded) return;
             QueueHealthPresentation();
             return;
         }
@@ -467,9 +490,25 @@ public sealed partial class SectionDetailView : UserControl
     /// the course code and deliberately ignores the section number — publishing
     /// section 2 would otherwise be reported as section 1 publishing.</para>
     /// </summary>
-    private SiteHealthRepair.Outcome? WhyThePreviewCannotBeOfferedNow()
+    private SiteHealthRepair.Outcome? WhyTheRepairCannotBePreviewedNow()
     {
         if (_window.Workspace.WorkspacePath is not { } workspacePath) return null;
+
+        // Said in the same shape as the other two rather than through
+        // TheAssistantIsBuilding()'s own dialog: that one is a second
+        // ContentDialog raised while the outcome dialog is still closing,
+        // which WinUI refuses — and its refusal is swallowed, so the press
+        // would do nothing and say nothing. Silence, in the button meant to
+        // end silence.
+        if (CourseActivity.IsBuildingElsewhere(workspacePath, _course.Code))
+        {
+            return new SiteHealthRepair.Outcome(
+                $"{_course.Code} is being built just now.",
+                "The assistant is rebuilding this course, and building it here at the same time " +
+                "would clash. You can preview it again once that has finished, and the change " +
+                "will be there.",
+                false);
+        }
 
         if (_lease is null && PreviewLeases.Active.Any(
                 lease => lease.FolderPath == workspacePath
@@ -528,12 +567,11 @@ public sealed partial class SectionDetailView : UserControl
             // course being published is the race DeployAsync spends thirty
             // lines avoiding. Withheld here means saying so, in the same
             // dialog shape, rather than swallowing the press.
-            if (WhyThePreviewCannotBeOfferedNow() is { } instead)
+            if (WhyTheRepairCannotBePreviewedNow() is { } instead)
             {
                 await PresentRepairOutcomeAsync(instead);
                 return;
             }
-            if (await TheAssistantIsBuilding()) return;
 
             if (_lease is not null || _previewRunner.IsRunning) await StopPreviewAsync();
 
@@ -543,7 +581,18 @@ public sealed partial class SectionDetailView : UserControl
             // see leaves a running preview.ps1 on a runner with no window and
             // a lease that refuses the section's own Preview button
             // afterwards.
-            if (!IsLoaded) return;
+            if (_isTornDown || !IsLoaded) return;
+
+            // Asked AGAIN after the stop, for the reason DeployAsync gives at
+            // the same point in its own sequence: the leases came off with the
+            // preview and the stop takes long enough for somebody else to
+            // start. WorkLease is an announcement, not a refusal, so nothing
+            // downstream would stop a build landing on top of the assistant's.
+            if (WhyTheRepairCannotBePreviewedNow() is { } nowInstead)
+            {
+                await PresentRepairOutcomeAsync(nowInstead);
+                return;
+            }
             StartAutomatedPreview();
         }
         catch (Exception ex)
@@ -580,7 +629,11 @@ public sealed partial class SectionDetailView : UserControl
             }
             catch (Exception ex)
             {
-                App.LogDiagnostic($"Folder-problem dialog refused (attempt {attempt + 1}): {ex.Message}");
+                // Once per batch, not once per attempt: a teacher reading
+                // another dialog would otherwise fill the log with five lines
+                // every couple of seconds for as long as they take.
+                if (attempt == 0)
+                    App.LogDiagnostic($"Folder-problem dialog refused, retrying: {ex.Message}");
                 await Task.Delay(150);
             }
         }

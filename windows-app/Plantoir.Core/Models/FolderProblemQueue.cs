@@ -44,11 +44,16 @@ public sealed class FolderProblemQueue
         // sentence is the one naming who has not seen the change yet
         // (students), and leaving that out of a batch that really did follow a
         // publish is the more costly of the two mistakes.
-        // Only when this batch actually contributed something. A publish that
-        // reported nothing new would otherwise leave the flag set, and the
-        // NEXT unrelated build's findings would be told they are not on the
-        // students' site yet.
-        if (cameFromPublishing && anythingNew) _pendingCameFromPublishing = true;
+        //
+        // Guarded on the batch being NON-EMPTY, and NOT on it being new — a
+        // distinction worth the sentence, because the obvious guard is the
+        // wrong one. The bug is the EMPTY batch: a deploy reports its findings
+        // unconditionally, so a healthy course, or one whose deploy skipped
+        // the build, hands over nothing at all, and setting the flag there
+        // labelled the next unrelated build's findings as a publish. Guarding
+        // on "new" would fix that and break the rule above, because a publish
+        // that repeats a finding still waiting to be shown really did happen.
+        if (cameFromPublishing && findings.Count > 0) _pendingCameFromPublishing = true;
         return anythingNew;
     }
 
