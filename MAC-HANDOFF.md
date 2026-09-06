@@ -409,6 +409,40 @@ rather than being deleted.
 > manual. A change that creates an obligation for the other platform and does
 > not list it has, from their side, not been handed over at all.
 
+- ⚠️ **A COURSE CODE OF "work" COLLIDES WITH THE BUILD WORKSPACE, on both
+  platforms** (found on Windows, 2026-09-06). `builds/{id}/work/{COURSE}` holds
+  every course's build workspace, so a course whose CODE is "work" resolves to
+  that shared directory. Nothing validated against it: `CourseCodeValidator`
+  accepts any letters and digits up to twelve characters, and the Python has
+  the same shape — `toolchain_paths.merged_output_root` builds from the course
+  directory's name.
+
+  Harmless until something DELETES by that path, which Windows now does when a
+  course is archived or restored. Windows refuses the name at the point of
+  deletion (`BuildOutputLocation.WouldCollideWithEveryCourse`) and that is the
+  cheap half. **The naming problem itself is shared and unfixed**: a teacher
+  can still create a course called "work" on either platform and have its
+  build workspace land on top of everybody else's. Worth deciding whether the
+  right answer is a reserved-name refusal in the wizard (both apps), a
+  different layout, or leaving it and documenting it — but it should be a
+  decision rather than an accident.
+
+- ⚠️ **DO NOT TELL ANYONE TO FIX A CREDENTIAL WITH `cmdkey` — Plantoir cannot
+  read what it writes** (Windows, 2026-09-06). Awareness rather than work, but
+  it cost an hour here and it would cost a support conversation the same.
+  `deploy.ps1`'s `CredApi` stores and reads the credential blob as **UTF-8**;
+  `cmdkey` writes **UTF-16**. A credential written with `cmdkey` therefore
+  shows up perfectly in `cmdkey /list` and is INVISIBLE to the app, which
+  falls through to asking the teacher for the token again — with no hint that
+  a credential is already sitting there.
+
+  Met twice in one evening: a Cloudflare token stored with `cmdkey` was
+  ignored by the launcher, and the machine's stored Cloudflare ACCOUNT ID had
+  evidently been written the same way long ago, so `ReadSecret` returned null
+  and the launcher asked for it. The fix is to write through the launcher's
+  own `CredApi`. If the mac ever documents credential recovery for Windows —
+  or a support note does — this is the trap.
+
 - ⚠️ **TWO CONTRACT SENTENCES SAY "on your Mac" AND ARE SHOWN TO WINDOWS
   TEACHERS TOO** (Windows, 2026-09-06). `specialNames.renameFolder.explanation`
   and `.doneNothingWasThere` both name the platform:
@@ -2153,6 +2187,63 @@ is what happened to the test-race item, sitting here for three days with
 Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
+
+- ✅ DONE (Windows, 2026-09-06). **The app can finally name where Windows keeps
+  a built website — which turned out to be why two different things were
+  wrong.**
+
+  **What was actually broken.** `BuildFreshness`, the one thing that decides
+  whether Deploy builds before publishing, read
+  `<course>/.merged_output/section<N>/public/index.html` — where builds lived
+  before row 290 moved them out of the working folder. Both of its answers
+  were wrong, and both were reproduced rather than reasoned about: on a course
+  made since the move that file never exists, so it always said "rebuild"
+  (safe, but every publish rebuilt); on a course carrying a leftover
+  `.merged_output`, it read the leftover, and one newer than the notes made it
+  answer "no rebuild needed" about a file that is not what Windows publishes.
+
+  The reason it went unnoticed is the useful part: **nothing in the C# knew
+  the build path at all.** Only the launchers and the Python did. That is also
+  why item 19's owed work had never been done — there was nothing in the app
+  that could name the folder to clear it.
+
+  **What was rejected.** Writing a second hash of the working folder's path.
+  The plan called for it and the plan was wrong: `FolderContainers` has
+  derived exactly that value for the container name since it was written, and
+  CLAUDE.md warns about this derivation by name. `FolderIdentifier` was
+  extracted from it instead — which is what the mac did too.
+
+  **What the mac may want to check.** Windows clears a course's build at FIVE
+  moments (archive a course, archive a section, restore a section, restore a
+  course, restore a backup) because it has no symlink to make "a build nothing
+  points at is not adopted" work. On the mac the link rule covers some of
+  those only incidentally — a whole-course `Restore` and a `RestoreBackup` are
+  caught because the link goes with the folder, not because anything decided
+  they should be. Worth confirming that is true rather than lucky.
+
+  **A scheduled deploy had no build step**, which is a Windows-only gap the
+  mac closed long ago in its launchd script. Fixed by building
+  unconditionally; the reasoning and the hang it nearly introduced are in
+  GUI-IMPROVEMENTS row 418.
+
+  **Verified by publishing.** `verify-deploy.ps1` (new — Windows had no deploy
+  gate of any kind) ran every destination and every pairing against real
+  sites: **36 passed, 0 failed, 0 skipped**, each site fetched back and read.
+  Four harness faults had to be fixed to get a green worth trusting, and one
+  of them is the reason this entry exists at all: the three Cloudflare legs
+  were publishing to NETLIFY and passing, because `deploy.ps1` never reads
+  `deploy_target` from the configuration and needs `--target cloudflare`,
+  and the harness then verified a `netlify.app` address as proof of a
+  Cloudflare publish. **A false pass is worse than a skip**: a skip says
+  nothing ran; a false pass says something ran correctly.
+
+  **Reference:** `Plantoir.Core/Models/BuildOutputLocation.cs` (new),
+  `FolderContainers.FolderIdentifier`, `BuildFreshness.NeedsRebuild(course,
+  section, buildsRoot)`, `CourseArchiver.DiscardBuilds`, `CourseRestorer`,
+  `Assist/TaskScheduling.WriteWrapperScript`, `verify-deploy.ps1`. Tests:
+  `BuildOutputLocationTests` (15, including the contract's five
+  `buildFreshness` rules, never run on Windows before), `BuildFreshnessTests`
+  repointed, `TaskSchedulingTests`.
 
 - ✅ DONE (Windows, 2026-09-06). **Items 15 and 16 ported: a course's own
   words for a unit and for its class folder. Nothing is asked of the mac — this

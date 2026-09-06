@@ -17,6 +17,34 @@ Docker Desktop) unless marked otherwise.
 | `PtyDriver/` | Console harness that drives the launchers under a ConPTY with scripted prompt replies — how the E2E runs below were performed. |
 | `Plantoir.Mcp/` | On `main` (`Plantoir.sln` lists it) and **it ships**: `publish.ps1` publishes it, copies `plantoir-mcp.exe` into the app's own output beside `Plantoir.exe`, and includes it in the signing list. A standalone MCP server exposing one working folder to an AI assistant. Load-bearing at runtime — `Plantoir/Services/ClaudeCodeLauncher.cs` looks for it beside the app, and `Plantoir/Services/McpClient.cs` launches it. See [its README](Plantoir.Mcp/README.md). |
 
+## Where parity stands (2026-09-06)
+
+`WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
+date after drifting in both directions — item 5 had been finished since August
+with its headline still reading as open work. **Thirteen of its twenty-one
+items are done.** What is genuinely left, smallest first:
+
+| Item | What is left | Size |
+|---|---|---|
+| 19 | The `working-folder.txt` marker AND a sweep that reads it. Do both or neither — the marker alone is ceremony. Two Windows specifics for the sweep are written into item 19. | Small |
+| 18 | The two VIEWS: the choice at the folder picker, and the dismissable notice for a folder the window restored. Detection, wording and the remembered-per-folder store are built. | Medium |
+| 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
+| 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 44 tests. | Large |
+| 21 | The folder-problems front end: the findings dialog, the Fix button, the two repairs, the outcome report, "Preview Again". Deferred deliberately as a FEATURE — it needs its own wording, not a port. | Large |
+
+Two things that are NOT in that list and should be known:
+
+- **The deploy gate exists now.** `verify-deploy.ps1` publishes to every
+  destination and every pairing against real sites and fetches each one back:
+  36 passed, 0 failed on 2026-09-06. It needs credentials and the network, so
+  it is opt-in and wired into nothing. Run it when the publishing path
+  changes. It is the only automated check of the PowerShell half of
+  publishing — `verify.sh` and `verify-deploy.sh` are bash and do not run
+  here.
+- **The unit suite is green**: 911 passed, 0 failed. `dev` stood at 668 passed
+  with 5 failing contract tests before this series; those five were each a
+  real gap between what the contract says Windows does and what it did.
+
 ## Four activity-trail events are declared but not yet emitted (2026-09-06)
 
 `ActivityTrail.Event` names `folder renamed`, `folder created`,

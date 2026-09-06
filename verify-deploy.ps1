@@ -243,8 +243,16 @@ function Check-Folder {
     else { Ok "$What - no page carries the live-reload client" }
 }
 
+# Which host a published address belongs to. A publish is only proved by an
+# address of the RIGHT KIND: the first version of this script checked a
+# netlify.app URL and called it a Cloudflare pass.
+function Expected-Host([string]$destination) {
+    if ($destination -eq 'cloudflare_pages') { return 'pages.dev' }
+    return 'netlify.app'
+}
+
 function Check-Url {
-    param([string]$What, [string]$Url, [int]$Attempts = 6)
+    param([string]$What, [string]$Url, [int]$Attempts = 12, [string]$MustEndWith = "")
     # A site created moments ago does not answer immediately - the first run of
     # this script reported a 404 for a Netlify site that answered 200 a few
     # minutes later in the very next case. A publish is not wrong because DNS
@@ -260,6 +268,14 @@ function Check-Url {
     try {
         if ($null -eq $response) { No "$What could not be fetched after $Attempts tries"; return }
         if ($response.StatusCode -ne 200) { No "$What answered HTTP $($response.StatusCode)"; return }
+        # The address must belong to the host this case is about. Without this,
+        # a leg that silently published somewhere ELSE passes: the Cloudflare
+        # cases did exactly that, verifying a netlify.app address three times
+        # over and reporting three green Cloudflare publishes.
+        if ($MustEndWith -and -not ($Url -match ([regex]::Escape($MustEndWith) + '(/|$)'))) {
+            No "$What answered, but at $Url - that is not a $MustEndWith address, so this destination did not publish"
+            return
+        }
         Ok "$What answered HTTP 200"
         if ($response.Content -match 'ws://localhost:') { No "$What is serving the preview's live-reload client" }
         else { Ok "$What carries no live-reload client" }
@@ -267,9 +283,26 @@ function Check-Url {
 }
 
 function Url-FromLog([string]$log) {
-    $m = [regex]::Match($log, 'https://[^\s""]+\.(?:netlify\.app|pages\.dev)')
-    if ($m.Success) { return $m.Value }
-    return ""
+    # PREFER the production address over a deployment-specific one. Cloudflare
+    # prints both - "https://21a7e1ae.mcr3u-....pages.dev" for that particular
+    # deployment and "https://mcr3u-....pages.dev" for the site itself - and
+    # taking the first match took the hashed one. On a project's FIRST publish
+    # that subdomain needs longer to resolve than the site does, so a real,
+    # successful publish was reported as "could not be fetched after 6 tries"
+    # while the site itself was already serving. It is also simply the wrong
+    # thing to check: the production address is the one a teacher gives out.
+    $all = [regex]::Matches($log, 'https://[^\s""]+\.(?:netlify\.app|pages\.dev)') |
+           ForEach-Object { $_.Value } | Select-Object -Unique
+    if (-not $all) { return "" }
+    $plain = $all | Where-Object {
+        $hostName = ([Uri]$_).Host
+        # A deployment-specific Cloudflare address has one extra label in front
+        # of the project name: <hash>.<project>.pages.dev is four labels,
+        # <project>.pages.dev is three.
+        -not ($hostName -like "*.pages.dev" -and ($hostName.Split(".").Count -gt 3))
+    }
+    if ($plain) { return @($plain)[0] }
+    return @($all)[0]
 }
 
 # Everything from here is wrapped so the course's own settings are put back on
@@ -370,16 +403,21 @@ if ($haveNetlify) {
     $netlifyRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "deploy-netlify.log") -Answers @("Testing", "", "y")
     if ($netlifyRun.ExitCode -eq 0) { Ok "publish to Netlify exited 0" } else { No "publish to Netlify exited $($netlifyRun.ExitCode)" }
     $netlifyUrl = Url-FromLog $netlifyRun.Log
-    if ($netlifyUrl) { Check-Url "Netlify" $netlifyUrl } else { No "no Netlify address in the output" }
+    if ($netlifyUrl) { Check-Url "Netlify" $netlifyUrl -MustEndWith "netlify.app" } else { No "no Netlify address in the output" }
 } else { Skipped "Netlify (no credentials)" }
 
 Hdr "Destination 3 of 3 - Cloudflare Pages"
 if ($haveCloudflare) {
     Set-Destination -Primary "cloudflare_pages"
-    $cloudflareRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "deploy-cloudflare.log") -Answers @("Testing", "", "y")
+    # --target is REQUIRED: deploy.ps1 defaults $TARGET to netlify and never
+    # reads deploy_target from the configuration. Setting the config key alone
+    # published to Netlify while this script reported a Cloudflare pass.
+    $cloudflareRun = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--target", "cloudflare") -LogFile (Join-Path $work "deploy-cloudflare.log") -Answers @("Testing", "", "y")
     if ($cloudflareRun.ExitCode -eq 0) { Ok "publish to Cloudflare exited 0" } else { No "publish to Cloudflare exited $($cloudflareRun.ExitCode)" }
+    if ($cloudflareRun.Log -match '(?i)cloudflare|wrangler|pages\.dev') { Ok "the launcher really went to Cloudflare" }
+    else { No "the Cloudflare leg's output never mentions Cloudflare - it published somewhere else" }
     $cloudflareUrl = Url-FromLog $cloudflareRun.Log
-    if ($cloudflareUrl) { Check-Url "Cloudflare Pages" $cloudflareUrl } else { No "no Cloudflare address in the output" }
+    if ($cloudflareUrl) { Check-Url "Cloudflare Pages" $cloudflareUrl -MustEndWith "pages.dev" } else { No "no Cloudflare address in the output" }
 } else { Skipped "Cloudflare Pages (no credentials)" }
 
 # ------------------------------------------------------------- the pairings
@@ -398,7 +436,7 @@ if ($haveNetlify) {
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (netlify $($legOne.ExitCode), folder $($legTwo.ExitCode))" }
     $u = Url-FromLog $legOne.Log
-    if ($u) { Check-Url "Netlify (paired)" $u } else { No "no Netlify address in the paired output" }
+    if ($u) { Check-Url "Netlify (paired)" $u -MustEndWith "netlify.app" } else { No "no Netlify address in the paired output" }
     Check-Folder "folder (paired)" (Join-Path $folderTarget "section$Section")
 } else { Skipped "Netlify + folder (no Netlify credentials)" }
 
@@ -407,10 +445,13 @@ if ($haveCloudflare) {
     Remove-Item -Recurse -Force $folderTarget -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $folderTarget | Out-Null
     Set-Destination -Primary "cloudflare_pages" -AdditionalJson "[{`"type`":`"local_folder`",`"folder_path`":`"$($folderTarget.Replace('\','\\'))`"}]"
-    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair2-cf.log") -Answers @("Testing", "", "y")
+    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--target", "cloudflare") -LogFile (Join-Path $work "pair2-cf.log") -Answers @("Testing", "", "y")
     $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "pair2-folder.log")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (cloudflare $($legOne.ExitCode), folder $($legTwo.ExitCode))" }
+    $cfPaired = Url-FromLog $legOne.Log
+    if ($cfPaired) { Check-Url "Cloudflare (paired with a folder)" $cfPaired -MustEndWith "pages.dev" }
+    else { No "no Cloudflare address in the paired output" }
     Check-Folder "folder (paired with Cloudflare)" (Join-Path $folderTarget "section$Section")
 } else { Skipped "Cloudflare + folder (no Cloudflare credentials)" }
 
@@ -419,11 +460,11 @@ if ($haveNetlify -and $haveCloudflare) {
     Set-Destination -Primary "netlify" -AdditionalJson '[{"type":"cloudflare_pages"}]'
     $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair3-netlify.log") -Answers @("Testing", "", "y")
     Set-Destination -Primary "cloudflare_pages"
-    $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair3-cf.log") -Answers @("Testing", "", "y")
+    $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--target", "cloudflare") -LogFile (Join-Path $work "pair3-cf.log") -Answers @("Testing", "", "y")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (netlify $($legOne.ExitCode), cloudflare $($legTwo.ExitCode))" }
-    $u1 = Url-FromLog $legOne.Log; if ($u1) { Check-Url "Netlify (paired with Cloudflare)" $u1 }
-    $u2 = Url-FromLog $legTwo.Log; if ($u2) { Check-Url "Cloudflare (paired with Netlify)" $u2 }
+    $u1 = Url-FromLog $legOne.Log; if ($u1) { Check-Url "Netlify (paired with Cloudflare)" $u1 -MustEndWith "netlify.app" }
+    $u2 = Url-FromLog $legTwo.Log; if ($u2) { Check-Url "Cloudflare (paired with Netlify)" $u2 -MustEndWith "pages.dev" }
 } else { Skipped "Netlify + Cloudflare (needs both sets of credentials)" }
 
 # ------------------------------------------------------------------ finishing

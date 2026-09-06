@@ -665,16 +665,47 @@ this side is expected to say so when the contract is wrong.
     outside the folder. Full write-up in "A cloud-synced working folder:
     explain it, never refuse it" below.
 
-19. **Builds outside the working folder — MOSTLY DONE; two small things left
-    (2026-09-06).** The `appliesOn` filter this item asks for is in
+19. **Builds outside the working folder — ONE of the two owed things is done
+    (2026-09-06); the OTHER is still open.** The `appliesOn` filter is in
     (`ContractTests`), the retired sentence is asserted absent
     (`CloudSyncedFolderTests`), and Windows already built outside the folder
-    (row 290). **Still owed, both named at the end of this item and neither
-    checked yet: whether archiving and restoring a course takes its build
-    with it**, and **a marker beside each build folder naming the working
-    folder it belongs to**, so a build for a folder that no longer exists is
-    litter somebody can recognise. The mac writes `working-folder.txt`;
-    nothing on this side writes anything. Original text: **The mac now builds outside the working folder too, and one sentence
+    (row 290).
+
+    ✅ **Archiving and restoring a course now takes its build with it.**
+    `BuildOutputLocation` (new) names `%LOCALAPPDATA%\Plantoir\builds\{id}`,
+    taking the id from `FolderContainers.FolderIdentifier` — the value the
+    container name has always used, which is `preview.ps1`'s `$WORKDIR_ID` —
+    rather than hashing a second time. Builds are discarded at all FIVE
+    moments a course's content is replaced (archive a course, archive a
+    section, restore a section, restore a course, restore a backup), and the
+    build WORKSPACE goes with the built site, because that is the half a
+    preview serves from.
+
+    ⚠️ **STILL OPEN: the marker, and the sweep that would give it a point.**
+    Nothing on this side writes `working-folder.txt` or anything like it, and
+    there is no Windows equivalent of the mac's
+    `discardBuildsForMissingWorkingFolders`. **Writing the marker alone is
+    ceremony** — nothing would read it — so whoever picks this up should do
+    both or neither. Two Windows specifics for the sweep, neither of which the
+    mac's version has to handle: only sweep paths under `%USERPROFILE%`, and
+    treat ONLY `ERROR_FILE_NOT_FOUND` / `ERROR_PATH_NOT_FOUND` as "the folder
+    is gone" — `Directory.Exists` also returns false for access-denied, for an
+    unplugged drive letter, and for a OneDrive on-demand folder, and clearing
+    a build because a USB stick was unplugged would be worse than the litter.
+    The cheapest home for the marker itself is the launchers'
+    `Enter-NativeRuntime`, which already holds `$WORKDIR_PHYSICAL` and creates
+    the folder — one `Set-Content` there and the app never needs the hash to
+    write it.
+
+    **Two things found while doing the first half, both now fixed, both worth
+    knowing because they are the same shape:** `BuildFreshness` was reading
+    `<course>\.merged_output\…`, the pre-row-290 location, so the decision
+    about whether to rebuild and the artefact that actually gets published
+    came from two different places; and a scheduled deploy had NO build step
+    at all. See "Builds outside the working folder" below and
+    `MAC-HANDOFF.md`.
+
+    Original text: **The mac now builds outside the working folder too, and one sentence
     you were told to leave out is now gone from BOTH apps (2026-09-05,
     row 402).** You already do this half — `PLANTOIR_BUILD_ROOT` →
     `%LOCALAPPDATA%\Plantoir\builds\<id>`, row 290 — and **nothing about
