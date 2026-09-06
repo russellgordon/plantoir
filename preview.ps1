@@ -235,22 +235,77 @@ $WORKDIR_ID = ([BitConverter]::ToString([System.Security.Cryptography.SHA256]::C
 $CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"
 
 # ---- Stop mode -------------------------------------------------------
-# .\preview.ps1 CODE N --stop : kill this section's preview processes
-# INSIDE the container. Ending the host-side script leaves the
-# container-side build or server running; this reclaims those
-# resources. It must never start anything — no engine setup, no image
-# build, no container creation. Processes are found by WORKING
-# DIRECTORY, not port, so builds are caught as well as servers and
-# other sections' processes can never be touched (parity: preview.sh).
+# .\preview.ps1 CODE N --stop : kill this section's preview processes.
+# Ending the host-side script leaves the build or server running; this
+# reclaims those resources. It must never start anything — no engine
+# setup, no image build, no container creation.
+#
+# WHICH processes belong to this section is a SHARED rule, written down
+# in contracts/shared-rules.json -> stopPreview and implemented for the
+# container side in scripts/stop_preview.py. It is implemented a second
+# time here because native Windows has no /proc to read and no container
+# to run Python in — the enumeration is Win32_Process and the killing is
+# Stop-Process, both of which are platform mechanics the contract
+# deliberately does not share. The RULE the two must agree on is:
+#
+#   * three kinds of evidence, any one of which is enough — the process
+#     sits in the section's build folder, its command line NAMES that
+#     folder, or it is build_site.py with this course and this section on
+#     its command line;
+#   * plus every descendant of a match, because a child spawned with a
+#     RELATIVE path (npx does) carries no evidence of its own;
+#   * and every comparison ends at a BOUNDARY, never a bare substring.
+#
+# That last clause was not true here until 2026-09-05, and the bug it
+# left is the reason the rule got written down: `...\section1` is a
+# prefix of `...\section10`, and `--section=1` is a prefix of
+# `--section=10`, so stopping section 1 also stopped section 10 — by
+# both routes at once. It needs a course with ten or more sections,
+# which nothing refuses.
 if ($NATIVE_RUNTIME -and $STOP_MODE) {
-    # Section processes are recognisable without /proc: the python build
-    # carries --course/--section on its command line, and the serving node's
-    # carries the section's work dir when launched with an absolute path.
-    # What that misses is a child spawned with a RELATIVE path (npx does),
-    # so every match's descendants go too, walked through the same process
-    # snapshot's parent links.
+    # A path is NAMED by a command line only when what follows it is a
+    # boundary: another path segment, a quote, whitespace, or the end of
+    # the line. Allowing the end is still safe against the section1 /
+    # section10 trap, because what follows `section1` in `section10` is
+    # `0`, which is not a boundary.
+    function Test-NamesPath {
+        param([string]$Line, [string]$PathToFind)
+        if (-not $Line -or -not $PathToFind) { return $false }
+        $needle = $PathToFind.TrimEnd('\', '/')
+        $boundaries = @('\', '/', ' ', "`t", '"', "'")
+        $index = $Line.IndexOf($needle, [StringComparison]::OrdinalIgnoreCase)
+        while ($index -ge 0) {
+            $after = $index + $needle.Length
+            if ($after -ge $Line.Length -or $boundaries -contains [string]$Line[$after]) {
+                return $true
+            }
+            $index = $Line.IndexOf($needle, $index + 1, [StringComparison]::OrdinalIgnoreCase)
+        }
+        return $false
+    }
+
+    # `--name=value` or `--name value`, read as an ARGUMENT. A substring
+    # test cannot tell `--section=1` from `--section=10`. Splitting on
+    # whitespace is safe for these two flags: a course code and a section
+    # number never contain a space, whatever the path beside them does.
+    function Test-ArgumentValue {
+        param([string]$Line, [string]$Name, [string]$Value)
+        if (-not $Line) { return $false }
+        $tokens = @($Line -split '\s+')
+        for ($i = 0; $i -lt $tokens.Count; $i++) {
+            $token = $tokens[$i]
+            if ($token.StartsWith("--$Name=", [StringComparison]::OrdinalIgnoreCase)) {
+                return ($token.Substring($Name.Length + 3) -ieq $Value)
+            }
+            if (($token -ieq "--$Name") -and (($i + 1) -lt $tokens.Count)) {
+                return ($tokens[$i + 1] -ieq $Value)
+            }
+        }
+        return $false
+    }
+
     $buildRoot = Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)
-    $sectionNeedle = (Join-Path $buildRoot ('work\' + $COURSE + '\section' + $SECTION)).ToLowerInvariant()
+    $sectionNeedle = Join-Path $buildRoot ('work\' + $COURSE + '\section' + $SECTION)
     Write-Host "Stopping preview processes for $COURSE section $SECTION ..."
     $snapshot = @(Get-CimInstance Win32_Process)
     $matched = New-Object System.Collections.Generic.HashSet[uint32]
@@ -258,9 +313,12 @@ if ($NATIVE_RUNTIME -and $STOP_MODE) {
         if ($proc.Name -ne 'node.exe' -and $proc.Name -ne 'python.exe') { continue }
         $line = [string]$proc.CommandLine
         if (-not $line) { continue }
-        $lower = $line.ToLowerInvariant()
-        $isBuild = ($lower.Contains('build_site.py') -and $lower.Contains(('--course=' + $COURSE).ToLowerInvariant()) -and $lower.Contains(('--section=' + $SECTION).ToLowerInvariant()))
-        if ($lower.Contains($sectionNeedle) -or $isBuild) { $null = $matched.Add($proc.ProcessId) }
+        $isBuild = ($line.ToLowerInvariant().Contains('build_site.py') -and `
+                    (Test-ArgumentValue $line 'course' $COURSE) -and `
+                    (Test-ArgumentValue $line 'section' $SECTION))
+        if ((Test-NamesPath $line $sectionNeedle) -or $isBuild) {
+            $null = $matched.Add($proc.ProcessId)
+        }
     }
     # Descendants: repeat until no new child turns up (the chain is
     # python -> cmd -> node, so one pass is not enough).

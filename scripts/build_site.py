@@ -21,6 +21,7 @@ _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import site_health
 import contracts
 import class_pages
+import stop_preview
 import toolchain_paths
 from datetime import datetime, timezone
 import threading
@@ -1036,33 +1037,39 @@ def stop_preview_serving(output_dir: Path) -> int:
     watcher — a daemon thread, and the actual cause of the race this closes —
     goes with it.
 
-    Reads `/proc`, which exists wherever this runs on the mac (inside the
-    container) and on Linux. Natively on Windows there is no `/proc` and this
-    does nothing, exactly as `kill_existing_quartz` already does nothing there
-    without `lsof`; Windows has its own answer to make — see WINDOWS-HANDOFF.
+    **The rule itself is not here.** It lives once, in `stop_preview.py`,
+    because this used to be the third of three implementations of one
+    question and they had already drifted — see `contracts/shared-rules.json`
+    -> `stopPreview` for what each of the three could and could not see. What
+    stays here is the CALLER's half: which question to ask (`servingOnly`,
+    never `everything` — a build for publishing must not stop a build), what
+    to say about it, and the fact that a build never stops itself.
+
+    Natively on Windows there is no `/proc`, so the snapshot comes back empty
+    and this does nothing — exactly as `kill_existing_quartz` already does
+    nothing there without `lsof`. Windows stops its own previews from
+    `preview.ps1`; see WINDOWS-HANDOFF.
     """
-    marker = str(output_dir).rstrip("/") + "/"
-    proc = Path("/proc")
-    if not proc.is_dir():
+    snapshot = stop_preview.read_proc_snapshot()
+    if not snapshot:
         return 0
+    pids = stop_preview.pids_to_stop(
+        snapshot,
+        stop_preview.expand_directories([str(output_dir)]),
+        mode=stop_preview.MODE_SERVING_ONLY,
+        # Belt and braces. `servingOnly` already refuses to recognise a build
+        # driver, and this process IS a build driver for this very section.
+        exclude=(os.getpid(),),
+    )
     stopped = 0
-    for entry in proc.iterdir():
-        if not entry.name.isdigit():
-            continue
+    for pid in pids:
         try:
-            command = (entry / "cmdline").read_bytes().replace(b"\x00", b" ").decode(
-                "utf-8", "replace")
-        except OSError:
-            continue
-        if marker not in command or "--serve" not in command:
-            continue
-        try:
-            os.kill(int(entry.name), signal.SIGKILL)
+            os.kill(pid, signal.SIGKILL)
             stopped += 1
             print(f"🛑 Stopped the preview that was still serving this section "
-                  f"(PID {entry.name}), so it cannot overwrite this build.")
-        except (ValueError, ProcessLookupError, PermissionError) as error:
-            print(f"⚠️ Could not stop the preview process {entry.name}: {error}")
+                  f"(PID {pid}), so it cannot overwrite this build.")
+        except (ProcessLookupError, PermissionError) as error:
+            print(f"⚠️ Could not stop the preview process {pid}: {error}")
     return stopped
 
 

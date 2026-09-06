@@ -58,6 +58,13 @@ COPY scripts/site_health.py /opt/scripts/site_health.py
 # toolchain change is gated on it: the unit tests were green and the image
 # could not be built at all.
 COPY scripts/class_pages.py /opt/scripts/class_pages.py
+# Which processes belong to a section's preview — the one answer, imported by
+# build_site.py before a build for publishing so the preview server cannot
+# overwrite what was just built. `preview.sh --stop` does NOT run this copy:
+# it pipes the recipe's own copy in over stdin, because stop mode must work
+# against a container built from an older image and this file would not be in
+# one. See contracts/shared-rules.json -> stopPreview.
+COPY scripts/stop_preview.py /opt/scripts/stop_preview.py
 COPY scripts/setup_course.py /opt/scripts/setup_course.py
 COPY scripts/build_site.py /opt/scripts/build_site.py
 COPY scripts/deploy.py /opt/scripts/deploy.py

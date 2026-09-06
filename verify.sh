@@ -687,6 +687,172 @@ else
   fail "could not put back a container without the builds mount"
 fi
 
+# -------------------- 6d. --stop stops this section, and only this one ------
+# Nothing here drove `--stop` before, so the mac's stop path had no automated
+# gate at all: the rule was unit-tested against a snapshot and the LAUNCHER
+# that carries it into the container was never run. Both halves of that are
+# checked here against real processes in the real container.
+#
+# The stand-ins are shells, not node: what the rule reads is the command line
+# and the working directory, and `sh -c "sleep 600" <args>` puts whatever is
+# wanted on the command line while genuinely sleeping. Using the real Quartz
+# CLI would test node's ability to start, which is not what is in question.
+echo ""
+echo "🚦 Driving ./preview.sh EXC2O 1 --stop against real processes…"
+
+_count_matching() {
+  # Skips its OWN process, which is not a nicety: the needle is on this
+  # counter's command line too, so without it every count reads one too high
+  # and every check in this section fails while the code under test is right.
+  docker exec "$CONTAINER_NAME" python3 -c '
+import os, sys
+needle = sys.argv[1]
+mine = str(os.getpid())
+found = 0
+for entry in os.listdir("/proc"):
+    if not entry.isdigit() or entry == mine:
+        continue
+    try:
+        line = open("/proc/%s/cmdline" % entry, "rb").read().replace(b"\x00", b" ").decode("utf-8", "replace")
+    except OSError:
+        continue
+    if needle in line:
+        found += 1
+print(found)
+' "$1" 2>/dev/null || echo 0
+}
+
+_start_stand_ins() {
+  # Serving this section: caught by the directory on its command line.
+  docker exec -d "$CONTAINER_NAME" sh -c \
+    'exec sh -c "sleep 600" /tmp/quartz-builds/EXC2O/section1/quartz/bootstrap-cli.mjs --serve cq4t-probe-serve-1' \
+    >/dev/null 2>&1
+  # Serving ANOTHER section. Must survive: this is the regression that started
+  # the whole rule — publishing section 2 taking section 1's preview down.
+  docker exec -d "$CONTAINER_NAME" sh -c \
+    'exec sh -c "sleep 600" /tmp/quartz-builds/EXC2O/section2/quartz/bootstrap-cli.mjs --serve cq4t-probe-serve-2' \
+    >/dev/null 2>&1
+  # In this section's folder with NOTHING on its command line to say so —
+  # the `npm install` shape, which only a working-directory sweep can see.
+  docker exec -d -w /tmp/quartz-builds/EXC2O/section1 "$CONTAINER_NAME" sh -c \
+    'exec sh -c "sleep 600" cq4t-probe-cwd' >/dev/null 2>&1
+  sleep 1
+}
+
+# Only section 1, which the cwd stand-in needs for `docker exec -w`. NOT
+# section 2: `build_site.py` skips the scaffold copy whenever the output
+# directory already exists, so an empty one left behind here makes a later
+# `./preview.sh EXC2O 2` fail on a missing bootstrap-cli.mjs — in the very
+# container this script leaves running and invites you to poke at. That is
+# the "litter that reads as a broken toolchain" this section warns about,
+# committed by the section itself.
+docker exec "$CONTAINER_NAME" mkdir -p /tmp/quartz-builds/EXC2O/section1 >/dev/null 2>&1 || true
+_start_stand_ins
+if [[ "$(_count_matching cq4t-probe-serve-1)" == "1" && "$(_count_matching cq4t-probe-cwd)" == "1" \
+      && "$(_count_matching cq4t-probe-serve-2)" == "1" ]]; then
+  pass "three stand-in processes are running in the container"
+else
+  fail "could not start the stand-in processes, so --stop was not exercised"
+fi
+
+./preview.sh EXC2O 1 --stop >/tmp/verify_stop.log 2>&1 || true
+sleep 1
+if [[ "$(_count_matching cq4t-probe-serve-1)" == "0" ]]; then
+  pass "--stop ended this section's preview server"
+else
+  fail "--stop left this section's preview server running"
+  tail -10 /tmp/verify_stop.log
+fi
+if [[ "$(_count_matching cq4t-probe-cwd)" == "0" ]]; then
+  pass "--stop ended a process known only by its working directory"
+else
+  fail "--stop missed a process sitting in the section's folder with nothing on its command line"
+fi
+if [[ "$(_count_matching cq4t-probe-serve-2)" == "1" ]]; then
+  pass "--stop left ANOTHER section's preview alone"
+else
+  fail "--stop took down another section's preview — the regression this rule exists to prevent"
+fi
+
+# ---- The same, against a container that predates the shared rule ----------
+# Stop mode must never build anything, so it runs against whatever container
+# is already there — and right after an upgrade that is one built from the
+# PREVIOUS image, with no stop_preview.py baked in. The launcher therefore
+# pipes the recipe's own copy in over stdin. Naming the baked path instead
+# would fail with a message nobody sees: both callers send this launcher's
+# output to the null device and neither checks its exit code, so the teacher
+# would be told nothing while the build carried on running.
+docker exec "$CONTAINER_NAME" rm -f /opt/scripts/stop_preview.py >/dev/null 2>&1 || true
+_start_stand_ins
+if [[ "$(_count_matching cq4t-probe-serve-1)" == "1" ]]; then
+  ./preview.sh EXC2O 1 --stop >/tmp/verify_stop_old.log 2>&1 || true
+  sleep 1
+  if [[ "$(_count_matching cq4t-probe-serve-1)" == "0" ]]; then
+    pass "--stop still works against a container built before the shared rule existed"
+  else
+    fail "--stop cannot stop anything in a container that predates stop_preview.py"
+    tail -10 /tmp/verify_stop_old.log
+  fi
+else
+  fail "could not restart the stand-in process for the older-container check"
+fi
+
+# Leave the container as it was found: the stand-ins ended, and the file this
+# section deleted from it put back. The container is left running on purpose
+# (the summary tells you so), and handing it on with a hole in /opt/scripts
+# would make the NEXT run's older-container check pass for the wrong reason —
+# and, sooner than that, make an ordinary build fail on `import stop_preview`
+# with an error that reads like a broken toolchain rather than like litter.
+#
+# Children too, not only the marked shells: this image's /bin/sh FORKS
+# `sleep 600` rather than exec'ing it, so each stand-in leaves a child whose
+# own command line carries no marker. Matching on the parent as well is what
+# makes "leaves the container as it found it" true rather than nearly true.
+docker exec "$CONTAINER_NAME" python3 -c '
+import os, signal
+# Skip THIS process. Its own command line carries the marker — the script
+# text is the argument — so without this it marks itself, SIGKILLs itself
+# part-way through, prints nothing and leaves the children it was written to
+# collect. That is exactly what happened, and it is the second time
+# self-matching has bitten in this one section: `_count_matching` above needs
+# the same guard for the same reason. A process scanning for a string it is
+# itself carrying is the shape to watch for here.
+mine = os.getpid()
+marked = set()
+for entry in os.listdir("/proc"):
+    if not entry.isdigit() or int(entry) == mine:
+        continue
+    try:
+        line = open("/proc/%s/cmdline" % entry, "rb").read()
+    except OSError:
+        continue
+    if b"cq4t-probe" in line:
+        marked.add(int(entry))
+doomed = set(marked)
+for entry in os.listdir("/proc"):
+    if not entry.isdigit() or int(entry) == mine:
+        continue
+    try:
+        for row in open("/proc/%s/status" % entry, encoding="utf-8", errors="replace"):
+            if row.startswith("PPid:") and int(row.split()[1]) in marked:
+                doomed.add(int(entry))
+                break
+    except (OSError, ValueError, IndexError):
+        continue
+for pid in doomed:
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
+' >/dev/null 2>&1 || true
+
+docker cp scripts/stop_preview.py "$CONTAINER_NAME:/opt/scripts/stop_preview.py" >/dev/null 2>&1 || true
+if docker exec "$CONTAINER_NAME" test -f /opt/scripts/stop_preview.py 2>/dev/null; then
+  pass "and the container was left as it was found (the rule put back in /opt/scripts)"
+else
+  fail "the container is still missing /opt/scripts/stop_preview.py — the next build in it will fail on an import, which reads as a broken toolchain rather than as this section's litter"
+fi
+
 RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo '(none)')"
 if [[ "$RUNNING_IMAGE" == "$DEV_TEST_IMAGE" ]]; then
   pass "Container '$CONTAINER_NAME' is running from $DEV_TEST_IMAGE"

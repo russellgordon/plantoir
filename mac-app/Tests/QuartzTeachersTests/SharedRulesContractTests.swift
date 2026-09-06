@@ -1032,6 +1032,89 @@ final class SharedRulesContractTests: XCTestCase {
         }
     }
 
+    // MARK: - Stopping a section's preview
+
+    /// The mac app does not implement this rule — it shells out to
+    /// `preview.sh --stop`, and the rule itself lives in
+    /// `scripts/stop_preview.py`, run against these cases by
+    /// `scripts/test_stop_preview.py`. What the mac suite is for here is the
+    /// SHAPE: that the cases exist, that they are well formed, and that the
+    /// launcher on this side still delegates rather than growing a fourth
+    /// copy of the question. The same precedent as `gradedFolders`.
+    func testStopPreviewCasesAreWellFormed() throws {
+        let rule: [String: Any] = try Self.section("stopPreview")
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 23,
+            "the stopPreview case list has lost cases; it is the only gate on a rule that "
+                + "used to be written out three times"
+        )
+        var modesSeen: Set<String> = []
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            let mode: String = try XCTUnwrap(oneCase["mode"] as? String, "\(name) has no mode")
+            modesSeen.insert(mode)
+            XCTAssertNotNil(oneCase["why"] as? String, "\(name) does not say why it exists")
+            let section: [String: Any] = try XCTUnwrap(
+                oneCase["section"] as? [String: Any], "\(name) names no section"
+            )
+            let directories: [String] = try XCTUnwrap(section["directories"] as? [String])
+            XCTAssertFalse(directories.isEmpty, "\(name) gives no build directory")
+            // A blank directory is a prefix of every path, so a case carrying
+            // one would sweep an entire container — that was a real hole in
+            // the rule, found by review. One case tests it ON PURPOSE and
+            // says so in its name; anything else with a blank is a mistake.
+            if !name.contains("blank build directory") {
+                for directory in directories {
+                    XCTAssertFalse(
+                        directory.isEmpty,
+                        "\(name) carries a blank build directory, which matches everything"
+                    )
+                }
+            }
+            // A case that only some platforms can answer must SAY so, and
+            // may name only evidence a platform can genuinely lack.
+            if let needs = oneCase["needsEvidence"] as? [String] {
+                XCTAssertFalse(needs.isEmpty, "\(name) has an empty needsEvidence")
+                for evidence in needs {
+                    XCTAssertEqual(
+                        evidence, "workingDirectory",
+                        "\(name) excuses a runner from '\(evidence)', which every platform "
+                            + "can see; the only evidence a platform genuinely lacks is a "
+                            + "working directory, and Windows is the platform"
+                    )
+                }
+            }
+            let snapshot: [[String: Any]] = try XCTUnwrap(
+                oneCase["snapshot"] as? [[String: Any]], "\(name) has no process snapshot"
+            )
+            XCTAssertFalse(snapshot.isEmpty, "\(name) has an empty snapshot")
+            let pids: Set<Int> = Set(snapshot.compactMap { process in process["pid"] as? Int })
+            XCTAssertEqual(pids.count, snapshot.count, "\(name) reuses a process id")
+            let stops: [Int] = try XCTUnwrap(oneCase["stops"] as? [Int], "\(name) has no verdict")
+            for stopped in stops {
+                XCTAssertTrue(
+                    pids.contains(stopped),
+                    "\(name) expects pid \(stopped) to be stopped and its snapshot has no such process"
+                )
+            }
+        }
+        XCTAssertEqual(
+            modesSeen, ["everything", "servingOnly"],
+            "both questions must be covered: what `--stop` reclaims, and what a build for "
+                + "publishing removes from its own way"
+        )
+    }
+
+    // The launcher's own half of this — that `preview.sh` delegates to the
+    // shared rule, keeps no sweep of its own, and pipes the code in rather
+    // than naming a path baked into the image — is asserted ONCE, in
+    // `scripts/test_stop_preview.py` (`ThereIsOnlyOneCopyOfTheRule`), which
+    // runs in `verify.sh` beside the rule it protects. It was asserted here
+    // too for a while; two gates checking the same three substrings of the
+    // same file is the shape that drifts, and the toolchain's gate is the
+    // right home for a claim about a toolchain file.
+
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
