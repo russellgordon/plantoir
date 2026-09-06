@@ -2865,6 +2865,105 @@ where.
   merges. The stale branch itself (`issue/mac-site-shots-unmerged`) was left
   for Russell to delete rather than deleted here, since deleting a pushed
   branch is his call.
+- ✅ DONE (Windows, 2026-08-22). **A teacher could delete the local
+  assistant's model file from Settings while an assistant window was still
+  using it — fixed by porting the mac's `AssistActivity`/`AssistModelLibrary.
+  mayRemove` guard, which Windows had never actually had despite this file
+  once claiming otherwise.**
+
+  **The report, almost missed.** Russell described watching the assistant
+  keep replying after he deleted its model file from Settings mid-chat, and
+  first read that as the bug — "the assistant still replied, somehow" — before
+  correcting himself to the real question: "you shouldn't be able to delete a
+  model while the AI assistant window that is using it is open, should you?"
+  The reply surviving was not evidence of safety; it was Windows' own file-
+  sharing rules letting a delete succeed while `llama-server.exe` still held
+  the file open, so the CURRENT reply rode out on an already-open handle. The
+  next prompt, a server restart, or a second assistant window opened after
+  the delete would find the weights gone, with nothing telling a teacher why.
+
+  **Root cause: this exact guard was believed to already exist and did not.**
+  The row-313 entry above (2026-08-17) lists "safe model removal (disabled
+  when any assistant window is open)" as done. It was not — confirmed by
+  direct code search before writing a line of the fix: no `AssistActivity`
+  type, no `mayRemove`, nothing tracking which windows were open, anywhere in
+  `windows-app`. `AssistModelStore.Remove()`'s own doc comment said as much in
+  plain words: "Deliberately does no 'is it safe' check — whether it is safe
+  to remove is a question about which windows are open, which this type
+  cannot see." `WINDOWS-HANDOFF.md` had already told a Windows session to
+  port the mac's `AssistActivity` for exactly this reason; it had simply never
+  been done. That row-313 line has been corrected in place above rather than
+  quietly rewritten, so the record shows it was wrong for five days, not that
+  it was always right.
+
+  **What was built, matching the mac's shape with one deliberate
+  difference.** New `Plantoir.Core/Assist/AssistActivity.cs` mirrors the
+  mac's `AssistActivity.swift` — same reasoning in the doc comment, same
+  `Begin`/`End`/naming-the-section-in-the-refusal shape — but tracks a
+  `HashSet<Session>` rather than one active session, because Windows does not
+  (yet) enforce one assistant window at a time the way the mac does. Rejected:
+  adding that one-at-a-time enforcement as part of this fix too, to make the
+  mac's single-`Session?` shape a straight port — out of scope for a bug
+  report about model deletion, and a genuinely bigger, separate feature (its
+  own window-focus/menu-item semantics, not just a data structure). Ported
+  onto `AssistModelStore`: `ReasonItCannotBeRemoved()`/`MayRemove()`, gating
+  `Remove()` itself (not just the UI) so a stale button can't bypass it.
+  `AssistWindow.xaml.cs` claims a session at the top of its async `Begin()`
+  (before the engine is ready — a teacher three minutes into a download still
+  has the assistant "open" as far as this question goes) and releases it
+  unconditionally in `Shutdown()`, matching the mac's `prepare()`/`finish()`
+  placement exactly. `AssistantSettingsDialog.cs` disables Remove with a
+  tooltip and appends the reason to the status line, and now also subscribes
+  to a new `AssistActivity.Changed` event (alongside its existing
+  `AssistModelStores` subscriptions, unsubscribed together in the same
+  `DetachFromStores()`) so the button updates live if an assistant window
+  opens or closes while Settings is already on screen — the mac gets this for
+  free from `@Observable`; WinUI needs the explicit event.
+
+  **Verified by an independent adversarial review** (fresh sub-agent, no
+  memory of this session, told to distrust the description and check the code
+  itself; also rebuilt the solution and re-ran the full suite from scratch).
+  It found no bugs: locking in `AssistActivity` is correct (the event fires
+  outside the lock), every early-return path through `AssistWindow.Begin()`
+  still releases its claim because `End()` is tied to the window's `Closed`
+  event rather than to `Begin()`'s own control flow, `HashSet.Add`/`Remove`
+  are safely idempotent so double-`Begin`/double-`End` cannot corrupt state,
+  the "nothing downloaded yet" case never shows a spurious "close the
+  assistant" message (`IsReady` is checked first), and no other code path in
+  the app deletes the model file or calls `Remove()` outside
+  `AssistantSettingsDialog.cs`.
+
+  **One theoretical gap noted for completeness, not introduced by this
+  change and not blocking.** The set dedups by `(FolderPath, CourseCode,
+  SectionNumber)`, so two `AssistWindow`s open for the exact same section
+  would have the SECOND one's close remove the shared entry and clear the
+  guard while the first is still live. In practice this is already narrowed
+  by the pre-existing `CourseActivity`/`WorkLease` file-lock that blocks a
+  second assistant window on the same section (`SidebarPane.xaml.cs`'s
+  `ReviseWithAi`) — advisory, with its own stated click-time race window, so
+  not airtight — but the mac's own single-`Session?` tracking has the
+  identical theoretical shape if its own one-at-a-time enforcement were ever
+  raced. Left as-is rather than fixed blind: reproducing a genuine same-
+  section double-open race is not something either suite can drive on demand,
+  and the existing WorkLease already carries the real-world risk down to
+  "advisory click-time window," not "routinely happens."
+
+  **Test coverage**: 8 new tests in `AssistModelStoreTests.cs` — sharing/
+  disk-state coverage already existed; new tests cover `MayRemove`/
+  `ReasonItCannotBeRemoved` with no assistant open, with one open (blocking
+  removal and naming the section), release-on-`End`, a rung not currently in
+  use still being blocked by ANY open assistant (matching the mac's "any
+  open, not which rung" rule), and the not-downloaded case not producing a
+  reason. `AssistActivity.Reset()` added to the test's setup/teardown
+  alongside the existing `AssistModelStores.Reset()`, in the same
+  `SharedLocalModelState` collection (`DisableParallelization = true`) —
+  process-wide state, one test class touches it, already serialized. Full
+  suite: 627 tests, 627 passed (up from 620).
+
+  Reference: `Plantoir.Core/Assist/AssistActivity.cs` (new),
+  `AssistModelStore.cs`, `Plantoir/Views/AssistWindow.xaml.cs`,
+  `Plantoir/Views/AssistantSettingsDialog.cs`, `AssistModelStoreTests.cs`.
+  Mac reference: `AssistActivity.swift`, `AssistModelLibrary.swift:200-245`.
 
 - ✅ DONE (Windows, 2026-08-22). **The Settings window's Download button did
   nothing at all — fixed by porting the mac's shared-store architecture, not
@@ -3447,7 +3546,7 @@ where.
   3. **Assistant Choice & Settings Panel (`AssistantSettingsDialog`)**:
      - "Before it changes your pages" toggle + small assistant caution.
      - "Which assistant runs on this PC" (automatic, smaller, larger) with hardware budget memory derivation and cautions.
-     - "On this PC" housekeeping list with download status, download trigger, and safe model removal (disabled when any assistant window is open).
+     - "On this PC" housekeeping list with download status and a download trigger. **Correction (2026-08-22): "safe model removal (disabled when any assistant window is open)" was NOT actually true as of this 2026-08-17 entry** — the Remove button deleted the file unconditionally, with no guard of any kind. It was fixed for real on 2026-08-22; see that entry below for what shipped and why this line was wrong for five days without anyone noticing, which is itself the argument for writing "not yet done" rather than describing the intended end state as if it already existed.
      - Connected to `AppSettings` and `MainWindow` menu (`File -> Settings…` / `Ctrl+,`).
   4. **Curriculum Coverage Map & Notes Toggles (Row 130 parity)**:
      - Added `include_curriculum_coverage` and `include_coverage_notes` per-section configuration accessors and `CoverageNotesEnabled` pure rule to `CourseConfiguration.cs`.
