@@ -157,6 +157,13 @@ public static class CourseArchiver
                                      coursesDirectory, course.Code);
         if (Directory.Exists(sectionDir)) CourseRestorer.DeleteTree(sectionDir);
         DiscardBuilds(coursesDirectory, course.Code, sectionNumber);
+        // A scheduled deploy for a section that no longer exists cannot do
+        // anything useful, and left alone it wakes up nightly to fail. Taking
+        // the section's number out of the configuration is what makes the
+        // launcher ask "Continue anyway?" about it, so this is also the other
+        // half of the reason the wrapper runs non-interactively.
+        Plantoir.Core.Assist.TaskScheduling.Cancel(
+            Plantoir.Core.Assist.TaskScheduling.NameFor(course.Code, sectionNumber));
         var remaining = course.Configuration.SectionNumbers.Where(n => n != sectionNumber).ToList();
         course.Configuration.SetSectionNumbers(remaining);
         course.Configuration.Write(course.ConfigFilePath);

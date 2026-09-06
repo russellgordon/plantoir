@@ -745,14 +745,8 @@ public sealed partial class SectionDetailView : UserControl
             // until 2026-09-06 nothing in the app could, so this asked about
             // <course>\.merged_output, which Windows stopped writing to when
             // builds moved out of the working folder.
-            // Not knowing means BUILDING. Every uncertainty here resolves
-            // towards the rebuild: the cost of an unnecessary one is a minute,
-            // and the cost of skipping a necessary one is a teacher's site
-            // showing last week's pages.
-            bool needsBuild = true;
-            if (_window.Workspace.WorkspacePath is { } buildsFolder)
-                needsBuild = BuildFreshness.NeedsRebuild(
-                    _course, _sectionNumber, BuildOutputLocation.BuildsRootFor(buildsFolder));
+            bool needsBuild = BuildFreshness.NeedsRebuild(
+                _course, _sectionNumber, BuildOutputLocation.BuildsRootFor(workspacePath));
 
             // The publish is on the books for its WHOLE life — the quiet build
             // included — and comes off them on every exit path: the normal

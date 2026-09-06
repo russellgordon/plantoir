@@ -200,4 +200,24 @@ public class BuildOutputLocationTests : IDisposable
         // Nothing has been built where Windows actually builds, so: rebuild.
         Assert.True(BuildFreshness.NeedsRebuild(course, 1, _buildsRoot));
     }
+
+    [Fact]
+    public void ACourseCalledWorkCannotDeleteEveryCoursesWorkspace()
+    {
+        // builds\{id}\work holds EVERY course's build workspace, so a course code
+        // of "work" makes ForCourse resolve to that shared directory. Deleting
+        // it would pull the ground from under every other course's preview.
+        // Windows filesystems are case-insensitive, so "WORK" is the same
+        // collision. The layout clash is older than this file - the Python has
+        // it too - but nothing DELETED by that path until now.
+        MakeBuild("ADA1O", 1);
+        Directory.CreateDirectory(Path.Combine(_buildsRoot, "work", "ICS3U", "section1"));
+
+        BuildOutputLocation.DiscardBuildsFor(_buildsRoot, "work");
+        BuildOutputLocation.DiscardBuildsFor(_buildsRoot, "WORK");
+        BuildOutputLocation.DiscardBuildsFor(_buildsRoot, "Work", 1);
+
+        Assert.True(Directory.Exists(Path.Combine(_buildsRoot, "work", "ICS3U", "section1")));
+        Assert.True(Directory.Exists(BuildOutputLocation.WorkspaceForSection(_buildsRoot, "ADA1O", 1)));
+    }
 }

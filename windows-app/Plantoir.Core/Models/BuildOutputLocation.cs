@@ -121,6 +121,7 @@ public static class BuildOutputLocation
     /// </summary>
     public static void DiscardBuildsFor(string buildsRoot, string courseCode)
     {
+        if (WouldCollideWithEveryCourse(courseCode)) return;
         Discard(ForCourse(buildsRoot, courseCode));
         Discard(WorkspaceForCourse(buildsRoot, courseCode));
     }
@@ -131,9 +132,30 @@ public static class BuildOutputLocation
     /// </summary>
     public static void DiscardBuildsFor(string buildsRoot, string courseCode, int sectionNumber)
     {
+        if (WouldCollideWithEveryCourse(courseCode)) return;
         Discard(ForSection(buildsRoot, courseCode, sectionNumber));
         Discard(WorkspaceForSection(buildsRoot, courseCode, sectionNumber));
     }
+
+    /// <summary>
+    /// The one course code that must never be discarded by name.
+    ///
+    /// <para><c>builds\{id}\work</c> holds EVERY course's build workspace, so
+    /// a course code of "work" makes <see cref="ForCourse"/> resolve to that
+    /// shared directory — and deleting it would pull the ground from under
+    /// every other course's preview. Windows filesystems are
+    /// case-insensitive, so "Work" and "WORK" are the same collision.</para>
+    ///
+    /// <para>The layout collision itself is older than this file and lives in
+    /// the Python too (<c>toolchain_paths.merged_output_root</c> uses the
+    /// course directory's name), but nothing DELETED by that path until now.
+    /// Refusing here is the cheap half; the naming is recorded for the mac in
+    /// MAC-HANDOFF.</para>
+    /// </summary>
+    private const string WorkspaceDirectoryName = "work";
+
+    private static bool WouldCollideWithEveryCourse(string courseCode) =>
+        courseCode.Equals(WorkspaceDirectoryName, StringComparison.OrdinalIgnoreCase);
 
     private static void Discard(string directory)
     {
