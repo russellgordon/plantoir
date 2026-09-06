@@ -409,23 +409,25 @@ rather than being deleted.
 > manual. A change that creates an obligation for the other platform and does
 > not list it has, from their side, not been handed over at all.
 
-- ⚠️ **A COURSE CODE OF "work" COLLIDES WITH THE BUILD WORKSPACE, on both
-  platforms** (found on Windows, 2026-09-06). `builds/{id}/work/{COURSE}` holds
-  every course's build workspace, so a course whose CODE is "work" resolves to
-  that shared directory. Nothing validated against it: `CourseCodeValidator`
-  accepts any letters and digits up to twelve characters, and the Python has
-  the same shape — `toolchain_paths.merged_output_root` builds from the course
-  directory's name.
+- ⚠️ **A COURSE CODE OF "work" COLLIDES WITH THE BUILD WORKSPACE — on WINDOWS
+  only; the mac has no such directory** (found on Windows, 2026-09-06).
+  Corrected the same day: an earlier version of this entry said "on both
+  platforms" and sent nobody anywhere useful, because the colliding folder is
+  created by the Windows launchers alone. `preview.ps1` and `deploy.ps1` set
+  `PLANTOIR_WORK_DIR` to `<buildRoot>\work`; `preview.sh` never sets it, so
+  the Python falls back to `/tmp/quartz-builds` and the mac's builds folder
+  holds only `<CODE>` directories and `working-folder.txt`. **There is nothing
+  for a mac session to look for.**
 
-  Harmless until something DELETES by that path, which Windows now does when a
-  course is archived or restored. Windows refuses the name at the point of
-  deletion (`BuildOutputLocation.WouldCollideWithEveryCourse`) and that is the
-  cheap half. **The naming problem itself is shared and unfixed**: a teacher
-  can still create a course called "work" on either platform and have its
-  build workspace land on top of everybody else's. Worth deciding whether the
-  right answer is a reserved-name refusal in the wizard (both apps), a
-  different layout, or leaving it and documenting it — but it should be a
-  decision rather than an accident.
+  Windows now refuses to DELETE by that path
+  (`BuildOutputLocation.WouldCollideWithEveryCourse`), which is the cheap
+  half. **What IS shared is only the naming**: neither `CourseCodeValidator`
+  (Windows — letters, digits, spaces and dashes, up to twelve characters) nor
+  the mac's `CourseCodeRule` reserves the name, so a teacher can create a
+  course called "work" on either platform. On the mac that is harmless today;
+  it stops being harmless the moment anything there adopts a `work` sibling.
+  Worth a shared decision — a reserved-name refusal in both wizards, or a
+  deliberate "we accept this" — rather than leaving it to be rediscovered.
 
 - ⚠️ **DO NOT TELL ANYONE TO FIX A CREDENTIAL WITH `cmdkey` — Plantoir cannot
   read what it writes** (Windows, 2026-09-06). Awareness rather than work, but
@@ -438,10 +440,13 @@ rather than being deleted.
 
   Met twice in one evening: a Cloudflare token stored with `cmdkey` was
   ignored by the launcher, and the machine's stored Cloudflare ACCOUNT ID had
-  evidently been written the same way long ago, so `ReadSecret` returned null
-  and the launcher asked for it. The fix is to write through the launcher's
-  own `CredApi`. If the mac ever documents credential recovery for Windows —
-  or a support note does — this is the trap.
+  evidently been written the same way long ago. Precisely: `ReadSecret`
+  returns null only when `CredRead` fails or the blob is empty — a UTF-16 blob
+  decodes instead into a NUL-riddled string, which is not the token and does
+  not authenticate. Either way the teacher is asked for a credential that is
+  already stored, with nothing to say so. The fix is to write through the
+  launcher's own `CredApi`. If the mac ever documents credential recovery for
+  Windows — or a support note does — this is the trap.
 
 - ⚠️ **TWO CONTRACT SENTENCES SAY "on your Mac" AND ARE SHOWN TO WINDOWS
   TEACHERS TOO** (Windows, 2026-09-06). `specialNames.renameFolder.explanation`
@@ -2213,13 +2218,19 @@ where.
   CLAUDE.md warns about this derivation by name. `FolderIdentifier` was
   extracted from it instead — which is what the mac did too.
 
-  **What the mac may want to check.** Windows clears a course's build at FIVE
-  moments (archive a course, archive a section, restore a section, restore a
-  course, restore a backup) because it has no symlink to make "a build nothing
-  points at is not adopted" work. On the mac the link rule covers some of
-  those only incidentally — a whole-course `Restore` and a `RestoreBackup` are
-  caught because the link goes with the folder, not because anything decided
-  they should be. Worth confirming that is true rather than lucky.
+  **Nothing for the mac to check here** — and an earlier version of this entry
+  wrongly asked it to. Windows clears a course's build at FIVE moments
+  (archive a course, archive a section, restore a section, restore a course,
+  restore a backup) because it has no symlink. The mac already clears
+  explicitly at four of them (`CourseArchiver.archive` for a course and for a
+  section, `CourseRestorer` for a section from an archive and from a backup),
+  and the two whole-course cases are covered by a rule that NAMES them:
+  `BuildOutputLocation.ensureLink`'s own comment says "archiving a course,
+  restoring one from a backup and replacing a course's contents all remove the
+  link… so a build folder found with no link pointing at it is cleared rather
+  than adopted". That is a decision with its reasoning written down, not luck,
+  and asking a mac session to "confirm" it would send them to re-derive
+  something already settled.
 
   **A scheduled deploy had no build step**, which is a Windows-only gap the
   mac closed long ago in its launchd script. Fixed by building
@@ -2241,7 +2252,7 @@ where.
   `FolderContainers.FolderIdentifier`, `BuildFreshness.NeedsRebuild(course,
   section, buildsRoot)`, `CourseArchiver.DiscardBuilds`, `CourseRestorer`,
   `Assist/TaskScheduling.WriteWrapperScript`, `verify-deploy.ps1`. Tests:
-  `BuildOutputLocationTests` (15, including the contract's five
+  `BuildOutputLocationTests` (14, including the contract's five
   `buildFreshness` rules, never run on Windows before), `BuildFreshnessTests`
   repointed, `TaskSchedulingTests`.
 

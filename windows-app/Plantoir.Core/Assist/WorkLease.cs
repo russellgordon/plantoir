@@ -10,7 +10,7 @@ namespace Plantoir.Core.Assist;
 /// Plantoir and the MCP server are separate processes with separate memory.
 /// Preview leases and publish records live inside the app; an assist session
 /// lives inside the server. Neither can see the other, and both build into
-/// <c>.merged_output/section&lt;N&gt;/</c> — which the build CLEARS before
+/// the section's build folder (see <c>BuildOutputLocation</c>; NOT <c>.merged_output</c>, which Windows stopped writing to in row 290) — which the build CLEARS before
 /// writing it. So the loser of a race serves a half-written site, or publishes
 /// files the other just deleted.
 ///
@@ -42,7 +42,7 @@ public static class WorkLease
     ///
     /// The other three kinds say what somebody is DOING; this one says what
     /// they are doing that clashes. Both a build and a rebuild write into
-    /// <c>.merged_output/section&lt;N&gt;/</c>, which the build clears first,
+    /// the section's build folder (see <c>BuildOutputLocation</c>; NOT <c>.merged_output</c>, which Windows stopped writing to in row 290), which the build clears first,
     /// so two at once lose each other's work. Nothing else conflicts: editing
     /// Markdown does not touch that folder, and a preview SERVER only reads it.
     ///

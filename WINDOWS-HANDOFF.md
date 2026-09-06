@@ -481,7 +481,7 @@ this side is expected to say so when the contract is wrong.
    index, and re-check badge contrast on a highlighted row) apply whether you
    end up hand-building or wiring the real control's template.
 
-10. ~~Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check~~ — ✅ Done, merged to `dev` 2026-09-06 (`GradedFolderRule.cs`, `SiteHealthFinding.cs`; GUI-IMPROVEMENTS rows 411-414).
+10. ~~Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check~~ — ✅ Done, merged to `dev` 2026-09-06 (`GradedFolderRule.cs`, `SiteHealthFinding.cs`; GUI-IMPROVEMENTS rows 411-414). **PARSING AND THE TRAIL ONLY.** The bullet below says Windows "displays the contract-authored sentence and detail" — it does not. `ScriptRunner.HealthFindings` is the seam a front end would attach to, and that front end is item 21, which is not built. (Item 21 refers to "the correction in item 10"; this is it.)
     - **`setup_course.py:graded_folders_for` reconciliation** — When a new
       course is created, `graded_folders_for` now checks the declared pool
       against the actual folder lists (`shared_folders` +
@@ -693,9 +693,10 @@ this side is expected to say so when the contract is wrong.
     unplugged drive letter, and for a OneDrive on-demand folder, and clearing
     a build because a USB stick was unplugged would be worse than the litter.
     The cheapest home for the marker itself is the launchers'
-    `Enter-NativeRuntime`, which already holds `$WORKDIR_PHYSICAL` and creates
-    the folder — one `Set-Content` there and the app never needs the hash to
-    write it.
+    `Enter-NativeRuntime`, which already holds `$WORKDIR_PHYSICAL` — but note
+    it only sets environment variables and does NOT create the builds folder
+    (the Python's `mkdir` does, later), so a bare `Set-Content` there fails on
+    a first run. `New-Item -ItemType Directory -Force` first, then write.
 
     **Two things found while doing the first half, both now fixed, both worth
     knowing because they are the same shape:** `BuildFreshness` was reading
@@ -998,6 +999,26 @@ this side is expected to say so when the contract is wrong.
     building is told nothing** — which is the exact failure the whole feature
     was written to end. The trail line is a diagnosis after the fact, not a
     warning at the time.
+
+22. **The "Folders Plantoir uses" sheet (mac row 361, 2026-08-23) — NEVER
+    PORTED, and it was in no list until 2026-09-06.** The mac's Course
+    Settings has a sheet explaining which folders Plantoir treats specially
+    and why (`Views/CourseSettings/SpecialFoldersHelpView.swift`, opened from
+    `CourseSettingsView.swift`). Nothing on this side has it: no
+    `SpecialFolderEntry`, no `SpecialFoldersHelp`, no such string anywhere in
+    `windows-app/`.
+
+    **How it went missing is the useful part.** Items 10-12 were scoped as
+    "special folders hardening, pieces 1-3", and this sheet was step 6 of the
+    EARLIER piece — so it fell in the gap between two scopings and appeared in
+    neither the outstanding list nor `WINDOWS-HANDOFF-COMPLETED.md`. Found by
+    an adversarial documentation review on 2026-09-06 that was asked whether
+    the list was COMPLETE rather than whether it was correct. Row 361's own
+    "Notes for Windows port" column says "Worth copying wholesale".
+
+    Medium. It is a teacher-facing explanation, so the wording matters more
+    than the mechanism.
+
 
 **Everything else this section used to list as an ordered work plan —
 contracts wiring, the approval wording, the deploy/preview race, the activity
