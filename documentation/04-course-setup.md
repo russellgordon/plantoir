@@ -285,8 +285,8 @@ that is not there simply contributes nothing.
 
 | What | Where the name comes from |
 |---|---|
-| The lessons folder | Every per-section folder the build counts as a class folder — the recorded `class_folder`, plus any whose name mentions classes. New class pages are written to one; the coverage map counts all of them. |
-| The curriculum folder | `curriculum_folder` if it names a folder the course has, otherwise the alphabetically first shared folder whose name mentions the curriculum. |
+| The lessons folder | Every per-section folder the build counts as a class folder — the recorded `class_folder`, plus any whose name mentions classes; failing both, the guess described in [`08`](08-course-config-reference.md). New class pages are written to one; the coverage map counts all of them. |
+| The curriculum folder | `curriculum_folder` if it names a folder the course has, otherwise the alphabetically first shared folder whose name mentions the curriculum. The BUILD asks one thing more than either app can see from configuration: the folder must actually hold a page carrying an expectation code. |
 | The folders that count for marks | `graded_folders`, or — for a course never asked — every folder whose name contains "task". An ABSENT key and an EMPTY list are different answers; see [`08-course-config-reference.md`](08-course-config-reference.md). |
 | `Media` | Managed by the build and kept out of the sidebar. |
 | `index.md` | The page a folder opens on, in every section and every folder. |
@@ -303,11 +303,14 @@ that sheet are deliberate and easy to undo by accident:
   them to get creative with it and turns an implementation detail into a
   promise the product then has to keep. This is also why the sheet is
   per-course rather than one static help page — the answers genuinely differ.
-- **The names come from the RESOLVED rules, not the raw configuration keys.**
-  A course whose `curriculum_folder` was never written still has a curriculum
-  folder as far as the build is concerned, and telling that teacher to create
-  one they already have is the one failure a sheet about folder names cannot
-  afford.
+- **The names must come from the RESOLVED rules, not the raw configuration
+  keys.** A course whose `curriculum_folder` was never written still has a
+  curriculum folder as far as the build is concerned, and telling that teacher
+  to create one they already have is the one failure a sheet about folder names
+  cannot afford. **Windows does this; the mac reads the raw key and is owed the
+  change** — two contract cases are proposed for it, and
+  [`MAC-HANDOFF.md`](../MAC-HANDOFF.md) says what it costs (one line: it
+  already has the function).
 
 The rows, the sentences and the cases are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →

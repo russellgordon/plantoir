@@ -3,9 +3,10 @@
   <!--
     Drives the REAL built Plantoir.exe through UI Automation.
 
-    In the solution so it always COMPILES — compile-rot is what actually kills
-    a suite nothing builds — but every test carries [UiFact], which skips
-    unless PLANTOIR_UI_TESTS=1. So a bare `dotnet test` builds these and runs
+    In the solution so a SOLUTION build compiles it — compile-rot is what
+    actually kills a suite nothing builds, though note the per-project commands
+    used day to day do not build this one — and every test carries [UiFact],
+    which skips unless PLANTOIR_UI_TESTS=1. So a bare `dotnet test` builds these and runs
     none of them, and running them is a deliberate act: `run-ui-tests.ps1`.
 
     Why it cannot live in Plantoir.Tests: that project is net9.0 and cannot
