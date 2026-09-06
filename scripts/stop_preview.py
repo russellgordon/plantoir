@@ -36,15 +36,24 @@ container built from an older image, and coupling it to a file baked into the
 image would give it a second way to fail at the worst moment.
 
 What is deliberately NOT shared, because it is platform mechanics rather than
-the rule: how the process list is obtained (`/proc` here, `Win32_Process` on
-native Windows) and how a process is ended (ask-then-insist here, since POSIX
-has SIGTERM; `Stop-Process -Force` there, since Windows has no equivalent).
+the rule: how the process list is obtained (`/proc` on Linux and inside the
+container, `Win32_Process` via PowerShell on native Windows) and how a process
+is ended (ask-then-insist on POSIX, since it has SIGTERM; a single
+`TerminateProcess` on Windows, which has no equivalent to ask with).
+
+Both snapshots are read HERE, so every caller of the rule gets the right one
+for the platform it is on. That was not true until 2026-09-05: `/proc` was the
+only reader, so on native Windows the list came back empty and
+`build_site.py`'s own `stop_preview_serving()` stopped nothing — leaving the
+overwrite race it exists to close wide open on that platform. See
+WINDOWS-HANDOFF.md item 20.
 """
 
 import argparse
 import json
 import os
 import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -335,10 +344,14 @@ def pids_to_stop(snapshot, directories, course=None, section=None,
 def read_proc_snapshot(proc_root: Path = Path("/proc")) -> list:
     """
     The process list from `/proc`, which exists wherever this runs on the mac
-    (inside the container) and on Linux. Natively on Windows there is no
-    `/proc` and this returns nothing, so every caller becomes a no-op rather
-    than an error — the shape `kill_existing_quartz` already has there without
-    `lsof`. Windows reads `Win32_Process` in `preview.ps1` instead.
+    (inside the container) and on Linux. Where there is no `/proc` this
+    returns nothing rather than raising — the shape `kill_existing_quartz`
+    already has without `lsof`.
+
+    POSIX ONLY, and deliberately so even on Windows: `read_snapshot()` is the
+    platform dispatcher, and this stays a pure function of `proc_root` so that
+    a caller (a test, most of all) can hand it a directory that does not exist
+    and get a no-op on every platform.
     """
     if not proc_root.is_dir():
         return []
@@ -376,23 +389,152 @@ def read_proc_snapshot(proc_root: Path = Path("/proc")) -> list:
     return snapshot
 
 
+def read_windows_snapshot(timeout: float = 15.0) -> list:
+    """
+    The process list on native Windows, via `Get-CimInstance Win32_Process`.
+
+    Windows has no `/proc`, and the one field the rule would most like — the
+    working directory — is not exposed by `Win32_Process` at all. That costs
+    nothing for the question this reader exists to answer: `servingOnly` never
+    consults `cwd` (see `process_matches`), because a build of this section
+    sits in this section's directory too. The contract records the gap, and
+    the cases that genuinely need that evidence say so in `needsEvidence`.
+
+    Five details here are each a way this could silently return nothing, which
+    is the failure that matters: a sweep that stops nothing looks exactly like
+    a sweep that had nothing to stop.
+
+    * **UTF-8 out of PowerShell, explicitly.** The default is the OEM code
+      page, so a teacher whose user folder is named José gets one byte 0x82
+      where the accent belongs: either a `UnicodeDecodeError`, or — worse,
+      with `errors="replace"` — a path that then never matches the section's
+      build directory, so nothing is ever stopped for that teacher and
+      nothing errors. Measured on Windows 11 26200 before writing this.
+    * **A full path to `powershell.exe`**, from `%SystemRoot%`, falling back
+      to the bare name. `CreateProcess` searches `System32` before `PATH`, so
+      the bare name works today from every caller, but this runs during a
+      publish and a publish should not depend on a `PATH` it did not set.
+    * **`-InputObject @(...)`**, because `ConvertTo-Json` given exactly one
+      process emits an object rather than an array (PowerShell 5.1 has no
+      `-AsArray`), and a machine with exactly one matching process is not the
+      machine anyone tests on.
+    * **stdin closed, and a timeout.** This runs under ConPTY when the app
+      drives it; a child that reads stdin, or a wedged WMI, would otherwise
+      hang the publish rather than delay it. On timeout it returns nothing
+      and says so — a publish that races is better than a publish that never
+      finishes, and the caller then writes no trail line, which is honest.
+    * **`CommandLine` is null for system processes**, and becomes `""`.
+    """
+    if os.name != "nt":
+        return []
+    query = ("[Console]::OutputEncoding=[Text.UTF8Encoding]::new(); "
+             "ConvertTo-Json -Compress -Depth 3 -InputObject @("
+             "Get-CimInstance Win32_Process | "
+             "Select-Object ProcessId,ParentProcessId,Name,CommandLine)")
+    powershell = "powershell.exe"
+    system_root = os.environ.get("SystemRoot") or os.environ.get("SYSTEMROOT")
+    if system_root:
+        full = Path(system_root) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+        if full.exists():
+            powershell = str(full)
+    try:
+        finished = subprocess.run(
+            [powershell, "-NoProfile", "-NonInteractive", "-Command", query],
+            stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout)
+    except (subprocess.TimeoutExpired, OSError) as error:
+        print(f"WARNING: could not read the list of running processes ({error}); "
+              f"nothing was stopped.")
+        return []
+    if finished.returncode != 0:
+        print("WARNING: could not read the list of running processes; nothing was stopped.")
+        return []
+    try:
+        listed = json.loads(finished.stdout.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        print("WARNING: could not read the list of running processes; nothing was stopped.")
+        return []
+
+    snapshot = []
+    for process in listed:
+        pid = process.get("ProcessId")
+        if pid is None:
+            continue
+        snapshot.append({
+            "pid": int(pid),
+            "ppid": int(process.get("ParentProcessId") or 0),
+            "name": process.get("Name") or "",
+            "commandLine": process.get("CommandLine") or "",
+            # Win32_Process has no working directory to give.
+            "cwd": "",
+        })
+    return snapshot
+
+
+def read_snapshot(proc_root=None) -> list:
+    """
+    The process list, from wherever this platform keeps it.
+
+    THE dispatcher: every caller that wants "the processes running right now"
+    comes through here, so a platform that reads its list a different way is a
+    change in one place rather than a rule that quietly does nothing there.
+    Until 2026-09-05 there was no dispatcher, `/proc` was the only reader, and
+    that is exactly how native Windows ended up running a rule that always
+    answered "nothing".
+
+    `proc_root` is for callers that mean `/proc` specifically — the container,
+    and the tests. Passing it explicitly keeps the POSIX reader's purity, so a
+    test can hand over a directory that does not exist and get a no-op on any
+    platform.
+    """
+    if proc_root is not None:
+        return read_proc_snapshot(proc_root)
+    if os.name == "nt":
+        return read_windows_snapshot()
+    return read_proc_snapshot()
+
+
+def stop_one(pid: int) -> bool:
+    """
+    End one process, in whatever way this platform has. True if it was asked.
+
+    Windows has no signal to ask with: `os.kill` there is `TerminateProcess`
+    whatever signal number it is handed, so this asks once and it is over.
+    Its errors are NOT the POSIX ones either — a pid that has already gone
+    raises a plain `OSError` (`[WinError 87]`, "the parameter is incorrect"),
+    never `ProcessLookupError`, so catching only the POSIX pair would let a
+    preview that exited between the snapshot and the kill take a publish down
+    with a traceback. Verified on Windows 11 26200.
+    """
+    try:
+        os.kill(pid, signal.SIGTERM)
+        return True
+    except OSError:
+        return False
+
+
 def stop_pids(pids, insist_after: float = 1.0) -> int:
     """
     Ask, then insist. SIGTERM lets a node server close its sockets and a
     Python driver run its own cleanup; SIGKILL a second later is for whatever
     ignored it.
 
-    Windows does this differently (`Stop-Process -Force`) because it has no
-    SIGTERM to send, and that difference is recorded in the contract rather
-    than papered over: the RULE is which processes, not how they end.
+    Windows does this differently because it has nothing to ask WITH: there is
+    no SIGTERM, `os.kill` is `TerminateProcess` whatever it is handed, and so
+    the first ask is already final. It therefore skips the wait and the second
+    pass entirely — a second spent sleeping between two identical kills is a
+    second in which a preview's sync watcher can overwrite the build this was
+    called to protect. `signal.SIGKILL` does not even EXIST on Windows, so the
+    old second pass would have raised `AttributeError` the moment the snapshot
+    there stopped coming back empty. That difference is recorded in the
+    contract rather than papered over: the RULE is which processes, not how
+    they end.
     """
     asked = []
     for pid in pids:
-        try:
-            os.kill(pid, signal.SIGTERM)
+        if stop_one(pid):
             asked.append(pid)
-        except (ProcessLookupError, PermissionError):
-            continue
+    if os.name == "nt":
+        return len(asked)
     if asked:
         time.sleep(insist_after)
     for pid in asked:
@@ -404,9 +546,16 @@ def stop_pids(pids, insist_after: float = 1.0) -> int:
 
 
 def stop_section(directories, course=None, section=None, mode: str = MODE_EVERYTHING,
-                 proc_root: Path = Path("/proc")) -> list:
-    """Read the process list, apply the rule, stop what it names."""
-    snapshot = read_proc_snapshot(proc_root)
+                 proc_root=None) -> list:
+    """
+    Read the process list, apply the rule, stop what it names.
+
+    `proc_root` defaults to None rather than to `/proc` so that this asks
+    `read_snapshot` for the RIGHT list on whatever platform it is running on.
+    A caller that means `/proc` specifically still says so, and a test that
+    passes a directory which does not exist still gets a no-op everywhere.
+    """
+    snapshot = read_snapshot(proc_root)
     if not snapshot:
         return []
     pids = pids_to_stop(
