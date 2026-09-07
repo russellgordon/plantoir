@@ -25,6 +25,7 @@
         </Grid.KeyboardAccelerators>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -61,9 +62,31 @@
         </MenuBar>
 
         <!-- The picker replaces the ENTIRE content area, sidebar included. -->
-        <views:WorkspacePickerView x:Name="Picker" Grid.Row="1" Visibility="Collapsed" />
+        <!-- A restored working folder that a cloud service keeps in sync. A row
+             of its own under the menu bar, ABOVE the content: the content row
+             is the star-sized one, so it absorbs the notice's height and the
+             path bar can never be pushed off screen (the mac's inline-banner
+             regression), and nothing is drawn over the section toolbar (which
+             an overlay would have covered). Dismissable; never a dialog. -->
+        <InfoBar x:Name="SyncNotice" Grid.Row="1" Margin="12,8,12,0"
+                 IsOpen="False" Severity="Informational" IsClosable="True"
+                 Closed="SyncNotice_Closed"
+                 AutomationProperties.AutomationId="syncedFolderNotice">
+            <InfoBar.ActionButton>
+                <Button x:Name="SyncNoticeDetailsButton" Click="SyncNoticeDetails_Click"
+                        AutomationProperties.AutomationId="syncedFolderNoticeDetails" />
+            </InfoBar.ActionButton>
+            <StackPanel Spacing="8" Margin="0,4,0,8">
+                <StackPanel x:Name="SyncNoticeDetails" Visibility="Collapsed" Spacing="6" />
+                <Button x:Name="SyncNoticeDismissButton" Click="SyncNoticeDismiss_Click"
+                        HorizontalAlignment="Left"
+                        AutomationProperties.AutomationId="syncedFolderNoticeDismiss" />
+            </StackPanel>
+        </InfoBar>
 
-        <Grid x:Name="SplitView" Grid.Row="1" Visibility="Collapsed">
+        <views:WorkspacePickerView x:Name="Picker" Grid.Row="2" Visibility="Collapsed" />
+
+        <Grid x:Name="SplitView" Grid.Row="2" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="230" MinWidth="180" />
                 <ColumnDefinition Width="*" />
@@ -76,7 +99,7 @@
 
         <!-- Working-folder path bar, under the detail content — where the
              file manager puts its own. -->
-        <Grid x:Name="PathBar" Grid.Row="2" Visibility="Collapsed"
+        <Grid x:Name="PathBar" Grid.Row="3" Visibility="Collapsed"
               Background="{ThemeResource LayerOnMicaBaseAltFillColorDefaultBrush}"
               BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0"
               Padding="8,4" ColumnSpacing="8" Height="40">
