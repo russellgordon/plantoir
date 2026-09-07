@@ -29,7 +29,8 @@ public static class SkeletonCatalog
         IReadOnlyList<string> PerSectionFolders,
         IReadOnlyList<string> PerSectionFiles,
         IReadOnlyList<string> Hidden,
-        IReadOnlyList<string> Expandable
+        IReadOnlyList<string> Expandable,
+        IReadOnlyList<string> GradedFolders
     );
 
     /// <summary>
@@ -101,7 +102,8 @@ public static class SkeletonCatalog
                 PerSectionFolders: List("per_section_folders"),
                 PerSectionFiles: List("per_section_files"),
                 Hidden: List("hidden"),
-                Expandable: List("expandable")
+                Expandable: List("expandable"),
+                GradedFolders: List("graded_folders")
             );
         }
         catch
@@ -113,6 +115,22 @@ public static class SkeletonCatalog
     /// <summary>
     /// Every bundled family name.
     /// </summary>
+    /// <summary>
+    /// Which of a skeleton's folders count for marks when the wizard adopts
+    /// it. The manifest's own <c>graded_folders</c> when it names any;
+    /// otherwise every folder whose name contains "task", which is the rule
+    /// the build applied before the key existed. Mirrors the mac's
+    /// <c>adoptSkeletonStructure()</c> exactly, so the same code opens with
+    /// the same marks pool on both platforms.
+    /// </summary>
+    public static List<string> AdoptedGradedFolders(Family family)
+    {
+        if (family.GradedFolders.Count > 0) return family.GradedFolders.ToList();
+        return family.SharedFolders.Concat(family.PerSectionFolders)
+            .Where(folder => folder.Contains("task", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
     public static IReadOnlyList<string> EveryFamilyName(string skeletonsRoot)
     {
         string mapPath = Path.Combine(skeletonsRoot, "families.json");
