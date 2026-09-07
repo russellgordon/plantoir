@@ -12,10 +12,13 @@ import Foundation
 /// never NAMED by the model, so they are not put in front of it.
 ///
 /// **Keep these three numbers right.** They are 22, 13 and 9 as this is
-/// written, pinned by `AssistToolRunnerTests` and
-/// `AssistCurriculumMentionsTests`, and they were 20, 13 and 7 in this comment
-/// for long enough that the same stale figure reached `CLAUDE.md` and two
-/// documents. A count nobody can check is a count that gets quoted.
+/// written. 22 and 13 are PINNED — `AssistCurriculumMentionsTests` and
+/// `AssistToolRunnerTests` both assert them, so those two cannot rot silently.
+/// **9 is not pinned by anything**; it is 22 minus 13 and it has to be kept by
+/// hand, which is why it was wrong here. They read 20, 13 and 7 for long
+/// enough that the stale figure reached `CLAUDE.md`, three documents, this
+/// file's neighbour and its own test's doc comment. A count nobody can check
+/// is a count that gets quoted.
 ///
 /// The descriptions are the Windows server's own, put through the same
 /// shortening rule the narrowed surface uses there: keep the `TEACHERS SAY:`

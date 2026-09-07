@@ -49,15 +49,17 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertEqual(AssistToolRunner.tools.count, expected.count, "A tool is defined twice.")
     }
 
-    /// What the LOCAL model is shown: thirteen of the twenty.
+    /// What the LOCAL model is shown: thirteen of the twenty-two.
     ///
-    /// Seven are left off because the model never has to NAME them, and every
-    /// schema in the prompt costs a small router accuracy. The six `plan_`
+    /// Nine are left off because the model never has to NAME them, and every
+    /// schema in the prompt costs a small router accuracy. The seven `plan_`
     /// twins are called IN CODE by plan mode, which builds the call from the
     /// write the model already chose; `remember_timetable` is off because dates
     /// the model supplies are dates it may have invented, and a wrong one
-    /// silently puts a class on the wrong day. All seven still RUN — they are
-    /// hidden from the list, not removed from the surface.
+    /// silently puts a class on the wrong day; `re_date_classes` is off because
+    /// its phrasings are matched in code and it is far too large a change to
+    /// reach through a router. All nine still RUN — they are hidden from the
+    /// list, not removed from the surface.
     @MainActor
     func testTheLocalModelIsShownExactlyThirteenToolsAndNoPlans() throws {
         let expected: Set<String> = [

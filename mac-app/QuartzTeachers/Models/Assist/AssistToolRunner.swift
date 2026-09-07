@@ -2,8 +2,8 @@ import AppKit
 import Foundation
 import Observation
 
-/// The twenty tools that exist — thirteen of them shown to the local model —
-/// and what running one does.
+/// The twenty-two tools that exist — thirteen of them shown to the local
+/// model — and what running one does.
 ///
 /// Four rules shape this surface. They are inherited from the Windows work
 /// rather than rediscovered, and every one of them is measured:
@@ -105,11 +105,12 @@ final class AssistToolRunner {
 
     /// The tools, as the LOCAL model sees them.
     ///
-    /// Thirteen of the twenty that exist. A small local model routes worse the
-    /// more it is shown, so anything it never has to NAME is kept off the list:
-    /// the six `plan_` twins, which plan mode calls in code, and
-    /// `remember_timetable`, whose dates must come from a teacher rather than
-    /// from a model. All of them still run when they are called.
+    /// Thirteen of the twenty-two that exist. A small local model routes worse
+    /// the more it is shown, so anything it never has to NAME is kept off the
+    /// list: the seven `plan_` twins, which plan mode calls in code, and two
+    /// more — `remember_timetable`, whose dates must come from a teacher rather
+    /// than from a model, and `re_date_classes`, whose phrasings are matched in
+    /// code. All of them still run when they are called.
     var definitions: [AssistToolDefinition] {
         return AssistToolRunner.localTools
     }

@@ -234,10 +234,18 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   ### The twelve, sorted
 
   Four buckets rather than three. The brief asked for product / Windows-shaped
-  / already-covered-under-another-name; **"already covered" came back empty** —
-  no mac tool is any of the twelve under a different name — and two of the
-  twelve turned out to need a teacher's problem before they need a decision,
-  which is a different answer from either "build it" or "never".
+  / already-covered-under-another-name, and a fourth was needed because
+  `sync_page_dates` turned out to need a teacher's problem before it needs a
+  decision, which is a different answer from either "build it" or "never".
+
+  **"Already covered under another name" is NOT empty, though the first draft
+  of this entry said it was.** `add_next_class` is the one-page case of
+  `add_classes` AND — through its `duplicate` argument — the one-class case of
+  `make_room_for_classes`; both engines are already called from
+  `AssistToolRunner`. So two of the six in the product bucket are widenings of
+  something that ships, not new features, and that is the single most useful
+  correction in this entry: it moves them from "a feature each" to "an argument
+  each".
 
   **PRODUCT — belongs on the mac. In this order.**
 
@@ -265,26 +273,49 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      is this about", `list_courses` answers "which courses are there".
 
   2. **`roll_over_section`** — the one that is a DEFECT before it is a feature,
-     and it is a defect **on both platforms**. See the next entry in this file,
-     which writes it up on its own because it is not really about a missing
-     tool.
+     and it is a defect **on both platforms**: "roll this section over to a new
+     year" is matched in code on each and routed to `re_date_classes`, which
+     cuts the section loose from its published site on neither, so the first
+     publish afterwards overwrites last year's website. Written up in full,
+     with three options, in `TODO.md` → "A rolled-over section publishes over
+     last year's website". It is a product decision rather than a missing
+     tool, which is why it is there and not here.
 
-  3. **`plan_add_classes` / `add_classes`** — the engine already exists here.
+  3. **`plan_add_classes` / `add_classes`** — smaller than it looks, and the
+     first draft of this entry got it wrong in a way worth recording.
      `PlaceholderClassPlanner` (340 lines) lays down a unit's worth of class
-     pages on the days the section actually meets, skipping days already taken,
-     and it has a GUI sheet. What is missing is only the tool definition, the
-     runner arm and the wording. Today "add seven days to the next unit" has no
-     assistant route on the mac at all; `add_next_class` does exactly one page.
-     This is the largest gap between what the mac CAN do and what a teacher can
-     ask it to do.
+     pages on the days the section actually meets, skipping days already taken
+     — and it is **already wired to the assistant**: `add_next_class` calls
+     `PlaceholderClassPlanner.apply` (`AssistToolRunner.swift:2309`) with a
+     count of one. So this is not "build a feature", nor even "wrap an engine";
+     it is **let the existing arm take a count**, plus a unit and a first day,
+     under a name of its own. Today "add seven days to the next unit" has no
+     assistant route on the mac; "add the next class" has had one all along.
 
-  4. **`plan_make_room_for_classes` / `make_room_for_classes`** — engine exists
-     too (`ClassInsertionPlanner`, 574 lines, a GUI sheet, and its own contract
-     in `contracts/class-planning.json`). Same shape as (3), and deliberately
-     ranked below it: the file's own comment calls it "the most dangerous thing
-     here, because it renames pages the teacher's links point at". If it is
-     built, **MCP-only** — a person is reading every step there. Never the
-     local list.
+     (Neither planner has a GUI sheet. An earlier draft of this entry said both
+     did — checked and false: nothing under `mac-app/QuartzTeachers/Views/`
+     mentions either one. They are reachable only through the assistant, which
+     makes the assistant surface the ONLY way a teacher gets at them and raises
+     the value of (3) and (4) rather than lowering it.)
+
+  4. **`plan_make_room_for_classes` / `make_room_for_classes`** — and this one
+     is **already covered under another name, for the one-class case**.
+     `ClassInsertionPlanner` (574 lines, its own contract in
+     `contracts/class-planning.json`) is what runs when a teacher says
+     "duplicate Unit 3, Day 2 as my next class" and the next day is already
+     taken: `duplicateClassRequested` calls
+     `ClassInsertionPlanner.plan(… count: 1)` and `.apply`
+     (`AssistToolRunner.swift:2138, 1993`), renaming the later days, re-dating
+     them onto real class days and rewriting every wikilink that pointed at a
+     renamed page. All of the dangerous machinery already runs on the mac
+     today. What is missing is a count above one, and the ability to name an
+     arbitrary insertion point rather than "the day after the page I named".
+
+     Ranked below (3) anyway, because widening it is where the danger is: the
+     file's own comment calls this "the most dangerous thing here, because it
+     renames pages the teacher's links point at", and the current route reaches
+     it only through a sentence naming one specific page. If it is built,
+     **MCP-only** — a person is reading every step there. Never the local list.
 
   5. **`back_up_course`** — MCP-only, and mechanically the smallest of all: it
      wraps `CourseArchiver.backUpCourse`, which exists. A LOCAL tool would be
@@ -359,25 +390,43 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
   **`re_date_classes` exists on both sides with the same NAME and different
   PARAMETERS.** Windows takes `timetable, block, pages, meetings, firstDay,
-  startYear` (`PlantoirTools.cs:938-951`); the mac takes `course` and `section`
-  and reads the remembered timetable. `toolSchemas` is generated from the mac,
+  startYear` on top of `course` and `section` (`PlantoirTools.cs:938-951`); the
+  mac takes `course` and `section` alone and reads the remembered timetable. `toolSchemas` is generated from the mac,
   so the contract records the mac's shape and nothing on either side compares
   Windows' actual parameters to it. **This is worse than a missing tool**: a
   missing tool is at least visible as missing, while a shared name with two
   shapes lets a client written against the contract send arguments one server
   silently ignores. Written up for Windows as part of item 33.
 
-  **And one measured artifact that never travelled back.** Windows added a
-  fourth `TEACHERS SAY:` phrasing to `check_section` on 2026-08-17 — "what
-  would students see in this section right now?" — two days after the mac wrote
-  its three, and it never came here. `AssistToolSurface`'s own rule for copying
-  a Windows description is to *"keep the `TEACHERS SAY:` clause whole"*, and
-  these phrasings are what took routing from 69% to 91%, so a missing one is a
-  routing change nobody chose. It is the ONLY such difference across all 25
-  shared tools — checked by comparing every clause in `toolSchemas.mcp` against
-  every `[Description]` in `PlantoirTools.cs`. Not fixed here, because adding a
-  phrasing IS a routing change and routing is measured by hand against a local
-  `llama-server`, which an unattended session cannot do.
+  ### The `TEACHERS SAY:` phrasings have drifted five ways, mostly OURS
+
+  Checked clause by clause, every `TEACHERS SAY:` list in `toolSchemas.mcp`
+  against every `[Description]` in `PlantoirTools.cs`. **Five of the 25 shared
+  tools differ, and four of the five are phrasings the MAC has and Windows has
+  nowhere at all** — not in the MCP server and not in their in-app assistant
+  (0 hits across `windows-app` for any of them):
+
+  | Tool | Difference |
+  |---|---|
+  | `check_section` | Windows has four phrasings, the mac three. Windows added "what would students see in this section right now?" on 2026-08-17, two days after the mac wrote its three, and it never came back here. |
+  | `add_next_class` | The mac has six phrasings. Windows has **no `TEACHERS SAY:` clause at all**. |
+  | `plan_add_next_class` | The mac has three. Windows has none. |
+  | `read_remembered_timetable` | The mac has four. Windows has none. |
+  | `remember_timetable` | The mac has four. Windows has none. |
+
+  This matters more than a documentation difference, and the reason is written
+  into `AssistToolSurface` itself: the phrasings *"are what took routing from
+  69% to 91%"*, so they are measured artifacts and a missing one is a routing
+  change nobody chose. The rule for copying a Windows description is to keep
+  the clause WHOLE, and `check_section` is the one place the mac did not.
+
+  **Nothing is fixed here on either side**, because adding a phrasing IS a
+  routing change and routing is measured by hand against a local
+  `llama-server`, which an unattended session cannot do. The mac owes itself
+  one phrasing; Windows owes itself seventeen, and item 33 tells them so.
+  (An earlier draft of this entry claimed the `check_section` case was the only
+  difference of the 25 — that was a script that only looked in one direction,
+  and it is exactly the failure this whole entry is about.)
 
   Reference: `windows-app/Plantoir.Mcp/PlantoirTools.cs` (the 37, each an
   `[McpServerTool]`), `mac-app/QuartzTeachers/Models/Assist/AssistToolSurface.swift`.
@@ -391,52 +440,13 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   measured 22, 9 and 7 — corrected, since stale counts in that file are exactly
   how the previous miscount happened.
 
-- **A section rolled over to a new year publishes over LAST year's website —
-  on both platforms** (found 2026-09-06 on `issue/mcp-tool-surface-divergence`,
-  while sorting the entry above; a **decision** for Russell, not a fix anybody
-  should make unasked).
-
-  A teacher says *"roll this section over to a new year."* On BOTH platforms
-  that exact sentence is matched in code, never routed by the model, and goes
-  to `re_date_classes` — `AssistCardCommand.swift:395` and
-  `AssistCardCommand.cs:50`. On BOTH platforms `re_date_classes` re-dates the
-  section and stops there.
-
-  Only `roll_over_section` calls `AssistWorkspace.ReleaseSite`
-  (`PlantoirTools.cs:911`), and only Windows has `roll_over_section`. What
-  `ReleaseSite` does is rename `courses/<CODE>/.netlify_sites/section<N>.json`
-  (or `.cloudflare_sites/`) aside, so the next publish makes a NEW site instead
-  of overwriting the old one. Shared `scripts/deploy.py` reads that marker, and
-  nothing under `mac-app/` or `scripts/` renames, clears or year-scopes it —
-  `CourseRenamer` deliberately leaves it alone, and `DeployCommand.swift` only
-  reads it.
-
-  So the first publish after a rollover lands on **last year's URL, which last
-  year's students may still be reading**. Windows' own comment says exactly
-  that (`AssistWorkspace.cs:1864-1877`), and Windows still has the hole,
-  because the sentence a teacher says does not reach the tool that closes it.
-
-  **This is a decision, not a defect to fix quietly, and that is the correction
-  to make to how it first read here.** Whether a section keeps one address
-  across years or starts a new site each year is a product choice — plenty of
-  teachers want the same address forever, and a URL that changes every
-  September breaks every link anybody saved. Windows made a choice and gave its
-  reason; the mac has not made one. Three options, for Russell:
-
-  - **Keep them separate, as Windows did.** `re_date_classes` re-dates;
-    something else cuts loose. Cheapest, and it leaves the card phrasing
-    pointing at the wrong one on both platforms — so the phrasing has to move
-    with it, or the bug stays exactly where it is.
-  - **Make the cut-loose part of the rollover phrasing**, on both platforms,
-    since "roll over to a new year" is the sentence that means it.
-  - **Ask.** The rollover already tells the teacher to preview and check
-    before deciding what students see; one more sentence — "should this be a
-    new website, or the same one as last year?" — is the honest shape, and it
-    is the only one that does not guess.
-
-  Whichever is chosen, it needs the same sentence on both platforms, so the
-  wording belongs in `contracts/`. **Windows' half is item 33 in
-  `WINDOWS-HANDOFF.md`.**
+- **A section rolled over to a new year publishes over LAST year's website, on
+  both platforms** — found 2026-09-06 while sorting the entry above. It is a
+  DECISION for Russell rather than a fix, and because it was found on the mac
+  rather than handed over from Windows, the write-up and the three options live
+  in **`TODO.md`** ("A rolled-over section publishes over last year's website").
+  Listed here only so the sorting above does not point at nothing: item (2) of
+  the product bucket is this. Windows' half is item 33 in `WINDOWS-HANDOFF.md`.
 
 - **The folder-problem front end landed on Windows, and it found two defects in
   the mac's own repair** (Windows, 2026-09-06, branch
