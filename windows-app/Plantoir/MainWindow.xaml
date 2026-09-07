@@ -74,6 +74,22 @@
             <ContentPresenter x:Name="DetailHost" Grid.Column="1" />
         </Grid>
 
+        <!-- A restored working folder that a cloud service keeps in sync. An
+             OVERLAY at the top of the content area, not a row of its own: an
+             inline banner pushed the window's bottom band off screen on the
+             mac and is recorded there as a regression. Above the path bar, as
+             the contract has it; dismissable; never a dialog. -->
+        <InfoBar x:Name="SyncNotice" Grid.Row="1" VerticalAlignment="Top" Margin="12,8,12,0"
+                 IsOpen="False" Severity="Informational" IsClosable="True"
+                 Closed="SyncNotice_Closed"
+                 AutomationProperties.AutomationId="syncedFolderNotice">
+            <InfoBar.ActionButton>
+                <Button x:Name="SyncNoticeDetailsButton" Click="SyncNoticeDetails_Click"
+                        AutomationProperties.AutomationId="syncedFolderNoticeDetails" />
+            </InfoBar.ActionButton>
+            <StackPanel x:Name="SyncNoticeDetails" Visibility="Collapsed" Spacing="6" Margin="0,4,0,8" />
+        </InfoBar>
+
         <!-- Working-folder path bar, under the detail content — where the
              file manager puts its own. -->
         <Grid x:Name="PathBar" Grid.Row="2" Visibility="Collapsed"

@@ -213,6 +213,7 @@ public partial class App : Application
     {
         var window = OpenWindow(null, null);
         window.Workspace.AdoptFolderForNewWindow();
+        window.ShowSyncNoticeIfNeeded();
         return window;
     }
 

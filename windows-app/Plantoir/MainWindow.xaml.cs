@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Plantoir.Core.Assist;
@@ -39,8 +40,8 @@ public sealed partial class MainWindow : Window
 
         // A remembered window restores exactly; a first run opens at a share of
         // the display's work area, not a fixed pixel count. AppWindow sizes are
-        // raw pixels, so a fixed 1100×720 looks postage-stamp small on a 200%
-        // display — a proportion of the work area is right at any scale. Clamped
+        // raw pixels, so a fixed 1100Ã—720 looks postage-stamp small on a 200%
+        // display â€” a proportion of the work area is right at any scale. Clamped
         // so it never dwarfs a small screen or sprawls across a huge one.
         var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         int defaultWidth = Math.Clamp((int)(workArea.Width * 0.62), 1000, 2000);
@@ -74,14 +75,14 @@ public sealed partial class MainWindow : Window
                 Workspace.NoteBecameKey();
                 // Subscribed before any SectionDetailView exists, so this runs
                 // before that view's own OnWindowActivated on the SAME
-                // activation — a scheduled deploy that finished overnight is
-                // reflected in the " — Edited" marker the first time the
+                // activation â€” a scheduled deploy that finished overnight is
+                // reflected in the " â€” Edited" marker the first time the
                 // teacher looks, not one activation later. See
                 // ScheduledDeployCompletion and WINDOWS-HANDOFF.md, "A
                 // scheduled deploy needs its own path to the same record".
                 _ = System.Threading.Tasks.Task.Run(ScheduledDeployCompletion.ConsumePending);
                 // The sidebar's own clock badge (SidebarRow.ScheduledDeploy)
-                // is read from schtasks, not stored anywhere of ours — a
+                // is read from schtasks, not stored anywhere of ours â€” a
                 // deploy scheduled through the assistant, or in another
                 // window on the same section, would otherwise sit invisible
                 // here until something else happened to reload the tree.
@@ -90,11 +91,11 @@ public sealed partial class MainWindow : Window
         };
         // Covers app launch itself, in case the window's first Activated
         // fires before this runs (or does not fire at all on some launch
-        // paths) — cheap and idempotent when there is nothing pending.
+        // paths) â€” cheap and idempotent when there is nothing pending.
         _ = System.Threading.Tasks.Task.Run(ScheduledDeployCompletion.ConsumePending);
         Closed += (_, _) => { IsClosed = true; Workspace.UnregisterWindow(); };
 
-        // The Preview menu tracks whichever section is currently shown —
+        // The Preview menu tracks whichever section is currently shown â€”
         // one callback registered once, rather than a refresh call threaded
         // through every place DetailHost.Content is assigned.
         DetailHost.RegisterPropertyChangedCallback(ContentPresenter.ContentProperty, (_, _) => TrackDetailForPreviewMenu());
@@ -122,6 +123,7 @@ public sealed partial class MainWindow : Window
             App.LogDiagnostic($"MainWindow ctor: AdoptRestoredPath('{folderPath}') starting");
             Workspace.AdoptRestoredPath(folderPath);
             App.LogDiagnostic("MainWindow ctor: AdoptRestoredPath done");
+            ShowSyncNoticeIfNeeded();
         }
         App.LogDiagnostic("MainWindow ctor: ApplyState starting");
         ApplyState();
@@ -135,7 +137,7 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// Test hooks: "--auto-select CODE N" selects a section on launch;
-    /// "--auto-preview" additionally presses Preview — the same code path
+    /// "--auto-preview" additionally presses Preview â€” the same code path
     /// as the button, so smoke tests exercise the real flow.
     /// </summary>
     private void RunAutomationHooks()
@@ -217,14 +219,14 @@ public sealed partial class MainWindow : Window
     public bool IsClosed { get; private set; }
 
     /// <summary>
-    /// Bring this window onto the screen ONLY if it is not already there —
+    /// Bring this window onto the screen ONLY if it is not already there â€”
     /// minimised, or hidden. A window the teacher can already see is left
     /// exactly as it is, and in particular is NOT activated: the assistant is
     /// a separate window they may still be typing in, and stealing keyboard
     /// focus mid-sentence to show them a build that was already in view is a
     /// worse trade than the mac's unconditional bring-to-front (row 300).
     ///
-    /// <para>"Not already there" is decided by two cheap, honest tests —
+    /// <para>"Not already there" is decided by two cheap, honest tests â€”
     /// <c>OverlappedPresenter.State == Minimized</c>, and
     /// <c>AppWindow.IsVisible</c> being false. A window fully covered by
     /// another window is NOT detected: there is no cheap answer to occlusion
@@ -244,11 +246,11 @@ public sealed partial class MainWindow : Window
     /// Bring a section's preview onto the screen, for the assistant.
     ///
     /// The assistant's tools build the section's site, and a build nobody can
-    /// see might as well not have happened — a teacher approved a rebuild,
+    /// see might as well not have happened â€” a teacher approved a rebuild,
     /// watched it finish, and had nothing to look at. So after a tool that
     /// leaves a fresh build behind, the assistant's window asks this one to
     /// select the section and start its preview. If a preview is already
-    /// serving, starting is skipped — live reload is showing the change. The
+    /// serving, starting is skipped â€” live reload is showing the change. The
     /// window comes forward only when it is minimised or hidden
     /// (<see cref="ComeForwardIfHidden"/>); one the teacher can already see is
     /// not activated, so the assistant window keeps keyboard focus. Until
@@ -278,8 +280,8 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Deploy a section through this window's own flow — console, milestones,
-    /// needs-rebuild decision and all — for the assistant. The assistant
+    /// Deploy a section through this window's own flow â€” console, milestones,
+    /// needs-rebuild decision and all â€” for the assistant. The assistant
     /// automates Plantoir; it does not deploy behind its back.
     /// </summary>
     public void DeployFor(string courseCode, int section)
@@ -305,8 +307,8 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Deploy through the section's own flow and AWAIT the real outcome —
-    /// success, failure, or a multi-destination partial — rather than only
+    /// Deploy through the section's own flow and AWAIT the real outcome â€”
+    /// success, failure, or a multi-destination partial â€” rather than only
     /// the moment the click was dispatched. Returns null if no section view
     /// was open to deploy through, or an exception struck before the deploy
     /// even started; callers word that as "did not finish", never as
@@ -351,11 +353,11 @@ public sealed partial class MainWindow : Window
     public bool IsSectionBusy(string courseCode, int section)
     {
         // Busy, to the caller asking before a DEPLOY, means "a deploy is
-        // already running" — not "a preview is up". The Deploy path stops a
+        // already running" â€” not "a preview is up". The Deploy path stops a
         // running preview itself and waits for it (deploy-during-preview
         // port, mac commit "Allow Deploy button to stop active preview
         // before publishing"), so reporting a preview as busy here made the
-        // assistant refuse — and say so — while the deploy went ahead.
+        // assistant refuse â€” and say so â€” while the deploy went ahead.
         if (DetailHost.Content is SectionDetailView detail)
         {
             return detail.IsDeploying;
@@ -364,7 +366,7 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Stop a section's preview, for the assistant — the first half of
+    /// Stop a section's preview, for the assistant â€” the first half of
     /// stop, edit, start again. No Activate: a stop is not the moment to
     /// pull the teacher away from the conversation.
     /// </summary>
@@ -427,7 +429,7 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Restore the remembered selection — but only when its target still
+    /// Restore the remembered selection â€” but only when its target still
     /// exists, so a course removed between sessions never greets the teacher
     /// with "Course Not Found". Unrecognized stored forms restore none.
     /// </summary>
@@ -494,7 +496,7 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>Populates each crumb's shell icon after the bar is already
-    /// showing names — a slow shell lookup should never delay the bar
+    /// showing names â€” a slow shell lookup should never delay the bar
     /// itself, only fill in the icon once it arrives.</summary>
     private static async Task LoadCrumbIconsAsync(List<PathBarCrumb> crumbs)
     {
@@ -506,8 +508,8 @@ public sealed partial class MainWindow : Window
 
     /// <summary>Matches the mac's own path bar: a plain click selects
     /// nothing. Revealing and opening are deliberately gated behind the
-    /// gestures a teacher already knows from their file manager — double-
-    /// click to open, right-click to reveal — not a bare click
+    /// gestures a teacher already knows from their file manager â€” double-
+    /// click to open, right-click to reveal â€” not a bare click
     /// (contracts/shared-rules.json -> workingFolderPathBar).</summary>
     private void FolderCrumbs_ItemClicked(BreadcrumbBar sender, BreadcrumbBarItemClickedEventArgs args)
     {
@@ -569,19 +571,19 @@ public sealed partial class MainWindow : Window
                 when Workspace.ArchivedItems.FirstOrDefault(a => a.Id == id) is { } item:
                 DetailHost.Content = EmptyState(item.Title,
                     $"{item.Subtitle}. It is not part of your courses until you restore it.",
-                    "Restore…", () => Sidebar.ConfirmRestore(item));
+                    "Restoreâ€¦", () => Sidebar.ConfirmRestore(item));
                 break;
             case SidebarSelection.BackupEntry(var backupId)
                 when Workspace.BackupItems.FirstOrDefault(b => b.Id == backupId) is { } backup:
                 DetailHost.Content = EmptyState(backup.Title,
                     $"{backup.Subtitle}. Restoring puts {backup.CourseCode} back to exactly this " +
-                    "moment — the current version is archived first, and the backup is kept.",
-                    "Restore…", () => Sidebar.ConfirmRestoreBackup(backup));
+                    "moment â€” the current version is archived first, and the backup is kept.",
+                    "Restoreâ€¦", () => Sidebar.ConfirmRestoreBackup(backup));
                 break;
             case null when Workspace.Courses.Count == 0:
                 DetailHost.Content = EmptyState("No Courses Yet",
                     "Add your first course, or start from the example course to see how everything fits together.",
-                    "Add a Course…", () => _ = SidebarPane.OpenNewCourseWizard());
+                    "Add a Courseâ€¦", () => _ = SidebarPane.OpenNewCourseWizard());
                 break;
             case null:
                 DetailHost.Content = EmptyState("Select a Course or Section",
@@ -637,12 +639,168 @@ public sealed partial class MainWindow : Window
 
     public async void OpenWorkingFolder_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new Windows.Storage.Pickers.FolderPicker();
-        WinRT.Interop.InitializeWithWindow.Initialize(picker,
-            WinRT.Interop.WindowNative.GetWindowHandle(this));
-        picker.FileTypeFilter.Add("*");
-        var folder = await picker.PickSingleFolderAsync();
-        if (folder is not null) Workspace.ChooseWorkspace(folder.Path);
+        // Looped, because "Choose a Different Folderâ€¦" in the synced-folder
+        // note reopens the OS picker rather than stranding the teacher on the
+        // picker view: they have already said what they want.
+        while (true)
+        {
+            var picker = new Windows.Storage.Pickers.FolderPicker();
+            WinRT.Interop.InitializeWithWindow.Initialize(picker,
+                WinRT.Interop.WindowNative.GetWindowHandle(this));
+            picker.FileTypeFilter.Add("*");
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder is null) return;
+
+            switch (await SyncedFolderChoiceAsync(folder.Path))
+            {
+                case SyncedFolderChoice.GoAhead:
+                    Workspace.ChooseWorkspace(folder.Path);
+                    ShowSyncNoticeIfNeeded();   // the re-chosen open folder takes the notice form
+                    return;
+                case SyncedFolderChoice.ChooseAnother:
+                    continue;
+            }
+        }
+    }
+
+    // ---- A working folder a cloud service keeps in sync -------------------
+    //
+    // Explained, never refused â€” contracts/shared-rules.json ->
+    // cloudSyncedFolders. Two moments: a choice at the picker for a folder
+    // just chosen (a dialog, two buttons, neither the default), and a quiet
+    // notice for a folder the window restored (the InfoBar above the path
+    // bar). Going ahead from either is remembered for that folder.
+
+    private enum SyncedFolderChoice { GoAhead, ChooseAnother }
+
+    /// <summary>
+    /// Folders already shown a note in THIS process, keyed by resolved path,
+    /// so a second window on the same folder does not repeat it before the
+    /// teacher has answered. The remembered answer itself is in
+    /// <see cref="AppSettings.AcceptedSyncedFolders"/>.
+    /// </summary>
+    private static readonly HashSet<string> _syncNoticedThisProcess = new(StringComparer.OrdinalIgnoreCase);
+
+    private static string ResolvedFolder(string path)
+    {
+        try { return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
+        catch { return path; }
+    }
+
+    private bool IsTheOpenFolder(string path) =>
+        Workspace.WorkspacePath is { } open &&
+        string.Equals(ResolvedFolder(open), ResolvedFolder(path), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The picker moment. Nothing to ask when the folder is not synced, was
+    /// already accepted, cannot be used anyway (neither a working folder nor
+    /// empty â€” the teacher is about to choose again, and a note about a folder
+    /// they cannot use is noise), or is the folder this window already shows
+    /// (a restore, not a choice: the notice form, so their courses are not
+    /// hidden behind the picker).
+    /// </summary>
+    private async Task<SyncedFolderChoice> SyncedFolderChoiceAsync(string path)
+    {
+        if (CloudSyncedFolder.ServiceFor(path) is not { } service) return SyncedFolderChoice.GoAhead;
+        if (App.Settings.HasAcceptedSyncFor(path)) return SyncedFolderChoice.GoAhead;
+        if (IsTheOpenFolder(path)) return SyncedFolderChoice.GoAhead;
+        if (Plantoir.Core.Models.Workspace.Classify(path) == WorkspaceState.Unrecognized) return SyncedFolderChoice.GoAhead;
+
+        ActivityTrail.Note(ActivityTrail.Event.SyncedFolderNoticed,
+            $"noticed that the folder just chosen is kept in sync with {service}");
+        _syncNoticedThisProcess.Add(ResolvedFolder(path));
+
+        // The path FIRST: the sentences say "this folder", and a teacher reads
+        // that and looks for which folder.
+        var body = new StackPanel { Spacing = 10 };
+        body.Children.Add(new TextBlock { Text = path, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+        body.Children.Add(new TextBlock { Text = CloudSyncWording.Summary, TextWrapping = TextWrapping.Wrap });
+        foreach (string paragraph in CloudSyncWording.Explanation(service))
+            body.Children.Add(new TextBlock { Text = paragraph, TextWrapping = TextWrapping.Wrap, Opacity = 0.85 });
+
+        var dialog = new ContentDialog
+        {
+            Title = CloudSyncWording.Headline(service),
+            Content = new ScrollViewer { Content = body, MaxHeight = 420 },
+            PrimaryButtonText = CloudSyncWording.UseAnywayButton,
+            CloseButtonText = CloudSyncWording.ChooseDifferentFolderButton,
+            // Neither button is the default: this is the one moment the choice
+            // is free, and a Return pressed out of habit must not decide it.
+            DefaultButton = ContentDialogButton.None,
+            XamlRoot = Content.XamlRoot,
+        };
+        AutomationProperties.SetAutomationId(dialog, "syncedFolderChoice");
+        ContentDialogResult answer;
+        try { answer = await dialog.ShowAsync(); }
+        catch (Exception ex)
+        {
+            // A dialog that could not be shown must not block the folder:
+            // the rule is "explained, never refused".
+            App.LogDiagnostic($"synced-folder dialog: {ex.Message}");
+            return SyncedFolderChoice.GoAhead;
+        }
+        if (answer != ContentDialogResult.Primary) return SyncedFolderChoice.ChooseAnother;
+
+        RememberSyncAccepted(path, service, "chose to use the folder anyway");
+        return SyncedFolderChoice.GoAhead;
+    }
+
+    private void RememberSyncAccepted(string path, string service, string how)
+    {
+        App.Settings.RememberAcceptedSyncFor(path);
+        try { App.Settings.Save(); } catch (Exception ex) { App.LogDiagnostic($"settings: {ex.Message}"); }
+        ActivityTrail.Note(ActivityTrail.Event.SyncedFolderAccepted,
+            $"{how} â€” a folder kept in sync with {service}");
+    }
+
+    private string? _syncNoticeService;
+
+    /// <summary>
+    /// The restored moment: the headline, the one-line summary, a way to open
+    /// the full explanation in place, and a button to dismiss it â€” once per
+    /// folder, in this window or any other. Called whenever a working folder
+    /// is adopted, because folders move into cloud services after they are
+    /// made and the check costs nothing.
+    /// </summary>
+    public void ShowSyncNoticeIfNeeded()
+    {
+        SyncNotice.IsOpen = false;
+        _syncNoticeService = null;
+        if (Workspace.WorkspacePath is not { } path) return;
+        if (CloudSyncedFolder.ServiceFor(path) is not { } service) return;
+        if (App.Settings.HasAcceptedSyncFor(path)) return;
+        if (!_syncNoticedThisProcess.Add(ResolvedFolder(path))) return;
+
+        ActivityTrail.Note(ActivityTrail.Event.SyncedFolderNoticed,
+            $"noticed that the working folder is kept in sync with {service}");
+        _syncNoticeService = service;
+        SyncNotice.Title = CloudSyncWording.Headline(service);
+        SyncNotice.Message = CloudSyncWording.Summary;
+        SyncNoticeDetails.Children.Clear();
+        foreach (string paragraph in CloudSyncWording.Explanation(service))
+            SyncNoticeDetails.Children.Add(new TextBlock { Text = paragraph, TextWrapping = TextWrapping.Wrap });
+        var gotIt = new Button { Content = CloudSyncWording.DismissNoticeButton, HorizontalAlignment = HorizontalAlignment.Left };
+        AutomationProperties.SetAutomationId(gotIt, "syncedFolderNoticeDismiss");
+        gotIt.Click += (_, _) => SyncNotice.IsOpen = false;
+        SyncNoticeDetails.Children.Add(gotIt);
+        SyncNoticeDetails.Visibility = Visibility.Collapsed;
+        SyncNoticeDetailsButton.Content = CloudSyncWording.ShowDetailsButton;
+        SyncNotice.IsOpen = true;
+    }
+
+    private void SyncNoticeDetails_Click(object sender, RoutedEventArgs e)
+    {
+        bool showing = SyncNoticeDetails.Visibility == Visibility.Visible;
+        SyncNoticeDetails.Visibility = showing ? Visibility.Collapsed : Visibility.Visible;
+        SyncNoticeDetailsButton.Content = showing ? CloudSyncWording.ShowDetailsButton : CloudSyncWording.HideDetailsButton;
+    }
+
+    /// <summary>Dismissing IS going ahead: remembered for the folder, so it is not shown again.</summary>
+    private void SyncNotice_Closed(InfoBar sender, InfoBarClosedEventArgs args)
+    {
+        if (_syncNoticeService is not { } service || Workspace.WorkspacePath is not { } path) return;
+        _syncNoticeService = null;
+        RememberSyncAccepted(path, service, "dismissed the note about the working folder");
     }
 
     private void NewWindow_Click(object sender, RoutedEventArgs e) => App.OpenNewWindow();
@@ -682,7 +840,7 @@ public sealed partial class MainWindow : Window
                    "It includes the messages Plantoir showed you while it worked, your course codes and section numbers, " +
                    "the names of your pages, and what kind of Windows this is. It leaves out what you have written on your pages, " +
                    "your sign-in details for Netlify or Cloudflare, and your name.\n\n" +
-                   "Save the report, then send it — with the file attached — to:",
+                   "Save the report, then send it â€” with the file attached â€” to:",
             TextWrapping = TextWrapping.Wrap,
         });
 
@@ -709,7 +867,7 @@ public sealed partial class MainWindow : Window
         {
             Title = "Send a report about a problem",
             Content = contentPanel,
-            PrimaryButtonText = "Save Report…",
+            PrimaryButtonText = "Save Reportâ€¦",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = Content.XamlRoot,
@@ -756,7 +914,7 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            // Normally a no-op — Closed already did this — but if ShowAsync
+            // Normally a no-op â€” Closed already did this â€” but if ShowAsync
             // never got the dialog on screen at all (WinUI allows only one
             // ContentDialog at a time), Closed never fires, and without this
             // the dialog stays subscribed to the app-lifetime
@@ -832,7 +990,7 @@ public sealed partial class MainWindow : Window
         (DetailHost.Content as SectionDetailView)?.PreviewReload();
 
     // Global counterparts to SectionDetailView's own scoped BackAccelerator/
-    // ForwardAccelerator/ReloadAccelerator — see the comment on Root's
+    // ForwardAccelerator/ReloadAccelerator â€” see the comment on Root's
     // KeyboardAccelerators in MainWindow.xaml for why both scopes exist.
     private void PreviewBackAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
