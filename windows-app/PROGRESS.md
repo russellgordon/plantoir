@@ -22,7 +22,7 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Twenty-six of its thirty-seven
+with its headline still reading as open work. **Twenty-seven of its thirty-seven
 items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
 day (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
@@ -57,7 +57,7 @@ What is genuinely left, smallest first:
 | 19 | The `working-folder.txt` marker AND a sweep that reads it. Do both or neither — the marker alone is ceremony. Two Windows specifics for the sweep are written into item 19. | Small |
 | 30 | Three small parity gaps, listed so they are not rediscovered as surprises: no Delete in the Archived/Backup detail pane, no icons or menu on the empty-folder picker's breadcrumbs, and no keyboard route to Rename Course. | Small |
 | 32 | `SpecialFoldersHelpContractTests` sweeps the teacher's own folder names for jargon and the contract says not to. Cannot fail on today's fixture, so it is a divergence rather than a bug. The mac fixed its own copy and the fix is worth copying, trap included. | Small |
-| 28 | Four small gaps in one item: the scheduled-deploy description is composed and never shown, the main window never comes forward for an assistant-started build, `settings saved` / `settings could not be saved` are declared and never emitted, and the assistant window forgets its size and position. | Small |
+| ~~28~~ | ✅ Done 2026-09-07 — the scheduled-deploy dialog names the unpublished classes, the main window comes forward for an assistant build when hidden, settings saves reach the trail, and the assistant window remembers its placement per section. | — |
 | ~~31~~ | ✅ Done 2026-09-07 — `Uri.EscapeDataString` replaced by a contract-driven encoder in both branches of `Spelled`; `FolderPathRewriterTests` deserialises every `linkRewriting` case. | — |
 | 36 | A decision, not code: `verify-deploy.ps1` is the only automated check of the PowerShell half of publishing and no gate runs it. Schedule it, make it a release-cut step, or write down that it is hand-run. | Small |
 | 37 | A decision the MAC makes: the Course Settings tip sentence is pinned by no contract on either platform and the two apps word it differently. Windows owes only taking the mac's wording once it is chosen. | Small |
@@ -175,14 +175,14 @@ is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code. The same goes for the four trail events below: the
 features that would raise them are these same two.
 
-## SIX activity-trail events are declared but not yet emitted (2026-09-06; a seventh was, and now is)
+## FOUR activity-trail events are declared but not yet emitted (2026-09-06; six then, two of them emitted since)
 
 `ActivityTrail.Event` names `folder renamed`, `folder created`,
 `synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,
-`settings saved` and `settings could not be saved`, which belong to no
-unbuilt view at all: `CourseSettingsView.Save_Click` writes the config and
-records nothing, while the mac records both. That last pair is a small fix
-rather than a feature, and it is handoff item 28. The first four are in
+`settings saved` and `settings could not be saved`, which belonged to no
+unbuilt view at all: `CourseSettingsView.Save_Click` wrote the config and
+recorded nothing, while the mac records both. That pair was handoff item 28
+and has been emitted since 2026-09-07. The four that remain are in
 `contracts/shared-rules.json` → `activityTrail.mustRecord`, and
 `ContractTests.SharedRules_ActivityTrailEvents_Exist` compares that list
 against the enum — so declaring them is what makes the suite green.
