@@ -1554,6 +1554,56 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Two shared-Python progress markers were classified nowhere, and
+  `markerOrigins.knownDivergence` had been stale since the native runtime
+  landed** (Windows + shared, 2026-09-06, branch
+  `issue/29-windows-contract-case-lists`). **The mac suite stays green** — both
+  edits are additive and the mac reads neither — so this is a know, not an ask.
+  Reference: `windows-app/Plantoir.Tests/MilestoneContractTests.cs`.
+
+  Wiring `markerOrigins` into the Windows gate (WINDOWS-HANDOFF item 29) turned
+  up two markers that `scripts/setup_course.py` prints — `"Example Course
+  installed to"` (line 1279) and `"EXAMPLE_COURSE_CODE="` (line 1306) — and
+  that `markerOrigins.origins` did not classify. Both are now in it as
+  `shared-python`.
+
+  **They went missing for a structural reason worth knowing.** The mac's
+  `testEveryMarkerIsClassified` walks the markers its OWN milestone lists use
+  and looks each one up, so a shared line the mac has no task for is invisible
+  to it however loudly the shared script prints it — and Windows has an
+  `ExampleCourse` milestone list the mac has no counterpart for. The Windows
+  test is written the other way round as well as the same way: a marker the
+  contract does not name, which something under `scripts/` nevertheless prints,
+  FAILS and says to classify it. That reverse direction is the half that
+  found these two, and it is worth adding on the mac if the mac ever grows a
+  task list of its own that the contract does not describe.
+
+  **`knownDivergence` was one stale pair.** It said `"Setting up this Mac"` →
+  `"Setting up this PC"`, and Windows stopped printing that string on
+  2026-08-19 when it dropped Docker for the native runtime — so the contract's
+  only record of how the two platforms' launcher text differs described a
+  correspondence that no longer exists, and the container markers it did not
+  mention have no Windows counterpart at all. It now carries a `note` and
+  `macOnlyLauncherMarkers`: the five strings a Windows milestone must never
+  watch for.
+
+  **Why a LIST of the mac's wording, rather than Windows' own text in the
+  contract.** Windows' launcher markers are the platform's, not the product's,
+  so by `contracts/README.md`'s own test they do not belong here, and they are
+  pinned against the real `.ps1` files by `TaskMilestoneLauncherMarkerTests`
+  instead. What does belong is the guard: Windows had a hand-typed array of the
+  mac's five phrasings, and a hand-kept copy of the OTHER platform's words is
+  precisely what goes stale the day that platform changes them — which is how
+  four markers came to be matched against launchers that had stopped printing
+  them (WINDOWS-HANDOFF item 5). That array is gone; the test reads the five
+  from here. If the mac ever renames one of its launcher lines, changing it
+  here is what tells Windows.
+
+  **Rejected: a `markerOrigins.windowsOrigins` map.** It would have put six
+  facts in two places — the contract and `ParsingTests.LauncherOnlyMarkers` —
+  validated by nobody on the mac, which is the four-copies problem this folder
+  exists to end. Caught in review before it was written.
+
 - **A UI test suite that drives the real app, and `--state-dir`, the product
   change that made it safe** (Windows, 2026-09-06, branch
   `issue/windows-special-folders-help`, `GUI-IMPROVEMENTS.md` row 423).
