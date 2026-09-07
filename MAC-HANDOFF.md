@@ -386,7 +386,7 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer` is a should, not a
      must; it is written up as `WINDOWS-HANDOFF.md` item 34. One stale comment
      is left for you rather than edited from this side: the `<remarks>` on
-     `SiteHealthRepair.cs:243-247` still call the per-finding list "a deliberate
+     `SiteHealthRepair.cs:241-250` still call the per-finding list "a deliberate
      divergence from the mac, whose dictionary is keyed by name", and it is no
      longer a divergence.
 

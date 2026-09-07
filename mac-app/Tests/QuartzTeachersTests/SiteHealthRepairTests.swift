@@ -169,7 +169,8 @@ final class SiteHealthRepairTests: XCTestCase {
 
             // The report is asked for FIRST, because it repairs as it goes:
             // asking `repair` and then `outcome` would run every repair twice,
-            // and the second run answers `alreadyFine` to everything.
+            // and anything the first pass RESTORED answers `alreadyFine` to
+            // the second.
             let outcome = try XCTUnwrap(
                 SiteHealthRepair.outcome(ofRepairing: findings, in: course)
             )
