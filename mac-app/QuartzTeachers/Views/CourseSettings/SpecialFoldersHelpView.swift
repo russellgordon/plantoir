@@ -70,19 +70,33 @@ struct SpecialFoldersHelpView: View {
         ))
 
         // **The folder the build would use, not the name the course happens to
-        // have recorded.** The wizard never writes `curriculum_folder`, so a
-        // course made from scratch has no such key and is found by name alone;
-        // reading the key directly showed those teachers the placeholder and
-        // told them to go and make a folder they already have. The other half
-        // is sharper still: a folder renamed in Finder or Obsidian leaves the
-        // key naming something that is no longer there, and a name a teacher
-        // cannot find is worse than the placeholder, because it looks like an
-        // answer. `CurriculumFolderRule` is the same rule folder protection
-        // uses, and matches `_find_curriculum_folder` in `build_site.py` on
-        // the NAME. The build asks one thing more that neither app can see
-        // from configuration — the folder must actually hold an expectation
-        // page — so this can still name a folder the build goes on to skip.
-        // Naming it is nonetheless righter than naming one that is not there.
+        // have recorded.** `curriculum_folder` has only been written since
+        // 2026-08-23, and even now it is null for a course made without a
+        // ready-made payload or a skeleton — so a course older than that has
+        // no such key at all and is found by name alone. Measured on this Mac
+        // on 2026-09-06: 12 of 15 real courses have no key, 1 has it null, and
+        // 11 of the 15 were being shown the "Your curriculum folder"
+        // placeholder while a perfectly good folder sat in the vault. Two of
+        // them call it "College Board Curriculum", which no placeholder would
+        // ever have named.
+        //
+        // The other half is sharper: a folder renamed in Finder or Obsidian
+        // leaves the key naming something that is no longer there, and a name
+        // a teacher cannot find is worse than the placeholder, because it
+        // looks like an answer. (A rename made in Course Settings does not do
+        // that — `SpecialFolderRenamer` materialises the key at the one moment
+        // Plantoir witnesses the rename.)
+        //
+        // `CurriculumFolderRule` is the same rule folder protection uses, and
+        // asks in the same ORDER as `_find_curriculum_folder` in
+        // `build_site.py` — the recorded name first, then the folder whose
+        // name mentions the curriculum — among the shared folders the course
+        // has recorded. It is narrower in two ways neither app can help: the
+        // build scans the merged tree on disk, per-section folders included,
+        // and it also wants an expectation page inside the folder, which no
+        // configuration shows. So the build can pass over the folder named
+        // here in favour of another. Naming it is still righter than naming
+        // one that is not there.
         let curriculumName: String
         if let resolved = CurriculumFolderRule.resolvedCurriculumFolder(for: course),
            !resolved.isEmpty {
