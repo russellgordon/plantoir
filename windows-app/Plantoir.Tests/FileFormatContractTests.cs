@@ -108,16 +108,15 @@ public sealed class FileFormatContractTests : IDisposable
     }
 
     /// <summary>
-    /// WINDOWS-HANDOFF item 25's acceptance test. Un-skip it when the wizard
-    /// asks the skeleton question, and delete the name from
-    /// <see cref="TheWizardWritesEveryAnswerTheContractSaysItAsksFor"/>.
+    /// WINDOWS-HANDOFF item 25's acceptance test, skipped from 2026-09-06
+    /// until the wizard asked the skeleton question on 2026-09-07.
     ///
     /// <para>Around 1,900 course codes have a skeleton and no ready-made
-    /// payload, so this is the question most teachers actually meet. The mac
-    /// asks it and writes <c>hasSkeleton(code) &amp;&amp; teacherSaidYes</c>;
-    /// this side writes nothing, so <c>setup_course.py</c>'s own default of
-    /// TRUE decides — the right answer, arrived at without asking, which is
-    /// still not the same product.</para>
+    /// payload, so this is the question most teachers actually meet. Both
+    /// apps ask it and write <c>hasSkeleton(code) &amp;&amp; teacherSaidYes</c>.
+    /// For three weeks this side wrote nothing, so <c>setup_course.py</c>'s
+    /// own default of TRUE decided — the right answer, arrived at without
+    /// asking, which was still not the same product.</para>
     /// </summary>
     [Fact]
     public void TheWizardWritesUseSkeleton()

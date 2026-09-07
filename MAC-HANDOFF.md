@@ -218,22 +218,25 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   difference from today.**
 
   On the mac, `adoptSkeletonStructure()` runs on every code change and
-  replaces the four lists; `startsFromSkeleton` is consulted only when the
-  configuration is built (`NewCourseWizardView.swift` around line 1049), and
-  the lists written are the editor's either way. So a teacher who types SNC4M,
-  sees "Investigations, Fieldwork…" appear, and turns the toggle off is shown
-  — and gets — the science skeleton's folders with none of its pages, while
-  the file says `use_skeleton: false`. Russell's decision for Windows (brief
+  replaces the four lists (`NewCourseWizardView.swift` line 603, the only
+  caller); `startsFromSkeleton` is read only when the configuration is built
+  (lines 1285 and 1361), and the lists written are the editor's either way.
+  So a teacher who types SNC4M, sees "Concepts, Investigations, Exercises…"
+  appear, and turns the toggle off is shown — and gets — the science
+  skeleton's folders with none of its pages, while the file says
+  `use_skeleton: false`. Russell's decision for Windows (brief
   for item 25, 2026-09-06) was that the editor must show what will actually
   be created, in both directions: OFF restores the factory or LCS defaults,
   ON adopts again. `RestoreGenericStructure` in `NewCourseDialog.cs` does it,
-  guarded by `SkeletonCatalog.IsOffered` so a list the teacher has edited is
-  never discarded — the same guard adoption uses, asked the other way.
+  list by list against a snapshot of what the adoption put there, so a list
+  the teacher has edited since — including one the LCS switch rewrote — is
+  left exactly as it is, and only the untouched lists go back.
 
-  What is asked: either copy the restore (two lines around
-  `Toggle("Start from a …")`'s `onChange`, plus the guard the mac already
-  has as `structureToAdopt`'s), or record that leaving the folders is what
-  the mac means and say why. Then a case under a new
+  What is asked: either copy the restore (the Toggle has no `onChange`
+  today; add one that, when the toggle goes off, puts the defaults back for
+  each list still equal to what `adoptSkeletonStructure()` set, LCS variant
+  included), or record that leaving the folders is what the mac means and
+  say why. Then a case under a new
   `file-formats.json` → `wizardAnswerKeys` rule, or `shared-rules.json`, so
   the two wizards cannot drift again. Windows follows whichever is chosen.
 
@@ -3246,14 +3249,24 @@ is what happened to the test-race item, sitting here for three days with
   Rejected: writing the key alone (closes the test and leaves the editor
   showing folders that will not be made), and shipping the key now with the
   structure adoption as a later item (two sessions for one feature, with the
-  misleading wizard in between). Nothing new on the trail: `course created`
-  already records the code, and the answer is in the file it names.
+  misleading wizard in between). Nothing new on the trail: creating a course
+  is already recorded as the task starting and finishing, and the answer
+  itself is in the `course_config.json` that task writes.
+
+  Two things the review found and the port shares with the mac, left as they
+  are and written down so they are not re-found: every prefix in
+  `families.json` is three letters, so a single typed "S" already adopts the
+  `general` skeleton, whose label is "This Course" — the toggle then reads
+  "Start from a this course skeleton" on both platforms until the code is
+  long enough to resolve; and switching from a skeleton code to one WITH
+  example content and then turning pre-populate off leaves the skeleton's
+  folders in the editor, on both platforms. Neither is new to the mac.
 
   Reference: `windows-app/Plantoir/Views/NewCourseDialog.cs`
   (`AdoptSkeletonStructure`, `RestoreGenericStructure`, `SkeletonForCode`),
   `Plantoir.Core/Catalogs/SkeletonCatalog.cs`, `SkeletonCatalogTests`,
   `FileFormatContractTests`. Windows suite 1153 passed, 1 skipped (1150 and 2
-  before).
+  before: two test methods added, one un-skipped).
 
 - **Windows now refuses a folder named `index.md` with the contract's own
   sentence, records the refusal on the trail, and runs the

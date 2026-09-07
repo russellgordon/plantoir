@@ -89,7 +89,8 @@ Two more things, one of which is now ON that list:
   did. **1,029 passed with 2 skipped** after item 29 wired the contract case
   lists this suite was not reading (2026-09-06), and **1,125 with 2 skipped**
   after item 31 wired the twelfth of them — `linkRewriting`, which item 29's
-  audit missed because it was added the same day (2026-09-07); **1,153 with 1
+  audit missed because it was added the same day (2026-09-07); 1,150 with 2
+  skipped once items 26, 31, 33 and 34 were all merged; and **1,153 with 1
   skipped** once item 25 made the wizard ask the skeleton question. The one
   skip left is a named divergence rather than unfinished work: the
   frontmatter-key question the mac has to settle, carrying the test that
