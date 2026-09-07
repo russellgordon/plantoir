@@ -280,7 +280,8 @@ final class SiteHealthRepairTests: XCTestCase {
     /// still refuses, and the teacher stops looking.
     ///
     /// Found by Windows porting this file line by line (`MAC-HANDOFF.md`,
-    /// 2026-09-06). `restoreMedia` four functions above has always used the
+    /// 2026-09-06). `restoreMedia`, the function directly above it, has always
+    /// used the
     /// `isDirectory:` form; this one did not.
     func testAFolderWhereTheFrontPageBelongsIsRefusedRatherThanCalledAlreadyFine() throws {
         let (root, course) = try makeCourse()

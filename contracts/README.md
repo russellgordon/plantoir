@@ -167,7 +167,8 @@ assistant's tests". Two of them matter enough to repeat:
 ## Coverage: every mac test file, and where it stands
 
 No stone unturned — this table is the audit, and a file missing from it is a
-gap nobody has looked at. Counts are test functions, taken 2026-08-16.
+gap nobody has looked at. Counts are test functions, taken 2026-08-16; the `siteHealth` row was
+recounted 2026-09-07.
 
 **Shared through a contract** (the Windows suite can run the same cases):
 
@@ -218,7 +219,7 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
 | Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
-| What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (11), SiteHealthRepair (23), and `scripts/test_site_health.py` |
+| What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (15), SiteHealthRepair (23), and `scripts/test_site_health.py` |
 
 ### Which of these the WINDOWS suite runs
 

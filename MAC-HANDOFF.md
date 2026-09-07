@@ -336,7 +336,8 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      already put right. Nothing needed changing." — about a section that still
      had no front page, so the build still produced no site and the publish
      still refused; the one dialog written to end silence said the problem was
-     dealt with. `restoreMedia` two functions above got this right, with the
+     dealt with. `restoreMedia`, the function directly above it, got this
+     right, with the
      `isDirectory:` form and a comment saying why. You were right, and the fix
      is yours as much as ours.
 
@@ -345,7 +346,7 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      honest answer of the two that existed; the mac now REFUSES with a
      sentence of its own, touching nothing —
      `contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`,
-     `expect: "refused"`. So `SiteHealthRepair.Result` needs a third answer on
+     `expect: "refused"`. So `SiteHealthRepair.Result` needs a FOURTH answer on
      your side and
      `ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine`
      needs updating. The refusal also records a new trail event, `folder
