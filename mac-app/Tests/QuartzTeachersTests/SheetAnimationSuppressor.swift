@@ -49,6 +49,15 @@ import XCTest
 /// afterwards — and a runloop observer registered for `_NSMoveTimerRunLoopMode`
 /// never fires, which is the whole point.
 ///
+/// It is AppKit's own branch rather than a hole punched in AppKit. Disassembling
+/// `-[NSMoveHelper _doAnimation]`: the flag is read at +192 and true branches to
+/// +216 → `_stopAnimation` → return at +252, before the `CFRunLoopRunInMode` at
+/// +488 — the identical branch AppKit takes when its own
+/// `inhibitWindowAnimations` is set. The selector is consulted from exactly one
+/// place, `_doAnimation`, reached from `openSheet`, `closeSheet` and
+/// `animateResizeToFrame:` and nowhere else, so a sheet RESIZE is covered too
+/// and nothing but the animation is gated.
+///
 /// **Why the switch rather than an empty `_doAnimation`.** Overriding
 /// `_doAnimation` with an empty method also works, and was what this file did
 /// first. The switch is better for three reasons. AppKit's own skip path leaves

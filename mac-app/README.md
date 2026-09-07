@@ -97,7 +97,9 @@ xcodebuild -project Plantoir.xcodeproj -scheme Plantoir test \
 
 **The test bundle changes one thing about AppKit, on purpose.** Its
 `NSPrincipalClass` (`INFOPLIST_KEY_NSPrincipalClass` in `project.yml`) is
-`SheetAnimationSuppressor`, which asks AppKit to skip the sheet slide animation
+`PlantoirTestBundleSetup` — the `@objc` name of `SheetAnimationSuppressor`,
+which is the string the Info.plist carries and the test asserts. It asks AppKit
+to skip the sheet slide animation
 for the life of the test host. Without it the host segfaults inside a nested
 runloop whenever a test raises and clears an alert on the real window — 10 runs
 in 30 before it existed, 0 in 30 after. Nothing in the shipped app changes, and

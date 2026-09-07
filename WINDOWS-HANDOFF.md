@@ -1791,10 +1791,10 @@ to run in the background.
       now.
 
     **The section that explains it** is "A test host that segfaults, and the
-    five levers that look like they should fix it", below. Read it only if you
+    six levers that look like they should fix it", below. Read it only if you
     ever hit something of this shape; it is written for that moment.
 
-## A test host that segfaults, and the five levers that look like they should fix it
+## A test host that segfaults, and the six levers that look like they should fix it
 
 Written 2026-09-07, for whoever meets a modal that kills a test process rather
 than failing an assertion. It is macOS mechanics — none of the code transfers —
@@ -1832,7 +1832,7 @@ thread. **It is not a race**, which is the single most useful thing to know: no
 delay, no extra settling and no ordering tweak could ever have made it safe, and
 an afternoon spent adding sleeps would have been an afternoon wasted.
 
-### The five levers that do not work, with numbers
+### The six levers that do not work, with numbers
 
 Every one of these is the obvious answer, and all five are dead. Measured on
 macOS 26.6 (25G72) by swizzling `-[NSMoveHelper _doAnimation]` and timing it, in
@@ -1861,7 +1861,17 @@ appears among the four read on that path.
 `NSSheetMoveHelper` declares its own `-shouldSkipAnimation`, overriding
 `NSMoveHelper`'s. Forcing it to answer true is how AppKit itself takes a sheet
 out of the animation. One `method_setImplementation` on the SUBCLASS's own
-method, in the test bundle only:
+method, in the test bundle only.
+
+**It is AppKit's own branch, not a hole punched in AppKit.** Disassembling
+`-[NSMoveHelper _doAnimation]` on macOS 26.6: the flag is read at +192, and true
+branches to +216 → `_stopAnimation` → return at +252 — before the
+`CFRunLoopRunInMode` at +488. That is the identical branch AppKit takes when its
+own `inhibitWindowAnimations` is set. A logging implementation over the live
+selector shows `shouldSkipAnimation` is consulted from exactly one place,
+`_doAnimation`, reached from `openSheet`/`closeSheet`/`animateResizeToFrame:`
+and nowhere else — so a sheet RESIZE is covered by the same switch, and nothing
+but the animation is gated by it.
 
 | | `_doAnimation` runs | nested mode entered | open / close blocked |
 |---|---|---|---|
@@ -1899,9 +1909,21 @@ symptom you can outlast.
 **Measure with enough runs to mean something.** The rate here was about one run
 in three, so a fix "confirmed" by two green runs would be confirmed 44% of the
 time by doing nothing at all. Baseline and fix were each run 30 times, same
-command, same machine, same session. The earlier record of this defect had
-measured the FULL suite at roughly one abort in two — a different and more
-important number, because that is the scope a merge gate actually runs.
+command, same machine, same session.
+
+**And measure at the scope the GATE runs, not the scope that reproduces
+fastest.** This is the one that nearly shipped a defect. The single class was
+clean 30 times out of 30, which is where an honest-looking session would have
+stopped. The full suite then aborted 8 times out of 8 — a DIFFERENT crash, an
+over-released `_NSWindowTransformAnimation`, in the class that happens to run
+next alphabetically. It was caused by the tidy-up a review had asked for
+(closing the window the new test borrowed), and a single-class loop can never
+see it, because the damage only lands on whatever runs afterwards. Isolating it
+took four runs, and the fourth is the one that mattered — reproducing it with
+the fix TURNED OFF, which is what proved the crash had nothing to do with the
+fix and everything to do with the tidy-up. **When two things changed and
+something broke, turn one of them off rather than reasoning about which is more
+suspicious.**
 
 ### And the half of it that is a product rule, not a test rule
 
