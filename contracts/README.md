@@ -234,8 +234,9 @@ recorded only in a Swift comment, two shared markers classified by nobody, and
 a launcher flag listed as shared that only one platform has.
 
 So the state is worth writing down rather than re-derived. Windows now runs
-every list that audit counted, plus two it missed (`linkRules.browserSafe` and
-`example-content.sentinels`), through these classes in
+every list that audit counted, plus three it missed (`linkRules.browserSafe`,
+`example-content.sentinels` and `linkRewriting`, the last wired on 2026-09-07
+as WINDOWS-HANDOFF item 31), through these classes in
 `windows-app/Plantoir.Tests/`:
 
 | What it runs | Class |
@@ -248,18 +249,17 @@ every list that audit counted, plus two it missed (`linkRules.browserSafe` and
 | `gradedFolders.cases` | `GradedFolderContractTests` |
 | `gradedFolders.choices` (cases, the depth cap and the skip list) | `GradedFolderChoicesTests` |
 | `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution` | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
-| `specialNames.renameFolder.linkRewriting` — how a folder's new name is SPELLED inside a link (11 cases) | `FolderPathRewriterTests` |
+| `specialNames.renameFolder.linkRewriting` — every case, plus `escapingSet.leaveUnescaped` character by character | `FolderPathRewriterTests` |
 | `siteHealth.repair.reportedOncePerFinding` (both cases, built as `howToRunACase` says) and `siteHealth.repair.refusedWhenSomethingIsInTheWay` (the sentence, word for word) | `SiteHealthRepairTests`, `SiteHealthContractTests` |
 **Two notes on the two `specialNames` rows**, because they are not part of the audit's
 count and reading them as though they were would mislead. The `specialNames`
 lists in the first were already being run — those test classes predate item 29
 — and were simply never written down here. `linkRewriting` is newer than the audit — it was added to
 `shared-rules.json` on 2026-09-06, the same day, and fell outside the sweep; the
-row is here so it is not missed a second time. **Whether `FolderPathRewriterTests`
-deserialises its eleven cases or retypes five of its own is tracked by item 31
-in [`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md)** — read whether that item is
-struck rather than trusting a sentence here, which is exactly the kind of status
-line that drifts.
+row is here so it is not missed a second time. `FolderPathRewriterTests` has
+deserialised every case since 2026-09-07 (item 31 in
+[`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md), struck that day); before that it
+retyped five of its own.
 
 **One list was added after that audit and wired the same day it reached
 Windows.** `siteHealth.repair.reportedOncePerFinding` (mac, 2026-09-07) says a
