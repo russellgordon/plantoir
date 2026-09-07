@@ -713,6 +713,10 @@ public sealed partial class CourseSettingsView : UserControl
         {
             Config.Write(_course.ConfigFilePath);
             RefreshDirtyState();
+            // The mac's wording, so the two trails read the same. Declared
+            // when the trail was built and emitted by nobody until 2026-09-07.
+            ActivityTrail.Note(ActivityTrail.Event.SettingsSaved,
+                "saved the settings for " + _course.Code);
             SaveStatus.Text = "Saved ✓";
             SaveStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
             await Task.Delay(3000);
@@ -720,6 +724,11 @@ public sealed partial class CourseSettingsView : UserControl
         }
         catch (Exception error)
         {
+            // The exception's message can carry a path under the teacher's
+            // home folder; LogRedactor redacts on the way IN
+            // (windowsHomeFolder), so what reaches disk is already safe.
+            ActivityTrail.Note(ActivityTrail.Event.SettingsCouldNotBeSaved,
+                "could not save the settings for " + _course.Code + " — " + error.Message);
             SaveStatus.Text = $"Could not save: {error.Message}";
             SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
         }
