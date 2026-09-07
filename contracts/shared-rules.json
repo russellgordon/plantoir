@@ -500,11 +500,11 @@
         "skippedWhy": "Build output, Plantoir's own bookkeeping, and `Media`. Skipped at ANY depth, and never walked INTO. `Media` is defensible either way \u2014 a teacher grading video portfolios might want it \u2014 and stays out because media is not assessed work in either app today, and differing here would change what the coverage map says. The two build-output names are skipped even where built websites are kept outside the course folder, so a folder left behind from before that move cannot turn up in the list.",
         "skippedMatching": "EXACT, case included. A teacher's own folder called `media` is offered.",
         "hidden": "A folder whose name begins with a dot, or which the platform marks hidden, is never offered and never walked into.",
-        "links": "A symbolic link or junction is not followed \u2014 but a folder is only treated as one when it genuinely has a link target. Testing for 'any reparse point' is wrong on Windows: with OneDrive's Files On-Demand, which a teacher using a synced working folder has on by default, an unmaterialised folder is a reparse point too, and skipping those puts every synced course straight back to the top-level-only list this rule exists to fix.",
+        "links": "A symbolic link or junction is not followed — but a folder is only treated as one when it genuinely has a LINK TARGET, rather than merely carrying a reparse point. The distinction is a Windows caution: the Cloud Files API documents a sync provider's unmaterialised placeholders as reparse points, so an attribute test could skip every folder in a cloud-synced working folder and put that course straight back on the top-level-only list this rule exists to fix. NOT reproduced on the machine this was written on — probing its OneDrive with Files On-Demand on found no reparse-point directories at all — so read it as a hazard the narrower test costs nothing to avoid, rather than as a measured fault.",
         "sectionFolders": "A `sectionN` folder is NOT offered, and its children ARE walked. Its contents are merged into the site and its own name never appears in a page's path there, so ticking it would count nothing \u2014 while a graded folder inside it certainly does count.",
         "excludedItems": "A name in `excluded_items` is not offered and is not walked into. Filtered at the two levels the build's preflight scan actually discovers: the course folder's own children against `excluded_items.shared`, and a section folder's children against `excluded_items.per_section`. Matched EXACTLY, case included, the same way preflight matches. Without it, removing a folder from a course breaks the promise the removal confirmation makes \u2014 'Removing it will take it out of your course's marks pool' \u2014 on the very next redraw, because the folder is still sitting on disk; ticking it again then writes a `graded_folders` naming a folder `excluded_items` tells the build to skip, which reads as asked-and-answered and suppresses the `noGradedFolders` warning.",
-        "order": "Declared names first, in list order; then the walked names, shallowest first and \u2014 within one folder \u2014 by name, compared case-insensitively. Directory enumeration order is the filesystem's business and is promised by neither platform, so it is sorted to give a teacher the same list every time and to let these cases pin an order at all.",
-        "duplicates": "By exact name, so a folder name appearing at two depths is offered once, at the shallower position."
+        "order": "Declared names first, in list order; then the walked names DEPTH-FIRST: each folder's children in case-insensitive name order, and a folder's children before its own next sibling. NOT shallowest-first — `Alpha/Middle` comes before a top-level `Zebra`. Directory enumeration order is the filesystem's business and is promised by neither platform, so children are sorted, to give a teacher the same list every time and to let these cases pin an order at all.",
+        "duplicates": "By exact name, so a folder name appearing in two places is offered once — at the position the walk FIRST reaches it, which, the walk being depth-first, may be the deeper of the two."
       },
       "cases": [
         { "name": "a graded folder nested inside another is offered",
@@ -552,7 +552,7 @@
           "directories": [".git", ".git/objects", ".obsidian", "Tasks"],
           "expect": ["Tasks"] },
 
-        { "name": "the same folder name at two depths is offered once",
+        { "name": "the same folder name in two places is offered once",
           "sharedFolders": [], "perSectionFolders": [],
           "directories": ["Unit 1", "Unit 1/Tasks", "Unit 2", "Unit 2/Tasks"],
           "expect": ["Unit 1", "Tasks", "Unit 2"] },
@@ -563,7 +563,7 @@
           "excludedItems": { "shared": ["Tasks"], "per_section": ["Handouts"] },
           "directories": ["Concepts", "Tasks", "Tasks/Unit 1", "section1", "section1/All Classes", "section1/Handouts"],
           "expect": ["Concepts", "All Classes"],
-          "why": "Proposed FROM Windows and not implemented on the mac yet. Walking the course folder is what makes this case exist at all: before it, a folder removed from a list simply left the checklist with it. Now the folder is still on disk, so without this it comes back unticked one redraw after the app told the teacher 'Removing it will take it out of your course's marks pool'. Its children go with it: nothing under a removed folder reaches the site either." }
+          "why": "Proposed FROM Windows and not implemented on the mac yet. Walking the course folder is what makes this case exist at all: before it, a folder removed from a list simply left the checklist with it. Now the folder is still on disk, so without this it comes back unticked one redraw after the app told the teacher 'Removing it will take it out of your course's marks pool'. Its children go with it: nothing under a removed folder reaches the site either. The cost, recorded rather than hidden: a pooled name found ONLY inside the removed folder then has no row to untick until the folder is put back. It is not silent — the build's health check walks the MERGED tree, so a pool naming nothing the site publishes still reports that no folder counts for marks — and nothing is lost, because a pooled name with no row is preserved rather than dropped." }
       ]
     },
     "cases": [

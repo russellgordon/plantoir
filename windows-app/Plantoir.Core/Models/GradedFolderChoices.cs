@@ -89,8 +89,11 @@ public static class GradedFolderChoices
     }
 
     /// <summary>
-    /// The folder names found inside a course, shallowest first and in name
-    /// order within each folder.
+    /// The folder names found inside a course, DEPTH-FIRST: each folder's
+    /// children in case-insensitive name order, and a folder's children before
+    /// its own next sibling. So <c>Alpha/Middle</c> comes before a top-level
+    /// <c>Zebra</c>, and a name found in two places is kept where the walk
+    /// first reaches it — which may be the deeper of the two.
     ///
     /// <para>Includes the course's own top-level folders: a folder sitting on
     /// disk that is in neither copy list will be added to <c>shared_folders</c>
@@ -213,15 +216,23 @@ public static class GradedFolderChoices
             }
             if (attributes.HasFlag(FileAttributes.Hidden)) continue;
 
-            // A symlink or junction ONLY — never "any reparse point". With
-            // OneDrive's Files On-Demand, which teachers using a synced working
-            // folder have on by default, an unmaterialised folder is also a
-            // reparse point, and skipping those would have put every synced
-            // course straight back to the top-level-only list this class
-            // exists to fix. `LinkTarget` is null for a cloud placeholder and
-            // non-null for a real link, which is exactly the distinction
-            // wanted. (The mac's walker does not follow symlinks either.)
-            if (child.LinkTarget is not null) continue;
+            // A symlink or junction ONLY - never "any reparse point". The Cloud
+            // Files API documents a sync provider's unmaterialised placeholders
+            // as reparse points, so an attribute test risks skipping every
+            // folder in a cloud-synced working folder and putting that course
+            // straight back on the top-level-only list this class exists to
+            // fix. `LinkTarget` is non-null only for a real symlink or
+            // junction, which is the distinction wanted. (Probing this
+            // machine's own OneDrive with Files On-Demand on found no
+            // reparse-point directories, so the hazard is documented rather
+            // than measured - the narrower test costs nothing either way. The
+            // mac's walker does not follow symlinks either.)
+            //
+            // The attribute is checked FIRST purely to skip a syscall:
+            // `LinkTarget` can open a handle per directory, and every folder
+            // with a link target has the attribute set, so the pair means
+            // exactly what `LinkTarget is not null` means on its own.
+            if (attributes.HasFlag(FileAttributes.ReparsePoint) && child.LinkTarget is not null) continue;
 
             if (SkippedFolders.Contains(name, StringComparer.Ordinal)) continue;
 

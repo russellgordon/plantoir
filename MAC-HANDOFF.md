@@ -3008,20 +3008,54 @@ where.
   taken deliberately, because copying would have regressed Windows), and a
   SORT of each folder's children so the offered list has an order at all.
 
-  **And one Windows-only trap, which is the part that could not have been
-  guessed from the Swift.** The mac's walker does not follow symlinks. The
-  obvious C# translation is to skip anything carrying
-  `FileAttributes.ReparsePoint` — which is what `CourseArchiver.cs:226` already
-  does — and it would have been quietly catastrophic here: with OneDrive's
-  Files On-Demand, on by default, an unmaterialised DIRECTORY is a reparse
-  point too. Every folder in a synced working folder would have been skipped at
-  level 1, putting exactly the courses `cloudSyncedFolders` says teachers keep
-  on purpose straight back to the top-level-only list this change exists to
-  fix — and no test would have caught it, because a temp folder is never a
-  cloud placeholder. `DirectoryInfo.LinkTarget is not null` is the test that
-  distinguishes them: non-null for a real symlink or junction, null for a
-  placeholder. **`CourseArchiver` has the same exposure** and was left alone
-  as out of scope; it is worth a look on both platforms.
+  **And one Windows-only caution, stated as what was actually measured.** The
+  mac's walker does not follow symlinks. The obvious C# translation is to skip
+  anything carrying `FileAttributes.ReparsePoint` — which is what
+  `CourseArchiver.cs:226` already does — and the Cloud Files API documents a
+  sync provider's unmaterialised placeholders as reparse points, which would
+  make that test skip every folder in a cloud-synced working folder and put
+  exactly the courses `cloudSyncedFolders` says teachers keep on purpose
+  straight back on the top-level-only list this change exists to fix. No test
+  would catch it either, since a temp folder is never a placeholder.
+
+  **It was not reproduced.** Probing this machine's own OneDrive with Files
+  On-Demand on (confirmed on: 3 of 4 sampled files carried the
+  offline/unpinned attributes) found **zero reparse-point directories and zero
+  reparse-point files**. So this is a documented hazard, not an observed
+  fault, and the reason for the narrower test is that it costs nothing:
+  measured on the same machine, a junction made with `mklink /J` has the
+  attribute AND a non-null `LinkTarget`, a plain folder has neither, and .NET
+  returns a link target only for symlink and mount-point tags. Windows uses
+  `attributes.HasFlag(ReparsePoint) && child.LinkTarget is not null` — the
+  attribute first only to avoid a syscall per folder. **`CourseArchiver` uses
+  the blanket version** and was left alone as out of scope; worth a look on
+  both platforms, with the same caveat that nobody has seen it bite.
+
+  **Two more things the review found, neither of them Windows' to decide.**
+
+  - **`sectionN` is matched case-INSENSITIVELY by both apps and
+    case-SENSITIVELY by the build.** `build_site.py:3551` is
+    `re.fullmatch(r"section\d+", name)`; the mac's test lowercases first, and
+    Windows copied it. So a teacher's folder called `SECTION3` is hidden from
+    the marks list by both apps while preflight would add it to
+    `shared_folders` and the build would count it. Vanishingly rare, identical
+    on both platforms, and left alone deliberately rather than "fixed" on one
+    side — recorded so it is not re-found a third time.
+  - **A pooled name can end up with no row to untick**, and Windows' own
+    `excluded_items` filter is one way to reach it. Tick something on a course
+    with `Portfolios/Tasks`, so the pool freezes as `["Tasks"]`, then remove
+    `Portfolios` from Shared folders: `Portfolios` was never graded, so
+    nothing drops `Tasks`, and the next walk skips the removed folder without
+    descending, so no row for `Tasks` is drawn. The mac reaches the same state
+    by other routes that both apps share — a pooled folder deleted on disk, or
+    one five levels down past the cap. **It is not silent and nothing is
+    lost**: `_has_graded_folders` walks the MERGED tree, so a pool naming
+    nothing the site publishes still raises `noGradedFolders`, and the list
+    editor preserves a member it is not drawing rather than dropping it. The
+    invariant that would close it — always offer what is already in the pool,
+    so a tick can always be undone — is a shared product decision and a
+    contract change, so it is **recommended here rather than taken on one
+    platform at a time.**
 
   Reference: `windows-app/Plantoir.Core/Models/GradedFolderChoices.cs`,
   `windows-app/Plantoir.Tests/GradedFolderChoicesTests.cs`,

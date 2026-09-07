@@ -86,6 +86,15 @@ public class GradedFolderChoicesTests : IDisposable
     /// alone. A test asserting only that "Tasks" appears in the offered list
     /// passed on the broken code, while the teacher's first tick still froze a
     /// pool without it.</para>
+    ///
+    /// <para><b>Be honest about what this can and cannot catch.</b> It would
+    /// not have compiled against the old no-argument
+    /// <c>MaterializedGradedFolders()</c> at all, and what it exercises is the
+    /// rule — that materialising over the OFFERED list keeps a nested folder —
+    /// rather than the view's wiring, where the bug actually lived. Nothing
+    /// reachable from a unit test asserts that Course Settings passes the same
+    /// list to both; making the parameter REQUIRED is what stands in for that,
+    /// since the narrow pool can no longer be had by writing nothing.</para>
     /// </summary>
     [Fact]
     public void TheFrozenPoolIsMaterialisedFromTheSameListTheChecklistOffers()
