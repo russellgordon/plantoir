@@ -167,6 +167,14 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   suite is not red on the stale text — nothing pins prose — which is exactly
   why it needs saying here rather than being left to be noticed.
 
+  Two source comments say the same stale thing and need no regeneration:
+  `mac-app/Tests/QuartzTeachersTests/SiteHealthContractTests.swift` (around
+  line 143: "Windows answers `Failed` here today with the generic … so this is
+  the sentence they adopt") and `mac-app/QuartzTeachers/Models/SiteHealthRepair.swift`
+  (around line 367: "Windows has no blocked case yet, so over there it reads
+  namelessly too until `WINDOWS-HANDOFF.md` item 33 lands"). Fix them in the
+  same pass, or the contract will be right and the code beside it wrong.
+
 - **`AppRulesContract.milestones()` leaves the example-course task out of the
   readout, so two shared markers were classified by nobody** (found 2026-09-06,
   branch `issue/29-windows-contract-case-lists`). **A one-line fix, and the
@@ -2921,10 +2929,12 @@ is what happened to the test-race item, sitting here for three days with
   `activityTrail.mustRecord` by equality, so the mac's merge of
   `issue/repair-index-md-directory` turned the Windows suite red — one test,
   `1030 passed, 1 failed` — the moment it reached `dev`. That is the mechanism
-  working, and it is ALSO why nine of the twelve overnight batch branches of
-  2026-09-06 (`batch/README.md`) were refused at the gate: they were cut from
-  a `dev` that already carried the new event, so every one of them inherited
-  a failure that had nothing to do with its own work. Windows had answered
+  working, and it is ALSO why nine of the twelve branches of the Windows
+  machine's overnight batch of 2026-09-06 were refused at its gate (the
+  driver and its run summaries live outside the repository, so there is
+  nothing to follow here): they were cut from a `dev` that already carried
+  the new event, so every one of them inherited a failure that had nothing to
+  do with its own work. Windows had answered
   `Failed` for the directory case since `3ddd4af4` — honest, and still
   sending the teacher to check permissions on a folder that is not locked.
 
