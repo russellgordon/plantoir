@@ -1470,8 +1470,8 @@ to run in the background.
     coverage at all beyond unit tests of its parts. It needs three credentials
     and the network, which is WHY it is opt-in, and that reasoning is sound;
     what was missing is anybody being told. Evidence:
-    `windows-app/PROGRESS.md` (the "Two things that are NOT in that list"
-    bullet) and [`documentation/12-windows-app.md`](documentation/12-windows-app.md).
+    `windows-app/PROGRESS.md` (the "the deploy gate exists now" bullet below
+    its parity table) and [`documentation/12-windows-app.md`](documentation/12-windows-app.md).
     **Windows owes nothing here except a decision** — run it on a schedule, run
     it as a release-cut step, or leave it hand-run and say so in `RELEASING.md`.
     **Not for tonight.**
