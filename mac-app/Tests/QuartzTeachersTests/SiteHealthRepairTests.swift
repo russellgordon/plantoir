@@ -141,6 +141,7 @@ final class SiteHealthRepairTests: XCTestCase {
         XCTAssertFalse(cases.isEmpty, "the contract carries no case to run")
 
         for testCase in cases {
+            let check: String = try XCTUnwrap(testCase["check"] as? String)
             let sections: [[String: Any]] = try XCTUnwrap(testCase["sections"] as? [[String: Any]])
             var sectionNumbers: [Int] = []
             for section in sections {
@@ -153,7 +154,7 @@ final class SiteHealthRepairTests: XCTestCase {
             var findings: [SiteHealthFinding] = []
             for section in sections {
                 let number: Int = try XCTUnwrap(section["number"] as? Int)
-                findings.append(finding("sectionIndexMissing", fixable: true, section: number))
+                findings.append(finding(check, fixable: true, section: number))
                 guard section["frontPage"] as? String == "theTeachersOwn" else {
                     continue
                 }
@@ -185,7 +186,8 @@ final class SiteHealthRepairTests: XCTestCase {
                 try FileManager.default.createDirectory(
                     at: theirs.deletingLastPathComponent(), withIntermediateDirectories: true
                 )
-                try "theirs".write(to: theirs, atomically: true, encoding: .utf8)
+                try "---\ntitle: My own front page\n---\nWelcome!\n"
+                    .write(to: theirs, atomically: true, encoding: .utf8)
             }
             let attempts: [SiteHealthRepair.Attempt] = SiteHealthRepair.repair(
                 findings, in: secondCourse

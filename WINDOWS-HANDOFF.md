@@ -1472,6 +1472,50 @@ to run in the background.
     The section below explains both, including what was REJECTED — moving the
     folder aside and writing a proper front page in its place — and why.
 
+34. **The mac's repair now answers one result per FINDING, and the rule is
+    contract data you can run.** This is your OTHER finding of 2026-09-06, and
+    you were right about it too: `repair(_:in:)` came back as a dictionary keyed
+    by the check's NAME, so two sections each missing a front page — two
+    findings, one name — collapsed to whichever ran last. Both were repaired;
+    only one was reported. "Section 1 restored, section 2 was already there"
+    read as "That is already put right. Nothing needed changing." with no
+    preview offered, for a repair that really had put a page back. Fixed on the
+    mac 2026-09-07 (branch `issue/repair-results-keyed-by-name`,
+    `GUI-IMPROVEMENTS.md` row 427).
+
+    **You inherit the code for free and owe one small piece of wiring.** Your
+    `Repair` has returned `IReadOnlyList<(SiteHealthFinding, Result)>` since you
+    ported the file (`SiteHealthRepair.cs:251`), and your
+    `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer` already pins the
+    behaviour — the mac has simply caught up to a shape you shipped first, which
+    is worth saying out loud because this list is usually the other direction.
+    What is new is that the rule is now DATA:
+    `contracts/shared-rules.json` → `siteHealth.repair.reportedOncePerFinding`
+    carries two cases, a `howToRunACase` note saying exactly how to build each
+    one, and the vocabulary `expectResults` draws on. Deserialise those two
+    cases in `Plantoir.Tests` in place of the hand-written test, so the rule is
+    checked against one source on both sides rather than proved twice in
+    parallel. **Your suite is not red without it** — nothing pins this list by
+    equality — so this is a should, not a must.
+
+    Two things in that entry to read rather than skim. `reachability` records
+    that the collapse was unreachable from either app's front end (a section
+    window owns one runner; the checks announce per section), so nobody later
+    reads it as damage a teacher met. And `knownLimit` records what was
+    deliberately NOT fixed: one check name with two DIFFERENT outcomes — section
+    1 restored, section 2 failed — still reads "Put the front page back."
+    followed by "Could not put the front page back.", because the sentence has
+    no way to say which section is which. Both platforms read that way, it is as
+    unreachable as the collapse was, and new wording nobody has weighed is
+    harder to take back than a paragraph of explanation. On the mac the REFUSAL
+    case escapes it, because its own sentence names the section folder; on your
+    side it will too, the day item 33 lands.
+
+    One stale comment left for you rather than edited from here: the `<remarks>`
+    on `SiteHealthRepair.cs:243-247` call the per-finding list "a deliberate
+    divergence from the mac, whose dictionary is keyed by name". It is no longer
+    a divergence. Reword it when you next touch the file.
+
 ## Windows no longer runs any of this in a container
 
 **Read this before the architecture sections below.** Windows dropped Docker,
@@ -5795,6 +5839,9 @@ Named here so it is not rediscovered as a puzzle, and NOT fixed by this piece:
   case and a second contract sentence — and nobody has decided the wording.
 - `SectionAdder` has the identical bare `fileExists` guard on `index.md` when a
   section is added, so a folder by that name is skipped silently there too.
-- `repair(_:in:)` returns `[String: Result]` keyed by check NAME, so two
+- ~~`repair(_:in:)` returns `[String: Result]` keyed by check NAME, so two
   findings with the same name collapse — your second finding of 2026-09-06,
-  owned by its own piece of work.
+  owned by its own piece of work.~~ — ✅ Done 2026-09-07, branch
+  `issue/repair-results-keyed-by-name`. It returns `[Attempt]` now, one entry
+  per finding, and the rule is contract data both suites can run
+  (`siteHealth.repair.reportedOncePerFinding`). See item 34 above.
