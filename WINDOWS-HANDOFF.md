@@ -1442,6 +1442,42 @@ to run in the background.
     `NoCurriculumFolderYet` and `NoneChosen` to the swept text, and give the
     fixture no curriculum folder.
 
+33. **A scheduled publish can still reach a question nobody is there to
+    answer — the mac has closed most of it, and two of your tests are red
+    until you close yours.** This is the item you raised (`MAC-HANDOFF.md`,
+    "A SCHEDULED DEPLOY HAS NOBODY TO ANSWER A QUESTION"; `TODO.md`,
+    2026-09-06), taken up on the mac on 2026-09-06. **What you inherit
+    free:** `scripts/deploy.py` is shared Python, so every refusal inside it
+    is already yours the moment the image carries it — including the one
+    that hung your harness for 45 minutes, a new Netlify site being named
+    after the saved one was deleted upstream. **What you owe, and it is
+    three small things:** `DeployCommand.Arguments` needs an `unattended`
+    parameter that appends `--non-interactive` straight after the course and
+    section (three new `deployArguments` cases in
+    `contracts/app-rules.json` carry `"unattended": true`, and
+    `AppRules_DeployArguments_MatchesContract` fails all three until it
+    does); `deploy.ps1` must PARSE `--non-interactive` with the
+    `'^--non-interactive$'` idiom
+    (`PublishAndLauncherContractTests` →
+    `TheDeployLauncherAcceptsTheExtraFlagsTheContractGivesIt` fails until it
+    does — do not mark the entry `macOnly`,
+    that would be a lie); and `TaskScheduling.WriteWrapperScript` must
+    append the flag to each `deploy.ps1` line it generates. Both reds are
+    the mechanism working, not damage. **Copy the refusal list from
+    `contracts/app-rules.json` → `launcherFlags.nonInteractive` rather than
+    deriving your own**: a flag that refuses in six places on one platform
+    and four on the other is a scheduled publish that hangs on one of them.
+    **`-NonInteractive` on PowerShell does not help here** and your own
+    `TODO.md` note already says why — `deploy.py`'s `input()` runs in a
+    Python child and the flag does not reach it. **Three things are NOT
+    done, on purpose, and are Russell's to decide** — the course-code guard,
+    what the app says afterwards, and the assistant/MCP publish path; all
+    three are set out in "A publish nobody is there to answer questions for"
+    below, with what was measured. **And `verify.sh` has not been run
+    against any of this** — it needs a TTY, Docker and Colima, and the
+    overnight session that wrote it was told not to. It must be run before
+    this is trusted.
+
 ## Windows no longer runs any of this in a container
 
 **Read this before the architecture sections below.** Windows dropped Docker,
@@ -5463,6 +5499,142 @@ imitation ever starts costing more than it saves.
 — keep the real control.** The mac ended up here because it had already been
 forced off the native control for the flyout's sake; do not inherit that
 position by accident.
+
+## A publish nobody is there to answer questions for (2026-09-06)
+
+You found this and you were right not to fix it: `verify-deploy.ps1`'s Netlify
+leg hung until its own 900-second timeout, because the site saved in
+`.netlify_sites/section1.json` had been deleted at Netlify at some point, so
+the publish fell through to creating a fresh one and asked what to call it.
+The mac has now added the flag; this is the reasoning, so the second
+implementation is a copy rather than a re-derivation.
+
+### The rule, in one sentence
+
+`--non-interactive` says nobody is at the computer, and every question a
+teacher would have to answer becomes a REFUSAL that names the question.
+Nothing takes a default it was not given.
+
+### Why refusing, and not any of the alternatives
+
+Both of the things that happen today were measured, and both are bad in a way
+that reaches a teacher:
+
+* **With a terminal on standard input**, Python's `input()` waits forever.
+  Your two harness runs sat at one prompt for **45 minutes**, still alive when
+  they were swept up. The failure a teacher meets is "the overnight publish
+  never happened and nothing said so" — the site is simply not updated in the
+  morning.
+* **Without one**, `sys.stdin.isatty()` is false and `prompt()` returns its
+  DEFAULT silently. Nothing is printed. The site is created at whatever
+  address the default suggested, a name conflict auto-suffixes `-01`, and on a
+  machine with no saved surname the address has no surname in it. The failure
+  is "published to an address nobody chose", which is worse than the first
+  because it looks like success.
+
+**"Assume yes" was rejected** for anything that publishes to students. A
+Netlify address is what students type, it is global to all of Netlify, and it
+cannot be changed later without every existing link breaking — there is no
+default that is safe to pick on a teacher's behalf at half six in the morning.
+Refusing is the only answer that neither hangs nor publishes something unasked
+for.
+
+### It is OPT-IN, and that is load-bearing
+
+Only the scheduled deploy passes it. The Deploy button, the assistant and an
+MCP client do not, and must not: on the mac, pressing Deploy runs the
+identical launcher through a pseudo-terminal (`PseudoTerminal.swift`), so a
+question from `deploy.py` comes back to the app and becomes a dialog the
+teacher answers (`ScriptRunner.separateDefaultAnswer`, `AskedQuestion`). That
+is the feature. A flag the launcher decided for itself — "no terminal, so
+refuse" — would have broken it, which is why the CALLER says which kind of run
+this is.
+
+### What it refuses, and where
+
+The list is contract data: `contracts/app-rules.json` → `launcherFlags.
+nonInteractive.refusals`. **Copy it rather than deriving your own.** A flag
+that refuses in six places on one platform and four on the other is a
+scheduled publish that hangs on one of them, and the missing one will be found
+by a teacher rather than by a test.
+
+Two of the entries are worth reading twice:
+
+* **A saved credential that fails its check is KEPT, not cleared.** Ordinarily
+  `deploy.sh` deletes a Netlify or Cloudflare token that does not validate and
+  asks for a new one. The check is a network call, so "this computer was
+  offline at 6am" and "the token was revoked" look identical from inside the
+  launcher — and throwing away a working credential that only a person can
+  replace is much the more expensive of the two mistakes. An ordinary publish
+  still clears it, with somebody there to paste a new one.
+* **The surname asymmetry is real and is not an oversight.** Naming a new
+  NETLIFY site is always a question, so it is always refused. Naming a new
+  CLOUDFLARE project asks nothing when the surname is already saved — the
+  address is derived from course, section, year and surname — so nothing is
+  refused there. The one question on that path is the surname itself, and that
+  is the one thing refused.
+
+### The one prompt deliberately left alone, and why it is your decision too
+
+`deploy.sh` and `preview.sh` both guard against an Ontario "Open" course code
+mistyped with a trailing zero: *Fix course code to 'ICS3O'? [Y/n]*. It is
+**unchanged**, and `contracts/app-rules.json` →
+`launcherFlags.nonInteractive.notRefused` says so in the contract so neither
+side quietly "fixes" it alone.
+
+Three facts decide it, and two of them were got wrong on the way here:
+
+1. **It reaches real courses.** The guard matches any three letters, a digit
+   and a zero, and a course code is free text up to twelve characters. `ENG10`,
+   `SCI10` and `ART10` all match, and a British Columbia course carries codes
+   of exactly that shape.
+2. **The two launchers already fail DIFFERENTLY at it, unattended.**
+   `preview.sh` has no `set -e`: the read fails at end of input, the answer
+   variable stays empty, `${_ans:-Y}` takes the default, and the build
+   silently retargets a DIFFERENT course code. `deploy.sh` has `set -euo
+   pipefail`: the same failed read ends the script on the spot, exit 1, with
+   nothing printed at all. A scheduled publish builds before it publishes, so
+   it meets both.
+3. **Both candidate answers are defensible.** Refusing with a message is
+   better than dying wordlessly, but leaves those courses unpublishable
+   unattended and wants a matching check at SCHEDULING time so the teacher
+   hears about it when they set the alarm rather than the next morning.
+   Keeping the code as typed makes them work — the code came from
+   `course_config.json` rather than a keyboard, so there is no typo to fix,
+   and a genuine typo still fails loudly at "Course folder not found".
+
+Because it picks between two defensible behaviours it is Russell's call, not a
+session's. Whichever way it goes, it goes both ways at once: `preview.sh` and
+`preview.ps1` need the flag as well as the deploy launchers, and the mac's
+`ScheduledDeploy.oneShotCommand` and your `TaskScheduling.WriteWrapperScript`
+both have a `--build-only` line to add it to.
+
+### Two more that are proposed rather than done
+
+* **Nothing tells the teacher.** A refusal lands in the section's own log and
+  nowhere else. The mac's `ScheduledDeploy.recordFolderProblems` already reads
+  that log from a byte offset after a scheduled run, so the mechanism for
+  noticing exists — but what the app SAYS, and the activity-trail line that
+  goes with it, is new teacher-facing behaviour and new detection, and it was
+  not invented at 3am. Your own note that "NOTHING reaches the activity trail
+  while they wait" is the same gap seen from your side.
+* **The assistant and MCP publish paths are headless callers with a terminal.**
+  On the mac, `AssistSiteWork` drives `MultiDestinationDeployRunner`, which
+  runs through `ScriptRunner`'s pseudo-terminal — so "publish tomorrow's class"
+  typed to the assistant, on a section whose site was deleted upstream, reaches
+  the same `input()` with a terminal and no answerer. Nothing outside the task
+  console reads `pendingQuestion`. Whether the fix is to pass `unattended:
+  true` on those paths or to surface the question in the conversation is a
+  product decision. Check whether `plantoir-mcp.exe`'s `publish_section` has
+  the same shape on your side; it probably does.
+
+### What has NOT been verified
+
+`verify.sh` is the real gate for anything under `scripts/` and it has **not**
+been run against this change — it needs a TTY, Docker and Colima, and the
+session that wrote it was told not to. `scripts/test_deploy_non_interactive.py`
+(11 cases, no Docker, no network) and the mac unit suite (1048 tests) are
+green, and that is all that is claimed.
 
 ## Spelling a folder's new name inside a link (2026-09-06)
 

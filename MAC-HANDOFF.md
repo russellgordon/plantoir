@@ -869,11 +869,43 @@ rather than being deleted.
   TheTwoPlatformWordedSentencesSayThisPcRatherThanYourMac` asserts it in both
   directions on this side.
 
-- ⚠️ **A SCHEDULED DEPLOY HAS NOBODY TO ANSWER A QUESTION, AND `deploy` STILL
-  ASKS THEM — the same shape on both platforms** (found on Windows,
-  2026-09-06). Written up in full in `TODO.md`; summarised here because the mac
-  is affected identically and neither side should assume the other has it in
-  hand.
+- 🟡 **PARTLY DONE 2026-09-06 (mac). A SCHEDULED DEPLOY HAS NOBODY TO ANSWER A
+  QUESTION, AND `deploy` STILL ASKS THEM — the same shape on both platforms**
+  (found on Windows, 2026-09-06). Written up in full in `TODO.md`; summarised
+  here because the mac is affected identically and neither side should assume
+  the other has it in hand.
+
+  **What landed on the mac, 2026-09-06.** `--non-interactive`, exactly as this
+  entry asked for: passed by the scheduled deploy and by nothing else, and
+  making every question a REFUSAL that names the question rather than a wait or
+  a silent default. It covers the three credential pastes in `deploy.sh`,
+  naming a new Netlify site in `deploy.py` (your 45-minute hang), and the
+  surname when a new Cloudflare project is being named; `prompt()` refuses as a
+  backstop so a question added later fails loudly. The launcher also asks for no
+  terminal at all under the flag, so the branch that WAITS cannot exist even if
+  Task Scheduler turns out to provide a console — **which answers the open
+  question in this entry by making it not matter.** The refusal points are
+  contract data (`contracts/app-rules.json` → `launcherFlags.nonInteractive`),
+  so copy them rather than deriving a second list. Your suite goes red in two
+  places until you take it — `AppRules_DeployArguments_MatchesContract` (three
+  new cases carry `"unattended": true`) and
+  `TheDeployLauncherAcceptsTheExtraFlagsTheContractGivesIt` (`deploy.ps1` must
+  parse the flag) — and that is the request, not damage. Full reasoning,
+  including what was rejected: `WINDOWS-HANDOFF.md` item 33 and "A publish
+  nobody is there to answer questions for".
+
+  **What is STILL OPEN, and it is Russell's to decide rather than a session's**:
+  the course-code guard (*Fix course code to 'ICS3O'?*), left untouched on
+  purpose because both candidate answers are defensible — and note that the two
+  launchers fail differently at it today, since `preview.sh` has no `set -e` and
+  takes the `[Y/n]` default while `deploy.sh` has `set -euo pipefail` and dies
+  wordlessly; what the app SAYS to the teacher afterwards, and the activity-trail
+  line that goes with it (still nothing on the trail, exactly as this entry
+  says); and the assistant/MCP publish path, which on the mac runs through a
+  pseudo-terminal with nobody to answer — check whether `plantoir-mcp.exe`'s
+  `publish_section` has the same shape.
+
+  **Not verified:** `verify.sh` has not been run against the change.
 
   Found by the new `verify-deploy.ps1`, whose Netlify leg hung until its own
   timeout: the site saved in `.netlify_sites/section1.json` no longer existed

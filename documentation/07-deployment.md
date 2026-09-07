@@ -67,10 +67,25 @@ site name encodes everything a teacher needs to recognize it later:
 
 - The teacher's last name is asked once and cached in
   `courses/.internal/profile.json` (a hidden folder that deploy also adds to
-  `courses/.gitignore`, along with `_backups/`).
+  `courses/.gitignore`, along with `_backups/`). It is asked for only at the
+  moment a NEW site or project is being named, never on a repeat publish —
+  and never at all under `--non-interactive`.
 - Names are sanitized to Netlify's subdomain rules, and name collisions
   (Netlify site names are global) trigger a retry prompt with an
   auto-suggested `-02`, `-03`, … suffix.
+
+**None of this can happen unattended.** A scheduled publish passes
+`--non-interactive`, and naming a site is the one question with no safe
+default — the address is what students type, it is global to all of Netlify,
+and changing it later breaks every existing link. So with that flag the
+script REFUSES here rather than asking or quietly taking the suggestion. It
+is reached in two states and both stop: a section that has never been
+published (which the app already refuses to SCHEDULE, for the same reason),
+and — the one that cannot be foreseen — a site that existed when the alarm
+was set and has since been deleted at Netlify, so the lookup below comes back
+404 and falls through to creating a fresh one. See
+[launcher scripts](03-launcher-scripts.md#deploysh) and
+`contracts/app-rules.json` → `launcherFlags.nonInteractive`.
 
 The created site's identity is saved as a **marker file** at
 `courses/<CODE>/.netlify_sites/section<N>.json` so subsequent deploys go to
@@ -270,7 +285,17 @@ Two things are needed, and only one comes from the teacher directly:
   against `/user/tokens/verify`, and the account is resolved by trying
   discovery, then a remembered value, then asking once. The GUI collects it
   up front, because an app publishing in the background has nothing attached
-  that could answer a console prompt.
+  that could answer a console prompt — and under `--non-interactive` that
+  last "asking once" is a refusal instead, naming the Account ID and pointing
+  at the course's own settings.
+
+Naming a NEW project asks the teacher nothing, and that is the one place this
+path differs from Netlify's: the project name is derived (course, section,
+year, surname) rather than offered for editing. So under `--non-interactive`
+there is nothing to refuse here **unless the surname has never been saved on
+this computer**, which is the single question on the path — and that one is
+refused. See `contracts/app-rules.json` → `launcherFlags.nonInteractive`,
+which records the asymmetry so neither app "tidies" it away.
 
 Per-section state lives in `courses/<CODE>/.cloudflare_sites/section<N>.json`,
 mirroring the Netlify marker, so re-publishing reuses the same project rather

@@ -28,11 +28,11 @@ verify.sh runs this early, before the (slow) Docker build.
 import contextlib
 import io
 import json
-import os
 import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import deploy
@@ -91,20 +91,19 @@ class NonInteractiveRefusesEveryQuestion(unittest.TestCase):
         )
 
     def test_the_surname_question_refuses(self):
-        """Reached only when a NEW website is being named."""
+        """Reached only when a NEW website is being named.
+
+        The surname is looked for under `GLOBAL_SECRETS_ROOT`, which is a
+        path inside the container — so it is pointed at an empty folder
+        here rather than left to the host's, where "no surname saved"
+        would be true by accident rather than by arrangement.
+        """
         with tempfile.TemporaryDirectory() as tmp:
-            previous_home = os.environ.get("HOME")
-            os.environ["HOME"] = tmp
-            try:
+            with unittest.mock.patch.object(deploy, "GLOBAL_SECRETS_ROOT", Path(tmp)):
                 with contextlib.redirect_stdout(io.StringIO()):
                     with self.assertRaises(SystemExit) as stopped:
                         deploy.get_or_prompt_teacher_last_name()
                 self.assertEqual(stopped.exception.code, 1)
-            finally:
-                if previous_home is None:
-                    os.environ.pop("HOME", None)
-                else:
-                    os.environ["HOME"] = previous_home
 
 
 class WithSomebodyThereNothingChanges(unittest.TestCase):
@@ -117,11 +116,16 @@ class WithSomebodyThereNothingChanges(unittest.TestCase):
 
     def test_a_prompt_still_takes_its_default_when_the_flag_is_off(self):
         self.assertFalse(deploy.NON_INTERACTIVE)
-        # No terminal here, which is the path an ordinary piped run takes.
-        self.assertEqual(
-            deploy.prompt("Enter Netlify site name", default="ics3u-s1-2026-gordon"),
-            "ics3u-s1-2026-gordon",
-        )
+        # Standard input is replaced rather than merely assumed to be a
+        # pipe. `prompt()` branches on `isatty()`, so run from a terminal
+        # this test would call `input()` and WAIT — and verify.sh insists
+        # on a terminal, which means the gate for a hang would itself hang,
+        # with its output redirected to a log so nothing said why.
+        with unittest.mock.patch.object(sys, "stdin", io.StringIO()):
+            self.assertEqual(
+                deploy.prompt("Enter Netlify site name", default="ics3u-s1-2026-gordon"),
+                "ics3u-s1-2026-gordon",
+            )
 
 
 class TheFlagIsWiredAllTheWayThrough(unittest.TestCase):
@@ -137,16 +141,25 @@ class TheFlagIsWiredAllTheWayThrough(unittest.TestCase):
     def test_the_launcher_accepts_the_flag_and_does_not_call_it_unknown(self):
         """`deploy.sh` exiting with "Unknown option" is a publish that never started.
 
-        Run in an empty folder, so it stops at the missing recipe long
-        before anything needs Docker — but only AFTER it has parsed the
-        flags, which is what this is really asking about.
+        A COPY is run, in an empty folder, because the launcher's second
+        line is `cd "$(dirname "$0")"` — running the repository's own copy
+        would ignore `cwd` entirely and carry on into the real working
+        folder. From an empty folder it stops at the missing recipe, long
+        before anything needs Docker, but only AFTER parsing the flags,
+        which is what this is really asking about.
         """
         with tempfile.TemporaryDirectory() as tmp:
+            launcher = Path(tmp) / "deploy.sh"
+            launcher.write_bytes((REPOSITORY_ROOT / "deploy.sh").read_bytes())
             result = subprocess.run(
-                ["bash", str(REPOSITORY_ROOT / "deploy.sh"), "ICS3U", "1", "--non-interactive"],
-                capture_output=True, text=True, cwd=tmp, timeout=120, stdin=subprocess.DEVNULL,
+                ["bash", str(launcher), "ICS3U", "1", "--non-interactive"],
+                capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL,
             )
             self.assertNotIn("Unknown option", result.stdout + result.stderr)
+            self.assertIn(
+                "missing the toolchain's build recipe", result.stdout + result.stderr,
+                "The flags were parsed and it reached the first real step",
+            )
 
     def test_the_launcher_hands_the_flag_to_the_python(self):
         """The container command builds its options as a string, so this

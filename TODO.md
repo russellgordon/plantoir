@@ -118,10 +118,33 @@ an item when it ships (finished behaviour is recorded in
   Not done now because neither half is reachable from the six tests that
   exist: they drive Course Settings, which starts nothing.
 
-- ⚠️ **A scheduled deploy has nobody to answer a question, and `deploy` still
-  asks them — found on Windows, 2026-09-06, and it is the same shape on both
-  platforms.** Not fixed, because the fix touches the launcher's argument
-  contract and that is a decision rather than a repair.
+- 🟡 **PARTLY DONE on the mac 2026-09-06. A scheduled deploy has nobody to
+  answer a question, and `deploy` still asks them — found on Windows,
+  2026-09-06, and it is the same shape on both platforms.** Originally not
+  fixed, because the fix touches the launcher's argument contract and that is a
+  decision rather than a repair.
+
+  **What was done, 2026-09-06.** `--non-interactive` exists on `deploy.sh` and
+  `scripts/deploy.py`, passed by the scheduled deploy and by nothing else. Every
+  question it can meet is now a refusal that names the question: the three
+  credential pastes in the launcher, naming a new Netlify site (the state that
+  hung the harness), and the surname when a new Cloudflare project is being
+  named. The launcher also asks for no terminal under the flag, so the branch
+  that WAITS cannot exist — which settles the open question below (“does Task
+  Scheduler give the wrapper a console?”) by making the answer not matter.
+  A saved credential that fails its check is now kept rather than cleared when
+  nobody is here. Refusal points: `contracts/app-rules.json` →
+  `launcherFlags.nonInteractive`. Not run: `verify.sh`.
+
+  **Still open, and deliberately so — each is a product decision:**
+  (1) the course-code guard, unchanged, with its two candidate answers set out
+  in the contract's `notRefused`; (2) what the app tells the teacher after a
+  refused overnight publish, and the trail line for it — the last paragraph of
+  this entry is still true, nothing reaches the trail; (3) the assistant and MCP
+  publish paths, which run through a pseudo-terminal with nobody to answer;
+  (4) the Windows mirror (`deploy.ps1`, `TaskScheduling.WriteWrapperScript`),
+  whose suite is red in two places until it lands. Everything below this point
+  is the original entry, kept as it was written.
 
   **How it was found.** `verify-deploy.ps1`'s Netlify leg hung until its own
   900-second timeout. The log says why: the site saved in
