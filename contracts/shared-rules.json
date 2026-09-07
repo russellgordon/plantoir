@@ -1473,6 +1473,100 @@
         "rule": "Renaming the folder a course currently RESOLVES to as its class folder or its curriculum folder writes that key, even on a course that never had one.",
         "why": "Both are found by guessing at the name when the key is absent — 'class' in it, or 'curriculum' in it — and a course made from scratch has `curriculum_folder: null` and no `class_folder` at all. Rename `Curriculum` to `Expectations` without writing the key and the guess stops finding it: the map is built from nothing, and NOBODY IS TOLD, because from the coverage check's point of view the folder was never there. Carrying an existing key across is not enough; the key has to be created. A rename is the one moment Plantoir witnesses the change, which is the whole reason renaming belongs in the app rather than in Obsidian."
       },
+      "linkRewriting": {
+        "note": "How a folder’s new name is SPELLED inside the links a rename repoints. The rename itself is above; this is the half that decides whether the repointed link still resolves. The reference implementation is `FolderPathRewriter` on both sides.",
+        "rule": "In a MARKDOWN link, escape when the NEW name needs it, whatever the old segment looked like. In a WIKILINK, keep the plain spelling. A segment that ARRIVED percent-encoded goes back percent-encoded in either style, so a link a teacher already had keeps the shape it had.",
+        "why": "“Spell it the way the old segment was spelled” is the obvious rule and it is wrong. A Markdown destination ends at the first SPACE, so renaming Tasks to All Tasks turned `[q](Tasks/Quiz%201.md)` into `[q](All Tasks/Quiz%201.md)`, which neither Obsidian nor Quartz can follow. The old segment `Tasks` carries no `%`, so nothing escaped anything — the `%20` in that example belongs to the FILE name, which is what made it easy to miss by eye. Every Markdown-style link into the folder broke, in a teacher’s own pages, and nothing said so. Found on Windows by adversarial review 2026-09-06; the mac had the identical defect. Escaping a WIKILINK would be the mirror-image mistake: `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes a wikilink whose folder has a space in it.",
+        "needsEscapingInAMarkdownLink": {
+          "characters": ["whitespace", "(", ")"],
+          "why": "Whitespace and round brackets close a destination, and nothing else does. **A lone `%` was on this list for an afternoon and was taken back off.** The argument for it was that Quartz resolves an internal link with JavaScript’s `decodeURI` and `decodeURI(\"10%/Quiz.md\")` throws — true of `decodeURI` on its own, and irrelevant here, because Quartz never sees a bare `%`: the Markdown parser normalises it to `%25` on the way to HTML, long before the link transformer runs. Measured in the running image 2026-09-06, `[b](Top10%/Quiz.md)` arrives as `Top10%25/Quiz.md`. A `%` is still ENCODED whenever escaping runs for another reason, which is what stops `Top 100%` becoming the half-escaped `Top%20100%`."
+        },
+        "escapingSet": {
+          "leaveUnescaped": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'?",
+          "onceEscapingIsTriggeredEncodeEverythingElse": "Nothing is encoded unless a name needs it — see needsEscapingInAMarkdownLink — or the old segment arrived encoded. `Café` goes into a link as `Café`; `Café Notes` goes in as `Caf%C3%A9%20Notes`. Both resolve; the Markdown parser normalises the first to `Caf%C3%A9` itself. Reading this key as “always encode” is the way the two apps would drift, so there is a case for it below.",
+          "why": "Neither macOS’s `urlPathAllowed` nor .NET’s `Uri.EscapeDataString` is right, and both were tried. Quartz v4.5.0 resolves an internal link with `decodeURI` (`quartz/util/path.ts`, `transformInternalLink`), and `decodeURI` deliberately leaves the reserved set `; / ? : @ & = + $ , #` still encoded. It then slugs what comes back, turning `&` into `-and-` and `%` into `-percent` (`sluggify`, same file). So a folder called “Tasks & Quizzes” written as `Tasks%20%26%20Quizzes` decodes to `Tasks %26 Quizzes` and slugs to `Tasks--percent26-Quizzes`, while the real folder slugs to `Tasks--and--Quizzes`: a 404 on the published site, and invisible in Obsidian, which decodes `%26` perfectly well. The set here is what JavaScript’s `encodeURI` leaves alone, minus three — `(` and `)` close a destination, `#` starts a heading — and minus `/` and `:`, which the rename sheet refuses anyway. **`?` was excluded at first and was put back**, on the reasoning that a bare `?` is a query delimiter to any other reader of the file. That was never a rule the code applied — `?` is not in needsEscapingInAMarkdownLink, so `Why?` always went in unescaped — and it was measurably wrong when escaping DID run: `sluggify` strips a `?`, so the real folder `Why Not?` slugs to `Why-Not`, an unescaped `Why%20Not?` slugs to the same and resolves, and the escaped `Why%20Not%3F` slugs to `Why-Not-percent3F` and 404s. Excluding it meant a folder resolved when it was called `Why?` and not when it was called `Why Not?`. Verified against the running image 2026-09-06: `decodeURI` turns `Work%28new%29` into `Work(new)`, `Top%2010%25` into “Top 10%”, `Caf%C3%A9%20Notes` into “Café Notes”, and leaves `C%2B%2B` alone.",
+          "windowsMustReplaceEscapeDataString": "`Uri.EscapeDataString` keeps only `A-Za-z0-9-._~`, so it over-encodes `&`, `,`, `+`, `'`, `!` and `*` — every one of which `decodeURI` then leaves alone and `sluggify` turns into `-percent…`. **Three of the eleven cases fail on Windows today** — the ampersand, the comma and the question mark — and all three are fixed by the same single change: replace `EscapeDataString` in `Spelled` with an encoder driven by `leaveUnescaped`. The comma is the one to notice: “Unit 1, Day 2” is this project’s own naming pattern, and Windows writes `Unit%201%2C%20Day%202`, which slugs to `Unit-1-percent2C-Day-2` and 404s. The per-cent case passes there already — `Top 10%` triggers escaping on its space, and `EscapeDataString` encodes the `%` too — so do NOT add `%` to WouldBreakAMarkdownTarget."
+        },
+        "cases": [
+          {
+            "given": "[q](Tasks/Quiz%201.md)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[q](All%20Tasks/Quiz%201.md)",
+            "why": "The defect itself. The `%20` belongs to the FILE name, so the old folder segment looks unencoded and the new name used to go in plain."
+          },
+          {
+            "given": "[q](Tasks/Quiz.md)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[q](All%20Tasks/Quiz.md)",
+            "why": "Nothing in the link was ever encoded, and the new name still has to be."
+          },
+          {
+            "given": "[[Tasks/Quiz 1]]",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "[[All Tasks/Quiz 1]]",
+            "why": "A wikilink keeps the space: this is exactly how Obsidian writes one."
+          },
+          {
+            "given": "[q](Tasks/Quiz.md)",
+            "oldName": "Tasks",
+            "newName": "Work(new)",
+            "expect": "[q](Work%28new%29/Quiz.md)",
+            "why": "A round bracket ends a destination too, and `decodeURI` gives both back."
+          },
+          {
+            "given": "[q](Tasks/Quiz.md)",
+            "oldName": "Tasks",
+            "newName": "Assignments",
+            "expect": "[q](Assignments/Quiz.md)",
+            "why": "A name needing nothing is not escaped for the sake of it."
+          },
+          {
+            "given": "![](Tasks/diagram.png)",
+            "oldName": "Tasks",
+            "newName": "All Tasks",
+            "expect": "![](All%20Tasks/diagram.png)",
+            "why": "An embed is the same destination in the same shape, and a picture that stops appearing is as visible to a teacher as a dead link."
+          },
+          {
+            "given": "[q](Tasks/Quiz.md)",
+            "oldName": "Tasks",
+            "newName": "Tasks & Quizzes",
+            "expect": "[q](Tasks%20&%20Quizzes/Quiz.md)",
+            "why": "An ampersand is left as it stands. Encoding it to `%26` passes through `decodeURI` untouched and then slugs to `-percent26-` while the real folder slugs to `-and-`, so the page 404s for students while looking healthy in Obsidian. “Tests & Quizzes” and “Q&A” are ordinary folder names, so this is not a corner case."
+          },
+          {
+            "given": "[q](Tasks/Quiz.md)",
+            "oldName": "Tasks",
+            "newName": "Unit 1, Day 2",
+            "expect": "[q](Unit%201,%20Day%202/Quiz.md)",
+            "why": "A comma is left as it stands, for the same reason as the ampersand: `decodeURI` leaves `%2C` encoded and `sluggify` then makes it `-percent2C-`, so `Unit%201%2C%20Day%202` 404s while the folder itself slugs to `Unit-1,-Day-2`. This is the case most likely to bite a real teacher — “Unit 1, Day 2” is this project’s own naming pattern."
+          },
+          {
+            "given": "[q](Tasks/Quiz.md)",
+            "oldName": "Tasks",
+            "newName": "Why Not?",
+            "expect": "[q](Why%20Not?/Quiz.md)",
+            "why": "A question mark is left as it stands. `sluggify` STRIPS a `?` from the real folder’s name, so `Why Not?` slugs to `Why-Not` and the unescaped link slugs to the same thing, while `Why%20Not%3F` slugs to `Why-Not-percent3F` and 404s. Not reachable on Windows, where `?` cannot be in a folder name at all — but the encoder is a pure string transform, so the case still runs there."
+          },
+          {
+            "given": "[q](Tasks/Quiz.md)",
+            "oldName": "Tasks",
+            "newName": "Café",
+            "expect": "[q](Café/Quiz.md)",
+            "why": "A name outside plain ASCII is still left alone when nothing about it needs escaping. Reading `leaveUnescaped` as “encode everything else, always” would give `Caf%C3%A9` here and make the two apps write different text for the same rename, with no case to catch it."
+          },
+          {
+            "given": "[q](Tasks/Quiz.md)",
+            "oldName": "Tasks",
+            "newName": "Top 10%",
+            "expect": "[q](Top%2010%25/Quiz.md)",
+            "why": "Once escaping runs — here because of the space — a `%` is encoded with everything else outside `leaveUnescaped`. Half-escaping it to `Top%20100%` would be the failure this prevents. The `%` is NOT what triggers escaping; see needsEscapingInAMarkdownLink."
+          }
+        ]
+      },
       "why": "Renaming was the gap behind the whole special-names family: the list editors changed course_config.json and never touched disk, so Add wrote an entry pointing at no folder and Remove left a folder full of the teacher’s work unreferenced — and a rename was only possible in Obsidian, after which preflight discovered the new name and APPENDED it, leaving the config naming both. Renaming from inside Plantoir is the one place a rename can be WITNESSED, which is what lets every key that names the folder be carried across in the same breath. One constraint is not arbitrary and must not be relaxed without replacing what it protects: it commits to disk immediately rather than waiting for Save, because the folder really has moved and a Cancel that appeared to undo it would be a lie; only the keys in carriesAcross are written, so a teacher’s other unsaved edits stay unsaved. **A SECOND constraint was here for a day and is gone — do not put it back.** The class folder had to keep a name containing “class”, because ClassFolder found it by that substring. Russell, 2026-09-01: that is Plantoir’s vocabulary imposed on a teacher’s, and somebody whose units are Threads and whose classes are Days calls the folder “All Days”. The lookup was what was at fault. A recorded `class_folder` replaced the substring guess, and this rename MATERIALISES it — see materialisesOnRename. A rule enforced because a lookup was weak is a rule to delete once the lookup is fixed."
     },
     "addCreatesTheFolder": {

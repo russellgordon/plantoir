@@ -592,6 +592,33 @@ an item when it ships (finished behaviour is recorded in
   course-level pages, but for a "sample course" it does not name — a
   different measurement from the 32 above, not a contradiction of it.)
 
+## A folder rename does not follow an angle-bracket Markdown link
+
+Noted 2026-09-06, while fixing the neighbouring defect (a rename to a name
+containing a space broke every Markdown link into the folder —
+`GUI-IMPROVEMENTS.md` 424). Found by adversarial review, not by a teacher.
+
+Markdown allows a destination to be wrapped in angle brackets, which is how a
+path containing a space is written WITHOUT percent-encoding:
+
+    [q](<Tasks/Quiz 1.md>)
+
+Neither app's `FolderPathRewriter` matches it. The Markdown pattern is
+`(\]\()([^)\s]+)`, so the first segment reads as `<Tasks`, which is not the
+folder `Tasks`, so nothing is rewritten and the link is left pointing at the
+old name. Pre-existing on both platforms and unchanged by the 2026-09-06 fix —
+listed here so it is not later mistaken for a regression that fix introduced.
+
+**Why it was left.** Obsidian does not write this form — it percent-encodes
+instead — so it can only appear in a link a teacher typed by hand, and the two
+apps have to agree about it before either changes, which makes it a contract
+case rather than a one-line patch. The fix itself is small: allow a
+`<`-wrapped destination in the pattern and strip the brackets before splitting
+into segments. What is NOT small is deciding how the new name is then spelled
+inside one — inside angle brackets a space needs no escaping at all, so it is a
+third spelling rule beside the two that now exist, and inventing it without a
+case both suites run is how the two apps drift.
+
 ## Docker build cache is never cleared (deliberately, for now)
 
 `docker system df` on the dev mac, 2026-08-23: 1301 build-cache entries,
