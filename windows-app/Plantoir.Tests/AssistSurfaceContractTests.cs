@@ -1,5 +1,5 @@
-using System.ComponentModel;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Server;
 using Plantoir.Core.Assist;
@@ -46,7 +46,12 @@ public class AssistSurfaceContractTests
         foreach (var method in typeof(PlantoirTools).GetMethods(BindingFlags.Public | BindingFlags.Instance))
         {
             var attribute = method.GetCustomAttribute<McpServerToolAttribute>();
-            if (attribute?.Name is { } name) tools[name] = method;
+            if (attribute is null) continue;
+            // The SDK falls back to the method name when the attribute gives
+            // none; matching that means a tool declared without a Name is
+            // COUNTED rather than silently skipped, which would otherwise read
+            // as the contract and the server agreeing.
+            tools[attribute.Name ?? method.Name] = method;
         }
         return tools;
     }
@@ -64,6 +69,16 @@ public class AssistSurfaceContractTests
         return "object";
     }
 
+    /// <summary>
+    /// The parameters the server really puts in a tool's schema.
+    ///
+    /// <para>Three approximations, none of which can pass silently: the SDK
+    /// also binds any parameter whose type is a registered service, so a future
+    /// injected argument would be counted here as required and fail loudly
+    /// rather than quietly; a nullable array goes on the wire as
+    /// <c>["array","null"]</c> and is called <c>array</c> here; and a tool
+    /// declared with no <c>Name</c> is matched by its method name above.</para>
+    /// </summary>
     private static (List<string> Required, Dictionary<string, string> Types) Parameters(MethodInfo method)
     {
         var required = new List<string>();
@@ -126,9 +141,54 @@ public class AssistSurfaceContractTests
     /// departure fails, and so does a departure that has been resolved and not
     /// deleted from here.</para>
     /// </summary>
-    private static void AssertOnlyTheDeparturesWeHaveAgreed(List<string> differing, IEnumerable<string> onThisSurface)
+    private static void AssertOnlyTheDeparturesWeHaveAgreed(
+        List<string> differing, List<string> onlyHere, IEnumerable<string> onThisSurface)
     {
         var tools = onThisSurface.ToHashSet(StringComparer.Ordinal);
+
+        // The arguments this server takes that the contract does not describe.
+        //
+        // `preview` is the SECOND of the two departures AssistToolSurface.swift
+        // names: on the mac every change rebuilds, which is what the assistant's
+        // system prompt promises a teacher, so there is no flag; here a batch of
+        // edits can be made with the preview suppressed and rebuilt once at the
+        // end. The rest are arguments the mac's surface simply does not offer.
+        //
+        // Held to an exact set for the same reason as the type departures: a
+        // NEW one is a routing difference nobody chose, and a resolved one that
+        // stays listed makes this list a record of what once differed. The
+        // plan_ twins take no `preview` — they change nothing, so there is
+        // nothing to rebuild — which this list said they did until the check
+        // itself said otherwise.
+        var agreedExtras = new[]
+        {
+            "publish_class_on.preview",
+            "publish_pages.preview", "publish_pages.includeLinked",
+            "unpublish_pages.preview", "unpublish_pages.includeLinked",
+            "plan_publish_pages.includeLinked",
+            "plan_unpublish_pages.includeLinked",
+            "add_next_class.unit", "add_next_class.days",
+            "plan_add_next_class.unit", "plan_add_next_class.days",
+            "read_remembered_timetable.scope", "read_remembered_timetable.revise",
+            "re_date_classes.timetable", "re_date_classes.block", "re_date_classes.pages",
+            "re_date_classes.meetings", "re_date_classes.firstDay", "re_date_classes.startYear",
+            "plan_re_date_classes.timetable", "plan_re_date_classes.block",
+            "plan_re_date_classes.pages", "plan_re_date_classes.meetings",
+            "plan_re_date_classes.firstDay", "plan_re_date_classes.startYear",
+        }.Where(e => tools.Contains(e[..e.IndexOf('.')])).ToList();
+
+        var unagreedExtras = onlyHere.Except(agreedExtras).OrderBy(e => e, StringComparer.Ordinal).ToList();
+        Assert.True(unagreedExtras.Count == 0,
+            "This server takes tool arguments the contract does not describe, and nobody has " +
+            "agreed them: " + string.Join("; ", unagreedExtras) + ". An argument the mac's model " +
+            "is not shown is a routing difference as surely as an extra tool is. Either add it to " +
+            "the contract, or record it here with its reason.");
+
+        var goneExtras = agreedExtras.Except(onlyHere).OrderBy(e => e, StringComparer.Ordinal).ToList();
+        Assert.True(goneExtras.Count == 0,
+            "These are recorded as arguments this server alone takes, and it no longer does — or " +
+            "the contract now describes them: " + string.Join("; ", goneExtras) + ". Delete them " +
+            "from the list.");
 
         // Scoped to the surface being checked: the plan_ twins are MCP-only, so
         // on the local surface they are not departures, they are simply absent.
@@ -194,6 +254,7 @@ public class AssistSurfaceContractTests
         Assert.NotEmpty(tools);
 
         var differing = new List<string>();
+        var onlyHere = new List<string>();
 
         foreach (var tool in tools)
         {
@@ -216,9 +277,17 @@ public class AssistSurfaceContractTests
                     $"\"{name}\" is documented as taking \"{parameter}\" and does not.");
                 if (type != actual) differing.Add($"{name}.{parameter} (contract {type}, here {actual})");
             }
+
+            // The other direction, which the first version of this test did not
+            // ask: an argument this server takes and the contract does not
+            // describe is one the model here is offered and the mac's is not.
+            // On a router, an extra argument is a routing difference exactly as
+            // an extra tool is.
+            foreach (string parameter in types.Keys)
+                if (!expectedTypes.ContainsKey(parameter)) onlyHere.Add($"{name}.{parameter}");
         }
 
-        AssertOnlyTheDeparturesWeHaveAgreed(differing,
+        AssertOnlyTheDeparturesWeHaveAgreed(differing, onlyHere,
             tools.Select(t => t!["function"]!["name"]!.ToString()));
     }
 
@@ -245,6 +314,7 @@ public class AssistSurfaceContractTests
         Assert.NotEmpty(tools);
 
         var differing = new List<string>();
+        var onlyHere = new List<string>();
         var missing = new List<string>();
         foreach (var tool in tools)
         {
@@ -264,6 +334,14 @@ public class AssistSurfaceContractTests
                     $"\"{name}\" is documented as taking \"{parameter}\" and does not.");
                 if (type != actual) differing.Add($"{name}.{parameter} (contract {type}, here {actual})");
             }
+
+            // The other direction, which the first version of this test did not
+            // ask: an argument this server takes and the contract does not
+            // describe is one the model here is offered and the mac's is not.
+            // On a router, an extra argument is a routing difference exactly as
+            // an extra tool is.
+            foreach (string parameter in types.Keys)
+                if (!expectedTypes.ContainsKey(parameter)) onlyHere.Add($"{name}.{parameter}");
         }
 
         Assert.True(missing.Count == 0,
@@ -271,7 +349,7 @@ public class AssistSurfaceContractTests
             string.Join(", ", missing) + ". A client told about a tool that is not there gets a " +
             "failure it cannot explain to the teacher.");
 
-        AssertOnlyTheDeparturesWeHaveAgreed(differing,
+        AssertOnlyTheDeparturesWeHaveAgreed(differing, onlyHere,
             tools.Select(t => t!["function"]!["name"]!.ToString()));
     }
 
@@ -293,14 +371,33 @@ public class AssistSurfaceContractTests
         foreach (var tool in doc["toolSchemas"]!["mcp"]!.AsArray())
             described.Add(tool!["function"]!["name"]!.ToString());
 
+        // Named, not counted. A count stays at twelve when one tool is added
+        // and another adopted into the contract, and it cannot tell the reader
+        // WHICH — so the two things that should happen next would get the same
+        // message. These are the twelve as of 2026-09-06.
+        var knownExtras = new[]
+        {
+            "add_classes", "back_up_course", "explain_publishing", "list_courses",
+            "list_recent_changes", "make_room_for_classes", "plan_add_classes",
+            "plan_make_room_for_classes", "plan_sync_page_dates", "read_timetable",
+            "roll_over_section", "sync_page_dates",
+        };
+
         var extra = served.Except(described).OrderBy(n => n, StringComparer.Ordinal).ToList();
 
-        Assert.True(extra.Count == 12,
-            $"This server offers {served.Count} tools where the contract describes " +
-            $"{described.Count}, an excess of {extra.Count} rather than the 12 recorded in " +
-            "MAC-HANDOFF.md: " + string.Join(", ", extra) + ". Either add the new one to " +
-            "assist-cases.json → toolSchemas.mcp so both apps serve it, or change this number " +
-            "and say in MAC-HANDOFF.md why it is Windows' alone.");
+        var unrecorded = extra.Except(knownExtras).OrderBy(n => n, StringComparer.Ordinal).ToList();
+        Assert.True(unrecorded.Count == 0,
+            "This server offers tools the contract does not describe and nobody has recorded: " +
+            string.Join(", ", unrecorded) + ". Add each to assist-cases.json → toolSchemas.mcp " +
+            "so both apps serve it, or list it here and say in MAC-HANDOFF.md why it is this " +
+            "platform's alone. A subset check cannot notice an addition, which is how twelve of " +
+            "these accumulated without either suite saying so.");
+
+        var adopted = knownExtras.Except(extra).OrderBy(n => n, StringComparer.Ordinal).ToList();
+        Assert.True(adopted.Count == 0,
+            "The contract now describes tools this list still records as this platform's alone: " +
+            string.Join(", ", adopted) + ". That is the gap closing — delete them from the " +
+            "list, which is the whole of what is owed here.");
     }
 
     // ---- Which assistant a teacher is offered ----------------------------
@@ -334,9 +431,18 @@ public class AssistSurfaceContractTests
     }
 
     /// <summary>
-    /// The automatic choice can never produce a caution — the ladder is held to
-    /// the same line the comfort rule uses, so a machine is never automatically
-    /// given something it will struggle with.
+    /// The automatic choice never cautions, BY CONSTRUCTION: a caution names a
+    /// tier the teacher picked, and the automatic choice names none.
+    ///
+    /// <para>Worth saying plainly, because the contract's own
+    /// <c>comfortFraction.why</c> gives a different reason — "the line the
+    /// automatic ladder has always been held to, which is why the automatic
+    /// choice can never produce a caution" — and that reason does not hold at
+    /// the bottom of the ladder here. On a 4 GB machine the ladder picks the
+    /// small assistant, which needs 1.75 GB, and a third of 4 GB is less than
+    /// that. The absence of a caution is right either way — a teacher who
+    /// chose nothing has nothing to be cautioned about — but the reason is the
+    /// construction, not the arithmetic. Recorded for the mac.</para>
     /// </summary>
     [Fact]
     public void TheAutomaticChoiceNeverCautions()
@@ -346,6 +452,13 @@ public class AssistSurfaceContractTests
             var budget = new AssistHardwareBudget(gigabytes * 1024 * 1024 * 1024);
             Assert.Null(AssistModelChoice.Caution(AssistModelChoice.Automatic, budget));
         }
+
+        // A NAMED choice DOES caution on a tight machine, so the loop above is
+        // not passing because cautions never happen at all.
+        Assert.NotNull(AssistModelChoice.Caution(
+            AssistModelChoice.Larger, new AssistHardwareBudget(4L * 1024 * 1024 * 1024)));
+        Assert.Null(AssistModelChoice.Caution(
+            AssistModelChoice.Larger, new AssistHardwareBudget(64L * 1024 * 1024 * 1024)));
     }
 
     /// <summary>
@@ -424,26 +537,37 @@ public class AssistSurfaceContractTests
         Assert.Equal(names["large"]!.ToString(), AssistModelTier.Large.DisplayName());
         Answer("The teacher never learns the model's name");
 
-        // The two that cannot be executed here, named rather than dropped.
-        //
-        // "The model runs on the HOST, with hardware acceleration" is about how
-        // the server is launched — a thing this suite cannot observe without
-        // starting one, and which LocalModelTests covers as far as it can. "A
-        // model that inverts polarity is VETOED" is a rule about how a MODEL is
-        // chosen: it governs the routing suite in research/ai-assist/, which is
-        // measured by hand and states its own conditions. Neither is provable
-        // by a unit test, and a test that pretended otherwise would be the
-        // green-for-the-wrong-reason this whole item exists to remove.
-        foreach (string unexecutable in new[]
+        // The model runs on the HOST, with hardware acceleration — never inside
+        // the container that builds the site. Both halves ARE executable, and
+        // the first version of this test wrongly called them unexecutable: the
+        // server launched is the bundled llama-server.exe rather than wsl.exe or
+        // a container runtime, and LocalModelTests pins the GPU offload flag it
+        // is given. A change routing the server through WSL would otherwise
+        // have left this green.
+        string? server = LocalModel.FindServer();
+        if (server is not null)
         {
-            "The model runs on the HOST, with hardware acceleration",
-            "A model that inverts polarity is VETOED, whatever it scores",
-        })
-        {
-            Assert.True(unanswered.Remove(unexecutable),
-                $"\"{unexecutable}\" is recorded here as a requirement no test can execute, and " +
-                "the contract no longer states it in those words.");
+            // A bundled executable beside the app, not a shell into a VM.
+            Assert.EndsWith("llama-server.exe", server, StringComparison.OrdinalIgnoreCase);
+            foreach (string elsewhere in new[] { "wsl", "docker", "colima" })
+                Assert.DoesNotContain(elsewhere, server, StringComparison.OrdinalIgnoreCase);
         }
+
+        // And the arguments carry the GPU offload, which is the "with hardware
+        // acceleration" half. Asserted here rather than only in
+        // LocalModelTests because that is where this requirement is claimed.
+        Assert.Contains("--n-gpu-layers",
+            LocalModel.BuildArguments("model.gguf", 8080, threads: 4, useGpu: true));
+        Answer("The model runs on the HOST, with hardware acceleration");
+
+        // The one that genuinely cannot be executed, named rather than dropped.
+        // A polarity veto is a rule about how a MODEL is chosen: it governs the
+        // routing suite in research/ai-assist/, which is measured by hand and
+        // states its own conditions. A test that pretended otherwise would be
+        // the green-for-the-wrong-reason this whole item exists to remove.
+        Assert.True(unanswered.Remove("A model that inverts polarity is VETOED, whatever it scores"),
+            "The polarity veto is recorded here as the one requirement no test can execute, and " +
+            "the contract no longer states it in those words.");
 
         Assert.True(unanswered.Count == 0,
             "contracts/app-rules.json requires things of the local assistant that no test here " +
@@ -495,9 +619,22 @@ public class AssistSurfaceContractTests
 
         // More than one line: the composer must not swallow the key, because
         // the arrows have to move the caret between those lines.
+        //
+        // Anchored to EACH arrow's own block, with comments stripped first.
+        // Bare containment stayed green with the guard deleted from Down and
+        // left on Up, and green again with it moved into a comment — which is
+        // the shape of source-reading test that reports a rule nobody follows.
         string composer = File.ReadAllText(Path.Combine(
             RepoRoot, "windows-app", "Plantoir", "Views", "AssistWindow.xaml.cs"));
-        Assert.Contains(@"Input.Text.Contains('\n')", composer, StringComparison.Ordinal);
+        string code = Regex.Replace(composer, @"//[^\n]*", "");
+
+        foreach (string arrow in new[] { "Up", "Down" })
+        {
+            Assert.Matches(
+                new Regex(@"VirtualKey\." + arrow + @"\)\s*\{\s*if \(Input\.Text\.Contains\('\\n'\)\) return;",
+                          RegexOptions.Singleline),
+                code);
+        }
         Assert.True(unanswered.Remove("the box holds more than one line"));
 
         Assert.True(unanswered.Count == 0,

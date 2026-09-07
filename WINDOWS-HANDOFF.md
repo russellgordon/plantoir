@@ -2198,7 +2198,10 @@ for behaviour only your side has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 23-tool MCP one.
+the 13-tool local surface and the 25-tool MCP one. (It said 23; corrected
+2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
+serves 37, and the twelve it has beyond the contract are named in
+`AssistSurfaceContractTests` and in `MAC-HANDOFF.md`.)
 
 The descriptions are the part to take seriously. They are measured artifacts,
 not commentary: the "TEACHERS SAY:" phrasings came out of the routing suite,
