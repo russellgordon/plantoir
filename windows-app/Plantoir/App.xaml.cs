@@ -198,8 +198,12 @@ public partial class App : Application
         foreach (var window in _windows)
         {
             if (window.IsClosed || window.Workspace.WorkspacePath is not { } open) continue;
-            if (string.Equals(Path.GetFullPath(open), Path.GetFullPath(folderPath), StringComparison.OrdinalIgnoreCase))
-                return window;
+            try
+            {
+                if (string.Equals(Path.GetFullPath(open), Path.GetFullPath(folderPath), StringComparison.OrdinalIgnoreCase))
+                    return window;
+            }
+            catch (Exception) { /* a malformed stored path is "no window", not a crash in the tool loop */ }
         }
         return null;
     }

@@ -91,7 +91,7 @@ computing its own path (see "The flags the app answers"):
 | `scheduled\pending\` | Sentinels a finished scheduled deploy leaves for the app to pick up next time it runs. |
 | `assist\`, `models\` | The assistant's MCP configuration (`mcp-<CODE>.json`) and the model weights it downloads. |
 | `WebView2\` | The embedded preview's user-data folder. |
-| `settings.json` | The app's own settings — and, since Windows has no system window restoration, the remembered-windows list IS the restoration mechanism. |
+| `settings.json` | The app's own settings — and, since Windows has no system window restoration, the remembered-windows list IS the restoration mechanism. (`AssistWindowPlacements`, beside it, is deliberately NOT replayed: restoring an assistant window would load a multi-gigabyte model unasked, so it remembers placement only and is a separate type.) |
 
 **The folder id is a hash, and it must never be derived twice.** The launcher
 computes it as `$WORKDIR_ID` and the app as
