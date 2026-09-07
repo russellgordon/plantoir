@@ -286,7 +286,7 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      `PlaceholderClassPlanner` (340 lines) lays down a unit's worth of class
      pages on the days the section actually meets, skipping days already taken
      — and it is **already wired to the assistant**: `add_next_class` calls
-     `PlaceholderClassPlanner.apply` (`AssistToolRunner.swift:2309`) with a
+     `PlaceholderClassPlanner.apply` (`AssistToolRunner.swift:2310`) with a
      count of one. So this is not "build a feature", nor even "wrap an engine";
      it is **let the existing arm take a count**, plus a unit and a first day,
      under a name of its own. Today "add seven days to the next unit" has no
@@ -305,7 +305,7 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      "duplicate Unit 3, Day 2 as my next class" and the next day is already
      taken: `duplicateClassRequested` calls
      `ClassInsertionPlanner.plan(… count: 1)` and `.apply`
-     (`AssistToolRunner.swift:2138, 1993`), renaming the later days, re-dating
+     (`AssistToolRunner.swift:2139, 1994`), renaming the later days, re-dating
      them onto real class days and rewriting every wikilink that pointed at a
      renamed page. All of the dangerous machinery already runs on the mac
      today. What is missing is a count above one, and the ability to name an
@@ -402,9 +402,9 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
   Checked clause by clause, every `TEACHERS SAY:` list in `toolSchemas.mcp`
   against every `[Description]` in `PlantoirTools.cs`. **Five of the 25 shared
-  tools differ, and four of the five are phrasings the MAC has and Windows has
-  nowhere at all** — not in the MCP server and not in their in-app assistant
-  (0 hits across `windows-app` for any of them):
+  tools differ, and four of the five are tools where Windows has no
+  `TEACHERS SAY:` clause at all** — seventeen phrasings the mac shows the model
+  and Windows shows it nowhere, in the MCP server or the in-app assistant:
 
   | Tool | Difference |
   |---|---|

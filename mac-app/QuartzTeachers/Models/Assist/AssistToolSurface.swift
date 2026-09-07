@@ -12,13 +12,14 @@ import Foundation
 /// never NAMED by the model, so they are not put in front of it.
 ///
 /// **Keep these three numbers right.** They are 22, 13 and 9 as this is
-/// written. 22 and 13 are PINNED — `AssistCurriculumMentionsTests` and
-/// `AssistToolRunnerTests` both assert them, so those two cannot rot silently.
-/// **9 is not pinned by anything**; it is 22 minus 13 and it has to be kept by
-/// hand, which is why it was wrong here. They read 20, 13 and 7 for long
-/// enough that the stale figure reached `CLAUDE.md`, three documents, this
-/// file's neighbour and its own test's doc comment. A count nobody can check
-/// is a count that gets quoted.
+/// written, and all three are now PINNED — `AssistCurriculumMentionsTests`
+/// asserts 22 and 13, and `testTheHiddenToolsAreStillServedToClaudeCode`
+/// asserts that the nine it names ARE the set difference, so hiding a tenth
+/// tool fails a test rather than quietly making a comment wrong. The nine was
+/// unpinned until 2026-09-06, which is exactly the one of the three that had
+/// rotted: they read 20, 13 and 7 for long enough that the stale figure
+/// reached `CLAUDE.md`, three documents, this file's neighbour and its own
+/// test's doc comment. A count nobody can check is a count that gets quoted.
 ///
 /// The descriptions are the Windows server's own, put through the same
 /// shortening rule the narrowed surface uses there: keep the `TEACHERS SAY:`
@@ -82,7 +83,9 @@ extension AssistToolRunner {
     ///
     /// Everything above still RUNS; this is only what the model is asked to
     /// choose between, and every schema in the list costs it context and
-    /// accuracy. Two kinds are left out, and neither loses a teacher anything:
+    /// accuracy. Nine are left out — the seven `plan_` twins, plus the two
+    /// named in `hiddenFromTheLocalModel` below — and none of them loses a
+    /// teacher anything:
     ///
     /// * **The seven `plan_` twins.** Plan mode calls them IN CODE —
     ///   `AssistAgent.showPlan` builds the call itself from the write the model

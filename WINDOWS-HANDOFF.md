@@ -1370,7 +1370,10 @@ to run in the background.
     fixture no curriculum folder.
 
 33. **Your MCP server serves 37 tools and the mac's serves 25, nobody was
-    going to notice, and two of the twelve differences are yours to fix.**
+    going to notice, and FOUR things fall to you — an enumeration test, a
+    rollover that publishes over last year's website, a signature that differs
+    from the mac's under the same name, and seventeen measured phrasings you
+    do not have.**
     Found 2026-09-06 by a mac audit asking whether the parity list was
     COMPLETE rather than whether it was correct. Full write-up: "The two MCP
     surfaces are not the same product" below, and the sorting of all twelve
@@ -1447,7 +1450,13 @@ to run in the background.
     `plan_add_next_class` (mac three, you none — `:533`),
     `read_remembered_timetable` (mac four, you none — `:620`) and
     `remember_timetable` (mac four, you none — `:767`). Not in your in-app
-    assistant either: `grep` for any of them across `windows-app` returns 0.
+    assistant either. Two of the seventeen DO appear in your code outside a
+    `TEACHERS SAY:` clause, which is where `Briefly` cannot reach them: "add
+    the next class" is an example inside `plan_add_next_class`' own description
+    (`PlantoirTools.cs:536`) and in `AssistCardCommand.cs:31`, and "when does
+    this class meet?" is a doc comment in `TimetableMemory.cs:11`. The clause
+    is the part that was measured, so being in the prose is not the same as
+    being in it.
 
     This is not a documentation difference. `AssistToolSurface`'s own comment
     says the phrasings *"are what took routing from 69% to 91%"* — they are
