@@ -1761,7 +1761,8 @@ to run in the background.
     `xcodebuild` reports that as exit 65, `** TEST FAILED **`, and a
     `Failing tests:` line naming whichever test happened to be running, while
     the totals two lines above say `0 failures`. Measured here, same command
-    and same machine: **10 crashes in 30 runs before, 0 in 30 after.** In an
+    and same machine: **10 crashes in 30 runs before, 0 in 30 after**, and 0 host
+    deaths in 13 full-suite runs of 1,062 cases. In an
     overnight batch on 2026-09-06/07 it rejected 3 of 7 pieces of correct work.
 
     **What Windows inherits free: nothing, and that is the right answer.**
