@@ -28,10 +28,13 @@ an item when it ships (finished behaviour is recorded in
 
   **What is NOT decided.** Whether `ConPtyProcess.Start` should defend itself
   by zeroing the creating process's std handles across the `CreateProcessW`
-  call - `SetStdHandle(STD_*_HANDLE, IntPtr.Zero)` under the existing
-  `_ptyGate`, restored afterwards. `GetStdHandle` and `SetStdHandle` are
-  **already declared in `ConPty.cs` and never called**, which suggests somebody
-  started down this road once. For: the failure is silent and points at the
+  call - `SetStdHandle(STD_*_HANDLE, IntPtr.Zero)`, restored afterwards.
+  `GetStdHandle` and `SetStdHandle` are **already declared in `ConPty.cs` and
+  never called**, which suggests somebody started down this road once. **It
+  needs a NEW static gate**, not the existing `_ptyGate`: that is an INSTANCE
+  field guarding `ClosePty`, `Start` is static, and std handles are
+  process-wide - so two concurrent spawns would race, and the first draft of
+  this entry said to use `_ptyGate` and would have shipped exactly that. For: the failure is silent and points at the
   wrong thing. Against: it is a fix for a case no teacher meets, and mutating
   process-wide std handles around a spawn has its own hazards. Rejected
   outright: `FreeConsole()` at startup, which was the first idea here - it

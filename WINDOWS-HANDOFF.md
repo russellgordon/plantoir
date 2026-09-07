@@ -1675,12 +1675,16 @@ to run in the background.
     same name.
 
     **What cost the afternoon, and is the reusable part.** The suite launched
-    the app with `UseShellExecute = false`, so the `dotnet test` host's PIPE
-    std handles were handed to the app and leaked into the ConPTY child: the
-    app captured nothing, what it sent the launcher never arrived, and
-    `input()` in `setup_course.py` reached EOF and died. It presents as
-    "failed (exit code 1) after 1s" with an empty transcript, which reads as a
-    broken toolchain and is not.
+    the app with `UseShellExecute = false`, so the `dotnet test` host's own std
+    handles were handed to the app and leaked into the ConPTY child: the app
+    captured nothing, what it sent the launcher never arrived, and `input()` in
+    `setup_course.py` reached EOF and died. It presents as "failed (exit code
+    1) after 1s" with an empty transcript, which reads as a broken toolchain
+    and is not. (That those handles are PIPES is inferred, not measured — it
+    fits, since console handles would have put the output in the terminal and a
+    one-second EOF is what a closed pipe gives. Said as an inference on
+    purpose; the whole point of this paragraph is that the previous version
+    stated a guess as fact.)
 
     **`ConPtyProcess.Start` already carried this**, in a CAUTION saying the
     child binds to the pseudo console only when the CREATING process's std
@@ -1725,10 +1729,15 @@ to run in the background.
     on `verify-deploy.ps1` (it redirects stdin from a file precisely so
     `deploy.py` asks nothing). The procedure says what to check and what NOT
     to: the dialog's wording is already contract data
-    (`app-rules.json` → `credentialRequests.requests.siteName`, asserted by
-    equality in `ContractTests`), so eyeballing it adds nothing; what nothing
-    pins is the ORDER, the pre-filled address, Cancel's behaviour, that the
-    created site carries the typed name, and the trail line.
+    (the `siteName` entry in `app-rules.json`'s `credentialRequests.requests`,
+    asserted by equality in `ContractTests`), so eyeballing it adds nothing;
+    what nothing pins is the ORDER, the pre-filled address, Cancel's
+    behaviour, that the created site carries the typed name, and the trail
+    line. **Writing that sentence found a real gap**: the contract sweep
+    checked title, field label, secrecy, link and steps and skipped
+    `explanation`, the longest thing a teacher reads in one of these dialogs.
+    One `Assert.Equal` in `ContractTests`, green on all seven requests — so
+    the claim the procedure makes is now true rather than nearly true.
 
     Whether that hand-check joins the release cut is deliberately left alone:
     it is the same open question as item 36, and answering it here would

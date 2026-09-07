@@ -120,8 +120,18 @@ Get-Process -Name Plantoir -ErrorAction SilentlyContinue | Stop-Process -Force -
 # them. The pid and folder are printed rather than a count, because a
 # force-kill that says only "1 process" is the kind of thing that gets
 # distrusted later.
-$orphans = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='python.exe'" -ErrorAction SilentlyContinue |
-             Where-Object { $_.CommandLine -match ("plantoir-ui-" + $env:PLANTOIR_UI_RUN) })
+#
+# Guarded rather than assumed: with an empty token the pattern collapses back
+# to the folder PREFIX and sweeps every run on the machine, which is the exact
+# thing this rework exists to stop. An unset token means the sweep cannot know
+# what is its own, so it does nothing.
+$orphans = @()
+if ([string]::IsNullOrWhiteSpace($env:PLANTOIR_UI_RUN)) {
+    Write-Host "No run token, so no orphan sweep - kill any leftover launcher by hand." -ForegroundColor Yellow
+} else {
+    $orphans = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='python.exe'" -ErrorAction SilentlyContinue |
+                 Where-Object { $_.CommandLine -match ("plantoir-ui-" + $env:PLANTOIR_UI_RUN) })
+}
 foreach ($o in $orphans) {
     Write-Host "Cleaning up a launcher this run left behind: $($o.Name) pid $($o.ProcessId)." -ForegroundColor Yellow
     Stop-Process -Id $o.ProcessId -Force -ErrorAction SilentlyContinue
