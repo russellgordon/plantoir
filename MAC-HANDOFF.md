@@ -1887,22 +1887,24 @@ rather than being deleted.
   and used by identity (row 300's trap). Not driven by hand: the minimised and
   no-window paths want one look at the real interface.
 
-- **Two smaller things from the same item the mac may want to compare
-  against its own.** (a) The sidebar's "Schedule Deploy…" dialog on Windows
-  now says which classes dated on or before the chosen day are still
-  unpublished — the same content `ScheduledDeploy.Describe()` has always
-  given the assistant, as one sentence in the dialog's idiom rather than
-  bullets. The DAY decides, because the sidebar has no list of named classes
-  the way the tool does; a class dated after the deploy is legitimately
-  unpublished and is not named. It is advice, not a refusal: the button stays
-  enabled. If the mac's sheet says nothing about unpublished classes, that is
-  worth a case in `shared-rules.json` → `scheduledDeployRefusals` or beside
-  it; the sentence is not in the contract yet and should be, from whichever
-  side settles the wording. (d) The Windows assistant window remembers its
-  placement per section (row 164's rule) in a type deliberately separate from
-  the windows replayed at launch, so a multi-gigabyte model is never loaded
-  unasked; it clamps to the displays that exist now and prunes with the
-  working folder. Nothing the mac need change.
+- **Two smaller things from the same item, both now matching the mac.** (a)
+  The sidebar's "Schedule Deploy…" dialog on Windows now says which classes
+  are still unpublished — the same content `ScheduledDeploy.Describe()` has
+  always given the assistant and the mac's sheet has always rendered
+  (`ScheduleDeploySheet.swift`, `plan.description`). A first draft filtered
+  the list by the chosen day; the review caught that the contract's
+  `scheduledDeployRefusals.alsoSaid` rule has no date qualifier and the mac's
+  `unpublishedClasses(course:sectionNumber:)` names every one, so Windows
+  does too. Advice, not a refusal: the button stays enabled, and while a
+  refusal is showing the advice is hidden, as the mac shows the problem
+  alone. One difference, recorded rather than fixed: Windows names pages by
+  FILE name, as its own `PlanScheduledDeploy` already does, where the mac uses
+  the page's title. If that ever matters, it wants a case, not two fixes.
+  (d) The Windows assistant window remembers its placement per section
+  (row 164's rule) in a type deliberately separate from the windows replayed
+  at launch, so a multi-gigabyte model is never loaded unasked; it clamps to
+  the displays that exist now and prunes with the working folder. Nothing
+  the mac need change.
 
 - **Windows now spells a renamed folder the way Quartz reads it — item 31's
   debt is paid, and the escaping rule is executed on both sides**

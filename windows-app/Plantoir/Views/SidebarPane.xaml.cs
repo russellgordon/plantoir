@@ -626,14 +626,17 @@ public sealed partial class SidebarPane : UserControl
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                 "SystemFillColorCautionBrush"],
         };
-        // Advice, not a refusal: the classes a deploy on the chosen day would
-        // put the site up without. The assistant's tool has said this since
-        // it existed (ScheduledDeploy.Describe); this door said nothing, so a
-        // teacher scheduled 6:30 AM without being told tomorrow's page was
-        // unpublished — the one thing the description exists to tell them.
-        // The list follows the DAY, so it is recomputed as the day moves;
-        // the button stays enabled, because "publish first" is advice the
-        // teacher may have a reason to ignore.
+        // Advice, not a refusal: the classes a deploy would put the site up
+        // without. The assistant's tool has said this since it existed
+        // (ScheduledDeploy.Describe), and so has the mac's sheet; this door
+        // said nothing, so a teacher scheduled 6:30 AM without being told
+        // tomorrow's page was unpublished — the one thing the description
+        // exists to tell them. Date-independent, so it is read once; the
+        // button stays enabled, because "publish first" is advice the teacher
+        // may have a reason to ignore. Shown only while there is no refusal,
+        // as on the mac, where the problem is shown alone.
+        string? advice = ScheduledDeploy.UnpublishedClassesSentence(
+            ScheduledDeploy.UnpublishedClassesIn(course, number));
         var unpublished = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
@@ -677,12 +680,9 @@ public sealed partial class SidebarPane : UserControl
             warning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             dialog.IsPrimaryButtonEnabled = problem is null;
 
-            string? advice = chosen is { } on
-                ? ScheduledDeploy.UnpublishedClassesSentence(
-                    ScheduledDeploy.UnpublishedClassesOnOrBefore(course, number, DateOnly.FromDateTime(on)))
-                : null;
-            unpublished.Text = advice ?? "";
-            unpublished.Visibility = advice is null ? Visibility.Collapsed : Visibility.Visible;
+            bool showAdvice = problem is null && advice is not null;
+            unpublished.Text = showAdvice ? advice! : "";
+            unpublished.Visibility = showAdvice ? Visibility.Visible : Visibility.Collapsed;
         }
 
         DateTime? Chosen() => day.Date is { } picked

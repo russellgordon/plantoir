@@ -77,6 +77,10 @@ public sealed partial class AssistWindow : Window
                           "and nothing reaches students until the section deploys — which always waits for your OK.";
 
         RestorePlacement();
+        // Sampled while the window is alive: reading AppWindow inside its own
+        // Closed handler is the one thing the rest of this app avoids
+        // (App.OpenWindow drops a closing window before remembering the rest).
+        AppWindow.Changed += (sender, args) => { if (args.DidPositionChange) _lastPosition = sender.Position; };
         Closed += (_, _) => { RememberPlacement(); Shutdown(); };
 
         // Started on Loaded, not here: the download offer is a ContentDialog,
@@ -106,6 +110,7 @@ public sealed partial class AssistWindow : Window
     // ---- Where this window sits -------------------------------------------
 
     private string PlacementKey => AppSettings.AssistWindowKey(_folder, _course.Code, _section);
+    private Windows.Graphics.PointInt32? _lastPosition;
 
     /// <summary>
     /// Put the window where this SECTION's assistant was last left —
@@ -127,6 +132,7 @@ public sealed partial class AssistWindow : Window
             // Some of the title bar must be inside the work area, or there is nothing to grab.
             if (point.X > area.X + area.Width - 120 || point.Y > area.Y + area.Height - 60) return;
             AppWindow.Move(point);
+            _lastPosition = point;
         }
         catch (Exception ex) { App.LogDiagnostic($"AssistWindow placement not restored: {ex.Message}"); }
     }
@@ -135,7 +141,7 @@ public sealed partial class AssistWindow : Window
     {
         try
         {
-            var position = AppWindow.Position;
+            if (_lastPosition is not { } position) return;     // never moved, nothing new to remember
             App.Settings.AssistWindowPlacements[PlacementKey] = new RememberedPlacement(position.X, position.Y);
             App.Settings.Save();
         }
@@ -405,8 +411,10 @@ public sealed partial class AssistWindow : Window
             StartDeployInApp = () => MainWindowForBuilds()?.DeployFor(_course.Code, _section),
             StartDeployInAppAsync = async () =>
             {
-                if (_main is null) return null;
-                return await _main.DeployForAsync(_course.Code, _section);
+                // The path a real deploy_section takes (the sync one above is
+                // the busy-section fallback), so it must find a window too.
+                if (MainWindowForBuilds() is not { } main) return null;
+                return await main.DeployForAsync(_course.Code, _section);
             },
             StopPreviewInApp = () => _main?.StopPreviewFor(_course.Code, _section),
             StopPreviewInAppAsync = async () =>

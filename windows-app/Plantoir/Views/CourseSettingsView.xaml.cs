@@ -726,7 +726,10 @@ public sealed partial class CourseSettingsView : UserControl
         {
             // The exception's message can carry a path under the teacher's
             // home folder; LogRedactor redacts on the way IN
-            // (windowsHomeFolder), so what reaches disk is already safe.
+            // (windowsHomeFolder, pinned by problemReportRedaction case 2).
+            // Its one known limit is pre-existing and shared with every other
+            // line: an account name with a space in it loses only its first
+            // word.
             ActivityTrail.Note(ActivityTrail.Event.SettingsCouldNotBeSaved,
                 "could not save the settings for " + _course.Code + " — " + error.Message);
             SaveStatus.Text = $"Could not save: {error.Message}";

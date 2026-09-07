@@ -327,6 +327,7 @@ public sealed partial class MainWindow : Window
                 {
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
                 }
+                ComeForwardIfHidden();
                 if (DetailHost.Content is SectionDetailView detail)
                 {
                     string? outcome = await detail.StartDeployForAutomationAsync();
