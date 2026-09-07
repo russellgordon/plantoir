@@ -1025,9 +1025,12 @@ this side is expected to say so when the contract is wrong.
     sentences, the listing grammar, the banned vocabulary and six cases;
     `Plantoir.Core/Models/SpecialFoldersHelp.cs` implements it and
     `Plantoir/Views/SpecialFoldersHelpDialog.cs` draws it, writing no sentence
-    of its own. Two cases are PROPOSED for the mac rather than describing it —
-    see `MAC-HANDOFF.md`; the mac names the raw `curriculum_folder` key where
-    the build resolves past it, which affects every real course checked.
+    of its own. Two cases were PROPOSED for the mac rather than describing it —
+    the mac named the raw `curriculum_folder` key where the build resolves past
+    it, which affected every real course checked. **The mac took both on
+    2026-09-06** and its suite is green on the whole block; see the ledger in
+    `MAC-HANDOFF.md`. It also retired the placeholder's second sentence, so the
+    two apps now say the same words about the same course.
 
     **The one thing worth carrying forward from doing it:** the banned-word
     list here is not rule 1's list. It carries "substring", "segment" and
@@ -1338,6 +1341,27 @@ to run in the background.
     goes red on its own, and the first obligation is invisible without this
     one. Eight of the eleven pass on Windows today. See "Spelling a folder's
     new name inside a link".
+
+32. **Your folders-help jargon sweep reads the teacher's own folder names, and
+    the contract says not to.** Small, latent, and named here only so it is not
+    rediscovered as a puzzle.
+    `SpecialFoldersHelpContractTests.TheSheetNamesNoMachineryAndPublishesNoMatchingRule`
+    appends `entry.Name` to the text it scans for banned words. But
+    `contracts/shared-rules.json` → `specialFoldersHelp.saysNoMachinery.rule`
+    excludes a folder's NAME on purpose — "a computer studies course with a
+    folder called 'Scripts' is not a wording bug" — which is a line your own
+    adversarial review put there. It cannot fail today because the fixture's
+    folders are Concepts/Tasks/Ontario Curriculum, so this is not a bug
+    report; it is that the two suites assert different things about the same
+    rule, and the one that is wrong is the one that would fail on a real
+    course. **The mac had the identical over-reach and fixed its own copy on
+    the way past** (2026-09-06), scanning the title, the intro, both button
+    labels, the placeholder and every row's `what` and `why` — the text the
+    PRODUCT writes — and running it against a course with NO curriculum
+    folder, which is the branch neither platform's fixture had ever exercised.
+    Both changes are worth copying: drop `entry.Name` from the sweep, add
+    `Title`, `Intro`, `OpenedBy`, `DismissedBy`, `NoCurriculumFolderYet` and
+    `NoneChosen` to it, and give the fixture no curriculum folder.
 
 ## Windows no longer runs any of this in a container
 
