@@ -81,6 +81,25 @@ public static class SiteHealthRepair
         Restored,
         AlreadyFine,
         Failed,
+        /// <summary>
+        /// A repair that cannot go ahead until the TEACHER moves something.
+        ///
+        /// <para>Counted as a failure, because it is one — but it carries its
+        /// own explanation, and that is the whole point of the case. A folder
+        /// named <c>index.md</c> used to come back <see cref="Failed"/> here,
+        /// which was honest, but the sentence that goes with it — "check the
+        /// folder isn't locked or read-only" — sends a teacher looking for the
+        /// wrong thing entirely. (On the mac it was worse still: a bare
+        /// existence check reported it as already put right.)</para>
+        ///
+        /// <para>The section it names comes from the finding beside it in
+        /// <see cref="Repair"/>'s result; this type only says how a repair
+        /// went, and <see cref="OutcomeOfRepairing"/> chooses every word.
+        /// Pinned by <c>contracts/shared-rules.json</c> -&gt;
+        /// <c>siteHealth.repair.refusedWhenSomethingIsInTheWay</c>, whose
+        /// vocabulary this is the "refused" of.</para>
+        /// </summary>
+        Refused,
     }
 
     /// <summary>Where the teacher met the problem.</summary>
@@ -112,6 +131,26 @@ public static class SiteHealthRepair
     public const string CouldNotExplanation =
         "You can make it yourself in Obsidian, or check that the folder holding " +
         "this course isn't locked or read-only.";
+
+    /// <summary>
+    /// What a teacher is told when a FOLDER is sitting where a section's front
+    /// page belongs.
+    ///
+    /// <para>Pinned word for word to <c>contracts/shared-rules.json</c> -&gt;
+    /// <c>siteHealth.repair.refusedWhenSomethingIsInTheWay</c>, so the two
+    /// apps say one sentence about one problem rather than inventing two.</para>
+    ///
+    /// <para>It names the COURSE as well as the section folder because every
+    /// course has a <c>section1</c>, and the dialog this appears in shows only
+    /// a headline and this sentence — nothing else in it says which course is
+    /// meant.</para>
+    /// </summary>
+    public static string FolderWhereTheFrontPageBelongs(string courseCode, int sectionNumber) =>
+        $"There is a folder called index.md in the section{sectionNumber} folder " +
+        $"of your {courseCode} course, where the front page should be. Plantoir " +
+        "has left it exactly as it is, in case your own pages are inside it. Move " +
+        "anything you want to keep somewhere else, then delete or rename that " +
+        "folder, and Plantoir can put the front page back.";
 
     /// <summary>
     /// Why the preview does not show the repair yet.
@@ -202,21 +241,62 @@ public static class SiteHealthRepair
         // "Put the front page and the front page back." is not a sentence.
         var restored = new List<string>();
         var failed = new List<string>();
+        var reasonsItCouldNotGoAhead = new List<string>();
+        bool somethingSimplyFailed = false;
         foreach (var (finding, result) in results)
         {
-            if (result == Result.Restored) { if (!restored.Contains(finding.Name)) restored.Add(finding.Name); }
-            else if (result == Result.Failed) { if (!failed.Contains(finding.Name)) failed.Add(finding.Name); }
+            switch (result)
+            {
+                case Result.Restored:
+                    AddOnce(finding.Name, restored);
+                    break;
+                case Result.Failed:
+                    AddOnce(finding.Name, failed);
+                    somethingSimplyFailed = true;
+                    break;
+                case Result.Refused:
+                    AddOnce(finding.Name, failed);
+                    // Two refused sections are two DIFFERENT sentences — each
+                    // names its own section folder — so both are wanted. What
+                    // is filtered here is the same sentence twice, which is
+                    // what the very same finding arriving twice would produce.
+                    AddOnce(FolderWhereTheFrontPageBelongs(course.Code, finding.Section),
+                            reasonsItCouldNotGoAhead);
+                    break;
+                case Result.AlreadyFine:
+                    break;
+            }
         }
         restored.Sort(StringComparer.Ordinal);
         failed.Sort(StringComparer.Ordinal);
+        reasonsItCouldNotGoAhead.Sort(StringComparer.Ordinal);
 
         // Nothing to do: every one of them was already there. Pressing the
         // button twice must not read as a permissions problem.
         if (restored.Count == 0 && failed.Count == 0)
             return new Outcome("That is already put right.", "Nothing needed changing.", false);
 
+        // Why it could not go ahead, in the order a teacher reads it.
+        //
+        // The generic explanation is added only when something failed for a
+        // reason nobody has a better sentence for — and it goes FIRST, with
+        // the specific refusals after it. Putting the refusal first would end
+        // the paragraph on "You can make it yourself in Obsidian", straight
+        // after "…and Plantoir can put the front page back", so "it" lands on
+        // the one thing that cannot be made until the folder in the way has
+        // been moved. This order ends on the step the teacher can take.
+        //
+        // Reachable only when a file sits where Media belongs AND a folder
+        // sits where the front page belongs, in one course, at one moment.
+        // Rare, and it still has to read properly.
+        var whyNotInOrder = new List<string>();
+        if (somethingSimplyFailed || reasonsItCouldNotGoAhead.Count == 0)
+            whyNotInOrder.Add(CouldNotExplanation);
+        whyNotInOrder.AddRange(reasonsItCouldNotGoAhead);
+        string whyNot = string.Join(" ", whyNotInOrder);
+
         if (restored.Count == 0)
-            return new Outcome("Plantoir could not put that back.", CouldNotExplanation, false);
+            return new Outcome("Plantoir could not put that back.", whyNot, false);
 
         string putBack = WhatWasPutBack(restored) ?? "";
 
@@ -224,11 +304,16 @@ public static class SiteHealthRepair
         // — silence whenever anything else succeeded, in the type added so that
         // failure would not be silent.
         if (WhatCouldNotBePutBack(failed) is { } alsoFailed)
-            return new Outcome(putBack, alsoFailed + " " + CouldNotExplanation, false);
+            return new Outcome(putBack, alsoFailed + " " + whyNot, false);
 
         return occasion == Occasion.Publishing
             ? new Outcome(putBack, NotPublishedYet, true)
             : new Outcome(putBack, NotOnTheSiteYet, true);
+    }
+
+    private static void AddOnce(string item, List<string> list)
+    {
+        if (!list.Contains(item)) list.Add(item);
     }
 
     /// <summary>
@@ -239,14 +324,16 @@ public static class SiteHealthRepair
     /// changes nothing.</para>
     /// </summary>
     /// <remarks>
-    /// One entry per FINDING, not per check name — which is a deliberate
-    /// divergence from the mac, whose dictionary is keyed by name. Two sections
-    /// each missing a front page are two findings with one name: both get
-    /// repaired either way, but keyed by name only the last result is reported,
-    /// so "section 1 restored, section 2 was already there" becomes "that is
-    /// already put right" with no preview offered. Unreachable from the app
-    /// today (a view owns one runner, and the checks announce per section), and
-    /// cheaper to make impossible than to leave as a comment.
+    /// One entry per FINDING, not per check name. Two sections each missing a
+    /// front page are two findings with one name: both get repaired either
+    /// way, but keyed by name only the last result is reported, so "section 1
+    /// restored, section 2 was already there" becomes "that is already put
+    /// right" with no preview offered. Unreachable from the app today (a view
+    /// owns one runner, and the checks announce per section), and cheaper to
+    /// make impossible than to leave as a comment. This shape shipped here
+    /// first; the mac's dictionary keyed by name followed it on 2026-09-07, and
+    /// the rule is now contract data — <c>siteHealth.repair.reportedOncePerFinding</c>,
+    /// whose cases <c>SiteHealthContractTests</c> runs.
     /// </remarks>
     public static IReadOnlyList<(SiteHealthFinding Finding, Result Result)> Repair(
         IReadOnlyList<SiteHealthFinding> findings, Course course)
@@ -313,14 +400,27 @@ public static class SiteHealthRepair
         string index = Path.Combine(sectionDirectory, "index.md");
         try
         {
-            // A FOLDER named index.md is not "already fine": Quartz needs a
-            // page there, and File.Exists answers false for a directory — so
-            // without this the write below fails and the teacher is told to
-            // check whether their disk is read-only, which is not the problem.
-            // (The mac asks fileExists, which is TRUE for a directory, and
-            // therefore reports this one as already put right — the worse of
-            // the two answers. See MAC-HANDOFF.)
-            if (Directory.Exists(index)) return Result.Failed;
+            // A FOLDER named index.md is not "already fine": the section still
+            // has no front page, so the build still produces no site and the
+            // publish still refuses. File.Exists answers false for a directory,
+            // so without this check the write below would fail and the teacher
+            // would be sent to check whether their disk is read-only, which is
+            // not the problem. (The mac's bare fileExists answered TRUE and
+            // reported it as already put right — the worse answer; fixed there
+            // 2026-09-07, and the two apps now share this refusal.)
+            //
+            // And it REFUSES rather than clearing the way. Moving the folder
+            // aside and writing a proper front page was considered and
+            // rejected: that relocates a folder which may hold the teacher's
+            // own pages, without asking, and neither app can see what is
+            // inside it. Refusing costs one more step by hand and nothing else.
+            if (Directory.Exists(index))
+            {
+                ActivityTrail.Note(ActivityTrail.Event.FolderProblemNotRepaired,
+                                   "found a folder called index.md where the front page belongs, " +
+                                   "and left it alone", course.Code, sectionNumber);
+                return Result.Refused;
+            }
             if (File.Exists(index)) return Result.AlreadyFine;
             Directory.CreateDirectory(sectionDirectory);
             // The course's own name, matching the mac character for character:
