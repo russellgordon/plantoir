@@ -1,38 +1,52 @@
 import XCTest
 @testable import QuartzTeachers
 
-/// The in-app explanation of which folders Plantoir uses.
+/// The in-app explanation of which folders Plantoir uses, driven from
+/// `contracts/shared-rules.json` → `specialFoldersHelp` rather than retyped
+/// here.
 ///
 /// Two properties matter and neither is obvious from reading the view: it must
 /// name the folders THIS course has rather than the rule that finds them, and
-/// it must not describe the machinery.
+/// it must not describe the machinery. Both are contract keys, so a change to
+/// either fails a test on BOTH platforms instead of drifting on one — the
+/// Windows half is `SpecialFoldersHelpContractTests.cs`.
+///
+/// This file used to retype the sentences and invent its own cases. It could
+/// not have caught what was actually wrong: its fixture always recorded a
+/// `curriculum_folder`, so the branch that showed a teacher the placeholder
+/// never ran once in a test.
 @MainActor
 final class SpecialFoldersHelpTests: XCTestCase {
 
     // MARK: - Functions
 
-    private func makeCourse(
-        shared: [String] = ["Concepts", "Tasks", "Ontario Curriculum"],
-        perSection: [String] = ["All Classes"],
-        graded: [String]? = nil,
-        curriculum: String? = "Ontario Curriculum"
-    ) throws -> (URL, Course) {
+    /// A course built from a contract case's own inputs.
+    ///
+    /// `graded_folders` and `curriculum_folder` are written only when the case
+    /// gives one, because an ABSENT key and an EMPTY list mean different
+    /// things — see `gradedFolders.absentIsNotEmpty`, and the cases here that
+    /// turn on exactly that. A JSON `null` arrives as `NSNull`, which the
+    /// `as?` casts below read as nil, so "never recorded" simply writes no key.
+    private func makeCourse(from figure: [String: Any]) throws -> (URL, Course) {
         let root: URL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("folders-help-\(UUID().uuidString)")
         let courseURL: URL = root.appendingPathComponent("courses/ICS3U")
         try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
+
         var configuration: [String: Any] = [
             "course_code": "ICS3U", "course_name": "Introduction to Computer Science",
             "section_numbers": [1], "num_sections": 1,
-            "shared_folders": shared, "per_section_folders": perSection,
+            "shared_folders": figure["sharedFolders"] as? [String] ?? [],
+            "per_section_folders": figure["perSectionFolders"] as? [String] ?? [],
             "shared_files": [], "per_section_files": [],
         ]
-        if let graded {
+        if let graded = figure["gradedFolders"] as? [String] {
             configuration["graded_folders"] = graded
         }
-        if let curriculum {
+        if let curriculum = figure["curriculumFolder"] as? String {
             configuration["curriculum_folder"] = curriculum
         }
+
         let configURL: URL = courseURL.appendingPathComponent("course_config.json")
         try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
             .write(to: configURL)
@@ -42,66 +56,192 @@ final class SpecialFoldersHelpTests: XCTestCase {
         ))
     }
 
-    /// The whole point: a teacher is told what THEIR folders are called.
-    func testItNamesThisCoursesOwnFolders() throws {
-        let (root, course) = try makeCourse(
-            shared: ["Concepts", "Tests", "Expectations"],
-            perSection: ["Lessons"],
-            graded: ["Tests"],
-            curriculum: "Expectations"
+    /// The row a case is talking about, found by the contract's own `key`
+    /// rather than by a position typed in here. A hard-coded index would go on
+    /// passing after a row was inserted above it, testing the wrong row and
+    /// saying nothing — which is the failure this whole file exists to catch.
+    private func name(ofRow key: String, in course: Course) throws -> String {
+        let rows: [[String: Any]] = try SpecialFoldersHelpTests.rows()
+        let entries: [SpecialFolderEntry] = SpecialFoldersHelpView(course: course).entries
+        for index in rows.indices {
+            if rows[index]["key"] as? String == key {
+                return entries[index].name
+            }
+        }
+        XCTFail("a case names a row the contract does not list: \(key)")
+        return ""
+    }
+
+    // MARK: - The names a course is shown
+
+    /// Every case in the contract, run against this app's own sheet.
+    func testTheSheetNamesEachCoursesOwnFolders() throws {
+        let section: [String: Any] = try SpecialFoldersHelpTests.section()
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(
+            cases.count, 6,
+            "the specialFoldersHelp case list has lost cases; two of them are the only "
+                + "gate on naming the RESOLVED curriculum folder"
         )
-        defer { try? FileManager.default.removeItem(at: root) }
 
-        let text: String = SpecialFoldersHelpView(course: course).entries
-            .map { entry in return entry.name }
-            .joined(separator: "\n")
+        for figure in cases {
+            let name: String = try XCTUnwrap(figure["name"] as? String)
+            let (root, course) = try makeCourse(from: figure)
+            defer { try? FileManager.default.removeItem(at: root) }
 
-        XCTAssertTrue(text.contains("Lessons"), text)
-        XCTAssertTrue(text.contains("Expectations"), text)
-        XCTAssertTrue(text.contains("Tests"), text)
-        XCTAssertFalse(text.contains("All Classes"),
-                       "this course does not have a folder called All Classes")
+            let expected: [String: Any] = try XCTUnwrap(figure["expectNames"] as? [String: Any])
+            for (key, value) in expected {
+                XCTAssertEqual(
+                    try self.name(ofRow: key, in: course), value as? String,
+                    "case “\(name)”, row “\(key)”"
+                )
+            }
+
+            // Scoped to the row NAMES, and compared as written: the contract's
+            // own rule excludes a folder's name from the jargon sweep for the
+            // opposite reason, and a case banning "Expectations" would fire
+            // spuriously against the curriculum row's "Your curriculum
+            // expectations" if this looked at the explanations too.
+            if let banned = figure["mustNotAppear"] as? [String] {
+                var shown: String = ""
+                for entry in SpecialFoldersHelpView(course: course).entries {
+                    shown += entry.name + " "
+                }
+                for word in banned {
+                    XCTAssertFalse(
+                        shown.contains(word),
+                        "case “\(name)”: the sheet names “\(word)”, which this course "
+                            + "does not have"
+                    )
+                }
+            }
+        }
     }
 
-    /// A course that has never been asked is shown what the build currently
-    /// counts, not a blank or a guess.
-    func testACourseNeverAskedIsShownWhatCountsToday() throws {
-        let (root, course) = try makeCourse(graded: nil)
+    // MARK: - The rows themselves
+
+    /// Every row's explanation, in the contract's order. The sentences a
+    /// teacher reads are the contract's, character for character.
+    func testTheRowsAreTheContractsRowsInTheContractsOrder() throws {
+        let rows: [[String: Any]] = try SpecialFoldersHelpTests.rows()
+        let (root, course) = try makeCourse(from: [
+            "perSectionFolders": ["All Classes"],
+            "sharedFolders": ["Concepts", "Tasks", "Ontario Curriculum"],
+        ])
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let view: SpecialFoldersHelpView = SpecialFoldersHelpView(course: course)
-        XCTAssertEqual(view.gradedFolderNames, ["Tasks"])
+        let entries: [SpecialFolderEntry] = SpecialFoldersHelpView(course: course).entries
+        XCTAssertEqual(entries.count, rows.count,
+                       "no row is ever omitted — see rowsAreOrdered")
+
+        for index in rows.indices {
+            let row: [String: Any] = rows[index]
+            let key: String = try XCTUnwrap(row["key"] as? String)
+            XCTAssertEqual(entries[index].what, row["what"] as? String, "row “\(key)”")
+            XCTAssertEqual(entries[index].why, row["why"] as? String, "row “\(key)”")
+            // A fixed row's name is the contract's; a course-named row's is
+            // not, and asserting it here would only restate the cases above.
+            if row["namedFrom"] as? String == "fixed" {
+                XCTAssertEqual(entries[index].name, row["name"] as? String, "row “\(key)”")
+            }
+        }
     }
 
-    /// Rule 1. This text is shown verbatim, and the whole reason the help
-    /// documents CONFIGURED names is to avoid publishing the matching rule as
-    /// if it were a promise.
+    /// The sentences that are not rows: the button that opens the sheet, its
+    /// title, the line under it, the button that closes it, and the one name
+    /// the product writes for itself.
+    func testTheTitleAndIntroAreTheContractsOwn() throws {
+        let section: [String: Any] = try SpecialFoldersHelpTests.section()
+        XCTAssertEqual(SpecialFoldersHelpView.title, section["title"] as? String)
+        XCTAssertEqual(SpecialFoldersHelpView.intro, section["intro"] as? String)
+        XCTAssertEqual(SpecialFoldersHelpView.openedBy, section["openedBy"] as? String)
+        XCTAssertEqual(SpecialFoldersHelpView.dismissedBy, section["dismissedBy"] as? String)
+
+        // Found by key, not by position — the same trap as name(ofRow:in:).
+        var checked: Bool = false
+        for row in try SpecialFoldersHelpTests.rows() where row["key"] as? String == "curriculum" {
+            XCTAssertEqual(
+                SpecialFoldersHelpView.noCurriculumFolderYet,
+                row["placeholderWhenNone"] as? String
+            )
+            checked = true
+        }
+        XCTAssertTrue(checked, "the contract lists no curriculum row to take the placeholder from")
+    }
+
+    // MARK: - How several names are said
+
+    func testSeveralFoldersAreListedTheWayAPersonWouldSayThem() throws {
+        let section: [String: Any] = try SpecialFoldersHelpTests.section()
+        let listing: [String: Any] = try XCTUnwrap(section["listing"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(listing["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty)
+
+        for figure in cases {
+            let names: [String] = try XCTUnwrap(figure["names"] as? [String])
+            XCTAssertEqual(
+                SpecialFoldersHelpView.listed(names), figure["expect"] as? String,
+                "listing \(names)"
+            )
+        }
+    }
+
+    // MARK: - Rule 1
+
+    /// The banned list carries "substring", "segment" and "case-insensitive"
+    /// alongside "container", because publishing the matching rule in words is
+    /// the same mistake as printing it in a row, by another route.
+    ///
+    /// **Scoped to the text the PRODUCT writes** — the title, the intro, every
+    /// row's what and why, and the one row name Plantoir supplies itself. A
+    /// teacher's own folder called "Scripts" is their word shown back to them,
+    /// not a wording bug, and sweeping the course's folder names would make it
+    /// one.
     func testItNamesNoMachineryAndPublishesNoMatchingRule() throws {
-        let (root, course) = try makeCourse()
+        let section: [String: Any] = try SpecialFoldersHelpTests.section()
+        let noMachinery: [String: Any] = try XCTUnwrap(section["saysNoMachinery"] as? [String: Any])
+        let jargon: [String] = try XCTUnwrap(noMachinery["jargon"] as? [String])
+
+        // A course with no curriculum folder, so the placeholder branch — the
+        // one that carried the offending sentence and never ran in a test —
+        // is the branch being read here.
+        let (root, course) = try makeCourse(from: [
+            "perSectionFolders": ["All Classes"],
+            "sharedFolders": ["Concepts", "Tasks"],
+        ])
         defer { try? FileManager.default.removeItem(at: root) }
 
-        var shown: String = ""
+        var shown: String = SpecialFoldersHelpView.title + " "
+            + SpecialFoldersHelpView.intro + " "
+            + SpecialFoldersHelpView.openedBy + " "
+            + SpecialFoldersHelpView.noCurriculumFolderYet + " "
+            + SpecialFoldersHelpView.noneChosen + " "
         for entry in SpecialFoldersHelpView(course: course).entries {
-            shown += entry.name + " " + entry.what + " " + entry.why + " "
+            shown += entry.what + " " + entry.why + " "
         }
-        let forbidden: [String] = [
-            "toolchain", "script", "docker", "container", "wsl", "python",
-            "json", "quartz", "config", "repository", "substring", "regex",
-            "case-insensitive", "segment",
-        ]
-        for word in forbidden {
-            XCTAssertFalse(shown.lowercased().contains(word),
-                           "the folders help says \"\(word)\" to a teacher")
+        let lowercased: String = shown.lowercased()
+
+        for word in jargon {
+            XCTAssertFalse(lowercased.contains(word.lowercased()),
+                           "the folders help says “\(word)” to a teacher")
         }
     }
 
-    func testSeveralFoldersAreListedTheWayAPersonWouldSayThem() {
-        XCTAssertEqual(SpecialFoldersHelpView.listed(["Tasks"]), "Tasks")
-        XCTAssertEqual(SpecialFoldersHelpView.listed(["Tasks", "Tests"]), "Tasks and Tests")
-        XCTAssertEqual(
-            SpecialFoldersHelpView.listed(["Tasks", "Tests", "Quizzes"]),
-            "Tasks, Tests and Quizzes"
+    // MARK: - Reading the contract
+
+    private static func section() throws -> [String: Any] {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
         )
-        XCTAssertEqual(SpecialFoldersHelpView.listed([]), "None chosen")
+        return try XCTUnwrap(all["specialFoldersHelp"] as? [String: Any],
+                             "No specialFoldersHelp in shared-rules.json")
+    }
+
+    private static func rows() throws -> [[String: Any]] {
+        return try XCTUnwrap(try section()["rows"] as? [[String: Any]])
     }
 }
