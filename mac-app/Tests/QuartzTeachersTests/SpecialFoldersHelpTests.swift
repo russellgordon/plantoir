@@ -60,11 +60,22 @@ final class SpecialFoldersHelpTests: XCTestCase {
     /// rather than by a position typed in here. A hard-coded index would go on
     /// passing after a row was inserted above it, testing the wrong row and
     /// saying nothing — which is the failure this whole file exists to catch.
+    ///
+    /// **Bounds-checked on purpose.** The whole point of this file is that a
+    /// row Windows adds to the contract makes the mac suite go red until the
+    /// mac builds it — and a Swift array subscript out of range is a fatal
+    /// error, not a test failure. It would kill the test host, abandon the run
+    /// and hide every other result, which reads as a broken machine rather
+    /// than as the request it is.
     private func name(ofRow key: String, in course: Course) throws -> String {
         let rows: [[String: Any]] = try SpecialFoldersHelpTests.rows()
         let entries: [SpecialFolderEntry] = SpecialFoldersHelpView(course: course).entries
         for index in rows.indices {
             if rows[index]["key"] as? String == key {
+                guard index < entries.count else {
+                    XCTFail("the contract lists a row “\(key)” the sheet does not build")
+                    return ""
+                }
                 return entries[index].name
             }
         }
@@ -131,8 +142,14 @@ final class SpecialFoldersHelpTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let entries: [SpecialFolderEntry] = SpecialFoldersHelpView(course: course).entries
+        // Asserted AND enforced: a mismatch has to stop the loop below, or the
+        // subscript traps and takes the whole run down with it rather than
+        // failing this one test.
         XCTAssertEqual(entries.count, rows.count,
                        "no row is ever omitted — see rowsAreOrdered")
+        guard entries.count == rows.count else {
+            return
+        }
 
         for index in rows.indices {
             let row: [String: Any] = rows[index]
@@ -192,15 +209,18 @@ final class SpecialFoldersHelpTests: XCTestCase {
     /// alongside "container", because publishing the matching rule in words is
     /// the same mistake as printing it in a row, by another route.
     ///
-    /// **Scoped to the text the PRODUCT writes** — the title, the intro, every
-    /// row's what and why, and the one row name Plantoir supplies itself. A
-    /// teacher's own folder called "Scripts" is their word shown back to them,
-    /// not a wording bug, and sweeping the course's folder names would make it
-    /// one.
+    /// **Scoped to the text the PRODUCT writes** — the title, the intro, both
+    /// button labels, every row's what and why, and the row names Plantoir
+    /// supplies ITSELF: the placeholder, "None chosen", and the four rows the
+    /// contract marks `namedFrom: "fixed"`. A teacher's own folder called
+    /// "Scripts" is their word shown back to them, not a wording bug, and
+    /// sweeping the course's folder names would make it one — which is the
+    /// only reason a name is ever left out.
     func testItNamesNoMachineryAndPublishesNoMatchingRule() throws {
         let section: [String: Any] = try SpecialFoldersHelpTests.section()
         let noMachinery: [String: Any] = try XCTUnwrap(section["saysNoMachinery"] as? [String: Any])
         let jargon: [String] = try XCTUnwrap(noMachinery["jargon"] as? [String])
+        let rows: [[String: Any]] = try SpecialFoldersHelpTests.rows()
 
         // A course with no curriculum folder, so the placeholder branch — the
         // one that carried the offending sentence and never ran in a test —
@@ -214,10 +234,15 @@ final class SpecialFoldersHelpTests: XCTestCase {
         var shown: String = SpecialFoldersHelpView.title + " "
             + SpecialFoldersHelpView.intro + " "
             + SpecialFoldersHelpView.openedBy + " "
+            + SpecialFoldersHelpView.dismissedBy + " "
             + SpecialFoldersHelpView.noCurriculumFolderYet + " "
             + SpecialFoldersHelpView.noneChosen + " "
-        for entry in SpecialFoldersHelpView(course: course).entries {
-            shown += entry.what + " " + entry.why + " "
+        let entries: [SpecialFolderEntry] = SpecialFoldersHelpView(course: course).entries
+        for index in entries.indices {
+            shown += entries[index].what + " " + entries[index].why + " "
+            if index < rows.count, rows[index]["namedFrom"] as? String == "fixed" {
+                shown += entries[index].name + " "
+            }
         }
         let lowercased: String = shown.lowercased()
 

@@ -312,8 +312,10 @@ that sheet are deliberate and easy to undo by accident:
   that decides which folder is protected from removal. Two things narrow the
   answer, in both apps equally: the scan looks at the SHARED folders only,
   where the build walks the merged tree, and neither app can see whether the
-  folder actually holds an expectation page. So the sheet can name a folder the
-  build goes on to skip — still righter than naming one that is not there.
+  folder actually holds an expectation page — and when the recorded folder has
+  none, the build does not give up, it falls through to the same scan. So the
+  sheet can name a folder the build passes over in favour of another. Still
+  righter than naming one that is not there.
 
 The rows, the sentences and the cases are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →

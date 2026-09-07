@@ -2563,8 +2563,13 @@ where.
      `SpecialFoldersHelpView` asked `course.configuration.curriculumFolder`
      and now asks `CurriculumFolderRule.resolvedCurriculumFolder(for:)` — the
      same rule folder protection already used at
-     `CourseSettingsView.swift:578`. Windows' measurement held here: the key
-     absent is the ordinary case, not a corner one.
+     `CourseSettingsView.swift:578`. **Windows' conclusion held here; its
+     reason did not, so the mac measured its own.** On this Mac, 2026-09-06,
+     across 15 real courses outside the repository: 12 have no
+     `curriculum_folder` key at all, 1 has it null, 2 have it set and correct
+     — and **11 of the 15 were being shown the placeholder while a perfectly
+     good folder sat in the vault**, two of them calling it "College Board
+     Curriculum", which no placeholder would ever have named.
   2. **The placeholder's second sentence is retired.** "One page per
      expectation, in a folder whose name mentions the curriculum" published
      the matching rule in plain words. The row now carries ONE explanation
@@ -2574,14 +2579,19 @@ where.
   keeping** — found by adversarial review before implementing, verified in the
   code rather than taken on trust.
 
-  - **"Nothing in the mac ever writes `curriculum_folder`" is not true.**
-    `SpecialFolderRenamer.swift:519-532` materialises it on an in-app rename,
-    deliberately and with its reasons written down. The accurate statement is
-    that the WIZARD never writes it, so a course made from scratch has it
-    absent — and a STALE key can therefore only come from a rename made
-    outside the app, in Finder or Obsidian. That sharpens the case rather than
-    weakening it: the sheet's whole job is the folder a teacher moved when
-    Plantoir was not watching.
+  - **"Nothing writes `curriculum_folder`" is not true, and it took two
+    reviews to get right.** `SpecialFolderRenamer.swift:519-532` materialises
+    it on an in-app rename, deliberately. And `setup_course.py:2381` writes it
+    for EVERY course made since 2026-08-23, from the payload or skeleton
+    manifest — all 50 skeleton manifests declare `"curriculum_folder":
+    "Curriculum"` — leaving it null only when the teacher declined a
+    ready-made course. So the population that meets this defect is courses
+    made BEFORE that date (12 of the 15 here), plus a stale key from a rename
+    made in Finder or Obsidian rather than in Course Settings. That sharpens
+    the case rather than weakening it: the sheet's whole job is the folder a
+    teacher moved when Plantoir was not watching. **The first draft of this
+    entry carried the wrong reason for the right fix, which is exactly the
+    thing that gets "simplified" back out later.**
   - **`CurriculumFolderRule` is narrower than the build, in one way the
     handoff did not name.** The build's fallback scan walks the MERGED tree
     (`build_site.py:4035`, `content_root = output_dir / "content"`), so it
@@ -2590,7 +2600,11 @@ where.
     manifest declares this folder as shared — and identical on Windows
     (`CourseConfiguration.cs:428`), so it is recorded in the contract's
     `rows[curriculum].source` rather than fixed. Do not "fix" it on one
-    platform alone.
+    platform alone. The second narrowness was already known and was stated too
+    weakly: when the recorded folder holds no expectation page the build does
+    not SKIP the row, it falls through to the same scan and may pick a
+    DIFFERENT folder — so the sheet can name a folder the build passes over,
+    not merely one it ignores. Both files now say so.
 
   **One test-scope decision, made on purpose.** The mac's jargon sweep reads
   the title, the intro, the button labels, the placeholder and every row's
