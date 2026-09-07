@@ -52,8 +52,15 @@ product, not of one platform.
 ## Contract cases waiting on the mac
 
 **One proposed 2026-09-07: `activityTrail.mustRecord` → `section restored`,
-marked `appliesOn: ["windows"]` so the mac suite stays green until the mac
-adopts it.** Branch `issue/27-assist-conversation-restore`. The mac's
+marked `appliesOn: ["windows"]` — and the mac suite goes RED on it anyway,
+which is the request arriving, not damage.** Branch
+`issue/27-assist-conversation-restore`. `SharedRulesContractTests.swift`'s
+`testTheTrailRecordsEveryEventTheContractRequires` builds its wanted set from
+every `mustRecord` entry with no `appliesOn` filter (the Windows twin honours
+it, since the mac's own `built site moved out of the working folder` is
+`appliesOn: ["mac"]`), so the mac fails by name until it either adopts the
+event or teaches its test the filter. Do both: the filter is what lets either
+side propose a platform-only event without reddening the other. The mac's
 "Restore Section N…" (`AssistSession.restoreSection`) records nothing on the
 trail; Windows' does, because a section whose pages are older than the
 conversation that changed them is exactly the thing a teacher asks about next
@@ -3331,6 +3338,26 @@ is what happened to the test-race item, sitting here for three days with
   so it does not fit `assist-cases.json`'s `when: <tool>` shape — the intent
   is here instead, as rule 2 allows. Not driven by hand: the banner, the
   dialog and the note want one look at the real interface.
+
+  **Five things the review found, kept as they are and written down.** (1) A
+  recorded copy that has since gone — deleted from the Backups list, or pruned
+  by five LATER conversations on the same course — is still the one the
+  banner offers, and Restore then says "The copy saved for this conversation
+  (…) could not be read." A first draft took a fresh copy in that case, which
+  would have made the dialog's "exactly how it was when this conversation
+  started" false; the mac checks only its dictionary and fails honestly, and
+  so does Windows now. (2) The key restore's frontmatter parser is as strict
+  as the mac's `PageFrontmatter.block` — line 1, "---" — and stricter than
+  this app's own `Block.Parse`; a shared page whose block starts after a blank
+  line is left alone rather than given a second block. (3) The failure note
+  in the transcript is a plain "Assistant" turn; the mac marks it
+  `isProblem: true` and Windows' transcript has no problem style. (4) The
+  copy's path travels ABSOLUTE in `_meta`, which Claude Code can see; the
+  app's own `back_up_course` answers relative. Harmless, unpretty. (5)
+  `roll_over_section` answers in a string and cannot carry `_meta`; it takes
+  no conversation copy, so nothing is lost, but a future tool that answers in
+  a string and changes things would not raise the banner — answer in a
+  result.
 
 - **The Windows wizard asks the skeleton question, writes `use_skeleton`, and
   shows the skeleton's folders it is about to make** (Windows, 2026-09-07,

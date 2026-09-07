@@ -49,18 +49,7 @@ public sealed class AssistWorkspace
     private static string CurrentCloudflareAccountId() =>
         CloudflareAccountIdOverrideForTests?.Invoke() ?? AppSettings.Load().CloudflareAccountId;
 
-    /// <param name="lockedCourse">
-    /// When given, the session can see and touch this course and nothing else.
-    /// Plantoir uses it when a teacher starts an assistant from a particular
-    /// course's menu: the request was about that course, so reaching another
-    /// one is never right, and a lock is a stronger guarantee than an
-    /// instruction the model might drift from.
-    /// </param>
-    /// <param name="undo">
-    /// Remembers what this session changed, so a wrong publish can be taken
-    /// back without restoring a whole course. Optional: without it every write
-    /// still happens, just unrecorded.
-    /// </param>
+
     // ---- One backup per conversation ---------------------------------------
 
     /// <summary>
@@ -93,7 +82,13 @@ public sealed class AssistWorkspace
     /// </summary>
     private string BackUpOnceForThisConversation(Course course, int sectionNumber)
     {
-        if (_conversationBackups.TryGetValue(course.Code, out var existing) && File.Exists(existing))
+        // The recorded copy is reused even if it has since gone — deleted from
+        // the Backups list, or pruned by five later conversations. Taking a
+        // fresh copy of the already-changed course and calling it "from before
+        // this conversation started" would make the restore dialog's promise
+        // false; the mac checks only its dictionary too, and a vanished copy
+        // then fails honestly with "could not be read".
+        if (_conversationBackups.TryGetValue(course.Code, out var existing))
         {
             ConversationBackupPath = existing;
             return existing;
@@ -105,6 +100,18 @@ public sealed class AssistWorkspace
         return made;
     }
 
+    /// <param name="lockedCourse">
+    /// When given, the session can see and touch this course and nothing else.
+    /// Plantoir uses it when a teacher starts an assistant from a particular
+    /// course's menu: the request was about that course, so reaching another
+    /// one is never right, and a lock is a stronger guarantee than an
+    /// instruction the model might drift from.
+    /// </param>
+    /// <param name="undo">
+    /// Remembers what this session changed, so a wrong publish can be taken
+    /// back without restoring a whole course. Optional: without it every write
+    /// still happens, just unrecorded.
+    /// </param>
     public AssistWorkspace(string workspacePath, ILauncherRunner launcher, string? lockedCourse = null,
                            UndoHistory? undo = null)
     {

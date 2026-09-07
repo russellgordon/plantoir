@@ -18,7 +18,7 @@ public static class AssistSectionRestore
     public sealed class Problem(string message) : Exception(message);
 
     public const string NothingToRestore =
-        "This conversation hasn’t changed anything yet, so there is nothing to put back.";
+        "This conversation hasn't changed anything yet, so there is nothing to put back.";
     public const string NoWorkingFolder =
         "Plantoir cannot find the working folder these courses live in.";
     public static string UnreadableBackup(string name) =>
@@ -39,7 +39,7 @@ public static class AssistSectionRestore
     /// </summary>
     public static string ConfirmationMessage(string courseCode, int sectionNumber) =>
         $"Section {sectionNumber} goes back to exactly how it was when this conversation started — " +
-        $"its pages, and whether the course’s shared pages are published for Section {sectionNumber}.\n\n" +
+        $"its pages, and whether the course's shared pages are published for Section {sectionNumber}.\n\n" +
         "Your other sections are not touched. Their pages, and their own publishing, stay exactly " +
         "as they are.\n\n" +
         $"Anything YOU changed in Section {sectionNumber} since this conversation started goes back " +
