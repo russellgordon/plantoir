@@ -106,6 +106,185 @@ public static class CourseRestorer
     /// — leaving the folder half-deleted behind an archive that had already
     /// succeeded.
     /// </summary>
+    /// <summary>
+    /// Puts ONE section back to how a backup has it, and touches no other.
+    ///
+    /// <para>Whole-course restore was rejected for this job for the reason
+    /// the mac's <c>AssistSectionRestore</c> gives: a teacher can be marking
+    /// Section 2 in Obsidian while they chat about Section 1, and a
+    /// whole-course rollback destroys that work. So: the section's own folder
+    /// is replaced wholesale, hidden files included; the course's SHARED pages
+    /// keep every byte except this section's own per-section frontmatter keys
+    /// (<c>publishForSection1:</c> and its relatives), which go back to what
+    /// the backup had — a key the conversation added where there was none
+    /// goes, one it removed comes back — so whether the shared pages are
+    /// published for this section is restored without touching what they
+    /// say for any other; and the section's built site is discarded, because
+    /// a build left standing would read as newer than the pages just put back.</para>
+    ///
+    /// <para>The zip is unpacked and checked BEFORE the course is touched, so
+    /// an unreadable backup can never leave an emptied section folder behind.
+    /// Mirrors the mac's <c>CourseRestorer.restoreSection</c>.</para>
+    /// </summary>
+    public static void RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory)
+    {
+        string courseDir = Path.Combine(coursesDirectory, item.CourseCode);
+        if (!Directory.Exists(courseDir))
+            throw new RestoreException($"{item.CourseCode} is not in Courses & Clubs, so there is nowhere to put Section {sectionNumber} back.");
+
+        string staging = Path.Combine(Path.GetTempPath(), "restore-" + Guid.NewGuid());
+        Directory.CreateDirectory(staging);
+        try
+        {
+            string payload = Unpack(item.FilePath, item.CourseCode, staging);
+            string folderName = "section" + sectionNumber;
+            string backedUpSection = Path.Combine(payload, folderName);
+            if (!Directory.Exists(backedUpSection))
+                throw new RestoreException($"The copy of {item.CourseCode} does not hold a Section {sectionNumber}.");
+
+            ReplaceContents(Path.Combine(courseDir, folderName), backedUpSection);
+            RestorePerSectionKeys(sectionNumber, courseDir, payload);
+            CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode, sectionNumber);
+        }
+        finally
+        {
+            try { Directory.Delete(staging, recursive: true); } catch { }
+        }
+    }
+
+    /// <summary>Out with the live folder's children, hidden ones included; in with the backup's.</summary>
+    private static void ReplaceContents(string live, string backedUp)
+    {
+        Directory.CreateDirectory(live);
+        foreach (string child in Directory.EnumerateFileSystemEntries(live))
+            DeleteTree(child);
+        foreach (string child in Directory.EnumerateFileSystemEntries(backedUp))
+        {
+            string target = Path.Combine(live, Path.GetFileName(child));
+            if (Directory.Exists(child)) Directory.Move(child, target);
+            else File.Move(child, target);
+        }
+    }
+
+    /// <summary>
+    /// Every shared page of the course gets this section's per-section keys
+    /// back as the backup had them, and nothing else about it changes.
+    /// </summary>
+    private static void RestorePerSectionKeys(int sectionNumber, string courseDir, string payload)
+    {
+        foreach (string page in SharedMarkdownPages(courseDir))
+        {
+            string relative = Path.GetRelativePath(courseDir, page);
+            string backedUpPage = Path.Combine(payload, relative);
+            string liveText, backupText;
+            try
+            {
+                if (!File.Exists(backedUpPage)) continue;
+                backupText = File.ReadAllText(backedUpPage);
+                liveText = File.ReadAllText(page);
+            }
+            catch (IOException) { continue; }
+            catch (UnauthorizedAccessException) { continue; }
+            string rewritten = SettingPerSectionKeys(sectionNumber, liveText, backupText);
+            if (rewritten != liveText)
+            {
+                try { File.WriteAllText(page, rewritten); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            }
+        }
+    }
+
+    /// <summary>The course's Markdown pages outside every section folder and every excluded folder.</summary>
+    private static IEnumerable<string> SharedMarkdownPages(string directory)
+    {
+        IEnumerable<string> entries;
+        try { entries = Directory.EnumerateFileSystemEntries(directory).ToList(); }
+        catch (IOException) { yield break; }
+        catch (UnauthorizedAccessException) { yield break; }
+        foreach (string entry in entries)
+        {
+            string name = Path.GetFileName(entry);
+            if (Directory.Exists(entry))
+            {
+                if (NamesASectionFolder(name) || CourseArchiver.ExcludedFromArchives.Contains(name)) continue;
+                foreach (string inner in SharedMarkdownPages(entry)) yield return inner;
+            }
+            else if (string.Equals(Path.GetExtension(entry), ".md", StringComparison.OrdinalIgnoreCase))
+            {
+                yield return entry;
+            }
+        }
+    }
+
+    public static bool NamesASectionFolder(string name)
+    {
+        const string prefix = "section";
+        if (!name.StartsWith(prefix, StringComparison.Ordinal) || name.Length == prefix.Length) return false;
+        for (int index = prefix.Length; index < name.Length; index++)
+            if (!char.IsAsciiDigit(name[index])) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// The live page's text with this section's per-section keys as the
+    /// backup had them. The mac's <c>settingPerSectionKeys</c>, line for line:
+    /// this section's lines are replaced by the backup's (or dropped when the
+    /// backup had none); with none of its own left on the page, the restored
+    /// lines go after the last per-section key so each section's lines stay
+    /// together and in order; a page with no frontmatter at all gets a block
+    /// of its own when the backup had keys for it.
+    /// </summary>
+    public static string SettingPerSectionKeys(int sectionNumber, string liveText, string backupText)
+    {
+        var restoredLines = new List<string>();
+        if (FrontmatterBounds(backupText) is { } backupBlock)
+        {
+            var backupLines = backupText.Split('\n');
+            for (int index = backupBlock.Open + 1; index < backupBlock.Close; index++)
+            {
+                string bare = backupLines[index].TrimEnd('\r');
+                if (SectionAdder.PerSectionKeyNumber(bare) == sectionNumber) restoredLines.Add(bare);
+            }
+        }
+
+        if (FrontmatterBounds(liveText) is not { } liveBlock)
+        {
+            if (restoredLines.Count == 0) return liveText;
+            return "---\n" + string.Join("\n", restoredLines) + "\n---\n" + liveText;
+        }
+
+        var lines = liveText.Split('\n');
+        int lastPerSectionIndex = -1;
+        for (int index = liveBlock.Open + 1; index < liveBlock.Close; index++)
+            if (SectionAdder.PerSectionKeyNumber(lines[index].TrimEnd('\r')) is not null) lastPerSectionIndex = index;
+
+        var rebuilt = new List<string> { lines[liveBlock.Open] };
+        bool placed = false;
+        for (int index = liveBlock.Open + 1; index < liveBlock.Close; index++)
+        {
+            string bare = lines[index].TrimEnd('\r');
+            if (SectionAdder.PerSectionKeyNumber(bare) == sectionNumber)
+            {
+                if (!placed) { rebuilt.AddRange(restoredLines); placed = true; }
+                continue;
+            }
+            rebuilt.Add(lines[index]);
+            if (index == lastPerSectionIndex && !placed) { rebuilt.AddRange(restoredLines); placed = true; }
+        }
+        if (!placed && restoredLines.Count > 0) rebuilt.AddRange(restoredLines);
+        for (int index = liveBlock.Close; index < lines.Length; index++) rebuilt.Add(lines[index]);
+        return string.Join("\n", rebuilt);
+    }
+
+    /// <summary>The line indexes of a page's opening and closing "---", or null when it has no frontmatter.</summary>
+    private static (int Open, int Close)? FrontmatterBounds(string text)
+    {
+        var lines = text.Split('\n');
+        if (lines.Length == 0 || lines[0].TrimEnd('\r') != "---") return null;
+        for (int index = 1; index < lines.Length; index++)
+            if (lines[index].TrimEnd('\r') == "---") return (0, index);
+        return null;
+    }
+
     internal static void DeleteTree(string path)
     {
         FileAttributes attributes;
