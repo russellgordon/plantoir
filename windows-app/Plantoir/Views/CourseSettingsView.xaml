@@ -28,6 +28,12 @@
             </Button>
         </Grid>
 
+        <!-- What a folder change did — Add made the folder, Remove left it on
+             disk, a rename finished — said once, here, where the list is. -->
+        <InfoBar x:Name="FolderNotice" Grid.Row="1" VerticalAlignment="Top" Margin="16,8,16,0"
+                 IsOpen="False" Severity="Informational" IsClosable="True"
+                 AutomationProperties.AutomationId="folderNotice" />
+
         <ScrollViewer x:Name="FormScroll" Grid.Row="1" Padding="16,0,16,16"
                       AutomationProperties.AutomationId="courseSettingsForm">
             <StackPanel x:Name="Form" Spacing="8" MaxWidth="720" HorizontalAlignment="Left" />
