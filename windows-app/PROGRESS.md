@@ -173,34 +173,25 @@ the views are what remains.
 
 Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
-the types as dead code. The same goes for the four trail events below: the
-features that would raise them are these same two.
+the types as dead code.
 
-## NO activity-trail event is declared without an emitter any more (2026-09-06; six were, and the last two were wired 2026-09-07)
+## ONE activity-trail event is declared without an emitter (2026-09-06; six were then, and all six have callers since 2026-09-07)
 
-`ActivityTrail.Event` names `folder renamed`, `folder created`,
+`ActivityTrail.Event` named `folder renamed`, `folder created`,
 `synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,
 `settings saved` and `settings could not be saved`, which belonged to no
 unbuilt view at all: `CourseSettingsView.Save_Click` wrote the config and
-recorded nothing, while the mac records both. That pair was handoff item 28
-and has been emitted since 2026-09-07; the two synced-folder events followed
-the same day with item 18's views. The two that remain are in
-`contracts/shared-rules.json` → `activityTrail.mustRecord`, and
-`ContractTests.SharedRules_ActivityTrailEvents_Exist` compares that list
-against the enum — so declaring them is what makes the suite green.
-
-**`folder renamed` and `folder created` were the last two**, wired on
-2026-09-07 when item 13's rename sheet landed (`CourseSettingsView`,
-`RenameFolderAsync` and `CreateFolderForNewEntry`). Nothing in
-`ActivityTrail.Event` is now declared without a caller — check with
-`grep -c` per member rather than trusting this sentence.
-
-This is written here rather than left in a commit message because a green
-suite that is green on a promise is exactly the kind of thing a later session
-should be able to find. **When either feature's front end lands, the events
-must actually be recorded** — the count and the names are in the contract
-entries, and `ReclaimedProcesses` is the worked example of parsing something
-out and putting it on the trail.
+recorded nothing, while the mac records both. All six are emitted now: the
+settings pair since item 28 (2026-09-07), the synced-folder pair the same day
+with item 18's views, and `folder renamed` / `folder created` with item 13's
+rename sheet (`CourseSettingsView`, `RenameFolderAsync` and
+`CreateFolderForNewEntry`). The one member still without a caller is
+`AssistantAsked`, whose line is written by `NotePrompt` without going through
+the enum — a recount should not be surprised by it. Check with `grep -c` per
+member rather than trusting this paragraph: a green suite that is green on a
+promise is exactly the kind of thing a later session should be able to find,
+and `ReclaimedProcesses` is the worked example of parsing something out and
+putting it on the trail.
 
 **There was a FIFTH, and this section did not name it: `folder problem
 repaired`.** Declared when the trail was built, still with no call site on

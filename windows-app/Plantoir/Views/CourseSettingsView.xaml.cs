@@ -342,13 +342,14 @@ public sealed partial class CourseSettingsView : UserControl
         {
             // Off the UI thread: the move is quick, but reading every page in
             // the course to rewrite links is not on a synced vault.
-            outcome = await Task.Run(() => finishing
+            outcome = await Task.Run(() =>
+            {
+                if (!finishing) return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections);
                 // The folders already moved; only the links and the record remain.
-                ? new RenameOutcome(true,
-                    SpecialFolderRenamer.DoneMessage(oldName, newName,
-                        SpecialFolderRenamer.RelinkPages(courseDirectory, oldName, newName)),
-                    0, 0, NothingWasThere: false)
-                : SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections));
+                int relinked = SpecialFolderRenamer.RelinkPages(courseDirectory, oldName, newName);
+                return new RenameOutcome(true, SpecialFolderRenamer.DoneMessage(oldName, newName, relinked),
+                                         0, relinked, NothingWasThere: false);
+            });
         }
         catch (SpecialFolderRenamer.RenameException error)
         {

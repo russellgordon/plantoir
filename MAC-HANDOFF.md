@@ -3410,17 +3410,21 @@ is what happened to the test-race item, sitting here for three days with
   `HalfFailureMessage` naming the section that stopped it, then
   `RelinkPages` over every page in the course. `Renaming(JObject…)` is
   `renaming(_:to:scope:in:)` ported, materialisation included: the class
-  folder is recognised through `ClassFolderRule.Name(recorded, folders)` and
-  the curriculum folder through `CurriculumFolderRule.Resolve`, both decided
+  folder is recognised through `WasSurelyTheClassFolder` — the recorded key
+  when it names a real folder, otherwise only a name containing "class" that
+  the resolver picks, so a first-folder GUESS is never frozen into the key
+  (the review caught a first draft that used the bare resolver) — and the
+  curriculum folder through `CurriculumFolderRule.Resolve`, both decided
   BEFORE the list is rewritten; `hidden`, `expandable` and `graded_folders`
   are rewritten from either scope; `curriculum_folder`, `class_folder` and
   `excluded_items` only in their own scope; every list is de-duplicated so
   finishing an interrupted rename leaves one name, not two.
-  `CourseConfiguration.RecordOnDisk` is `recordOnDisk` ported — three
-  compare-and-swap tries, then the FRESHEST bytes — with one addition the
-  mac does not need: the change is applied to the in-memory object too and
-  the bytes written become its last-saved state, so Revert keeps the rename
-  and drops only what was never saved. `Write` is untouched, and
+  `CourseConfiguration.RecordOnDisk` is `recordOnDisk` ported whole — three
+  compare-and-swap tries, then the FRESHEST bytes, and the change applied
+  to the in-memory object with the bytes written as its last-saved state, so
+  Revert keeps the rename and drops only what was never saved (a first
+  draft of this entry called that an addition; it is the mac's own last two
+  lines). `Write` is untouched, and
   `WriteIsUnchangedAndRevertStillDoesWhatItSays` pins that it does NOT
   read-compare-write. The record lives at
   `courses/.internal/renames/<CODE>.json` with `from`, `to` and `scope`;
@@ -3439,11 +3443,23 @@ is what happened to the test-race item, sitting here for three days with
   pre-fill; a modal on opening Settings). The two foot-guns: Add creates
   the folder in every section and says so; Remove says the folder stays.
 
+  **Two shared limits, written down rather than fixed.** The record is one
+  file per COURSE, and any successful rename clears it — so a teacher with
+  an interrupted `Tasks → Assignments` who renames another folder first, or
+  types a different name into the pre-filled sheet, loses the only evidence
+  and is back in the dead end; the mac's `clearRenameRecord` does the same.
+  And `recordOnDisk`'s last-saved bytes carry any key another writer put
+  there that the in-memory object lacks, so a form nobody edited can show
+  as dirty after a build wrote `unit_word` — identical on both platforms.
+  Neither is this branch's to change alone; both want a decision.
+
   **Windows specifics.** The dialog's Rename button is the default (the
   mac's sheet submits on Return too); the refusal is re-asked on every
   keystroke with the "finishing" waiver granted only when the typed name
   equals the recorded target; the move and the relinking run off the UI
-  thread. The sentences a teacher reads: the contract's, with "on this PC"
+  thread; a capitalisation-only rename is allowed through, as on the mac,
+  which meant loosening this side's "unchanged" refusal from case-insensitive
+  to exact. The sentences a teacher reads: the contract's, with "on this PC"
   for "on your Mac" in `removeLeavesTheFolderOnDisk` as the two rename
   sentences already do. Not driven by hand — worth one look: rename a
   per-section folder with Obsidian holding a file in it open, which is the
