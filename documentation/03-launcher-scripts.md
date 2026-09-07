@@ -282,6 +282,20 @@ Recreating the container is cheap because all state lives in the bind mount.
     temp file (`umask 077`) and reading it inside the `docker exec` shell
     into the `NETLIFY_AUTH_TOKEN` environment variable — it never appears in
     a process argument list on the host.
+- **`--non-interactive`** says nobody is at the computer, which is what a
+  scheduled publish is. Every question the launcher can ask — the Netlify
+  token, the Cloudflare token, the Cloudflare Account ID — becomes a refusal
+  that names the question, and the flag is passed on to `deploy.py`, which
+  does the same for the questions it owns. It also asks for no terminal at
+  all when running the container step, so the branch of Python's `input()`
+  that WAITS cannot be reached. A saved credential that fails its check is
+  KEPT rather than cleared under this flag: the check is a network call, so
+  an offline machine and a revoked token look identical from here. Only the
+  app's SCHEDULED deploy passes it — pressing Deploy runs this same launcher
+  through a pseudo-terminal so a question can come back as a dialog. What it
+  refuses is listed in `contracts/app-rules.json` →
+  `launcherFlags.nonInteractive`; the course-code guard above is deliberately
+  NOT among them, and that file says why.
 - Finally runs `deploy.py` inside the container
   (see [Deployment](07-deployment.md)).
 
