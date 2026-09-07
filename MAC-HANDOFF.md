@@ -101,7 +101,7 @@ plus three more, in `contracts/shared-rules.json` →
 rename to a name with a space broke every Markdown link into it"** — carries
 the reasoning, INCLUDING the part Windows now owes: the escaping SET was
 measured against Quartz and `Uri.EscapeDataString` turned out to be wrong, so
-two of the eight cases fail on Windows today. That is the mechanism working
+one of the nine cases fails on Windows today. That is the mechanism working
 rather than damage; what to do about it is in `WINDOWS-HANDOFF.md`.
 
 What is still waiting in this section is the `specialFoldersHelp` pair, below.
@@ -2621,19 +2621,36 @@ where.
   `decodeURI("Tasks%20&%20Quizzes/Quiz.md")` → `Tasks & Quizzes/Quiz.md`;
   `decodeURI("Work%28new%29/Quiz.md")` → `Work(new)/Quiz.md`;
   `decodeURI("Caf%C3%A9%20Notes/Quiz.md")` → `Café Notes/Quiz.md`;
-  `decodeURI("C%2B%2B/Quiz.md")` unchanged; `decodeURI("10%/Quiz.md")` THROWS.
+  `decodeURI("C%2B%2B/Quiz.md")` unchanged.
 
   So the set left unescaped is what JavaScript's `encodeURI` leaves alone,
   minus `(`, `)`, `#` and `?` — which a Markdown destination or a slug cannot
   hold — and minus `/` and `:`, which the rename sheet refuses anyway. It is
   written down in the contract as `escapingSet.leaveUnescaped` rather than
-  described, so both sides can check a character against it. The last throw is
-  why `%` joined whitespace and the round brackets in what forces escaping at
-  all: a lone `%` does not break Markdown, it breaks `decodeURI`.
+  described, so both sides can check a character against it. Nothing is
+  encoded unless the name needs it — `Café` goes in as `Café`, `Café Notes` as
+  `Caf%C3%A9%20Notes` — and there is a case pinning that, because reading the
+  set as “always encode” is the way the two apps would drift.
 
-  **Two of the eight cases therefore fail on Windows today** — “an ampersand
-  is left as it stands” and “a per-cent sign is escaped”. Read them as a
-  request, not as damage; `WINDOWS-HANDOFF.md` carries what to change.
+  **Exactly one of the nine cases fails on Windows today** — “an ampersand is
+  left as it stands”. Read it as a request, not as damage; `WINDOWS-HANDOFF.md`
+  carries what to change.
+
+  **Two things this entry said first and got wrong, kept because the reason
+  travels.** A lone `%` was added to what forces escaping at all, on the
+  strength of `decodeURI("10%/Quiz.md")` throwing. An adversarial review
+  measured the actual pipeline and it never happens: Quartz parses with
+  `remarkRehype`, and the Markdown parser normalises a bare `%` to `%25` on
+  the way to HTML long before the link transformer runs — `[b](Top10%/Quiz.md)`
+  arrives as `Top10%25/Quiz.md`. `%` came back out of the trigger, which also
+  took the “per-cent sign” case off the Windows list, where it never belonged:
+  `Top 10%` triggers on its SPACE, and `EscapeDataString` encodes the `%` too,
+  so Windows passed it all along. And this entry claimed a folder named with
+  `?` was broken in Quartz whichever spelling was used. It is not: `sluggify`
+  strips the `?`, so an unescaped `Why?/Quiz.md` resolves and the escaped
+  `Why%3F` does not. `?` is escaped anyway — a bare `?` is a query delimiter
+  to every other reader of the file — but as a measured, deliberate loss
+  rather than a wash.
 
   **What was REJECTED.** Matching `Uri.EscapeDataString` exactly, which was
   the first plan here, chosen precisely so the two platforms could not drift.
@@ -2642,9 +2659,8 @@ where.
   `urlPathAllowed` set gets `Tasks & Quizzes` right today by accident, and
   copying .NET would have broken it. Also rejected: escaping wikilinks the
   same way (the mirror-image mistake), and widening the rename sheet's
-  refusals to cover `#` and `?` — a folder named with either is broken in
-  Quartz whichever spelling is used, and refusing names is a product decision
-  nobody has made.
+  refusals to cover `#` and `?` — refusing names is a product decision nobody
+  has made, and for `#` neither spelling resolves anyway.
 
   Reference: `mac-app/QuartzTeachers/Models/FolderPathRewriter.swift`
   (`spelled(_:likeThe:in:)`, `charactersThatSurviveQuartzUndecoded`,
