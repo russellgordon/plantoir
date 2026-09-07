@@ -219,7 +219,7 @@ recounted 2026-09-07.
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
 | Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
-| What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (15), SiteHealthRepair (23), and `scripts/test_site_health.py` |
+| What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (15), SiteHealthRepair (25), and `scripts/test_site_health.py` |
 
 ### Which of these the WINDOWS suite runs
 
@@ -244,6 +244,16 @@ every list that audit counted, plus two it missed (`linkRules.browserSafe` and
 | `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts`, `linkRules.browserSafe` | `PublishAndLauncherContractTests` |
 | `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
+
+**One list added since, and not yet run over there.**
+`siteHealth.repair.reportedOncePerFinding` (mac, 2026-09-07) says a repair
+reports one result per FINDING rather than one per check name, and names each
+thing once in the sentence however many findings produced it. Windows already
+BEHAVES this way — it shipped the shape first — but proves it with a
+hand-written test rather than by reading the cases, so the rule has two homes
+until they wire it. Named here rather than left to be rediscovered by the next
+audit; `WINDOWS-HANDOFF.md` item 34 has the detail. Nothing goes red in the
+meantime: no list pins this one by equality.
 
 **Three habits came out of that work and are worth copying on either side.**
 

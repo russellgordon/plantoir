@@ -95,8 +95,11 @@ enum SiteHealthRepair {
         if wanted.isEmpty {
             return nil
         }
-        let results: [String: Result] = repair(wanted, in: course)
+        let attempts: [Attempt] = repair(wanted, in: course)
 
+        // Each thing is named ONCE, however many findings produced it: two
+        // sections both missing a front page are two repairs and one sentence,
+        // and "Put the front page and the front page back." is not a sentence.
         var restored: [String] = []
         var failed: [String] = []
         // A repair the teacher must clear the way for before it can go ahead.
@@ -105,23 +108,30 @@ enum SiteHealthRepair {
         // still appears — but it brings its own reason, and that reason
         // replaces the generic one below.
         //
-        // Sorted before it is joined so that two of them, should a second
-        // blocked cause ever be added, land in one order rather than in
-        // whatever order a dictionary happened to enumerate.
+        // Sorted before it is joined so that two of them — two sections each
+        // with a folder in the way, or a second blocked cause should one ever
+        // be added — land in one order every time. It is an alphabetical sort
+        // of the SENTENCES, so it does not promise section order: "section10"
+        // sorts before "section2". One stable order is all this needs.
         var reasonsItCouldNotGoAhead: [String] = []
         var somethingSimplyFailed: Bool = false
-        for (name, result) in results {
-            switch result {
+        for attempt in attempts {
+            let name: String = attempt.finding.name
+            switch attempt.result {
             case .restored:
-                restored.append(name)
+                addOnce(name, to: &restored)
             case .failed:
-                failed.append(name)
+                addOnce(name, to: &failed)
                 somethingSimplyFailed = true
             case .blockedByAFolderWhereTheFrontPageBelongs(let sectionNumber):
-                failed.append(name)
-                reasonsItCouldNotGoAhead.append(folderWhereTheFrontPageBelongs(
+                addOnce(name, to: &failed)
+                // Two blocked sections are two DIFFERENT sentences — each one
+                // names its own section folder — so both are wanted. What is
+                // filtered here is the same sentence twice, which is what the
+                // very same finding arriving twice would produce.
+                addOnce(folderWhereTheFrontPageBelongs(
                     course: course.code, section: sectionNumber
-                ))
+                ), to: &reasonsItCouldNotGoAhead)
             case .alreadyFine:
                 break
             }
@@ -297,11 +307,6 @@ enum SiteHealthRepair {
         + "their site until you publish again. You can preview it now to check "
         + "the change looks right."
 
-    /// Repairs what can be repaired, and reports what it did.
-    ///
-    /// Never overwrites: every repair checks first, so pressing the button
-    /// twice, or pressing it after fixing the problem in Obsidian, changes
-    /// nothing.
     /// How one repair went.
     ///
     /// `alreadyFine` is a THIRD answer, and leaving it out was a bug: both
@@ -331,24 +336,82 @@ enum SiteHealthRepair {
         case blockedByAFolderWhereTheFrontPageBelongs(section: Int)
     }
 
+    /// One finding, and how its repair went.
+    ///
+    /// It exists so that the answer cannot COLLAPSE. This used to come back as
+    /// a dictionary keyed by the check's NAME, and two findings share a name
+    /// as soon as two sections are involved: two sections each missing a front
+    /// page are two repairs, both of which run, but only the last result was
+    /// reported. "Section 1 restored, section 2 was already there" therefore
+    /// read as "That is already put right. Nothing needed changing." — with no
+    /// preview offered — for a repair that really had put a page back.
+    ///
+    /// **It was unreachable from the app**, and is fixed anyway. A section
+    /// window owns one runner and the checks announce per section, so the
+    /// findings handed to a repair have always been one section's. What makes
+    /// it worth an hour is that the collapse was SILENT and the constraint was
+    /// written down nowhere: the next caller — the assistant, a second window,
+    /// a whole-course fix — would have met it as a wrong report rather than as
+    /// a compile error. Windows found it by porting this file line by line
+    /// (`MAC-HANDOFF.md`, 2026-09-06) and shipped this shape first; the mac is
+    /// catching up to it rather than inventing it.
+    ///
+    /// One thing it does NOT fix, deliberately. Section 1 restored and section
+    /// 2 FAILED, both `sectionIndexMissing`, still reads "Put the front page
+    /// back." followed by "Could not put the front page back." — one name, two
+    /// outcomes, and the sentence has no way to say which section is which.
+    /// Windows reads the same way. Inventing wording for it was rejected: it
+    /// is as unreachable as the collapse was, and a sentence nobody has
+    /// weighed is harder to take back than a paragraph of explanation. The
+    /// blocked case does not have the problem HERE — its own sentence names
+    /// the section folder — but Windows has no blocked case yet, so over there
+    /// it reads namelessly too until `WINDOWS-HANDOFF.md` item 33 lands.
+    struct Attempt: Equatable {
+
+        // MARK: - Stored properties
+
+        let finding: SiteHealthFinding
+        let result: Result
+    }
+
+    /// Adds a name, or a sentence, only if it is not already there.
+    ///
+    /// What a teacher is told is a list of DISTINCT things, however many
+    /// findings produced them — see `Attempt`.
+    private static func addOnce(_ value: String, to list: inout [String]) {
+        if list.contains(value) {
+            return
+        }
+        list.append(value)
+    }
+
+    /// Repairs what can be repaired, and reports what each one did — one
+    /// `Attempt` per finding, in the order they were given.
+    ///
+    /// Never overwrites: every repair checks first, so pressing the button
+    /// twice, or pressing it after fixing the problem in Obsidian, changes
+    /// nothing.
     @discardableResult
     static func repair(
         _ findings: [SiteHealthFinding], in course: Course
-    ) -> [String: Result] {
-        var results: [String: Result] = [:]
+    ) -> [Attempt] {
+        var attempts: [Attempt] = []
         for finding in findings where canRepair(finding) {
             switch finding.name {
             case "mediaFolderMissing":
-                results[finding.name] = restoreMedia(in: course)
+                attempts.append(Attempt(
+                    finding: finding, result: restoreMedia(in: course)
+                ))
             case "sectionIndexMissing":
-                results[finding.name] = restoreIndex(
-                    forSection: finding.section, in: course
-                )
+                attempts.append(Attempt(
+                    finding: finding,
+                    result: restoreIndex(forSection: finding.section, in: course)
+                ))
             default:
                 break
             }
         }
-        return results
+        return attempts
     }
 
     static func restoreMedia(in course: Course) -> Result {
