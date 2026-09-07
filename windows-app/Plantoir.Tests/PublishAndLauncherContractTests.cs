@@ -365,6 +365,45 @@ public class PublishAndLauncherContractTests
         }
     }
 
+    // ---- The address handed to the teacher's browser ----------------------
+
+    /// <summary>
+    /// `localhost` becomes `127.0.0.1` in the address a preview hands the
+    /// browser.
+    ///
+    /// <para>The reason is the mac's — Safari tries IPv6 (::1) first and the
+    /// container publishes IPv4 only, which reads to a teacher as "the server
+    /// dropped the connection". This platform does the same rewrite, and the
+    /// contract's own note asks each side to check whether ITS default browser
+    /// needs it: measured here on 2026-08-23 against a real preview, Edge was
+    /// indistinguishable either way, so the rewrite is a harmless no-op rather
+    /// than a fix for an observed problem (MAC-HANDOFF.md). Kept, because it
+    /// costs nothing — and pinned here, because a no-op nobody tests is a
+    /// no-op somebody eventually deletes.</para>
+    /// </summary>
+    [Fact]
+    public void ThePreviewAddressIsMadeBrowserSafe()
+    {
+        var doc = ContractLoader.LoadJson("app-rules.json");
+        var cases = doc["linkRules"]!["browserSafe"]!["cases"]!.AsArray();
+        Assert.NotEmpty(cases);
+
+        foreach (var entry in cases)
+        {
+            string input = entry!["input"]!.ToString();
+            string expected = entry["expect"]!.ToString();
+
+            // The rewrite happens where the address is READ, out of the
+            // launcher's own announcement, so it is exercised the way it runs.
+            var found = OutputParsers.PreviewAddress($"Preview will be available at: {input}");
+
+            Assert.True(found is not null,
+                $"The preview address \"{input}\" was not recognised in the launcher's " +
+                "announcement at all, so the teacher is handed nothing to click.");
+            Assert.Equal(expected, found!.ToString());
+        }
+    }
+
     // ---- The preview's ports ---------------------------------------------
 
     /// <summary>

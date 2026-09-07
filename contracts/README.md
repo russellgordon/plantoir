@@ -77,8 +77,9 @@ markers its own lists use and looks each one up; Windows
 (`MilestoneContractTests`) does the same and then the reverse — a marker the
 contract does NOT name, which something under `scripts/` nevertheless prints,
 fails and says to classify it. That reverse direction is what found the two
-example-course markers, which the mac has no task to have listed. Getting this
-wrong crashes nothing: the progress bar simply stops moving, which reads as a
+example-course markers — which the mac DOES have a task for, but which
+`AppRulesContract.milestones()` leaves out of the readout its own check walks.
+Getting this wrong crashes nothing: the progress bar simply stops moving, which reads as a
 slow build.
 
 One of the twenty-eight is in no milestone list on either side. "Launching
@@ -231,23 +232,28 @@ recorded only in a Swift comment, two shared markers classified by nobody, and
 a launcher flag listed as shared that only one platform has.
 
 So the state is worth writing down rather than re-derived. Windows now runs
-every list in the table above, through these classes in
+every list that audit counted, plus two it missed (`linkRules.browserSafe` and
+`example-content.sentinels`), through these classes in
 `windows-app/Plantoir.Tests/`:
 
 | What it runs | Class |
 |---|---|
 | `markerOrigins` both directions, and the shared steps of each `milestones` list | `MilestoneContractTests` |
 | `wizardAnswerKeys`, `firstDeployMarkers`, `sectionTimetable`, `pageVisibility.writingRules` | `FileFormatContractTests` |
-| `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts` | `PublishAndLauncherContractTests` |
+| `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts`, `linkRules.browserSafe` | `PublishAndLauncherContractTests` |
 | `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
-| `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
+| `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
 
 **Three habits came out of that work and are worth copying on either side.**
 
 - **Ask the list both ways.** A test that walks the contract and looks each
   case up in the code cannot notice a case the CODE has and the contract does
-  not — an extra credential, an extra tool, an extra argument. Every gap named
-  above was found by the reverse direction, and none by the forward one.
+  not. Three of the gaps above were found ONLY that way — a credential request
+  the contract does not describe, twelve MCP tools, and sixteen tool arguments
+  — and no forward walk could have seen any of them. (The others came the
+  ordinary way: the frontmatter divergence and `--image` both failed a walk of
+  the contract. Both directions earn their keep; only one of them was being
+  done.)
 - **Check completeness, not just correctness.** A hand-written mirror answers
   the cases that existed the day somebody read the contract. Where a rule's
   cases are prose keyed to behaviour, map each case to a named test and assert
@@ -267,9 +273,9 @@ cases, and a "test" of them could only assert that a string exists:
 | Rule | Why no test |
 |---|---|
 | `cloudSyncedFolders.detection.macMarkers` / `.windowsMarkers` | Four paragraphs describing what each platform exposes. The BEHAVIOUR they produce is covered by hand on both sides; the paragraphs are the reasoning behind it. |
-| `stopPreview.notShared` | Names the three things about stopping a preview that are the platform's, and says why. The cases themselves ARE run — on Windows by `test_stop_preview.ps1`, which `ReclaimedProcessesTests` runs inside `dotnet test` so it is a gate rather than a script somebody remembers. |
+| `stopPreview.notShared` | Names the three things about stopping a preview that are the platform's, and says why. The cases themselves ARE run — on Windows by `test_stop_preview.ps1`, which `TheLauncherMatcherAnswersTheContract` (in `ReclaimedProcessesTests.cs`) runs inside `dotnet test`, so it is a gate rather than a script somebody remembers. |
 | `modelTiers.requirements` — the polarity veto | A rule about how a MODEL is chosen, governing the by-hand routing suite in `research/ai-assist/`. |
-| `example-content.rules` — the three about the installer | They constrain how `setup_course.py` is written; its own tests and `lint_skeletons.py` hold them, both run from `verify.sh`. |
+| `example-content.rules` — the three about the installer | They constrain how `setup_course.py` is written, and **nothing automated holds them on either platform** — said plainly because the first draft of this row named an owner that does not exist. `setup_course.py` has no test file; `lint_payload.py` and `lint_skeletons.py` are run BY HAND through the `example-content` skill, and `verify.sh` runs neither. The fourth rule, "anything in the payload trees must be named in the manifest", IS executed — `SharedRuleContractTests` walks every payload against the allow-lists the installer really reads. |
 
 **Not shared, and why.** Each of these is a deliberate decision, not an
 oversight:

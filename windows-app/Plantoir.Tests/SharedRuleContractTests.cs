@@ -493,10 +493,13 @@ public sealed class SharedRuleContractTests : IDisposable
 
         // The remaining three are about how the INSTALLER is written rather
         // than about what a payload contains, so nothing in this suite can
-        // execute them: `setup_course.py`'s own tests and `lint_skeletons.py`
-        // are where they live, and both run from verify.sh — which does not run
-        // on Windows. Named rather than dropped, so a fourth joining them is a
-        // decision somebody takes rather than a line nobody notices.
+        // execute them — and, checked 2026-09-06, nothing anywhere does.
+        // `setup_course.py` has no test file; `lint_payload.py` and
+        // `lint_skeletons.py` are run BY HAND through the example-content
+        // skill, and verify.sh runs neither. Named rather than dropped, so a
+        // fourth joining them is a decision somebody takes rather than a line
+        // nobody notices — and so that "held elsewhere" is not mistaken for
+        // "held".
         foreach (string elsewhere in new[]
         {
             "The manifest is the WHOLE structure",
@@ -513,6 +516,62 @@ public sealed class SharedRuleContractTests : IDisposable
             "contracts/example-content.json states payload rules that no test here answers and " +
             "that are not on the list of rules answered elsewhere: " +
             string.Join("; ", unanswered.OrderBy(r => r, StringComparer.Ordinal)));
+    }
+
+    /// <summary>
+    /// A payload page carries a SENTINEL where its date goes, never a literal
+    /// date.
+    ///
+    /// <para>The failure is not merely wrong, it is invisible: the course
+    /// installs, the pages open, and every class claims a date from whenever
+    /// the payload happened to be authored. A teacher creating a course in
+    /// March gets a September they never taught, and nothing anywhere says
+    /// so.</para>
+    ///
+    /// <para>The mac pins its bundled payload against this; nothing on this
+    /// side did, and both apps install from the same folders.</para>
+    /// </summary>
+    [Fact]
+    public void NoPayloadPageCarriesALiteralDateWhereASentinelBelongs()
+    {
+        var doc = ContractLoader.LoadJson("example-content.json");
+        var tokens = new List<string>();
+        foreach (var entry in doc["sentinels"]!["tokens"]!.AsArray())
+            tokens.Add(entry!["token"]!.ToString());
+        Assert.NotEmpty(tokens);
+
+        // "__CREATED_CLASS_K__" is a shape, not a literal: K is the class's
+        // index. Compare on the stem so a payload's real "__CREATED_CLASS_7__"
+        // is recognised.
+        var stems = tokens.Select(t => t.TrimEnd('_').TrimEnd("K".ToCharArray()).TrimEnd('_')).ToList();
+
+        string payloads = Path.Combine(RepoRoot, "support", "example_content");
+        var literal = new System.Text.RegularExpressions.Regex(
+            @"^created:\s*[""']?\d{4}-\d{2}-\d{2}", System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        var offenders = new List<string>();
+        int pagesChecked = 0;
+
+        foreach (string page in Directory.EnumerateFiles(payloads, "*.md", SearchOption.AllDirectories))
+        {
+            string text = File.ReadAllText(page);
+            if (!text.Contains("created:", StringComparison.Ordinal)) continue;
+            pagesChecked++;
+
+            if (literal.IsMatch(text))
+                offenders.Add(Path.GetRelativePath(payloads, page));
+        }
+
+        Assert.True(pagesChecked > 100,
+            $"Only {pagesChecked} payload pages carry a created: key; the walk is looking in the " +
+            "wrong place and this test is proving nothing.");
+
+        Assert.True(offenders.Count == 0,
+            "These payload pages carry a literal date where a sentinel belongs, so a course made " +
+            "from them arrives full of dates from whenever the payload was written: " +
+            string.Join(", ", offenders.Take(10)) +
+            (offenders.Count > 10 ? $" …and {offenders.Count - 10} more" : "") +
+            ". The tokens are " + string.Join(" and ", stems) + "…");
     }
 
     // ---- Which folders make up the recipe -----------------------------------
