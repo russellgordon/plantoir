@@ -219,8 +219,16 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > **A note on `publish:` versus `draft:`.** Courses created before this
 > convention carry `draft:` and `draftSection<N>:`, which mean the *opposite*
 > — `draft: true` is a page students cannot see. Those still work: the build
-> reads them, inverted, and Plantoir rewrites a page's key only when something
-> edits that page. You never have to convert a course by hand. A page with
+> reads them, inverted. You never have to convert a course by hand.
+>
+> **The two apps disagree about what happens next, and it is being decided**
+> (found 2026-09-06). Windows rewrites the old key to the new one the first
+> time something edits that page — the sentence this note used to give as the
+> product's behaviour. The macOS app keeps the old key and inverts the value,
+> which is what `contracts/file-formats.json` → `pageVisibility.writingRules`
+> says. Either is safe, because the build reads both spellings; they cannot
+> both be true of a course carried between the two machines. See
+> `MAC-HANDOFF.md`. A page with
 > **no** publication key at all is visible, so forgetting the key leaves work
 > showing rather than making it disappear unnoticed.
 
