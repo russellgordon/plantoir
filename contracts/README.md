@@ -244,16 +244,15 @@ every list that audit counted, plus two it missed (`linkRules.browserSafe` and
 | `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts`, `linkRules.browserSafe` | `PublishAndLauncherContractTests` |
 | `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
+| `siteHealth.repair.reportedOncePerFinding` (both cases, built as `howToRunACase` says) and `siteHealth.repair.refusedWhenSomethingIsInTheWay` (the sentence, word for word) | `SiteHealthRepairTests`, `SiteHealthContractTests` |
 
-**One list added since, and not yet run over there.**
-`siteHealth.repair.reportedOncePerFinding` (mac, 2026-09-07) says a repair
-reports one result per FINDING rather than one per check name, and names each
-thing once in the sentence however many findings produced it. Windows already
-BEHAVES this way — it shipped the shape first — but proves it with a
-hand-written test rather than by reading the cases, so the rule has two homes
-until they wire it. Named here rather than left to be rediscovered by the next
-audit; `WINDOWS-HANDOFF.md` item 34 has the detail. Nothing goes red in the
-meantime: no list pins this one by equality.
+**One list was added after that audit and wired the same day it reached
+Windows.** `siteHealth.repair.reportedOncePerFinding` (mac, 2026-09-07) says a
+repair reports one result per FINDING rather than one per check name, and
+names each thing once in the sentence however many findings produced it.
+Windows shipped that shape first and proved it with a hand-written test; on
+2026-09-07 the test was replaced by the contract's cases, so the rule has one
+home. `WINDOWS-HANDOFF.md` items 33 and 34 have the detail.
 
 **Three habits came out of that work and are worth copying on either side.**
 
