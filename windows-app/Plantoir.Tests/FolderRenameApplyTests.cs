@@ -20,13 +20,13 @@ namespace Plantoir.Tests;
 public sealed class FolderRenameApplyTests : IDisposable
 {
     private readonly string _root;
-    private readonly string _trailPath;
 
     public FolderRenameApplyTests()
     {
         _root = Directory.CreateTempSubdirectory("plantoir-rename-apply").FullName;
-        _trailPath = Path.Combine(_root, "trail.txt");
-        ActivityTrail.SetCustomLogPathForTesting(_trailPath);
+        // No line is written here, but the redirect keeps a stray one out of
+        // the real trail; the collection is what makes that safe to set.
+        ActivityTrail.SetCustomLogPathForTesting(Path.Combine(_root, "trail.txt"));
     }
 
     public void Dispose()
@@ -103,13 +103,29 @@ public sealed class FolderRenameApplyTests : IDisposable
     }
 
     [Fact]
-    public void AFolderThatIsNotOnDiskChangesOnlyTheSettings()
+    public void AFolderThatIsNotOnDiskStillRenamesTheLinksAndSaysBothThings()
     {
         MakeCourse(Config);
+        File.WriteAllText(Path.Combine(CourseDir, "section1", "index.md"), "See [notes](Notes/Week%201.md).\n");
         var outcome = SpecialFolderRenamer.Rename("Notes", "Handouts", FolderScope.Shared, CourseDir, Sections);
         Assert.True(outcome.NothingWasThere);
         Assert.Equal(0, outcome.FoldersMoved);
-        Assert.Equal(SpecialNames.RenameNothingWasThere, outcome.Message);
+        // The configuration is about to name the new folder, so a page that
+        // links into the old name would otherwise be left pointing nowhere.
+        Assert.Equal(1, outcome.PagesRelinked);
+        Assert.Contains("(Handouts/Week%201.md)", File.ReadAllText(Path.Combine(CourseDir, "section1", "index.md")));
+        Assert.StartsWith(SpecialNames.RenameDone.Replace("{old}", "Notes").Replace("{new}", "Handouts"), outcome.Message);
+        Assert.EndsWith(SpecialNames.RenameNothingWasThere, outcome.Message);
+    }
+
+    [Fact]
+    public void ACapitalisationOnlyRenameIsARename()
+    {
+        MakeCourse(Config);
+        Assert.Null(SpecialFolderRenamer.Problem("TASKS", "Tasks", new[] { "Tasks", "All Classes" }));
+        var outcome = SpecialFolderRenamer.Rename("Tasks", "TASKS", FolderScope.PerSection, CourseDir, Sections);
+        Assert.Equal(2, outcome.FoldersMoved);
+        Assert.Equal("TASKS", Path.GetFileName(Directory.GetDirectories(Path.Combine(CourseDir, "section1"), "T*").Single()));
     }
 
     [Fact]
@@ -165,6 +181,36 @@ public sealed class FolderRenameApplyTests : IDisposable
         var other = SpecialFolderRenamer.Renaming(values, "Tasks", "Assignments", FolderScope.PerSection);
         Assert.Null(other["class_folder"]);
         Assert.Equal(JTokenType.Null, other["curriculum_folder"]!.Type);
+
+        // A GUESS is never frozen: with nothing recorded and no folder
+        // containing "class", the resolver falls back to the first folder,
+        // and writing that into class_folder would stop a real "All Classes"
+        // added later from ever taking over (the mac's wasSurelyTheClassFolder).
+        var guessed = JObject.Parse(@"{""per_section_folders"": [""Lessons"", ""Homework""]}");
+        Assert.Null(SpecialFolderRenamer.Renaming(guessed, "Lessons", "Notes", FolderScope.PerSection)["class_folder"]);
+        // A recorded key that names a real folder is the answer, "class" or not.
+        var recorded = JObject.Parse(@"{""per_section_folders"": [""Lessons"", ""Homework""], ""class_folder"": ""Lessons""}");
+        Assert.Equal("Notes", SpecialFolderRenamer.Renaming(recorded, "Lessons", "Notes", FolderScope.PerSection)["class_folder"]!.ToString());
+    }
+
+    [Fact]
+    public void AScopedKeyIsCarriedOnlyByARenameInItsOwnScope()
+    {
+        // The mac's contract test, ported: both keys set, the same bare name in
+        // both scopes, and a rename in one scope leaves the other's key alone.
+        var values = JObject.Parse(@"{""shared_folders"": [""Tasks"", ""Curriculum""], ""per_section_folders"": [""Tasks"", ""All Classes""], ""curriculum_folder"": ""Curriculum"", ""class_folder"": ""Tasks"", ""excluded_items"": {""shared"": [""Tasks""], ""per_section"": [""Tasks""]}}");
+        var sharedRenamed = SpecialFolderRenamer.Renaming(values, "Tasks", "Handouts", FolderScope.Shared);
+        Assert.Equal("Tasks", sharedRenamed["class_folder"]!.ToString());
+        Assert.Equal(new[] { "Tasks", "All Classes" }, sharedRenamed["per_section_folders"]!.Select(t => t.ToString()));
+        Assert.Equal(new[] { "Tasks" }, sharedRenamed["excluded_items"]!["per_section"]!.Select(t => t.ToString()));
+        Assert.Equal(new[] { "Handouts" }, sharedRenamed["excluded_items"]!["shared"]!.Select(t => t.ToString()));
+
+        var curriculumRenamed = SpecialFolderRenamer.Renaming(values, "Curriculum", "Expectations", FolderScope.Shared);
+        Assert.Equal("Expectations", curriculumRenamed["curriculum_folder"]!.ToString());
+        var perSectionRenamed = SpecialFolderRenamer.Renaming(values, "Tasks", "Assignments", FolderScope.PerSection);
+        Assert.Equal("Assignments", perSectionRenamed["class_folder"]!.ToString());
+        Assert.Equal("Curriculum", perSectionRenamed["curriculum_folder"]!.ToString());
+        Assert.Equal(new[] { "Tasks", "Curriculum" }, perSectionRenamed["shared_folders"]!.Select(t => t.ToString()));
     }
 
     [Fact]
@@ -255,7 +301,11 @@ public sealed class FolderRenameApplyTests : IDisposable
         Assert.Contains("Assignments", written["per_section_folders"]!.Select(t => t.ToString()));
         Assert.Null(written["course_name"]);                                        // the unsaved edit stayed unsaved
         Assert.Contains("Assignments", config.PerSectionFolders);                   // and the object knows the rename
-        Assert.True(config.HasUnsavedChanges);                                      // because the name is still unsaved
+        // Still dirty — the unsaved name, and ALSO the other writer's key, which
+        // the last-saved bytes now carry and the object does not: the same
+        // dirtiness the mac's recordOnDisk produces, and Save would then
+        // write the object's view over that key. A shared limit, recorded.
+        Assert.True(config.HasUnsavedChanges);
         config.DiscardChanges();                                                    // Revert keeps the rename, drops the name
         Assert.Contains("Assignments", config.PerSectionFolders);
         Assert.False(config.HasUnsavedChanges);

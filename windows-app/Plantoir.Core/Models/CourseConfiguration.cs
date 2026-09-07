@@ -79,7 +79,6 @@ public sealed class CourseConfiguration
         _lastSavedData = data;
     }
 
-    /// <summary>The Revert button: put the values back the way the last save left them.</summary>
     /// <summary>
     /// Writes ONE change to the file on disk from a fresh read, leaving every
     /// other unsaved edit in this object unsaved — the recorder a folder
@@ -134,6 +133,7 @@ public sealed class CourseConfiguration
     private static byte[] Serialize(JObject values) =>
         new CourseConfiguration(values, Array.Empty<byte>()).SerializedBytes();
 
+    /// <summary>The Revert button: put the values back the way the last save left them.</summary>
     public void DiscardChanges()
     {
         if (_lastSavedData.Length == 0) return;

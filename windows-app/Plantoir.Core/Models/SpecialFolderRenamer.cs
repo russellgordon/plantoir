@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
-using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Models;
 
@@ -99,7 +98,9 @@ public static class SpecialFolderRenamer
     {
         string wanted = (newName ?? string.Empty).Trim();
         if (wanted.Length == 0) return SpecialNames.RenameProblemEmpty;
-        if (wanted.Equals(currentName, StringComparison.OrdinalIgnoreCase)) return SpecialNames.RenameProblemUnchanged;
+        // Exact equality only, as on the mac: "tasks" to "Tasks" is a rename a
+        // teacher may reasonably want, and the filesystem lets it through.
+        if (wanted.Equals(currentName, StringComparison.Ordinal)) return SpecialNames.RenameProblemUnchanged;
         if (wanted.Contains('/') || wanted.Contains('\\') || wanted.Contains(':'))
             return SpecialNames.RenameProblemHasSeparator;
         if (wanted.StartsWith('.')) return SpecialNames.RenameProblemIsHidden;
@@ -254,7 +255,16 @@ public static class SpecialFolderRenamer
             throw new RenameException(refusal);
 
         if (moves.Count == 0)
-            return new RenameOutcome(true, SpecialNames.RenameNothingWasThere, 0, 0, NothingWasThere: true);
+        {
+            // No folder to move — but a page may still carry a qualified link
+            // into the name, and the configuration is about to change under
+            // it, so the links are rewritten regardless; and the rename DID
+            // happen, so the done sentence leads and "nothing was there" is
+            // the explanation after it, as on the mac.
+            int relinkedAnyway = RelinkPages(courseDirectory, oldName, newName);
+            string done = SpecialNames.RenameDone.Replace("{old}", oldName).Replace("{new}", newName);
+            return new RenameOutcome(true, done + " " + SpecialNames.RenameNothingWasThere, 0, relinkedAnyway, NothingWasThere: true);
+        }
 
         RecordRenameStarting(oldName, newName, scope, courseDirectory);
 
@@ -357,9 +367,8 @@ public static class SpecialFolderRenamer
         // Which special folder, if either, this WAS — decided before the list
         // is rewritten, because both answers are derived from it.
         bool wasTheClassFolder = scope == FolderScope.PerSection
-            && ClassFolderRule.Name(values["class_folder"]?.Type == JTokenType.String ? values["class_folder"]!.ToString() : null, perSection)
-                .Equals(oldName, StringComparison.OrdinalIgnoreCase)
-            && perSection.Any(n => n.Equals(oldName, StringComparison.OrdinalIgnoreCase));
+            && WasSurelyTheClassFolder(oldName, perSection,
+                values["class_folder"]?.Type == JTokenType.String ? values["class_folder"]!.ToString() : null);
         bool wasTheCurriculumFolder = scope == FolderScope.Shared
             && string.Equals(
                 CurriculumFolderRule.Resolve(values["curriculum_folder"]?.Type == JTokenType.String ? values["curriculum_folder"]!.ToString() : null, shared),
@@ -393,6 +402,26 @@ public static class SpecialFolderRenamer
             updated["excluded_items"] = rewritten;
         }
         return updated;
+    }
+
+    /// <summary>
+    /// Whether this folder is the class folder with enough confidence to write
+    /// the key. A recorded key that names a real folder is the answer. With
+    /// nothing recorded the resolver GUESSES — "class" in the name, else the
+    /// first folder — and freezing a first-folder guess into <c>class_folder</c>
+    /// would stop a real "All Classes" added later from ever taking over, and
+    /// leave the same course with different JSON on the two machines. So,
+    /// unrecorded, the name must contain "class" and be what the resolver
+    /// picks. The mac's <c>wasSurelyTheClassFolder</c>, found by its review
+    /// 2026-09-01 and by this side's 2026-09-07.
+    /// </summary>
+    public static bool WasSurelyTheClassFolder(string name, IReadOnlyList<string> perSectionFolders, string? recorded)
+    {
+        if (recorded is { Length: > 0 }
+            && perSectionFolders.Any(f => f.Equals(recorded, StringComparison.OrdinalIgnoreCase)))
+            return recorded.Equals(name, StringComparison.OrdinalIgnoreCase);
+        if (!name.Contains("class", StringComparison.OrdinalIgnoreCase)) return false;
+        return ClassFolderRule.Name(perSectionFolders).Equals(name, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
