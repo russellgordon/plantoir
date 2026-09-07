@@ -1,15 +1,21 @@
 import Foundation
 
-/// The twenty tools that exist, and the thirteen of them the local model is
-/// shown.
+/// The twenty-two tools that exist, and the thirteen of them the local model
+/// is shown.
 ///
-/// It was fifteen when routing accuracy was measured, and the five that came
-/// after — reading and recording a section's timetable, and adding the next
-/// class page — were added on purpose, knowing the cost. A small local model
-/// routes worse the more it is shown, so the number is worth re-measuring
-/// rather than assuming the old figure still holds. `localTools` is the answer
-/// to that pressure: seven of the twenty are never NAMED by the model, so they
-/// are not put in front of it.
+/// It was fifteen when routing accuracy was measured, and the seven that came
+/// after — reading and recording a section's timetable, adding the next class
+/// page, and re-dating a whole section — were added on purpose, knowing the
+/// cost. A small local model routes worse the more it is shown, so the number
+/// is worth re-measuring rather than assuming the old figure still holds.
+/// `localTools` is the answer to that pressure: nine of the twenty-two are
+/// never NAMED by the model, so they are not put in front of it.
+///
+/// **Keep these three numbers right.** They are 22, 13 and 9 as this is
+/// written, pinned by `AssistToolRunnerTests` and
+/// `AssistCurriculumMentionsTests`, and they were 20, 13 and 7 in this comment
+/// for long enough that the same stale figure reached `CLAUDE.md` and two
+/// documents. A count nobody can check is a count that gets quoted.
 ///
 /// The descriptions are the Windows server's own, put through the same
 /// shortening rule the narrowed surface uses there: keep the `TEACHERS SAY:`
@@ -75,7 +81,7 @@ extension AssistToolRunner {
     /// choose between, and every schema in the list costs it context and
     /// accuracy. Two kinds are left out, and neither loses a teacher anything:
     ///
-    /// * **The six `plan_` twins.** Plan mode calls them IN CODE —
+    /// * **The seven `plan_` twins.** Plan mode calls them IN CODE —
     ///   `AssistAgent.showPlan` builds the call itself from the write the model
     ///   already chose — so the model never has to name one. They were about a
     ///   third of the prompt and bought nothing.
