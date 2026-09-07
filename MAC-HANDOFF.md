@@ -257,6 +257,35 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ## Open — what the mac still owes
 
+- **One check, five minutes: does `deploy.sh` validate the Netlify token
+  before running `deploy.py`?** (Windows, 2026-09-07, branch
+  `issue/35-first-run-ui-checks`, handoff item 35.) Windows' `deploy.ps1`
+  does — `Test-TokenValid` against `https://api.netlify.com/api/v1/user`
+  before the Python starts — and that single fact is what makes the
+  new-site dialog un-automatable there: a fake token never reaches the
+  site-naming prompt, so it raises "Connect to Netlify" instead. Combined
+  with the credential store not being redirected by a test's state
+  directory, a test would either stop at the token dialog or **publish a
+  real website**, depending on what the machine happened to have saved. So
+  Windows made that path a hand-driven check with a written procedure
+  (`documentation/12-windows-app.md`) rather than a test.
+
+  **What the mac owes is only the check, not the work**: if `deploy.sh`
+  has the same shape, the mac's equivalent path is un-automatable for the
+  same reason and should be a hand-check too rather than a test somebody
+  spends an afternoon failing to write. If it does NOT — if the mac's
+  launcher passes the token through unvalidated — then the mac can automate
+  what Windows could not, which is worth knowing and worth telling Windows.
+  Either way, say which, because "nobody checked" is how both sides end up
+  discovering it separately.
+
+  While there, one cheap contract case somebody could propose: the New
+  Course wizard's affirmative button reads "Create Course" on both
+  platforms (`NewCourseDialog.cs`; `NewCourseWizardView.swift`) and nothing
+  in `contracts/` pins it. Windows now asserts it in a Windows-only test.
+  A case would go green on both sides immediately — but the contract is
+  generated on the mac, so proposing it is that side's call.
+
 - **Two small decisions from Windows item 30, both for the mac to make**
   (Windows, 2026-09-07, branch `issue/30-polish-delete-crumbs-rename`).
   (a) The backup pane's sentence: Windows says "Restoring puts {code} back to
@@ -1925,6 +1954,57 @@ rather than being deleted.
   green suite as proof.
 
 ## For awareness — no mac code needed
+
+- **Windows now clicks the New Course wizard's Create button in a running app,
+  and found that a GUI app started from a console cannot shell out at all**
+  (Windows, 2026-09-07, branch `issue/35-first-run-ui-checks`, handoff item 35).
+  **Nothing for the mac to do**, and no contract case: this is a test suite and
+  a platform mechanic. Two halves of it are worth knowing anyway.
+
+  **The trap, which is the part that might save the mac an afternoon.**
+  `Plantoir.UiTests` launched the app with `UseShellExecute = false`, so the
+  `dotnet test` host's PIPE std handles reached the app and leaked into the
+  ConPTY child: the app captured nothing, what it sent the launcher never
+  arrived, and `input()` in `setup_course.py` reached EOF and died. It
+  presents as "failed (exit code 1) after 1s" with an empty transcript, which
+  reads as a broken toolchain and is not. `ConPtyProcess.Start` already
+  carried the rule in a CAUTION — the child binds to the pseudo console only
+  when the CREATING process's std handles are clean, "console handles or
+  none" — and the first version of this write-up ignored it and blamed an
+  inherited CONSOLE instead, which is wrong. Three launches of one build
+  settled it (Lenovo 20QES70500, Intel Core i5-8365U @ 1.60 GHz, 16 GB):
+  clean console handles → course made, 21 s; ShellExecute → the same, 21 s;
+  output redirected to a file → nothing captured, hung, no course. **An
+  ordinary terminal is fine; redirecting is not.**
+
+  The mac has no ConPTY, so this is not a mac bug — but the general shape is
+  not platform-specific, and a mac session that ever drives the app from a
+  test HOST rather than from Finder should know the failure mode exists,
+  because nothing about the symptom points at the cause. Deferred rather than
+  fixed, in `TODO.md`: whether `ConPtyProcess.Start` should zero the creating
+  process's std handles across `CreateProcessW`.
+
+  **And the half Windows did NOT automate, with the reasoning, so nobody
+  proposes it again.** The other path item 35 named is the dialog a
+  BRAND-NEW section's first publish raises, where a teacher chooses their
+  website address; it is now a hand-driven check with a written procedure
+  (`documentation/12-windows-app.md`, "The new-site dialog: a hand-driven
+  check") rather than a test. The reason that settles it is not the obvious
+  one: `deploy.ps1`'s Credential Manager target is hardcoded and `--state-dir`
+  does not redirect Credential Manager, so whether a test reached the dialog
+  or **published a real website** would depend on whether the machine happened
+  to have a token saved. Also rejected, each for its own reason: a fake token
+  (the launcher validates it against Netlify before `deploy.py` starts, so it
+  raises "Connect to Netlify" instead); a stub `deploy.ps1` (the app rewrites
+  any launcher that differs from its bundled copy, on every workspace reload);
+  and leaning on `verify-deploy.ps1` (it redirects stdin from a file precisely
+  so `deploy.py` asks nothing). What NOT to check by hand, either platform:
+  the dialog's title, explanation and steps are already contract data
+  (`app-rules.json` → `credentialRequests.requests.siteName`) asserted by
+  equality; what nothing pins is the ORDER, the pre-filled address, Cancel's
+  behaviour, and that the created site carries the typed name. The one thing
+  the mac is actually ASKED to look at is in "Open — what the mac still owes"
+  rather than buried here.
 
 - **Rename Course lives in Windows' FILE menu with F2, not in an Edit menu
   with no key — a chosen divergence on two counts, not drift** (Windows,

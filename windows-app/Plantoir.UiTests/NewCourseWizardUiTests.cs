@@ -21,19 +21,11 @@ namespace Plantoir.UiTests;
 /// doing so deletes the only coverage of the button and leaves a test with the
 /// same name that proves what was already proven.**</para>
 ///
-/// <para><b>This is the first UI test that runs a LAUNCHER, and that is worth
-/// knowing before a second one is written.</b> <c>--state-dir</c> redirects
-/// everything the APP resolves, but a launcher computes its own paths from the
-/// real environment: <c>setup.ps1</c>'s <c>Enter-NativeRuntime</c> sets
-/// <c>PLANTOIR_BUILD_ROOT</c> to <c>%LOCALAPPDATA%\Plantoir\builds\&lt;id&gt;</c>
-/// from the teacher's REAL <c>LOCALAPPDATA</c>. Creating a course is safe only
-/// because <c>setup_course.py</c> never resolves
-/// <c>toolchain_paths.merged_output_root</c> — so the variable is set and the
-/// folder is never made. Measured rather than assumed: after a hand-driven
-/// create on 2026-09-07 there was no new folder under the real builds root and
-/// the real activity trail was untouched. Nothing enforces that property, so
-/// <b>check it again before running a different launcher from a test</b>. A
-/// preview or a scheduled deploy would NOT be safe.</para>
+/// <para><b>This is the first UI test that runs a LAUNCHER.</b> That is safe
+/// for narrow reasons that nothing enforces, written out once in
+/// <c>documentation/12-windows-app.md</c> under "The flags the app answers".
+/// Read them before running a DIFFERENT launcher from a test: preview and
+/// scheduled deploy would NOT be safe.</para>
 ///
 /// <para>Serialised with the rest: one real application at a time.</para>
 /// </summary>
@@ -193,11 +185,14 @@ public class NewCourseWizardUiTests
                         $"the configuration names a shared folder \"{name}\" that was never made");
         }
 
-        // The affirmative button becomes the way OUT once the work is over.
-        // Asserting its label would prove nothing — BeginProgress renames it to
-        // "Close" the instant Create is pressed, a millisecond in — so what is
-        // checked is that it became usable and that Cancel has gone.
-        Assert.True(create.IsEnabled, "the wizard's closing button never became usable");
+        // Cancel is gone, which is FinishProgress emptying CloseButtonText —
+        // the affirmative button becoming usable again is already what
+        // WaitForTheWorkToFinish waited for, so it is not re-asserted here.
+        // (Asserting the button's LABEL would prove nothing either way:
+        // BeginProgress renames it to "Close" the instant Create is pressed.)
+        // This does lean on the ContentDialog template dropping a button whose
+        // text is empty rather than showing a blank one — true today, and the
+        // thing to suspect first if this line ever fails on its own.
         Assert.True(app.FindOrNull("CloseButton", TimeSpan.FromSeconds(2)) is null,
                     "Cancel was still offered after the course had been made");
 
@@ -271,6 +266,17 @@ public class NewCourseWizardUiTests
     /// </summary>
     private static void WaitForTheWorkToFinish(DrivenApp app)
     {
+        // Wait for the work to have STARTED before waiting for it to end.
+        // Without this the next wait is racy in the direction that lies:
+        // InvokePattern.Invoke is asynchronous by contract, so a first poll of
+        // IsEnabled can still see the TRUE that Create had before
+        // BeginProgress disabled it — and the test would then fail complaining
+        // about the ending rather than about a click that had not landed.
+        // The progress view only exists once BeginProgress has swapped it in.
+        Assert.True(Retry.WhileNull(() => app.FindOrNull("taskPhaseLabel", TimeSpan.FromSeconds(1)),
+                                    TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(200)).Result is not null,
+                    "Create was pressed but the wizard never started work");
+
         // The ENDING is "the closing button became usable", not "the label says
         // Done": FinishProgress re-enables it however the launcher exited, so
         // waiting on it stops the moment the work stops. Waiting on the word

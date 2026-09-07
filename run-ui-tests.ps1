@@ -34,8 +34,21 @@
     remembered windows and window positions are not read or written.
 
     The exception worth knowing: the LAUNCHERS compute the builds root
-    themselves, so do not write a test that previews or schedules from a
-    redirected run without reading `AppDataRoot` first.
+    themselves. ONE test runs one — NewCourseWizardUiTests presses the wizard's
+    Create button, which runs setup.ps1 — and it is safe only because
+    setup_course.py never resolves merged_output_root, so PLANTOIR_BUILD_ROOT
+    is set and the folder it names is never made. Nothing enforces that. Do not
+    write a test that previews or schedules without reading "The flags the app
+    answers" in documentation/12-windows-app.md first.
+
+    WHEN ONE FAILS
+    ==============
+    Set PLANTOIR_UI_KEEP=1 and run it again. A test that fails INSIDE the app
+    has almost nothing to say from outside it, and the evidence that matters -
+    that run's own startup.log, its breadcrumb trail, its per-run launcher log
+    under Logs\runs, and its working folder - is all in the temporary folder
+    normally deleted on the way out. With the switch set, the folder is kept
+    and this script prints where it is.
 
     A RUNNING PLANTOIR IS CLOSED
     ============================
@@ -50,6 +63,9 @@
     .\run-ui-tests.ps1
 .EXAMPLE
     .\run-ui-tests.ps1 -Filter "FullyQualifiedName~TheSheetCloses"
+.EXAMPLE
+    $env:PLANTOIR_UI_KEEP = 1; .\run-ui-tests.ps1 -Filter "FullyQualifiedName~TheCreateButton"
+    # Keeps the run's state folder and working folder so a failure can be read.
 #>
 [CmdletBinding()]
 param(
@@ -74,6 +90,9 @@ dotnet build "$repo\windows-app\Plantoir\Plantoir.csproj" -c Debug -p:Platform=x
 if ($LASTEXITCODE -ne 0) { Write-Host "The app did not build." -ForegroundColor Red; exit 1 }
 
 $env:PLANTOIR_UI_TESTS = "1"
+# A token for THIS run, folded into every temporary folder DrivenApp makes, so
+# the sweep at the end can match this run's own children and nothing else.
+$env:PLANTOIR_UI_RUN = [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $dotnetArgs = @("test", "$repo\windows-app\Plantoir.UiTests\Plantoir.UiTests.csproj", "-c", "Debug", "-p:Platform=x64", "--nologo")
 if ($Filter) { $dotnetArgs += @("--filter", $Filter) }
 
@@ -93,13 +112,29 @@ Get-Process -Name Plantoir -ErrorAction SilentlyContinue | Stop-Process -Force -
 # Directory.Delete then fails silently (it must never turn a passing test red)
 # and the folder survives with nothing to say where it came from.
 #
-# Matched on the command line naming one of THIS suite's temp folders, whose
-# names DrivenApp builds as "plantoir-ui-<8 hex>". Nothing of anyone else's can
-# match that, which is what makes a force-kill here safe.
+# Matched on THIS RUN's token, not on the suite's folder prefix. Matching the
+# prefix was the first version and it is too wide: two runs at once would kill
+# each other's live launchers, and a developer reading a kept folder (`Get-
+# Content ...\plantoir-ui-*\state\Logs\startup.log -Wait`) has that pattern in
+# their own command line and would be force-killed by a run finishing beside
+# them. The pid and folder are printed rather than a count, because a
+# force-kill that says only "1 process" is the kind of thing that gets
+# distrusted later.
 $orphans = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='python.exe'" -ErrorAction SilentlyContinue |
-             Where-Object { $_.CommandLine -match 'plantoir-ui-[0-9a-f]{8}' })
-if ($orphans.Count -gt 0) {
-    Write-Host "Cleaning up $($orphans.Count) launcher process(es) left behind by a test run." -ForegroundColor Yellow
-    foreach ($o in $orphans) { Stop-Process -Id $o.ProcessId -Force -ErrorAction SilentlyContinue }
+             Where-Object { $_.CommandLine -match ("plantoir-ui-" + $env:PLANTOIR_UI_RUN) })
+foreach ($o in $orphans) {
+    Write-Host "Cleaning up a launcher this run left behind: $($o.Name) pid $($o.ProcessId)." -ForegroundColor Yellow
+    Stop-Process -Id $o.ProcessId -Force -ErrorAction SilentlyContinue
 }
+
+# Where the evidence is, when there is any. DrivenApp says this too, but plain
+# Console output from Dispose is not attached to a test result and often does
+# not surface in `dotnet test`, so the reliable notice is here.
+$kept = @(Get-ChildItem $env:TEMP -Directory -Filter "plantoir-ui-$($env:PLANTOIR_UI_RUN)-*" -ErrorAction SilentlyContinue)
+foreach ($k in $kept) { Write-Host "Kept this run's files at $($k.FullName)" -ForegroundColor Cyan }
+if ($code -ne 0 -and $kept.Count -eq 0) {
+    Write-Host 'Re-run with $env:PLANTOIR_UI_KEEP = 1 to keep the failed run''s logs and working folder.' -ForegroundColor Yellow
+}
+
+$env:PLANTOIR_UI_RUN = $null
 exit $code
