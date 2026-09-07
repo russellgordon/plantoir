@@ -63,17 +63,9 @@ enum FolderPathRewriter {
 
         // MARK: - Computed properties
 
-        /// The pattern that finds this style's targets.
-        var pattern: String {
-            switch self {
-            case .wikiLink:
-                return FolderPathRewriter.wikiLinkPattern
-            case .markdown:
-                return FolderPathRewriter.markdownLinkPattern
-            }
-        }
-
-        /// The compiled form of that pattern, built once for the whole run.
+        /// The compiled pattern that finds this style's targets —
+        /// `wikiLinkPattern` or `markdownLinkPattern`, built once for the
+        /// whole run rather than per page.
         var expression: NSRegularExpression? {
             switch self {
             case .wikiLink:
@@ -125,13 +117,29 @@ enum FolderPathRewriter {
     /// Measured against the running image on 2026-09-06.
     ///
     /// The set below is therefore what JavaScript's `encodeURI` leaves alone,
-    /// minus the four that a Markdown destination or a slug cannot hold:
-    /// `(` and `)` close the destination, `#` starts a heading and `?` a
-    /// query. `/` and `:` are left out too — the rename sheet refuses both, so
-    /// they cannot arrive, and encoding is the safer of the two ways to be
-    /// wrong if that ever changes. Everything else — the space, `%`, the
-    /// quotes and brackets, and every non-ASCII letter — is encoded, and
-    /// `decodeURI` gives all of it back.
+    /// minus four: `(` and `)` close a destination, `#` starts a heading, and
+    /// `?` opens a query. `/` and `:` are left out too — the rename sheet
+    /// refuses both, so they cannot arrive, and encoding is the safer of the
+    /// two ways to be wrong if that ever changes. Everything else — the space,
+    /// `%`, the quotes and brackets, and every non-ASCII letter — is encoded
+    /// once escaping runs at all, and `decodeURI` gives all of it back.
+    ///
+    /// **`?` is the one deliberate loss here, and it was measured rather than
+    /// assumed.** `sluggify` strips a `?` from the real folder's name, so
+    /// `Why?` becomes `Why` — and an UNESCAPED `Why?/Quiz.md` slugs to the
+    /// same thing and resolves, while `Why%3F` survives `decodeURI` (a `?` is
+    /// in its reserved set) and slugs to `Why-percent3F`, which does not. So
+    /// escaping `?` is worse in Quartz, and it is escaped anyway: a bare `?`
+    /// in a destination is a query delimiter to every other reader of the
+    /// file, and a folder whose name contains one is close enough to
+    /// impossible that the ambiguity costs more than the slug does.
+    ///
+    /// **Nothing here is encoded unless `wouldBreakAMarkdownTarget` fires, or
+    /// the old segment arrived encoded.** `Café` goes into a link as `Café`;
+    /// `Café Notes` goes in as `Caf%C3%A9%20Notes`. Both resolve — the
+    /// Markdown parser normalises the first to `Caf%C3%A9` itself — and the
+    /// rule is written this way so that a name needing nothing is left as the
+    /// teacher typed it.
     nonisolated private static let charactersThatSurviveQuartzUndecoded: CharacterSet = CharacterSet(
         charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'"
     )
@@ -353,15 +361,25 @@ enum FolderPathRewriter {
     }
 
     /// Whether this name, dropped into a Markdown destination as it stands,
-    /// would end the destination early or fail to parse.
+    /// would end the destination early.
     ///
-    /// Whitespace and round brackets are the two that close a destination.
-    /// A lone `%` is the third and is less obvious: Quartz resolves an
-    /// internal link by calling JavaScript's `decodeURI` on it, and
-    /// `decodeURI("10%/Quiz.md")` throws rather than returning anything.
+    /// Whitespace and round brackets, and nothing else. **A lone `%` was in
+    /// this list for an afternoon and was taken back out**: the argument for
+    /// it was that Quartz resolves an internal link with JavaScript's
+    /// `decodeURI`, and `decodeURI("10%/Quiz.md")` throws. True of `decodeURI`
+    /// on its own and irrelevant here, because Quartz never sees a bare `%` —
+    /// the Markdown parser normalises it to `%25` on the way to HTML long
+    /// before the link transformer runs. Measured in the running image on
+    /// 2026-09-06: `[b](Top10%/Quiz.md)` arrives as `Top10%25/Quiz.md`.
+    /// Escaping it anyway would have been harmless and would have made this
+    /// app disagree with the Windows one over a rule neither needs.
+    ///
+    /// A `%` IS still encoded whenever escaping runs for another reason — it
+    /// is outside `charactersThatSurviveQuartzUndecoded` — which is what stops
+    /// `Top 100%` becoming the half-escaped `Top%20100%`.
     nonisolated private static func wouldBreakAMarkdownTarget(_ name: String) -> Bool {
         for character in name {
-            if character.isWhitespace || character == "(" || character == ")" || character == "%" {
+            if character.isWhitespace || character == "(" || character == ")" {
                 return true
             }
         }
