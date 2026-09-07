@@ -22,13 +22,13 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Thirty of its thirty-seven
+with its headline still reading as open work. **Thirty-one of its thirty-seven
 items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
 day (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
 the contract case lists this suite was not reading); items 33 and 34 — the
 refusal of a folder named `index.md`, and the per-finding repair report as
-contract cases — struck on 2026-09-07, along with 18, 19, 25, 26, 27, 28 and
+contract cases — struck on 2026-09-07, along with 18, 19, 25, 26, 27, 28, 30 and
 31 the same day. Items 35–37 were added the
 same day by an audit of these two documents and are open.
 
@@ -56,7 +56,7 @@ What is genuinely left, smallest first:
 | Item | What is left | Size |
 |---|---|---|
 | ~~19~~ | ✅ Done 2026-09-07 — `working-folder.txt` is written by the app and adopted retroactively; the launch-time sweep removes only builds whose working folder the system says is not there. | — |
-| 30 | Three small parity gaps, listed so they are not rediscovered as surprises: no Delete in the Archived/Backup detail pane, no icons or menu on the empty-folder picker's breadcrumbs, and no keyboard route to Rename Course. | Small |
+| ~~30~~ | ✅ Done 2026-09-07 — Delete beside Restore in the detail panes, the picker's breadcrumbs with the main bar's affordances, and Rename Course in the File menu with F2. | — |
 | 32 | `SpecialFoldersHelpContractTests` sweeps the teacher's own folder names for jargon and the contract says not to. Cannot fail on today's fixture, so it is a divergence rather than a bug. The mac fixed its own copy and the fix is worth copying, trap included. | Small |
 | ~~28~~ | ✅ Done 2026-09-07 — the scheduled-deploy dialog names the unpublished classes, the main window comes forward for an assistant build when hidden, settings saves reach the trail, and the assistant window remembers its placement per section. | — |
 | ~~31~~ | ✅ Done 2026-09-07 — `Uri.EscapeDataString` replaced by a contract-driven encoder in both branches of `Spelled`; `FolderPathRewriterTests` deserialises every `linkRewriting` case. | — |
