@@ -162,10 +162,9 @@
         {
           "defaultWhenAbsent": true,
           "key": "use_skeleton",
-          "knownDivergence": "Windows: not written as of 2026-08-16, so the Python's default of true wins and the teacher is never asked. To be closed by asking the question in the wizard.",
           "requirement": "BOTH apps ask the teacher and write the answer. Decided 2026-08-16: Windows matches macOS.",
           "type": "boolean",
-          "why": "Whether a course with no ready-made payload starts from its subject's SKELETON — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing. Around 1,900 course codes have a skeleton and no payload, so this is the question most teachers actually meet. The mac writes `hasSkeleton(code) && teacherSaidYes`; **Windows does not write it at all**, so the Python takes its own default of TRUE and a Windows teacher cannot decline."
+          "why": "Whether a course with no ready-made payload starts from its subject's SKELETON — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing. Around 1,900 course codes have a skeleton and no payload, so this is the question most teachers actually meet. Both apps write `hasSkeleton(code) && teacherSaidYes`. (Windows did not write it at all until 2026-09-07, so for three weeks the Python took its own default of TRUE and a Windows teacher could not decline.)"
         },
         {
           "key": "prepopulate_example_content",

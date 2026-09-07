@@ -22,7 +22,7 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Twenty-five of its thirty-seven
+with its headline still reading as open work. **Twenty-six of its thirty-seven
 items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
 day (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
@@ -65,7 +65,7 @@ What is genuinely left, smallest first:
 | 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
 | 27 | The assistant offers no way back for a whole conversation. `UndoHistory` gives per-change undo, which is a different promise. The mac's `AssistSectionRestore` has no counterpart here. | Medium |
 | ~~26~~ | ✅ Done 2026-09-06 — the marks checklist offers folders nested up to four levels deep (`GradedFolderChoices`), and the frozen pool is fed from the same list. | — |
-| 25 | The wizard never asks the skeleton question, so `use_skeleton` is answered by a default nobody chose. The test that announces it exists and is skipped: `FileFormatContractTests.TheWizardWritesUseSkeleton`. | Medium |
+| ~~25~~ | ✅ Done 2026-09-07 — the wizard asks the skeleton question with the mac's sentences, writes `use_skeleton`, and the structure editor shows the skeleton's folders. | — |
 | 35 | The wizard's Create button and the new-site dialog have never been driven through the real interface. `Plantoir.UiTests` is where the first belongs; the second needs credentials and may have to stay a written hand-check. | Medium |
 | 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 52 test methods over 63 cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
 | ~~22~~ | ✅ Done 2026-09-06 — the "Folders Plantoir uses" sheet, now shared as `shared-rules.json` → `specialFoldersHelp` rather than living inside a view. Two cases proposed back to the mac. | — |
@@ -89,9 +89,11 @@ Two more things, one of which is now ON that list:
   did. **1,029 passed with 2 skipped** after item 29 wired the contract case
   lists this suite was not reading (2026-09-06), and **1,125 with 2 skipped**
   after item 31 wired the twelfth of them — `linkRewriting`, which item 29's
-  audit missed because it was added the same day (2026-09-07). The two skips are named
-  divergences rather than unfinished work: `use_skeleton` (item 25) and the
-  frontmatter-key question the mac has to settle, each carrying the test that
+  audit missed because it was added the same day (2026-09-07); 1,150 with 2
+  skipped once items 26, 31, 33 and 34 were all merged; and **1,153 with 1
+  skipped** once item 25 made the wizard ask the skeleton question. The one
+  skip left is a named divergence rather than unfinished work: the
+  frontmatter-key question the mac has to settle, carrying the test that
   closes it.
 
 ## Every contract case list is now RUN here (2026-09-06)
