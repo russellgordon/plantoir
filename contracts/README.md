@@ -232,8 +232,9 @@ recorded only in a Swift comment, two shared markers classified by nobody, and
 a launcher flag listed as shared that only one platform has.
 
 So the state is worth writing down rather than re-derived. Windows now runs
-every list that audit counted, plus two it missed (`linkRules.browserSafe` and
-`example-content.sentinels`), through these classes in
+every list that audit counted, plus three it missed (`linkRules.browserSafe`,
+`example-content.sentinels` and `linkRewriting`, the last wired on 2026-09-07
+as WINDOWS-HANDOFF item 31), through these classes in
 `windows-app/Plantoir.Tests/`:
 
 | What it runs | Class |
@@ -243,6 +244,7 @@ every list that audit counted, plus two it missed (`linkRules.browserSafe` and
 | `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts`, `linkRules.browserSafe` | `PublishAndLauncherContractTests` |
 | `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
+| `specialNames.renameFolder.linkRewriting` — every case, plus `escapingSet.leaveUnescaped` character by character | `FolderPathRewriterTests` |
 
 **Three habits came out of that work and are worth copying on either side.**
 

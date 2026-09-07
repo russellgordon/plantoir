@@ -309,7 +309,9 @@ public class FolderPathRewriterTests
     /// carries, so a case the mac ADDS cannot go unrun — but a case the mac
     /// CHANGES or drops would quietly leave one of the named anchors below
     /// guarding nothing, still passing, and no longer describing the shared
-    /// rule. This names each anchor against the case it mirrors.
+    /// rule. This names each anchor against the case it mirrors, ANSWER
+    /// included — comparing inputs alone would miss a case whose expected
+    /// text the mac changed.
     ///
     /// <para>Two of the anchors' assertions are deliberately absent from this
     /// map, and saying so is the point of writing it out. The wikilink half of
@@ -322,32 +324,37 @@ public class FolderPathRewriterTests
     [Fact]
     public void TheHandWrittenAnchorsStillMatchTheContract()
     {
-        var anchors = new Dictionary<string, (string Given, string Old, string New)>
+        var anchors = new Dictionary<string, (string Given, string Old, string New, string Expect)>
         {
             ["ANewNameWithASpaceIsEscapedInAMarkdownLink (encoded file name)"] =
-                ("[q](Tasks/Quiz%201.md)", "Tasks", "All Tasks"),
+                ("[q](Tasks/Quiz%201.md)", "Tasks", "All Tasks", "[q](All%20Tasks/Quiz%201.md)"),
             ["ANewNameWithASpaceIsEscapedInAMarkdownLink (plain file name)"] =
-                ("[q](Tasks/Quiz.md)", "Tasks", "All Tasks"),
+                ("[q](Tasks/Quiz.md)", "Tasks", "All Tasks", "[q](All%20Tasks/Quiz.md)"),
             ["BracketsInANewNameAreEscapedInAMarkdownLinkToo"] =
-                ("[q](Tasks/Quiz.md)", "Tasks", "Work(new)"),
+                ("[q](Tasks/Quiz.md)", "Tasks", "Work(new)", "[q](Work%28new%29/Quiz.md)"),
             ["AWikiLinkKeepsTheSpaceRatherThanEscapingIt"] =
-                ("[[Tasks/Quiz 1]]", "Tasks", "All Tasks"),
+                ("[[Tasks/Quiz 1]]", "Tasks", "All Tasks", "[[All Tasks/Quiz 1]]"),
             ["APlainNewNameIsNotEscapedForNoReason (Markdown half)"] =
-                ("[q](Tasks/Quiz.md)", "Tasks", "Assignments"),
+                ("[q](Tasks/Quiz.md)", "Tasks", "Assignments", "[q](Assignments/Quiz.md)"),
         };
 
-        List<(string Given, string Old, string New)> carried = LinkRewritingRules()["cases"]!
+        // The EXPECTED text is part of the comparison, not just the inputs. A
+        // mac that changed a case's answer while keeping its inputs would leave
+        // the anchor passing and quietly contradicting the contract — the
+        // theory above would fail, but the anchor is what a reader trusts.
+        List<(string Given, string Old, string New, string Expect)> carried = LinkRewritingRules()["cases"]!
             .AsArray()
             .Select(entry => (entry!["given"]!.ToString(),
                               entry["oldName"]!.ToString(),
-                              entry["newName"]!.ToString()))
+                              entry["newName"]!.ToString(),
+                              entry["expect"]!.ToString()))
             .ToList();
 
-        foreach (KeyValuePair<string, (string Given, string Old, string New)> anchor in anchors)
+        foreach (KeyValuePair<string, (string Given, string Old, string New, string Expect)> anchor in anchors)
             Assert.True(carried.Contains(anchor.Value),
-                        anchor.Key + " guards a case the contract no longer carries: " +
+                        anchor.Key + " guards a case the contract no longer carries as written: " +
                         anchor.Value.Given + " — “" + anchor.Value.Old +
-                        "” to “" + anchor.Value.New + "”");
+                        "” to “" + anchor.Value.New + "”, expecting " + anchor.Value.Expect);
     }
 
     // --------------------- the anchors themselves, kept by name (2026-09-06)

@@ -93,6 +93,32 @@ product, not of one platform.
 > </details>
 
 
+**One is outstanding, proposed 2026-09-07: a TWELFTH `linkRewriting` case, for
+the branch of the spelling rule that no case reached.** Added while Windows
+replaced `Uri.EscapeDataString` (WINDOWS-HANDOFF item 31), in
+`contracts/shared-rules.json` →
+`specialNames.renameFolder.linkRewriting.cases`:
+
+    given    [q](All%20Tasks/Quiz.md)
+    oldName  All Tasks
+    newName  Q&A
+    expect   [q](Q&A/Quiz.md)
+
+**This should be GREEN on the mac the day you read it** — said plainly so a
+passing case is not mistaken for one that needs work. `spelled(_:likeThe:in:)`
+already calls `percentEncoded` in both of its branches, and `Q&A` contains
+nothing outside `charactersThatSurviveQuartzUndecoded`, so the mac answers
+`[q](Q&A/Quiz.md)` today. If it does not, the divergence is real and worth
+knowing about.
+
+**Why it is worth a case at all.** `Spelled` has two reasons to escape: the new
+name would break a Markdown destination, or the OLD segment arrived
+percent-encoded. Every one of the original eleven cases takes the first — each
+new name contains a space or a bracket — so the second branch was covered by
+nothing. On Windows it still called `Uri.EscapeDataString`, and a fix applied to
+the first line alone would have left `Q&A` spelled `Q%26A` with all eleven cases
+still green. The case is what makes the second branch visible.
+
 ~~**One is outstanding, proposed 2026-09-06: a folder rename breaks Markdown
 links when the new name contains a space — on BOTH platforms.**~~
 **✅ Done 2026-09-06 (mac).** Implemented here, with the five proposed cases
@@ -101,8 +127,9 @@ plus six more, in `contracts/shared-rules.json` →
 rename to a name with a space broke every Markdown link into it"** — carries
 the reasoning, INCLUDING the part Windows now owes: the escaping SET was
 measured against Quartz and `Uri.EscapeDataString` turned out to be wrong, so
-three of the eleven cases fail on Windows today — one change fixes all three. That is the mechanism working
-rather than damage; what to do about it is in `WINDOWS-HANDOFF.md`.
+three of the eleven cases failed on Windows — one change fixed all three, on
+2026-09-07 (see the awareness entry below). That is the mechanism working
+rather than damage; the reasoning is in `WINDOWS-HANDOFF.md`.
 
 The `specialFoldersHelp` pair below went the same way on the same day.
 
@@ -1627,6 +1654,75 @@ rather than being deleted.
   green suite as proof.
 
 ## For awareness — no mac code needed
+
+- **Windows now spells a renamed folder the way Quartz reads it — item 31's
+  debt is paid, and the escaping rule is executed on both sides**
+  (Windows + shared, 2026-09-07, branch `issue/31-rename-link-escaping`,
+  commit `2bed7c83`). **The mac is expected only to KNOW this**; no Swift
+  changes, and one new contract case that should already be green here (see
+  "Contract cases waiting on the mac", at the top of this file).
+
+  **What was done.** `Spelled` in
+  `windows-app/Plantoir.Core/Models/FolderPathRewriter.cs` called
+  `Uri.EscapeDataString`, which keeps only `A-Za-z0-9-._~`. It is replaced by a
+  `PercentEncoded` driven by the contract's own
+  `specialNames.renameFolder.linkRewriting.escapingSet.leaveUnescaped`, in BOTH
+  of `Spelled`'s branches. Three cases had been failing there — the ampersand,
+  the comma and the question mark — and `FolderPathRewriterTests` now
+  deserialises every case instead of retyping five of them.
+
+  **WHY it was two changes and not one, which is the part that travels.**
+  Fixing the encoder without wiring the cases would have been invisible —
+  nothing on that side went red, which is how three failures sat there for a
+  day. And wiring the cases without fixing BOTH branches would have looked
+  finished: every one of the original eleven new names contains a space or a
+  bracket, so all eleven take the FIRST branch, and a framework call left behind
+  in the second passes the lot. That is what the twelfth case is for.
+
+  **Two habits from item 29 earned their keep again, and the second one is
+  new.** Asking the list both ways found nothing here — the code had no rule
+  the contract lacked. What DID find something was pinning the code's copy of
+  the set against the contract's string directly
+  (`TheEscapingSetIsTheContractsCharacterForCharacter`): a behavioural walk over
+  `leaveUnescaped` can only test the characters the CODE already has, so adding
+  `#` to the constant would leave every other test green. **The mac's
+  `testEveryCharacterTheContractLeavesAloneSurvivesARename` has exactly that
+  hole**, and closing it there is a two-line test against
+  `charactersThatSurviveQuartzUndecoded` — offered, not owed.
+
+  **Numbers.** 1125 passed, 2 skipped, 0 failed on the Windows unit suite; 1031
+  passed before. +94: twelve contract cases, seventy-seven characters of the
+  escaping set, and five new facts. Windows 11 Pro 26200, .NET 9, `dotnet test`
+  in 12 s.
+
+  **What was REJECTED.** *Encoding character by character rather than by UTF-8
+  byte* — a `char` loop splits a surrogate pair and writes two invalid
+  sequences for one letter; every byte at or above `0x80` is outside the allowed
+  set by construction, so the byte test is exact and simpler. *Keeping
+  `Uri.EscapeDataString` in the second branch* — it is the older rule ("a
+  segment that arrived encoded goes back encoded") and it is tempting to leave
+  alone, but the rule is about WHETHER to escape, not about how, and the mac has
+  always used one encoder for both. *Adding `%` to
+  `WouldBreakAMarkdownTarget`* — explicitly refused by the contract; Quartz
+  never sees a bare `%`. *Deleting the five hand-typed facts once the theory
+  ran them* — they are what a reader searching for "what broke" finds by
+  name, and two of their assertions have no contract case behind them at all;
+  `TheHandWrittenAnchorsStillMatchTheContract` keeps them tied to the contract
+  instead.
+
+  **One divergence found and deliberately NOT fixed**, so it is not
+  rediscovered as a puzzle: the mac's `rewriting(_:folderNamed:to:)` trims
+  whitespace from `oldName` and `newName` and the C# `Rewritten` does not. It
+  is pre-existing on both sides, unreachable in practice (`SpecialFolderRenamer`
+  refuses a trailing space before a rename can happen), covered by no contract
+  case, and changing behaviour unattended is not this item's job. If it is worth
+  settling, it wants a case rather than two independent fixes.
+
+  Reference: `windows-app/Plantoir.Core/Models/FolderPathRewriter.cs`
+  (`PercentEncoded`, `CharactersThatSurviveQuartzUndecoded`, `Spelled`) and
+  `windows-app/Plantoir.Tests/FolderPathRewriterTests.cs`. The mac's is
+  `spelled(_:likeThe:in:)` / `percentEncoded` in
+  `mac-app/QuartzTeachers/Models/FolderPathRewriter.swift`.
 
 - **`workingFolderPathBar.ancestorPaths` now carries `windowsCases`, and two
   rules were being pinned by nobody on either side** (Windows + shared,
