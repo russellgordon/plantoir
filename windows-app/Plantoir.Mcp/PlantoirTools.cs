@@ -1144,7 +1144,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                    ReadOnly = true, Destructive = false)]
     [Description("List what this conversation has changed, newest first, so the teacher can see what could be " +
                  "taken back. This history is only kept while this conversation is open. Anything older lives in " +
-                 "Plantoir's Backups list, which is made before every change.")]
+                 "Plantoir's Backups list, which is made before a conversation's first change.")]
     public string ListRecentChanges()
     {
         var entries = workspace.History?.Entries;
@@ -1173,7 +1173,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "else. Can be called more than once to step further back. " +
                  "\n\nOnly changes made in THIS conversation can be undone this way; the history is not kept " +
                  "afterwards. For anything older, Plantoir's Backups list has a full copy of the course taken " +
-                 "before each change. " +
+                 "before the conversation's first change. " +
                  "\n\nIf the teacher had already published the section themselves, undoing the pages does not " +
                  "un-publish the live site — they need to publish again in Plantoir to bring it back in step.")]
     public CallToolResult UndoLastChange()
@@ -1473,28 +1473,34 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// teacher's chat window: one string cannot be short for a person and
     /// complete for a model at the same time.
     /// </summary>
-    private static CallToolResult Answering(string summary, string detail) => new()
+    private CallToolResult Answering(string summary, string detail) => CarryingTheConversationBackup(new()
     {
         Content = [new TextContentBlock { Text = detail }],
         Meta = new JsonObject { [AssistToolAnswer.TeacherSummaryKey] = summary },
-    };
+    });
 
     /// <summary>
     /// An answer that is the same words to both — every refusal, and every
     /// tool whose whole reply is already one sentence. No <c>_meta</c> is
     /// sent, and the client reads that absence as "show what you were given".
     /// </summary>
-    private static CallToolResult Answering(string both) => new()
+    private CallToolResult Answering(string both) => CarryingTheConversationBackup(new()
     {
         Content = [new TextContentBlock { Text = both }],
-    };
+    });
 
     /// <summary>
     /// Every answer after this conversation's first change names the copy
     /// saved before it, under <see cref="AssistToolAnswer.ConversationBackupKey"/>.
-    /// The window reads it to offer "Restore Section N…"; a refusal carries
-    /// it too, because the copy exists whether or not this call changed
-    /// anything, and Claude Code ignores <c>_meta</c> it does not know.
+    /// Stamped by the two <c>Answering</c> builders and both <c>Proposing</c>
+    /// ones — the ONLY ways an answer is made here — rather than by
+    /// <c>Guarded</c>, because five tools (publish, whole-unit, publish-on,
+    /// re-date, roll-over's helpers) build their answers from their own
+    /// try/catch and never pass through it; a first draft stamped in
+    /// <c>Guarded</c> and the banner never appeared for a publish. The window
+    /// reads it to offer "Restore Section N…"; a refusal carries it too,
+    /// because the copy exists whether or not this call changed anything, and
+    /// Claude Code ignores <c>_meta</c> it does not know.
     /// </summary>
     private CallToolResult CarryingTheConversationBackup(CallToolResult result)
     {
@@ -1504,7 +1510,6 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         return result;
     }
 
-    /// <summary><see cref="Guarded(Func{string})"/>, for a tool that answers in two halves.</summary>
     /// <summary>
     /// A WRITE tool that answers in one string. Wrapped into a result here
     /// rather than left to the SDK, so the conversation's backup can ride in
@@ -1512,9 +1517,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// </summary>
     private CallToolResult GuardedResult(Func<string> work) => Guarded(() => Answering(work()));
 
+    /// <summary><see cref="Guarded(Func{string})"/>, for a tool that answers in two halves.</summary>
     private CallToolResult Guarded(Func<CallToolResult> work)
     {
-        try { return CarryingTheConversationBackup(work()); }
+        try { return work(); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (Plantoir.Core.Models.OutsideWorkspaceException refusal) { return Answering(refusal.Message); }
         catch (IOException error) { return Answering($"That couldn’t be read: {error.Message}"); }
@@ -1534,7 +1540,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// ahead" was being addressed as though they were the model, about
     /// machinery, directly above the asking it described.
     /// </summary>
-    private static CallToolResult Proposing(PublishPlan plan) =>
+    private CallToolResult Proposing(PublishPlan plan) =>
         plan.NothingToDoSentence is { } already
             ? Answering(already)
             : (plan.ChangesNothing && plan.UnknownNames.Count > 0)
@@ -1556,7 +1562,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// can be done invites a teacher to approve a dead end. The mac transcript
     /// that produced this rule shows them declining one four times in a row.
     /// </summary>
-    private static CallToolResult Proposing(string plan) => new()
+    private CallToolResult Proposing(string plan) => CarryingTheConversationBackup(new()
     {
         Content = [new TextContentBlock { Text = plan + "\n\n" + AskBeforeGoingAhead }],
         Meta = new JsonObject
@@ -1564,7 +1570,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             [AssistToolAnswer.TeacherSummaryKey] = plan,
             [AssistToolAnswer.IsPlanKey] = true,
         },
-    };
+    });
 
     /// <summary>Said to a caller that has no Go and Cancel of its own. Never to a teacher.</summary>
     private const string AskBeforeGoingAhead =

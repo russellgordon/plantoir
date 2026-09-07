@@ -775,6 +775,7 @@ public sealed class AssistAgent
     private async Task<List<Line>> ShowPlan(string twinName, JsonObject call, CancellationToken cancellation)
     {
         var answer = await _tools.CallTool(twinName, ArgumentsOf(call), OnToolProgress, cancellation);
+        if (answer.ConversationBackupPath is { } savedCopy) OnConversationBackup?.Invoke(savedCopy);
 
         // A plan twin can come back with a REFUSAL — no such page, no such
         // section — and a refusal is an answer, not a proposal. "Shall I go

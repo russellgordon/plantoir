@@ -92,20 +92,7 @@ public static class CourseRestorer
         }
     }
 
-    /// <summary>
-    /// A delete that survives what a course folder really holds: the
-    /// container leaves links inside .merged_output that
-    /// Directory.Delete(recursive) cannot traverse (the restore died on
-    /// content\Media before touching anything else), and readonly files stop
-    /// it too. Reparse points are deleted AS LINKS, never followed.
-    ///
-    /// Shared with <see cref="CourseArchiver"/>, which learned the same
-    /// lesson separately: the Quartz project copied into .merged_output can
-    /// carry a .git whose pack files are readonly, and removing a course
-    /// died on the first one — "Access to the path 'pack-….idx' is denied"
-    /// — leaving the folder half-deleted behind an archive that had already
-    /// succeeded.
-    /// </summary>
+
     /// <summary>
     /// Puts ONE section back to how a backup has it, and touches no other.
     ///
@@ -152,7 +139,14 @@ public static class CourseRestorer
         }
     }
 
-    /// <summary>Out with the live folder's children, hidden ones included; in with the backup's.</summary>
+    /// <summary>
+    /// Out with the live folder's children, hidden ones included; in with the
+    /// backup's. Moved when the staging folder is on the same volume, COPIED
+    /// when it is not: <c>Directory.Move</c> fails across volumes on Windows,
+    /// and a working folder on D: with %TEMP% on C: would otherwise be left
+    /// with an emptied section — the one outcome this method exists to
+    /// prevent. (The mac's <c>moveItem</c> copies across volumes itself.)
+    /// </summary>
     private static void ReplaceContents(string live, string backedUp)
     {
         Directory.CreateDirectory(live);
@@ -161,9 +155,26 @@ public static class CourseRestorer
         foreach (string child in Directory.EnumerateFileSystemEntries(backedUp))
         {
             string target = Path.Combine(live, Path.GetFileName(child));
-            if (Directory.Exists(child)) Directory.Move(child, target);
-            else File.Move(child, target);
+            try
+            {
+                if (Directory.Exists(child)) Directory.Move(child, target);
+                else File.Move(child, target);
+            }
+            catch (IOException)
+            {
+                if (Directory.Exists(child)) CopyTree(child, target);
+                else File.Copy(child, target, overwrite: true);
+            }
         }
+    }
+
+    private static void CopyTree(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (string file in Directory.EnumerateFiles(source))
+            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), overwrite: true);
+        foreach (string folder in Directory.EnumerateDirectories(source))
+            CopyTree(folder, Path.Combine(target, Path.GetFileName(folder)));
     }
 
     /// <summary>
@@ -249,6 +260,9 @@ public static class CourseRestorer
         if (FrontmatterBounds(liveText) is not { } liveBlock)
         {
             if (restoredLines.Count == 0) return liveText;
+            // A page that HAS a block this parser does not see (one starting
+            // after a blank line) must not be given a second one.
+            if (liveText.Contains("\n---")) return liveText;
             return "---\n" + string.Join("\n", restoredLines) + "\n---\n" + liveText;
         }
 
@@ -275,7 +289,16 @@ public static class CourseRestorer
         return string.Join("\n", rebuilt);
     }
 
-    /// <summary>The line indexes of a page's opening and closing "---", or null when it has no frontmatter.</summary>
+    /// <summary>
+    /// The line indexes of a page's opening and closing "---", or null when it
+    /// has no frontmatter. As strict as the mac's <c>PageFrontmatter.block</c>
+    /// on purpose — line 1 exactly, "---" terminator — so the two apps restore
+    /// the same pages the same way; stricter than this app's own
+    /// <c>PageFrontmatter.Block.Parse</c>, which tolerates leading blank lines
+    /// and "...". A shared page whose block starts after a blank line is
+    /// therefore left alone by the key restore rather than edited — and that
+    /// is the mac's behaviour too.
+    /// </summary>
     private static (int Open, int Close)? FrontmatterBounds(string text)
     {
         var lines = text.Split('\n');
@@ -285,6 +308,20 @@ public static class CourseRestorer
         return null;
     }
 
+    /// <summary>
+    /// A delete that survives what a course folder really holds: the
+    /// container leaves links inside .merged_output that
+    /// Directory.Delete(recursive) cannot traverse (the restore died on
+    /// content\Media before touching anything else), and readonly files stop
+    /// it too. Reparse points are deleted AS LINKS, never followed.
+    ///
+    /// Shared with <see cref="CourseArchiver"/>, which learned the same
+    /// lesson separately: the Quartz project copied into .merged_output can
+    /// carry a .git whose pack files are readonly, and removing a course
+    /// died on the first one — "Access to the path 'pack-….idx' is denied"
+    /// — leaving the folder half-deleted behind an archive that had already
+    /// succeeded.
+    /// </summary>
     internal static void DeleteTree(string path)
     {
         FileAttributes attributes;
