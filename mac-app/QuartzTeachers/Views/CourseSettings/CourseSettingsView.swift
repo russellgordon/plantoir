@@ -190,7 +190,7 @@ struct CourseSettingsView: View {
                     Text("The curriculum map uses this to show which expectations you have actually evaluated. Most courses keep “Tasks”; add “Tests” or anything else you mark, and remove what you don’t.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                    Button("What else does Plantoir use my folders for?") {
+                    Button(SpecialFoldersHelpView.openedBy) {
                         isShowingFoldersHelp = true
                     }
                     .buttonStyle(.link)

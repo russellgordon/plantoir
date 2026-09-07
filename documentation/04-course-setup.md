@@ -307,10 +307,15 @@ that sheet are deliberate and easy to undo by accident:
   keys.** A course whose `curriculum_folder` was never written still has a
   curriculum folder as far as the build is concerned, and telling that teacher
   to create one they already have is the one failure a sheet about folder names
-  cannot afford. **Windows does this; the mac reads the raw key and is owed the
-  change** — two contract cases are proposed for it, and
-  [`MAC-HANDOFF.md`](../MAC-HANDOFF.md) says what it costs (one line: it
-  already has the function).
+  cannot afford. **Both apps do this** — Windows from the start, the mac from
+  2026-09-06, when it stopped reading the key and started asking the same rule
+  that decides which folder is protected from removal. Two things narrow the
+  answer, in both apps equally: the scan looks at the SHARED folders only,
+  where the build walks the merged tree, and neither app can see whether the
+  folder actually holds an expectation page — and when the recorded folder has
+  none, the build does not give up, it falls through to the same scan. So the
+  sheet can name a folder the build passes over in favour of another. Still
+  righter than naming one that is not there.
 
 The rows, the sentences and the cases are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →

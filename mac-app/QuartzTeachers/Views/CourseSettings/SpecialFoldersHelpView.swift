@@ -11,9 +11,45 @@ import SwiftUI
 /// The other reason it is per-course: these answers genuinely differ. One
 /// course grades "Tasks", another "Tests" and "Thinking Tasks"; one calls its
 /// class folder "All Classes" and another "Lessons".
+///
+/// **Every name comes from the course's RESOLVED rules, never from a raw
+/// configuration key.** `ClassFolder`, `CurriculumFolderRule` and the graded
+/// pool below all answer the question the build asks; a key merely records an
+/// answer somebody wrote down, and a course can perfectly well have the folder
+/// without the key, or the key without the folder.
+///
+/// The rows, the sentences, the listing grammar and the banned vocabulary are
+/// `contracts/shared-rules.json` → `specialFoldersHelp`, run here by
+/// `SpecialFoldersHelpTests` and on Windows by
+/// `SpecialFoldersHelpContractTests`.
 struct SpecialFoldersHelpView: View {
 
     // MARK: - Stored properties
+
+    /// The button in Course Settings that opens the sheet, the sheet's own
+    /// title, and the sentence under it. Named rather than typed where they
+    /// are used, so the contract can pin them: a sentence a teacher reads is
+    /// shared with Windows, and a quoted copy is the one that keeps passing
+    /// after the words change.
+    nonisolated static let openedBy: String = "What else does Plantoir use my folders for?"
+
+    /// The button that closes it. The MECHANISM differs — a sheet here, a
+    /// dialog on Windows — but the label does not.
+    nonisolated static let dismissedBy: String = "Done"
+
+    nonisolated static let title: String = "Folders Plantoir uses"
+
+    nonisolated static let intro: String =
+        "Renaming or deleting one of these changes what appears on your site. "
+        + "Everything else in your course is yours to arrange however you like."
+
+    /// What the curriculum row says when the course has no curriculum folder
+    /// at all. The single piece of text in this sheet allowed to describe
+    /// rather than name, and only in that one case.
+    nonisolated static let noCurriculumFolderYet: String = "Your curriculum folder"
+
+    /// What a list of names reads as when there are none.
+    nonisolated static let noneChosen: String = "None chosen"
 
     let course: Course
 
@@ -33,22 +69,71 @@ struct SpecialFoldersHelpView: View {
                 + "out which pages your course actually teaches."
         ))
 
-        if let curriculum = course.configuration.curriculumFolder, !curriculum.isEmpty {
-            rows.append(SpecialFolderEntry(
-                name: curriculum,
-                what: "Your curriculum expectations",
-                why: "One page per expectation. The curriculum map is built from "
-                    + "these — without them there is nothing to measure your "
-                    + "lessons against, and the map is left out."
-            ))
+        // **The folder the build would use, not the name the course happens to
+        // have recorded.** `curriculum_folder` has only been written since
+        // 2026-08-23, and even now it is null for a course made without a
+        // ready-made payload or a skeleton — so a course older than that has
+        // no such key at all and is found by name alone. Measured on this Mac
+        // on 2026-09-06, across 15 course folders — most of them scratch
+        // working folders from test sessions, so read it as a shape rather
+        // than as a teacher population: 12 have no key, 1 has it null, 2 have
+        // it set and correct. **11 of the 15 were being shown the "Your
+        // curriculum folder" placeholder while a real folder sat in the
+        // vault.** Of those 11, 8 are now named exactly the folder the build
+        // uses, 1 names a folder the build finds no expectation pages in (so
+        // no map is built either way, and the teacher is at least told which
+        // folder to fill), and 2 are named the alphabetically first of TWO
+        // curriculum folders where the build uses the other — see the last
+        // paragraph, which is not hypothetical.
+        //
+        // The other half is sharper: a folder renamed in Finder or Obsidian
+        // leaves the key naming something that is no longer there, and a name
+        // a teacher cannot find is worse than the placeholder, because it
+        // looks like an answer. (A rename made in Course Settings does not do
+        // that — `SpecialFolderRenamer` materialises the key at the one moment
+        // Plantoir witnesses the rename.)
+        //
+        // `CurriculumFolderRule` is the same rule folder protection uses, and
+        // asks in the same ORDER as `_find_curriculum_folder` in
+        // `build_site.py` — the recorded name first, then the folder whose
+        // name mentions the curriculum — among the shared folders the course
+        // has recorded. It is narrower in two ways neither app can see from
+        // configuration: the build scans the merged tree on disk, per-section
+        // folders included, and it also wants an expectation page inside the
+        // folder.
+        //
+        // **So the build can pass over the folder named here in favour of
+        // another, and on this Mac it does — for two courses that keep both
+        // an "Ontario Curriculum" and a "College Board Curriculum" folder.**
+        // The tie-break is alphabetical (pinned by `specialNames`
+        // → `curriculumFolderResolution`), the College Board pages are named
+        // "1.A" rather than in expectation-code form, and so the build builds
+        // the map from Ontario Curriculum while this row says College Board.
+        // Both apps agree, which is why it is not fixed here on a whim:
+        // teaching the apps to break the tie the way the build does means
+        // reading the vault, and that is a shared decision, written up in
+        // `TODO.md`. Naming a real folder of the teacher's is still righter
+        // than telling them to create one they already have.
+        let curriculumName: String
+        if let resolved = CurriculumFolderRule.resolvedCurriculumFolder(for: course),
+           !resolved.isEmpty {
+            curriculumName = resolved
         } else {
-            rows.append(SpecialFolderEntry(
-                name: "Your curriculum folder",
-                what: "Your curriculum expectations",
-                why: "One page per expectation, in a folder whose name mentions "
-                    + "the curriculum. The curriculum map is built from these."
-            ))
+            curriculumName = SpecialFoldersHelpView.noCurriculumFolderYet
         }
+        // One explanation, whichever name the row carries. A course with no
+        // expectations needs to hear the same thing about what they are for,
+        // and the sentence the placeholder branch used to add — "in a folder
+        // whose name mentions the curriculum" — published the matching rule in
+        // plain words, which is the exact thing naming a course's own folders
+        // exists to avoid.
+        rows.append(SpecialFolderEntry(
+            name: curriculumName,
+            what: "Your curriculum expectations",
+            why: "One page per expectation. The curriculum map is built from "
+                + "these — without them there is nothing to measure your "
+                + "lessons against, and the map is left out."
+        ))
 
         rows.append(SpecialFolderEntry(
             name: SpecialFoldersHelpView.listed(gradedFolderNames),
@@ -110,11 +195,9 @@ struct SpecialFoldersHelpView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Folders Plantoir uses")
+                Text(SpecialFoldersHelpView.title)
                     .font(.title2).bold()
-                Text("Renaming or deleting one of these changes what appears on "
-                     + "your site. Everything else in your course is yours to "
-                     + "arrange however you like.")
+                Text(SpecialFoldersHelpView.intro)
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -145,7 +228,7 @@ struct SpecialFoldersHelpView: View {
 
             HStack {
                 Spacer()
-                Button("Done") { dismiss() }
+                Button(SpecialFoldersHelpView.dismissedBy) { dismiss() }
                     .keyboardShortcut(.defaultAction)
             }
             .padding(16)
@@ -164,7 +247,7 @@ struct SpecialFoldersHelpView: View {
             }
         }
         if kept.isEmpty {
-            return "None chosen"
+            return noneChosen
         }
         if kept.count == 1 {
             return kept[0]

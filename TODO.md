@@ -4,6 +4,96 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **The mac suite crashes intermittently inside AppKit, and it reads as a
+  failing test rather than as a crash** (mac, 2026-09-06, measured while
+  working on something else — NOT caused by that work, see below).
+
+  **What it looks like.** `xcodebuild ... test` exits 65 and prints
+  `** TEST FAILED **` with a "Failing tests:" line naming one
+  `CourseRenameInterfaceTests` method — but the XCTest totals above it say
+  `0 failures`, and the method NAMED is whichever one happened to be running
+  when the host died. Earlier in the log: `Restarting after unexpected exit,
+  crash, or test timeout`. So the honest reading is "the test host
+  segfaulted", and the test named is a bystander.
+
+  **What it actually is.** `~/Library/Logs/DiagnosticReports/Plantoir-*.ips`:
+  `EXC_BAD_ACCESS (SIGSEGV)` at address 0, faulting stack entirely inside
+  AppKit — `NSAlert beginSheetModalForWindow:` → `NSWindow _doOrderWindow:` →
+  `NSSheetMoveHelper closeSheet` → `NSMoveHelper _doAnimation` →
+  `UC::DriverCore::continueProcessing`. Nothing of ours is on the stack. It is
+  the sheet-dismissal ANIMATION, in a test that drives a real alert.
+
+  **Measured, because "it feels flaky" is not usable.** Running
+  `-only-testing:QuartzTeachersTests/CourseRenameInterfaceTests` alone:
+  **3 crashes in 7 runs on an unmodified `dev` worktree** (commit `3ca5f0a4`,
+  built fresh in `/tmp`), and 2 in 3 on a branch that touched only
+  `SpecialFoldersHelpView`. So it PRE-DATES any current work and reproduces
+  from a clean checkout. The full suite is likewise green on some runs
+  (1047 tests, 3 skipped, 0 failures) and aborted at 542 on others.
+
+  **Why it matters more than a rerun.** Anything that gates on the suite —
+  a batch driver, CI, a session deciding whether it broke something — sees
+  red for a reason that has nothing to do with the diff, and the message
+  actively points at an innocent test. Someone will spend an afternoon on
+  `testACourseThatIsPreviewingIsNotRenamed` before noticing the totals say
+  zero failures.
+
+  Not fixed here because it is not this piece's, and because the fix is a real
+  question rather than a tweak: whether these tests should drive a live
+  `NSAlert` sheet at all (`beginSheetModalForWindow:` under a test host, with
+  animations on), or assert the same thing without one. Worth checking
+  `NSAnimationContext`/`reduce motion` in the test environment first — a
+  disabled sheet animation would take the faulting frame out of the picture
+  entirely, and would be a two-line experiment.
+
+- **Two courses whose curriculum folder BOTH apps name is not the one the
+  build uses — decide whether they should read the vault to break the tie**
+  (mac, 2026-09-06, found by measuring the fix in `GUI-IMPROVEMENTS.md` row
+  425, not by a report). Written up as a decision rather than done, because it
+  changes a rule both platforms share and nobody was awake to agree it.
+
+  **What happens.** `CurriculumFolderRule` (mac) and `CurriculumFolderRule.cs`
+  (Windows) answer from `course_config.json` alone: the recorded
+  `curriculum_folder` if the course still has it, otherwise the alphabetically
+  first shared folder whose name mentions the curriculum.
+  `_find_curriculum_folder` in `scripts/build_site.py` asks in the same order
+  but only accepts a folder that HOLDS a page whose stem is an expectation
+  code. Two courses on this Mac keep an "Ontario Curriculum" and a "College
+  Board Curriculum" folder; the College Board pages are named "1.A", "1.B",
+  which is not expectation-code form, so the build builds the map from Ontario
+  Curriculum while the "Folders Plantoir uses" sheet names College Board, and
+  folder protection protects College Board. The tie-break itself is already a
+  contract case with those exact two names
+  (`shared-rules.json` → `specialNames.curriculumFolderResolution`), so the
+  two apps agree with each other — this is a shared limit, not drift.
+
+  **Why it was not just fixed.** The apps would have to look at the disk, and
+  that reaches further than it sounds: the sheet is built from a `Course`
+  loaded from configuration, folder protection runs while a teacher is typing
+  in Course Settings, and the wizard asks the same question before any folder
+  exists. A scan on every keystroke is the obvious way to make Settings feel
+  broken. It is also the kind of rule that must land on both platforms at once
+  or the contract case becomes a lie.
+
+  **Options, and what each costs.**
+  1. *Leave it.* Both apps stay wrong together for a course with two
+     curriculum folders, which is rare and, for the sheet, still better than
+     the placeholder it replaced — it names a real folder of the teacher's.
+     Costs nothing; the contract note now says so out loud.
+  2. *Break the tie by reading the vault, cached per course.* Right answer,
+     matches the build exactly. Costs a disk scan and a cache-invalidation
+     question nobody has asked yet.
+  3. *Record the answer instead of computing it* — have the build write back
+     the folder it actually used, the way `class_folder` and
+     `curriculum_folder` are already materialised on rename. Cheapest correct
+     answer at read time, and it makes the key mean what the build did rather
+     than what a manifest declared; but it puts a config write in the build,
+     which nothing there does today.
+
+  Rejected outright: making the SHEET read the disk while folder protection
+  does not. Two answers to "which folder is the curriculum folder" in one
+  settings window is worse than one wrong answer.
+
 - **The UI-test runner closes a running Plantoir without checking whether it
   is BUSY, and leaves its leases behind** (Windows, 2026-09-06). Deliberate as
   far as it goes: Russell's instruction that day was "kill my copy, I don't
