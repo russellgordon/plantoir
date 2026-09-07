@@ -1221,9 +1221,11 @@ to run in the background.
     list, which is the only thing a Windows session reads first. Two places
     described it and neither was an index.
 
-    The test that would have announced it is `wizardAnswerKeys.keys`, which
-    the mac suite runs and Windows does not — see item 29. Medium: a wizard
-    field, the key, and one contract test.
+    The test that would have announced it now EXISTS and is skipped, naming
+    this item: `FileFormatContractTests.TheWizardWritesUseSkeleton` (item 29,
+    done 2026-09-06). Un-skipping it, and deleting `use_skeleton` from the
+    `knowinglyAbsent` set beside it, is this item's acceptance test — so what
+    is left is the wizard field and the key, not the test. Medium.
 
 26. **The marks checklist offers only TOP-LEVEL folders, so a nested one
     cannot be ticked and loses its marks silently (found 2026-09-06).**
@@ -1312,11 +1314,13 @@ to run in the background.
     the mac owes.
 
     **The habits are the transferable part**, and they are in
-    `contracts/README.md`: ask each list BOTH ways, because every gap above was
-    found by walking the code and looking it up in the contract rather than the
-    reverse; assert completeness so a case the other platform adds fails by
-    name; and say in the test which rules cannot be executed, rather than
-    dropping them.
+    `contracts/README.md`: ask each list BOTH ways — three of the gaps above
+    could ONLY be found by walking the code and looking it up in the contract
+    (a credential request, twelve MCP tools, sixteen tool arguments), and the
+    rest came from the ordinary forward walk, so both directions earn their
+    keep and only one was being done; assert completeness so a case the other
+    platform adds fails by name; and say in the test which rules cannot be
+    executed, rather than dropping them.
 
     None is unreachable — `Contracts.cs` is a plain JSON loader — each is
     simply a test never written. **This is the highest-leverage item on the
