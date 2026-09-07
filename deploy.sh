@@ -222,7 +222,7 @@ PREVIEW_CMD="./preview.sh"
 usage() {
   cat <<USAGE
 🧰 Usage:
-  ${SELF_CMD} <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--account <ACCOUNT_ID>] [--diagnose] [--team <TEAM_SLUG>] [--reset-token|--logout] [--image REF]
+  ${SELF_CMD} <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--account <ACCOUNT_ID>] [--diagnose] [--team <TEAM_SLUG>] [--reset-token|--logout] [--image REF] [--non-interactive]
 
 Examples:
   ${SELF_CMD} ICS3U 1
@@ -247,6 +247,10 @@ Notes:
 - --image REF publishes using a particular already-built image; normally the
   image is built locally from this folder's recipe when missing.
 - If your course code ends with '0' (zero), you'll be prompted to correct it to 'O' for Open-level courses.
+- --non-interactive says nobody is at the computer, which is what a scheduled
+  publish is. Anything that would stop and ask — a Netlify or Cloudflare
+  credential, a name for a website that does not exist yet — stops the publish
+  instead, saying which question it could not ask.
 USAGE
 }
 
@@ -303,6 +307,14 @@ DIAGNOSE=""
 TEAM_SLUG=""
 RESET_TOKEN="false"
 TO_FOLDER=""
+# Nobody is at the computer — a scheduled publish, run by launchd at a time
+# the teacher chose and then went to bed for. Every prompt below becomes a
+# refusal that names the question, because both of the alternatives were
+# seen for real (TODO.md, 2026-09-06): with a terminal on standard input the
+# read waits forever and the site is simply not updated in the morning;
+# without one the read returns empty and something is chosen on the
+# teacher's behalf. See the same flag in scripts/deploy.py.
+NON_INTERACTIVE="false"
 TARGET="netlify"
 ACCOUNT_ARG=""
 while [[ $# -gt 0 ]]; do
@@ -330,6 +342,8 @@ while [[ $# -gt 0 ]]; do
       TEAM_SLUG="${1#*=}" ;;
     --reset-token|--logout)
       RESET_TOKEN="true" ;;
+    --non-interactive)
+      NON_INTERACTIVE="true" ;;
     --image)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
       OVERRIDE_IMAGE="$2"; shift ;;
@@ -730,12 +744,31 @@ CF_ACCOUNT=""
 if [[ "$TARGET" == "cloudflare" ]]; then
   CF_TOKEN="$(get_cf_token_keychain)"
   if [[ -n "$CF_TOKEN" ]] && ! validate_cf_token "$CF_TOKEN"; then
+    # Unattended, the saved token is KEPT even though the check failed.
+    # The check is a network call, so "this Mac was offline at 6am" and
+    # "the token was revoked" look identical from here — and throwing away
+    # a working credential that only a person can replace is the more
+    # expensive of the two mistakes by a wide margin. An ordinary publish
+    # clears it as before, with somebody there to paste a new one.
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+      echo "❌ The saved Cloudflare connection could not be checked, so ${COURSE_CODE} Section ${SECTION_NUM}"
+      echo "   was not published. It may have expired, or this computer may have been offline."
+      echo "   It has been left in place, because nobody is here to enter a new one."
+      echo "   Open Plantoir and publish this section once to sort it out."
+      exit 1
+    fi
     echo "⚠️ The saved Cloudflare token no longer works, so it has been cleared."
     delete_cf_token_keychain
     delete_cf_account_keychain
     CF_TOKEN=""
   fi
   if [[ -z "$CF_TOKEN" ]]; then
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+      echo "❌ Cloudflare is not connected on this computer, so ${COURSE_CODE} Section ${SECTION_NUM} was not published."
+      echo "   Connecting asks you to paste a token from Cloudflare, and nobody is here to do that."
+      echo "   Open Plantoir and publish this section once, then it can publish on its own."
+      exit 1
+    fi
     cat <<'MSG'
 
 Connect to Cloudflare.
@@ -785,6 +818,13 @@ MSG
   if [[ -z "$CF_ACCOUNT" ]]; then CF_ACCOUNT="$(discover_cf_account "$CF_TOKEN")"; fi
   if [[ -z "$CF_ACCOUNT" ]]; then CF_ACCOUNT="$(get_cf_account_keychain)"; fi
   if [[ -z "$CF_ACCOUNT" ]]; then
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+      echo "❌ Cloudflare needs your Account ID, and it is not saved on this computer, so"
+      echo "   ${COURSE_CODE} Section ${SECTION_NUM} was not published."
+      echo "   Nobody is here to be asked for it. Add it in this course’s settings, under"
+      echo "   Deploying, then schedule this again."
+      exit 1
+    fi
     CF_ACCOUNT="$(prompt_for_cf_account)" || exit 1
     set_cf_account_keychain "$CF_ACCOUNT"
   fi
@@ -797,6 +837,15 @@ TOKEN=""
 if [[ "$TARGET" == "netlify" ]]; then
 TOKEN="$(get_token_keychain || true)"
 if [[ -n "$TOKEN" ]] && ! validate_token "$TOKEN"; then
+  # Kept rather than cleared when nobody is here — see the same reasoning
+  # on the Cloudflare token above.
+  if [[ "$NON_INTERACTIVE" == "true" ]]; then
+    echo "❌ The saved Netlify connection could not be checked, so ${COURSE_CODE} Section ${SECTION_NUM}"
+    echo "   was not published. It may have expired, or this computer may have been offline."
+    echo "   It has been left in place, because nobody is here to enter a new one."
+    echo "   Open Plantoir and publish this section once to sort it out."
+    exit 1
+  fi
   echo "⚠️ The saved Netlify token no longer works, so it has been cleared."
   delete_token_keychain
   TOKEN=""
@@ -836,6 +885,12 @@ fi
 
 # If still no token, prompt user to create one (quote-safe via here-doc)
 if [[ -z "$TOKEN" ]]; then
+  if [[ "$NON_INTERACTIVE" == "true" ]]; then
+    echo "❌ Netlify is not connected on this computer, so ${COURSE_CODE} Section ${SECTION_NUM} was not published."
+    echo "   Connecting asks you to paste an access token from Netlify, and nobody is here to do that."
+    echo "   Open Plantoir and publish this section once, then it can publish on its own."
+    exit 1
+  fi
   cat <<'MSG'
 
 Connect to Netlify.
@@ -1323,12 +1378,21 @@ fi
 # Ask for a terminal only when there is one: `docker exec -t` refuses to start
 # without a terminal on stdin, which is how this runs from a script or from
 # Plantoir's MCP server. See the same note in preview.sh.
-if [[ -t 0 ]]; then _EXEC_TTY="-it"; else _EXEC_TTY="-i"; fi
+#
+# Unattended, never ask for one even if the host happens to have a console.
+# That removes the branch that hangs: with a terminal on standard input
+# `deploy.py`'s own prompts would WAIT rather than return, and a scheduled
+# publish has nobody to type into it. The Python refuses on its own now, but
+# the two together mean neither half has to be right for the other to hold.
+if [[ "$NON_INTERACTIVE" == "true" ]]; then
+  _EXEC_TTY="-i"
+elif [[ -t 0 ]]; then _EXEC_TTY="-it"; else _EXEC_TTY="-i"; fi
 
 # Pass options via env to avoid fragile mixed quoting in sh -lc
 docker exec $_EXEC_TTY \
   -e HOST_TZ_OFFSET="${HOST_TZ_OFFSET}" \
   -e DIAGNOSE="${DIAGNOSE}" \
+  -e NON_INTERACTIVE="${NON_INTERACTIVE}" \
   -e TEAM_SLUG="${TEAM_SLUG}" \
   -e TARGET="${TARGET}" \
   -e CF_ACCOUNT="${CF_ACCOUNT}" \
@@ -1338,6 +1402,7 @@ docker exec $_EXEC_TTY \
     opts="";
     [ -n "$DIAGNOSE" ]  && opts="$opts $DIAGNOSE";
     [ -n "$TEAM_SLUG" ] && opts="$opts --team $TEAM_SLUG";
+    [ "$NON_INTERACTIVE" = "true" ] && opts="$opts --non-interactive";
     if [ "$TARGET" = "cloudflare" ]; then
       CLOUDFLARE_API_TOKEN="$tok" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \
         python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course '"$COURSE_CODE"' --section '"$SECTION_NUM"' $opts

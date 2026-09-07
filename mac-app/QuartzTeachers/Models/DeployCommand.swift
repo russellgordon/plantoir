@@ -29,13 +29,31 @@ enum DeployCommand {
     ///
     /// Netlify passes no target flag at all: it is `deploy.sh`'s default,
     /// and every course written before Cloudflare existed relies on that.
+    ///
+    /// `unattended` is what a SCHEDULED deploy passes and nothing else
+    /// does. It is the difference between the two kinds of caller, and it
+    /// has to be a choice rather than something the launcher works out for
+    /// itself: pressing Deploy runs the launcher through a pseudo-terminal
+    /// (`PseudoTerminal`), so a question from `deploy.py` comes back to the
+    /// app and becomes a dialog the teacher answers. That is the feature,
+    /// not a fault, and it must keep working. The launchd agent runs
+    /// through the identical machinery with nobody in front of it, and
+    /// there the same question either waits forever or is answered with a
+    /// default nobody chose. So the caller says which it is.
     static func arguments(
         courseCode: String,
         sectionNumber: Int,
         destination: CourseConfiguration.DeployDestination,
-        cloudflareAccountID: String
+        cloudflareAccountID: String,
+        unattended: Bool = false
     ) -> [String] {
         var arguments: [String] = [courseCode, String(sectionNumber)]
+        // Before the destination, so every shape of deploy carries it in
+        // the same place — including a folder deploy, which asks nothing
+        // today but is still being run by nobody.
+        if unattended {
+            arguments.append("--non-interactive")
+        }
         if destination.type == "local_folder" {
             arguments.append("--to-folder")
             arguments.append(destination.path)
@@ -66,7 +84,8 @@ enum DeployCommand {
         courseCode: String,
         sectionNumber: Int,
         configuration: CourseConfiguration,
-        cloudflareAccountID: String
+        cloudflareAccountID: String,
+        unattended: Bool = false
     ) -> [String] {
         return arguments(
             courseCode: courseCode,
@@ -74,7 +93,8 @@ enum DeployCommand {
             destination: CourseConfiguration.DeployDestination(
                 type: configuration.deployTarget, path: configuration.deployFolderPath
             ),
-            cloudflareAccountID: cloudflareAccountID
+            cloudflareAccountID: cloudflareAccountID,
+            unattended: unattended
         )
     }
 

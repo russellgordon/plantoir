@@ -134,6 +134,13 @@ else
   cat /tmp/verify_deploy_course_dir_test.log
 fi
 
+if (cd scripts && python3 test_deploy_non_interactive.py) >/tmp/verify_deploy_non_interactive_test.log 2>&1; then
+  pass "deploy: a publish nobody is there to answer questions for refuses rather than waiting or guessing (scripts/test_deploy_non_interactive.py)"
+else
+  fail "deploy: a publish nobody is there to answer questions for refuses rather than waiting or guessing (scripts/test_deploy_non_interactive.py)"
+  cat /tmp/verify_deploy_non_interactive_test.log
+fi
+
 if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
   pass "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
 else

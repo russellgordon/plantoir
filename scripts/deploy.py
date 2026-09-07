@@ -282,6 +282,12 @@ def get_or_prompt_teacher_last_name() -> str | None:
     ln = load_teacher_last_name()
     if ln:
         return ln
+    if NON_INTERACTIVE:
+        # Backstop only. Both callers refuse before they reach this, where
+        # they can say WHICH section and which web host it was about.
+        refuse_because_nobody_is_here([
+            "❌ Publishing stopped: it needed your surname to name a new website, and nobody is at this computer.",
+        ])
     if not sys.stdin.isatty():
         return None
     try:
@@ -322,7 +328,38 @@ def parse_host_tz() -> dt.tzinfo:
 TZ = parse_host_tz()
 NOW = dt.datetime.now(TZ)
 
+# ---------- Running with nobody at the computer ----------
+# A scheduled publish runs at a time the teacher chose and then went to bed
+# for. Every question below is one a person answers in two seconds and an
+# empty room answers never — so when `--non-interactive` is passed, a
+# question becomes a refusal that NAMES the question, and nothing takes a
+# default it was not given.
+#
+# Why refusing beats defaulting, given both branches were seen for real
+# (TODO.md, 2026-09-06): with a terminal on standard input `input()` waits
+# forever — two runs sat at one prompt for 45 minutes — and the teacher's
+# site is simply not updated in the morning, with nothing to say why.
+# Without one, `isatty()` is false and the DEFAULT is taken silently, so
+# the site is published at an address nobody chose. Refusing is the only
+# answer that neither hangs nor publishes something unasked for.
+NON_INTERACTIVE = False
+
+def refuse_because_nobody_is_here(lines: list[str]):
+    """Stop, saying which question could not be asked."""
+    for line in lines:
+        print(line)
+    sys.exit(1)
+
 def prompt(text: str, default: str | None = None) -> str:
+    if NON_INTERACTIVE:
+        # A backstop, not the usual path: every question that can be
+        # foreseen is refused earlier, where there is enough context to
+        # say what it was about. Reaching here means a NEW question has
+        # been added upstream, and failing loudly is how it gets noticed
+        # rather than silently answered with a default.
+        refuse_because_nobody_is_here([
+            f"❌ Publishing stopped: it needed an answer to “{text}”, and nobody is at this computer.",
+        ])
     if not sys.stdin.isatty():
         return default or ""
     if default is not None and default != "":
@@ -690,6 +727,18 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
         project_name = marker["name"]
         print(f" Using this section's existing Cloudflare project: {project_name}")
     else:
+        # A NEW Cloudflare project is about to be named. Unlike Netlify,
+        # nothing is ASKED here when the surname is already saved — the
+        # address is derived (`suggest_pages_name`) and no question exists
+        # to refuse. The one question on this path is the surname, so that
+        # is the one thing refused.
+        if NON_INTERACTIVE and teacher_last_name is None:
+            refuse_because_nobody_is_here([
+                f"❌ Publishing {course_code} Section {section} needs a new website on Cloudflare, and its",
+                "   address is built from your surname — which is not saved on this computer yet.",
+                "   Nobody is here to be asked for it, so nothing was published.",
+                "   Publish this section from Plantoir once, and after that it can publish on its own.",
+            ])
         # Same rule as the Netlify path: the surname is asked for only when
         # a NEW project is being named, never on a repeat deploy.
         if teacher_last_name is None:
@@ -978,6 +1027,9 @@ def main():
                    help="Where to publish. Defaults to netlify.")
     p.add_argument("--course", required=True, help="Course code, e.g., ICS3U")
     p.add_argument("--section", required=True, help="Section number, e.g., 1")
+    p.add_argument("--non-interactive", action="store_true", dest="non_interactive",
+                   help="Nobody is at the computer. Any question a teacher would have to answer "
+                        "becomes a refusal instead of a prompt or a silent default.")
     p.add_argument("--diagnose", action="store_true",
                    help="Print a breakdown of required files and save list to _required_last_deploy.txt")
     # optional team slug flag (advanced users only)
@@ -985,8 +1037,9 @@ def main():
                    help="Netlify team slug (advanced). If omitted, your personal team is used.")
     args = p.parse_args()
 
-    global _HOST_OS
+    global _HOST_OS, NON_INTERACTIVE
     _HOST_OS = getattr(args, 'host_os', 'unknown')
+    NON_INTERACTIVE = bool(getattr(args, 'non_interactive', False))
 
     # Keep .gitignore hygiene and migrate *profile only* from legacy if present.
     _ensure_courses_gitignore()
@@ -1126,6 +1179,30 @@ def main():
                     raise
 
     if not site_marker:
+        # A NEW Netlify site is about to be named, and naming it is a
+        # QUESTION — `maybe_create_netlify_site_simple` offers a suggested
+        # address and lets the teacher change it. There is no safe way to
+        # answer that for them: the address is what students type, it is
+        # global to all of Netlify, and it cannot be changed afterwards
+        # without every existing link breaking.
+        #
+        # This is reached in two states, and it matters that both stop
+        # here. The first publish of a section is one — already refused at
+        # SCHEDULING time by the app (`ScheduledDeploy.problem`), so an
+        # alarm cannot be set on it. The second cannot be foreseen: the
+        # site existed when the alarm was set and has since been deleted at
+        # Netlify, so the lookup above 404s and falls through to creating a
+        # fresh one. That is exactly the state that hung for 45 minutes on
+        # Windows (TODO.md, 2026-09-06).
+        if NON_INTERACTIVE:
+            refuse_because_nobody_is_here([
+                f"❌ Publishing {args.course} Section {args.section} needs a new website address on Netlify,",
+                "   and choosing one is a question only you can answer.",
+                "   Nobody is at this computer, so nothing was published rather than an address",
+                "   being picked for you.",
+                "   Publish this section from Plantoir once, choose the address there, and after",
+                "   that it can publish on its own.",
+            ])
         # A site is about to be NAMED — the one moment the surname is
         # useful. On a terminal this asks (once, then it is saved); anywhere
         # non-interactive it stays None and the name simply omits it.
