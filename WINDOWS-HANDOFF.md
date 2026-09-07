@@ -1293,8 +1293,18 @@ to run in the background.
     was has to undo six times and know that is what they are doing. Written up
     nowhere before today. Medium.
 
-28. **Four small gaps, each too slight for an item of its own and none of them
-    written down before today (found 2026-09-06).**
+28. ~~**Four small gaps, each too slight for an item of its own and none of them
+    written down before today (found 2026-09-06).**~~ ✅ Done 2026-09-07, all
+    four, as four commits on `issue/28-four-small-gaps` (`GUI-IMPROVEMENTS.md`
+    rows 432–434). (a) the Schedule Deploy dialog names the unpublished
+    classes dated on or before the chosen day, as advice; (b) the main window
+    comes forward for an assistant-driven build only when it was minimised or
+    hidden — a chosen divergence, `MAC-HANDOFF.md` → For awareness; (c)
+    `settings saved` / `settings could not be saved` are emitted from
+    `Save_Click` with the mac's wording; (d) the assistant window remembers its
+    placement per section in `AppSettings.AssistWindowPlacements`, a type
+    apart from `RememberedWindows` so it is never reopened at launch. The
+    original item follows.
 
     - **A scheduled deploy is arranged without the teacher seeing the plan.**
       `ScheduledDeploy.Describe()` already composes it — destination, machine
