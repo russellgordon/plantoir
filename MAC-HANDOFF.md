@@ -51,6 +51,21 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
+**One proposed 2026-09-07: `file-formats.json` → `pageVisibility.writingRules[0]`
+now says a page in the old `draft:` spelling is MIGRATED to `publishForSection<N>`
+and the legacy key removed — the mac keeps the old key inverted, so its suite
+fails on this rule until it moves. That failure is the request arriving, not
+damage.** Branch `issue/frontmatter-draft-key-divergence`; Russell's decision;
+the reasoning and what was rejected are in the rule's own `why`. What the mac
+adopts: `AssistPageVisibility.setting(published:…)` writes the NEW key on the
+old key's line and drops the legacy one (Windows' `PageFrontmatter.SetDraft`
+is the reference, and `FileFormatContractTests.TheOldSpellingIsMigratedToTheNewKey`
+the cases); a page carrying both spellings loses the legacy one; and a
+legacy page whose value is already right is still migrated, once — the rule's
+one deliberate exception to "writing the value it already has changes
+nothing", reasoned in `migrationIsTheOneExceptionToRule4`. `GUI-IMPROVEMENTS.md`
+row 140's migration paragraph was right all along and needs no correction.
+
 **One proposed 2026-09-07: `activityTrail.mustRecord` → `section restored`,
 marked `appliesOn: ["windows"]` — and the mac suite goes RED on it anyway,
 which is the request arriving, not damage.** Branch
@@ -448,8 +463,11 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   a routing change needing the suite re-run, and that is not what this branch
   is for.
 
-- **The two apps write a teacher's visibility flag DIFFERENTLY, and the
-  contract only describes one of them** (found 2026-09-06 by wiring
+- ~~**The two apps write a teacher's visibility flag DIFFERENTLY, and the
+  contract only describes one of them**~~ ✅ Decided 2026-09-07: migration
+  wins, the contract now says so, and the case is at the top of this file
+  waiting on the mac. The two documentation files are corrected to the rule.
+  The original entry follows. (found 2026-09-06 by wiring
   `pageVisibility.writingRules` into the Windows gate, branch
   `issue/29-windows-contract-case-lists`). **What is owed is a decision, and it
   is not this branch's to take** — both behaviours are deliberate and were
