@@ -1359,9 +1359,15 @@ to run in the background.
     labels, the placeholder and every row's `what` and `why` — the text the
     PRODUCT writes — and running it against a course with NO curriculum
     folder, which is the branch neither platform's fixture had ever exercised.
-    Both changes are worth copying: drop `entry.Name` from the sweep, add
-    `Title`, `Intro`, `OpenedBy`, `DismissedBy`, `NoCurriculumFolderYet` and
-    `NoneChosen` to it, and give the fixture no curriculum folder.
+    Both changes are worth copying, and there is a trap in the obvious
+    version of the first: drop only the COURSE-named `entry.Name`s from the
+    sweep and KEEP the four the contract marks `namedFrom: "fixed"` — Media,
+    index.md, Key Links.md, Curriculum Coverage — because those are the
+    product's own words and the reason for excluding a name does not reach
+    them. (The mac's first draft dropped all of them and a review caught it.)
+    Then add `Title`, `Intro`, `OpenedBy`, `DismissedBy`,
+    `NoCurriculumFolderYet` and `NoneChosen` to the swept text, and give the
+    fixture no curriculum folder.
 
 ## Windows no longer runs any of this in a container
 

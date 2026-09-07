@@ -74,11 +74,17 @@ struct SpecialFoldersHelpView: View {
         // 2026-08-23, and even now it is null for a course made without a
         // ready-made payload or a skeleton — so a course older than that has
         // no such key at all and is found by name alone. Measured on this Mac
-        // on 2026-09-06: 12 of 15 real courses have no key, 1 has it null, and
-        // 11 of the 15 were being shown the "Your curriculum folder"
-        // placeholder while a perfectly good folder sat in the vault. Two of
-        // them call it "College Board Curriculum", which no placeholder would
-        // ever have named.
+        // on 2026-09-06, across 15 course folders — most of them scratch
+        // working folders from test sessions, so read it as a shape rather
+        // than as a teacher population: 12 have no key, 1 has it null, 2 have
+        // it set and correct. **11 of the 15 were being shown the "Your
+        // curriculum folder" placeholder while a real folder sat in the
+        // vault.** Of those 11, 8 are now named exactly the folder the build
+        // uses, 1 names a folder the build finds no expectation pages in (so
+        // no map is built either way, and the teacher is at least told which
+        // folder to fill), and 2 are named the alphabetically first of TWO
+        // curriculum folders where the build uses the other — see the last
+        // paragraph, which is not hypothetical.
         //
         // The other half is sharper: a folder renamed in Finder or Obsidian
         // leaves the key naming something that is no longer there, and a name
@@ -91,12 +97,23 @@ struct SpecialFoldersHelpView: View {
         // asks in the same ORDER as `_find_curriculum_folder` in
         // `build_site.py` — the recorded name first, then the folder whose
         // name mentions the curriculum — among the shared folders the course
-        // has recorded. It is narrower in two ways neither app can help: the
-        // build scans the merged tree on disk, per-section folders included,
-        // and it also wants an expectation page inside the folder, which no
-        // configuration shows. So the build can pass over the folder named
-        // here in favour of another. Naming it is still righter than naming
-        // one that is not there.
+        // has recorded. It is narrower in two ways neither app can see from
+        // configuration: the build scans the merged tree on disk, per-section
+        // folders included, and it also wants an expectation page inside the
+        // folder.
+        //
+        // **So the build can pass over the folder named here in favour of
+        // another, and on this Mac it does — for two courses that keep both
+        // an "Ontario Curriculum" and a "College Board Curriculum" folder.**
+        // The tie-break is alphabetical (pinned by `specialNames`
+        // → `curriculumFolderResolution`), the College Board pages are named
+        // "1.A" rather than in expectation-code form, and so the build builds
+        // the map from Ontario Curriculum while this row says College Board.
+        // Both apps agree, which is why it is not fixed here on a whim:
+        // teaching the apps to break the tie the way the build does means
+        // reading the vault, and that is a shared decision, written up in
+        // `TODO.md`. Naming a real folder of the teacher's is still righter
+        // than telling them to create one they already have.
         let curriculumName: String
         if let resolved = CurriculumFolderRule.resolvedCurriculumFolder(for: course),
            !resolved.isEmpty {

@@ -104,8 +104,7 @@ measured against Quartz and `Uri.EscapeDataString` turned out to be wrong, so
 three of the eleven cases fail on Windows today — one change fixes all three. That is the mechanism working
 rather than damage; what to do about it is in `WINDOWS-HANDOFF.md`.
 
-The `specialFoldersHelp` pair below went the same way on the same day, so
-nothing in this section is waiting on the mac as of 2026-09-06.
+The `specialFoldersHelp` pair below went the same way on the same day.
 
 The two cases proposed for v1.1.0 were cleared on 2026-08-20 — one implemented,
 three retired — and the reasoning for each is in the ledger below under "The
@@ -129,7 +128,10 @@ suite reads it as a request:
 
 Remove the line when the mac implements it, and mark the matching entry below
 `✅ DONE` — the ledger keeps the history, this section keeps only what is
-outstanding.
+outstanding. (Striking the line through in place with a pointer to the ledger
+entry does the same job and is what the last two mac sessions did; either is
+fine. What is not fine is leaving a finished item looking pending, which is
+the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ~~- `contracts/shared-rules.json` → `specialFoldersHelp` → `cases` →
   **"the curriculum folder is named even when the course never recorded one"**
@@ -2567,9 +2569,12 @@ where.
      reason did not, so the mac measured its own.** On this Mac, 2026-09-06,
      across 15 real courses outside the repository: 12 have no
      `curriculum_folder` key at all, 1 has it null, 2 have it set and correct
-     — and **11 of the 15 were being shown the placeholder while a perfectly
-     good folder sat in the vault**, two of them calling it "College Board
-     Curriculum", which no placeholder would ever have named.
+     — and **11 of the 15 were being shown the placeholder while a real
+     folder sat in the vault.** Most of the 15 are scratch working folders
+     from test sessions, so read the shape rather than the population. Of the
+     11: 8 are now named exactly what the build uses, 1 names a folder holding
+     no expectation pages (no map either way, and the teacher is at least told
+     which folder to fill), and 2 hit the limit below.
   2. **The placeholder's second sentence is retired.** "One page per
      expectation, in a folder whose name mentions the curriculum" published
      the matching rule in plain words. The row now carries ONE explanation
@@ -2604,14 +2609,29 @@ where.
     weakly: when the recorded folder holds no expectation page the build does
     not SKIP the row, it falls through to the same scan and may pick a
     DIFFERENT folder — so the sheet can name a folder the build passes over,
-    not merely one it ignores. Both files now say so.
+    not merely one it ignores. **And it is not hypothetical:** two courses on
+    this Mac keep both an "Ontario Curriculum" and a "College Board
+    Curriculum" folder, the College Board pages are named "1.A" rather than in
+    expectation-code form, so the shared rule's alphabetical tie-break names
+    College Board while the map is built from Ontario. The tie-break itself
+    was already a contract case (`specialNames.curriculumFolderResolution`,
+    third case, with those exact two names), so nothing drifted — but that
+    section's NOTE claimed the apps "never protect a different folder than the
+    build would pick", which is now known to be false and is corrected.
+    **Breaking the tie the way the build does means reading the vault, which
+    is a product decision for both platforms and is written up in `TODO.md`
+    rather than guessed at overnight.**
 
   **One test-scope decision, made on purpose.** The mac's jargon sweep reads
   the title, the intro, the button labels, the placeholder and every row's
   `what` and `why` — the text the PRODUCT writes — and NOT the course's own
   folder names, because `saysNoMachinery.rule` excludes them: a computer
   studies course with a folder called "Scripts" is the teacher's word, not a
-  wording bug. Windows' equivalent still folds `entry.Name` into its sweep;
+  wording bug. The four `namedFrom: "fixed"` names — Media, index.md,
+  Key Links.md, Curriculum Coverage — ARE swept, because those are the
+  product's words and the reason for excluding names does not reach them; the
+  first draft dropped them by accident and a review caught it. Windows'
+  equivalent still folds every `entry.Name` into its sweep;
   latent only, since its fixture has no such folder, and it is item 32 in
   `WINDOWS-HANDOFF.md`. It runs against a course with NO curriculum folder,
   so the branch that carried the retired sentence — the one that had never
