@@ -32,13 +32,40 @@ public sealed partial class WorkspacePickerView : UserControl
 
         if (offerInitialize && workspace.WorkspacePath is { } path)
         {
-            ChosenCrumbs.ItemsSource = FolderCrumb.ForPath(path);
+            // Wrapped as the main window wraps its own, so the icons arrive
+            // after the names are already showing.
+            var crumbs = FolderCrumb.ForPath(path).ConvertAll(c => new PathBarCrumb(c));
+            ChosenCrumbs.ItemsSource = crumbs;
+            _ = LoadCrumbIconsAsync(crumbs);
         }
 
         ProblemText.Text = workspace.WorkspaceProblem ?? "";
         ProblemText.Visibility = workspace.WorkspaceProblem is null ? Visibility.Collapsed : Visibility.Visible;
         // WorkspaceState.Unrecognized deliberately shows the choosing state
         // with no message: the guidance above already says what to pick.
+    }
+
+    private static async System.Threading.Tasks.Task LoadCrumbIconsAsync(System.Collections.Generic.List<PathBarCrumb> crumbs)
+    {
+        foreach (var crumb in crumbs) crumb.Icon = await FolderIcons.ForPathAsync(crumb.Path);
+    }
+
+    /// <summary>A plain click does nothing here either — the main bar's rule (item 6). Walking up the tree would be the picker's obvious reading, and is recommended rather than shipped.</summary>
+    private void ChosenCrumbs_ItemClicked(BreadcrumbBar sender, BreadcrumbBarItemClickedEventArgs args) { }
+
+    private void CrumbShowInExplorer_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: PathBarCrumb crumb }) FolderActions.ShowInFileExplorer(crumb.Path);
+    }
+
+    private void CrumbOpenFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: PathBarCrumb crumb }) FolderActions.OpenFolder(crumb.Path);
+    }
+
+    private void Crumb_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: PathBarCrumb crumb }) FolderActions.OpenFolder(crumb.Path);
     }
 
     private void Choose_Click(object sender, RoutedEventArgs e) =>

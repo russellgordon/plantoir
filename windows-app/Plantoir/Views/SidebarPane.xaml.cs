@@ -982,7 +982,7 @@ public sealed partial class SidebarPane : UserControl
         && !Workspace.ArchivedItems.Any(a => a.CourseCode == courseCode && a.SectionNumber is null && a.FilePath != zipPath)
         && !Workspace.BackupItems.Any(b => b.CourseCode == courseCode && b.FilePath != zipPath);
 
-    private async void ConfirmDeleteBackup(BackupItem item)
+    public async void ConfirmDeleteBackup(BackupItem item)
     {
         string consequence = IsOnlyRemainingCopy(item.CourseCode, item.FilePath)
             ? $"This backup is the only remaining copy of {item.CourseCode} — the course is no longer " +

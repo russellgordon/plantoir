@@ -87,6 +87,7 @@ public sealed partial class MainWindow : Window
                 // window on the same section, would otherwise sit invisible
                 // here until something else happened to reload the tree.
                 if (Workspace.State == WorkspaceState.Ready) Sidebar.Refresh();
+                RefreshRenameCourseItem();
             }
         };
         // Covers app launch itself, in case the window's first Activated
@@ -107,7 +108,7 @@ public sealed partial class MainWindow : Window
                 or nameof(WorkspaceViewModel.WorkspacePath)
                 or nameof(WorkspaceViewModel.WorkspaceProblem)) ApplyState();
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)
-                or nameof(WorkspaceViewModel.Courses)) ShowDetailForSelection();
+                or nameof(WorkspaceViewModel.Courses)) { ShowDetailForSelection(); RefreshRenameCourseItem(); }
             // The selection is part of the window's memory (row 99).
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)) App.RememberOpenWindows();
         };
@@ -484,6 +485,7 @@ public sealed partial class MainWindow : Window
         }
         RefreshPathBar();
         RestoreFromArchiveItem.IsEnabled = Workspace.SelectedArchivedItem is not null;
+        RefreshRenameCourseItem();
         App.RememberOpenWindows();
     }
 
@@ -571,14 +573,19 @@ public sealed partial class MainWindow : Window
                 when Workspace.ArchivedItems.FirstOrDefault(a => a.Id == id) is { } item:
                 DetailHost.Content = EmptyState(item.Title,
                     $"{item.Subtitle}. It is not part of your courses until you restore it.",
-                    "Restore…", () => Sidebar.ConfirmRestore(item));
+                    "Restore…", () => Sidebar.ConfirmRestore(item),
+                    // The SAME confirmation the sidebar's menu asks: a
+                    // destructive action reached from a different place must
+                    // not ask a different question.
+                    "Delete Archive…", () => Sidebar.ConfirmDeleteArchive(item));
                 break;
             case SidebarSelection.BackupEntry(var backupId)
                 when Workspace.BackupItems.FirstOrDefault(b => b.Id == backupId) is { } backup:
                 DetailHost.Content = EmptyState(backup.Title,
                     $"{backup.Subtitle}. Restoring puts {backup.CourseCode} back to exactly this " +
                     "moment — the current version is archived first, and the backup is kept.",
-                    "Restore…", () => Sidebar.ConfirmRestoreBackup(backup));
+                    "Restore…", () => Sidebar.ConfirmRestoreBackup(backup),
+                    "Delete Backup…", () => Sidebar.ConfirmDeleteBackup(backup));
                 break;
             case null when Workspace.Courses.Count == 0:
                 DetailHost.Content = EmptyState("No Courses Yet",
@@ -597,7 +604,15 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private static UIElement EmptyState(string title, string description, string? actionLabel, Action? action)
+    /// <summary>
+    /// A centred title, a sentence, and up to two buttons — the second only
+    /// ever beside a first: the accented one is the thing this pane is for,
+    /// the plain one beside it the other thing a teacher might have come here
+    /// to do (the mac's own archived and
+    /// backup panes, `Restore…` prominent and `Delete …` plain).
+    /// </summary>
+    private static UIElement EmptyState(string title, string description, string? actionLabel, Action? action,
+                                        string? secondLabel = null, Action? secondAction = null)
     {
         var panel = new StackPanel
         {
@@ -630,7 +645,26 @@ public sealed partial class MainWindow : Window
                 Margin = new Thickness(0, 8, 0, 0),
             };
             button.Click += (_, _) => action();
-            panel.Children.Add(button);
+            if (secondLabel is not null && secondAction is not null)
+            {
+                var row = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 8,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 8, 0, 0),
+                };
+                button.Margin = new Thickness(0);
+                var second = new Button { Content = secondLabel };
+                second.Click += (_, _) => secondAction();
+                row.Children.Add(button);
+                row.Children.Add(second);
+                panel.Children.Add(row);
+            }
+            else
+            {
+                panel.Children.Add(button);
+            }
         }
         return panel;
     }
@@ -872,6 +906,69 @@ public sealed partial class MainWindow : Window
     {
         Workspace.Reload();
         ApplyState();
+    }
+
+    // ---- Rename Course, from the File menu and F2 -------------------------
+
+    /// <summary>
+    /// The course a rename would apply to: the selected course, or the
+    /// parent of the selected section — a teacher who has clicked into a
+    /// section has not stopped meaning the course (the mac's
+    /// <c>courseThatCanBeRenamed</c>).
+    /// </summary>
+    private Course? CourseThatCanBeRenamed => Workspace.SelectedCourse;
+
+    /// <summary>
+    /// Read at the moment of asking, never captured earlier (the staleness
+    /// lesson, row 104): a preview that started since the menu was drawn
+    /// still counts.
+    /// </summary>
+    private string? WhyRenameIsUnavailable(Course course) =>
+        Workspace.WorkspacePath is { } folder ? CourseActivity.BusyReason(folder, course.Code) : null;
+
+    /// <summary>
+    /// The File menu has no Opening event to hang this on, so the item is
+    /// redrawn when the selection changes and whenever the window's state is
+    /// re-applied; the accelerator re-checks live regardless.
+    /// </summary>
+    private void RefreshRenameCourseItem()
+    {
+        var course = CourseThatCanBeRenamed;
+        string? reason = course is null ? null : WhyRenameIsUnavailable(course);
+        RenameCourseItem.IsEnabled = course is not null && reason is null;
+        RenameCourseItem.Text = course is null ? "Rename Course…" : $"Rename {course.Code}…";
+        RenameCourseReason.Text = reason ?? "";
+        RenameCourseReason.Visibility = reason is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void RenameCourse_Click(object sender, RoutedEventArgs e) => RenameSelectedCourse();
+
+    /// <summary>
+    /// No busy guard here on purpose: the dialog re-checks and EXPLAINS ("…is
+    /// previewing or deploying right now. Stop that first, then rename."),
+    /// and the menu item can be stale — the MenuBar has no Opening event and
+    /// nothing redraws it when a preview starts — so a silent return here
+    /// would be a dead click with no answer, where the sidebar's route gives
+    /// one.
+    /// </summary>
+    private void RenameSelectedCourse()
+    {
+        if (CourseThatCanBeRenamed is not { } course) return;
+        _ = Sidebar.OpenRenameCourseDialog(course);
+    }
+
+    /// <summary>
+    /// F2 renames the selected course — unless the teacher is typing. A
+    /// root-scoped accelerator fires wherever focus is, so it asks what has
+    /// focus first: any text-entry control keeps its F2, and the key is left
+    /// unhandled so nothing else swallows it either.
+    /// </summary>
+    private void RenameCourseAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        var focused = FocusManager.GetFocusedElement(Content.XamlRoot);
+        if (focused is TextBox or RichEditBox or PasswordBox or AutoSuggestBox or NumberBox) return;
+        RenameSelectedCourse();
+        args.Handled = true;
     }
 
     private void RestoreFromArchive_Click(object sender, RoutedEventArgs e)
