@@ -104,6 +104,10 @@ enum SiteHealthRepair {
         // preview is not offered and "Could not put the front page back."
         // still appears — but it brings its own reason, and that reason
         // replaces the generic one below.
+        //
+        // Sorted before it is joined so that two of them, should a second
+        // blocked cause ever be added, land in one order rather than in
+        // whatever order a dictionary happened to enumerate.
         var reasonsItCouldNotGoAhead: [String] = []
         var somethingSimplyFailed: Bool = false
         for (name, result) in results {
@@ -126,18 +130,6 @@ enum SiteHealthRepair {
         failed.sort()
         reasonsItCouldNotGoAhead.sort()
 
-        // The generic explanation is added only when something failed for a
-        // reason nobody has a better sentence for. When BOTH happen at once —
-        // a file where Media belongs and a folder where the front page belongs
-        // — both are said, and in that order: the specific one first, because
-        // "you can make it yourself in Obsidian" is true of the Media folder
-        // and is exactly what cannot be done about the front page until the
-        // folder in the way has been moved.
-        if somethingSimplyFailed || reasonsItCouldNotGoAhead.isEmpty {
-            reasonsItCouldNotGoAhead.append(couldNotExplanation)
-        }
-        let whyNot: String = reasonsItCouldNotGoAhead.joined(separator: " ")
-
         // Nothing to do: every one of them was already there. Pressing Fix
         // twice must not read as a permissions problem.
         if restored.isEmpty && failed.isEmpty {
@@ -147,6 +139,29 @@ enum SiteHealthRepair {
                 canRebuild: false
             )
         }
+
+        // Why it could not go ahead, in the order a teacher reads it.
+        //
+        // The generic explanation is added only when something failed for a
+        // reason nobody has a better sentence for — and it goes FIRST, with
+        // the specific refusals after it. Both orders were read aloud. Putting
+        // the refusal first ends the paragraph on "You can make it yourself in
+        // Obsidian", immediately after "…and Plantoir can put the front page
+        // back", so "it" lands on the front page — the one thing that cannot
+        // be made until the folder in the way has been moved. This order ends
+        // instead on the step the teacher can actually take.
+        //
+        // Reachable only when a file sits where Media belongs AND a folder
+        // sits where the front page belongs, in one course, at one moment.
+        // Rare, and it still has to read properly.
+        var whyNotInOrder: [String] = []
+        if somethingSimplyFailed || reasonsItCouldNotGoAhead.isEmpty {
+            whyNotInOrder.append(couldNotExplanation)
+        }
+        for reason in reasonsItCouldNotGoAhead {
+            whyNotInOrder.append(reason)
+        }
+        let whyNot: String = whyNotInOrder.joined(separator: " ")
 
         if restored.isEmpty {
             return Outcome(

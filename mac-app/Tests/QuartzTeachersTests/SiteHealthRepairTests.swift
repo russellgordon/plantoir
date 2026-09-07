@@ -305,6 +305,11 @@ final class SiteHealthRepairTests: XCTestCase {
     /// nothing. Moving the folder aside was rejected because it relocates a
     /// folder that may hold the teacher's own pages, without asking, and
     /// neither app can see what is inside it.
+    ///
+    /// This one would pass against the OLD code too — it never moved anything
+    /// either. It is here to guard the option that was REJECTED, not the bug
+    /// that was fixed, so do not count it as cover for the `isDirectory:`
+    /// check: the three tests either side of it are what fail on a revert.
     func testTheFolderInTheWayAndEverythingInItIsLeftExactlyAsItWas() throws {
         let (root, course) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -393,6 +398,84 @@ final class SiteHealthRepairTests: XCTestCase {
                       outcome?.detail ?? "")
         XCTAssertTrue(outcome?.detail.contains("There is a folder called index.md") ?? false,
                       outcome?.detail ?? "")
+        XCTAssertEqual(outcome?.canRebuild, false)
+    }
+
+    /// The refusal leaves a line on the trail (rule 5).
+    ///
+    /// Without it the trail shows the problem being FOUND and then nothing at
+    /// all, which reads exactly like a teacher who never pressed the button —
+    /// and the folder in the way is something they will very likely have moved
+    /// by the time they report it, so it cannot be looked for afterwards.
+    func testTheRefusalIsRecordedOnTheTrail() throws {
+        let (root, course) = try makeCourse()
+        let trailFolder: URL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("refusal-trail-\(UUID().uuidString)")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: trailFolder)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: trailFolder)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+        try "# a lesson they wrote".write(
+            to: index.appendingPathComponent("Unit 1, Day 1.md"),
+            atomically: true, encoding: .utf8
+        )
+
+        _ = SiteHealthRepair.outcome(
+            ofRepairing: [finding("sectionIndexMissing", fixable: true)], in: course
+        )
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("ICS3U/1 · found a folder called index.md "
+                                     + "where the front page belongs, and left it alone"),
+                      trail)
+        XCTAssertFalse(trail.contains("put the front page back"),
+                       "nothing was put back, and a line saying so would be believed")
+        XCTAssertFalse(trail.contains("a lesson they wrote"),
+                       "never what is written on a page")
+    }
+
+    /// Both kinds of failure at once, which is where the two explanations have
+    /// to be ordered rather than merely both present: a FILE where the Media
+    /// folder belongs (nothing better to say than the generic sentence) and a
+    /// FOLDER where the front page belongs (which has its own).
+    ///
+    /// The generic one comes first. The other way round the paragraph ends on
+    /// "You can make it yourself in Obsidian" directly after "…and Plantoir
+    /// can put the front page back", so "it" lands on the front page — the one
+    /// thing that cannot be made until the folder in the way has been moved.
+    func testWhenBothKindsOfFailureHappenTheGenericExplanationComesFirst() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try "not a folder".write(
+            to: course.directoryURL.appendingPathComponent("Media"),
+            atomically: true, encoding: .utf8
+        )
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+
+        let outcome = SiteHealthRepair.outcome(
+            ofRepairing: [
+                finding("mediaFolderMissing", fixable: true),
+                finding("sectionIndexMissing", fixable: true),
+            ],
+            in: course
+        )
+        XCTAssertEqual(outcome?.headline, "Plantoir could not put that back.")
+        XCTAssertEqual(
+            outcome?.detail,
+            SiteHealthRepair.couldNotExplanation + " "
+            + SiteHealthRepair.folderWhereTheFrontPageBelongs(course: "ICS3U", section: 1),
+            "the generic explanation first, the one that names the folder last"
+        )
         XCTAssertEqual(outcome?.canRebuild, false)
     }
 
