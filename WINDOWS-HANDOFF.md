@@ -481,7 +481,7 @@ this side is expected to say so when the contract is wrong.
    index, and re-check badge contrast on a highlighted row) apply whether you
    end up hand-building or wiring the real control's template.
 
-10. ~~Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check~~ — ✅ Done, merged to `dev` 2026-09-06 (`GradedFolderRule.cs`, `SiteHealthFinding.cs`; GUI-IMPROVEMENTS rows 411-414). **PARSING AND THE TRAIL ONLY.** The bullet below says Windows "displays the contract-authored sentence and detail" — it does not. `ScriptRunner.HealthFindings` is the seam a front end would attach to, and that front end is item 21, which is not built. (Item 21 refers to "the correction in item 10"; this is it.)
+10. ~~Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check~~ — ✅ Done, merged to `dev` 2026-09-06 (`GradedFolderRule.cs`, `SiteHealthFinding.cs`; GUI-IMPROVEMENTS rows 411-414). **PARSING AND THE TRAIL ONLY — on the day this item landed.** The bullet below says Windows "displays the contract-authored sentence and detail"; when this was written it did not, and `ScriptRunner.HealthFindings` was a seam with nothing attached to it. **Corrected 2026-09-06: that front end is item 21, and item 21 LANDED the same day** — `windows-app/Plantoir/Views/FolderProblemsDialog.cs`, `GUI-IMPROVEMENTS.md` row 420 — so the bullet below is true today and this caveat is history rather than open work. (Item 21 refers to "the correction in item 10"; this is it, and item 21 is what answered it.)
     - **`setup_course.py:graded_folders_for` reconciliation** — When a new
       course is created, `graded_folders_for` now checks the declared pool
       against the actual folder lists (`shared_folders` +
@@ -627,7 +627,7 @@ this side is expected to say so when the contract is wrong.
     until you read `pageNaming`'s new `term` field with a default.** Full
     write-up in "What a course calls a unit" below.
 
-16. ~~What a course calls its class folder~~ — ✅ Done 2026-09-06 (`ClassFolderRule.Name/Names` with the recorded key, the wizard writing it, and `ItemProtectionRule` protecting it). **NOT yet done: the rename that MATERIALISES the key** — that belongs to item 13's sheet, which is still owed. Original text: `class_folder` in
+16. ~~What a course calls its class folder~~ — ✅ Done 2026-09-06 (`ClassFolderRule.Name/Names` with the recorded key, the wizard writing it, and `ItemProtectionRule` protecting it). **The rename that MATERIALISES the key is NOT part of this item and is not owed by it** — it belongs to item 13's sheet and is tracked there, as open work, with the rest of the rename. Nothing under this heading is outstanding; read item 13 for what is. (Corrected 2026-09-06: this rider used to read "NOT yet done", which put a live-sounding obligation inside a struck item, where anybody skimming the list for open work would never see it.) Original text: `class_folder` in
     `course_config.json`, recorded rather than guessed, materialised by a
     rename along with `curriculum_folder`. Replaces the class-folder refusal
     item 13 described, which no longer exists. **Eight new contract cases will
@@ -1469,6 +1469,167 @@ to run in the background.
     Then add `Title`, `Intro`, `OpenedBy`, `DismissedBy`,
     `NoCurriculumFolderYet` and `NoneChosen` to the swept text, and give the
     fixture no curriculum folder.
+
+33. ~~**A folder named `index.md` is now REFUSED with a sentence of its own, and
+    the trail records the refusal.**~~ ✅ Done 2026-09-07 (branch
+    `issue/33-repair-refused-folder-in-the-way`, `GUI-IMPROVEMENTS.md` row 428).
+    `Result.Refused` is the fourth answer, `FolderWhereTheFrontPageBelongs`
+    is the sentence (pinned to the contract by
+    `TheRefusalSentenceIsTheContractsWordForWord`), and `RestoreIndex` writes
+    `folder problem not repaired` from the directory branch only. The two
+    contract sentences that still say Windows owes this are the mac's to
+    regenerate — `MAC-HANDOFF.md`, top of "Open". The original item follows.
+
+    You already found this bug on the mac and
+    were right about it (`MAC-HANDOFF.md`, 2026-09-06): `restoreIndex` asked
+    `fileExists(atPath:)` with no `isDirectory:` out-parameter, so a directory
+    called `index.md` came back `.alreadyFine` and the teacher was told the
+    problem was already put right about a section that still had no front page.
+    Fixed on the mac 2026-09-07. **You inherit nothing free here — there are two
+    things you owe, and one of them changes a decision you have already made.**
+
+    First, the SENTENCE. You return `Failed`, which is the honest one of the two
+    answers that existed, and your test
+    `ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine`
+    (`SiteHealthRepairTests.cs:180`) pins it. The mac has gone one further:
+    `contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`
+    now carries `expect: "refused"` and the sentence a teacher reads, so your
+    `Result` needs a FOURTH answer beside `Restored`/`AlreadyFine`/`Failed`, and
+    that test needs updating. The sentence is in the contract; do not retype it.
+
+    Second, the TRAIL. `activityTrail.mustRecord` gained `folder problem not
+    repaired`, and `SharedRules_ActivityTrailEvents_Exist` (`ContractTests.cs`)
+    pins that list by EQUALITY — so **your suite is red until you add the
+    event**, and that is the mechanism working, not damage. Write it from the
+    directory-refusal branch only, not from every failed repair: the plain
+    failure path deliberately records nothing yet, and the event is named for
+    the OUTCOME rather than for its one cause so that gap can be closed later
+    without a rename on either side.
+
+    The section below explains both, including what was REJECTED — moving the
+    folder aside and writing a proper front page in its place — and why.
+
+34. ~~**The mac's repair now answers one result per FINDING, and the rule is
+    contract data you can run.**~~ ✅ Done 2026-09-07 (same branch as 33).
+    `ARepairReportsOneResultPerFindingNeverOnePerCheckName` deserialises the
+    two `reportedOncePerFinding` cases in place of the hand-written test, and
+    the stale `<remarks>` on `Repair` is reworded. The original item follows.
+
+    This is your OTHER finding of 2026-09-06, and
+    you were right about it too: `repair(_:in:)` came back as a dictionary keyed
+    by the check's NAME, so two sections each missing a front page — two
+    findings, one name — collapsed to whichever ran last. Both were repaired;
+    only one was reported. "Section 1 restored, section 2 was already there"
+    read as "That is already put right. Nothing needed changing." with no
+    preview offered, for a repair that really had put a page back. Fixed on the
+    mac 2026-09-07 (branch `issue/repair-results-keyed-by-name`,
+    `GUI-IMPROVEMENTS.md` row 427).
+
+    **You inherit the code for free and owe one small piece of wiring.** Your
+    `Repair` returns `IReadOnlyList<(SiteHealthFinding, Result)>`
+    (`SiteHealthRepair.cs:251`) — arrived at in `014ee031`, your second commit
+    on that file, having ported the mac's dictionary in `3ddd4af4` a few hours
+    earlier and thought better of it the same day — and your
+    `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer` already pins the
+    behaviour — the mac has simply caught up to a shape you shipped first, which
+    is worth saying out loud because this list is usually the other direction.
+    What is new is that the rule is now DATA:
+    `contracts/shared-rules.json` → `siteHealth.repair.reportedOncePerFinding`
+    carries two cases, a `howToRunACase` note saying exactly how to build each
+    one, and the vocabulary `expectResults` draws on. Deserialise those two
+    cases in `Plantoir.Tests` in place of the hand-written test, so the rule is
+    checked against one source on both sides rather than proved twice in
+    parallel. **Your suite is not red without it** — nothing pins this list by
+    equality — so this is a should, not a must.
+
+    Two things in that entry to read rather than skim. `reachability` records
+    that the collapse was unreachable from either app's front end (a section
+    window owns one runner; the checks announce per section), so nobody later
+    reads it as damage a teacher met. And `knownLimit` records what was
+    deliberately NOT fixed: one check name with two DIFFERENT outcomes — section
+    1 restored, section 2 failed — still reads "Put the front page back."
+    followed by "Could not put the front page back.", because the sentence has
+    no way to say which section is which. Both platforms read that way, it is as
+    unreachable as the collapse was, and new wording nobody has weighed is
+    harder to take back than a paragraph of explanation. On the mac the REFUSAL
+    case escapes it, because its own sentence names the section folder; on your
+    side it will too, the day item 33 lands.
+
+    One stale comment left for you rather than edited from here: the `<remarks>`
+    on `SiteHealthRepair.cs:241-250` call the per-finding list "a deliberate
+    divergence from the mac, whose dictionary is keyed by name". It is no longer
+    a divergence. Reword it when you next touch the file.
+
+35. **The wizard's Create button and the new-site dialog have never been
+    driven through the real interface (audited onto this list 2026-09-06; the
+    gap itself is older).** Both are the first things a teacher meets, and
+    neither has ever been clicked in a running app by anybody checking that it
+    works. `windows-app/PROGRESS.md` records both, and until today that was the
+    only place either was written down: the wizard's Create button was proven
+    "underneath" — the `setup.ps1` plus answer-pump path ran to completion
+    through `PtyDriver`, which is not the same as the button reaching it — and
+    the verified deploy was a repeat publish to a site that already existed, so
+    the new-site dialog a BRAND-NEW section's deploy raises has never been
+    seen. **What Windows owes: two `[UiFact]` cases in `Plantoir.UiTests`**,
+    which is the project that exists for exactly this (`--state-dir` moves the
+    whole state folder, so nothing of the teacher's is touched) — today it
+    holds only `SpecialFoldersHelpUiTests`. The new-site half needs
+    credentials, so it may have to stay a hand-driven check with a written
+    procedure instead; say which it became. **Not for tonight**, and not a
+    defect report: it is an untested path, listed so it is a choice.
+
+36. **`verify-deploy.ps1` is wired into nothing, and that is a standing
+    exposure rather than a task (audited onto this list 2026-09-06).** It is
+    the ONLY automated check of the PowerShell half of publishing — it
+    publishes to every destination and every pairing against real sites and
+    fetches each one back, 36 passed / 0 failed on 2026-09-06 — and no gate
+    runs it. `verify.sh` and `verify-deploy.sh` are bash and do not run here,
+    so if this one is not run by hand, the publishing path on Windows has no
+    coverage at all beyond unit tests of its parts. It needs three credentials
+    and the network, which is WHY it is opt-in, and that reasoning is sound;
+    what was missing is anybody being told. Evidence:
+    `windows-app/PROGRESS.md` (the "the deploy gate exists now" bullet below
+    its parity table) and [`documentation/12-windows-app.md`](documentation/12-windows-app.md).
+    **Windows owes nothing here except a decision** — run it on a schedule, run
+    it as a release-cut step, or leave it hand-run and say so in `RELEASING.md`.
+    **Not for tonight.**
+
+37. **The Course Settings tip sentence is pinned by no contract on either
+    platform, and the two apps word the same rule differently (audited onto
+    this list 2026-09-06).** A sentence a teacher READS belongs in `contracts/`
+    by CLAUDE.md rule 2, and this one is in neither app's contract:
+    `grep -rn "added to your site automatically" contracts/` returns nothing.
+    So Windows wrote its own, in
+    `windows-app/Plantoir/Views/CourseSettingsView.xaml.cs`:
+
+    > "Tip: you can also simply create new folders in Obsidian — they're added
+    > to your site automatically the next time you preview. The exception is
+    > anything you remove here: it stays off your site, even if you make it
+    > again in Obsidian, until you add it back on this page."
+
+    while the mac says the same thing differently, in
+    `mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift`
+    (the change is `GUI-IMPROVEMENTS.md` row 375, which records that the
+    callout was amended but does not carry the sentence):
+
+    > "Tip: you can also simply create new folders in Obsidian — they’re added
+    > to your site automatically the next time you preview (unless you have
+    > removed them here)."
+
+    Both are quoted here so whoever decides can read them side by side. The mac
+    says the exception in six words inside a bracket; Windows spends a second
+    sentence on it and tells the teacher what to DO about it. They also differ
+    in a detail that will matter when one becomes a contract case: the mac's
+    apostrophe in "they’re" is the curly one, Windows' is straight.
+    **It is not ownerless, but nobody has picked it up.**
+    `MAC-HANDOFF.md`'s "Open — what the mac still owes" already says choosing
+    WHICH sentence becomes the contract is the mac's call, and says why no case
+    was proposed: proposing one would redden the mac suite over wording the mac
+    already ships. That has been sitting there unactioned, which is the actual
+    state and is why it is now indexed here too. **What Windows owes: taking
+    the mac's wording verbatim once the mac picks it**, and nothing before
+    that. **Not for tonight** — it is a decision about what a teacher reads,
+    not a defect.
 
 ## Windows no longer runs any of this in a container
 
@@ -5653,3 +5814,149 @@ not what triggers it.
   them — the segment reads as `<Tasks` — and neither app has ever matched them.
   Pre-existing on both sides and out of this piece's scope; noted here so it is
   not mistaken for a regression.
+
+
+## A folder named `index.md`, and why both apps refuse rather than clear the way (2026-09-07)
+
+The bug is yours — you found it porting `SiteHealthRepair` line by line, and
+`MAC-HANDOFF.md`'s entry of 2026-09-06 is what this fixes. What follows is the
+part that does not travel in a diff: what the mac chose, what it rejected, and
+why the two are not interchangeable.
+
+### The bug, stated once
+
+`FileManager.fileExists(atPath:)` — and `File.Exists`, and every other bare
+existence test — is answering a question about a NAME, not about a file. On the
+mac it returns `true` for a directory. So this:
+
+```swift
+if FileManager.default.fileExists(atPath: index.path) { return .alreadyFine }
+```
+
+reported `.alreadyFine` for a section whose `index.md` was a FOLDER, and
+`outcome(ofRepairing:)` sorts `.alreadyFine` into neither "restored" nor
+"failed", so the dialog said **"That is already put right. Nothing needed
+changing."** The section still had no front page: `build_site.py` produces no
+root `index.html`, so there is no site to publish and the deploy refuses. The
+one dialog written to end silence was the thing telling them it was dealt with.
+
+`restoreMedia`, the function DIRECTLY above it, has used the `isDirectory:`
+form since it was written, with a comment saying why. And the two were written
+in the same sitting — `git log -S` puts both in commit `04dfd0cd`, 2026-08-23 —
+so this is not a case of an old habit and a new one. The careful form and the
+bare one were typed one function apart, on the same afternoon, by somebody who
+had just explained in a comment why the careful one was needed. That is the
+useful lesson in it: knowing the rule does not make the next call site obey it,
+and a grep for `fileExists` / `File.Exists` with no `isDirectory:` is worth more
+than remembering.
+
+### What it does now, and the decision behind it
+
+**Refuse, explain, and touch nothing.** Russell decided this before the work
+started, and the alternative was live: move the folder aside and write a proper
+front page in its place, so the teacher's next publish just works.
+
+**That was rejected because the folder may hold their pages.** Neither app can
+see inside it — this is a teacher's Obsidian vault, and a folder called
+`index.md` is most often a sync conflict or a mis-drag, but it can perfectly
+well be a folder somebody made on purpose with a term's work in it. A repair
+that relocates a teacher's writing to make a warning go away is a worse outcome
+than the warning, and it is the kind of thing that gets discovered in May.
+Refusing costs one step by hand, in Finder or Explorer, and nothing else.
+
+It also fits the rule the whole health feature is built on
+(`siteHealth.checksTheFeatureNotTheFolder`): a fix must restore the FEATURE.
+Moving a folder out of the way and writing an empty page satisfies the check
+while possibly hiding the teacher's own pages, which is the same failure mode
+as recreating an empty curriculum folder, one step further along.
+
+### The sentence, and why it names the course
+
+`contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`
+carries it. On the mac it is `SiteHealthRepair.folderWhereTheFrontPageBelongs(course:section:)`.
+
+It names the course as well as the section folder, and that was a review
+finding rather than a first draft: the outcome dialog shows a headline and one
+sentence and NOTHING else — not the course, not the section — so "in your
+section1 folder" sends a teacher with two courses to a folder that exists twice.
+This is the first teacher-facing sentence on either platform to name a
+`section<N>` folder. It is safe to do: that is the on-disk name, it is what
+Obsidian's file tree shows, and both apps already offer "Reveal in Finder" on
+exactly that folder.
+
+**And the generic explanation is REPLACED, not appended to.** That is
+`SiteHealthRepair.couldNotExplanation` on the mac — the one that sends a teacher
+to check whether a folder is locked or read-only. It is the right thing to say
+about a read-only volume and the wrong thing to say here: permissions are not
+what is wrong, and a teacher gets one prompt to act on. When BOTH kinds of failure happen at once — a file where
+`Media` belongs and a folder where the front page belongs — both sentences are
+said, generic first and specific last. Both orders were read aloud. The other
+way round ends the paragraph on the generic explanation's opening clause —
+"You can make it yourself in Obsidian" —
+immediately after "…and Plantoir can put the front page back", so "it" lands on
+the front page — the one thing that cannot be made until the folder in the way
+has moved. There is a test on the order
+(`testWhenBothKindsOfFailureHappenTheGenericExplanationComesFirst`), because a
+comment claiming a paragraph reads well is worth nothing.
+
+### The shape of the answer, which is what you have to copy
+
+`Result` gained a fourth case:
+
+```swift
+case blockedByAFolderWhereTheFrontPageBelongs(section: Int)
+```
+
+Two things about it are deliberate.
+
+It carries the **section number, not the sentence**. `Result` says how a repair
+went — a fact — and `outcome(ofRepairing:in:occasion:)` chooses every word in
+that file. Putting the prose in the Result would have split the wording across
+two places, and the first adversarial review of the plan caught exactly that.
+
+It is counted as a **failure**: the check's name goes into the failed list, so
+"Could not put the front page back." still appears beside anything that did
+come back, and `canRebuild` stays false, so the "Preview Again" button is not
+offered. There is nothing to look at.
+
+### The trail line
+
+`ActivityTrail.Event.folderProblemNotRepaired` = `"folder problem not
+repaired"`, written from the refusal branch with the course and section:
+
+```
+ICS3U/1 · found a folder called index.md where the front page belongs, and left it alone
+```
+
+Without it the trail shows the problem being FOUND and then nothing at all,
+which reads exactly like a teacher who never pressed the button — and the
+folder in the way is something they will very likely have moved or deleted by
+the time they report anything, so it cannot be looked for afterwards.
+
+**Named for the OUTCOME, not for its one cause, and this is the part worth
+copying rather than re-deciding.** Only the directory refusal writes it today.
+A repair that simply FAILED — a read-only volume, a permissions problem — still
+records nothing, which is a real gap and is left open on purpose: closing it is
+a different piece of work, and it belongs to whoever also decides what
+`restoreMedia` should say when a FILE is sitting where the `Media` folder
+belongs (the same class of problem, still answering `.failed` with the generic
+sentence). Naming the event `folder problem repair blocked` would have forced a
+rename on both platforms and in the contract the day that gap closes. So: wire
+it to the directory branch, not to every failure, and leave the name alone.
+
+### What is still not right in this file, on both platforms
+
+Named here so it is not rediscovered as a puzzle, and NOT fixed by this piece:
+
+- `restoreMedia` answers plain `.failed` when a FILE sits where the `Media`
+  folder belongs. Same class of problem, same wrong explanation, no sentence of
+  its own. The machinery to give it one is now in place — a second `Result`
+  case and a second contract sentence — and nobody has decided the wording.
+- `SectionAdder` has the identical bare `fileExists` guard on `index.md` when a
+  section is added, so a folder by that name is skipped silently there too.
+- ~~`repair(_:in:)` returns `[String: Result]` keyed by check NAME, so two
+  findings with the same name collapse — your second finding of 2026-09-06,
+  owned by its own piece of work.~~ — ✅ Done 2026-09-07, branch
+  `issue/repair-results-keyed-by-name`. It returns `[Attempt]` now, one entry
+  per finding, and the rule is contract data both suites can run
+  (`siteHealth.repair.reportedOncePerFinding`). See item 34 above.
