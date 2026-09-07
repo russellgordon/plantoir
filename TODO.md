@@ -4,6 +4,56 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **Start the Windows app with its output redirected and every launcher fails,
+  silently and unrecognisably** (Windows, 2026-09-07, met while writing the
+  wizard's UI test - the research below is done, so picking this up is cheap).
+
+  **What happens.** `ConPtyProcess.Start` already says why, in its own CAUTION:
+  the launcher binds to the pseudo console only when the process that started
+  Plantoir has clean std handles - console handles, or none, as a GUI app
+  started from a shortcut has. A parent whose stdio is pipes leaks those into
+  the launcher. The app then captures nothing, and what it sends the launcher
+  never arrives. `dotnet test` gives "failed (exit code 1) after 1s" with an
+  empty transcript; a `> out.txt` redirect instead hangs on the first prompt.
+  Both read as a broken toolchain.
+
+  **Measured** (Lenovo 20QES70500, Intel Core i5-8365U, 16 GB, 2026-09-07),
+  three launches of one build: clean console handles -> course made,
+  `setup.ps1` succeeded after 21 s; ShellExecute -> the same, 21 s; output
+  redirected to a file -> nothing captured, hung, no course. **An ordinary
+  terminal is FINE** - the first version of this entry said otherwise, on a
+  mechanism that turned out to be wrong, and the experiment is what settled it.
+  `Plantoir.UiTests` is the case that meets it, and is fixed at its end:
+  `DrivenApp` launches with `UseShellExecute = true`.
+
+  **What is NOT decided.** Whether `ConPtyProcess.Start` should defend itself
+  by zeroing the creating process's std handles across the `CreateProcessW`
+  call - `SetStdHandle(STD_*_HANDLE, IntPtr.Zero)`, restored afterwards.
+  `GetStdHandle` and `SetStdHandle` are **already declared in `ConPty.cs` and
+  never called**, which suggests somebody started down this road once. **It
+  needs a NEW static gate**, not the existing `_ptyGate`: that is an INSTANCE
+  field guarding `ClosePty`, `Start` is static, and std handles are
+  process-wide - so two concurrent spawns would race, and the first draft of
+  this entry said to use `_ptyGate` and would have shipped exactly that. For: the failure is silent and points at the
+  wrong thing. Against: it is a fix for a case no teacher meets, and mutating
+  process-wide std handles around a spawn has its own hazards. Rejected
+  outright: `FreeConsole()` at startup, which was the first idea here - it
+  detaches a console without clearing the std handle VALUES, so on this
+  mechanism it would not fix anything.
+
+  A zero-risk middle path worth more than either, if this is picked up: log one
+  line to `startup.log` when the app starts with redirected stdio. The real
+  complaint is that nothing says what happened.
+
+  Two neighbours checked while here, both unaffected today: `plantoir-mcp.exe`
+  uses plain redirected pipes rather than ConPTY
+  (`Plantoir.Mcp/LauncherRunner.cs`), and the screenshot harness's
+  `Start-Process -NoNewWindow` (`website/shots/capture_windows.py`) only stages
+  runners and never shells out - though it is one feature away from meeting
+  this. Documented meanwhile in
+  [`documentation/12-windows-app.md`](documentation/12-windows-app.md),
+  "Never start the app with its output redirected".
+
 - **The mac suite crashes intermittently inside AppKit, and it reads as a
   failing test rather than as a crash** (mac, 2026-09-06, measured while
   working on something else — NOT caused by that work, see below).

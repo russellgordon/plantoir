@@ -232,6 +232,18 @@ public sealed class NewCourseDialog : ContentDialog
         _shortRow = FormBuilders.LabeledRow("Short label beside emoji (≤ 12 characters)", _shortBox);
         _shortRow.Visibility = Visibility.Collapsed;
 
+        // Named for the UI suite, which is the only thing that reads these:
+        // NewCourseWizardUiTests drives Create through a real window, and
+        // before this the only controls the wizard named were its toggles.
+        // Nothing a teacher sees changes — an automation id is not a label,
+        // and every one of these controls already has its own.
+        AutomationProperties.SetAutomationId(this, "newCourseDialog");
+        AutomationProperties.SetAutomationId(_codeBox, "newCourseCodeBox");
+        AutomationProperties.SetAutomationId(_nameBox, "newCourseNameBox");
+        AutomationProperties.SetAutomationId(_sectionsBox, "newCourseSectionsBox");
+        AutomationProperties.SetAutomationId(_codeWarning, "newCourseCodeWarning");
+        AutomationProperties.SetAutomationId(_validationText, "newCourseValidation");
+
         // Pin the whole dialog to a fixed width so the form and the progress
         // view share the same size and the "Step x of y" label can't be
         // clipped off the right edge (issue 3). ContentDialog width is driven
