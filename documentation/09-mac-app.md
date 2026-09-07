@@ -81,11 +81,15 @@ button, opening a sheet that names the folders THIS course has which the build
 treats specially, and says what breaks if one is renamed. It is shared
 behaviour rather than a mac feature, so it is documented once for both apps in
 [Course Setup](04-course-setup.md#which-of-a-courses-folders-the-build-treats-specially)
-and pinned by `contracts/shared-rules.json` → `specialFoldersHelp`. **The mac
-owes that contract two changes**, both named in
-[`MAC-HANDOFF.md`](../MAC-HANDOFF.md): naming the RESOLVED curriculum folder
-rather than the raw key, and retiring a second placeholder sentence that
-publishes the matching rule in words.
+and pinned by `contracts/shared-rules.json` → `specialFoldersHelp`, which
+`SpecialFoldersHelpTests` deserialises rather than retyping. The view writes no
+sentence the contract does not carry: its title, intro, button labels and
+placeholder are named constants on `SpecialFoldersHelpView` for exactly that
+reason. The two changes the mac owed that contract — naming the RESOLVED
+curriculum folder rather than the raw key, and retiring a second placeholder
+sentence that published the matching rule in words — landed 2026-09-06; the
+reasoning, including two things the handoff had wrong, is in the ledger in
+[`MAC-HANDOFF.md`](../MAC-HANDOFF.md).
 
 ## Renaming a course folder
 

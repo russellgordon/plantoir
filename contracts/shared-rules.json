@@ -1164,11 +1164,11 @@
       {
         "key": "curriculum",
         "namedFrom": "course",
-        "source": "the curriculum folder the build resolves BY NAME for this course - the same first-the-recorded-name-then-the-scan order the build uses. Only the name half: the build also wants an expectation page inside the folder, which neither app can see from configuration, so the sheet can name a folder the build would go on to skip. Naming it is still righter than naming one that is not there.",
+        "source": "the curriculum folder the build resolves BY NAME for this course - the same first-the-recorded-name-then-the-scan order the build uses. Only the name half, and only among the SHARED folders: the build also wants an expectation page inside the folder, which neither app can see from configuration, so the sheet can name a folder the build would go on to skip. The build's own scan walks the merged tree, so it would also find a per-section folder whose name mentions the curriculum, where both apps look at shared_folders alone - unreachable in practice, because every manifest declares this folder as shared, and named here rather than left to be rediscovered. Naming it is still righter than naming one that is not there.",
         "placeholderWhenNone": "Your curriculum folder",
         "what": "Your curriculum expectations",
         "why": "One page per expectation. The curriculum map is built from these — without them there is nothing to measure your lessons against, and the map is left out.",
-        "whyPlaceholder": "The NAME is the only thing that changes: \"Your curriculum folder\" is the single piece of text in the sheet allowed to describe rather than name, and only for a course that has no such folder at all. The explanation beside it does not change - a course with no expectations needs to hear the same thing about what they are for. The mac has a SECOND sentence here today (\"One page per expectation, in a folder whose name mentions the curriculum\") and it is deliberately NOT adopted: it publishes the matching rule in plain words, which is what saysNoMachinery exists to stop. Retiring it is one of the two things MAC-HANDOFF.md asks of the mac."
+        "whyPlaceholder": "The NAME is the only thing that changes: \"Your curriculum folder\" is the single piece of text in the sheet allowed to describe rather than name, and only for a course that has no such folder at all. The explanation beside it does not change - a course with no expectations needs to hear the same thing about what they are for. The mac used to add a SECOND sentence here (\"One page per expectation, in a folder whose name mentions the curriculum\"), which this contract deliberately never carried: it publishes the matching rule in plain words, which is what saysNoMachinery exists to stop. Retired on the mac 2026-09-06, so both apps now say exactly what is above. It survived unnoticed for a fortnight because \"mentions\" is not a banned word and every fixture course had a curriculum folder, so the branch never ran in a test - which is why the case list below now includes a course that has none."
       },
       {
         "key": "graded",
@@ -1347,7 +1347,7 @@
         "expectNames": {
           "curriculum": "Ontario Curriculum"
         },
-        "why": "PROPOSED FROM WINDOWS, 2026-09-06 - see MAC-HANDOFF.md. The build finds this course's curriculum folder perfectly well without the key being set, so the sheet must name it. Showing the placeholder here would tell a teacher to go and create a folder they already have, which is the one failure a sheet about folder names cannot afford."
+        "why": "PROPOSED FROM WINDOWS, 2026-09-06; adopted by the mac the same day - see the ledger in MAC-HANDOFF.md. The build finds this course's curriculum folder perfectly well without the key being set, so the sheet must name it. Showing the placeholder here would tell a teacher to go and create a folder they already have, which is the one failure a sheet about folder names cannot afford."
       },
       {
         "name": "a recorded name the course no longer has is not shown",
@@ -1368,7 +1368,7 @@
         "mustNotAppear": [
           "Expectations"
         ],
-        "why": "PROPOSED FROM WINDOWS, 2026-09-06 - the second half of the case above and the sharper one. The course renamed its folder and the recorded name went stale; the build resolves past it to the folder that is really there. A sheet reading the raw name shows \"Expectations\", which the teacher does not have and cannot find - worse than the placeholder, because it looks like an answer."
+        "why": "PROPOSED FROM WINDOWS, 2026-09-06, adopted by the mac the same day - the second half of the case above and the sharper one. The course renamed its folder and the recorded name went stale; the build resolves past it to the folder that is really there. A sheet reading the raw name shows \"Expectations\", which the teacher does not have and cannot find - worse than the placeholder, because it looks like an answer."
       },
       {
         "name": "more than one class folder is listed, not just the first",
