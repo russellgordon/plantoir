@@ -84,6 +84,24 @@ public sealed partial class AssistWindow : Window
         Root.Loaded += OnceLoaded;
     }
 
+    /// <summary>
+    /// The main window a build or deploy should run in. The one this window
+    /// was opened from, while it is still open; otherwise another window on
+    /// the same working folder; otherwise a NEW one, opened here so that a
+    /// teacher who closed the main window and kept revising still sees the
+    /// build they approved (mac row 300's case). The fresh window is used by
+    /// IDENTITY — the object just returned — never looked up by the folder
+    /// it will end up showing, which is the trap row 300 records. Must be
+    /// called on the UI thread, which every caller here is.
+    /// </summary>
+    private MainWindow? MainWindowForBuilds()
+    {
+        if (_main is { IsClosed: false }) return _main;
+        if (App.WindowFor(_folder) is { } other) return other;
+        try { return App.OpenWindow(_folder, null); }
+        catch (Exception ex) { App.LogDiagnostic($"AssistWindow could not open a main window: {ex}"); return null; }
+    }
+
     private void OnceLoaded(object sender, RoutedEventArgs e)
     {
         Root.Loaded -= OnceLoaded;
@@ -343,8 +361,8 @@ public sealed partial class AssistWindow : Window
             OnToolProgress = NoteToolProgress,
             // Building and deploying automate the main window's own flows —
             // once, on screen — rather than running again behind the chat.
-            ShowPreviewInApp = () => _main?.ShowPreviewFor(_course.Code, _section),
-            StartDeployInApp = () => _main?.DeployFor(_course.Code, _section),
+            ShowPreviewInApp = () => MainWindowForBuilds()?.ShowPreviewFor(_course.Code, _section),
+            StartDeployInApp = () => MainWindowForBuilds()?.DeployFor(_course.Code, _section),
             StartDeployInAppAsync = async () =>
             {
                 if (_main is null) return null;

@@ -406,9 +406,12 @@ public sealed class AssistAgent
     /// server's own container run, invisible, while the chat showed dots —
     /// and finished with the result sitting on disk where nobody could see
     /// it. The main window already knows how to build a section with its
-    /// console on screen and the preview in front of the teacher. So
-    /// rebuild_preview and deploy_section never reach the server from here:
-    /// they press Plantoir's own buttons. The server keeps those tools for
+    /// console on screen and the preview in view — and, on Windows, it comes
+    /// forward only when it was minimised or hidden, because the teacher may
+    /// still be typing in the assistant's own window (a chosen divergence
+    /// from the mac; see MainWindow.ComeForwardIfHidden). So rebuild_preview
+    /// and deploy_section never reach the server from here: they press
+    /// Plantoir's own buttons. The server keeps those tools for
     /// the clients that have no window — Claude Code, and deploys scheduled
     /// for half six in the morning.
     /// </summary>
