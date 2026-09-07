@@ -91,6 +91,14 @@ sentence that published the matching rule in words — landed 2026-09-06; the
 reasoning, including two things the handoff had wrong, is in the ledger in
 [`MAC-HANDOFF.md`](../MAC-HANDOFF.md).
 
+The row check runs every case the contract lists rather than one fixture of its
+own, and that is deliberate: two of those cases leave the course with no
+curriculum folder, so the sheet's placeholder wording is pinned to the contract
+as tightly as the ordinary wording is. A single fixture that happened to have a
+curriculum folder is what let the retired sentence sit unguarded, and the
+banned-word sweep could not stand in for it — a banned word catches only that
+word.
+
 ## Renaming a course folder
 
 Folder rows in Course Settings carry a pencil. It renames the folder **on

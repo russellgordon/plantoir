@@ -1342,8 +1342,14 @@ to run in the background.
     one. Eight of the eleven pass on Windows today. See "Spelling a folder's
     new name inside a link".
 
-32. **Your folders-help jargon sweep reads the teacher's own folder names, and
-    the contract says not to.** Small, latent, and named here only so it is not
+32. **Both of your folders-help tests assert less than they look like they
+    do: the jargon sweep reads names the contract excludes, and the row check
+    builds one course, so it cannot catch the retired placeholder sentence
+    coming back.** Two halves, in one test file. The second is a hole in a
+    gate rather than a tidy-up, and is written out below the first.
+
+    **The first half — the jargon sweep reads the teacher's own folder names,
+    and the contract says not to.** Latent, and named here so it is not
     rediscovered as a puzzle.
     `SpecialFoldersHelpContractTests.TheSheetNamesNoMachineryAndPublishesNoMatchingRule`
     appends `entry.Name` to the text it scans for banned words. But
@@ -1359,7 +1365,7 @@ to run in the background.
     labels, the placeholder and every row's `what` and `why` — the text the
     PRODUCT writes — and running it against a course with NO curriculum
     folder, which is the branch neither platform's fixture had ever exercised.
-    Both changes are worth copying, and there is a trap in the obvious
+    Both of those changes are worth copying, and there is a trap in the obvious
     version of the first: drop only the COURSE-named `entry.Name`s from the
     sweep and KEEP the four the contract marks `namedFrom: "fixed"` — Media,
     index.md, Key Links.md, Curriculum Coverage — because those are the
@@ -1368,6 +1374,43 @@ to run in the background.
     Then add `Title`, `Intro`, `OpenedBy`, `DismissedBy`,
     `NoCurriculumFolderYet` and `NoneChosen` to the swept text, and give the
     fixture no curriculum folder.
+
+    **Added 2026-09-06, and it is the larger half: your
+    `TheRowsAreTheContractsRowsInTheContractsOrder` cannot catch the retired
+    sentence coming back, because it builds ONE course and that course has a
+    curriculum folder** (`SpecialFoldersHelpContractTests.cs:96-98`, shared
+    folders `["Tasks","Ontario Curriculum"]`). It is the only test on either
+    platform that compares a row's `Why` with the contract's, so the
+    PLACEHOLDER branch's copy of that sentence is pinned by nothing. The mac
+    had the identical hole and it is not theoretical: **putting the old
+    sentence back — "One page per expectation, in a folder whose name mentions
+    the curriculum" — left all five mac tests green, measured on this Mac on
+    2026-09-06 by doing exactly that.** The jargon sweep runs that branch and
+    still cannot see it, because "mentions" is not a banned word.
+
+    **Do not fix it by adding "mentions" to `saysNoMachinery.jargon`.**
+    Rejected on the mac: banning a word catches only that word, and "in a
+    folder named after the curriculum" would sail straight through. It also
+    makes a shared contract change that sweeps every other row's text, for a
+    weaker guarantee than pinning the sentence itself.
+
+    The fix the mac made, which ports line for line: stop hand-typing the
+    fixture and loop `specialFoldersHelp.cases`, building each course through
+    the same `CourseFrom(figure)` the naming test already uses, asserting the
+    count, `What`, `Why` and the `namedFrom: "fixed"` names per case with the
+    case's own name in the message. Two of those cases record no curriculum
+    folder at all, so both branches get compared and no new fixture is invented
+    to drift. (Three cases record no `curriculum_folder`; the third of them
+    has a folder the scan finds, which is the case whose whole point is that
+    recording none and having none are different things.) Two traps met on
+    the way: the count guard must `continue` rather than `return`, or one bad
+    case silences every case after it; and assert at
+    the END that both branches were actually reached (the mac keeps
+    `sawResolvedFolder` and `sawPlaceholder` flags), because a case list that
+    drifted until every course had a curriculum folder would leave the test
+    green while covering exactly what it covered before. **Measured after the
+    fix: the same reversion now fails 2 assertions naming both placeholder
+    cases, where it failed 0 before.**
 
 ## Windows no longer runs any of this in a container
 
