@@ -1516,8 +1516,15 @@ to run in the background.
     one. Eight of the eleven pass on Windows today. See "Spelling a folder's
     new name inside a link".
 
-32. **Your folders-help jargon sweep reads the teacher's own folder names, and
-    the contract says not to.** Small, latent, and named here only so it is not
+32. ~~**Your folders-help jargon sweep reads the teacher's own folder names, and
+    the contract says not to.**~~ ✅ Done 2026-09-07 (branch
+    `issue/32-folders-help-jargon-sweep`). The sweep now scans what the
+    PRODUCT writes — title, intro, both buttons, both placeholders, every
+    row's what and why, and a row's name only where the contract marks it
+    `namedFrom: "fixed"` (the four kept, asserted as four) — against a course
+    with a marks folder called "Scripts" and no curriculum folder, so the
+    exclusion and the never-rendered branch are both exercised. No assertion
+    weakened; nothing a teacher sees changed. The original item follows. Small, latent, and named here only so it is not
     rediscovered as a puzzle.
     `SpecialFoldersHelpContractTests.TheSheetNamesNoMachineryAndPublishesNoMatchingRule`
     appends `entry.Name` to the text it scans for banned words. But

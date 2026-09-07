@@ -154,13 +154,43 @@ public class SpecialFoldersHelpContractTests
     [Fact]
     public void TheSheetNamesNoMachineryAndPublishesNoMatchingRule()
     {
+        // A computer studies course with a folder called "Scripts", and NO
+        // curriculum folder — the branch neither platform's fixture had ever
+        // exercised, so "Your curriculum folder" and "None chosen" are
+        // actually rendered here rather than merely declared.
         var config = CourseConfiguration.FromBytes(Encoding.UTF8.GetBytes(
-            """{"course_code":"ICS3U","per_section_folders":["All Classes"],"shared_folders":["Concepts","Tasks","Ontario Curriculum"]}"""));
+            """{"course_code":"ICS3U","per_section_folders":["All Classes"],"shared_folders":["Concepts","Scripts","Tasks"],"graded_folders":["Scripts","Tasks"]}"""));
+        var entries = SpecialFoldersHelp.Entries(config);
+        var rows = Contract()["rows"]!.AsArray();
+        Assert.Equal(rows.Count, entries.Count);
 
-        var shown = new StringBuilder(SpecialFoldersHelp.Title).Append(' ').Append(SpecialFoldersHelp.Intro);
-        foreach (var entry in SpecialFoldersHelp.Entries(config))
-            shown.Append(' ').Append(entry.Name).Append(' ').Append(entry.What).Append(' ').Append(entry.Why);
+        // What the PRODUCT writes: the title, the intro, both buttons, the two
+        // placeholders, every row's what and why — and a row's NAME only when
+        // the contract marks it `namedFrom: "fixed"` (Media, index.md, Key
+        // Links.md, Curriculum Coverage), because those four are the product's
+        // own words. A course-named row shows the teacher's own word back to
+        // them as they typed it, and "Scripts" is not a wording bug.
+        var shown = new StringBuilder()
+            .Append(SpecialFoldersHelp.Title).Append(' ')
+            .Append(SpecialFoldersHelp.Intro).Append(' ')
+            .Append(SpecialFoldersHelp.OpenedBy).Append(' ')
+            .Append(SpecialFoldersHelp.DismissedBy).Append(' ')
+            .Append(SpecialFoldersHelp.NoCurriculumFolderYet).Append(' ')
+            .Append(SpecialFoldersHelp.NoneChosen);
+        int fixedNames = 0;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            if (rows[i]!["namedFrom"]!.ToString() == "fixed") { shown.Append(' ').Append(entries[i].Name); fixedNames++; }
+            shown.Append(' ').Append(entries[i].What).Append(' ').Append(entries[i].Why);
+        }
+        Assert.Equal(4, fixedNames);
         string text = shown.ToString().ToLowerInvariant();
+
+        // The exclusion is exercised, not merely written: the teacher's
+        // "Scripts" counts for marks, so it is on the sheet by name, and it
+        // would fail the sweep if names were in.
+        Assert.Contains(entries, entry => entry.Name.Contains("Scripts"));
+        Assert.Contains(entries, entry => entry.Name == SpecialFoldersHelp.NoCurriculumFolderYet);
 
         foreach (JsonNode? word in Contract()["saysNoMachinery"]!["jargon"]!.AsArray())
             Assert.False(text.Contains(word!.ToString().ToLowerInvariant()),
