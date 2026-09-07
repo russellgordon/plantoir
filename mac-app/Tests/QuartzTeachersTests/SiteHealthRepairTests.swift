@@ -7,14 +7,14 @@ final class SiteHealthRepairTests: XCTestCase {
 
     // MARK: - Functions
 
-    private func makeCourse() throws -> (URL, Course) {
+    private func makeCourse(sections: [Int] = [1]) throws -> (URL, Course) {
         let root: URL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("health-repair-\(UUID().uuidString)")
         let courseURL: URL = root.appendingPathComponent("courses/ICS3U")
         try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
         let configuration: [String: Any] = [
             "course_code": "ICS3U", "course_name": "Introduction to Computer Science",
-            "section_numbers": [1], "num_sections": 1,
+            "section_numbers": sections, "num_sections": sections.count,
             "shared_folders": [], "per_section_folders": ["All Classes"],
             "shared_files": [], "per_section_files": [],
         ]
@@ -60,7 +60,8 @@ final class SiteHealthRepairTests: XCTestCase {
         let repaired = SiteHealthRepair.repair(
             [finding("mediaFolderMissing", fixable: true)], in: course
         )
-        XCTAssertEqual(repaired["mediaFolderMissing"], .restored)
+        XCTAssertEqual(repaired.count, 1)
+        XCTAssertEqual(repaired.first?.result, .restored)
         XCTAssertTrue(FileManager.default.fileExists(atPath: media.path))
     }
 
@@ -74,6 +75,140 @@ final class SiteHealthRepairTests: XCTestCase {
             .appendingPathComponent("index.md")
         let written: String = try String(contentsOf: index, encoding: .utf8)
         XCTAssertTrue(written.contains("title: Introduction to Computer Science"), written)
+    }
+
+    /// Two findings of the same KIND keep separate answers.
+    ///
+    /// The shape claim, made directly against `repair` rather than through the
+    /// report: the result used to be a dictionary keyed by the check's name,
+    /// and two sections each missing a front page share one name. Both were
+    /// repaired; only the last was reported. What the teacher then read is
+    /// pinned by `testTheContractsSameNameCasesAreReportedSeparately` below.
+    ///
+    /// Unreachable from the app — a section window owns one runner, and the
+    /// checks announce per section — which is why the collapse survived so
+    /// long, and why this is written as a latent defect rather than as one a
+    /// teacher met.
+    func testTwoFindingsWithOneNameDoNotCollapseIntoOneResult() throws {
+        let (root, course) = try makeCourse(sections: [1, 2])
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let theirs: URL = course.sectionDirectoryURL(forSection: 2)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(
+            at: theirs.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try "---\ntitle: My own front page\n---\nWelcome!\n"
+            .write(to: theirs, atomically: true, encoding: .utf8)
+
+        let attempts: [SiteHealthRepair.Attempt] = SiteHealthRepair.repair(
+            [finding("sectionIndexMissing", fixable: true, section: 1),
+             finding("sectionIndexMissing", fixable: true, section: 2)],
+            in: course
+        )
+
+        XCTAssertEqual(attempts.count, 2, "one entry per finding, not one per check name")
+        XCTAssertEqual(attempts.first?.finding.section, 1)
+        XCTAssertEqual(attempts.first?.result, .restored)
+        XCTAssertEqual(attempts.last?.finding.section, 2)
+        XCTAssertEqual(attempts.last?.result, .alreadyFine)
+        XCTAssertTrue(
+            try String(contentsOf: theirs, encoding: .utf8).contains("Welcome!"),
+            "the teacher's own page must survive"
+        )
+    }
+
+    /// And what the teacher is TOLD, from the contract rather than retyped.
+    ///
+    /// `siteHealth.repair.reportedOncePerFinding` carries both halves of the
+    /// rule as cases both apps can run: a result that must not collapse, and a
+    /// sentence that must name each thing once however many findings produced
+    /// it.
+    func testTheContractsSameNameCasesAreReportedSeparately() throws {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let siteHealth: [String: Any] = try XCTUnwrap(all["siteHealth"] as? [String: Any])
+        let repair: [String: Any] = try XCTUnwrap(siteHealth["repair"] as? [String: Any])
+        let rule: [String: Any] = try XCTUnwrap(
+            repair["reportedOncePerFinding"] as? [String: Any]
+        )
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty, "the contract carries no case to run")
+
+        for testCase in cases {
+            let check: String = try XCTUnwrap(testCase["check"] as? String)
+            let sections: [[String: Any]] = try XCTUnwrap(testCase["sections"] as? [[String: Any]])
+            var sectionNumbers: [Int] = []
+            for section in sections {
+                sectionNumbers.append(try XCTUnwrap(section["number"] as? Int))
+            }
+
+            let (root, course) = try makeCourse(sections: sectionNumbers)
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            var findings: [SiteHealthFinding] = []
+            for section in sections {
+                let number: Int = try XCTUnwrap(section["number"] as? Int)
+                findings.append(finding(check, fixable: true, section: number))
+                guard section["frontPage"] as? String == "theTeachersOwn" else {
+                    continue
+                }
+                let theirs: URL = course.sectionDirectoryURL(forSection: number)
+                    .appendingPathComponent("index.md")
+                try FileManager.default.createDirectory(
+                    at: theirs.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                try "---\ntitle: My own front page\n---\nWelcome!\n"
+                    .write(to: theirs, atomically: true, encoding: .utf8)
+            }
+
+            // The report is asked for FIRST, because it repairs as it goes:
+            // asking `repair` and then `outcome` would run every repair twice,
+            // and anything the first pass RESTORED answers `alreadyFine` to
+            // the second.
+            let outcome = try XCTUnwrap(
+                SiteHealthRepair.outcome(ofRepairing: findings, in: course)
+            )
+            XCTAssertEqual(outcome.headline, testCase["expectHeadline"] as? String)
+            XCTAssertEqual(outcome.canRebuild, testCase["expectCanRebuild"] as? Bool)
+
+            // And the results themselves, on a fresh copy of the same course.
+            let (secondRoot, secondCourse) = try makeCourse(sections: sectionNumbers)
+            defer { try? FileManager.default.removeItem(at: secondRoot) }
+            for section in sections where section["frontPage"] as? String == "theTeachersOwn" {
+                let number: Int = try XCTUnwrap(section["number"] as? Int)
+                let theirs: URL = secondCourse.sectionDirectoryURL(forSection: number)
+                    .appendingPathComponent("index.md")
+                try FileManager.default.createDirectory(
+                    at: theirs.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                try "---\ntitle: My own front page\n---\nWelcome!\n"
+                    .write(to: theirs, atomically: true, encoding: .utf8)
+            }
+            let attempts: [SiteHealthRepair.Attempt] = SiteHealthRepair.repair(
+                findings, in: secondCourse
+            )
+            var howEachWent: [String] = []
+            for attempt in attempts {
+                switch attempt.result {
+                case .restored:
+                    howEachWent.append("restored")
+                case .alreadyFine:
+                    howEachWent.append("alreadyFine")
+                case .failed:
+                    howEachWent.append("failed")
+                case .blockedByAFolderWhereTheFrontPageBelongs:
+                    howEachWent.append("refused")
+                }
+            }
+            XCTAssertEqual(howEachWent, testCase["expectResults"] as? [String],
+                           "one answer per finding, in the order they were given")
+        }
     }
 
     /// A repair whose outcome is invisible is one nobody trusts the second
@@ -274,6 +409,213 @@ final class SiteHealthRepairTests: XCTestCase {
         )
     }
 
+    /// A FOLDER named `index.md` is not a front page, and saying "that is
+    /// already put right" about one is the worst answer available: the section
+    /// still has none, so the build still produces no site and the publish
+    /// still refuses, and the teacher stops looking.
+    ///
+    /// Found by Windows porting this file line by line (`MAC-HANDOFF.md`,
+    /// 2026-09-06). `restoreMedia`, the function directly above it, has always
+    /// used the
+    /// `isDirectory:` form; this one did not.
+    func testAFolderWhereTheFrontPageBelongsIsRefusedRatherThanCalledAlreadyFine() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+
+        let repaired = SiteHealthRepair.repair(
+            [finding("sectionIndexMissing", fixable: true)], in: course
+        )
+        XCTAssertEqual(repaired.count, 1)
+        XCTAssertEqual(
+            repaired.first?.result,
+            .blockedByAFolderWhereTheFrontPageBelongs(section: 1),
+            "a folder called index.md satisfies a bare existence check, and used "
+            + "to be reported as already put right"
+        )
+    }
+
+    /// The decision Russell made about this case: refuse and explain, touch
+    /// nothing. Moving the folder aside was rejected because it relocates a
+    /// folder that may hold the teacher's own pages, without asking, and
+    /// neither app can see what is inside it.
+    ///
+    /// This one would pass against the OLD code too — it never moved anything
+    /// either. It is here to guard the option that was REJECTED, not the bug
+    /// that was fixed, so do not count it as cover for the `isDirectory:`
+    /// check: the three tests either side of it are what fail on a revert.
+    func testTheFolderInTheWayAndEverythingInItIsLeftExactlyAsItWas() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+        let theirPage: URL = index.appendingPathComponent("Unit 1, Day 1.md")
+        try "# a lesson they wrote".write(to: theirPage, atomically: true, encoding: .utf8)
+
+        _ = SiteHealthRepair.outcome(
+            ofRepairing: [finding("sectionIndexMissing", fixable: true)], in: course
+        )
+
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: index.path, isDirectory: &isDirectory),
+            "the folder must still be there"
+        )
+        XCTAssertTrue(isDirectory.boolValue, "and must still be a folder")
+        XCTAssertEqual(
+            try String(contentsOf: theirPage, encoding: .utf8), "# a lesson they wrote",
+            "nothing inside it may be moved, renamed or overwritten"
+        )
+    }
+
+    /// The refusal must say what is actually wrong. "Check the folder isn't
+    /// locked or read-only" is the generic explanation, and it sends a teacher
+    /// to look at permissions on a folder that is not locked.
+    func testTheRefusalNamesTheFolderRatherThanBlamingPermissions() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+
+        let outcome = SiteHealthRepair.outcome(
+            ofRepairing: [finding("sectionIndexMissing", fixable: true)], in: course
+        )
+        XCTAssertEqual(outcome?.headline, "Plantoir could not put that back.")
+        XCTAssertEqual(
+            outcome?.detail,
+            SiteHealthRepair.folderWhereTheFrontPageBelongs(course: "ICS3U", section: 1)
+        )
+        XCTAssertFalse(outcome?.detail.contains("read-only") ?? true,
+                       "the generic explanation is replaced, not appended to")
+        XCTAssertEqual(outcome?.canRebuild, false,
+                       "there is nothing to look at, so do not offer the preview")
+    }
+
+    /// It has to be findable. Every course has a `section1`, and this dialog
+    /// shows a headline and one sentence and nothing else — so a teacher with
+    /// two courses would otherwise be sent to a folder that exists twice.
+    func testTheRefusalNamesBothTheCourseAndTheSectionFolder() {
+        let said: String = SiteHealthRepair.folderWhereTheFrontPageBelongs(
+            course: "ICS3U", section: 2
+        )
+        XCTAssertTrue(said.contains("index.md"), said)
+        XCTAssertTrue(said.contains("section2"), said)
+        XCTAssertTrue(said.contains("ICS3U"), said)
+    }
+
+    /// A blocked repair beside a genuine one: what came back is announced,
+    /// what did not is named, and BOTH explanations are given — the specific
+    /// one first, because "you can make it yourself in Obsidian" is true of
+    /// the Media folder and is exactly what cannot be done about the front
+    /// page until the folder in the way has been moved.
+    func testABlockedRepairBesideARestoredOneSaysBothHalves() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+
+        let outcome = SiteHealthRepair.outcome(
+            ofRepairing: [
+                finding("mediaFolderMissing", fixable: true),
+                finding("sectionIndexMissing", fixable: true),
+            ],
+            in: course
+        )
+        XCTAssertEqual(outcome?.headline, "Put the Media folder back.")
+        XCTAssertTrue(outcome?.detail.contains("Could not put the front page back") ?? false,
+                      outcome?.detail ?? "")
+        XCTAssertTrue(outcome?.detail.contains("There is a folder called index.md") ?? false,
+                      outcome?.detail ?? "")
+        XCTAssertEqual(outcome?.canRebuild, false)
+    }
+
+    /// The refusal leaves a line on the trail (rule 5).
+    ///
+    /// Without it the trail shows the problem being FOUND and then nothing at
+    /// all, which reads exactly like a teacher who never pressed the button —
+    /// and the folder in the way is something they will very likely have moved
+    /// by the time they report it, so it cannot be looked for afterwards.
+    func testTheRefusalIsRecordedOnTheTrail() throws {
+        let (root, course) = try makeCourse()
+        let trailFolder: URL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("refusal-trail-\(UUID().uuidString)")
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: trailFolder)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: trailFolder)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+        try "# a lesson they wrote".write(
+            to: index.appendingPathComponent("Unit 1, Day 1.md"),
+            atomically: true, encoding: .utf8
+        )
+
+        _ = SiteHealthRepair.outcome(
+            ofRepairing: [finding("sectionIndexMissing", fixable: true)], in: course
+        )
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("ICS3U/1 · found a folder called index.md "
+                                     + "where the front page belongs, and left it alone"),
+                      trail)
+        XCTAssertFalse(trail.contains("put the front page back"),
+                       "nothing was put back, and a line saying so would be believed")
+        XCTAssertFalse(trail.contains("a lesson they wrote"),
+                       "never what is written on a page")
+    }
+
+    /// Both kinds of failure at once, which is where the two explanations have
+    /// to be ordered rather than merely both present: a FILE where the Media
+    /// folder belongs (nothing better to say than the generic sentence) and a
+    /// FOLDER where the front page belongs (which has its own).
+    ///
+    /// The generic one comes first. The other way round the paragraph ends on
+    /// "You can make it yourself in Obsidian" directly after "…and Plantoir
+    /// can put the front page back", so "it" lands on the front page — the one
+    /// thing that cannot be made until the folder in the way has been moved.
+    func testWhenBothKindsOfFailureHappenTheGenericExplanationComesFirst() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try "not a folder".write(
+            to: course.directoryURL.appendingPathComponent("Media"),
+            atomically: true, encoding: .utf8
+        )
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+
+        let outcome = SiteHealthRepair.outcome(
+            ofRepairing: [
+                finding("mediaFolderMissing", fixable: true),
+                finding("sectionIndexMissing", fixable: true),
+            ],
+            in: course
+        )
+        XCTAssertEqual(outcome?.headline, "Plantoir could not put that back.")
+        XCTAssertEqual(
+            outcome?.detail,
+            SiteHealthRepair.couldNotExplanation + " "
+            + SiteHealthRepair.folderWhereTheFrontPageBelongs(course: "ICS3U", section: 1),
+            "the generic explanation first, the one that names the folder last"
+        )
+        XCTAssertEqual(outcome?.canRebuild, false)
+    }
+
     /// Pressing it twice, or pressing it after fixing the problem in Obsidian,
     /// must change nothing — a repair that overwrote would destroy the very
     /// page the teacher had just written.
@@ -292,7 +634,8 @@ final class SiteHealthRepairTests: XCTestCase {
         let repaired = SiteHealthRepair.repair(
             [finding("sectionIndexMissing", fixable: true)], in: course
         )
-        XCTAssertEqual(repaired["sectionIndexMissing"], .alreadyFine,
+        XCTAssertEqual(repaired.count, 1)
+        XCTAssertEqual(repaired.first?.result, .alreadyFine,
                        "already there is not a failure")
         XCTAssertTrue(
             try String(contentsOf: index, encoding: .utf8).contains("Welcome!"),

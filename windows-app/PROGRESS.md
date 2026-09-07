@@ -22,29 +22,65 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Sixteen of its twenty-four
-items are done**, items 21, 23 and 24 having landed on 2026-09-06 (the
-folder-problems front end, the same findings reaching the assistant, and the
-overnight run's findings being captured and reported the next morning).
+with its headline still reading as open work. **Twenty-five of its thirty-seven
+items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
+day (the folder-problems front end, the same findings reaching the assistant,
+the overnight run's findings being captured and reported the next morning, and
+the contract case lists this suite was not reading), and items 33 and 34 — the
+refusal of a folder named `index.md`, and the per-finding repair report as
+contract cases — struck on 2026-09-07. Items 35–37 were added the
+same day by an audit of these two documents and are open.
+
+**Count them rather than trusting this line.** It read "sixteen of its
+twenty-four" on a list that had grown to 32 items with eleven of them open,
+seven of which this table did not name at all. These two commands count it, run
+from the repository root — a plain `grep` over the whole file also counts every
+other numbered list in it, of which there are many:
+
+```bash
+awk '/^### What is still genuinely outstanding/,/^## Windows no longer runs/' WINDOWS-HANDOFF.md | grep -c '^[0-9]\+\. '
+awk '/^### What is still genuinely outstanding/,/^## Windows no longer runs/' WINDOWS-HANDOFF.md | grep -c '^[0-9]\+\. ~~'
+```
+
+The first is the total; the second is how many are struck, which is how many
+are done.
+
+**Striking an item in `WINDOWS-HANDOFF.md` means striking its row here too**,
+in the same session. This table is the second place the same fact lives, and a
+second place is only worth having if both are updated together — the whole
+reason the count above went wrong is that one of them was.
+
 What is genuinely left, smallest first:
 
 | Item | What is left | Size |
 |---|---|---|
 | 19 | The `working-folder.txt` marker AND a sweep that reads it. Do both or neither — the marker alone is ceremony. Two Windows specifics for the sweep are written into item 19. | Small |
+| 30 | Three small parity gaps, listed so they are not rediscovered as surprises: no Delete in the Archived/Backup detail pane, no icons or menu on the empty-folder picker's breadcrumbs, and no keyboard route to Rename Course. | Small |
+| 32 | `SpecialFoldersHelpContractTests` sweeps the teacher's own folder names for jargon and the contract says not to. Cannot fail on today's fixture, so it is a divergence rather than a bug. The mac fixed its own copy and the fix is worth copying, trap included. | Small |
+| 28 | Four small gaps in one item: the scheduled-deploy description is composed and never shown, the main window never comes forward for an assistant-started build, `settings saved` / `settings could not be saved` are declared and never emitted, and the assistant window forgets its size and position. | Small |
+| ~~31~~ | ✅ Done 2026-09-07 — `Uri.EscapeDataString` replaced by a contract-driven encoder in both branches of `Spelled`; `FolderPathRewriterTests` deserialises every `linkRewriting` case. | — |
+| 36 | A decision, not code: `verify-deploy.ps1` is the only automated check of the PowerShell half of publishing and no gate runs it. Schedule it, make it a release-cut step, or write down that it is hand-run. | Small |
+| 37 | A decision the MAC makes: the Course Settings tip sentence is pinned by no contract on either platform and the two apps word it differently. Windows owes only taking the mac's wording once it is chosen. | Small |
 | 18 | The two VIEWS: the choice at the folder picker, and the dismissable notice for a folder the window restored. Detection, wording and the remembered-per-folder store are built — the store's API is `AppSettings.HasAcceptedSyncFor` / `RememberAcceptedSyncFor`, and the two moments belong in `WorkspacePickerView` (a folder just chosen) and `MainWindow`'s restore path (a folder the window reopened). | Medium |
 | 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
-| 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 59 test methods over 157 cases — `FolderPathRewriter`'s share grew on 2026-09-07 when item 31 wired `linkRewriting` in from the contract rather than retyping five of its cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
+| 27 | The assistant offers no way back for a whole conversation. `UndoHistory` gives per-change undo, which is a different promise. The mac's `AssistSectionRestore` has no counterpart here. | Medium |
+| ~~26~~ | ✅ Done 2026-09-06 — the marks checklist offers folders nested up to four levels deep (`GradedFolderChoices`), and the frozen pool is fed from the same list. | — |
+| 25 | The wizard never asks the skeleton question, so `use_skeleton` is answered by a default nobody chose. The test that announces it exists and is skipped: `FileFormatContractTests.TheWizardWritesUseSkeleton`. | Medium |
+| 35 | The wizard's Create button and the new-site dialog have never been driven through the real interface. `Plantoir.UiTests` is where the first belongs; the second needs credentials and may have to stay a written hand-check. | Medium |
+| 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 52 test methods over 63 cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
 | ~~22~~ | ✅ Done 2026-09-06 — the "Folders Plantoir uses" sheet, now shared as `shared-rules.json` → `specialFoldersHelp` rather than living inside a view. Two cases proposed back to the mac. | — |
 
-Two things that are NOT in that list and should be known:
+Two more things, one of which is now ON that list:
 
-- **The deploy gate exists now.** `verify-deploy.ps1` publishes to every
+- **The deploy gate exists now — and is wired into nothing, which is handoff
+  item 36.** `verify-deploy.ps1` publishes to every
   destination and every pairing against real sites and fetches each one back:
   36 passed, 0 failed on 2026-09-06. It needs credentials and the network, so
   it is opt-in and wired into nothing. Run it when the publishing path
   changes. It is the only automated check of the PowerShell half of
   publishing — `verify.sh` and `verify-deploy.sh` are bash and do not run
-  here.
+  here. Listed as item 36 on 2026-09-06 so that "no gate runs it" is a
+  decision somebody makes rather than something nobody was told.
 - **The unit suite is green**: 911 passed, 0 failed at the time this section
   was written; 945 after the folder-problems front end, and 979 once
   parity-tail was merged into it and the overnight capture was added. `dev` stood
@@ -297,7 +333,9 @@ plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
 - Two paths proven underneath but never click-driven in-app: the wizard's
   Create button (the `setup.ps1` + answer-pump path ran to completion via
   PtyDriver), and the new-site dialog a BRAND-NEW section's deploy raises —
-  the verified deploy was a repeat publish to an existing site.
+  the verified deploy was a repeat publish to an existing site. **This is
+  handoff item 35** since 2026-09-06; before that it was written down here and
+  indexed nowhere, so no session planning from the numbered list could see it.
 - Smoke-test hooks, all driving the real button code paths
   (`MainWindow.xaml.cs`, `RunAutomationHooks`): `--auto-select CODE N`,
   `--auto-preview CODE N`, `--auto-deploy CODE N`, `--auto-course CODE`,

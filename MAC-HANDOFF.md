@@ -172,9 +172,155 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   way — is in the ledger entry **"The folders sheet named a curriculum folder
   the course may not have"**.
 
-**Nothing was left waiting here as of 2026-09-06.**
+- `contracts/shared-rules.json` → `gradedFolders` → **`choices`**, a whole new
+  authored block with ten cases, proposed 2026-09-06. **The mac suite will not
+  go red on its own for this** — nothing over there reads the key yet, which is
+  the honest difference between proposing a case in a list a mac test already
+  walks and proposing a new list. So this line is the only thing that will tell
+  you it is here.
+
+  Nine of the ten cases describe what the mac's own `nestedFolderNames`
+  already does, written down so both apps can be tested against one rule
+  instead of two implementations that happen to agree. **Two of them need
+  something from the mac:**
+
+  - **A SORT.** `"declared folders first, then what is on disk"` and `"the same
+    folder name in two places is offered once"` pin an ORDER, and the mac's
+    `FileManager.enumerator` returns children in whatever order the filesystem
+    gives. Sorting each folder's children case-insensitively before walking
+    them is the whole change, and it is worth having for its own sake: the list
+    a teacher reads is otherwise in an order nothing promises and which can
+    differ between two machines holding the same course.
+
+    **The comparison is ORDINAL, case-insensitive** — `OrdinalIgnoreCase` in
+    the C#, and the contract's `walk.order` says so. Worth naming, because the
+    natural Swift reach is `localizedStandardCompare` (Finder order), and the
+    two disagree the moment a course numbers its folders: ordinal puts
+    `Unit 10` before `Unit 2`, Finder order puts `Unit 2` first. A contract
+    case now pins it, so the suites disagree rather than the teachers.
+    Finder order is arguably the nicer answer for a person reading a list, and
+    if anyone wants it, it is a shared change to the contract and both apps —
+    not something to reach for on one side because it looked more natural
+    there.
+  - **`"a folder the teacher removed from the course is not offered back"` is
+    a real behaviour difference, and Windows took it deliberately** — see the
+    ledger entry below.
+
+  Reference: `windows-app/Plantoir.Core/Models/GradedFolderChoices.cs` and
+  `windows-app/Plantoir.Tests/GradedFolderChoicesTests.cs`.
 
 ## Open — what the mac still owes
+
+- **Two sentences in `contracts/shared-rules.json` now say Windows still owes
+  the refusal case, and Windows no longer does** (Windows, 2026-09-07, branch
+  `issue/33-repair-refused-folder-in-the-way`). **A regeneration and two
+  edited strings; nothing behavioural.**
+
+  `siteHealth.repair.reportedOncePerFinding.howToRunACase` ends `("refused" is
+  refusedWhenSomethingIsInTheWay, which the mac has and Windows still owes)`,
+  and `knownLimit` in the same entry says `Windows has no refusal case yet
+  (WINDOWS-HANDOFF.md item 33) … It stops being a Windows limit the day item
+  33 lands`. Both were true when written and are false now: Windows answers
+  `Refused`, says the contract's sentence, and writes `folder problem not
+  repaired` — see the ledger entry below. The contract is generated on the mac
+  and never hand-edited, so the correction has to come from
+  `SiteHealthContract.swift` (or wherever those two strings are authored) and
+  `Plantoir --write-contracts`. Suggested wording: drop the parenthesis from
+  `howToRunACase`, and in `knownLimit` say the refusal case escapes the limit
+  on BOTH platforms because its sentence names the section folder. Windows'
+  suite is not red on the stale text — nothing pins prose — which is exactly
+  why it needs saying here rather than being left to be noticed.
+
+  Two source comments say the same stale thing and need no regeneration:
+  `mac-app/Tests/QuartzTeachersTests/SiteHealthContractTests.swift` (around
+  line 143: "Windows answers `Failed` here today with the generic … so this is
+  the sentence they adopt") and `mac-app/QuartzTeachers/Models/SiteHealthRepair.swift`
+  (around line 367: "Windows has no blocked case yet, so over there it reads
+  namelessly too until `WINDOWS-HANDOFF.md` item 33 lands"). Fix them in the
+  same pass, or the contract will be right and the code beside it wrong.
+
+- **The Marks checklist offers a folder the teacher has REMOVED from the
+  course** (found on Windows 2026-09-06, branch
+  `issue/26-marks-checklist-nested-folders`). **Small, and it only bites
+  because the mac walks the disk.**
+
+  `CourseSettingsView.swift`'s `nestedFolderNames` walks the course folder and
+  offers what it finds. It does not consult `excluded_items`, so a folder the
+  teacher has just taken out of Shared folders — which they were told, in the
+  confirmation they had to read, "will take it out of your course's marks
+  pool" — is still on disk, and comes straight back into the Marks list on the
+  next redraw, unticked. Tick it and `graded_folders` names a folder
+  `excluded_items` tells the build to skip: a non-empty pool matching nothing
+  the build will publish, so nothing counts for marks while the settings claim
+  something does. The mac already keeps this promise on the way OUT —
+  `dropFromMarksPool` takes a removed folder out of the pool for exactly that
+  reason — and this is the same hole arriving back in through the walk.
+
+  **One thing an earlier draft of this entry said is not true**, and is
+  corrected here rather than quietly deleted, because a wrong reason gets
+  acted on: such a pool does NOT suppress the `noGradedFolders` finding.
+  `_has_graded_folders` in `build_site.py` walks the MERGED tree, so a pool
+  matching nothing published answers false and `site_health.py` raises the
+  finding exactly as it would for an empty pool. The reason to filter is the
+  promise in the dialog, which is reason enough. (Windows' own
+  `DropFromMarksPool` comment carried the same wrong clause, inherited from
+  GUI-IMPROVEMENTS row 380, and has been corrected in place — that row
+  itself is append-only history and is left as it stands.)
+
+  Windows filters it. The rule is in the contract under
+  `gradedFolders.choices.walk.excludedItems`: a name in `excluded_items` is
+  neither offered nor walked into, matched EXACTLY (case included, the way
+  `preflight_update_course_config` matches a Python set), and filtered only at
+  the two levels the build's preflight scan actually discovers — the course
+  folder's own children against `excluded_items.shared`, a section folder's
+  children against `excluded_items.per_section`. Deliberately not at every
+  depth: a nested `Portfolios/Tasks` still counts when a top-level `Tasks` has
+  been removed, because those are different folders and only one of them was
+  removed.
+
+  **Why Windows took a divergence rather than copying and writing it up.**
+  Copying would have REGRESSED this side. Before the walk, the Windows
+  checklist was literally `SharedFolders.Concat(PerSectionFolders)`, so a
+  removed folder left the Marks list in the same gesture; adding the walk
+  without the filter would have introduced the reappearing folder here as a
+  new bug of the change's own making. Against that, the divergence costs
+  nothing a coverage map can see — `CountsForMarks` is untouched, and a
+  ticked-but-excluded folder counts nothing on either platform, because the
+  build never publishes it. What differs is only which names a teacher is
+  OFFERED, and only for folders they have removed.
+
+  Reference: `GradedFolderChoices.Walk` / `Excluded`, and the contract case
+  `"a folder the teacher removed from the course is not offered back"`.
+
+- **Two smaller things in the same area, neither of them introduced by
+  Windows, both inherited by both apps** (found while porting the walk,
+  2026-09-06). Recorded so they are not re-found a third time; neither is
+  urgent and neither is Windows-specific.
+
+  - Removing a shared folder drops that NAME from the marks pool, but not the
+    graded folders nested inside it. Remove `Portfolios` while the pool holds
+    `Tasks` (found at `Portfolios/Tasks`) and the pool keeps naming a folder
+    whose parent has left the site.
+  - A pool entry whose folder has since been deleted on disk still counts
+    toward the "last folder that counts for marks" floor, so the floor can
+    refuse a removal on the strength of a folder that is not there.
+
+- **A recommendation rather than a defect: the "Folders Plantoir uses" sheet
+  can under-report the marks folders, on both platforms.**
+  `SpecialFoldersHelpView.gradedFolderNames` infers from `sharedFolders +
+  perSectionFolders`, while `gradedFoldersBinding` infers from
+  `gradedFolderChoices` — which includes the walked names. So a course that
+  has never been asked can see `Tasks` ticked in the checklist and NOT listed
+  in the sheet one section below it, until the first save makes the pool
+  explicit. Windows now matches the mac exactly here on purpose
+  (`SpecialFoldersHelp.cs` passes the top-level lists explicitly, with a
+  comment saying why), because the sheet is handed a configuration with no
+  course folder to walk and `specialFoldersHelp`'s own contract cases build
+  their config from JSON alone. Fixing it means giving the sheet a directory,
+  which changes a shared contract's shape — a decision for both platforms at
+  once rather than one taken on the side that noticed.
+
+- **`AppRulesContract.milestones()` leaves the example-course task out of the
 
 - **`AppRulesContract.milestones()` leaves the example-course task out of the
   readout, so two shared markers were classified by nobody** (found 2026-09-06,
@@ -357,24 +503,40 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   **know**; the two below are genuine **do**s for this side, both found by
   porting the mac's code line by line and asking what each branch answers.
 
-  1. **A DIRECTORY named `index.md` is reported to the teacher as ALREADY PUT
-     RIGHT.** `SiteHealthRepair.restoreIndex` (`SiteHealthRepair.swift:294`)
-     asks `FileManager.fileExists(atPath:)`, which is TRUE for a directory, so
-     it returns `.alreadyFine` — "That is already put right. Nothing needed
-     changing." The section still has no front page, so the build still
-     produces no site and the publish still refuses; the one dialog written to
-     end silence says the problem is dealt with. `restoreMedia` two functions
-     above gets this right, with the `isDirectory:` form and a comment saying
-     why. **Windows returns `Failed` here**, which is the honest answer of the
-     two available (the teacher is at least told nothing was put back), though
-     its sentence — "check that the folder isn't locked or read-only" — is
-     still not quite the reason. If the mac wants a better sentence than
-     either, that is a contract case worth proposing back.
-     Windows reference: `SiteHealthRepair.RestoreIndex`, test
-     `ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine`.
+  1. ~~**A DIRECTORY named `index.md` is reported to the teacher as ALREADY PUT
+     RIGHT.**~~ — ✅ **Done 2026-09-07**, branch
+     `issue/repair-index-md-directory`, `GUI-IMPROVEMENTS.md` row 426.
+     `SiteHealthRepair.restoreIndex` asked `FileManager.fileExists(atPath:)`,
+     which is TRUE for a directory, so it returned `.alreadyFine` — "That is
+     already put right. Nothing needed changing." — about a section that still
+     had no front page, so the build still produced no site and the publish
+     still refused; the one dialog written to end silence said the problem was
+     dealt with. `restoreMedia`, the function directly above it, got this
+     right, with the
+     `isDirectory:` form and a comment saying why. You were right, and the fix
+     is yours as much as ours.
 
-  2. **`repair(_:in:)` returns `[String: Result]`, keyed by check NAME, so two
-     findings with the same name collapse.** Two sections each missing a front
+     **The mac took the better sentence you invited it to propose, so this
+     comes back to you as work.** Windows returned `Failed`, which is the
+     honest answer of the two that existed; the mac now REFUSES with a
+     sentence of its own, touching nothing —
+     `contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`,
+     `expect: "refused"`. So `SiteHealthRepair.Result` needs a FOURTH answer on
+     your side and
+     `ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine`
+     needs updating. The refusal also records a new trail event, `folder
+     problem not repaired`, which `activityTrail.mustRecord` pins by equality
+     — **your suite is red until you add it**, and that is the mechanism
+     working. Both are written up as `WINDOWS-HANDOFF.md` item 33, with the
+     rejected alternative (move the folder aside and write a proper front page
+     — no: it relocates a folder that may hold their pages, without asking,
+     and neither app can see inside it) and the reason the event is named for
+     the outcome rather than for its cause.
+
+  2. ~~**`repair(_:in:)` returns `[String: Result]`, keyed by check NAME, so two
+     findings with the same name collapse.**~~ — ✅ **Done 2026-09-07**, branch
+     `issue/repair-results-keyed-by-name`, `GUI-IMPROVEMENTS.md` row 427.
+     Two sections each missing a front
      page are both repaired — the loop runs — but only the LAST result is
      reported. Section 1 restored and section 2 already fine therefore reads as
      "That is already put right", with `canRebuild: false` and no preview
@@ -386,6 +548,22 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      the NAMES when building the sentence, so "Put the front page and the front
      page back." cannot occur either. Reference: `SiteHealthRepair.Repair`,
      test `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer`.
+
+     **The mac now returns `[Attempt]` — the same shape, arrived at second.**
+     You were right on both counts, and this one you had already fixed, so the
+     mac copied rather than invented. What came back the other way is the RULE
+     as data: `contracts/shared-rules.json` →
+     `siteHealth.repair.reportedOncePerFinding` carries two cases, a
+     `howToRunACase` note, and the `expectResults` vocabulary, so the behaviour
+     can be checked against one source instead of proved twice in parallel.
+     **Nothing of yours goes red** — no list pins it by equality — so
+     deserialising those two cases in place of
+     `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer` is a should, not a
+     must; it is written up as `WINDOWS-HANDOFF.md` item 34. One stale comment
+     is left for you rather than edited from this side: the `<remarks>` on
+     `SiteHealthRepair.cs:241-250` still call the per-finding list "a deliberate
+     divergence from the mac, whose dictionary is keyed by name", and it is no
+     longer a divergence.
 
   **Two places Windows is deliberately BROADER than the mac, and the mac may
   want to match — a know rather than a do, but the second one is visible.**
@@ -1728,6 +1906,63 @@ rather than being deleted.
   `spelled(_:likeThe:in:)` / `percentEncoded` in
   `mac-app/QuartzTeachers/Models/FolderPathRewriter.swift`.
 
+- **The prose every Windows session plans from was corrected, and one habit
+  is worth stealing** (Windows, 2026-09-06, branch
+  `issue/docs-handoff-and-progress-corrections`). **No mac code, no contract
+  change, no `.cs` touched at all** — this is a documentation pass, listed here
+  because one of its findings is a failure mode this side has exactly as much
+  of. Reference: `WINDOWS-HANDOFF.md` items 10, 16 and the new 35–37 (numbered 33–35 when written; the mac's own
+  items 33 and 34 landed first);
+  `windows-app/PROGRESS.md`'s "Where parity stands"; `contracts/README.md`'s
+  Windows table.
+
+  **What was wrong.** An audit of the two documents a Windows session reads
+  before planning found four false statements. Item 10's caveat said the
+  folder-problems front end "is item 21, which is not built" — item 21 landed
+  the same week and `FolderProblemsDialog.cs` has existed since, so anyone
+  planning from item 10 believed the findings still reached nobody. Item 16 was
+  struck through with a rider reading "**NOT yet done**", carrying a live
+  obligation inside an item the eye skips. `PROGRESS.md` said "sixteen of its
+  twenty-four items are done" when the list held 32 with eleven open, and its
+  "what is genuinely left" table named four of them, missing seven entirely.
+  And `contracts/README.md`'s Windows table had no row for
+  `specialNames.renameFolder.linkRewriting`, which was added to the contract
+  the same day as the audit that built the table and fell outside its sweep.
+
+  **The sentence worth carrying**, which is the whole reason this is in the
+  ledger rather than a commit message: **an item struck through with live work
+  inside it is invisible, and a status line that has drifted from the code is
+  worse than no status line, because it gets believed.** Both files are read
+  top-down and abandoned partway — that is what they are FOR — so a
+  correction buried below the point a reader stops is not a correction. This
+  side has the same shape of exposure in `MAC-HANDOFF.md`'s own first two
+  sections; the v1.1.0 cut sheet at the top of this file sat as an open
+  instruction for seventeen days after the release shipped, which is the
+  identical failure pointing the other way.
+
+  **What was rejected.** Un-striking item 16 so its rider would be visible:
+  rejected, because item 16 itself IS done and the obligation belongs to item
+  13, which is open and was being worked the same night. Two items claiming the
+  same work is how the count drifted in the first place; the rider now says
+  plainly that item 16 owes nothing and names item 13 as where the work is
+  tracked. Also rejected: writing an absolute pass/fail into `contracts/README.md`
+  for whether `FolderPathRewriterTests` deserialises its eleven cases. **That
+  row and the wiring that makes it true landed in the same overnight batch**
+  (Windows item 31), so any status sentence written there would have been wrong
+  in one direction or the other by morning. The row names the list and the
+  class and points at item 31's struck-or-not state for the answer, which is
+  the one fact that cannot go stale. The same reasoning changed one line of
+  `documentation/09-mac-app.md`, which described those eleven cases as ones
+  "both apps run" — true of the mac, not yet of Windows.
+
+  **What the mac is expected to do: nothing.** One thing this audit surfaced IS
+  the mac's, and it is already in the Open section above rather than duplicated
+  here — the Course Settings tip sentence, pinned by no contract on either
+  platform and worded differently by the two apps. It is now indexed on the
+  Windows side as item 37 as well, recorded honestly as waiting on the mac's
+  choice with nobody having picked it up. Windows owes only taking the mac's
+  wording verbatim once it is chosen.
+
 - **`workingFolderPathBar.ancestorPaths` now carries `windowsCases`, and two
   rules were being pinned by nobody on either side** (Windows + shared,
   2026-09-06, branch `issue/29-windows-contract-case-lists`). **The mac suite
@@ -2957,9 +3192,164 @@ is what happened to the test-race item, sitting here for three days with
 
 ## Done — the ledger
 
+- **Windows now refuses a folder named `index.md` with the contract's own
+  sentence, records the refusal on the trail, and runs the
+  `reportedOncePerFinding` cases from the contract** (Windows, 2026-09-07,
+  branch `issue/33-repair-refused-folder-in-the-way`; `WINDOWS-HANDOFF.md`
+  items 33 and 34 struck; `GUI-IMPROVEMENTS.md` row 428). **The mac is
+  expected to KNOW, not to match** — it shipped the refusal first, on
+  2026-09-07, and this is Windows catching up to it. ✅ DONE.
+
+  What it fixed. `SharedRules_ActivityTrailEvents_Exist` pins
+  `activityTrail.mustRecord` by equality, so the mac's merge of
+  `issue/repair-index-md-directory` turned the Windows suite red — one test,
+  `1030 passed, 1 failed` — the moment it reached `dev`. That is the mechanism
+  working, and it is ALSO why nine of the twelve branches of the Windows
+  machine's overnight batch of 2026-09-06 were refused at its gate (the
+  driver and its run summaries live outside the repository, so there is
+  nothing to follow here): they were cut from a `dev` that already carried
+  the new event, so every one of them inherited a failure that had nothing to
+  do with its own work. Windows had answered
+  `Failed` for the directory case since `3ddd4af4` — honest, and still
+  sending the teacher to check permissions on a folder that is not locked.
+
+  What was done, and where. `SiteHealthRepair.Result` gained `Refused`;
+  `FolderWhereTheFrontPageBelongs(course, section)` is the sentence, filled
+  from the finding's section because a C# enum cannot carry a value the way
+  the mac's `blockedByAFolderWhereTheFrontPageBelongs(section:)` does — the
+  per-finding tuple already has it, so nothing is lost. `OutcomeOfRepairing`
+  assembles the explanation in the mac's order (generic advice first, only
+  when something SIMPLY failed or nothing was refused; refusals after it, each
+  named once). `RestoreIndex` writes `folder problem not repaired` from the
+  directory branch only — the plain-failure path still records nothing, as the
+  contract's `why` asks. `ActivityTrail.Event.FolderProblemNotRepaired` is the
+  event. Tests: `SiteHealthRepairTests` (refused and left untouched, with the
+  teacher's page inside it surviving; refusal alone; both kinds at once in
+  the right order; refusal beside a restore; two refused sections are two
+  sentences) and `SiteHealthContractTests.TheRefusalSentenceIsTheContractsWordForWord`
+  plus `TheRefusalSentenceNamesNoMachinery`. Item 34's "should":
+  `ARepairReportsOneResultPerFindingNeverOnePerCheckName` builds each
+  `reportedOncePerFinding` case exactly as `howToRunACase` says, on two copies
+  of the course — one for the results, one for the report — and replaces
+  `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer`.
+
+  Nothing rejected that the mac had not already rejected: moving the folder
+  aside was refused for the same reason (a folder that may hold the teacher's
+  pages, moved without asking, by an app that cannot see inside it). One thing
+  the mac may want to know about its own contract text is the open item at
+  the top of this file.
+
 Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
+
+- **Windows caught up to the mac's nested marks folders — and found two things
+  the mac's version does not do** (Windows, 2026-09-06, branch
+  `issue/26-marks-checklist-nested-folders`, commit `02cf58b2`). **The mac is
+  expected to KNOW this one, and to take the two items in the sections above;
+  the rest of it is the mac's own design arriving here.**
+
+  **What it fixed.** Windows' Marks checklist was built from
+  `SharedFolders.Concat(PerSectionFolders)` — top-level names only — while
+  `GradedFolderRule.CountsForMarks` matches a folder segment at any depth. With
+  `graded_folders` absent meaning "never asked, historical rule applies", the
+  first tick FROZE the narrow list, so a teacher who files assessed work in
+  `Portfolios/Tasks` could not tick it and, from that tick onwards, every
+  expectation it addressed read as never evaluated on the coverage map. Nothing
+  said so, and nothing ever would. The mac has been right about this since it
+  added `nestedFolderNames`; the sentence that explains the whole item is the
+  mac's own, on `gradedFoldersBinding`: *"the first tick freezes it, so anything
+  the build counts today and this list omits loses its marks without a word."*
+
+  **The half that is easy to miss.** The gap was in TWO places, and fixing only
+  the visible one still loses the marks: `MaterializedGradedFolders()` inferred
+  from the same top-level lists, and that — not the checklist — is what the
+  first tick actually writes. The mac never hits it because its binding's `get`
+  filters `gradedFolderChoices`, which already holds the nested names. Both are
+  now fed from one list on Windows, and a test asserts it, because a test
+  covering only the visible list passes on the broken code.
+
+  **What was copied without re-deriving, and why.** The four-level cap, the
+  skip list, keeping `Media` out, and excluding `sectionN` by name while still
+  walking its children are all the mac's answers. Two apps disagreeing about
+  which folders count would produce two different coverage maps from the same
+  course, which is the one place a divergence is indefensible — so the sub-
+  questions were not re-opened. Rejected on those grounds: a different depth
+  cap (four is an affordability judgement, honestly documented as a cap rather
+  than completeness, and a different number would mean different pools for the
+  same course); keeping `Media` in for a teacher who grades video portfolios
+  (defensible, and still no, because media is not assessed work in either app
+  today); and grouping or indenting the nested names under a heading (the mac's
+  list is flat — same product, one shape).
+
+  **Rejected and worth recording: warning the teacher on the first tick** that
+  a folder the build counts today is about to stop counting. Arguably the real
+  fix for the harm, since the walk is a cap rather than a guarantee and a
+  folder five levels down is still lost silently. Not shipped: neither app does
+  it, it is new teacher-facing behaviour, and it belongs in a decision made for
+  both platforms at once rather than at 3am on one of them.
+
+  **Two things Windows does that the mac does not.** Both are in the sections
+  above with their full reasoning — `excluded_items` filtering (a divergence
+  taken deliberately, because copying would have regressed Windows), and a
+  SORT of each folder's children so the offered list has an order at all.
+
+  **And one Windows-only caution, stated as what was actually measured.** The
+  mac's walker does not follow symlinks. The obvious C# translation is to skip
+  anything carrying `FileAttributes.ReparsePoint` — which is what
+  `CourseArchiver.cs:226` already does — and the Cloud Files API documents a
+  sync provider's unmaterialised placeholders as reparse points, which would
+  make that test skip every folder in a cloud-synced working folder and put
+  exactly the courses `cloudSyncedFolders` says teachers keep on purpose
+  straight back on the top-level-only list this change exists to fix. No test
+  would catch it either, since a temp folder is never a placeholder.
+
+  **It was not reproduced.** Probing this machine's own OneDrive with Files
+  On-Demand on (confirmed on: 3 of 4 sampled files carried the
+  offline/unpinned attributes) found **zero reparse-point directories and zero
+  reparse-point files**. So this is a documented hazard, not an observed
+  fault, and the reason for the narrower test is that it costs nothing:
+  measured on the same machine, a junction made with `mklink /J` has the
+  attribute AND a non-null `LinkTarget`, a plain folder has neither, and .NET
+  returns a link target only for symlink and mount-point tags. Windows uses
+  `attributes.HasFlag(ReparsePoint) && child.LinkTarget is not null` — the
+  attribute first only to avoid a syscall per folder. **`CourseArchiver` uses
+  the blanket version** and was left alone as out of scope; worth a look on
+  both platforms, with the same caveat that nobody has seen it bite.
+
+  **Two more things the review found, neither of them Windows' to decide.**
+
+  - **`sectionN` is matched case-INSENSITIVELY by both apps and
+    case-SENSITIVELY by the build.** `build_site.py:3551` is
+    `re.fullmatch(r"section\d+", name)`; the mac's test lowercases first, and
+    Windows copied it. So a teacher's folder called `SECTION3` is hidden from
+    the marks list by both apps while preflight would add it to
+    `shared_folders` and the build would count it. The mac is looser again in
+    a second way: `Int(name.dropFirst(7))` parses a sign, so `section+3` and
+    `section-3` are section folders there and ordinary offered folders both on
+    Windows and to the build. Vanishingly rare, and left alone deliberately
+    rather than "fixed" on one side — recorded so it is not re-found a third
+    time.
+  - **A pooled name can end up with no row to untick**, and Windows' own
+    `excluded_items` filter is one way to reach it. Tick something on a course
+    with `Portfolios/Tasks`, so the pool freezes as `["Tasks"]`, then remove
+    `Portfolios` from Shared folders: `Portfolios` was never graded, so
+    nothing drops `Tasks`, and the next walk skips the removed folder without
+    descending, so no row for `Tasks` is drawn. The mac reaches the same state
+    by other routes that both apps share — a pooled folder deleted on disk, or
+    one five levels down past the cap. **It is not silent and nothing is
+    lost**: `_has_graded_folders` walks the MERGED tree, so a pool naming
+    nothing the site publishes still raises `noGradedFolders`, and the list
+    editor preserves a member it is not drawing rather than dropping it. The
+    invariant that would close it — always offer what is already in the pool,
+    so a tick can always be undone — is a shared product decision and a
+    contract change, so it is **recommended here rather than taken on one
+    platform at a time.**
+
+  Reference: `windows-app/Plantoir.Core/Models/GradedFolderChoices.cs`,
+  `windows-app/Plantoir.Tests/GradedFolderChoicesTests.cs`,
+  `contracts/shared-rules.json` → `gradedFolders.choices`. Suite 1047 passed,
+  2 skipped, 0 failed (1031 before).
 
 - ✅ DONE (mac, 2026-09-06, branch `issue/help-sheet-resolved-curriculum-folder`,
   commit `3f1626be`). **The folders sheet named a curriculum folder the course
