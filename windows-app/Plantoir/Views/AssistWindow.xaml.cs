@@ -76,7 +76,8 @@ public sealed partial class AssistWindow : Window
         Subheading.Text = "Ask for a change in plain words. Every change is backed up and can be undone, " +
                           "and nothing reaches students until the section deploys — which always waits for your OK.";
 
-        Closed += (_, _) => Shutdown();
+        RestorePlacement();
+        Closed += (_, _) => { RememberPlacement(); Shutdown(); };
 
         // Started on Loaded, not here: the download offer is a ContentDialog,
         // and a dialog needs a XamlRoot, which does not exist until the
@@ -100,6 +101,45 @@ public sealed partial class AssistWindow : Window
         if (App.WindowFor(_folder) is { } other) return other;
         try { return App.OpenWindow(_folder, null); }
         catch (Exception ex) { App.LogDiagnostic($"AssistWindow could not open a main window: {ex}"); return null; }
+    }
+
+    // ---- Where this window sits -------------------------------------------
+
+    private string PlacementKey => AppSettings.AssistWindowKey(_folder, _course.Code, _section);
+
+    /// <summary>
+    /// Put the window where this SECTION's assistant was last left —
+    /// placement only, the size is the window's own — and only if that point
+    /// is still on a display. A remembered monitor that is gone would put
+    /// the window where a teacher cannot find it, so the point is checked
+    /// against the displays that exist now and the default placement wins
+    /// otherwise (the clamp MainWindow applies to its own frame).
+    /// </summary>
+    private void RestorePlacement()
+    {
+        try
+        {
+            if (!App.Settings.AssistWindowPlacements.TryGetValue(PlacementKey, out var placement)) return;
+            var point = new Windows.Graphics.PointInt32((int)placement.X, (int)placement.Y);
+            var display = Microsoft.UI.Windowing.DisplayArea.GetFromPoint(point, Microsoft.UI.Windowing.DisplayAreaFallback.None);
+            if (display is null) return;
+            var area = display.WorkArea;
+            // Some of the title bar must be inside the work area, or there is nothing to grab.
+            if (point.X > area.X + area.Width - 120 || point.Y > area.Y + area.Height - 60) return;
+            AppWindow.Move(point);
+        }
+        catch (Exception ex) { App.LogDiagnostic($"AssistWindow placement not restored: {ex.Message}"); }
+    }
+
+    private void RememberPlacement()
+    {
+        try
+        {
+            var position = AppWindow.Position;
+            App.Settings.AssistWindowPlacements[PlacementKey] = new RememberedPlacement(position.X, position.Y);
+            App.Settings.Save();
+        }
+        catch (Exception ex) { App.LogDiagnostic($"AssistWindow placement not remembered: {ex.Message}"); }
     }
 
     private void OnceLoaded(object sender, RoutedEventArgs e)

@@ -72,4 +72,32 @@ public class AcceptedSyncedFoldersTests
         Assert.Empty(settings.AcceptedSyncedFolders);
         Assert.False(settings.HasAcceptedSyncFor(null));
     }
+
+    // ---- Where each section's assistant window was left ------------------
+
+    /// <summary>
+    /// Placement is per SECTION, is a different type from the windows replayed
+    /// at launch (so an assistant window is never reopened unasked, model and
+    /// all), and is pruned with the same rule as those: a working folder that
+    /// is gone takes its entries with it.
+    /// </summary>
+    [Fact]
+    public void AssistantWindowPlacementsArePerSectionAndPrunedWithTheirFolder()
+    {
+        var settings = Fresh();
+        string kept = AppSettings.AssistWindowKey(@"C:\Teaching", "ICS3U", 1);
+        string other = AppSettings.AssistWindowKey(@"C:\Teaching", "ICS3U", 2);
+        string gone = AppSettings.AssistWindowKey(@"D:\Old|Folder", "ICS3U", 1);
+        settings.AssistWindowPlacements[kept] = new RememberedPlacement(10, 20);
+        settings.AssistWindowPlacements[other] = new RememberedPlacement(30, 40);
+        settings.AssistWindowPlacements[gone] = new RememberedPlacement(50, 60);
+
+        Assert.Equal(@"D:\Old|Folder", AppSettings.FolderOfAssistWindowKey(gone));
+        settings.PruneAssistWindowPlacements(folder => folder == @"C:\Teaching");
+
+        Assert.Equal(new[] { kept, other }.OrderBy(k => k), settings.AssistWindowPlacements.Keys.OrderBy(k => k));
+        Assert.Equal(new RememberedPlacement(30, 40), settings.AssistWindowPlacements[other]);
+        // The launch-restore list is untouched by any of this.
+        Assert.Empty(settings.RememberedWindows);
+    }
 }
