@@ -365,9 +365,65 @@
         "name" : "A local folder wins over everything else",
         "section" : 3,
         "why" : "A folder deploy never touches a web host, so no target and no account are passed even when an account ID exists."
+      },
+      {
+        "cloudflareAccountID" : "",
+        "configuration" : {
+          "course_code" : "ICS3U"
+        },
+        "course" : "ICS3U",
+        "expectArguments" : [
+          "ICS3U",
+          "1",
+          "--non-interactive"
+        ],
+        "name" : "A scheduled deploy says nobody is at the computer",
+        "section" : 1,
+        "unattended" : true,
+        "why" : "The flag goes straight after the course and section, before the destination, so every shape of deploy carries it in the same place. Only a SCHEDULED deploy passes it: pressing Deploy runs the launcher through a pseudo-terminal, so a question from the publishing step comes back to the app and becomes a dialog the teacher answers — that is the feature, not a fault, and it must keep working."
+      },
+      {
+        "cloudflareAccountID" : "0123456789abcdef0123456789abcdef",
+        "configuration" : {
+          "course_code" : "MCV4U",
+          "deploy_target" : "cloudflare_pages"
+        },
+        "course" : "MCV4U",
+        "expectArguments" : [
+          "MCV4U",
+          "2",
+          "--non-interactive",
+          "--target",
+          "cloudflare",
+          "--account",
+          "0123456789abcdef0123456789abcdef"
+        ],
+        "name" : "A scheduled Cloudflare deploy carries the flag and the destination",
+        "section" : 2,
+        "unattended" : true
+      },
+      {
+        "cloudflareAccountID" : "",
+        "configuration" : {
+          "course_code" : "SPH3U",
+          "deploy_folder_path" : "/Users/teacher/Sites/sph3u",
+          "deploy_target" : "local_folder"
+        },
+        "course" : "SPH3U",
+        "expectArguments" : [
+          "SPH3U",
+          "3",
+          "--non-interactive",
+          "--to-folder",
+          "/Users/teacher/Sites/sph3u"
+        ],
+        "name" : "A scheduled folder deploy carries it too",
+        "section" : 3,
+        "unattended" : true,
+        "why" : "A folder deploy asks nothing today — it never reaches a web host and never names a site — so the flag changes nothing here. It is passed anyway because it describes the CALLER, not the destination: it says nobody is at the computer, and that stays true if a question is ever added to this path."
       }
     ],
-    "note" : "Given a course's configuration, what deploy.sh is asked to do. One place must decide this in each app — on the mac it is DeployCommand.arguments, shared by the Deploy button, the assistant and the scheduled-deploy alarm. Built separately anywhere and this happens: the assistant path never passed --target cloudflare, and a Cloudflare course deployed to Netlify. Nothing failed; the site simply appeared on the wrong host. Netlify passes NO target flag at all — it is the launcher's default, and every course written before Cloudflare existed relies on that. A course can configure more than one destination now (additional_deploy_targets, in file-formats.json) — Deploy walks them in order and calls this same argument-building logic once per destination, so every case above still applies per leg; there is no separate multi-destination argument shape to test."
+    "note" : "Given a course's configuration, what deploy.sh is asked to do. One place must decide this in each app — on the mac it is DeployCommand.arguments, shared by the Deploy button, the assistant and the scheduled-deploy alarm. Built separately anywhere and this happens: the assistant path never passed --target cloudflare, and a Cloudflare course deployed to Netlify. Nothing failed; the site simply appeared on the wrong host. Netlify passes NO target flag at all — it is the launcher's default, and every course written before Cloudflare existed relies on that. A course can configure more than one destination now (additional_deploy_targets, in file-formats.json) — Deploy walks them in order and calls this same argument-building logic once per destination, so every case above still applies per leg; there is no separate multi-destination argument shape to test. A case may carry `unattended: true`, which is what the SCHEDULED deploy passes and nothing else does — the Deploy button, the assistant and an MCP client all leave it off. It adds `--non-interactive`, which tells the launcher that any question a teacher would have to answer must become a refusal rather than a prompt nobody can answer or a default nobody chose. What it refuses, on both platforms, is launcherFlags.nonInteractive."
   },
   "failureExplanations" : {
     "cases" : [
@@ -460,8 +516,68 @@
         "macOnly" : true,
         "meaning" : "Publish using a particular already-built image instead of the one the recipe hashes to.",
         "why" : "NOT shared, recorded 2026-09-06 when this list was first run against the launchers. `deploy.sh` parses it; `deploy.ps1` does not, and cannot — Windows dropped Docker for a native runtime on 2026-08-19 (GUI-IMPROVEMENTS.md entry 290), so there is no image for a tag to name. The right answer was to write the divergence down rather than add a flag that does nothing to a launcher so a test would pass. `--diagnose` above IS shared and both launchers take it."
+      },
+      {
+        "flag" : "--non-interactive",
+        "meaning" : "Nobody is at the computer. Anything that would stop and ask — a Netlify or Cloudflare credential, a name for a website that does not exist yet — stops the publish instead, saying which question it could not ask.",
+        "usedFor" : [
+          "a scheduled publish, which runs at a time the teacher chose and then went to bed for"
+        ],
+        "why" : "Both alternatives were seen for real (TODO.md, 2026-09-06). With a terminal on standard input, deploy.py's input() WAITS — two measured runs sat at one prompt for 45 minutes — and the teacher's site is simply not updated in the morning, with nothing to say why. Without one, sys.stdin.isatty() is false and the DEFAULT is taken silently, so the site is published at an address nobody chose. Refusing is the only answer that neither hangs nor publishes something unasked for. The launcher passes the same flag on to deploy.py, and asks for no terminal at all when it is set, so the waiting branch cannot exist."
       }
     ],
+    "nonInteractive" : {
+      "note" : "What `--non-interactive` must refuse, on BOTH platforms. The list is the point: a flag that refuses in six places on one platform and four on the other is a scheduled publish that hangs on one of them. deploy.py is shared Python, so those refusals cannot drift; the launcher's own are per-platform and are written out here so the second one is copied rather than invented.",
+      "notRefused" : {
+        "question" : "Fix course code to '<CODE>'? [Y/n] — the guard for a code ending in a digit zero",
+        "state" : "DELIBERATELY UNCHANGED, and proposed rather than decided — see WINDOWS-HANDOFF.md and MAC-HANDOFF.md, 2026-09-06.",
+        "why" : "Both answers are defensible, so it is a product decision rather than a repair. The guard matches any code of three letters, a digit and a zero, and a course code here is free text up to twelve characters (CourseCodeRule), so ENG10, SCI10 and ART10 are all legitimate codes that match it. Refusing would make those courses unschedulable every night, forever, with nothing at scheduling time to say so. Keeping the code as typed is the other candidate and is also defensible: the code comes from course_config.json rather than a keyboard, and a genuine typo already fails loudly at “Course folder not found”. What is NOT defensible is what happens today — an empty read defaults to Y and the publish silently retargets a different course code."
+      },
+      "refusals" : [
+        {
+          "question" : "Paste Netlify token",
+          "reachedWhen" : "Netlify is not connected on this computer.",
+          "refuse" : "Say Netlify is not connected, that connecting asks for a token nobody is here to paste, and that publishing this section once from Plantoir sorts it out.",
+          "where" : "launcher"
+        },
+        {
+          "question" : "Paste Cloudflare token",
+          "reachedWhen" : "Cloudflare is not connected on this computer.",
+          "refuse" : "The same, for Cloudflare.",
+          "where" : "launcher"
+        },
+        {
+          "question" : "Paste Cloudflare Account ID",
+          "reachedWhen" : "Cloudflare is the destination, the app passed no --account, the token cannot list its own account, and nothing was remembered.",
+          "refuse" : "Say the Account ID is not saved, and to add it in the course's settings under Deploying — the same words the app already uses when it refuses to SCHEDULE for this reason.",
+          "where" : "launcher"
+        },
+        {
+          "question" : "(not a question) a saved credential that fails its check",
+          "reachedWhen" : "The saved token does not validate.",
+          "refuse" : "Refuse, and LEAVE THE TOKEN IN PLACE rather than clearing it. The check is a network call, so “this computer was offline at 6am” and “the token was revoked” look identical from there — and throwing away a working credential only a person can replace is the more expensive of the two mistakes. An ordinary publish still clears it, with somebody there to paste a new one.",
+          "where" : "launcher"
+        },
+        {
+          "question" : "Enter Netlify site name",
+          "reachedWhen" : "There is no Netlify site for this section — either it has never been published, or the site was deleted at Netlify since the alarm was set and the lookup comes back 404.",
+          "refuse" : "Refuse. The address is what students type, it is global to all of Netlify, and it cannot be changed later without every existing link breaking, so there is no safe default. This is the state that hung for 45 minutes on Windows.",
+          "where" : "deploy.py"
+        },
+        {
+          "question" : "First time setup... what is your last name?",
+          "reachedWhen" : "A new Cloudflare project is being named and no surname is saved on this computer.",
+          "refuse" : "Refuse. On the Netlify path this is unreachable — naming the site is refused first. Note the asymmetry: with a surname already saved, a new Cloudflare project asks NOTHING (the address is derived from the course, section, year and surname), so nothing is refused there.",
+          "where" : "deploy.py"
+        },
+        {
+          "question" : "any other prompt",
+          "reachedWhen" : "A question is added upstream that this list does not name.",
+          "refuse" : "The prompt helper itself refuses when the flag is set, naming the question verbatim. A backstop, so a new question fails loudly instead of being answered with a default nobody chose.",
+          "where" : "deploy.py"
+        }
+      ]
+    },
     "note" : "What the APP passes the launchers, beyond the deploy arguments already above. Both platforms drive their own launcher — `preview.sh` here, `preview.ps1` there — and those scripts must accept the same flags, because the apps are written against the same behaviour. A flag renamed in one script and not the other fails at the worst moment: the launcher prints 'Unknown option' and exits, and to a teacher that is a preview that just did not start.",
     "preview" : [
       {

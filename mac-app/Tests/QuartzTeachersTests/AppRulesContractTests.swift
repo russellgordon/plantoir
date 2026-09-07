@@ -27,11 +27,14 @@ final class AppRulesContractTests: XCTestCase {
             let configuration: CourseConfiguration = try roundTripped(
                 try XCTUnwrap(testCase["configuration"] as? [String: Any])
             )
+            // Absent means "somebody is at the computer", which is every
+            // case written before a scheduled deploy could say otherwise.
             let arguments: [String] = DeployCommand.arguments(
                 courseCode: try XCTUnwrap(testCase["course"] as? String),
                 sectionNumber: try XCTUnwrap(testCase["section"] as? Int),
                 configuration: configuration,
-                cloudflareAccountID: testCase["cloudflareAccountID"] as? String ?? ""
+                cloudflareAccountID: testCase["cloudflareAccountID"] as? String ?? "",
+                unattended: testCase["unattended"] as? Bool ?? false
             )
             XCTAssertEqual(arguments, try XCTUnwrap(testCase["expectArguments"] as? [String]), name)
         }

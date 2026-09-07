@@ -549,7 +549,11 @@ enum ScheduledDeploy {
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
                 destination: destination,
-                cloudflareAccountID: cloudflareAccountID
+                cloudflareAccountID: cloudflareAccountID,
+                // The one caller that passes this. Nobody is at the Mac at
+                // the scheduled moment, so the launcher must refuse a
+                // question rather than wait for an answer or pick one.
+                unattended: true
             ))
         }
         let plist: [String: Any] = propertyList(
