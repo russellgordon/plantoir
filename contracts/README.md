@@ -167,7 +167,8 @@ assistant's tests". Two of them matter enough to repeat:
 ## Coverage: every mac test file, and where it stands
 
 No stone unturned — this table is the audit, and a file missing from it is a
-gap nobody has looked at. Counts are test functions, taken 2026-08-16.
+gap nobody has looked at. Counts are test functions, taken 2026-08-16; the `siteHealth` row was
+recounted 2026-09-07.
 
 **Shared through a contract** (the Windows suite can run the same cases):
 
@@ -218,7 +219,7 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
 | Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
-| What a teacher is told when a folder a feature needs has gone | `shared-rules.json` → `siteHealth` | SiteHealthContract (5), SiteHealthFinding (11), and `scripts/test_site_health.py` |
+| What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (15), SiteHealthRepair (25), and `scripts/test_site_health.py` |
 
 ### Which of these the WINDOWS suite runs
 
@@ -245,8 +246,8 @@ every list that audit counted, plus two it missed (`linkRules.browserSafe` and
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
 | `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution` | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
 | `specialNames.renameFolder.linkRewriting` — how a folder's new name is SPELLED inside a link (11 cases) | `FolderPathRewriterTests` |
-
-**Two notes on the last two rows**, because they are not part of the audit's
+| `siteHealth.repair.reportedOncePerFinding` (both cases, built as `howToRunACase` says) and `siteHealth.repair.refusedWhenSomethingIsInTheWay` (the sentence, word for word) | `SiteHealthRepairTests`, `SiteHealthContractTests` |
+**Two notes on the two `specialNames` rows**, because they are not part of the audit's
 count and reading them as though they were would mislead. The `specialNames`
 lists in the first were already being run — those test classes predate item 29
 — and were simply never written down here. `linkRewriting` is newer than the audit — it was added to
@@ -256,6 +257,14 @@ deserialises its eleven cases or retypes five of its own is tracked by item 31
 in [`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md)** — read whether that item is
 struck rather than trusting a sentence here, which is exactly the kind of status
 line that drifts.
+
+**One list was added after that audit and wired the same day it reached
+Windows.** `siteHealth.repair.reportedOncePerFinding` (mac, 2026-09-07) says a
+repair reports one result per FINDING rather than one per check name, and
+names each thing once in the sentence however many findings produced it.
+Windows shipped that shape first and proved it with a hand-written test; on
+2026-09-07 the test was replaced by the contract's cases, so the rule has one
+home. `WINDOWS-HANDOFF.md` items 33 and 34 have the detail.
 
 **Three habits came out of that work and are worth copying on either side.**
 
