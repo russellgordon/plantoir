@@ -22,15 +22,16 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Thirty-five of its thirty-eight
+with its headline still reading as open work. **Thirty-six of its thirty-eight
 items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
 day (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
 the contract case lists this suite was not reading); items 33 and 34 — the
 refusal of a folder named `index.md`, and the per-finding repair report as
-contract cases — struck on 2026-09-07, along with 13, 17, 18, 19, 25, 26, 27, 28, 30, 31, 32
-and 38 the same day. Items 35–37 were added the
-same day by an audit of these two documents and are open.
+contract cases — struck on 2026-09-07, along with 13, 17, 18, 19, 25, 26, 27, 28, 30, 31, 32,
+35 and 38 the same day. Items 35–37 were added the same day by an audit of
+these two documents; **36 and 37 are what is left**, and both are decisions
+rather than code.
 
 **Count them rather than trusting this line.** It read "sixteen of its
 twenty-four" on a list that had grown to 32 items with eleven of them open,
@@ -145,15 +146,18 @@ Run it **from the repository root**, not from `windows-app/`:
 ```
 
 **Two switches, both added 2026-09-07 with item 35.** `PLANTOIR_UI_KEEP=1`
-leaves a failed run's temporary folder behind and prints the path — a test
-that fails INSIDE the app has almost nothing to say from outside it, and the
-evidence (that run's `startup.log`, its trail, its per-run launcher log, its
-working folder) was being deleted on the way out. And the runner now sweeps
-orphaned `powershell.exe`/`python.exe` children afterwards, matched on a
-command line naming one of the suite's own `plantoir-ui-<8 hex>` folders:
-killing `Plantoir.exe` kills only `Plantoir.exe`, because the whole-tree kill
-lives in `ConPty.Kill()` and runs when the APP ends a task, not when the app
-is ended from outside.
+stops the run deleting its temporary folders — every test's, not just a failed
+one's, since the teardown cannot know the outcome — and the runner prints each
+path. A test that fails INSIDE the app has almost nothing to say from outside
+it, and the evidence (that run's `startup.log`, its trail, its per-run
+launcher log, its working folder) was being deleted on the way out. And the
+runner now sweeps orphaned `powershell.exe`/`python.exe` children afterwards,
+matched on **this run's token** — minted by the runner and folded by
+`DrivenApp` into every folder name (`plantoir-ui-<run>-<8 hex>`) — because
+matching the folder prefix would kill a parallel run's live launchers and a
+developer tailing a kept folder's log. Killing `Plantoir.exe` kills only
+`Plantoir.exe`: the whole-tree kill lives in `ConPty.Kill()` and runs when the
+APP ends a task, not when the app is ended from outside.
 
 It closes a running Plantoir before it starts, says so, and does not reopen it.
 `--state-dir` moves the whole state folder for the run, so nothing of the
@@ -166,6 +170,11 @@ s) and once in a full run (6/6, 3 m 16 s). It is the test that ticks a marks
 folder and waits for the sheet to be rebuilt through the dispatcher, and it
 already retries for 20 seconds at half-second intervals. Nothing in that run
 had touched the app or the UI project.
+
+**It did it again on 2026-09-07**, on the item 35 branch: one failure in a
+full run, then a pass alone (23 s) and a pass in a full run (9/9, 4 m 13 s) —
+so roughly one full run in four across two days, on a branch that had touched
+neither this test nor the view it drives. Second data point, same conclusion.
 
 **So: if it fails, re-run it alone before believing it.** Recorded because an
 intermittent nobody writes down is rediscovered as a regression by the next

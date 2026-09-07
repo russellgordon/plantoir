@@ -103,7 +103,8 @@ public sealed class DrivenApp : IDisposable
         // other's live launchers, and a developer reading a kept folder — say
         // `Get-Content ...\plantoir-ui-*\state\Logs\startup.log -Wait` — would
         // have the pattern in their own command line and be force-killed.
-        string run = Environment.GetEnvironmentVariable("PLANTOIR_UI_RUN") ?? "solo";
+        string run = Environment.GetEnvironmentVariable("PLANTOIR_UI_RUN") is { } token
+                     && !string.IsNullOrWhiteSpace(token) ? token : "solo";
         _root = Path.Combine(Path.GetTempPath(),
                              $"plantoir-ui-{run}-{Guid.NewGuid().ToString("N")[..8]}");
         WorkspacePath = Path.Combine(_root, "workspace");
@@ -132,10 +133,14 @@ public sealed class DrivenApp : IDisposable
         // CAUTION: the child binds to the pseudo console only when the
         // CREATING process's std handles are clean — console handles or none —
         // and a creator whose stdio is redirected to pipes leaks those handles
-        // into the child instead. The `dotnet test` host's stdio is pipes, and
-        // UseShellExecute = false hands them straight to the app. ShellExecute
-        // gives a GUI process no std handles at all, which is the "or none"
-        // case, and is also exactly what a teacher's shortcut does.
+        // into the child instead. ShellExecute gives a GUI process no std
+        // handles at all, which is the "or none" case, and is also exactly
+        // what a teacher's shortcut does. (That the `dotnet test` host's own
+        // handles are PIPES is inferred rather than measured — it fits, since
+        // console handles would have put the launcher's output in the terminal
+        // and the one-second EOF is what a closed pipe gives. Flagged as an
+        // inference because the version of this comment before it was exactly
+        // that: a plausible story stated as fact.)
         //
         // Measured 2026-09-07 (Lenovo 20QES70500, Intel Core i5-8365U @
         // 1.60 GHz, 16 GB), one variable, three launches of the same build:
@@ -258,13 +263,17 @@ public sealed class DrivenApp : IDisposable
         // Deleted last, and never fatally: a locked file must not turn a
         // passing test red, and the folder is under TEMP either way.
         //
-        // PLANTOIR_UI_KEEP=1 leaves it behind instead. A UI test that fails
-        // inside the app has almost nothing to say from out here — the useful
-        // evidence is the run's own startup.log, breadcrumb trail and working
-        // folder, and all three are inside this folder being deleted. Written
-        // after an afternoon of guessing at a launcher failure whose reason
-        // was sitting in a log that had already been thrown away. It prints
-        // the path, because a folder kept silently is litter.
+        // PLANTOIR_UI_KEEP=1 leaves it behind instead — EVERY test's, since
+        // teardown does not know whether the test passed. A UI test that fails
+        // inside the app has almost nothing to say from out here: the useful
+        // evidence is the run's own startup.log, breadcrumb trail, per-run
+        // launcher log and working folder, and all of it is inside this folder
+        // being deleted. Written after an afternoon of guessing at a launcher
+        // failure whose reason was sitting in a log already thrown away.
+        //
+        // run-ui-tests.ps1 prints the kept paths too, and THAT is the notice
+        // to rely on: plain Console output from Dispose is not attached to a
+        // test result and often does not surface in `dotnet test`.
         if (Environment.GetEnvironmentVariable("PLANTOIR_UI_KEEP") == "1")
         {
             Console.WriteLine($"PLANTOIR_UI_KEEP: leaving this run's files at {_root}");

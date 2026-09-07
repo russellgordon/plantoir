@@ -51,6 +51,18 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
+**One proposed 2026-09-07, and nothing goes red for it: the New Course
+wizard's affirmative button reads "Create Course" on both platforms** —
+`NewCourseDialog.cs` on Windows, `NewCourseWizardView.swift:520` on the mac —
+**and nothing in `contracts/` pins it** (`grep -rn "Create Course" contracts/`
+returns nothing). It is the first thing a teacher presses in this app, it is
+identical on both sides today, and it would go green on both immediately.
+Windows now asserts it in a Windows-only UI test (`NewCourseWizardUiTests`),
+which is the weakest place for a shared sentence to live. The contract is
+generated on the mac, so where it belongs — `app-rules.json`, or a wizard
+block of its own — is that side's call; this is the proposal, not the
+implementation. Branch `issue/35-first-run-ui-checks`.
+
 **One proposed 2026-09-07, a SENTENCE, not a rule: `shared-rules.json` →
 `specialNames.renameFolder.interruptedRename`** — the line Windows shows
 inside the rename sheet when it opens on a rename that stopped after the
@@ -270,21 +282,17 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   Windows made that path a hand-driven check with a written procedure
   (`documentation/12-windows-app.md`) rather than a test.
 
-  **What the mac owes is only the check, not the work**: if `deploy.sh`
-  has the same shape, the mac's equivalent path is un-automatable for the
-  same reason and should be a hand-check too rather than a test somebody
-  spends an afternoon failing to write. If it does NOT — if the mac's
-  launcher passes the token through unvalidated — then the mac can automate
-  what Windows could not, which is worth knowing and worth telling Windows.
-  Either way, say which, because "nobody checked" is how both sides end up
-  discovering it separately.
-
-  While there, one cheap contract case somebody could propose: the New
-  Course wizard's affirmative button reads "Create Course" on both
-  platforms (`NewCourseDialog.cs`; `NewCourseWizardView.swift`) and nothing
-  in `contracts/` pins it. Windows now asserts it in a Windows-only test.
-  A case would go green on both sides immediately — but the contract is
-  generated on the mac, so proposing it is that side's call.
+  **What the mac owes is only the check, not the work**, and it is really
+  two questions, because token validation alone does not settle it: (a) does
+  `deploy.sh` validate the token before running `deploy.py`, and (b) **can a
+  test put a known-bad token into the Keychain for its own run without
+  touching the teacher's?** If the answer to (b) is no — and on Windows it
+  is no, `deploy.ps1`'s Credential Manager target is hardcoded — then the
+  path is un-automatable whatever (a) says, because a machine with a real
+  token saved would publish a live site. An earlier version of this entry
+  drew the opposite inference from (a) alone; it does not follow. Say what
+  you find either way, because "nobody checked" is how both sides discover
+  the same thing separately.
 
 - **Two small decisions from Windows item 30, both for the mac to make**
   (Windows, 2026-09-07, branch `issue/30-polish-delete-crumbs-rename`).
@@ -2000,11 +2008,15 @@ rather than being deleted.
   and leaning on `verify-deploy.ps1` (it redirects stdin from a file precisely
   so `deploy.py` asks nothing). What NOT to check by hand, either platform:
   the dialog's title, explanation and steps are already contract data
-  (`app-rules.json` → `credentialRequests.requests.siteName`) asserted by
-  equality; what nothing pins is the ORDER, the pre-filled address, Cancel's
-  behaviour, and that the created site carries the typed name. The one thing
-  the mac is actually ASKED to look at is in "Open — what the mac still owes"
-  rather than buried here.
+  (the `siteName` entry in `app-rules.json`'s `credentialRequests.requests`)
+  asserted by equality; what nothing pins is the ORDER, the pre-filled
+  address, Cancel's behaviour, and that the created site carries the typed
+  name. **One thing the mac inherits free:** that sweep was skipping
+  `explanation` — the longest sentence in these dialogs — on both platforms,
+  and Windows added the assertion on 2026-09-07 (green across all seven
+  requests). The mac's own credential-request test is worth a look for the
+  same omission. The one thing the mac is actually ASKED to do is in
+  "Open — what the mac still owes" rather than buried here.
 
 - **Rename Course lives in Windows' FILE menu with F2, not in an Edit menu
   with no key — a chosen divergence on two counts, not drift** (Windows,

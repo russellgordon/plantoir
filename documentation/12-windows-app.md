@@ -333,20 +333,30 @@ and not reopening it — that part is the teacher's).
 It does **not** judge anything visual: colour, contrast, dark-mode legibility,
 how a long name wraps. That is a screenshot pass, not this.
 
-**Two switches worth knowing.** `PLANTOIR_UI_KEEP=1` leaves a failed run's
-temporary folder behind instead of deleting it, and prints the path — a test
-that fails INSIDE the app has almost nothing to say from outside it, and the
-evidence that matters (the run's own `startup.log`, its breadcrumb trail, its
-per-run launcher log under `Logs\runs`, and the working folder) is all in the
-folder being thrown away. And `run-ui-tests.ps1` sweeps orphaned launcher
-children afterwards: killing `Plantoir.exe` kills only `Plantoir.exe`, because
-the whole-tree kill lives in `ConPty.Kill()`, which runs when the APP ends a
-task rather than when the app is ended from outside. A test that fails while
-`setup.ps1` is mid-run therefore leaves `powershell.exe` and `python.exe`
-holding the temporary working folder open, and the folder then survives with
-nothing to say where it came from. The sweep matches on a command line naming
-one of the suite's own folders (`plantoir-ui-<8 hex>`), which is what makes a
-force-kill there safe.
+**Two switches worth knowing.** `PLANTOIR_UI_KEEP=1` stops the run deleting
+its temporary folders — EVERY test's, not just a failed one's, since the
+teardown does not know the outcome — and `run-ui-tests.ps1` prints each path.
+A test that fails INSIDE the app has almost nothing to say from outside it,
+and the evidence that matters (that run's own `startup.log`, its breadcrumb
+trail, its per-run launcher log under `Logs\runs`, and its working folder) is
+all in what is normally thrown away.
+
+And `run-ui-tests.ps1` sweeps orphaned launcher children afterwards: killing
+`Plantoir.exe` kills only `Plantoir.exe`, because the whole-tree kill lives in
+`ConPty.Kill()`, which runs when the APP ends a task rather than when the app
+is ended from outside. A test that fails while `setup.ps1` is mid-run
+therefore leaves `powershell.exe` and `python.exe` holding the temporary
+working folder open, and the folder then survives with nothing to say where it
+came from. **The sweep matches THIS RUN's token** — `run-ui-tests.ps1` mints
+one and `DrivenApp` folds it into every folder it makes
+(`plantoir-ui-<run>-<8 hex>`). Matching the folder PREFIX instead was the
+first version and is too wide: two runs at once would kill each other's live
+launchers, and a developer tailing a kept folder's log has the prefix in their
+own command line. Both match the prefix; neither matches the token. Python is
+caught by the same match because `setup.ps1` runs it as `python.exe -u
+<workspace>\.toolchain\scripts\setup_course.py` — the script path is inside
+the temporary folder, so it is on the command line even though the folder is
+otherwise only python's working directory.
 
 ### Never start the app with its output redirected
 
@@ -417,8 +427,12 @@ dialog has never been seen by anybody checking that it works.
 
 **What to check, and what NOT to.** Do not eyeball the dialog's title,
 explanation or its three steps: those are contract data
-(`contracts/app-rules.json` → `credentialRequests.requests.siteName`) and are
-asserted by equality in `ContractTests`, so reading them by hand adds nothing.
+(the `siteName` entry in `contracts/app-rules.json`'s `credentialRequests.requests`
+array) and are asserted by equality in `ContractTests`, so reading them by hand
+adds nothing. **The explanation was the exception until 2026-09-07** — the
+sweep checked title, field label, secrecy, link and steps, and skipped the
+longest thing a teacher reads. Writing this paragraph is what found it; it is
+asserted now.
 Check the five things nothing pins:
 
 1. The **surname** dialog comes first, and only once. On a second new section
@@ -438,9 +452,20 @@ Check the five things nothing pins:
 with a real token already saved. `--auto-deploy CODE N` presses Publish for
 you; the button does the same thing.
 
-**Clean up afterwards, or the check stops checking anything.** Delete the site
-on Netlify, and delete `courses/<CODE>/.netlify_sites/section<N>.json` — with
-the marker in place the next publish reuses the site and never asks.
+**Do it in a working folder made for it, and clean up afterwards, or the check
+stops checking anything.** Three pieces of state make a second run silent:
+
+- `courses/<CODE>/.netlify_sites/section<N>.json` — the site marker. With it
+  in place the next publish reuses the site and never asks.
+- `courses/<CODE>/section<N>/.netlify_site.json` — the LEGACY marker, which
+  `deploy.py` migrates back into the stable path if it finds one, so an older
+  folder needs both removed.
+- `courses/.internal/profile.json` — the saved surname. Nothing removes it,
+  which is why **step 1 can only be checked once per working folder**: use a
+  fresh one, or accept that you are checking steps 2–5 only and say so.
+
+And delete the site on Netlify, since it is a real one and the address is
+globally unique.
 
 Whether this joins the release cut is the same open question as handoff item
 36 (`verify-deploy.ps1` is wired into nothing and that is a decision nobody has
