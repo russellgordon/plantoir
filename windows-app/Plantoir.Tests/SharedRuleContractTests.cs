@@ -17,6 +17,7 @@ namespace Plantoir.Tests;
 /// whether a rule is the product's or the platform's. None was unreachable;
 /// each was simply a test nobody had written.</para>
 /// </summary>
+[Collection(ProcessEnvironment.Name)]
 public sealed class SharedRuleContractTests : IDisposable
 {
     private readonly string _folder = Path.Combine(Path.GetTempPath(),
@@ -73,16 +74,16 @@ public sealed class SharedRuleContractTests : IDisposable
         }
 
         string courses = Path.Combine(_folder, "courses");
-        string before = Path.Combine(courses, "ICS3U");
+        string before = Path.Combine(courses, "ZZT4Q");
         Directory.CreateDirectory(Path.Combine(before, "section1"));
         Directory.CreateDirectory(Path.Combine(before, ".netlify_sites"));
-        Directory.CreateDirectory(Path.Combine(courses, "_backups", "ICS3U"));
-        File.WriteAllText(Path.Combine(courses, "_backups", "ICS3U", "backup.zip"), "zip");
+        Directory.CreateDirectory(Path.Combine(courses, "_backups", "ZZT4Q"));
+        File.WriteAllText(Path.Combine(courses, "_backups", "ZZT4Q", "backup.zip"), "zip");
         File.WriteAllText(Path.Combine(before, ".netlify_sites", "section1.json"), """{"site":"ics3u-s1"}""");
         File.WriteAllText(Path.Combine(before, "course_config.json"),
             """
             {
-              "course_code": "ICS3U",
+              "course_code": "ZZT4Q",
               "course_name": "Introduction to Computer Science",
               "deploy_target": "netlify",
               "num_sections": 1,
@@ -93,13 +94,13 @@ public sealed class SharedRuleContractTests : IDisposable
         File.WriteAllText(Path.Combine(_folder, "deploy.ps1"), "# marker");
 
         var workspace = new AssistWorkspace(_folder, new FakeLauncher());
-        var course = workspace.Course("ICS3U");
+        var course = workspace.Course("ZZT4Q");
         Assert.NotNull(course);
 
-        var outcome = CourseRenamer.Rename(course!, "ICS4U", courses, new[] { "ICS3U" });
-        Assert.Equal("ICS4U", outcome.NewCode);
+        var outcome = CourseRenamer.Rename(course!, "ZZT4R", courses, new[] { "ZZT4Q" });
+        Assert.Equal("ZZT4R", outcome.NewCode);
 
-        string after = Path.Combine(courses, "ICS4U");
+        string after = Path.Combine(courses, "ZZT4R");
 
         // The code IS the folder name, so renaming is a move.
         Assert.Equal(Expect("courseFolderMoves"), Directory.Exists(after) && !Directory.Exists(before));
@@ -108,7 +109,7 @@ public sealed class SharedRuleContractTests : IDisposable
         // it from course_config.json. A pair that disagree produce a sidebar
         // saying one thing and a published page saying another, with no error.
         string written = File.ReadAllText(Path.Combine(after, "course_config.json"));
-        Assert.Equal(Expect("courseCodeInSettingsRewritten"), written.Contains("\"ICS4U\"", StringComparison.Ordinal));
+        Assert.Equal(Expect("courseCodeInSettingsRewritten"), written.Contains("\"ZZT4R\"", StringComparison.Ordinal));
 
         // The teacher's own wording is left alone.
         Assert.Equal(
@@ -120,7 +121,15 @@ public sealed class SharedRuleContractTests : IDisposable
         // called that.
         Assert.Equal(
             Expect("backupsAndArchivesMove"),
-            Directory.Exists(Path.Combine(courses, "_backups", "ICS4U")));
+            Directory.Exists(Path.Combine(courses, "_backups", "ZZT4R")));
+
+        // Not moved is not the same as not there: a renamer that DELETED the
+        // backups would satisfy the line above.
+        Assert.True(File.Exists(Path.Combine(courses, "_backups", "ZZT4Q", "backup.zip")),
+            "The backup was made when the course was called ZZT4Q and belongs under that name. " +
+            "Renaming must leave it exactly where it is — restoring one still works, because the " +
+            "restorer names the restored folder after the ITEM rather than after whatever the zip " +
+            "holds inside.");
 
         // Where a section publishes to is recorded INSIDE the course folder, so
         // it travels and the students' address does not change.
@@ -133,7 +142,7 @@ public sealed class SharedRuleContractTests : IDisposable
         // addressed by the old code, which after a rename would fire at a
         // course that is no longer there.
         var notice = CourseRenamer.NoticeAfterRenaming(
-            new CourseRenamer.Outcome("ICS4U", new[] { 1 }, Array.Empty<int>()));
+            new CourseRenamer.Outcome("ZZT4R", new[] { 1 }, Array.Empty<int>()));
         Assert.NotNull(notice);
         Assert.Contains("Section 1", notice!.Message, StringComparison.Ordinal);
         Assert.Contains("Renaming turned that off", notice.Message, StringComparison.Ordinal);
@@ -142,7 +151,7 @@ public sealed class SharedRuleContractTests : IDisposable
         // And a rename with nothing scheduled says nothing at all — an alert
         // that fires every time is one nobody reads.
         Assert.Null(CourseRenamer.NoticeAfterRenaming(
-            new CourseRenamer.Outcome("ICS4U", Array.Empty<int>(), Array.Empty<int>())));
+            new CourseRenamer.Outcome("ZZT4R", Array.Empty<int>(), Array.Empty<int>())));
 
         Assert.True(unanswered.Count == 0,
             "contracts/course-management.json names effects of renaming a course that no test " +
@@ -188,7 +197,7 @@ public sealed class SharedRuleContractTests : IDisposable
         // shown unconditionally.
         string dialog = File.ReadAllText(Path.Combine(
             RepoRoot, "windows-app", "Plantoir", "MainWindow.xaml.cs"));
-        Assert.Contains("HasAssistantPrompts", dialog, StringComparison.Ordinal);
+        Assert.Contains("if (store.HasAssistantPrompts)", dialog, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -393,7 +402,31 @@ public sealed class SharedRuleContractTests : IDisposable
 
         string payloads = Path.Combine(RepoRoot, "support", "example_content");
         var offenders = new List<string>();
+        var withoutAManifest = new List<string>();
         int checkedPayloads = 0;
+
+        // Mirrors setup_course.py's `top_level_allowed`, which is the function
+        // that actually decides. Matching the manifest as TEXT — the first
+        // version of this test — is not the same rule and passes on a
+        // coincidental hit: "Curriculum" appears in `hidden` and
+        // `curriculum_folder` as well as in `shared_folders`, so dropping it
+        // from the list the installer reads would have gone unnoticed, which is
+        // precisely the silent direction this rule exists to catch.
+        static bool Installs(JsonNode manifest, string tree, string name, bool isFolder,
+                             HashSet<string> exceptions)
+        {
+            if (exceptions.Contains(name)) return true;
+
+            string folderKey = tree == "shared" ? "shared_folders" : "per_section_folders";
+            string fileKey = tree == "shared" ? "shared_files" : "per_section_files";
+
+            var allowed = manifest[isFolder ? folderKey : fileKey] as JsonArray;
+            if (allowed is null) return false;
+
+            foreach (var listed in allowed)
+                if (string.Equals(listed!.ToString(), name, StringComparison.Ordinal)) return true;
+            return false;
+        }
 
         foreach (string payload in Directory.EnumerateDirectories(payloads))
         {
@@ -401,10 +434,17 @@ public sealed class SharedRuleContractTests : IDisposable
             if (code.StartsWith('.')) continue;
 
             string manifestPath = Path.Combine(payload, "manifest.json");
-            if (!File.Exists(manifestPath)) continue;
+            if (!File.Exists(manifestPath))
+            {
+                // Not skipped quietly: the wizard discovers a payload BY its
+                // manifest, so a folder here without one is a course that looks
+                // ready and reaches nobody.
+                withoutAManifest.Add(code);
+                continue;
+            }
             checkedPayloads++;
 
-            string manifest = File.ReadAllText(manifestPath);
+            var manifest = JsonNode.Parse(File.ReadAllText(manifestPath))!;
             foreach (string tree in new[] { "shared", "per_section" })
             {
                 string treePath = Path.Combine(payload, tree);
@@ -413,26 +453,31 @@ public sealed class SharedRuleContractTests : IDisposable
                 foreach (string entry in Directory.EnumerateFileSystemEntries(treePath))
                 {
                     string name = Path.GetFileName(entry);
-                    if (exceptions.Contains(name)) continue;
-
-                    // The manifest names a folder or file by its own name; the
-                    // installer filters the copy by those lists.
-                    string bare = Path.GetFileNameWithoutExtension(name);
-                    if (manifest.Contains($"\"{name}\"", StringComparison.Ordinal)) continue;
-                    if (manifest.Contains($"\"{bare}\"", StringComparison.Ordinal)) continue;
-
-                    offenders.Add($"{code}/{tree}/{name}");
+                    bool isFolder = Directory.Exists(entry);
+                    if (!Installs(manifest, tree, name, isFolder, exceptions))
+                        offenders.Add($"{code}/{tree}/{name}");
                 }
             }
         }
 
+        Assert.True(withoutAManifest.Count == 0,
+            "These sit in support/example_content and carry no manifest.json, so the wizard finds " +
+            "no payload for them: " + string.Join(", ", withoutAManifest));
+
+        int payloadFolders = Directory.EnumerateDirectories(payloads)
+            .Count(d => !Path.GetFileName(d).StartsWith('.'));
+        Assert.Equal(payloadFolders, checkedPayloads);
         Assert.True(checkedPayloads >= 30,
             $"Only {checkedPayloads} payloads were checked; the repository ships far more, so the " +
             "walk is looking in the wrong place and this test is proving nothing.");
 
         Assert.True(offenders.Count == 0,
-            "These sit in a payload's trees and the manifest does not name them, so setup_course.py " +
-            "filters them out and no teacher ever sees them: " + string.Join(", ", offenders));
+            "These sit in a payload's trees and the manifest's own allow-list for that tree does " +
+            "not name them, so setup_course.py filters them out and no teacher ever sees them: " +
+            string.Join(", ", offenders) + ". Naming a folder under `hidden` or `graded_folders` " +
+            "is not enough — the installer reads shared_folders/shared_files for shared/ and " +
+            "per_section_folders/per_section_files for per_section/, and matches the name exactly, " +
+            "extension included.");
         Answer("Anything IN the payload trees must be named in the manifest");
 
         // The curriculum folder installs only when the teacher asked for it —

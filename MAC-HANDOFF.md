@@ -1728,6 +1728,24 @@ rather than being deleted.
     project references `Plantoir.Core` and `Plantoir.Mcp`, never the interface
     project — the honest limit of everything wired in this branch.)
 
+  **Rejected, and worth recording so they are not proposed again:**
+
+  - *A `windowsOrigins`-style mirror for the path bar* — a second list on this
+    side rather than a case list in the contract. Rejected for the reason the
+    marker-origins one was: the RULE is shared and only the spelling of a root
+    is the platform's, so the contract is the right home and a mirror would be
+    a second one.
+  - *Creating a real Windows scheduled task to prove the rename cancels it.*
+    That puts a job on the machine, and `CourseRenamer.Rename` would then
+    delete a real one — so what is asserted is the notice a teacher reads, on a
+    hand-built outcome, and the course code in the test was changed to one no
+    real task could carry. Proving the cancellation itself wants a seam in
+    `TaskScheduling`, which is a product change and not this branch's.
+  - *Walking a payload's trees recursively.* `setup_course.py`'s
+    `top_level_allowed` filters only the TOP level and copies whole folders
+    below it, so a recursive walk would report files the installer does in fact
+    install.
+
 - **`--image` is the mac's flag alone, and the contract listed it as shared;
   and a completeness check the mac may want** (Windows + shared, 2026-09-06,
   branch `issue/29-windows-contract-case-lists`). **The mac suite stays green**
