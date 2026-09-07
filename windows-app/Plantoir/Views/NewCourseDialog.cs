@@ -111,6 +111,13 @@ public sealed class NewCourseDialog : ContentDialog
     /// mean anything.
     /// </summary>
     private bool _startsFromSkeleton = true;
+    /// <summary>
+    /// What the last adoption put into the editor, list by list, so that
+    /// turning the toggle off can put the defaults back for exactly the lists
+    /// the teacher has NOT edited since. Null until a skeleton is adopted.
+    /// </summary>
+    private (List<string> SharedFolders, List<string> SharedFiles, List<string> PerSectionFolders,
+             List<string> PerSectionFiles, List<string> GradedFolders)? _adopted;
     private bool _includeCurriculum = true;
     private bool _includeCurriculumCoverage = true;
     private bool _includeCoverageNotes = true;
@@ -275,6 +282,7 @@ public sealed class NewCourseDialog : ContentDialog
         RefreshGradeWarning();
         RefreshCodeValidation();
         RefreshStartingContent();
+        AdoptSkeletonStructure();
         RefreshStructureArea();
 
         if (sections is not null)
@@ -774,6 +782,8 @@ public sealed class NewCourseDialog : ContentDialog
         _perSectionFolders = skeleton.PerSectionFolders.ToList();
         _perSectionFiles = skeleton.PerSectionFiles.ToList();
         _gradedFolders = SkeletonCatalog.AdoptedGradedFolders(skeleton);
+        _adopted = (_sharedFolders.ToList(), _sharedFiles.ToList(), _perSectionFolders.ToList(),
+                    _perSectionFiles.ToList(), _gradedFolders.ToList());
         RebuildStructureLists();
     }
 
@@ -782,19 +792,29 @@ public sealed class NewCourseDialog : ContentDialog
     /// leave the editor and the generic defaults come back. A one-way
     /// adoption is this feature's bug in miniature — the editor would keep
     /// showing a subject's folders for a course about to be made without them.
-    /// Only a structure the skeleton put there is replaced; one the teacher
-    /// has edited since is theirs and is left alone.
+    ///
+    /// <para>List by list, against what the adoption put there: a list the
+    /// teacher has edited since — a folder added or removed, a file renamed,
+    /// the LCS switch flipped, a marks box unticked — is theirs and is left
+    /// exactly as it is, and only the untouched ones go back to the defaults.
+    /// (An earlier version asked a single question of the shared folders and
+    /// replaced all five lists on the answer, which discarded an edited file
+    /// list and, after an LCS flip, silently restored nothing at all.)</para>
     /// </summary>
     private void RestoreGenericStructure()
     {
-        bool offered = SkeletonCatalog.IsOffered(
-            SkeletonsRoot, _sharedFolders, WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders);
-        if (!offered) return;
-        _sharedFolders = (_useLcs ? WizardDefaults.LcsSharedFolders : WizardDefaults.SharedFolders).ToList();
-        _sharedFiles = (_useLcs ? WizardDefaults.LcsSharedFiles : WizardDefaults.SharedFiles).ToList();
-        _perSectionFolders = WizardDefaults.PerSectionFolders.ToList();
-        _perSectionFiles = WizardDefaults.PerSectionFiles.ToList();
-        _gradedFolders = null;      // re-inferred from the restored lists
+        if (_adopted is not { } adopted) return;
+        if (_sharedFolders.SequenceEqual(adopted.SharedFolders))
+            _sharedFolders = (_useLcs ? WizardDefaults.LcsSharedFolders : WizardDefaults.SharedFolders).ToList();
+        if (_sharedFiles.SequenceEqual(adopted.SharedFiles))
+            _sharedFiles = (_useLcs ? WizardDefaults.LcsSharedFiles : WizardDefaults.SharedFiles).ToList();
+        if (_perSectionFolders.SequenceEqual(adopted.PerSectionFolders))
+            _perSectionFolders = WizardDefaults.PerSectionFolders.ToList();
+        if (_perSectionFiles.SequenceEqual(adopted.PerSectionFiles))
+            _perSectionFiles = WizardDefaults.PerSectionFiles.ToList();
+        if (_gradedFolders is not null && _gradedFolders.SequenceEqual(adopted.GradedFolders))
+            _gradedFolders = null;      // re-inferred from the restored lists
+        _adopted = null;
         RebuildStructureLists();
     }
 
@@ -1214,6 +1234,24 @@ public sealed class NewCourseDialog : ContentDialog
         string locale = _localeBox.SelectedIndex >= 0
             ? LocaleCatalog.Codes[_localeBox.SelectedIndex]
             : WizardDefaults.DefaultLocale;
+
+        // Adopt once more, here, whether or not the code box's TextChanged
+        // ever ran — it does not for a programmatic Text on an untemplated
+        // box (AutoCreate, and StageForCapture's own comment). A config that
+        // disagreed with the pages about to be installed would leave empty
+        // folders beside them. The guard is StructureToAdopt's own, so a list
+        // the teacher edited is still theirs. Mirrors the mac's
+        // buildConfiguration.
+        if (_startsFromSkeleton
+            && SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, code, _sharedFolders,
+                                                WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders) is { } lateAdopted)
+        {
+            _sharedFolders = lateAdopted.SharedFolders.ToList();
+            _sharedFiles = lateAdopted.SharedFiles.ToList();
+            _perSectionFolders = lateAdopted.PerSectionFolders.ToList();
+            _perSectionFiles = lateAdopted.PerSectionFiles.ToList();
+            _gradedFolders = SkeletonCatalog.AdoptedGradedFolders(lateAdopted);
+        }
 
         // The skeleton decides its own sidebar, whatever the teacher has
         // since done to the folder list — mirrors the mac. The lists written

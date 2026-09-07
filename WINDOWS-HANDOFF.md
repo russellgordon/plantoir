@@ -2303,7 +2303,7 @@ ask:
 | Key | What it decides |
 |---|---|
 | `use_skeleton` | Whether a course with no ready-made payload starts from its subject's skeleton — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing at all. |
-| `prepopulate_example_content` | Whether one of the 37 ready-made courses is poured in. |
+| `prepopulate_example_content` | Whether one of the 38 ready-made courses is poured in. |
 | `include_curriculum_pages` | Whether that payload's Curriculum folder comes with it. |
 
 **`use_skeleton` was not written by the Windows wizard at all** (checked
