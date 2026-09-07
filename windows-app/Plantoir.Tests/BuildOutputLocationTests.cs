@@ -268,8 +268,10 @@ public class BuildOutputLocationTests : IDisposable
 
         // "May still exist" is answered by the system in production; here it
         // is answered by hand so the test can say what each case IS: only the
-        // deleted folder is gone, the locked one and the unplugged drive are
-        // "cannot tell", and cannot-tell keeps.
+        // deleted folder is gone, the locked one is "cannot tell", and
+        // cannot-tell keeps. The drive letter and the folder outside home
+        // never reach the predicate at all — the home filter drops them
+        // first, and that filter is what protects removable media.
         var swept = BuildOutputLocation.DiscardBuildsForMissingWorkingFolders(_buildsRoot, home,
             workingFolderMayStillExist: path => path != gone);
 
@@ -288,5 +290,14 @@ public class BuildOutputLocationTests : IDisposable
         Assert.True(BuildOutputLocation.WorkingFolderMayStillExist(_root));
         Assert.False(BuildOutputLocation.WorkingFolderMayStillExist(Path.Combine(_root, "no-such-folder")));
         Assert.False(BuildOutputLocation.WorkingFolderMayStillExist(Path.Combine(_root, "no", "such", "path")));
+
+        // The two answers that separate this from Directory.Exists, measured
+        // 2026-09-07 on Windows 11 26200. A server that is not there is
+        // ERROR_BAD_NETPATH (53): unreachable, kept. An absent drive letter is
+        // ERROR_PATH_NOT_FOUND (3): "gone" to this rule — which is why the
+        // home-folder filter, not this rule, is what protects a USB stick.
+        Assert.True(BuildOutputLocation.WorkingFolderMayStillExist(@"\\nosuchserver\share\x"));
+        Assert.False(Directory.Exists(@"\\nosuchserver\share\x"));
+        Assert.False(BuildOutputLocation.WorkingFolderMayStillExist(@"Q:\Teaching"));
     }
 }
