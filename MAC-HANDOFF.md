@@ -881,10 +881,15 @@ rather than being deleted.
   a silent default. It covers the three credential pastes in `deploy.sh`,
   naming a new Netlify site in `deploy.py` (your 45-minute hang), and the
   surname when a new Cloudflare project is being named; `prompt()` refuses as a
-  backstop so a question added later fails loudly. The launcher also asks for no
-  terminal at all under the flag, so the branch that WAITS cannot exist even if
-  Task Scheduler turns out to provide a console — **which answers the open
-  question in this entry by making it not matter.** The refusal points are
+  backstop so a question added later fails loudly. **The open question in this
+  entry — does Task Scheduler give the wrapper a console? — stops mattering the
+  moment your wrapper passes the flag**, and the reason is the shared Python
+  rather than anything the mac did: `prompt()` and
+  `get_or_prompt_teacher_last_name()` now test the flag BEFORE `isatty()`, so
+  the branch that waits is unreachable whether there is a console or not. (The
+  mac also drops the container's terminal under the flag, which is belt and
+  braces on this side and has no Windows counterpart, since you run no
+  container.) The refusal points are
   contract data (`contracts/app-rules.json` → `launcherFlags.nonInteractive`),
   so copy them rather than deriving a second list. Your suite goes red in two
   places until you take it — `AppRules_DeployArguments_MatchesContract` (three

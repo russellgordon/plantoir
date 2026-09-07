@@ -186,9 +186,15 @@ One rule learned the hard way:
 - **Run it `-NonInteractive`.** Nobody answers a question at 6 a.m. Without
   it, a `Read-Host` anywhere in the chain blocks until Task Scheduler's own
   limit and the site is simply never updated, with nothing to say why. Note
-  the flag reaches PowerShell's own prompts only: a Python `input()` in
-  `deploy.py` is guarded separately, by `sys.stdin.isatty()`, which takes the
-  default silently rather than refusing — see [`TODO.md`](../TODO.md).
+  the flag reaches PowerShell's own prompts only: it does nothing for a
+  Python `input()` in `deploy.py`, which runs in a child process. That half is
+  answered by `--non-interactive` instead (added on the mac 2026-09-06):
+  `deploy.py` refuses a question rather than taking a default, and it does so
+  before it looks at `sys.stdin.isatty()`, so a console makes no difference.
+  **Windows does not pass the flag yet** — `TaskScheduling.WriteWrapperScript`
+  and `deploy.ps1` are what is owed, and until they land the old behaviour
+  stands here: the default is taken silently. See
+  [`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md) item 33.
 
 ---
 
