@@ -3348,14 +3348,38 @@ is what happened to the test-race item, sitting here for three days with
   builds folder's marker, ignores unmarked folders and any path not under
   `%USERPROFILE%`, and asks `GetFileAttributesW` rather than
   `Directory.Exists`, which swallows the reason it says no: only
-  `ERROR_FILE_NOT_FOUND` (2) and `ERROR_PATH_NOT_FOUND` (3) mean gone. Access
-  denied (5), a drive letter that is not there (3 is NOT what an unplugged
-  letter gives — it gives 21 or 15), a sleeping network share (53, 1231) and a
-  OneDrive folder not on this computer just now all keep the build. Erring
-  toward litter is the safe direction. `TheSweepRemovesOnlyABuildWhoseWorkingFolderIsGenuinelyGone`
-  pins each case with the answer injected, and
-  `TheSystemIsAskedWhyAFolderIsMissingNotJustWhetherItIs` pins the real
-  system answer for the two cases any machine can make.
+  `ERROR_FILE_NOT_FOUND` (2) and `ERROR_PATH_NOT_FOUND` (3) mean gone.
+  **Measured, 2026-09-07, Windows 11 26200, after a review caught a wrong
+  claim:** `Q:\Teaching` on an absent drive letter answers **3** — the
+  error-code rule would sweep it. So the two guards do different jobs, and
+  the write-up must not blur them: the HOME-FOLDER filter is what protects
+  removable media (a USB stick's folder is `E:\…`, never under home — the
+  mac's own reasoning), and the error-code rule protects a folder that is
+  present but unreachable — a sleeping network share (53, 1231), a card
+  reader with no card (21), a folder this account may not read (5, which is
+  rare on Windows: bypass-traverse lets attributes be read past most ACLs,
+  so the mac's TCC rationale does not transfer). A OneDrive folder not on
+  this computer just now reads its attributes locally and is simply present.
+  `TheSystemIsAskedWhyAFolderIsMissingNotJustWhetherItIs` pins the two
+  answers that separate the rule from `Directory.Exists`, and
+  `TheSweepRemovesOnlyABuildWhoseWorkingFolderIsGenuinelyGone` pins the
+  home filter and the unmarked case with the system's answer injected.
+
+  Three more things the review found, written down rather than fixed. The
+  marker is written only once a folder is known to be a WORKING folder
+  (after `Reload`, `State == Ready`) — a first draft wrote it on every open,
+  which would have made a builds folder for a Downloads picked by mistake
+  that the sweep could never remove. A UI test that ever drives Preview will
+  make a real `%LOCALAPPDATA%\Plantoir\builds\<id>` for a fixture path,
+  because the launchers compute the root from `%LOCALAPPDATA%` themselves
+  under `--state-dir`; it is permanently unmarked and left alone, the same
+  hole the mac's `isRunningTests` guard closes — none does today. And a
+  removable volume mounted at a path UNDER the home folder, with no drive
+  letter, would be recorded under home and swept when unmounted (unverified;
+  no spare volume): the cost is a rebuild, not lost work. The marker's name
+  and content shape match the mac's; a contract twin under
+  `buildOutputLocation.windowsLocation` with the sweep's rules would be the
+  next honest step and is proposed, not done.
 
   **The adjacent question, answered.** Can
   `%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>` outlive an archived course and

@@ -181,9 +181,10 @@ public static class BuildOutputLocation
     {
         try
         {
-            string builds = buildsParent is null
-                ? BuildsRootFor(workingFolderPath)
-                : Path.Combine(buildsParent, FolderContainers.FolderIdentifier(workingFolderPath));
+            // Under BuildsParent, never BuildsRootFor: the latter honours
+            // PLANTOIR_BUILD_ROOT, which the sweep does not read, so a marker
+            // written there would be one the sweep never finds.
+            string builds = Path.Combine(buildsParent ?? BuildsParent, FolderContainers.FolderIdentifier(workingFolderPath));
             Directory.CreateDirectory(builds);
             File.WriteAllText(Path.Combine(builds, WorkingFolderMarkerName),
                               FolderContainers.PhysicalPath(workingFolderPath) + Environment.NewLine);
@@ -207,9 +208,7 @@ public static class BuildOutputLocation
             try
             {
                 if (!Directory.Exists(folder)) continue;
-                string builds = buildsParent is null
-                    ? BuildsRootFor(folder)
-                    : Path.Combine(buildsParent, FolderContainers.FolderIdentifier(folder));
+                string builds = Path.Combine(buildsParent ?? BuildsParent, FolderContainers.FolderIdentifier(folder));
                 if (!Directory.Exists(builds)) continue;
                 if (File.Exists(Path.Combine(builds, WorkingFolderMarkerName))) continue;
                 WriteWorkingFolderMarker(folder, buildsParent);
@@ -223,16 +222,22 @@ public static class BuildOutputLocation
     /// those. Once per process, at launch, silently — a teacher cannot see
     /// this, so it leaves no trail line.
     ///
-    /// <para>Two Windows specifics the mac's sweep never meets. Only paths
-    /// under the home folder are swept, so a marker naming a network share or
-    /// another drive is left alone. And "gone" means exactly
-    /// <c>ERROR_FILE_NOT_FOUND</c> or <c>ERROR_PATH_NOT_FOUND</c> from the
-    /// system: <c>Directory.Exists</c> also answers false for access denied,
-    /// an unplugged drive letter, a sleeping network path and a OneDrive
-    /// folder that is not on this computer just now, and clearing a
-    /// teacher's build because a USB stick was unplugged would be worse
-    /// than the litter. Anything but those two codes is "may still exist"
-    /// and is kept. Erring toward litter is the safe direction.</para>
+    /// <para>Two guards, and it matters which does what. Only paths under the
+    /// home folder are swept: that is the guard for REMOVABLE media — a USB
+    /// stick's working folder is <c>E:\…</c>, never under home, and an absent
+    /// drive letter answers <c>ERROR_PATH_NOT_FOUND</c> (3), measured, so the
+    /// error-code rule alone would NOT save it. (The mac's reasoning exactly:
+    /// the home volume is always mounted; a path on another volume might be
+    /// back tomorrow.) And "gone" means exactly <c>ERROR_FILE_NOT_FOUND</c>
+    /// (2) or <c>ERROR_PATH_NOT_FOUND</c> (3) from the system: that is the
+    /// guard for a folder that is present but UNREACHABLE — a network share
+    /// that is asleep (53, 1231), a card reader with no card (21), a folder
+    /// this account may not read (5, rare on Windows, since bypass-traverse
+    /// lets attributes be read past most ACLs) — for which
+    /// <c>Directory.Exists</c> also answers false. A OneDrive folder that is
+    /// not on this computer just now reads its attributes locally and is
+    /// simply present. Anything but those two codes is "may still exist" and
+    /// is kept. Erring toward litter is the safe direction.</para>
     /// </summary>
     public static IReadOnlyList<string> DiscardBuildsForMissingWorkingFolders(
         string? buildsParent = null, string? homeDirectory = null,
@@ -256,8 +261,11 @@ public static class BuildOutputLocation
             if (recorded.Length == 0) continue;
             if (!recorded.StartsWith(home, StringComparison.OrdinalIgnoreCase)) continue;
             if (mayExist(recorded)) continue;
+            // DeleteTree is child by child, not atomic: a file some process
+            // still holds leaves the tree half gone, uncounted, to be finished
+            // by the next launch. Litter, not an error.
             try { CourseRestorer.DeleteTree(entry); swept.Add(entry); }
-            catch (Exception) { /* a build in use is litter, not an error */ }
+            catch (Exception) { }
         }
         return swept;
     }

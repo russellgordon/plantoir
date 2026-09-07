@@ -687,8 +687,12 @@ this side is expected to say so when the contract is wrong.
     (`DiscardBuildsForMissingWorkingFolders`) runs once per process from
     `App.OnLaunched`, only under the home folder, and treats ONLY
     `ERROR_FILE_NOT_FOUND` / `ERROR_PATH_NOT_FOUND` from `GetFileAttributesW`
-    as "gone"; access denied, an unplugged drive and a sleeping network path
-    all keep the build. No `.ps1` touched. The original item follows. The `appliesOn` filter is in
+    as "gone"; a sleeping network path (53) and a media-less reader (21) keep
+    the build. **An absent drive letter answers 3, measured** — so the
+    home-folder filter, not the error code, is what protects a USB stick's
+    working folder, exactly as on the mac. No `.ps1` touched. The original
+    item, as it stood, follows; its first paragraph was misfiled from item
+    18 before this session and is left where it was. The `appliesOn` filter is in
     (`ContractTests`), the retired sentence is asserted absent
     (`CloudSyncedFolderTests`), and Windows already built outside the folder
     (row 290).
@@ -703,7 +707,10 @@ this side is expected to say so when the contract is wrong.
     build WORKSPACE goes with the built site, because that is the half a
     preview serves from.
 
-    ⚠️ **STILL OPEN: the marker, and the sweep that would give it a point.**
+    ~~⚠️ STILL OPEN~~ — done 2026-09-07, see above; the launcher home
+    suggested at the end of this paragraph was REJECTED (`MAC-HANDOFF.md`
+    ledger has why), and the unplugged-drive claim in it was wrong.
+    **The marker, and the sweep that would give it a point.**
     Nothing on this side writes `working-folder.txt` or anything like it, and
     there is no Windows equivalent of the mac's
     `discardBuildsForMissingWorkingFolders`. **Writing the marker alone is

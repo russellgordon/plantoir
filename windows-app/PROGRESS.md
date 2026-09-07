@@ -26,9 +26,10 @@ with its headline still reading as open work. **Thirty of its thirty-seven
 items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
 day (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
-the contract case lists this suite was not reading), and items 33 and 34 — the
+the contract case lists this suite was not reading); items 33 and 34 — the
 refusal of a folder named `index.md`, and the per-finding repair report as
-contract cases — struck on 2026-09-07. Items 35–37 were added the
+contract cases — struck on 2026-09-07, along with 18, 19, 25, 26, 27, 28 and
+31 the same day. Items 35–37 were added the
 same day by an audit of these two documents and are open.
 
 **Count them rather than trusting this line.** It read "sixteen of its
