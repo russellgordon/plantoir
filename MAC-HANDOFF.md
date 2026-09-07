@@ -179,6 +179,70 @@ outstanding.
 
 ## Open — what the mac still owes
 
+- **`AppRulesContract.milestones()` leaves the example-course task out of the
+  readout, so two shared markers were classified by nobody** (found 2026-09-06,
+  branch `issue/29-windows-contract-case-lists`). **A one-line fix, and the
+  smallest item here.**
+
+  `mac-app/QuartzTeachers/Models/Assist/AppRulesContract.swift` writes eight
+  milestone lists into `app-rules.json`; `TaskMilestones.swift` has nine.
+  `exampleCourse` is the missing one, and it carries `"Example Course installed
+  to"` and `"EXAMPLE_COURSE_CODE="` — both printed by `setup_course.py`, both
+  shared, and both invisible to `testEveryMarkerIsClassified`, which walks the
+  readout rather than the code it is a readout of.
+
+  ```swift
+  ("exampleCourse", TaskMilestones.exampleCourse),
+  ```
+
+  Add it to the `lists` array and run `Plantoir --write-contracts contracts`.
+  **Windows is already ready for that**: the two markers were added to
+  `markerOrigins.origins` on 2026-09-06 (see the awareness entry below), and
+  `MilestoneContractTests`' parity map already answers `exampleCourse`, so the
+  regeneration lands green rather than failing the Windows suite by name. The
+  shared steps agree in order on both sides — checked by hand before writing
+  this.
+
+  **Worth taking the general lesson, not just the line.** A readout cannot fail
+  when the code it reads changes — `contracts/README.md` says exactly that
+  about the generated halves — and this is that rule biting the readout's own
+  COMPLETENESS rather than its contents. A test that walks
+  `TaskMilestones.allLists` and asserts every list appears in the readout would
+  have caught it, and is worth more than the one-line fix.
+
+- **The generator should emit the tool-schema DEPARTURES beside the schemas,
+  because the only record of them is a Swift comment** (found 2026-09-06 by
+  wiring `toolSchemas` into the Windows gate, branch
+  `issue/29-windows-contract-case-lists`). **Small, and it removes a copy
+  rather than adding one.** Reference:
+  `AssistSurfaceContractTests.AssertOnlyTheDeparturesWeHaveAgreed`.
+
+  `AssistToolSurface.swift` names "two deliberate departures from the Windows
+  schema": lists of page names reach the mac as ONE semicolon-separated string,
+  because that client's schema has no arrays and a comma-separated list would
+  cut "Unit 2, Day 3" in half; and the mac has no `preview` flag, because every
+  change rebuilds there. Both are good decisions with their reasons written
+  down — and written down **only in that doc comment**.
+
+  So when the Windows suite started running `toolSchemas`, four parameters came
+  up as type mismatches (`publish_pages.pages` and its three relatives: array
+  here, string there) with nothing in the contract to say they were meant. The
+  Windows test now carries the list, which makes it the SECOND home for a fact
+  the contract cannot hold — `toolSchemas` is a generated key, so the departure
+  cannot be written beside the schemas it applies to by hand.
+
+  **What is asked:** have `Plantoir --write-contracts` emit the departures into
+  the generated `toolSchemas` block — tool, parameter, each side's type, and
+  the reason — from the same place the doc comment states them. The Windows
+  test then reads them and deletes its copy. Until then the copy is asserted as
+  an exact set, so a NEW departure fails on this side and a resolved one fails
+  too, which is the best a second home can do.
+
+  **Not proposed: making the two agree.** The mac's shape is forced by its
+  client and the semicolon choice is reasoned; changing either app's schema is
+  a routing change needing the suite re-run, and that is not what this branch
+  is for.
+
 - **The two apps write a teacher's visibility flag DIFFERENTLY, and the
   contract only describes one of them** (found 2026-09-06 by wiring
   `pageVisibility.writingRules` into the Windows gate, branch
@@ -1663,70 +1727,6 @@ rather than being deleted.
     `Describe()`. That gap is real and this test cannot see it: the test
     project references `Plantoir.Core` and `Plantoir.Mcp`, never the interface
     project — the honest limit of everything wired in this branch.)
-
-- **The generator should emit the tool-schema DEPARTURES beside the schemas,
-  because the only record of them is a Swift comment** (found 2026-09-06 by
-  wiring `toolSchemas` into the Windows gate, branch
-  `issue/29-windows-contract-case-lists`). **Small, and it removes a copy
-  rather than adding one.** Reference:
-  `AssistSurfaceContractTests.AssertOnlyTheDeparturesWeHaveAgreed`.
-
-  `AssistToolSurface.swift` names "two deliberate departures from the Windows
-  schema": lists of page names reach the mac as ONE semicolon-separated string,
-  because that client's schema has no arrays and a comma-separated list would
-  cut "Unit 2, Day 3" in half; and the mac has no `preview` flag, because every
-  change rebuilds there. Both are good decisions with their reasons written
-  down — and written down **only in that doc comment**.
-
-  So when the Windows suite started running `toolSchemas`, four parameters came
-  up as type mismatches (`publish_pages.pages` and its three relatives: array
-  here, string there) with nothing in the contract to say they were meant. The
-  Windows test now carries the list, which makes it the SECOND home for a fact
-  the contract cannot hold — `toolSchemas` is a generated key, so the departure
-  cannot be written beside the schemas it applies to by hand.
-
-  **What is asked:** have `Plantoir --write-contracts` emit the departures into
-  the generated `toolSchemas` block — tool, parameter, each side's type, and
-  the reason — from the same place the doc comment states them. The Windows
-  test then reads them and deletes its copy. Until then the copy is asserted as
-  an exact set, so a NEW departure fails on this side and a resolved one fails
-  too, which is the best a second home can do.
-
-  **Not proposed: making the two agree.** The mac's shape is forced by its
-  client and the semicolon choice is reasoned; changing either app's schema is
-  a routing change needing the suite re-run, and that is not what this branch
-  is for.
-
-- **`AppRulesContract.milestones()` leaves the example-course task out of the
-  readout, so two shared markers were classified by nobody** (found 2026-09-06,
-  branch `issue/29-windows-contract-case-lists`). **A one-line fix, and the
-  smallest item here.**
-
-  `mac-app/QuartzTeachers/Models/Assist/AppRulesContract.swift` writes eight
-  milestone lists into `app-rules.json`; `TaskMilestones.swift` has nine.
-  `exampleCourse` is the missing one, and it carries `"Example Course installed
-  to"` and `"EXAMPLE_COURSE_CODE="` — both printed by `setup_course.py`, both
-  shared, and both invisible to `testEveryMarkerIsClassified`, which walks the
-  readout rather than the code it is a readout of.
-
-  ```swift
-  ("exampleCourse", TaskMilestones.exampleCourse),
-  ```
-
-  Add it to the `lists` array and run `Plantoir --write-contracts contracts`.
-  **Windows is already ready for that**: the two markers were added to
-  `markerOrigins.origins` on 2026-09-06 (see the awareness entry below), and
-  `MilestoneContractTests`' parity map already answers `exampleCourse`, so the
-  regeneration lands green rather than failing the Windows suite by name. The
-  shared steps agree in order on both sides — checked by hand before writing
-  this.
-
-  **Worth taking the general lesson, not just the line.** A readout cannot fail
-  when the code it reads changes — `contracts/README.md` says exactly that
-  about the generated halves — and this is that rule biting the readout's own
-  COMPLETENESS rather than its contents. A test that walks
-  `TaskMilestones.allLists` and asserts every list appears in the readout would
-  have caught it, and is worth more than the one-line fix.
 
 - **`--image` is the mac's flag alone, and the contract listed it as shared;
   and a completeness check the mac may want** (Windows + shared, 2026-09-06,
