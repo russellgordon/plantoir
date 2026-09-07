@@ -1455,8 +1455,9 @@ to run in the background.
     parameter that appends `--non-interactive` straight after the course and
     section (three new `deployArguments` cases in
     `contracts/app-rules.json` carry `"unattended": true`, and
-    `AppRules_DeployArguments_MatchesContract` fails all three until it
-    does); `deploy.ps1` must PARSE `--non-interactive` with the
+    `AppRules_DeployArguments_MatchesContract` fails at the first of them
+    until it does — one `[Fact]` asserting in a loop, so it reports one
+    failure, not three); `deploy.ps1` must PARSE `--non-interactive` with the
     `'^--non-interactive$'` idiom
     (`PublishAndLauncherContractTests` →
     `TheDeployLauncherAcceptsTheExtraFlagsTheContractGivesIt` fails until it
@@ -5584,17 +5585,25 @@ side quietly "fixes" it alone.
 
 Three facts decide it, and two of them were got wrong on the way here:
 
-1. **It reaches real courses.** The guard matches any three letters, a digit
-   and a zero, and a course code is free text up to twelve characters. `ENG10`,
-   `SCI10` and `ART10` all match, and a British Columbia course carries codes
-   of exactly that shape.
+1. **Who it reaches, MEASURED — and narrower than it first looks.** The guard
+   matches three letters, a digit and a zero, and **no code in either
+   catalogue the wizard offers matches it**: 0 of 1930 Ontario codes and 0 of
+   117 British Columbia ones (BC codes are `MFMP-10` / `MPREC11` shaped). A
+   course code is free text up to twelve characters, so `ENG10` typed by hand
+   still reaches it — which is exactly the case the guard was written for.
+   That cuts both ways: refusing breaks far fewer real courses than the first
+   draft of this section claimed, and the prompt is rarer than it looks. (The
+   first draft said BC courses carry codes of that shape. They do not; it was
+   asserted rather than measured, and a review caught it.)
 2. **The two launchers already fail DIFFERENTLY at it, unattended.**
    `preview.sh` has no `set -e`: the read fails at end of input, the answer
    variable stays empty, `${_ans:-Y}` takes the default, and the build
-   silently retargets a DIFFERENT course code. `deploy.sh` has `set -euo
-   pipefail`: the same failed read ends the script on the spot, exit 1, with
-   nothing printed at all. A scheduled publish builds before it publishes, so
-   it meets both.
+   retargets a DIFFERENT course code — announcing it with "Using corrected
+   course code", which nobody is there to read. `deploy.sh` has `set -euo
+   pipefail`: the same failed read ends the script on the spot, exit 1.
+   Measured: it prints the guard's two explanatory lines and then stops, with
+   no prompt text, no error and no reason. A scheduled publish builds before
+   it publishes, so it meets both.
 3. **Both candidate answers are defensible.** Refusing with a message is
    better than dying wordlessly, but leaves those courses unpublishable
    unattended and wants a matching check at SCHEDULING time so the teacher

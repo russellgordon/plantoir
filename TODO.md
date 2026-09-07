@@ -129,9 +129,13 @@ an item when it ships (finished behaviour is recorded in
   question it can meet is now a refusal that names the question: the three
   credential pastes in the launcher, naming a new Netlify site (the state that
   hung the harness), and the surname when a new Cloudflare project is being
-  named. The launcher also asks for no terminal under the flag, so the branch
-  that WAITS cannot exist — which settles the open question below (“does Task
-  Scheduler give the wrapper a console?”) by making the answer not matter.
+  named. **The open question below — “does Task Scheduler give the wrapper a
+  console?” — stops mattering once Windows passes the flag too**, and the
+  reason is the shared Python rather than anything platform-specific:
+  `prompt()` and `get_or_prompt_teacher_last_name()` test the flag BEFORE
+  `isatty()`, so the branch that waits is unreachable either way. `deploy.sh`
+  additionally drops the container's terminal under the flag, which is belt and
+  braces on the mac and has no Windows counterpart.
   A saved credential that fails its check is now kept rather than cleared when
   nobody is here. Refusal points: `contracts/app-rules.json` →
   `launcherFlags.nonInteractive`. Not run: `verify.sh`.
