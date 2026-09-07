@@ -115,9 +115,9 @@ Four things about it are deliberate:
   (`[q](All%20Tasks/Quiz.md)`); a wikilink keeps the plain spelling, because
   `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes one. Which characters
   are encoded is fixed by what the built site can decode, not by any general
-  URL rule — `&` is left alone on purpose, and a name needing nothing is left
-  exactly as the teacher typed it. The rule, the measurements and the nine
-  cases both apps run are in
+  URL rule — `&` and `,` are left alone on purpose, and a name needing nothing
+  is left exactly as the teacher typed it. The rule, the measurements and the
+  eleven cases both apps run are in
   [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
   `specialNames.renameFolder.linkRewriting`; the reasoning is in
   [`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md) → "Spelling a folder's new name
