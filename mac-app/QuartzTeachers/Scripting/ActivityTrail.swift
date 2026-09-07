@@ -77,6 +77,21 @@ nonisolated enum ActivityTrail {
         /// somebody acted on it — and a trail that could not tell them apart
         /// would leave "did they ever fix it?" unanswerable.
         case folderProblemRepaired = "folder problem repaired"
+        /// A repair the teacher ASKED for did not happen. Carries the course,
+        /// the section, and what was in the way — never anything from inside
+        /// it. Recorded because the trail otherwise shows the problem being
+        /// found and then nothing at all, which reads exactly like a teacher
+        /// who never pressed the button; and the thing in the way is a folder
+        /// they will very likely have moved by the time they report it, so it
+        /// cannot be looked for afterwards.
+        ///
+        /// Named for the OUTCOME rather than for the one cause that writes it
+        /// today: only the "a folder is sitting where the front page belongs"
+        /// refusal records this, and a repair that simply failed — a read-only
+        /// volume, a permissions problem — still records nothing. That gap is
+        /// deliberate rather than forgotten, and this event is the line it
+        /// joins when it is closed, without a rename on either platform.
+        case folderProblemNotRepaired = "folder problem not repaired"
         /// A folder or file was removed in Course Settings, excluding it
         /// from previews and deploys.
         case itemExcluded = "item excluded"

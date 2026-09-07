@@ -1442,6 +1442,36 @@ to run in the background.
     `NoCurriculumFolderYet` and `NoneChosen` to the swept text, and give the
     fixture no curriculum folder.
 
+33. **A folder named `index.md` is now REFUSED with a sentence of its own, and
+    the trail records the refusal.** You already found this bug on the mac and
+    were right about it (`MAC-HANDOFF.md`, 2026-09-06): `restoreIndex` asked
+    `fileExists(atPath:)` with no `isDirectory:` out-parameter, so a directory
+    called `index.md` came back `.alreadyFine` and the teacher was told the
+    problem was already put right about a section that still had no front page.
+    Fixed on the mac 2026-09-07. **You inherit nothing free here — there are two
+    things you owe, and one of them changes a decision you have already made.**
+
+    First, the SENTENCE. You return `Failed`, which is the honest one of the two
+    answers that existed, and your test
+    `ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine`
+    (`SiteHealthRepairTests.cs:180`) pins it. The mac has gone one further:
+    `contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`
+    now carries `expect: "refused"` and the sentence a teacher reads, so your
+    `Result` needs a FOURTH answer beside `Restored`/`AlreadyFine`/`Failed`, and
+    that test needs updating. The sentence is in the contract; do not retype it.
+
+    Second, the TRAIL. `activityTrail.mustRecord` gained `folder problem not
+    repaired`, and `SharedRules_ActivityTrailEvents_Exist` (`ContractTests.cs`)
+    pins that list by EQUALITY — so **your suite is red until you add the
+    event**, and that is the mechanism working, not damage. Write it from the
+    directory-refusal branch only, not from every failed repair: the plain
+    failure path deliberately records nothing yet, and the event is named for
+    the OUTCOME rather than for its one cause so that gap can be closed later
+    without a rename on either side.
+
+    The section below explains both, including what was REJECTED — moving the
+    folder aside and writing a proper front page in its place — and why.
+
 ## Windows no longer runs any of this in a container
 
 **Read this before the architecture sections below.** Windows dropped Docker,
@@ -5625,3 +5655,146 @@ not what triggers it.
   them — the segment reads as `<Tasks` — and neither app has ever matched them.
   Pre-existing on both sides and out of this piece's scope; noted here so it is
   not mistaken for a regression.
+
+
+## A folder named `index.md`, and why both apps refuse rather than clear the way (2026-09-07)
+
+The bug is yours — you found it porting `SiteHealthRepair` line by line, and
+`MAC-HANDOFF.md`'s entry of 2026-09-06 is what this fixes. What follows is the
+part that does not travel in a diff: what the mac chose, what it rejected, and
+why the two are not interchangeable.
+
+### The bug, stated once
+
+`FileManager.fileExists(atPath:)` — and `File.Exists`, and every other bare
+existence test — is answering a question about a NAME, not about a file. On the
+mac it returns `true` for a directory. So this:
+
+```swift
+if FileManager.default.fileExists(atPath: index.path) { return .alreadyFine }
+```
+
+reported `.alreadyFine` for a section whose `index.md` was a FOLDER, and
+`outcome(ofRepairing:)` sorts `.alreadyFine` into neither "restored" nor
+"failed", so the dialog said **"That is already put right. Nothing needed
+changing."** The section still had no front page: `build_site.py` produces no
+root `index.html`, so there is no site to publish and the deploy refuses. The
+one dialog written to end silence was the thing telling them it was dealt with.
+
+`restoreMedia`, the function DIRECTLY above it, has used the `isDirectory:`
+form since it was written, with a comment saying why. And the two were written
+in the same sitting — `git log -S` puts both in commit `04dfd0cd`, 2026-08-23 —
+so this is not a case of an old habit and a new one. The careful form and the
+bare one were typed one function apart, on the same afternoon, by somebody who
+had just explained in a comment why the careful one was needed. That is the
+useful lesson in it: knowing the rule does not make the next call site obey it,
+and a grep for `fileExists` / `File.Exists` with no `isDirectory:` is worth more
+than remembering.
+
+### What it does now, and the decision behind it
+
+**Refuse, explain, and touch nothing.** Russell decided this before the work
+started, and the alternative was live: move the folder aside and write a proper
+front page in its place, so the teacher's next publish just works.
+
+**That was rejected because the folder may hold their pages.** Neither app can
+see inside it — this is a teacher's Obsidian vault, and a folder called
+`index.md` is most often a sync conflict or a mis-drag, but it can perfectly
+well be a folder somebody made on purpose with a term's work in it. A repair
+that relocates a teacher's writing to make a warning go away is a worse outcome
+than the warning, and it is the kind of thing that gets discovered in May.
+Refusing costs one step by hand, in Finder or Explorer, and nothing else.
+
+It also fits the rule the whole health feature is built on
+(`siteHealth.checksTheFeatureNotTheFolder`): a fix must restore the FEATURE.
+Moving a folder out of the way and writing an empty page satisfies the check
+while possibly hiding the teacher's own pages, which is the same failure mode
+as recreating an empty curriculum folder, one step further along.
+
+### The sentence, and why it names the course
+
+`contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`
+carries it. On the mac it is `SiteHealthRepair.folderWhereTheFrontPageBelongs(course:section:)`.
+
+It names the course as well as the section folder, and that was a review
+finding rather than a first draft: the outcome dialog shows a headline and one
+sentence and NOTHING else — not the course, not the section — so "in your
+section1 folder" sends a teacher with two courses to a folder that exists twice.
+This is the first teacher-facing sentence on either platform to name a
+`section<N>` folder. It is safe to do: that is the on-disk name, it is what
+Obsidian's file tree shows, and both apps already offer "Reveal in Finder" on
+exactly that folder.
+
+**And the generic explanation is REPLACED, not appended to.** That is
+`SiteHealthRepair.couldNotExplanation` on the mac — the one that sends a teacher
+to check whether a folder is locked or read-only. It is the right thing to say
+about a read-only volume and the wrong thing to say here: permissions are not
+what is wrong, and a teacher gets one prompt to act on. When BOTH kinds of failure happen at once — a file where
+`Media` belongs and a folder where the front page belongs — both sentences are
+said, generic first and specific last. Both orders were read aloud. The other
+way round ends the paragraph on the generic explanation's opening clause —
+"You can make it yourself in Obsidian" —
+immediately after "…and Plantoir can put the front page back", so "it" lands on
+the front page — the one thing that cannot be made until the folder in the way
+has moved. There is a test on the order
+(`testWhenBothKindsOfFailureHappenTheGenericExplanationComesFirst`), because a
+comment claiming a paragraph reads well is worth nothing.
+
+### The shape of the answer, which is what you have to copy
+
+`Result` gained a fourth case:
+
+```swift
+case blockedByAFolderWhereTheFrontPageBelongs(section: Int)
+```
+
+Two things about it are deliberate.
+
+It carries the **section number, not the sentence**. `Result` says how a repair
+went — a fact — and `outcome(ofRepairing:in:occasion:)` chooses every word in
+that file. Putting the prose in the Result would have split the wording across
+two places, and the first adversarial review of the plan caught exactly that.
+
+It is counted as a **failure**: the check's name goes into the failed list, so
+"Could not put the front page back." still appears beside anything that did
+come back, and `canRebuild` stays false, so the "Preview Again" button is not
+offered. There is nothing to look at.
+
+### The trail line
+
+`ActivityTrail.Event.folderProblemNotRepaired` = `"folder problem not
+repaired"`, written from the refusal branch with the course and section:
+
+```
+ICS3U/1 · found a folder called index.md where the front page belongs, and left it alone
+```
+
+Without it the trail shows the problem being FOUND and then nothing at all,
+which reads exactly like a teacher who never pressed the button — and the
+folder in the way is something they will very likely have moved or deleted by
+the time they report anything, so it cannot be looked for afterwards.
+
+**Named for the OUTCOME, not for its one cause, and this is the part worth
+copying rather than re-deciding.** Only the directory refusal writes it today.
+A repair that simply FAILED — a read-only volume, a permissions problem — still
+records nothing, which is a real gap and is left open on purpose: closing it is
+a different piece of work, and it belongs to whoever also decides what
+`restoreMedia` should say when a FILE is sitting where the `Media` folder
+belongs (the same class of problem, still answering `.failed` with the generic
+sentence). Naming the event `folder problem repair blocked` would have forced a
+rename on both platforms and in the contract the day that gap closes. So: wire
+it to the directory branch, not to every failure, and leave the name alone.
+
+### What is still not right in this file, on both platforms
+
+Named here so it is not rediscovered as a puzzle, and NOT fixed by this piece:
+
+- `restoreMedia` answers plain `.failed` when a FILE sits where the `Media`
+  folder belongs. Same class of problem, same wrong explanation, no sentence of
+  its own. The machinery to give it one is now in place — a second `Result`
+  case and a second contract sentence — and nobody has decided the wording.
+- `SectionAdder` has the identical bare `fileExists` guard on `index.md` when a
+  section is added, so a folder by that name is skipped silently there too.
+- `repair(_:in:)` returns `[String: Result]` keyed by check NAME, so two
+  findings with the same name collapse — your second finding of 2026-09-06,
+  owned by its own piece of work.
