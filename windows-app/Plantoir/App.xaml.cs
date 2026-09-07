@@ -208,6 +208,13 @@ public partial class App : Application
         return null;
     }
 
+    /// <summary>A synced-folder note answered in one window leaves every other window showing that folder.</summary>
+    public static void HideSyncNoticesFor(string path, MainWindow? except)
+    {
+        foreach (var window in _windows)
+            if (!ReferenceEquals(window, except) && !window.IsClosed) window.HideSyncNoticeFor(path);
+    }
+
     /// <summary>Ctrl+N: inherit the key window's folder; alone → the picker.</summary>
     public static MainWindow OpenNewWindow()
     {

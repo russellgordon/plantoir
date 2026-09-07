@@ -643,14 +643,15 @@ this side is expected to say so when the contract is wrong.
 18. ~~**A cloud-synced working folder — HALF DONE 2026-09-06.**~~ ✅ Done
     2026-09-07 (branch `issue/18-cloud-synced-folder-views`,
     `GUI-IMPROVEMENTS.md` row 436). The two views: a `ContentDialog` after the
-    OS picker (path first, headline, summary, the four explanation
+    OS picker (path first, then the headline, then the four explanation
     paragraphs, "Use This Folder Anyway" / "Choose a Different Folder…" with
     NO default button; the second reopens the OS picker), and a dismissable
-    `InfoBar` overlaying the top of the content area for a restored or
+    `InfoBar` in a row of its own under the menu bar for a restored or
     inherited folder, with "Show Details" opening the explanation in place and
     "Got It" dismissing — which is remembered, as the contract says going
-    ahead from either button is. Both trail events are emitted, naming the
-    service and never the folder. The original item follows. The
+    ahead from either button is. Both trail events are emitted, carrying the
+    service and the folder, which the trail redacts on the way in. The
+    original item follows. The
     detection is built and tested (`CloudSyncedFolder.cs`: OneDrive's three
     published roots, Dropbox's `info.json`, iCloud for Windows; never from a
     folder's NAME), the wording is pinned to the contract
