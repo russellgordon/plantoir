@@ -1631,6 +1631,39 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **`workingFolderPathBar.ancestorPaths` now carries `windowsCases`, and two
+  rules were being pinned by nobody on either side** (Windows + shared,
+  2026-09-06, branch `issue/29-windows-contract-case-lists`). **The mac suite
+  stays green** — one authored list added, nothing changed. Reference:
+  `SharedRuleContractTests` in `windows-app/Plantoir.Tests/`.
+
+  The path bar's cases were `/Users/teacher/…` with the Windows spelling left
+  as a prose `windowsEquivalent`, so this side hand-typed its own crumbs in
+  `ContractTests`. `windowsCases` says the same thing as DATA — three cases,
+  including one on a second drive, since `D:\` is an ordinary place for a
+  teacher to keep their courses and its root is not `/`. The RULE is shared
+  ("every ancestor, root first, folder last"); only the spelling of a root is
+  the platform's, and that is exactly what a per-platform case list is for.
+
+  **Two lists the contract carried that neither suite ran**, now run here:
+
+  - `buildOutputLocation.windowsLocation.buildsRoot`. Its own note said it was
+    "asserted by nobody on either side", and it stayed that way for the obvious
+    reason — it describes a Windows path, so the mac cannot check it and nobody
+    on this side had. It is now checked against `BuildOutputLocation.BuildsRootFor`,
+    including that the folder identifier is ONE path segment and stable for a
+    given working folder, which is what makes a course's build location
+    resolvable from both sides.
+  - `scheduledDeployRefusals.alsoSaid` — "list the class pages students cannot
+    see yet, by name". `ScheduledDeploy.Describe()` does. **This list is not on
+    item 29's own inventory**: the audit that opened the item missed it, which
+    is worth knowing because it is the second time a list has gone unnoticed
+    for want of being indexed rather than for want of being implementable.
+    (Item 28 records separately that this side's interface does not yet CALL
+    `Describe()`. That gap is real and this test cannot see it: the test
+    project references `Plantoir.Core` and `Plantoir.Mcp`, never the interface
+    project — the honest limit of everything wired in this branch.)
+
 - **The generator should emit the tool-schema DEPARTURES beside the schemas,
   because the only record of them is a Swift comment** (found 2026-09-06 by
   wiring `toolSchemas` into the Windows gate, branch
