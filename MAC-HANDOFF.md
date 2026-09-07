@@ -143,9 +143,105 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   way — is in the ledger entry **"The folders sheet named a curriculum folder
   the course may not have"**.
 
-**Nothing was left waiting here as of 2026-09-06.**
+- `contracts/shared-rules.json` → `gradedFolders` → **`choices`**, a whole new
+  authored block with ten cases, proposed 2026-09-06. **The mac suite will not
+  go red on its own for this** — nothing over there reads the key yet, which is
+  the honest difference between proposing a case in a list a mac test already
+  walks and proposing a new list. So this line is the only thing that will tell
+  you it is here.
+
+  Nine of the ten cases describe what the mac's own `nestedFolderNames`
+  already does, written down so both apps can be tested against one rule
+  instead of two implementations that happen to agree. **Two of them need
+  something from the mac:**
+
+  - **A SORT.** `"declared folders first, then what is on disk"` and `"the same
+    folder name at two depths is offered once"` pin an ORDER, and the mac's
+    `FileManager.enumerator` returns children in whatever order the filesystem
+    gives. Sorting each folder's children case-insensitively before walking
+    them is the whole change, and it is worth having for its own sake: the list
+    a teacher reads is otherwise in an order nothing promises and which can
+    differ between two machines holding the same course.
+  - **`"a folder the teacher removed from the course is not offered back"` is
+    a real behaviour difference, and Windows took it deliberately** — see the
+    ledger entry below.
+
+  Reference: `windows-app/Plantoir.Core/Models/GradedFolderChoices.cs` and
+  `windows-app/Plantoir.Tests/GradedFolderChoicesTests.cs`.
 
 ## Open — what the mac still owes
+
+- **The Marks checklist offers a folder the teacher has REMOVED from the
+  course** (found on Windows 2026-09-06, branch
+  `issue/26-marks-checklist-nested-folders`). **Small, and it only bites
+  because the mac walks the disk.**
+
+  `CourseSettingsView.swift`'s `nestedFolderNames` walks the course folder and
+  offers what it finds. It does not consult `excluded_items`, so a folder the
+  teacher has just taken out of Shared folders — which they were told, in the
+  confirmation they had to read, "will take it out of your course's marks
+  pool" — is still on disk, and comes straight back into the Marks list on the
+  next redraw, unticked. Tick it and `graded_folders` names a folder
+  `excluded_items` tells the build to skip: a non-empty pool matching nothing
+  the build will publish, which reads as asked-and-answered and suppresses the
+  `noGradedFolders` health finding. That last consequence is the mac's own
+  reasoning, from the comment on `removeFromGradedFolders`; this is the same
+  hole arriving through the walk.
+
+  Windows filters it. The rule is in the contract under
+  `gradedFolders.choices.walk.excludedItems`: a name in `excluded_items` is
+  neither offered nor walked into, matched EXACTLY (case included, the way
+  `preflight_update_course_config` matches a Python set), and filtered only at
+  the two levels the build's preflight scan actually discovers — the course
+  folder's own children against `excluded_items.shared`, a section folder's
+  children against `excluded_items.per_section`. Deliberately not at every
+  depth: a nested `Portfolios/Tasks` still counts when a top-level `Tasks` has
+  been removed, because those are different folders and only one of them was
+  removed.
+
+  **Why Windows took a divergence rather than copying and writing it up.**
+  Copying would have REGRESSED this side. Before the walk, the Windows
+  checklist was literally `SharedFolders.Concat(PerSectionFolders)`, so a
+  removed folder left the Marks list in the same gesture; adding the walk
+  without the filter would have introduced the reappearing folder here as a
+  new bug of the change's own making. Against that, the divergence costs
+  nothing a coverage map can see — `CountsForMarks` is untouched, and a
+  ticked-but-excluded folder counts nothing on either platform, because the
+  build never publishes it. What differs is only which names a teacher is
+  OFFERED, and only for folders they have removed.
+
+  Reference: `GradedFolderChoices.Walk` / `Excluded`, and the contract case
+  `"a folder the teacher removed from the course is not offered back"`.
+
+- **Two smaller things in the same area, neither of them introduced by
+  Windows, both inherited by both apps** (found while porting the walk,
+  2026-09-06). Recorded so they are not re-found a third time; neither is
+  urgent and neither is Windows-specific.
+
+  - Removing a shared folder drops that NAME from the marks pool, but not the
+    graded folders nested inside it. Remove `Portfolios` while the pool holds
+    `Tasks` (found at `Portfolios/Tasks`) and the pool keeps naming a folder
+    whose parent has left the site.
+  - A pool entry whose folder has since been deleted on disk still counts
+    toward the "last folder that counts for marks" floor, so the floor can
+    refuse a removal on the strength of a folder that is not there.
+
+- **A recommendation rather than a defect: the "Folders Plantoir uses" sheet
+  can under-report the marks folders, on both platforms.**
+  `SpecialFoldersHelpView.gradedFolderNames` infers from `sharedFolders +
+  perSectionFolders`, while `gradedFoldersBinding` infers from
+  `gradedFolderChoices` — which includes the walked names. So a course that
+  has never been asked can see `Tasks` ticked in the checklist and NOT listed
+  in the sheet one section below it, until the first save makes the pool
+  explicit. Windows now matches the mac exactly here on purpose
+  (`SpecialFoldersHelp.cs` passes the top-level lists explicitly, with a
+  comment saying why), because the sheet is handed a configuration with no
+  course folder to walk and `specialFoldersHelp`'s own contract cases build
+  their config from JSON alone. Fixing it means giving the sheet a directory,
+  which changes a shared contract's shape — a decision for both platforms at
+  once rather than one taken on the side that noticed.
+
+- **`AppRulesContract.milestones()` leaves the example-course task out of the
 
 - **`AppRulesContract.milestones()` leaves the example-course task out of the
   readout, so two shared markers were classified by nobody** (found 2026-09-06,
@@ -2860,6 +2956,77 @@ is what happened to the test-race item, sitting here for three days with
 Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
 where.
+
+- **Windows caught up to the mac's nested marks folders — and found two things
+  the mac's version does not do** (Windows, 2026-09-06, branch
+  `issue/26-marks-checklist-nested-folders`, commit `02cf58b2`). **The mac is
+  expected to KNOW this one, and to take the two items in the sections above;
+  the rest of it is the mac's own design arriving here.**
+
+  **What it fixed.** Windows' Marks checklist was built from
+  `SharedFolders.Concat(PerSectionFolders)` — top-level names only — while
+  `GradedFolderRule.CountsForMarks` matches a folder segment at any depth. With
+  `graded_folders` absent meaning "never asked, historical rule applies", the
+  first tick FROZE the narrow list, so a teacher who files assessed work in
+  `Portfolios/Tasks` could not tick it and, from that tick onwards, every
+  expectation it addressed read as never evaluated on the coverage map. Nothing
+  said so, and nothing ever would. The mac has been right about this since it
+  added `nestedFolderNames`; the sentence that explains the whole item is the
+  mac's own, on `gradedFoldersBinding`: *"the first tick freezes it, so anything
+  the build counts today and this list omits loses its marks without a word."*
+
+  **The half that is easy to miss.** The gap was in TWO places, and fixing only
+  the visible one still loses the marks: `MaterializedGradedFolders()` inferred
+  from the same top-level lists, and that — not the checklist — is what the
+  first tick actually writes. The mac never hits it because its binding's `get`
+  filters `gradedFolderChoices`, which already holds the nested names. Both are
+  now fed from one list on Windows, and a test asserts it, because a test
+  covering only the visible list passes on the broken code.
+
+  **What was copied without re-deriving, and why.** The four-level cap, the
+  skip list, keeping `Media` out, and excluding `sectionN` by name while still
+  walking its children are all the mac's answers. Two apps disagreeing about
+  which folders count would produce two different coverage maps from the same
+  course, which is the one place a divergence is indefensible — so the sub-
+  questions were not re-opened. Rejected on those grounds: a different depth
+  cap (four is an affordability judgement, honestly documented as a cap rather
+  than completeness, and a different number would mean different pools for the
+  same course); keeping `Media` in for a teacher who grades video portfolios
+  (defensible, and still no, because media is not assessed work in either app
+  today); and grouping or indenting the nested names under a heading (the mac's
+  list is flat — same product, one shape).
+
+  **Rejected and worth recording: warning the teacher on the first tick** that
+  a folder the build counts today is about to stop counting. Arguably the real
+  fix for the harm, since the walk is a cap rather than a guarantee and a
+  folder five levels down is still lost silently. Not shipped: neither app does
+  it, it is new teacher-facing behaviour, and it belongs in a decision made for
+  both platforms at once rather than at 3am on one of them.
+
+  **Two things Windows does that the mac does not.** Both are in the sections
+  above with their full reasoning — `excluded_items` filtering (a divergence
+  taken deliberately, because copying would have regressed Windows), and a
+  SORT of each folder's children so the offered list has an order at all.
+
+  **And one Windows-only trap, which is the part that could not have been
+  guessed from the Swift.** The mac's walker does not follow symlinks. The
+  obvious C# translation is to skip anything carrying
+  `FileAttributes.ReparsePoint` — which is what `CourseArchiver.cs:226` already
+  does — and it would have been quietly catastrophic here: with OneDrive's
+  Files On-Demand, on by default, an unmaterialised DIRECTORY is a reparse
+  point too. Every folder in a synced working folder would have been skipped at
+  level 1, putting exactly the courses `cloudSyncedFolders` says teachers keep
+  on purpose straight back to the top-level-only list this change exists to
+  fix — and no test would have caught it, because a temp folder is never a
+  cloud placeholder. `DirectoryInfo.LinkTarget is not null` is the test that
+  distinguishes them: non-null for a real symlink or junction, null for a
+  placeholder. **`CourseArchiver` has the same exposure** and was left alone
+  as out of scope; it is worth a look on both platforms.
+
+  Reference: `windows-app/Plantoir.Core/Models/GradedFolderChoices.cs`,
+  `windows-app/Plantoir.Tests/GradedFolderChoicesTests.cs`,
+  `contracts/shared-rules.json` → `gradedFolders.choices`. Suite 1047 passed,
+  2 skipped, 0 failed (1031 before).
 
 - ✅ DONE (mac, 2026-09-06, branch `issue/help-sheet-resolved-curriculum-folder`,
   commit `3f1626be`). **The folders sheet named a curriculum folder the course
