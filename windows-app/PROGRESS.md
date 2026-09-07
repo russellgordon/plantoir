@@ -67,7 +67,7 @@ What is genuinely left, smallest first:
 | ~~27~~ | ✅ Done 2026-09-07 — “Restore Section N…” puts a section back to how it was when the conversation started; the assistant now saves one copy per conversation rather than one per change. | — |
 | ~~26~~ | ✅ Done 2026-09-06 — the marks checklist offers folders nested up to four levels deep (`GradedFolderChoices`), and the frozen pool is fed from the same list. | — |
 | ~~25~~ | ✅ Done 2026-09-07 — the wizard asks the skeleton question with the mac's sentences, writes `use_skeleton`, and the structure editor shows the skeleton's folders. | — |
-| 35 | The wizard's Create button and the new-site dialog have never been driven through the real interface. `Plantoir.UiTests` is where the first belongs; the second needs credentials and may have to stay a written hand-check. | Medium |
+| ~~35~~ | ✅ Done 2026-09-07 — the Create button is three `[UiFact]` cases in `NewCourseWizardUiTests` (suite 6 → 9, green in 4 m 12 s); the new-site dialog became a written hand-check, because `deploy.ps1`'s Credential Manager target is hardcoded and `--state-dir` does not redirect it. Found on the way: started with `UseShellExecute = false` the app is handed the `dotnet test` host's PIPE std handles, which leak into the ConPTY child — every launcher then fails in one second with an empty transcript. `ConPtyProcess.Start`'s own CAUTION had already said so. | — |
 | ~~13~~ | ✅ Done 2026-09-07 — the rename sheet, the apply method, every key carried across and `class_folder`/`curriculum_folder` materialised; Add creates the folder, Remove says it stays. | — |
 | ~~22~~ | ✅ Done 2026-09-06 — the "Folders Plantoir uses" sheet, now shared as `shared-rules.json` → `specialFoldersHelp` rather than living inside a view. Two cases proposed back to the mac. | — |
 
@@ -140,9 +140,20 @@ and the one thing measurement added.
 Run it **from the repository root**, not from `windows-app/`:
 
 ```powershell
-.\run-ui-tests.ps1                 # all of it, about 3 minutes
+.\run-ui-tests.ps1                 # all of it, about 4 minutes
 .\run-ui-tests.ps1 -Filter "FullyQualifiedName~TheSheetCloses"
 ```
+
+**Two switches, both added 2026-09-07 with item 35.** `PLANTOIR_UI_KEEP=1`
+leaves a failed run's temporary folder behind and prints the path — a test
+that fails INSIDE the app has almost nothing to say from outside it, and the
+evidence (that run's `startup.log`, its trail, its per-run launcher log, its
+working folder) was being deleted on the way out. And the runner now sweeps
+orphaned `powershell.exe`/`python.exe` children afterwards, matched on a
+command line naming one of the suite's own `plantoir-ui-<8 hex>` folders:
+killing `Plantoir.exe` kills only `Plantoir.exe`, because the whole-tree kill
+lives in `ConPty.Kill()` and runs when the APP ends a task, not when the app
+is ended from outside.
 
 It closes a running Plantoir before it starts, says so, and does not reopen it.
 `--state-dir` moves the whole state folder for the run, so nothing of the
@@ -326,12 +337,17 @@ plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
   (`MainWindow.xaml`, handoff item 1). Corrected 2026-09-06: this paragraph
   outlived the work by a fortnight, and anyone planning from it would have
   built it twice.
-- Two paths proven underneath but never click-driven in-app: the wizard's
+- ~~Two paths proven underneath but never click-driven in-app: the wizard's
   Create button (the `setup.ps1` + answer-pump path ran to completion via
   PtyDriver), and the new-site dialog a BRAND-NEW section's deploy raises —
-  the verified deploy was a repeat publish to an existing site. **This is
-  handoff item 35** since 2026-09-06; before that it was written down here and
-  indexed nowhere, so no session planning from the numbered list could see it.
+  the verified deploy was a repeat publish to an existing site.~~ Closed
+  2026-09-07 as handoff item 35. The Create button is now click-driven by
+  `NewCourseWizardUiTests`; the new-site dialog is a hand-driven check with a
+  written procedure (`documentation/12-windows-app.md`), because reaching it
+  needs a real saved Netlify token and creates a real site. It was listed as
+  item 35 on 2026-09-06 — before that it was written down here and indexed
+  nowhere, so no session planning from the numbered list could see it, which
+  is the whole reason the audit added it.
 - Smoke-test hooks, all driving the real button code paths
   (`MainWindow.xaml.cs`, `RunAutomationHooks`): `--auto-select CODE N`,
   `--auto-preview CODE N`, `--auto-deploy CODE N`, `--auto-course CODE`,

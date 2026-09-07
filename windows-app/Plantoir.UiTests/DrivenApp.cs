@@ -36,16 +36,14 @@ namespace Plantoir.UiTests;
 /// that PREVIEWED would look for its build where the launcher did not put it,
 /// and one that SCHEDULED a deploy would register a REAL Task Scheduler task
 /// whose sentinels land in the teacher's real pending folder. Neither is done
-/// by any test today, and neither should be without reading this first.
+/// by any test today, and neither should be without reading this first.</para>
 ///
-/// <para><b>One launcher IS run now:</b> <c>NewCourseWizardUiTests</c> presses
-/// Create, which runs <c>setup.ps1</c>. That is safe for one narrow reason —
-/// <c>setup_course.py</c> never resolves <c>merged_output_root</c>, so
-/// <c>PLANTOIR_BUILD_ROOT</c> is set and the folder it names is never made.
-/// Checked by hand on 2026-09-07: no new folder under the real
-/// <c>%LOCALAPPDATA%\Plantoir\builds</c>, and the real breadcrumb trail
-/// untouched. Nothing enforces that property, so check it again before a test
-/// runs a DIFFERENT launcher.</para>
+/// <para><b>One launcher IS run now</b> — <c>NewCourseWizardUiTests</c> presses
+/// Create, which runs <c>setup.ps1</c> — and it is safe for narrow reasons
+/// that nothing enforces. They are written out once, in
+/// <c>documentation/12-windows-app.md</c> under "The flags the app answers";
+/// read them before a test runs a DIFFERENT launcher, because preview and
+/// schedule would NOT be safe.</para>
 ///
 /// <para><b>A running Plantoir is closed, not worked around.</b> Russell's
 /// standing instruction (2026-09-06, and CLAUDE.md's Windows setup notes):
@@ -99,7 +97,15 @@ public sealed class DrivenApp : IDisposable
             try { other.Kill(true); other.WaitForExit(5000); } catch { }
         }
 
-        _root = Path.Combine(Path.GetTempPath(), "plantoir-ui-" + Guid.NewGuid().ToString("N")[..8]);
+        // The folder name carries THIS RUN's token when the runner supplied
+        // one, so run-ui-tests.ps1's orphan sweep can match its own children
+        // and nothing else. Without it two parallel runs would sweep each
+        // other's live launchers, and a developer reading a kept folder — say
+        // `Get-Content ...\plantoir-ui-*\state\Logs\startup.log -Wait` — would
+        // have the pattern in their own command line and be force-killed.
+        string run = Environment.GetEnvironmentVariable("PLANTOIR_UI_RUN") ?? "solo";
+        _root = Path.Combine(Path.GetTempPath(),
+                             $"plantoir-ui-{run}-{Guid.NewGuid().ToString("N")[..8]}");
         WorkspacePath = Path.Combine(_root, "workspace");
         string stateDir = Path.Combine(_root, "state");
         Directory.CreateDirectory(WorkspacePath);
@@ -118,28 +124,34 @@ public sealed class DrivenApp : IDisposable
             ["RestoreWindowsOnLaunch"] = false,
         }.ToJsonString(), new UTF8Encoding(false));
 
-        // UseShellExecute = TRUE, and this is not a detail. It is the one line
+        // UseShellExecute = TRUE, and this is not a detail: it is the one line
         // that decides whether a test can drive anything the app SHELLS OUT to
-        // — preview, publish, or creating a course.
+        // — creating a course, previewing, publishing.
         //
-        // Plantoir is a WinExe, so it never allocates a console of its own; but
-        // a GUI process started with UseShellExecute = false INHERITS its
-        // parent's, and the parent here is the `dotnet test` host, which has
-        // one. The app then hands its launcher a ConPTY pseudo console while
-        // the child quietly writes to the INHERITED console instead — so the
-        // app captures nothing, the child's stdin is never the app's, and
-        // `input()` in setup_course.py hits EOF and dies. What that looks like
-        // from a test is a launcher that "failed (exit code 1) after 1s" with
-        // an EMPTY transcript, which reads like a broken toolchain and is not.
+        // WHY is already written down, once, in ConPtyProcess.Start's own
+        // CAUTION: the child binds to the pseudo console only when the
+        // CREATING process's std handles are clean — console handles or none —
+        // and a creator whose stdio is redirected to pipes leaks those handles
+        // into the child instead. The `dotnet test` host's stdio is pipes, and
+        // UseShellExecute = false hands them straight to the app. ShellExecute
+        // gives a GUI process no std handles at all, which is the "or none"
+        // case, and is also exactly what a teacher's shortcut does.
         //
-        // Measured, 2026-09-07: identical code, identical workspace, the only
-        // change this flag. False → exit 1 in one second, nothing captured,
-        // no course made. True → the create runs to the end, 47 s for the
-        // whole test. The same failure reproduces with no test harness at all
-        // by typing `.\Plantoir.exe` in a console — see
-        // documentation/12-windows-app.md, "Do not launch it from a terminal".
-        // ShellExecute is also what a teacher's shortcut does, so this is the
-        // faithful launch as well as the working one.
+        // Measured 2026-09-07 (Lenovo 20QES70500, Intel Core i5-8365U @
+        // 1.60 GHz, 16 GB), one variable, three launches of the same build:
+        // clean CONSOLE handles (cmd.exe in its own window) → the course is
+        // made, setup.ps1 succeeded after 21 s. ShellExecute → the same, 21 s.
+        // Output REDIRECTED to a file → the launcher's output lands in the
+        // redirect target, the app captures nothing, and the run hangs on the
+        // first prompt because the answer never reaches the child. Under
+        // `dotnet test` the same leak ends faster and looks worse: "failed
+        // (exit code 1) after 1s" with an EMPTY transcript, because the pipe
+        // gives the child EOF and `input()` in setup_course.py dies.
+        //
+        // The trap is REDIRECTED stdio, NOT an inherited console — an earlier
+        // version of this comment said the opposite, and the experiment above
+        // is what settled it. So `.\Plantoir.exe` at an ordinary prompt is
+        // fine; `.\Plantoir.exe > out.txt` is not.
         var psi = new ProcessStartInfo(ExecutablePath) { UseShellExecute = true };
         psi.ArgumentList.Add("--state-dir");
         psi.ArgumentList.Add(stateDir);   // ArgumentList quotes for us
