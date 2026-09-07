@@ -219,6 +219,58 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
 | What a teacher is told when a folder a feature needs has gone | `shared-rules.json` → `siteHealth` | SiteHealthContract (5), SiteHealthFinding (11), and `scripts/test_site_health.py` |
 
+### Which of these the WINDOWS suite runs
+
+The table above says what the MAC draws on, and for a long time nothing said
+the same about Windows. That turned out to matter: an audit on 2026-09-06
+(WINDOWS-HANDOFF item 29) found **23 case lists the mac ran and the Windows
+gate did not read at all** — none of them unreachable, each simply a test
+nobody had written. Wiring them found a divergence in how the two apps write
+teachers' frontmatter, four tool arguments that differ by design and were
+recorded only in a Swift comment, two shared markers classified by nobody, and
+a launcher flag listed as shared that only one platform has.
+
+So the state is worth writing down rather than re-derived. Windows now runs
+every list in the table above, through these classes in
+`windows-app/Plantoir.Tests/`:
+
+| What it runs | Class |
+|---|---|
+| `markerOrigins` both directions, and the shared steps of each `milestones` list | `MilestoneContractTests` |
+| `wizardAnswerKeys`, `firstDeployMarkers`, `sectionTimetable`, `pageVisibility.writingRules` | `FileFormatContractTests` |
+| `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts` | `PublishAndLauncherContractTests` |
+| `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
+| `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
+
+**Three habits came out of that work and are worth copying on either side.**
+
+- **Ask the list both ways.** A test that walks the contract and looks each
+  case up in the code cannot notice a case the CODE has and the contract does
+  not — an extra credential, an extra tool, an extra argument. Every gap named
+  above was found by the reverse direction, and none by the forward one.
+- **Check completeness, not just correctness.** A hand-written mirror answers
+  the cases that existed the day somebody read the contract. Where a rule's
+  cases are prose keyed to behaviour, map each case to a named test and assert
+  no case is left unmapped, so a case the other platform ADDS fails by name.
+  (Map to names rather than draining a shared set: xUnit builds a fresh
+  instance per `[Fact]` and fixes no order, so a set filled by ten tests and
+  emptied by an eleventh passes on whatever happened to run.)
+- **Say what cannot be executed, in the test.** Some rules are about how work
+  is done rather than what the code does — the routing suite's polarity veto,
+  the payload rules that belong to `setup_course.py`'s own tests. Naming them
+  in the completeness check keeps them owned; dropping them silently is how a
+  rule stops being anybody's.
+
+**What is deliberately NOT executed, on either side.** These are English, not
+cases, and a "test" of them could only assert that a string exists:
+
+| Rule | Why no test |
+|---|---|
+| `cloudSyncedFolders.detection.macMarkers` / `.windowsMarkers` | Four paragraphs describing what each platform exposes. The BEHAVIOUR they produce is covered by hand on both sides; the paragraphs are the reasoning behind it. |
+| `stopPreview.notShared` | Names the three things about stopping a preview that are the platform's, and says why. The cases themselves ARE run — on Windows by `test_stop_preview.ps1`, which `ReclaimedProcessesTests` runs inside `dotnet test` so it is a gate rather than a script somebody remembers. |
+| `modelTiers.requirements` — the polarity veto | A rule about how a MODEL is chosen, governing the by-hand routing suite in `research/ai-assist/`. |
+| `example-content.rules` — the three about the installer | They constrain how `setup_course.py` is written; its own tests and `lint_skeletons.py` hold them, both run from `verify.sh`. |
+
 **Not shared, and why.** Each of these is a deliberate decision, not an
 oversight:
 

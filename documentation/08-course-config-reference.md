@@ -123,7 +123,7 @@ belong in the same mental model:
 | `publishForSection<N>` / `createdSection<N>` | shared content | Per-section publication state; collapsed to `publish`/`created` when building section N ([mechanism](05-build-pipeline.md#frontmatter-processing)). |
 | `publish` | any page | `false` keeps the page out of the built site. Anything else — including no key at all — publishes it. |
 | `created` | any page | The displayed and sort date ([C1-3](06-quartz-customizations.md#c1-applied-on-first-build--full-rebuild)). |
-| `draft` / `draftSection<N>` | any page | **Legacy, still read.** The same idea with the opposite polarity (`draft: true` hides). Used only when no `publish` key is present; rewritten to `publish` the first time anything edits the page. |
+| `draft` / `draftSection<N>` | any page | **Legacy, still read.** The same idea with the opposite polarity (`draft: true` hides). Used only when no `publish` key is present. Whether editing such a page REWRITES the key differs between the two apps and is being decided — Windows migrates it, macOS keeps it and inverts the value, and the build reads both either way (see `MAC-HANDOFF.md`, found 2026-09-06). |
 | `renderFolderPages: false` | a folder's `index.md` | Suppresses the auto-generated file listing on that folder page ([A3](06-quartz-customizations.md#a3-foldercontenttsx-folder-listing-page)). |
 | `excludeBacklinks: true` | any page | Hides the "When did we do this?" backlinks panel on that page ([D1](06-quartz-customizations.md#d1-patched-backlinkstsx-supportbacklinkstsx)). |
 | `transcludeTitleSize: h2` | a transcluded page | Heading level used for the page's title when embedded via `![[…]]` ([C1-10](06-quartz-customizations.md#c1-applied-on-first-build--full-rebuild)). |

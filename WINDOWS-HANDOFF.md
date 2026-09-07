@@ -1276,20 +1276,47 @@ to run in the background.
       `MainWindow` has a frame in `AppSettings`. Row 164's note says "Windows
       has its own placement memory", which is true of the main window only.
 
-29. **~20 contract case lists the mac suite runs and the Windows suite does
-    not, which is why gaps like item 25 go unannounced (found 2026-09-06).**
+29. ~~**~20 contract case lists the mac suite runs and the Windows suite does
+    not, which is why gaps like item 25 go unannounced (found 2026-09-06).**~~
+    — ✅ Done 2026-09-06, branch `issue/29-windows-contract-case-lists`.
+    All 23 lists are wired; `contracts/README.md` has a section naming which
+    class runs which, so the next session does not repeat the audit. Two of the
+    bullets below were WRONG and are struck with their corrections inline.
 
-    **In progress on branch `issue/29-windows-contract-case-lists`.** The audit
-    that opened this item counted ~20; running it properly found 23, and two of
-    its bullets below were wrong — corrections are marked inline. Landed so
-    far: the progress markers, the file formats, the publish state, the
-    credentials, the launcher's extra flags and the preview's ports. What the
-    wiring has turned up, none of which any inspection had: two shared markers
-    classified by nobody (because the mac's contract readout omits a whole
-    task), a live divergence in how the two apps write a teacher's own
-    frontmatter, a field both apps write that no contract named, and `--image`
-    listed as shared when it is the mac's alone. All four are written up in
-    [`MAC-HANDOFF.md`](MAC-HANDOFF.md).
+    **What the wiring found, none of which any inspection had.** This is the
+    argument for the item, so it is recorded rather than left in commit
+    messages:
+
+    - **Two shared-Python markers classified by nobody.** Not for the reason I
+      first wrote — the mac HAS an example-course task; its
+      `AppRulesContract.milestones()` leaves that task out of the generated
+      readout, and the mac's classification test walks the readout. A
+      classification is only as complete as the list it is checked against.
+    - **The two apps write a teacher's own frontmatter differently.** The
+      contract says a page in the old `draft:` spelling keeps it, inverted, and
+      the mac does that; this side migrates the key to `publishForSection<N>`,
+      which `GUI-IMPROVEMENTS.md` row 140 records as intended. Both are
+      defensible, they cannot both be true of a course opened on one machine and
+      then the other, and `documentation/` had already taken the Windows side —
+      so it is wrong for the mac today whichever way it is decided.
+    - **Four tool arguments differ by design and were recorded only in a Swift
+      doc comment**, plus sixteen more this server takes that the contract does
+      not describe — `preview` among them, which is the mac's own second
+      documented departure.
+    - **A field both apps have always written that no contract named**
+      (`sectionTimetable.section`), and **`--image` listed as a shared launcher
+      flag** when `deploy.ps1` cannot accept it.
+
+    All of it is written up in [`MAC-HANDOFF.md`](MAC-HANDOFF.md); the
+    frontmatter divergence is a decision, not a fix, and is at the top of what
+    the mac owes.
+
+    **The habits are the transferable part**, and they are in
+    `contracts/README.md`: ask each list BOTH ways, because every gap above was
+    found by walking the code and looking it up in the contract rather than the
+    reverse; assert completeness so a case the other platform adds fails by
+    name; and say in the test which rules cannot be executed, rather than
+    dropping them.
 
     None is unreachable — `Contracts.cs` is a plain JSON loader — each is
     simply a test never written. **This is the highest-leverage item on the
@@ -1304,27 +1331,42 @@ to run in the background.
     which says the plan must name the section's unpublished class pages — item
     28's first gap — and which the list below missed entirely.)
 
-    Worth doing first, roughly in this order:
+    The order they were done in, kept because the reasons are still the
+    reasons — and each is marked with what became of it:
 
     - `app-rules.json` → `markerOrigins.origins` (26) and `milestones` (57).
       `contracts/README.md` calls `markerOrigins` "the one easiest to get
       wrong", and getting it wrong stops the progress bar moving, which reads
-      as a slow build rather than a bug.
-    - `file-formats.json` → `wizardAnswerKeys.keys` (3) — item 25.
+      as a slow build rather than a bug. **Done**, and it found the two
+      unclassified markers.
+    - `file-formats.json` → `wizardAnswerKeys.keys` (3) — item 25. **Wired, and
+      it fails as predicted**: the test for `use_skeleton` is `[Fact(Skip = …)]`
+      naming item 25, and un-skipping it is that item's acceptance test. The
+      other two keys pass.
     - `app-rules.json` → `credentialPrompts.everyRequest` (7): whether a typed
       token is echoed on screen. Windows runs `credentialPrompts.cases` only.
+      **Done**, in BOTH directions — the reverse one, by reflection over the
+      real `CredentialRequests`, is the half that would catch a request added
+      here and written down nowhere.
     - `app-rules.json` → `publishedFreshness.whenShown` (9) / `whenRecorded`
-      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/25, the
-      descriptions the model actually sees); `course-management.json` →
-      `courseCode.renameEffects` (6); `shared-rules.json` →
-      `buildOutputLocation.windowsLocation.buildsRoot` (asserted by nobody on
-      either side), `problemReportDialog.askAboutPromptsWhen`,
-      `workingFolderPathBar.ancestorPaths` (Windows hardcodes its own crumbs),
+      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/25 — the NAMES
+      and ARGUMENTS, not the descriptions, which `Briefly()` rewrites here for
+      measured reasons); `course-management.json` → `courseCode.renameEffects`
+      (6); `shared-rules.json` → `buildOutputLocation.windowsLocation.buildsRoot`
+      (was asserted by nobody on either side; now run here),
+      `problemReportDialog.askAboutPromptsWhen`,
+      `workingFolderPathBar.ancestorPaths` (Windows hardcoded its own crumbs;
+      the contract now carries `windowsCases` and the copy is gone),
       `assistantModelChoice.comfortFraction`/`guidance`;
       `file-formats.json` → `firstDeployMarkers.paths` (3);
-      `example-content.json` → `rules` (5).
+      `example-content.json` → `rules` (5). **All done.**
     - **Neither side** tests `cloudSyncedFolders.detection.windowsMarkers` (4),
-      which item 18 depends on.
+      which item 18 depends on. **Still true, and deliberately so**: those four
+      are prose paragraphs describing what each platform exposes, not cases. The
+      behaviour they produce IS covered by hand in `CloudSyncedFolderTests`, and
+      `contracts/README.md` now records them among the rules no test executes,
+      with the reason — which is the honest answer rather than a test that
+      asserts a paragraph exists.
     - ~~`stopPreview.cases` (23) ARE covered, but by `test_stop_preview.ps1`,
       outside `dotnet test` — so they do not run in the gate.~~ **WRONG,
       corrected 2026-09-06.** `ReclaimedProcessesTests.TheLauncherMatcherAnswersTheContract`
