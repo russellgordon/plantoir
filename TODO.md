@@ -682,6 +682,57 @@ an item when it ships (finished behaviour is recorded in
   course-level pages, but for a "sample course" it does not name — a
   different measurement from the 32 above, not a contradiction of it.)
 
+## A rolled-over section publishes over last year's website
+
+Noted 2026-09-06 on `issue/mcp-tool-surface-divergence`, while sorting the
+twelve MCP tools Windows serves and the mac does not (`MAC-HANDOFF.md`). Found
+by reading code, not by a teacher. **It is a DECISION, not a defect to fix
+quietly**, and it is open on BOTH platforms.
+
+A teacher says *"roll this section over to a new year."* On both platforms that
+exact sentence is matched in code, never routed by the model, and goes to
+`re_date_classes` — `AssistCardCommand.swift:395` and `AssistCardCommand.cs:50`.
+On both platforms `re_date_classes` re-dates the section and stops there.
+
+Only `roll_over_section` calls `AssistWorkspace.ReleaseSite`
+(`PlantoirTools.cs:911`), and only Windows has `roll_over_section`. What
+`ReleaseSite` does is rename `courses/<CODE>/.netlify_sites/section<N>.json`
+(or `.cloudflare_sites/`) aside, so the next publish makes a NEW site instead of
+overwriting the old one. Shared `scripts/deploy.py` reads that marker, and
+nothing under `mac-app/` or `scripts/` renames, clears or year-scopes it —
+`CourseRenamer` deliberately leaves it alone and `DeployCommand.swift` only
+reads it.
+
+So the first publish after a rollover lands on **last year's URL, which last
+year's students may still be reading**, and the teacher is not asked what to
+call the site because `HasDeployedBefore` finds the marker and reads it as
+proof the section has a home. Windows' own comment
+(`AssistWorkspace.cs:1864-1877`) says exactly why that is bad — and Windows
+still has the hole, because the sentence a teacher says does not reach the tool
+that closes it.
+
+**Why this is a decision.** Whether a section keeps one address across years or
+starts a new site each September is a product choice, not an obvious bug.
+Plenty of teachers want one address forever, and a URL that changes every year
+breaks every link anybody saved. Windows made a choice and gave its reason; the
+mac has never made one. Three options:
+
+- **Keep them separate, as Windows did.** `re_date_classes` re-dates;
+  something else cuts loose. Cheapest — and it leaves the card phrasing
+  pointing at the wrong one on BOTH platforms, so the phrasing has to move with
+  it or the bug stays exactly where it is.
+- **Make the cut-loose part of the rollover phrasing**, on both platforms,
+  since "roll over to a new year" is the sentence that means it. Risk: a
+  teacher who says it meaning only "fix the dates" loses their address.
+- **Ask.** The rollover already tells the teacher to preview and check before
+  deciding what students see; one more sentence — "should this be a new
+  website, or the same one as last year?" — is the only option that does not
+  guess. It is also the only one that needs new wording, which then belongs in
+  `contracts/` so both platforms say it identically.
+
+Whichever is chosen it needs the same sentence on both sides. Windows' half is
+item 33 in `WINDOWS-HANDOFF.md`.
+
 ## A folder rename does not follow an angle-bracket Markdown link
 
 Noted 2026-09-06, while fixing the neighbouring defect (a rename to a name

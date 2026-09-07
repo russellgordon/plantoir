@@ -1381,7 +1381,7 @@ to run in the background.
     the twelve are either the mac's to build or deliberately not the mac's.
     Nothing you serve is being taken away.
 
-    **You owe three things.**
+    **You owe four things.**
 
     **One — an enumeration test over your own 37.** Nobody has told you this,
     which is why it is first. `AssistCases_Tools_MatchesContract`
@@ -1420,8 +1420,8 @@ to run in the background.
     bad. The mac has the identical hole (`AssistCardCommand.swift:395`) and no
     `ReleaseSite` at all. **Do not fix this unilaterally**: whether a rolled-
     over section keeps its address or starts a new site is a product choice —
-    plenty of teachers want one address forever — and `MAC-HANDOFF.md` puts
-    three options to Russell. Whatever is chosen needs the same sentence on
+    plenty of teachers want one address forever — and `TODO.md` ("A rolled-over
+    section publishes over last year's website") puts three options to Russell. Whatever is chosen needs the same sentence on
     both platforms, so the wording belongs in `contracts/`.
 
     **Three — `re_date_classes` has the same NAME and different PARAMETERS on
@@ -1439,16 +1439,30 @@ to run in the background.
     down where a test can see it — most cheaply as part of the `mcpToolNames`
     work above, extended to schemas rather than names.
 
-    **And one measured artifact of yours the mac never got.** You added a
-    fourth `TEACHERS SAY:` phrasing to `check_section` on 2026-08-17 — "what
-    would students see in this section right now?" — two days after the mac
-    wrote its three, and it never travelled back. The mac's rule for copying
-    one of your descriptions is to keep the `TEACHERS SAY:` clause WHOLE, so
-    that is a routing change nobody chose. It is the only such difference
-    across all 25 shared tools (checked clause by clause). Nothing for you to
-    do; the mac cannot fix it unattended because adding a phrasing is a
-    routing change and routing is measured by hand against a local
-    `llama-server`.
+    **Four — seventeen `TEACHERS SAY:` phrasings the mac has and you do not.**
+    Checked clause by clause, every list in `toolSchemas.mcp` against every
+    `[Description]` in `PlantoirTools.cs`. Five of the 25 shared tools differ,
+    and **four of the five are yours**: `add_next_class` (mac has six
+    phrasings, you have no `TEACHERS SAY:` clause at all — `PlantoirTools.cs:553`),
+    `plan_add_next_class` (mac three, you none — `:533`),
+    `read_remembered_timetable` (mac four, you none — `:620`) and
+    `remember_timetable` (mac four, you none — `:767`). Not in your in-app
+    assistant either: `grep` for any of them across `windows-app` returns 0.
+
+    This is not a documentation difference. `AssistToolSurface`'s own comment
+    says the phrasings *"are what took routing from 69% to 91%"* — they are
+    measured artifacts, so a missing one is a routing change nobody chose, and
+    on your side that is seventeen of them. Worth a measurement on your own
+    backend before you copy them in: you have a Vulkan-accelerated
+    `llama-server` and the mac cannot run your hardware, so this is one of the
+    things only you can settle. `research/ai-assist/tools-from-contract.py`
+    writes the surface the suites take as input.
+
+    The fifth difference is the mac's own and the mac owes it: you added a
+    fourth `check_section` phrasing on 2026-08-17 — "what would students see in
+    this section right now?" — two days after the mac wrote its three, and it
+    never came back. Neither side is fixed here, because routing is measured by
+    hand and an unattended session cannot do it.
 
 ## Windows no longer runs any of this in a container
 
@@ -2391,9 +2405,12 @@ acceptance list both suites run. The sorting is in `MAC-HANDOFF.md` under
 **What the sorting concluded, in one paragraph**, so this file is readable on
 its own: six of the twelve are product the mac should have — `list_courses`
 and `back_up_course` and `explain_publishing` as MCP-only tools that cost no
-routing, `add_classes` and `make_room_for_classes` as thin wrappers over
-engines the mac already has (`PlaceholderClassPlanner`, `ClassInsertionPlanner`),
-and `roll_over_section` because of the defect in item 33's second part. Two are
+routing, `add_classes` and `make_room_for_classes` as WIDENINGS of something
+that already ships rather than new features (`add_next_class` already calls
+`PlaceholderClassPlanner.apply`, and its `duplicate` argument already calls
+`ClassInsertionPlanner.plan(count: 1)` — so the mac is missing an argument
+each, not an engine each), and `roll_over_section` because of the defect in
+item 33's second part. Two are
 Windows-shaped and stay yours: `read_timetable`, because the mac puts
 spreadsheet reading behind its schedule sheet on purpose and has no file-path
 argument anywhere on its surface; and `list_recent_changes`, because both mac
@@ -2418,10 +2435,13 @@ same rules — the model is simply shown fewer.
   a wrong one schedules a class on the wrong day silently. The schedule UI
   owns that path. `read_remembered_timetable` stays, because reading is safe.
 
-Result: 20 tools down to **13** for the model — the six `plan_` twins and
-`remember_timetable` are the seven taken off the list. (An earlier draft of
-this note said 12; the cuts named above come to 13, and the code and its
-tests say 13.) The thirteen are `list_pages`, `read_page`, `check_section`,
+Result: 22 tools down to **13** for the model — the seven `plan_` twins,
+`remember_timetable` and `re_date_classes` are the nine taken off the list.
+(An earlier draft of this note said 12; the cuts named above come to 13, and
+the code and its tests say 13. It then said 20 down to 13 with six twins and
+seven taken off, which was true when it was written and had gone stale by
+2026-09-06 — the local list has stayed 13 throughout, but the surface it is
+drawn from grew.) The thirteen are `list_pages`, `read_page`, `check_section`,
 `publish_class_on`, `publish_pages`, `unpublish_pages`, `rebuild_preview`,
 `undo_last_change`, `deploy_section`, `schedule_deploy`,
 `cancel_scheduled_deploy`, `read_remembered_timetable`, `add_next_class`.
