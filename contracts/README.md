@@ -81,14 +81,22 @@ example-course markers, which the mac has no task to have listed. Getting this
 wrong crashes nothing: the progress bar simply stops moving, which reads as a
 slow build.
 
-Three of the twenty-eight appear in no mac milestone list, and that is expected
-rather than drift. The two example-course markers are Windows' alone — the mac
-has no such task. "Launching Quartz preview" is now matched by NEITHER app:
-`build_site.py` prints it before `quartz build --serve` has started, so it
-completed every remaining step at once and pinned the bar there for the whole
-real build (Windows found this; `TaskMilestones.Preview` uses Quartz's own
-"Done processing" instead). It stays classified because the line is still
-printed and a future list may want it.
+One of the twenty-eight is in no milestone list on either side. "Launching
+Quartz preview" is printed by `build_site.py` BEFORE `quartz build --serve`
+has started, so a bar that waited on it completed every remaining step at once
+and sat there for the whole real build (Windows found this;
+`TaskMilestones.Preview` uses Quartz's own "Done processing" instead). It stays
+classified because the line is still printed and a future list may want it.
+
+Two more — `"Example Course installed to"` and `"EXAMPLE_COURSE_CODE="` — went
+unclassified until 2026-09-06, and how is worth knowing, because the mechanism
+can hide any marker. Both apps have an example-course task and always did
+(`TaskMilestones.exampleCourse`), but `AppRulesContract.milestones()` does not
+list it, so the generated `milestones` readout has eight tasks where the mac
+has nine. The mac's classification test walks the READOUT, so a marker missing
+from it is invisible to the test however loudly the shared script prints it —
+and the classification is only as complete as the readout it is checked
+against.
 
 ## Proposing a case from the Windows side
 
