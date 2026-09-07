@@ -177,8 +177,10 @@ public class FolderPathRewriterTests
     //
     // The cases these five facts used to retype are now DESERIALISED from the
     // contract by the theory below, which is why three of them were failing
-    // here and nothing said so: `Uri.EscapeDataString` over-encodes `&`, `,`,
-    // `+`, `'`, `!` and `*`, and only the later cases exercise any of them. The
+    // here and nothing said so: `Uri.EscapeDataString` over-encodes eleven of
+    // the characters this rule leaves alone — the list, and which eight of them
+    // actually break a link, is on CharactersThatSurviveQuartzUndecoded rather
+    // than repeated here — and only the later cases exercise any of them. The
     // five stay as named regression anchors — the ones written when the
     // Markdown-destination defect was found, and that a reader looking for
     // "what broke" will search for by name — and

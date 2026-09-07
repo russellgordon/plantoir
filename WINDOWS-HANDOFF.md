@@ -596,7 +596,7 @@ this side is expected to say so when the contract is wrong.
 13. **Renaming a course folder from inside the app — HALF DONE 2026-09-06.**
     The model layer is built and under test: `FolderPathRewriter` (the link
     rewriting, 32 test methods over 119 cases since item 31 wired the contract) and `SpecialFolderRenamer` (the refusals, the move
-    list, the check-every-destination-first rule, 22 tests), plus the two
+    list, the check-every-destination-first rule, 27 test methods over 38 cases — the “22” written here on 2026-09-06 was already stale that day), plus the two
     trail events, which are DECLARED AND NOT YET EMITTED because nothing
     raises them until the sheet exists — see `windows-app/PROGRESS.md`.
     **Still owed: the sheet itself**, the method that performs the moves, the
@@ -1396,7 +1396,7 @@ to run in the background.
     `PercentEncoded` driven by `leaveUnescaped`, in BOTH branches, and
     `FolderPathRewriterTests` deserialises the cases instead of retyping five.
     A TWELFTH case went into the contract with it, for the second branch, which
-    the original eleven never reached — see "What Windows owes" below, and
+    the original eleven never reached — see "What Windows owed" below, and
     `MAC-HANDOFF.md`. 1125 passed, 2 skipped, 0 failed (1031 before). Original
     text: You found and fixed the defect itself on
     2026-09-06 — a Markdown destination ends at the first space, so renaming
@@ -5597,9 +5597,11 @@ failed (1031 before).
 **A TWELFTH case went in with the fix**, and it is the part worth reading even
 now the work is done. `Spelled` has two reasons to escape — the new name would
 break a Markdown destination, or the OLD segment arrived percent-encoded — and
-every one of the original eleven new names contains a space or a bracket, so all
-eleven take the FIRST branch. A `Uri.EscapeDataString` left behind in the second
-branch alone would have passed all eleven. The new case
+NONE of the original eleven reaches the second. Eight take the first (a space or
+a bracket in the new name); the other three reach no encoder at all, because
+`Assignments` and `Café` need no escaping and the wikilink case is not a
+Markdown link. A `Uri.EscapeDataString` left behind in the second branch alone
+would have passed all eleven. The new case
 (`[q](All%20Tasks/Quiz.md)`, "All Tasks" → `Q&A`, expecting
 `[q](Q&A/Quiz.md)`) is the only one that reaches it. It is named in
 `MAC-HANDOFF.md`, and it should be green on the mac already.
@@ -5626,9 +5628,12 @@ All three were ONE change in
 above — in BOTH of its branches, which is the half that reads as optional and
 is not. It keeps only `A-Za-z0-9-._~`, so it over-encodes `&`, `,`, `+`, `'`,
 `!` and `*` alike. **Not all eleven break, and this line said they did.** The
-ones that 404 are the characters `decodeURI` leaves encoded — `; , @ & = + $`,
-and `?`, which `sluggify` strips from the real folder's name instead — each
-turned into `-percent…`. `%27`, `%21` and `%2A` decode back to `'`, `!` and
+ones that 404 are the eight characters `decodeURI` leaves encoded and
+`sluggify` then turns into `-percent…`: `; , @ & = + $ ?`. `?` is an ordinary
+member of that set and not a special case — `Why%20Not%3F` slugs to
+`Why-Not-percent3F` by the same mechanism as the rest. (What IS peculiar to `?`
+is why the UNESCAPED spelling works: `sluggify` strips it from the real
+folder's name too, so both sides land on `Why-Not`.) `%27`, `%21` and `%2A` decode back to `'`, `!` and
 `*` and resolve fine, so over-encoding those three is noise rather than damage.
 Corrected 2026-09-07 by an adversarial review of the fix; the encoder is
 unchanged by the correction, because the eight that DO break include both of
@@ -5646,8 +5651,8 @@ character quietly ADDED to either app's constant is invisible to it.
 cases of its own rather than deserialising `linkRewriting.cases`, so **nothing
 on the Windows side went red on its own** — the three failures above are invisible
 there until the cases are wired in. `contracts/README.md`'s own rule is to
-deserialise and never retype; this file is one of the places that does not
-yet.
+deserialise and never retype, and this file was one of the places that did not
+— until 2026-09-07.
 
 The per-cent case, “a per-cent sign is escaped” (`Top 10%` →
 `[q](Top%2010%25/Quiz.md)`), **passes on Windows already** and is not work:

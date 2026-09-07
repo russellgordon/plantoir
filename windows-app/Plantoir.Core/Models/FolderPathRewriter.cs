@@ -86,12 +86,17 @@ public static class FolderPathRewriter
     ///
     /// <para>Being precise about WHICH of its over-encodings break, because
     /// the loose version of this sentence has been written twice: the ones
-    /// that 404 are the characters <c>decodeURI</c> leaves encoded —
-    /// <c>; , @ &amp; = + $</c>, and <c>?</c>, which <c>sluggify</c> strips
-    /// from the real folder's name instead. <c>'</c>, <c>!</c> and <c>*</c>
-    /// are over-encoded too and come back out of <c>decodeURI</c> intact, so
-    /// those are merely noise. The encoder below is still the answer to both,
-    /// and the eight that break include the two that will happen.</para>
+    /// that 404 are the EIGHT characters <c>decodeURI</c> leaves encoded and
+    /// <c>sluggify</c> then turns into <c>-percent…</c> —
+    /// <c>; , @ &amp; = + $ ?</c>. <c>'</c>, <c>!</c> and <c>*</c> are
+    /// over-encoded too and come back out of <c>decodeURI</c> intact, so those
+    /// are merely noise. <c>?</c> is an ordinary member of the eight, not a
+    /// special case: <c>Why%20Not%3F</c> slugs to <c>Why-Not-percent3F</c> by
+    /// the same mechanism as the rest. What IS peculiar to <c>?</c> is why the
+    /// UNESCAPED spelling works — <c>sluggify</c> strips it from the real
+    /// folder's name too, so both sides land on <c>Why-Not</c>. The encoder
+    /// below is the answer to all eleven, and the eight that break include the
+    /// two a teacher will actually type.</para>
     ///
     /// <para>The set is what JavaScript's <c>encodeURI</c> leaves alone, minus
     /// three — <c>(</c> and <c>)</c> close a destination, <c>#</c> starts a

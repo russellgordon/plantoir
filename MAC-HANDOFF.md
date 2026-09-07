@@ -113,8 +113,10 @@ knowing about.
 
 **Why it is worth a case at all.** `Spelled` has two reasons to escape: the new
 name would break a Markdown destination, or the OLD segment arrived
-percent-encoded. Every one of the original eleven cases takes the first — each
-new name contains a space or a bracket — so the second branch was covered by
+percent-encoded. Not one of the original eleven reaches the second: eight take
+the first (their new names carry a space or a bracket), and the other three
+escape nothing at all — `Assignments` and `Café` need nothing, and the
+wikilink case is not a Markdown link. So the second branch was covered by
 nothing. On Windows it still called `Uri.EscapeDataString`, and a fix applied to
 the first line alone would have left `Q&A` spelled `Q%26A` with all eleven cases
 still green. The case is what makes the second branch visible.
@@ -1675,9 +1677,11 @@ rather than being deleted.
   Fixing the encoder without wiring the cases would have been invisible —
   nothing on that side went red, which is how three failures sat there for a
   day. And wiring the cases without fixing BOTH branches would have looked
-  finished: every one of the original eleven new names contains a space or a
-  bracket, so all eleven take the FIRST branch, and a framework call left behind
-  in the second passes the lot. That is what the twelfth case is for.
+  finished: of the original eleven, eight take the FIRST branch (a space or a
+  bracket in the new name) and three reach no encoder at all — `Assignments`
+  and `Café` need no escaping, and the wikilink case is not a Markdown link.
+  None of them reaches the second branch, so a framework call left behind there
+  passes the lot. That is what the twelfth case is for.
 
   **Two habits from item 29 earned their keep again, and the second one is
   new.** Asking the list both ways found nothing here — the code had no rule
