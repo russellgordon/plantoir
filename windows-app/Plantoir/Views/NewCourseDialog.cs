@@ -101,6 +101,23 @@ public sealed class NewCourseDialog : ContentDialog
     // Starting Content (rows 92–94, 130): the ready-made pages and their
     // toggles, plus the terminology switch for the factory structure.
     private bool _prepopulate = true;
+    /// <summary>
+    /// Whether a course with no ready-made pages starts from its subject's
+    /// skeleton. Ships ON, matching <c>file-formats.json</c>'s
+    /// <c>defaultWhenAbsent</c> for <c>use_skeleton</c> and the mac's
+    /// <c>startsFromSkeleton</c>; it only means anything for a code that has
+    /// a skeleton and no example content, and the key is written as
+    /// <c>hasSkeleton &amp;&amp; teacherSaidYes</c> so a stale true can never
+    /// mean anything.
+    /// </summary>
+    private bool _startsFromSkeleton = true;
+    /// <summary>
+    /// What the last adoption put into the editor, list by list, so that
+    /// turning the toggle off can put the defaults back for exactly the lists
+    /// the teacher has NOT edited since. Null until a skeleton is adopted.
+    /// </summary>
+    private (List<string> SharedFolders, List<string> SharedFiles, List<string> PerSectionFolders,
+             List<string> PerSectionFiles, List<string> GradedFolders)? _adopted;
     private bool _includeCurriculum = true;
     private bool _includeCurriculumCoverage = true;
     private bool _includeCoverageNotes = true;
@@ -147,7 +164,17 @@ public sealed class NewCourseDialog : ContentDialog
     }
 
     private static string ExampleContentRoot => BundledToolchain.SupportPath("example_content");
+    private static string SkeletonsRoot => BundledToolchain.SupportPath("skeletons");
     private string NormalizedCode => _codeBox.Text.Trim().ToUpperInvariant();
+
+    /// <summary>
+    /// The skeleton the typed code would start from, or null when there is
+    /// none — or when there is example content, which always wins.
+    /// </summary>
+    private SkeletonCatalog.Family? SkeletonForCode() =>
+        SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, NormalizedCode)
+            ? SkeletonCatalog.GetFamily(SkeletonsRoot, NormalizedCode)
+            : null;
 
     /// <summary>
     /// True when the example content, not the teacher, decides the course's
@@ -255,6 +282,7 @@ public sealed class NewCourseDialog : ContentDialog
         RefreshGradeWarning();
         RefreshCodeValidation();
         RefreshStartingContent();
+        AdoptSkeletonStructure();
         RefreshStructureArea();
 
         if (sections is not null)
@@ -354,7 +382,7 @@ public sealed class NewCourseDialog : ContentDialog
         {
             if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput) RefreshCodeSuggestions();
             AutoFillCourseName(); RefreshClubRow(); RefreshGradeWarning(); RefreshCodeValidation(); RefreshCreateEnabled();
-            RefreshStartingContent(); RefreshStructureArea(); RefreshFontSample();
+            RefreshStartingContent(); AdoptSkeletonStructure(); RefreshStructureArea(); RefreshFontSample();
         };
 
         var nameRow = FormBuilders.LabeledRow("Course name", _nameBox);
@@ -684,13 +712,110 @@ public sealed class NewCourseDialog : ContentDialog
                 RefreshStructureArea();
             };
         }
+        else if (SkeletonForCode() is { } skeleton)
+        {
+            // The mac's two sentences, verbatim: one question, one wording,
+            // on both platforms. The toggle survives a code change the same
+            // way the pre-populate toggle does — the field keeps the answer
+            // and the control is rebuilt from it.
+            var skeletonToggle = new ToggleSwitch { IsOn = _startsFromSkeleton, OnContent = "", OffContent = "" };
+            AutomationProperties.SetAutomationId(skeletonToggle, "skeletonToggle");
+            var skeletonRow = FormBuilders.LabeledRow(
+                $"Start from a {skeleton.Label.ToLowerInvariant()} skeleton", skeletonToggle);
+            skeletonRow.Children.Add(FormBuilders.ExampleCaption(
+                "There is no ready-made course for this code, but there is a starting point shaped for the subject: folders that suit it, four units of class pages to rename, a page explaining what the site can do, and placeholders saying what belongs where."));
+            _startingContentBody.Children.Add(skeletonRow);
+
+            // With the toggle off the teacher is in exactly the situation the
+            // no-content note describes, so it says so — the same sentence,
+            // not a third one.
+            var offNote = NoExampleContentNote();
+            offNote.Visibility = _startsFromSkeleton ? Visibility.Collapsed : Visibility.Visible;
+            _startingContentBody.Children.Add(offNote);
+
+            skeletonToggle.Toggled += (_, _) =>
+            {
+                if (skeletonToggle.IsOn == _startsFromSkeleton) return;
+                _startsFromSkeleton = skeletonToggle.IsOn;
+                offNote.Visibility = _startsFromSkeleton ? Visibility.Collapsed : Visibility.Visible;
+                if (_startsFromSkeleton) AdoptSkeletonStructure();
+                else RestoreGenericStructure();
+            };
+        }
         else
         {
-            var note = FormBuilders.ExampleCaption(
-                "Example content isn’t available for this course code yet, so the course will start with empty folders ready for your own pages.");
-            AutomationProperties.SetAutomationId(note, "noExampleContentNote");
-            _startingContentBody.Children.Add(note);
+            _startingContentBody.Children.Add(NoExampleContentNote());
         }
+    }
+
+    private static TextBlock NoExampleContentNote()
+    {
+        var note = FormBuilders.ExampleCaption(
+            "Example content isn’t available for this course code yet, so the course will start with empty folders ready for your own pages.");
+        AutomationProperties.SetAutomationId(note, "noExampleContentNote");
+        return note;
+    }
+
+    /// <summary>
+    /// When a course code with no example content is entered, offer the
+    /// folders its SUBJECT wants rather than the school-neutral factory list —
+    /// a music course opens with Repertoire and Warm-Ups, a chemistry course
+    /// with Investigations and Safety in the Lab. The lists stay editable; a
+    /// list the teacher has already changed is left alone
+    /// (<see cref="SkeletonCatalog.StructureToAdopt"/>). Mirrors the mac's
+    /// <c>adoptSkeletonStructure()</c>.
+    ///
+    /// <para>The editor must show what will actually be created. Writing the
+    /// key while leaving the generic defaults on screen was rejected: a wizard
+    /// that lies about what it is about to make is a worse product than one
+    /// that never asked.</para>
+    /// </summary>
+    private void AdoptSkeletonStructure()
+    {
+        if (!_startsFromSkeleton) return;
+        var skeleton = SkeletonCatalog.StructureToAdopt(
+            ExampleContentRoot, SkeletonsRoot, NormalizedCode, _sharedFolders,
+            WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders);
+        if (skeleton is null) return;
+        _sharedFolders = skeleton.SharedFolders.ToList();
+        _sharedFiles = skeleton.SharedFiles.ToList();
+        _perSectionFolders = skeleton.PerSectionFolders.ToList();
+        _perSectionFiles = skeleton.PerSectionFiles.ToList();
+        _gradedFolders = SkeletonCatalog.AdoptedGradedFolders(skeleton);
+        _adopted = (_sharedFolders.ToList(), _sharedFiles.ToList(), _perSectionFolders.ToList(),
+                    _perSectionFiles.ToList(), _gradedFolders.ToList());
+        RebuildStructureLists();
+    }
+
+    /// <summary>
+    /// The other direction: the toggle went off, so the skeleton's folders
+    /// leave the editor and the generic defaults come back. A one-way
+    /// adoption is this feature's bug in miniature — the editor would keep
+    /// showing a subject's folders for a course about to be made without them.
+    ///
+    /// <para>List by list, against what the adoption put there: a list the
+    /// teacher has edited since — a folder added or removed, a file renamed,
+    /// the LCS switch flipped, a marks box unticked — is theirs and is left
+    /// exactly as it is, and only the untouched ones go back to the defaults.
+    /// (An earlier version asked a single question of the shared folders and
+    /// replaced all five lists on the answer, which discarded an edited file
+    /// list and, after an LCS flip, silently restored nothing at all.)</para>
+    /// </summary>
+    private void RestoreGenericStructure()
+    {
+        if (_adopted is not { } adopted) return;
+        if (_sharedFolders.SequenceEqual(adopted.SharedFolders))
+            _sharedFolders = (_useLcs ? WizardDefaults.LcsSharedFolders : WizardDefaults.SharedFolders).ToList();
+        if (_sharedFiles.SequenceEqual(adopted.SharedFiles))
+            _sharedFiles = (_useLcs ? WizardDefaults.LcsSharedFiles : WizardDefaults.SharedFiles).ToList();
+        if (_perSectionFolders.SequenceEqual(adopted.PerSectionFolders))
+            _perSectionFolders = WizardDefaults.PerSectionFolders.ToList();
+        if (_perSectionFiles.SequenceEqual(adopted.PerSectionFiles))
+            _perSectionFiles = WizardDefaults.PerSectionFiles.ToList();
+        if (_gradedFolders is not null && _gradedFolders.SequenceEqual(adopted.GradedFolders))
+            _gradedFolders = null;      // re-inferred from the restored lists
+        _adopted = null;
+        RebuildStructureLists();
     }
 
     /// <summary>
@@ -1110,13 +1235,47 @@ public sealed class NewCourseDialog : ContentDialog
             ? LocaleCatalog.Codes[_localeBox.SelectedIndex]
             : WizardDefaults.DefaultLocale;
 
-        var allItems = _sharedFolders.Concat(_sharedFiles).Concat(_perSectionFolders).Concat(_perSectionFiles).ToHashSet();
-        var hidden = WizardDefaults.HiddenItems
-            .Where(i => allItems.Contains(i)
-                        || string.Equals(i, "Media", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var expandableSource = _sharedFolders.Concat(_perSectionFolders).ToHashSet();
-        var expandable = WizardDefaults.ExpandableItems.Where(expandableSource.Contains).ToList();
+        // Adopt once more, here, whether or not the code box's TextChanged
+        // ever ran — it does not for a programmatic Text on an untemplated
+        // box (AutoCreate, and StageForCapture's own comment). A config that
+        // disagreed with the pages about to be installed would leave empty
+        // folders beside them. The guard is StructureToAdopt's own, so a list
+        // the teacher edited is still theirs. Mirrors the mac's
+        // buildConfiguration.
+        if (_startsFromSkeleton
+            && SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, code, _sharedFolders,
+                                                WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders) is { } lateAdopted)
+        {
+            _sharedFolders = lateAdopted.SharedFolders.ToList();
+            _sharedFiles = lateAdopted.SharedFiles.ToList();
+            _perSectionFolders = lateAdopted.PerSectionFolders.ToList();
+            _perSectionFiles = lateAdopted.PerSectionFiles.ToList();
+            _gradedFolders = SkeletonCatalog.AdoptedGradedFolders(lateAdopted);
+        }
+
+        // The skeleton decides its own sidebar, whatever the teacher has
+        // since done to the folder list — mirrors the mac. The lists written
+        // are the editor's: adoption already put the skeleton's folders there,
+        // and a list the teacher edited since is theirs.
+        var skeletonInUse = _startsFromSkeleton ? SkeletonForCode() : null;
+        List<string> hidden;
+        List<string> expandable;
+        if (skeletonInUse is not null)
+        {
+            var plan = SkeletonCatalog.Sidebar(skeletonInUse, _sharedFolders, _sharedFiles, _perSectionFolders, _perSectionFiles);
+            hidden = plan.Hidden.ToList();
+            expandable = plan.Expandable.ToList();
+        }
+        else
+        {
+            var allItems = _sharedFolders.Concat(_sharedFiles).Concat(_perSectionFolders).Concat(_perSectionFiles).ToHashSet();
+            hidden = WizardDefaults.HiddenItems
+                .Where(i => allItems.Contains(i)
+                            || string.Equals(i, "Media", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var expandableSource = _sharedFolders.Concat(_perSectionFolders).ToHashSet();
+            expandable = WizardDefaults.ExpandableItems.Where(expandableSource.Contains).ToList();
+        }
 
         // The real wizard reads these as its defaults, exactly like every
         // other answer here. False when no content exists for the code, so a
@@ -1144,6 +1303,9 @@ public sealed class NewCourseDialog : ContentDialog
             ["show_reading_time"] = _showReadingTime,
             ["show_grade_in_title"] = PerSection(_ => _showsGrade),
             ["prepopulate_example_content"] = hasContent && _prepopulate,
+            // The same capabilityExists && teacherSaidYes shape as the two
+            // above — contracts/file-formats.json -> wizardAnswerKeys.
+            ["use_skeleton"] = SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, code) && _startsFromSkeleton,
             ["include_curriculum_pages"] = hasContent && _prepopulate && includesCurriculum && _includeCurriculum,
             ["include_curriculum_coverage"] = PerSection(_ => _includeCurriculumCoverage),
 

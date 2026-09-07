@@ -211,6 +211,35 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ## Open — what the mac still owes
 
+- **Turning the skeleton toggle OFF leaves the skeleton's folders in the mac's
+  structure editor, and Windows now puts the generic defaults back — decide
+  which, and make it a contract case** (Windows, 2026-09-07, branch
+  `issue/25-wizard-skeleton-question`). **Small, and it is a teacher-visible
+  difference from today.**
+
+  On the mac, `adoptSkeletonStructure()` runs on every code change and
+  replaces the four lists (`NewCourseWizardView.swift` line 603, the only
+  caller); `startsFromSkeleton` is read only when the configuration is built
+  (lines 1285 and 1361), and the lists written are the editor's either way.
+  So a teacher who types SNC4M, sees "Concepts, Investigations, Exercises…"
+  appear, and turns the toggle off is shown — and gets — the science
+  skeleton's folders with none of its pages, while the file says
+  `use_skeleton: false`. Russell's decision for Windows (brief
+  for item 25, 2026-09-06) was that the editor must show what will actually
+  be created, in both directions: OFF restores the factory or LCS defaults,
+  ON adopts again. `RestoreGenericStructure` in `NewCourseDialog.cs` does it,
+  list by list against a snapshot of what the adoption put there, so a list
+  the teacher has edited since — including one the LCS switch rewrote — is
+  left exactly as it is, and only the untouched lists go back.
+
+  What is asked: either copy the restore (the Toggle has no `onChange`
+  today; add one that, when the toggle goes off, puts the defaults back for
+  each list still equal to what `adoptSkeletonStructure()` set, LCS variant
+  included), or record that leaving the folders is what the mac means and
+  say why. Then a case under a new
+  `file-formats.json` → `wizardAnswerKeys` rule, or `shared-rules.json`, so
+  the two wizards cannot drift again. Windows follows whichever is chosen.
+
 - **Two sentences in `contracts/shared-rules.json` now say Windows still owes
   the refusal case, and Windows no longer does** (Windows, 2026-09-07, branch
   `issue/33-repair-refused-folder-in-the-way`). **A regeneration and two
@@ -3191,6 +3220,53 @@ is what happened to the test-race item, sitting here for three days with
 
 
 ## Done — the ledger
+
+- **The Windows wizard asks the skeleton question, writes `use_skeleton`, and
+  shows the skeleton's folders it is about to make** (Windows, 2026-09-07,
+  branch `issue/25-wizard-skeleton-question`; `WINDOWS-HANDOFF.md` item 25
+  struck; `GUI-IMPROVEMENTS.md` row 431). **The mac is expected to KNOW, and
+  to settle one difference — the open item at the top of this file.** ✅ DONE.
+
+  What it fixed. Decided 2026-08-16, indexed nowhere a Windows session reads
+  first, and open for three weeks: `use_skeleton` was never written, so
+  `setup_course.py`'s default of true answered for ~1,900 course codes and a
+  Windows teacher could not decline. The contract's `knownDivergence` note is
+  deleted and `FileFormatContractTests.TheWizardWritesUseSkeleton` runs.
+
+  What was done. The mac's two sentences verbatim — "Start from a
+  {label} skeleton" and the caption beginning "There is no ready-made course
+  for this code" — with the toggle shipping ON. `SkeletonCatalog.Family` gained
+  `GradedFolders` (the manifests' `graded_folders`, which the port had dropped)
+  and `AdoptedGradedFolders` mirrors the mac's fallback to every folder
+  containing "task". `AdoptSkeletonStructure` runs on each code change through
+  the existing `StructureToAdopt` guard; the key is written as
+  `HasSkeleton && _startsFromSkeleton`; and when a skeleton is in use the
+  sidebar plan comes from `SkeletonCatalog.Sidebar`, as on the mac. With the
+  toggle off the section shows the existing "Example content isn't available"
+  sentence, because that is then exactly the situation it describes — the
+  same sentence, not a third one.
+
+  Rejected: writing the key alone (closes the test and leaves the editor
+  showing folders that will not be made), and shipping the key now with the
+  structure adoption as a later item (two sessions for one feature, with the
+  misleading wizard in between). Nothing new on the trail: creating a course
+  is already recorded as the task starting and finishing, and the answer
+  itself is in the `course_config.json` that task writes.
+
+  Two things the review found and the port shares with the mac, left as they
+  are and written down so they are not re-found: every prefix in
+  `families.json` is three letters, so a single typed "S" already adopts the
+  `general` skeleton, whose label is "This Course" — the toggle then reads
+  "Start from a this course skeleton" on both platforms until the code is
+  long enough to resolve; and switching from a skeleton code to one WITH
+  example content and then turning pre-populate off leaves the skeleton's
+  folders in the editor, on both platforms. Neither is new to the mac.
+
+  Reference: `windows-app/Plantoir/Views/NewCourseDialog.cs`
+  (`AdoptSkeletonStructure`, `RestoreGenericStructure`, `SkeletonForCode`),
+  `Plantoir.Core/Catalogs/SkeletonCatalog.cs`, `SkeletonCatalogTests`,
+  `FileFormatContractTests`. Windows suite 1153 passed, 1 skipped (1150 and 2
+  before: two test methods added, one un-skipped).
 
 - **Windows now refuses a folder named `index.md` with the contract's own
   sentence, records the refusal on the trail, and runs the

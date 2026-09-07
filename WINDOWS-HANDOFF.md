@@ -1206,8 +1206,18 @@ APP, not as the shell it happens to run, or the operating system tells the
 teacher that "bash" — or, on the second attempt here, a person's name — wants
 to run in the background.
 
-25. **The wizard never asks the skeleton question, so ~1,900 course codes get
-    an answer nobody chose (found 2026-09-06).** `use_skeleton` appears
+25. ~~**The wizard never asks the skeleton question, so ~1,900 course codes get
+    an answer nobody chose (found 2026-09-06).**~~ ✅ Done 2026-09-07 (branch
+    `issue/25-wizard-skeleton-question`, `GUI-IMPROVEMENTS.md` row 431). The
+    question is asked with the mac's two sentences verbatim (`skeletonToggle`),
+    `use_skeleton` is written as `hasSkeleton && teacherSaidYes`, the structure
+    editor adopts the skeleton's folders on entry and puts the generic defaults
+    back when the toggle goes off, and `TheWizardWritesUseSkeleton` runs. One
+    correction to the text below: `SkeletonCatalog.cs` was "referenced only from
+    a comment" in the UI project only — `SkeletonCatalogTests` had exercised it
+    since it was ported. The original item follows.
+
+    `use_skeleton` appears
     NOWHERE in `windows-app/` — verified by search, zero hits. The mac asks it
     (`NewCourseWizardView.swift`, "Start from a … skeleton") and writes the
     answer; `NewCourseDialog.cs` goes straight to the "no example content"
@@ -1375,9 +1385,9 @@ to run in the background.
       as a slow build rather than a bug. **Done**, and it found the two
       unclassified markers.
     - `file-formats.json` → `wizardAnswerKeys.keys` (3) — item 25. **Wired, and
-      it fails as predicted**: the test for `use_skeleton` is `[Fact(Skip = …)]`
-      naming item 25, and un-skipping it is that item's acceptance test. The
-      other two keys pass.
+      it failed as predicted** until 2026-09-07: the test for `use_skeleton`
+      was `[Fact(Skip = …)]` naming item 25, and un-skipping it was that item's
+      acceptance test. All three keys pass now.
     - `app-rules.json` → `credentialPrompts.everyRequest` (7): whether a typed
       token is echoed on screen. Windows runs `credentialPrompts.cases` only.
       **Done**, in BOTH directions — the reverse one, by reflection over the
@@ -2293,14 +2303,14 @@ ask:
 | Key | What it decides |
 |---|---|
 | `use_skeleton` | Whether a course with no ready-made payload starts from its subject's skeleton — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing at all. |
-| `prepopulate_example_content` | Whether one of the 37 ready-made courses is poured in. |
+| `prepopulate_example_content` | Whether one of the 38 ready-made courses is poured in. |
 | `include_curriculum_pages` | Whether that payload's Curriculum folder comes with it. |
 
-**`use_skeleton` is not written by the Windows wizard at all** (checked
-2026-08-16). The Python then falls back to its own default — `True` — so a
-Windows teacher gets a skeleton and is never asked. That is the question MOST
-teachers meet, because around 1,900 course codes have a skeleton and no
-payload; only 37 have a ready-made course.
+**`use_skeleton` was not written by the Windows wizard at all** (checked
+2026-08-16; written since 2026-09-07, item 25). The Python then fell back to
+its own default — `True` — so a Windows teacher got a skeleton and was never
+asked. That is the question MOST teachers meet, because around 1,900 course
+codes have a skeleton and no payload; only 38 have a ready-made course.
 
 **Decided 2026-08-16: match the mac — ask the question and write the answer.**
 The alternative was to always start from the skeleton and write
