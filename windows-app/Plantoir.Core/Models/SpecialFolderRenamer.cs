@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Newtonsoft.Json.Linq;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Models;
 
@@ -76,7 +78,24 @@ public static class SpecialFolderRenamer
     /// <para>Checked before anything is touched, and every sentence is the
     /// contract's — see <c>specialNames.renameFolder.problems</c>.</para>
     /// </summary>
-    public static string? Problem(string? newName, string currentName, IEnumerable<string> namesInUse)
+    public static string? Problem(string? newName, string currentName, IEnumerable<string> namesInUse) =>
+        Problem(newName, currentName, namesInUse, isFinishingAnInterruptedRename: false);
+
+    /// <summary>
+    /// The refusals, asked before anything on disk is touched. With
+    /// <paramref name="isFinishingAnInterruptedRename"/> the one refusal that
+    /// would otherwise stop a rename from being FINISHED — "this course
+    /// already has a folder called that" — is waived, because the starting
+    /// state of an interrupted rename holds both names by definition: the
+    /// folder moved, the configuration still names the old one, and a build
+    /// since has discovered the new one and appended it. That is not two
+    /// folders competing for a name; it is one rename half done. The flag is
+    /// true only for the exact target the record names — see
+    /// <see cref="InterruptedRenameTarget"/> — so typing anything else gets
+    /// the ordinary refusal back.
+    /// </summary>
+    public static string? Problem(string? newName, string currentName, IEnumerable<string> namesInUse,
+                                  bool isFinishingAnInterruptedRename)
     {
         string wanted = (newName ?? string.Empty).Trim();
         if (wanted.Length == 0) return SpecialNames.RenameProblemEmpty;
@@ -92,9 +111,313 @@ public static class SpecialFolderRenamer
             return SpecialNames.RenameProblemWindowsWontAllowIt.Replace("{name}", wanted);
         foreach (string used in namesInUse)
             if (!used.Equals(currentName, StringComparison.OrdinalIgnoreCase)
-                && used.Equals(wanted, StringComparison.OrdinalIgnoreCase))
+                && used.Equals(wanted, StringComparison.OrdinalIgnoreCase)
+                && !isFinishingAnInterruptedRename)
                 return SpecialNames.RenameProblemAlreadyUsed.Replace("{name}", wanted);
         return null;
+    }
+
+    public sealed class RenameException(string message) : Exception(message);
+
+    // ---- Where a folder by a name would be ---------------------------------
+
+    /// <summary>Every place a folder of this name lives for this scope, whether or not it exists.</summary>
+    public static IReadOnlyList<(string Path, int? Section)> FolderLocations(
+        string name, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers)
+    {
+        if (scope == FolderScope.Shared) return new[] { (Path.Combine(courseDirectory, name), (int?)null) };
+        return sectionNumbers.Select(n => (Path.Combine(courseDirectory, $"section{n}", name), (int?)n)).ToList();
+    }
+
+    // ---- The record of a rename that has started ----------------------------
+
+    /// <summary>
+    /// <c>&lt;courses&gt;/.internal/renames/&lt;CODE&gt;.json</c> — the
+    /// <c>.internal</c> convention both apps share, and deliberately NOT a
+    /// <c>course_config.json</c> key, because the failure being handled is
+    /// that the configuration write did not happen.
+    /// </summary>
+    public static string RenameRecordPath(string courseDirectory)
+    {
+        string trimmed = courseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string courses = Path.GetDirectoryName(trimmed) ?? trimmed;
+        return Path.Combine(courses, ".internal", "renames", Path.GetFileName(trimmed) + ".json");
+    }
+
+    /// <summary>
+    /// Written BEFORE anything moves. A rename interrupted between the move
+    /// and the configuration write leaves folders under the new name and a
+    /// configuration naming the old one; the next build discovers the moved
+    /// folder and appends it, so the list holds BOTH names and retrying is
+    /// refused as a clash. The disk alone cannot be the evidence — that same
+    /// state is also a phantom entry whose folder was never made being renamed
+    /// onto a genuine second folder, and bypassing there would hand the real
+    /// folder the phantom's attributes, <c>hidden</c> among them. So the
+    /// record carries the TARGET, and the clash check is relaxed only when the
+    /// record and the disk agree.
+    /// </summary>
+    public static void RecordRenameStarting(string oldName, string newName, FolderScope scope, string courseDirectory)
+    {
+        try
+        {
+            string path = RenameRecordPath(courseDirectory);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var note = new JObject { ["from"] = oldName, ["to"] = newName, ["scope"] = ScopeKey(scope) };
+            File.WriteAllText(path, note.ToString(Newtonsoft.Json.Formatting.Indented) + "\n");
+        }
+        catch (Exception) { /* best-effort: a missing record costs a refusal later, never a folder */ }
+    }
+
+    /// <summary>The configuration is written, so the rename is whole and the record can go.</summary>
+    public static void ClearRenameRecord(string courseDirectory)
+    {
+        try { File.Delete(RenameRecordPath(courseDirectory)); } catch (Exception) { }
+    }
+
+    private static JObject? ReadRenameRecord(string courseDirectory)
+    {
+        try
+        {
+            string path = RenameRecordPath(courseDirectory);
+            return File.Exists(path) ? JObject.Parse(File.ReadAllText(path)) : null;
+        }
+        catch (Exception) { return null; }
+    }
+
+    /// <summary>
+    /// The name a rename of this folder was heading for when it stopped, or
+    /// null when nothing was interrupted. Answered when the sheet opens, not
+    /// per keystroke: it reads the record and asks the disk.
+    /// </summary>
+    public static string? InterruptedRenameTarget(
+        string oldName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers)
+    {
+        var note = ReadRenameRecord(courseDirectory);
+        if (note?["to"]?.ToString() is not { } target) return null;
+        return LooksLikeAnInterruptedRename(oldName, target, scope, courseDirectory, sectionNumbers) ? target : null;
+    }
+
+    /// <summary>
+    /// True only when BOTH the record and the disk say so: the record names
+    /// this exact rename, no place still holds the old folder (a mixture means
+    /// something other than an interrupted rename, and the ordinary refusal
+    /// must stand), and at least one place holds the new one.
+    /// </summary>
+    public static bool LooksLikeAnInterruptedRename(
+        string oldName, string newName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers)
+    {
+        var note = ReadRenameRecord(courseDirectory);
+        if (note is null) return false;
+        if (!string.Equals(note["from"]?.ToString(), oldName, StringComparison.OrdinalIgnoreCase)) return false;
+        if (!string.Equals(note["to"]?.ToString(), newName, StringComparison.OrdinalIgnoreCase)) return false;
+        if (note["scope"]?.ToString() != ScopeKey(scope)) return false;
+        foreach (var (place, _) in FolderLocations(oldName, scope, courseDirectory, sectionNumbers))
+            if (Directory.Exists(place) || File.Exists(place)) return false;
+        foreach (var (place, _) in FolderLocations(newName, scope, courseDirectory, sectionNumbers))
+            if (Directory.Exists(place)) return true;
+        return false;
+    }
+
+    public static string ScopeKey(FolderScope scope) =>
+        scope == FolderScope.Shared ? CourseConfiguration.SharedScope : CourseConfiguration.PerSectionScope;
+
+    public static string ConfigurationKey(FolderScope scope) =>
+        scope == FolderScope.Shared ? "shared_folders" : "per_section_folders";
+
+    // ---- Doing it ------------------------------------------------------------
+
+    /// <summary>
+    /// Renames the folder on disk — in every section that has one — and
+    /// rewrites the links that name it. The configuration is NOT touched here:
+    /// the caller records the change with <see cref="Renaming"/> through
+    /// <see cref="CourseConfiguration.RecordOnDisk"/>, disk first on purpose,
+    /// so that a move that fails leaves the course exactly as it was.
+    ///
+    /// <para>Nothing moves until every destination has been checked (a
+    /// per-section rename is several moves, and one that stopped half way
+    /// would leave a course nobody could reason about). If a move still
+    /// fails — <c>Directory.Move</c> refuses a folder with an open handle, and
+    /// both OneDrive and Obsidian hold them — the moved sections stay moved
+    /// and the exception names WHICH section stopped it. Rolling back was
+    /// rejected: a roll-back can itself half-fail, leaving a state nobody has
+    /// a sentence for, and it moves a teacher's folders a second time without
+    /// being asked.</para>
+    /// </summary>
+    public static RenameOutcome Rename(
+        string oldName, string newName, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers)
+    {
+        var moves = Moves(courseDirectory, oldName, newName, scope, sectionNumbers);
+        // A rename that only changes capitalisation moves a folder onto
+        // itself: the destination "exists" because it IS the source.
+        bool onlyCapitalisation = oldName.Equals(newName, StringComparison.OrdinalIgnoreCase);
+        if (!onlyCapitalisation && WhyTheMovesCannotBeMade(moves) is { } refusal)
+            throw new RenameException(refusal);
+
+        if (moves.Count == 0)
+            return new RenameOutcome(true, SpecialNames.RenameNothingWasThere, 0, 0, NothingWasThere: true);
+
+        RecordRenameStarting(oldName, newName, scope, courseDirectory);
+
+        int moved = 0;
+        foreach (var move in moves)
+        {
+            try { Directory.Move(move.From, move.To); moved++; }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                throw new RenameException(HalfFailureMessage(moved, moves.Count, oldName, move.Section, error.Message));
+            }
+        }
+
+        int relinked = RelinkPages(courseDirectory, oldName, newName);
+        return new RenameOutcome(true, DoneMessage(oldName, newName, relinked), moved, relinked, NothingWasThere: false);
+    }
+
+    /// <summary>What the teacher is told afterwards: what moved, and what else changed.</summary>
+    public static string DoneMessage(string oldName, string newName, int relinked)
+    {
+        string done = SpecialNames.RenameDone.Replace("{old}", oldName).Replace("{new}", newName);
+        string links = relinked switch
+        {
+            0 => SpecialNames.RenameRelinkedNone,
+            1 => SpecialNames.RenameRelinkedOne,
+            _ => SpecialNames.RenameRelinkedMany.Replace("{count}", relinked.ToString()),
+        };
+        return done + " " + links;
+    }
+
+    /// <summary>
+    /// Every page in the course whose links name the folder is rewritten.
+    /// One unwritable page must not abandon the rest: the folder has already
+    /// moved, so stopping would leave MORE links broken than carrying on.
+    /// </summary>
+    public static int RelinkPages(string courseDirectory, string oldName, string newName)
+    {
+        int changed = 0;
+        foreach (string page in PagePaths.MarkdownPages(courseDirectory))
+        {
+            string text;
+            try { text = File.ReadAllText(page); } catch (Exception) { continue; }
+            if (FolderPathRewriter.Count(text, oldName) == 0) continue;
+            string rewritten = FolderPathRewriter.Rewritten(text, oldName, newName);
+            if (rewritten == text) continue;
+            try { File.WriteAllText(page, rewritten); changed++; } catch (Exception) { }
+        }
+        return changed;
+    }
+
+    /// <summary>
+    /// Adding a name to a list CREATES the folder — in every section, for a
+    /// per-section one. It used to write a configuration entry pointing at
+    /// nothing. Nothing is put inside: an empty folder is the honest starting
+    /// state. True when at least one folder was made.
+    /// </summary>
+    public static bool CreateFoldersOnDisk(string name, FolderScope scope, string courseDirectory, IReadOnlyList<int> sectionNumbers)
+    {
+        bool created = false;
+        foreach (var (place, _) in FolderLocations(name, scope, courseDirectory, sectionNumbers))
+        {
+            try
+            {
+                if (Directory.Exists(place) || File.Exists(place)) continue;
+                Directory.CreateDirectory(place);
+                created = true;
+            }
+            catch (Exception) { }
+        }
+        return created;
+    }
+
+    // ---- The configuration keys a rename carries across -----------------------
+
+    /// <summary>
+    /// The configuration with every key that named the folder now naming the
+    /// new one — a port of the mac's <c>renaming(_:to:scope:in:)</c>, and the
+    /// one consumer of <see cref="KeysThatCarryAcross"/>. Run against a FRESH
+    /// read of the file by <see cref="CourseConfiguration.RecordOnDisk"/>.
+    ///
+    /// <para>Materialised, not merely carried: a course made from scratch has
+    /// <c>curriculum_folder: null</c> and no <c>class_folder</c>, both found
+    /// by guessing at the name. Rename <c>Curriculum</c> to
+    /// <c>Expectations</c> without writing the key and the guess stops
+    /// finding it, the map is built from nothing, and nobody is told. The
+    /// rename is the one moment Plantoir witnesses the change.</para>
+    ///
+    /// <para><c>hidden</c> is the dangerous one: leave it naming the old folder
+    /// and a rename silently UN-HIDES it, so the next publish puts pages the
+    /// teacher deliberately hid in front of students. Scoped keys are carried
+    /// only by a rename in their own scope, because a shared folder and a
+    /// per-section folder may legitimately share a name.</para>
+    /// </summary>
+    public static JObject Renaming(JObject values, string oldName, string newName, FolderScope scope)
+    {
+        var updated = (JObject)values.DeepClone();
+        var perSection = Strings(values["per_section_folders"]);
+        var shared = Strings(values["shared_folders"]);
+
+        // Which special folder, if either, this WAS — decided before the list
+        // is rewritten, because both answers are derived from it.
+        bool wasTheClassFolder = scope == FolderScope.PerSection
+            && ClassFolderRule.Name(values["class_folder"]?.Type == JTokenType.String ? values["class_folder"]!.ToString() : null, perSection)
+                .Equals(oldName, StringComparison.OrdinalIgnoreCase)
+            && perSection.Any(n => n.Equals(oldName, StringComparison.OrdinalIgnoreCase));
+        bool wasTheCurriculumFolder = scope == FolderScope.Shared
+            && string.Equals(
+                CurriculumFolderRule.Resolve(values["curriculum_folder"]?.Type == JTokenType.String ? values["curriculum_folder"]!.ToString() : null, shared),
+                oldName, StringComparison.OrdinalIgnoreCase);
+
+        string listKey = ConfigurationKey(scope);
+        updated[listKey] = new JArray(RenamingInList(Strings(values[listKey]), oldName, newName));
+
+        if (wasTheClassFolder) updated["class_folder"] = newName;
+        if (wasTheCurriculumFolder) updated["curriculum_folder"] = newName;
+
+        // Three flat lists that name folders from EITHER scope.
+        foreach (string key in new[] { "graded_folders", "hidden", "expandable" })
+            if (values[key] is JArray names)
+                updated[key] = new JArray(RenamingInList(Strings(names), oldName, newName));
+
+        // Scoped, both of them: carried only by a rename in their own scope.
+        if (scope == FolderScope.Shared && values["curriculum_folder"]?.Type == JTokenType.String
+            && values["curriculum_folder"]!.ToString().Equals(oldName, StringComparison.OrdinalIgnoreCase))
+            updated["curriculum_folder"] = newName;
+        if (scope == FolderScope.PerSection && values["class_folder"]?.Type == JTokenType.String
+            && values["class_folder"]!.ToString().Equals(oldName, StringComparison.OrdinalIgnoreCase))
+            updated["class_folder"] = newName;
+
+        // This scope's exclusions only: excluded_items is keyed by scope
+        // precisely because the same bare name can exist in both.
+        if (values["excluded_items"] is JObject excluded && excluded[ScopeKey(scope)] is JArray excludedNames)
+        {
+            var rewritten = (JObject)excluded.DeepClone();
+            rewritten[ScopeKey(scope)] = new JArray(RenamingInList(Strings(excludedNames), oldName, newName));
+            updated["excluded_items"] = rewritten;
+        }
+        return updated;
+    }
+
+    /// <summary>
+    /// The list with the old name replaced — and DE-DUPLICATED, because the
+    /// starting state of an interrupted rename holds both names by definition,
+    /// and a naive rename would leave the new one in twice.
+    /// </summary>
+    public static List<string> RenamingInList(IEnumerable<string> names, string oldName, string newName)
+    {
+        var result = new List<string>();
+        foreach (string name in names)
+        {
+            string renamed = name.Equals(oldName, StringComparison.OrdinalIgnoreCase) ? newName : name;
+            if (!result.Any(kept => kept.Equals(renamed, StringComparison.OrdinalIgnoreCase))) result.Add(renamed);
+        }
+        return result;
+    }
+
+    private static List<string> Strings(JToken? token)
+    {
+        var result = new List<string>();
+        if (token is JArray array)
+            foreach (var element in array)
+                if (element is JValue { Type: JTokenType.String } v) result.Add((string)v!);
+        return result;
     }
 
     /// <summary>

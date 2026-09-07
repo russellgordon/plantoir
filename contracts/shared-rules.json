@@ -1625,6 +1625,10 @@
       "doneRelinkedMany": "{count} pages had links pointing into it, and they now point at the new name.",
       "doneRelinkedNone": "No page linked into it by name, so nothing else needed changing.",
       "doneNothingWasThere": "There was no folder by that name on your Mac, so only this course’s settings changed. Make it in Obsidian when you need it.",
+      "interruptedRename": {
+        "message": "Plantoir started renaming \u201c{old}\u201d to \u201c{new}\u201d and did not finish \u2014 the folder has its new name, but this course\u2019s settings still use the old one. Press Rename to finish.",
+        "why": "Proposed from Windows 2026-09-07. A rename interrupted after the folders moved is picked up the next time the sheet opens (the record under courses/.internal/renames names the target), and the field is filled in with that name so finishing is one keypress. The mac pre-fills silently; a filled-in field with nothing said leaves the teacher wondering why, and a modal on opening Course Settings would interrupt somebody who came for something else. One line, in the sheet, is the middle. The mac may adopt it or say why not."
+      },
       "carriesAcross": [
         "shared_folders",
         "per_section_folders",

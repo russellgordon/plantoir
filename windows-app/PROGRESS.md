@@ -22,14 +22,14 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Thirty-three of its thirty-eight
+with its headline still reading as open work. **Thirty-five of its thirty-eight
 items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
 day (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
 the contract case lists this suite was not reading); items 33 and 34 — the
 refusal of a folder named `index.md`, and the per-finding repair report as
-contract cases — struck on 2026-09-07, along with 18, 19, 25, 26, 27, 28, 30, 31, 32 and
-38 the same day. Items 35–37 were added the
+contract cases — struck on 2026-09-07, along with 13, 17, 18, 19, 25, 26, 27, 28, 30, 31, 32
+and 38 the same day. Items 35–37 were added the
 same day by an audit of these two documents and are open.
 
 **Count them rather than trusting this line.** It read "sixteen of its
@@ -63,12 +63,12 @@ What is genuinely left, smallest first:
 | 36 | A decision, not code: `verify-deploy.ps1` is the only automated check of the PowerShell half of publishing and no gate runs it. Schedule it, make it a release-cut step, or write down that it is hand-run. | Small |
 | 37 | A decision the MAC makes: the Course Settings tip sentence is pinned by no contract on either platform and the two apps word it differently. Windows owes only taking the mac's wording once it is chosen. | Small |
 | ~~18~~ | ✅ Done 2026-09-07 — the choice at the folder picker and the dismissable notice for a restored folder both exist, and `synced folder noticed` / `synced folder accepted` are emitted. | — |
-| 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
+| ~~17~~ | ✅ Done 2026-09-07 — `CourseConfiguration.RecordOnDisk` (a fresh-read recorder beside an untouched `Write`) and the interrupted-rename record under `courses/.internal/renames`. | — |
 | ~~27~~ | ✅ Done 2026-09-07 — “Restore Section N…” puts a section back to how it was when the conversation started; the assistant now saves one copy per conversation rather than one per change. | — |
 | ~~26~~ | ✅ Done 2026-09-06 — the marks checklist offers folders nested up to four levels deep (`GradedFolderChoices`), and the frozen pool is fed from the same list. | — |
 | ~~25~~ | ✅ Done 2026-09-07 — the wizard asks the skeleton question with the mac's sentences, writes `use_skeleton`, and the structure editor shows the skeleton's folders. | — |
 | 35 | The wizard's Create button and the new-site dialog have never been driven through the real interface. `Plantoir.UiTests` is where the first belongs; the second needs credentials and may have to stay a written hand-check. | Medium |
-| 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 52 test methods over 63 cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
+| ~~13~~ | ✅ Done 2026-09-07 — the rename sheet, the apply method, every key carried across and `class_folder`/`curriculum_folder` materialised; Add creates the folder, Remove says it stays. | — |
 | ~~22~~ | ✅ Done 2026-09-06 — the "Folders Plantoir uses" sheet, now shared as `shared-rules.json` → `specialFoldersHelp` rather than living inside a view. Two cases proposed back to the mac. | — |
 
 Two more things, one of which is now ON that list:
@@ -176,7 +176,7 @@ is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code. The same goes for the four trail events below: the
 features that would raise them are these same two.
 
-## TWO activity-trail events are declared but not yet emitted (2026-09-06; six then, four of them emitted since)
+## NO activity-trail event is declared without an emitter any more (2026-09-06; six were, and the last two were wired 2026-09-07)
 
 `ActivityTrail.Event` names `folder renamed`, `folder created`,
 `synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,
@@ -189,9 +189,11 @@ the same day with item 18's views. The two that remain are in
 `ContractTests.SharedRules_ActivityTrailEvents_Exist` compares that list
 against the enum — so declaring them is what makes the suite green.
 
-**Nothing raises the two that remain yet**, because the feature that would
-is only half built: WINDOWS-HANDOFF item 13's rename sheet does not exist
-(the model layer — `SpecialFolderRenamer`, `FolderPathRewriter` — does).
+**`folder renamed` and `folder created` were the last two**, wired on
+2026-09-07 when item 13's rename sheet landed (`CourseSettingsView`,
+`RenameFolderAsync` and `CreateFolderForNewEntry`). Nothing in
+`ActivityTrail.Event` is now declared without a caller — check with
+`grep -c` per member rather than trusting this sentence.
 
 This is written here rather than left in a commit message because a green
 suite that is green on a promise is exactly the kind of thing a later session
