@@ -22,7 +22,11 @@ public class GradedFolderChoicesTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_root, recursive: true); } catch (IOException) { }
+        // Broad on purpose: this is temp-folder cleanup, and one case leaves a
+        // junction behind, which recursive delete can refuse for reasons that
+        // have nothing to do with the rule under test. A failure to tidy must
+        // not be reported as a failure of the suite.
+        try { Directory.Delete(_root, recursive: true); } catch (Exception) { }
     }
 
     private static JsonNode Choices =>
@@ -43,8 +47,8 @@ public class GradedFolderChoicesTests : IDisposable
     public void TheOfferedPoolMatchesTheContract()
     {
         var cases = Choices["cases"]!.AsArray();
-        Assert.True(cases.Count >= 10,
-            $"The contract lost graded-folder-choice cases: {cases.Count} present, 10 expected at least.");
+        Assert.True(cases.Count >= 11,
+            $"The contract lost graded-folder-choice cases: {cases.Count} present, 11 expected at least.");
 
         int index = 0;
         foreach (var testCase in cases)
@@ -180,6 +184,50 @@ public class GradedFolderChoicesTests : IDisposable
         bookkeeping.Attributes |= FileAttributes.Hidden;
 
         Assert.Equal(new[] { "Tasks" }, GradedFolderChoices.NestedFolderNames(course));
+    }
+
+    /// <summary>
+    /// A junction is not walked into.
+    ///
+    /// <para>Windows-only, and it belongs here rather than in the contract,
+    /// which has no notion of a link. It pins the one line most likely to be
+    /// "simplified" later: the walk tests for a real LINK TARGET rather than
+    /// for the reparse-point attribute alone, because a sync provider's
+    /// unmaterialised placeholders carry that attribute too and skipping them
+    /// would put a cloud-synced course back on the top-level-only list. A
+    /// junction needs no privilege to make, which is why it is a junction and
+    /// not a symbolic link.</para>
+    /// </summary>
+    [Fact]
+    public void AJunctionIsNotWalkedInto()
+    {
+        string course = MakeCourse("junction", new[] { "Tasks" });
+        string away = Path.Combine(_root, "elsewhere");
+        Directory.CreateDirectory(Path.Combine(away, "Linked Tasks"));
+
+        var mklink = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+            "cmd.exe", $"/c mklink /J \"{Path.Combine(course, "Shortcut")}\" \"{away}\"")
+        { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true });
+        mklink!.WaitForExit();
+        // Nothing to assert on a machine that would not make one; saying so
+        // beats a test that fails for a reason unrelated to the rule.
+        if (mklink.ExitCode != 0) return;
+
+        List<string> offered;
+        try
+        {
+            offered = GradedFolderChoices.NestedFolderNames(course);
+        }
+        finally
+        {
+            // Unlink before the class tears its temp folder down, so nothing
+            // walks through it on the way out.
+            try { Directory.Delete(Path.Combine(course, "Shortcut")); } catch (Exception) { }
+        }
+
+        Assert.Equal(new[] { "Tasks" }, offered);
+        Assert.DoesNotContain("Shortcut", offered);
+        Assert.DoesNotContain("Linked Tasks", offered);
     }
 
     /// <summary>

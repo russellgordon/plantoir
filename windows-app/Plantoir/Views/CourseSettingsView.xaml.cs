@@ -75,10 +75,19 @@ public sealed partial class CourseSettingsView : UserControl
     /// <para>Without this the consequential dialog's own sentence is FALSE --
     /// it promises "Removing it will take it out of your course's marks pool"
     /// -- and `graded_folders` ends up naming a folder `excluded_items` tells
-    /// the build to skip. Worse, if it was the only entry the course is left
-    /// with a non-empty pool matching nothing on disk, which reads as "asked
-    /// and answered" and suppresses the `noGradedFolders` warning. This is the
-    /// mac's row 380 correction (3), ported rather than rediscovered.</para>
+    /// the build to skip. If it was the only entry, the course is left with a
+    /// non-empty pool matching nothing the site publishes, so nothing counts
+    /// for marks while the settings claim something does. This is the mac's
+    /// row 380 correction (3), ported rather than rediscovered.</para>
+    ///
+    /// <para><b>One thing this comment used to say is not true and was
+    /// corrected 2026-09-06</b>, because a wrong reason gets acted on: such a
+    /// pool does NOT read as "asked and answered" to the build and does not
+    /// suppress the `noGradedFolders` warning. `_has_graded_folders` in
+    /// <c>build_site.py</c> walks the MERGED tree and answers false when no
+    /// directory there matches a pooled name, so <c>site_health.py</c> raises
+    /// the finding exactly as it would for an empty pool. The reason to do
+    /// this is the promise in the dialog, which is reason enough.</para>
     ///
     /// <para>Materialised first, so a legacy course whose pool has never been
     /// set does not get one CREATED as an empty list by a removal -- that

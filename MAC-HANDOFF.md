@@ -156,12 +156,23 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   something from the mac:**
 
   - **A SORT.** `"declared folders first, then what is on disk"` and `"the same
-    folder name at two depths is offered once"` pin an ORDER, and the mac's
+    folder name in two places is offered once"` pin an ORDER, and the mac's
     `FileManager.enumerator` returns children in whatever order the filesystem
     gives. Sorting each folder's children case-insensitively before walking
     them is the whole change, and it is worth having for its own sake: the list
     a teacher reads is otherwise in an order nothing promises and which can
     differ between two machines holding the same course.
+
+    **The comparison is ORDINAL, case-insensitive** — `OrdinalIgnoreCase` in
+    the C#, and the contract's `walk.order` says so. Worth naming, because the
+    natural Swift reach is `localizedStandardCompare` (Finder order), and the
+    two disagree the moment a course numbers its folders: ordinal puts
+    `Unit 10` before `Unit 2`, Finder order puts `Unit 2` first. A contract
+    case now pins it, so the suites disagree rather than the teachers.
+    Finder order is arguably the nicer answer for a person reading a list, and
+    if anyone wants it, it is a shared change to the contract and both apps —
+    not something to reach for on one side because it looked more natural
+    there.
   - **`"a folder the teacher removed from the course is not offered back"` is
     a real behaviour difference, and Windows took it deliberately** — see the
     ledger entry below.
@@ -183,10 +194,21 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   pool" — is still on disk, and comes straight back into the Marks list on the
   next redraw, unticked. Tick it and `graded_folders` names a folder
   `excluded_items` tells the build to skip: a non-empty pool matching nothing
-  the build will publish, which reads as asked-and-answered and suppresses the
-  `noGradedFolders` health finding. That last consequence is the mac's own
-  reasoning, from the comment on `removeFromGradedFolders`; this is the same
-  hole arriving through the walk.
+  the build will publish, so nothing counts for marks while the settings claim
+  something does. The mac already keeps this promise on the way OUT —
+  `dropFromMarksPool` takes a removed folder out of the pool for exactly that
+  reason — and this is the same hole arriving back in through the walk.
+
+  **One thing an earlier draft of this entry said is not true**, and is
+  corrected here rather than quietly deleted, because a wrong reason gets
+  acted on: such a pool does NOT suppress the `noGradedFolders` finding.
+  `_has_graded_folders` in `build_site.py` walks the MERGED tree, so a pool
+  matching nothing published answers false and `site_health.py` raises the
+  finding exactly as it would for an empty pool. The reason to filter is the
+  promise in the dialog, which is reason enough. (Windows' own
+  `DropFromMarksPool` comment carried the same wrong clause, inherited from
+  GUI-IMPROVEMENTS row 380, and has been corrected in place — that row
+  itself is append-only history and is left as it stands.)
 
   Windows filters it. The rule is in the contract under
   `gradedFolders.choices.walk.excludedItems`: a name in `excluded_items` is
@@ -3038,9 +3060,12 @@ where.
     `re.fullmatch(r"section\d+", name)`; the mac's test lowercases first, and
     Windows copied it. So a teacher's folder called `SECTION3` is hidden from
     the marks list by both apps while preflight would add it to
-    `shared_folders` and the build would count it. Vanishingly rare, identical
-    on both platforms, and left alone deliberately rather than "fixed" on one
-    side — recorded so it is not re-found a third time.
+    `shared_folders` and the build would count it. The mac is looser again in
+    a second way: `Int(name.dropFirst(7))` parses a sign, so `section+3` and
+    `section-3` are section folders there and ordinary offered folders both on
+    Windows and to the build. Vanishingly rare, and left alone deliberately
+    rather than "fixed" on one side — recorded so it is not re-found a third
+    time.
   - **A pooled name can end up with no row to untick**, and Windows' own
     `excluded_items` filter is one way to reach it. Tick something on a course
     with `Portfolios/Tasks`, so the pool freezes as `["Tasks"]`, then remove
