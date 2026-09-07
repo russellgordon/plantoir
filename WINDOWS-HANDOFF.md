@@ -1746,6 +1746,174 @@ to run in the background.
     rule that migrated only on a genuine change would leave the pages nobody
     flips old forever.
 
+39. **The mac's unit suite was segfaulting its own test host a third of the
+    time, and you owe almost nothing for it — but check one thing and re-read
+    one rule** (2026-09-07, mac). Fixed on the mac; listed here because rule 3
+    says a write-up nothing points at is, from your side, a write-up nobody
+    made, and because two halves of it do travel.
+
+    **What it was.** The mac unit suite runs against the app's real window, so
+    a test that sets alert state raises a real `NSAlert` sheet, and clearing it
+    takes the sheet down again. SwiftUI ends the modal session from inside
+    `NSHostingView.layout()`, and AppKit's sheet-close animation then spins a
+    **nested runloop** from inside a display-cycle callback that is already
+    running — the display cycle is re-entered and dereferences null.
+    `xcodebuild` reports that as exit 65, `** TEST FAILED **`, and a
+    `Failing tests:` line naming whichever test happened to be running, while
+    the totals two lines above say `0 failures`. Measured here, same command
+    and same machine: **10 crashes in 30 runs before, 0 in 30 after.** In an
+    overnight batch on 2026-09-06/07 it rejected 3 of 7 pieces of correct work.
+
+    **What Windows inherits free: nothing, and that is the right answer.**
+    There is no WinUI equivalent, and your unit suite hosts no window at all —
+    nothing in `Plantoir.Tests/` constructs one — so the configuration that
+    produces this does not exist on your side. Do not go looking for it, and
+    do not port the fix.
+
+    **What you owe — two small things.**
+
+    - **Check whether `Plantoir.UiTests` can CRASH its host rather than fail an
+      assertion.** The one intermittent you have recorded,
+      `SpecialFoldersHelpUiTests.TheSheetShowsAMarksFolderTickedButNotYetSaved`
+      (commit `680f7a96`), is a different class: a UI-Automation test timing out
+      waiting for a dispatcher rebuild, in an opt-in suite that gates nothing.
+      That is a flaky assertion, and re-running it is the right response. If one
+      ever kills the process instead, the shape to look for is a modal being
+      torn down from inside a layout pass — and the lesson from this side is
+      that the honest signal is the test TOTALS, never the exit code.
+    - **Re-read `shared-rules.json` → `siteHealth.repair.oneAlertAtATime`. Its
+      reason has been strengthened, because the old one understated it.** It
+      said that raising a second alert while the first is dismissing "loses one
+      of them". It does worse: on 2026-09-05 it CRASHED the shipping mac app
+      (`GUI-IMPROVEMENTS.md` row 391), the same stack as this whole item. Do
+      not dismiss a dialog and raise a message box in one step — show the
+      outcome after the dialog has gone, or inline, which is what the mac does
+      now.
+
+    **The section that explains it** is "A test host that segfaults, and the
+    five levers that look like they should fix it", below. Read it only if you
+    ever hit something of this shape; it is written for that moment.
+
+## A test host that segfaults, and the five levers that look like they should fix it
+
+Written 2026-09-07, for whoever meets a modal that kills a test process rather
+than failing an assertion. It is macOS mechanics — none of the code transfers —
+but the SHAPE of the fault and the way it was cornered do, and the dead ends are
+the expensive part. Item 39 in the outstanding list says what, if anything, you
+owe. This is the manual.
+
+### The fault
+
+The mac unit suite hosts the real app, so its tests act on the real window. A
+test setting `renameProblem` puts a genuine `NSAlert` sheet on screen; clearing
+it takes the sheet down. All 38 crash reports from 2026-09-01 to 09-07 share one
+stack, and every one carries `libXCTestBundleInject.dylib` — they are all test
+hosts. Innermost last:
+
+    XCTest pumps the runloop
+      CA::Transaction::commit()
+        -[NSWindow _layoutViewTree]                  <- a layout pass starts
+          NSHostingView.layout()
+            +[NSAnimationContext runAnimationGroup:]
+              ViewGraph.updateOutputs -> preferencesDidChange()
+                AppKitDialogBridge.updateExistingAlert(allAlerts:id:)
+                  NSWindowEndWindowModalSession
+                    -[NSWindow(NSSheets) _orderOutRelativeToWindow:]
+                      -[NSSheetMoveHelper closeSheet]
+                        -[NSMoveHelper _doAnimation] <- spins a NESTED runloop
+                          the display cycle is re-entered -> null deref
+
+Two independent things have to be true at once, and naming both is what made it
+tractable. SwiftUI ends the modal session from **inside a layout pass**; and
+AppKit's sheet animation **spins a nested runloop** — in its own private
+`_NSMoveTimerRunLoopMode` — to drive itself. A nested runloop entered from inside
+a display-cycle callback re-enters the display cycle. It is one call stack on one
+thread. **It is not a race**, which is the single most useful thing to know: no
+delay, no extra settling and no ordering tweak could ever have made it safe, and
+an afternoon spent adding sleeps would have been an afternoon wasted.
+
+### The five levers that do not work, with numbers
+
+Every one of these is the obvious answer, and all five are dead. Measured on
+macOS 26.6 (25G72) by swizzling `-[NSMoveHelper _doAnimation]` and timing it, in
+a standalone AppKit probe rather than in the suite:
+
+| lever | close animation |
+|---|---|
+| nothing (baseline) | 0.268 s |
+| `-NSAutomaticWindowAnimationsEnabled NO` | 0.268 s |
+| `NSWindow.animationBehavior = .none` on the sheet | 0.264 s |
+| the same on the sheet's PARENT window | 0.270 s |
+| `endSheet` inside a zero-duration `NSAnimationContext` group | 0.267 s |
+| `-NSOrderOutSheetWhenEnded NO` | 0.266 s |
+| parent window never ordered on screen | 0.264 s |
+
+The first is the cruel one. `NSAutomaticWindowAnimationsEnabled` is the key
+everybody reaches for, it is real, and AppKit **reads it on this very path** —
+hooking `-[NSUserDefaults objectForKey:]` during a sheet close shows it consulted
+alongside `NSOrderOutSheetWhenEnded` — and then ignores it for the sheet move. A
+reviewer checking "is this key real?" gets yes; only measuring gets the truth.
+Reduce Motion was not tried and is near-certainly dead too: no accessibility key
+appears among the four read on that path.
+
+### What does work: the class's own switch
+
+`NSSheetMoveHelper` declares its own `-shouldSkipAnimation`, overriding
+`NSMoveHelper`'s. Forcing it to answer true is how AppKit itself takes a sheet
+out of the animation. One `method_setImplementation` on the SUBCLASS's own
+method, in the test bundle only:
+
+| | `_doAnimation` runs | nested mode entered | open / close blocked |
+|---|---|---|---|
+| unchanged | 2 | **yes** | 0.281 s / 0.267 s |
+| force `shouldSkipAnimation` | 2 | no | 0.020 s / 0.008 s |
+| empty `_doAnimation` override | 0 | no | 0.020 s / 0.005 s |
+
+Sheet frame identical in all three, completion handler run, window takes another
+sheet afterwards.
+
+**The empty override was tried first and rejected, and the reason generalises.**
+Both work. The switch is better because AppKit's own skip path leaves the state
+AppKit intends to leave, BY CONSTRUCTION, rather than by our having probed that
+dropping `setUpAnimation`/`cleanUpAnimation` happens to be symmetric; because the
+switch is declared on the sheet subclass, so scoping needs no `class_addMethod`
+and no fallback branch to reason about, where `_doAnimation` is declared only on
+`NSMoveHelper`, which animates ordinary window moves too; and because it puts the
+test host in a configuration the framework already ships to real people instead
+of one nobody runs. **Where a framework has its own switch for the behaviour you
+want off, use the switch rather than removing the behaviour** — that is the part
+worth carrying to WinUI.
+
+### Two things about testing it that cost time
+
+**A test that cannot fail is not a test.** The first version raised a sheet,
+closed it, and asserted the sheet had gone — which passes identically with the
+fix removed, because the assertions come after a sleep that outlasts the 0.268 s
+animation. It looked like a regression test for a day. The version that works
+registers a `CFRunLoopObserver` for `_NSMoveTimerRunLoopMode` and asserts it
+never fires: it watches for **the exact frame in the crash stack**, has no timing
+threshold to go flaky on a busy machine, and was checked by putting the fault
+back and watching it fail. If you pin an intermittent, pin the mechanism, not a
+symptom you can outlast.
+
+**Measure with enough runs to mean something.** The rate here was about one run
+in three, so a fix "confirmed" by two green runs would be confirmed 44% of the
+time by doing nothing at all. Baseline and fix were each run 30 times, same
+command, same machine, same session. The earlier record of this defect had
+measured the FULL suite at roughly one abort in two — a different and more
+important number, because that is the scope a merge gate actually runs.
+
+### And the half of it that is a product rule, not a test rule
+
+This mechanism is reachable in the SHIPPING app, and has fired once:
+`GUI-IMPROVEMENTS.md` row 391, 2026-09-05, when a rename dismissed a sheet and
+raised an alert in the same breath. `contracts/shared-rules.json` →
+`siteHealth.repair.oneAlertAtATime` is the rule against it, and its stated reason
+used to say only that one of the two alerts is lost. It now says what actually
+happened. **A rule whose reason understates the consequence is a rule somebody
+will trade away**, and that is the reason to keep the sentence accurate rather
+than tidy.
+
 ## Windows no longer runs any of this in a container
 
 **Read this before the architecture sections below.** Windows dropped Docker,

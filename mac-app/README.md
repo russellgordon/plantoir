@@ -95,6 +95,16 @@ xcodebuild -project Plantoir.xcodeproj -scheme Plantoir test \
 > by the test runner, which fails the first UI test with
 > "Failed to terminate ca.russellgordon.Plantoir".
 
+**The test bundle changes one thing about AppKit, on purpose.** Its
+`NSPrincipalClass` (`INFOPLIST_KEY_NSPrincipalClass` in `project.yml`) is
+`SheetAnimationSuppressor`, which asks AppKit to skip the sheet slide animation
+for the life of the test host. Without it the host segfaults inside a nested
+runloop whenever a test raises and clears an alert on the real window — 10 runs
+in 30 before it existed, 0 in 30 after. Nothing in the shipped app changes, and
+the file itself carries the stack, the numbers, and the levers that look like
+they should work and do not. If a test ever needs to watch a sheet ANIMATE, that
+is the thing standing in its way.
+
 There is also a conventional **XCUITest** suite (`QuartzTeachersUITests`)
 that drives the app with synthesized clicks. Running it requires a one-time
 macOS approval: the first run fails with "Timed out while enabling automation
