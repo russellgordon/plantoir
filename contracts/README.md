@@ -243,6 +243,19 @@ every list that audit counted, plus two it missed (`linkRules.browserSafe` and
 | `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts`, `linkRules.browserSafe` | `PublishAndLauncherContractTests` |
 | `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
+| `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution` | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
+| `specialNames.renameFolder.linkRewriting` — how a folder's new name is SPELLED inside a link (11 cases) | `FolderPathRewriterTests` |
+
+**Two notes on the last two rows**, because they are not part of the audit's
+count and reading them as though they were would mislead. The `specialNames`
+lists in the first were already being run — those test classes predate item 29
+— and were simply never written down here. `linkRewriting` is newer than the audit — it was added to
+`shared-rules.json` on 2026-09-06, the same day, and fell outside the sweep; the
+row is here so it is not missed a second time. **Whether `FolderPathRewriterTests`
+deserialises its eleven cases or retypes five of its own is tracked by item 31
+in [`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md)** — read whether that item is
+struck rather than trusting a sentence here, which is exactly the kind of status
+line that drifts.
 
 **Three habits came out of that work and are worth copying on either side.**
 
