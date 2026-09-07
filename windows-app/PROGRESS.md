@@ -43,6 +43,11 @@ awk '/^### What is still genuinely outstanding/,/^## Windows no longer runs/' WI
 The first is the total; the second is how many are struck, which is how many
 are done.
 
+**Striking an item in `WINDOWS-HANDOFF.md` means striking its row here too**,
+in the same session. This table is the second place the same fact lives, and a
+second place is only worth having if both are updated together — the whole
+reason the count above went wrong is that one of them was.
+
 What is genuinely left, smallest first:
 
 | Item | What is left | Size |

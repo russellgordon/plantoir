@@ -1489,8 +1489,21 @@ to run in the background.
     > anything you remove here: it stays off your site, even if you make it
     > again in Obsidian, until you add it back on this page."
 
-    while the mac ships its own wording for the same rule (`GUI-IMPROVEMENTS.md`
-    row 375). **It is not ownerless, but nobody has picked it up.**
+    while the mac says the same thing differently, in
+    `mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift`
+    (the change is `GUI-IMPROVEMENTS.md` row 375, which records that the
+    callout was amended but does not carry the sentence):
+
+    > "Tip: you can also simply create new folders in Obsidian — they’re added
+    > to your site automatically the next time you preview (unless you have
+    > removed them here)."
+
+    Both are quoted here so whoever decides can read them side by side. The mac
+    says the exception in six words inside a bracket; Windows spends a second
+    sentence on it and tells the teacher what to DO about it. They also differ
+    in a detail that will matter when one becomes a contract case: the mac's
+    apostrophe in "they’re" is the curly one, Windows' is straight.
+    **It is not ownerless, but nobody has picked it up.**
     `MAC-HANDOFF.md`'s "Open — what the mac still owes" already says choosing
     WHICH sentence becomes the contract is the mac's call, and says why no case
     was proposed: proposing one would redden the mac suite over wording the mac
