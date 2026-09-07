@@ -33,7 +33,7 @@ What is genuinely left, smallest first:
 | 19 | The `working-folder.txt` marker AND a sweep that reads it. Do both or neither — the marker alone is ceremony. Two Windows specifics for the sweep are written into item 19. | Small |
 | 18 | The two VIEWS: the choice at the folder picker, and the dismissable notice for a folder the window restored. Detection, wording and the remembered-per-folder store are built — the store's API is `AppSettings.HasAcceptedSyncFor` / `RememberAcceptedSyncFor`, and the two moments belong in `WorkspacePickerView` (a folder just chosen) and `MainWindow`'s restore path (a folder the window reopened). | Medium |
 | 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
-| 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 52 test methods over 63 cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
+| 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 59 test methods over 157 cases — `FolderPathRewriter`'s share grew on 2026-09-07 when item 31 wired `linkRewriting` in from the contract rather than retyping five of its cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
 | ~~22~~ | ✅ Done 2026-09-06 — the "Folders Plantoir uses" sheet, now shared as `shared-rules.json` → `specialFoldersHelp` rather than living inside a view. Two cases proposed back to the mac. | — |
 
 Two things that are NOT in that list and should be known:
@@ -51,7 +51,9 @@ Two things that are NOT in that list and should be known:
   at 668 passed with 5 failing contract tests before this series; those five
   were each a real gap between what the contract says Windows does and what it
   did. **1,029 passed with 2 skipped** after item 29 wired the contract case
-  lists this suite was not reading (2026-09-06). The two skips are named
+  lists this suite was not reading (2026-09-06), and **1,125 with 2 skipped**
+  after item 31 wired the twelfth of them — `linkRewriting`, which item 29's
+  audit missed because it was added the same day (2026-09-07). The two skips are named
   divergences rather than unfinished work: `use_skeleton` (item 25) and the
   frontmatter-key question the mac has to settle, each carrying the test that
   closes it.

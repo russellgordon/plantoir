@@ -84,6 +84,15 @@ public static class FolderPathRewriter
     /// <c>,</c> the same way, which is the one that will actually happen here:
     /// "Unit 1, Day 2" is this project's own naming pattern.</para>
     ///
+    /// <para>Being precise about WHICH of its over-encodings break, because
+    /// the loose version of this sentence has been written twice: the ones
+    /// that 404 are the characters <c>decodeURI</c> leaves encoded —
+    /// <c>; , @ &amp; = + $</c>, and <c>?</c>, which <c>sluggify</c> strips
+    /// from the real folder's name instead. <c>'</c>, <c>!</c> and <c>*</c>
+    /// are over-encoded too and come back out of <c>decodeURI</c> intact, so
+    /// those are merely noise. The encoder below is still the answer to both,
+    /// and the eight that break include the two that will happen.</para>
+    ///
     /// <para>The set is what JavaScript's <c>encodeURI</c> leaves alone, minus
     /// three — <c>(</c> and <c>)</c> close a destination, <c>#</c> starts a
     /// heading — and minus <c>/</c> and <c>:</c>, which the rename sheet
