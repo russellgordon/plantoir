@@ -1658,7 +1658,92 @@ to run in the background.
     divergence from the mac, whose dictionary is keyed by name". It is no longer
     a divergence. Reword it when you next touch the file.
 
-35. **The wizard's Create button and the new-site dialog have never been
+35. ~~**The wizard's Create button and the new-site dialog have never been
+    driven through the real interface.**~~ ✅ Done 2026-09-07, branch
+    `issue/35-first-run-ui-checks`. **It asked which each half became, so:
+    the Create button became three `[UiFact]` cases; the new-site dialog
+    became a hand-driven check with a written procedure.**
+
+    `NewCourseWizardUiTests` presses the button — the wizard opens from the
+    course list, a duplicate code explains itself beside the field with Create
+    still off, and Create makes a course that exists on disk and in the
+    sidebar. The suite went from 6 tests to 9, green in 4 m 12 s. **A later
+    reader must not "simplify" the third test into `--auto-createcourse`:**
+    that hook calls `StartCreation()` from the dialog's `Opened` event, so it
+    never presses the button, and swapping to it would delete the only
+    coverage of the thing this item was about while leaving a test with the
+    same name.
+
+    **What cost the afternoon, and is the reusable part.** The suite launched
+    the app with `UseShellExecute = false`, so the `dotnet test` host's own std
+    handles were handed to the app and leaked into the ConPTY child: the app
+    captured nothing, what it sent the launcher never arrived, and `input()` in
+    `setup_course.py` reached EOF and died. It presents as "failed (exit code
+    1) after 1s" with an empty transcript, which reads as a broken toolchain
+    and is not. (That those handles are PIPES is inferred, not measured — it
+    fits, since console handles would have put the output in the terminal and a
+    one-second EOF is what a closed pipe gives. Said as an inference on
+    purpose; the whole point of this paragraph is that the previous version
+    stated a guess as fact.)
+
+    **`ConPtyProcess.Start` already carried this**, in a CAUTION saying the
+    child binds to the pseudo console only when the CREATING process's std
+    handles are clean — "console handles or none, as in a GUI app" — and that
+    a harness must be ShellExecute-launched. Read it before theorising, as the
+    first version of this write-up did not: it claimed an inherited CONSOLE was
+    the problem, which is wrong and would have sent the next person after
+    `FreeConsole()`. **Three launches of one build settled it** (Lenovo
+    20QES70500, Intel Core i5-8365U @ 1.60 GHz, 16 GB, 2026-09-07): clean
+    console handles, from `cmd.exe` in its own window — course made,
+    `setup.ps1` succeeded after 21 s; ShellExecute — the same, 21 s; the same
+    with `> out.txt 2>&1` — nothing captured, hung on the first prompt, no
+    course. So an ordinary terminal is FINE and redirecting is not. Written up
+    in [`documentation/12-windows-app.md`](documentation/12-windows-app.md)
+    ("Never start the app with its output redirected"); whether
+    `ConPtyProcess.Start` should defend itself by zeroing std handles across
+    `CreateProcessW` — `GetStdHandle`/`SetStdHandle` are declared in
+    `ConPty.cs` and never called — is in `TODO.md` with the research done.
+
+    **This is also the first UI test to run a LAUNCHER**, which the suite had
+    deliberately avoided. It is safe for one narrow reason, checked rather
+    than assumed: `setup_course.py` never resolves `merged_output_root`, so
+    `PLANTOIR_BUILD_ROOT` is set and the folder it names is never made —
+    after a create there was no new folder under the real
+    `%LOCALAPPDATA%\Plantoir\builds` and the real breadcrumb trail was
+    untouched. Nothing enforces that. **Check it again before a test runs a
+    different launcher**; preview and schedule would NOT be safe.
+
+    **Why the new-site half is a hand-check, so it is not proposed again.**
+    The reason that settles it is not the obvious one: `deploy.ps1`'s
+    Credential Manager target is hardcoded and `--state-dir` does not redirect
+    Credential Manager, so whether a test reached the dialog or **published a
+    real website** would depend on whether the machine happened to have a
+    token saved — behaviour forking on developer machine state, one fork of
+    which creates a live site. Rejected too: a fake token (the launcher
+    validates it against Netlify before `deploy.py` starts, so it raises
+    "Connect to Netlify" instead); a stub `deploy.ps1` (`RefreshLaunchers`
+    rewrites any launcher differing from the bundled copy, on every
+    `Reload()`, with no once-per-folder guard — note `RefreshToolchain` DOES
+    have that guard, so a stub under `.toolchain\scripts` would survive, which
+    rescues nothing because the token check stops the run first); and leaning
+    on `verify-deploy.ps1` (it redirects stdin from a file precisely so
+    `deploy.py` asks nothing). The procedure says what to check and what NOT
+    to: the dialog's wording is already contract data
+    (the `siteName` entry in `app-rules.json`'s `credentialRequests.requests`,
+    asserted by equality in `ContractTests`), so eyeballing it adds nothing;
+    what nothing pins is the ORDER, the pre-filled address, Cancel's
+    behaviour, that the created site carries the typed name, and the trail
+    line. **Writing that sentence found a real gap**: the contract sweep
+    checked title, field label, secrecy, link and steps and skipped
+    `explanation`, the longest thing a teacher reads in one of these dialogs.
+    One `Assert.Equal` in `ContractTests`, green on all seven requests — so
+    the claim the procedure makes is now true rather than nearly true.
+
+    Whether that hand-check joins the release cut is deliberately left alone:
+    it is the same open question as item 36, and answering it here would
+    settle 36 by the back door. The original item follows.
+
+    **The wizard's Create button and the new-site dialog have never been
     driven through the real interface (audited onto this list 2026-09-06; the
     gap itself is older).** Both are the first things a teacher meets, and
     neither has ever been clicked in a running app by anybody checking that it

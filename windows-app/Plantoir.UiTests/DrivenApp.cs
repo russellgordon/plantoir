@@ -35,10 +35,15 @@ namespace Plantoir.UiTests;
 /// wrapper bakes the same into the script it registers. So a redirected run
 /// that PREVIEWED would look for its build where the launcher did not put it,
 /// and one that SCHEDULED a deploy would register a REAL Task Scheduler task
-/// whose sentinels land in the teacher's real pending folder. Nothing in the
-/// suite does either today — but a UI test that drives Preview is the obvious
-/// next thing somebody writes.
-/// None of it is reached by a Course Settings test.</para>
+/// whose sentinels land in the teacher's real pending folder. Neither is done
+/// by any test today, and neither should be without reading this first.</para>
+///
+/// <para><b>One launcher IS run now</b> — <c>NewCourseWizardUiTests</c> presses
+/// Create, which runs <c>setup.ps1</c> — and it is safe for narrow reasons
+/// that nothing enforces. They are written out once, in
+/// <c>documentation/12-windows-app.md</c> under "The flags the app answers";
+/// read them before a test runs a DIFFERENT launcher, because preview and
+/// schedule would NOT be safe.</para>
 ///
 /// <para><b>A running Plantoir is closed, not worked around.</b> Russell's
 /// standing instruction (2026-09-06, and CLAUDE.md's Windows setup notes):
@@ -92,7 +97,16 @@ public sealed class DrivenApp : IDisposable
             try { other.Kill(true); other.WaitForExit(5000); } catch { }
         }
 
-        _root = Path.Combine(Path.GetTempPath(), "plantoir-ui-" + Guid.NewGuid().ToString("N")[..8]);
+        // The folder name carries THIS RUN's token when the runner supplied
+        // one, so run-ui-tests.ps1's orphan sweep can match its own children
+        // and nothing else. Without it two parallel runs would sweep each
+        // other's live launchers, and a developer reading a kept folder — say
+        // `Get-Content ...\plantoir-ui-*\state\Logs\startup.log -Wait` — would
+        // have the pattern in their own command line and be force-killed.
+        string run = Environment.GetEnvironmentVariable("PLANTOIR_UI_RUN") is { } token
+                     && !string.IsNullOrWhiteSpace(token) ? token : "solo";
+        _root = Path.Combine(Path.GetTempPath(),
+                             $"plantoir-ui-{run}-{Guid.NewGuid().ToString("N")[..8]}");
         WorkspacePath = Path.Combine(_root, "workspace");
         string stateDir = Path.Combine(_root, "state");
         Directory.CreateDirectory(WorkspacePath);
@@ -111,7 +125,39 @@ public sealed class DrivenApp : IDisposable
             ["RestoreWindowsOnLaunch"] = false,
         }.ToJsonString(), new UTF8Encoding(false));
 
-        var psi = new ProcessStartInfo(ExecutablePath) { UseShellExecute = false };
+        // UseShellExecute = TRUE, and this is not a detail: it is the one line
+        // that decides whether a test can drive anything the app SHELLS OUT to
+        // — creating a course, previewing, publishing.
+        //
+        // WHY is already written down, once, in ConPtyProcess.Start's own
+        // CAUTION: the child binds to the pseudo console only when the
+        // CREATING process's std handles are clean — console handles or none —
+        // and a creator whose stdio is redirected to pipes leaks those handles
+        // into the child instead. ShellExecute gives a GUI process no std
+        // handles at all, which is the "or none" case, and is also exactly
+        // what a teacher's shortcut does. (That the `dotnet test` host's own
+        // handles are PIPES is inferred rather than measured — it fits, since
+        // console handles would have put the launcher's output in the terminal
+        // and the one-second EOF is what a closed pipe gives. Flagged as an
+        // inference because the version of this comment before it was exactly
+        // that: a plausible story stated as fact.)
+        //
+        // Measured 2026-09-07 (Lenovo 20QES70500, Intel Core i5-8365U @
+        // 1.60 GHz, 16 GB), one variable, three launches of the same build:
+        // clean CONSOLE handles (cmd.exe in its own window) → the course is
+        // made, setup.ps1 succeeded after 21 s. ShellExecute → the same, 21 s.
+        // Output REDIRECTED to a file → the launcher's output lands in the
+        // redirect target, the app captures nothing, and the run hangs on the
+        // first prompt because the answer never reaches the child. Under
+        // `dotnet test` the same leak ends faster and looks worse: "failed
+        // (exit code 1) after 1s" with an EMPTY transcript, because the pipe
+        // gives the child EOF and `input()` in setup_course.py dies.
+        //
+        // The trap is REDIRECTED stdio, NOT an inherited console — an earlier
+        // version of this comment said the opposite, and the experiment above
+        // is what settled it. So `.\Plantoir.exe` at an ordinary prompt is
+        // fine; `.\Plantoir.exe > out.txt` is not.
+        var psi = new ProcessStartInfo(ExecutablePath) { UseShellExecute = true };
         psi.ArgumentList.Add("--state-dir");
         psi.ArgumentList.Add(stateDir);   // ArgumentList quotes for us
         _app = Application.Launch(psi);
@@ -216,6 +262,23 @@ public sealed class DrivenApp : IDisposable
         catch { }
         // Deleted last, and never fatally: a locked file must not turn a
         // passing test red, and the folder is under TEMP either way.
+        //
+        // PLANTOIR_UI_KEEP=1 leaves it behind instead — EVERY test's, since
+        // teardown does not know whether the test passed. A UI test that fails
+        // inside the app has almost nothing to say from out here: the useful
+        // evidence is the run's own startup.log, breadcrumb trail, per-run
+        // launcher log and working folder, and all of it is inside this folder
+        // being deleted. Written after an afternoon of guessing at a launcher
+        // failure whose reason was sitting in a log already thrown away.
+        //
+        // run-ui-tests.ps1 prints the kept paths too, and THAT is the notice
+        // to rely on: plain Console output from Dispose is not attached to a
+        // test result and often does not surface in `dotnet test`.
+        if (Environment.GetEnvironmentVariable("PLANTOIR_UI_KEEP") == "1")
+        {
+            Console.WriteLine($"PLANTOIR_UI_KEEP: leaving this run's files at {_root}");
+            return;
+        }
         try { Directory.Delete(_root, recursive: true); } catch { }
     }
 }
