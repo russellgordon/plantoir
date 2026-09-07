@@ -51,6 +51,17 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
+**One proposed 2026-09-07, a SENTENCE, not a rule: `shared-rules.json` →
+`specialNames.renameFolder.interruptedRename`** — the line Windows shows
+inside the rename sheet when it opens on a rename that stopped after the
+folders moved: "Plantoir started renaming “{old}” to “{new}” and did not
+finish — the folder has its new name, but this course’s settings still use
+the old one. Press Rename to finish." The mac pre-fills the field silently
+(`StringListEditorView.renameSheet`); Windows says why, because a filled-in
+field with nothing said leaves a teacher wondering. Nothing on the mac goes
+red — no test pins this key — so this is a request to adopt the line or say
+why not. Branch `issue/13-rename-folder-and-config-writers`.
+
 **One proposed 2026-09-07: `file-formats.json` → `pageVisibility.writingRules[0]`
 now says a page in the old `draft:` spelling is MIGRATED to `publishForSection<N>`
 and the legacy key removed — the mac keeps the old key inverted, so its suite
@@ -3384,6 +3395,75 @@ is what happened to the test-race item, sitting here for three days with
 
 
 ## Done — the ledger
+
+- **Windows renames a course folder from inside the app, records the change
+  from a fresh read, and can finish a rename that stopped half way — items 13
+  and 17, one piece** (Windows, 2026-09-07, branch
+  `issue/13-rename-folder-and-config-writers`; `GUI-IMPROVEMENTS.md` rows
+  441–443). **The mac is expected to KNOW; it owes a reading of one
+  sentence (top of this file).** ✅ DONE.
+
+  **What landed, against the mac's shape.** `SpecialFolderRenamer.Rename` is
+  `rename(_:to:scope:…)` ported: every destination checked first, a
+  capitalisation-only rename allowed through, the record written before the
+  first move, `Directory.Move` per location, a half-failure thrown as
+  `HalfFailureMessage` naming the section that stopped it, then
+  `RelinkPages` over every page in the course. `Renaming(JObject…)` is
+  `renaming(_:to:scope:in:)` ported, materialisation included: the class
+  folder is recognised through `WasSurelyTheClassFolder` — the recorded key
+  when it names a real folder, otherwise only a name containing "class" that
+  the resolver picks, so a first-folder GUESS is never frozen into the key
+  (the review caught a first draft that used the bare resolver) — and the
+  curriculum folder through `CurriculumFolderRule.Resolve`, both decided
+  BEFORE the list is rewritten; `hidden`, `expandable` and `graded_folders`
+  are rewritten from either scope; `curriculum_folder`, `class_folder` and
+  `excluded_items` only in their own scope; every list is de-duplicated so
+  finishing an interrupted rename leaves one name, not two.
+  `CourseConfiguration.RecordOnDisk` is `recordOnDisk` ported whole — three
+  compare-and-swap tries, then the FRESHEST bytes, and the change applied
+  to the in-memory object with the bytes written as its last-saved state, so
+  Revert keeps the rename and drops only what was never saved (a first
+  draft of this entry called that an addition; it is the mac's own last two
+  lines). `Write` is untouched, and
+  `WriteIsUnchangedAndRevertStillDoesWhatItSays` pins that it does NOT
+  read-compare-write. The record lives at
+  `courses/.internal/renames/<CODE>.json` with `from`, `to` and `scope`;
+  `InterruptedRenameTarget` answers only when the record and the disk agree
+  (no place still holds the old folder, at least one holds the new).
+
+  **The decisions, as the brief recorded them and as built.** A pencil on
+  each folder row (rejected: a context menu, invisible to everyone else; and
+  double-click-to-edit, which fights the sheet the contract words). A
+  half-failed rename leaves the moved sections moved and names the one that
+  stopped it (rejected: rolling back, which can itself half-fail and moves a
+  teacher's folders a second time unasked). A separate recorder, `Write`
+  untouched (rejected: making `Write` read-compare-write, which would change
+  what `HasUnsavedChanges` and Revert mean). An interrupted rename is
+  explained in the sheet in one line and pre-filled (rejected: silent
+  pre-fill; a modal on opening Settings). The two foot-guns: Add creates
+  the folder in every section and says so; Remove says the folder stays.
+
+  **Two shared limits, written down rather than fixed.** The record is one
+  file per COURSE, and any successful rename clears it — so a teacher with
+  an interrupted `Tasks → Assignments` who renames another folder first, or
+  types a different name into the pre-filled sheet, loses the only evidence
+  and is back in the dead end; the mac's `clearRenameRecord` does the same.
+  And `recordOnDisk`'s last-saved bytes carry any key another writer put
+  there that the in-memory object lacks, so a form nobody edited can show
+  as dirty after a build wrote `unit_word` — identical on both platforms.
+  Neither is this branch's to change alone; both want a decision.
+
+  **Windows specifics.** The dialog's Rename button is the default (the
+  mac's sheet submits on Return too); the refusal is re-asked on every
+  keystroke with the "finishing" waiver granted only when the typed name
+  equals the recorded target; the move and the relinking run off the UI
+  thread; a capitalisation-only rename is allowed through, as on the mac,
+  which meant loosening this side's "unchanged" refusal from case-insensitive
+  to exact. The sentences a teacher reads: the contract's, with "on this PC"
+  for "on your Mac" in `removeLeavesTheFolderOnDisk` as the two rename
+  sentences already do. Not driven by hand — worth one look: rename a
+  per-section folder with Obsidian holding a file in it open, which is the
+  one failure the message exists for.
 
 - **Windows' folders-help jargon sweep now matches the mac's: it scans what
   the product writes, not the teacher's folder names** (Windows, 2026-09-07,
