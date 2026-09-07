@@ -52,6 +52,7 @@ public sealed partial class WorkspacePickerView : UserControl
         try
         {
             await _window.Workspace.InitializeWorkspaceAsync();
+            _window.SyncNoticeAnsweredBySetUp();
             _window.ApplyState();
             if (_window.Workspace.State == WorkspaceState.Ready && _window.Workspace.WorkspaceProblem is null)
                 _ = _window.SidebarPane.OpenNewCourseWizard();
