@@ -158,6 +158,45 @@ public class SiteHealthContractTests
     }
 
     /// <summary>
+    /// The one refusal the contract carries is worded here exactly as it is
+    /// there -- <c>siteHealth.repair.refusedWhenSomethingIsInTheWay</c>. The
+    /// sentence is not retyped: it is read from the contract, its placeholders
+    /// filled, and compared with what this app says.
+    /// </summary>
+    [Fact]
+    public void TheRefusalSentenceIsTheContractsWordForWord()
+    {
+        var refused = SiteHealth["repair"]!["refusedWhenSomethingIsInTheWay"]!;
+        var cases = refused["cases"]!.AsArray();
+        Assert.NotEmpty(cases);
+
+        foreach (var refusal in cases)
+        {
+            // An unknown refusal case would have appeared with nothing behind it.
+            Assert.Equal("sectionIndexMissing", refusal!["check"]!.ToString());
+            Assert.Equal("refused", refusal["expect"]!.ToString());
+            string sentence = refusal["sentence"]!.ToString()
+                .Replace("{course}", "ICS3U")
+                .Replace("{section}", "2");
+            Assert.Equal(sentence, SiteHealthRepair.FolderWhereTheFrontPageBelongs("ICS3U", 2));
+        }
+    }
+
+    /// <summary>
+    /// Rule 1 again, for the refusal -- which the machinery sweep below does
+    /// not reach, because it walks <c>checks</c> and this sentence lives under
+    /// <c>repair</c>.
+    /// </summary>
+    [Fact]
+    public void TheRefusalSentenceNamesNoMachinery()
+    {
+        string said = SiteHealthRepair.FolderWhereTheFrontPageBelongs("ICS3U", 1).ToLowerInvariant();
+        foreach (string word in new[] { "toolchain", "script", "docker", "container", "wsl",
+                                        "python", "stdout", "quartz", "repository", "config" })
+            Assert.DoesNotContain(word, said);
+    }
+
+    /// <summary>
     /// The trail line carries the stable check NAME, never the product
     /// wording. <c>activityTrail.mustRecord</c> -> "folder problem found" says
     /// so, and the reason is that the sentence gets reworded while the name is

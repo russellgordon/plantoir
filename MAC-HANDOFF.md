@@ -147,6 +147,26 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ## Open — what the mac still owes
 
+- **Two sentences in `contracts/shared-rules.json` now say Windows still owes
+  the refusal case, and Windows no longer does** (Windows, 2026-09-07, branch
+  `issue/33-repair-refused-folder-in-the-way`). **A regeneration and two
+  edited strings; nothing behavioural.**
+
+  `siteHealth.repair.reportedOncePerFinding.howToRunACase` ends `("refused" is
+  refusedWhenSomethingIsInTheWay, which the mac has and Windows still owes)`,
+  and `knownLimit` in the same entry says `Windows has no refusal case yet
+  (WINDOWS-HANDOFF.md item 33) … It stops being a Windows limit the day item
+  33 lands`. Both were true when written and are false now: Windows answers
+  `Refused`, says the contract's sentence, and writes `folder problem not
+  repaired` — see the ledger entry below. The contract is generated on the mac
+  and never hand-edited, so the correction has to come from
+  `SiteHealthContract.swift` (or wherever those two strings are authored) and
+  `Plantoir --write-contracts`. Suggested wording: drop the parenthesis from
+  `howToRunACase`, and in `knownLimit` say the refusal case escapes the limit
+  on BOTH platforms because its sentence names the section folder. Windows'
+  suite is not red on the stale text — nothing pins prose — which is exactly
+  why it needs saying here rather than being left to be noticed.
+
 - **`AppRulesContract.milestones()` leaves the example-course task out of the
   readout, so two shared markers were classified by nobody** (found 2026-09-06,
   branch `issue/29-windows-contract-case-lists`). **A one-line fix, and the
@@ -2888,6 +2908,51 @@ is what happened to the test-race item, sitting here for three days with
 
 
 ## Done — the ledger
+
+- **Windows now refuses a folder named `index.md` with the contract's own
+  sentence, records the refusal on the trail, and runs the
+  `reportedOncePerFinding` cases from the contract** (Windows, 2026-09-07,
+  branch `issue/33-repair-refused-folder-in-the-way`; `WINDOWS-HANDOFF.md`
+  items 33 and 34 struck; `GUI-IMPROVEMENTS.md` row 428). **The mac is
+  expected to KNOW, not to match** — it shipped the refusal first, on
+  2026-09-07, and this is Windows catching up to it. ✅ DONE.
+
+  What it fixed. `SharedRules_ActivityTrailEvents_Exist` pins
+  `activityTrail.mustRecord` by equality, so the mac's merge of
+  `issue/repair-index-md-directory` turned the Windows suite red — one test,
+  `1030 passed, 1 failed` — the moment it reached `dev`. That is the mechanism
+  working, and it is ALSO why nine of the twelve overnight batch branches of
+  2026-09-06 (`batch/README.md`) were refused at the gate: they were cut from
+  a `dev` that already carried the new event, so every one of them inherited
+  a failure that had nothing to do with its own work. Windows had answered
+  `Failed` for the directory case since `3ddd4af4` — honest, and still
+  sending the teacher to check permissions on a folder that is not locked.
+
+  What was done, and where. `SiteHealthRepair.Result` gained `Refused`;
+  `FolderWhereTheFrontPageBelongs(course, section)` is the sentence, filled
+  from the finding's section because a C# enum cannot carry a value the way
+  the mac's `blockedByAFolderWhereTheFrontPageBelongs(section:)` does — the
+  per-finding tuple already has it, so nothing is lost. `OutcomeOfRepairing`
+  assembles the explanation in the mac's order (generic advice first, only
+  when something SIMPLY failed or nothing was refused; refusals after it, each
+  named once). `RestoreIndex` writes `folder problem not repaired` from the
+  directory branch only — the plain-failure path still records nothing, as the
+  contract's `why` asks. `ActivityTrail.Event.FolderProblemNotRepaired` is the
+  event. Tests: `SiteHealthRepairTests` (refused and left untouched, with the
+  teacher's page inside it surviving; refusal alone; both kinds at once in
+  the right order; refusal beside a restore; two refused sections are two
+  sentences) and `SiteHealthContractTests.TheRefusalSentenceIsTheContractsWordForWord`
+  plus `TheRefusalSentenceNamesNoMachinery`. Item 34's "should":
+  `ARepairReportsOneResultPerFindingNeverOnePerCheckName` builds each
+  `reportedOncePerFinding` case exactly as `howToRunACase` says, on two copies
+  of the course — one for the results, one for the report — and replaces
+  `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer`.
+
+  Nothing rejected that the mac had not already rejected: moving the folder
+  aside was refused for the same reason (a folder that may hold the teacher's
+  pages, moved without asking, by an app that cannot see inside it). One thing
+  the mac may want to know about its own contract text is the open item at
+  the top of this file.
 
 Kept in full, newest first. A finished entry is not deleted: the mac does what
 it does BECAUSE of these, and the `✅ DONE` line names what landed here and
