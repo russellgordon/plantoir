@@ -1470,8 +1470,15 @@ to run in the background.
       the PowerShell parser and runs the REAL launcher code, which a C# port
       cannot — it would be a third implementation of one rule.
 
-30. **Smaller still, and listed only so they are not rediscovered as
-    surprises**: the Archived/Backup detail pane offers Restore but not Delete
+30. ~~**Smaller still, and listed only so they are not rediscovered as
+    surprises**~~ ✅ Done 2026-09-07, all three (branch
+    `issue/30-polish-delete-crumbs-rename`, `GUI-IMPROVEMENTS.md` rows
+    438–440): Delete beside Restore in both detail panes, reusing the
+    sidebar's confirmations; the picker's breadcrumbs with the main bar's
+    icon, tooltip, menu and double-click; and Rename Course in the FILE menu
+    with F2 — a chosen divergence from the mac's Edit menu, `MAC-HANDOFF.md`
+    → For awareness. The original item follows: the Archived/Backup detail
+    pane offers Restore but not Delete
     (Delete exists in the sidebar menu); the empty-folder picker's breadcrumbs
     have none of the main window's icons, tooltip or menu; and there is no Edit
     menu or keyboard route to Rename Course — it is context-menu only.

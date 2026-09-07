@@ -1884,6 +1884,38 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Rename Course lives in Windows' FILE menu with F2, not in an Edit menu
+  with no key — a chosen divergence on two counts, not drift** (Windows,
+  2026-09-07, branch `issue/30-polish-delete-crumbs-rename`, item 30 (c);
+  `GUI-IMPROVEMENTS.md` row 440). **Nothing for the mac to do.** On Windows a
+  top-level Edit menu conventionally holds Cut/Copy/Paste, and one holding a
+  single Rename Course reads as broken; File already holds a selection-scoped
+  action ("Restore from Archive…"), so it is the established home. And the
+  mac omits a key for an AppKit reason — a bare Return equivalent is stolen by
+  every text field — that does not exist on Windows, where the item asks for
+  a keyboard route; F2 is Explorer's rename key. Rejected: an Edit menu for
+  parity; no key for parity; a new Course menu for one item. The item is
+  dimmed WITH its reason, the way the course menu does it (a disabled row
+  holding `CourseActivity.BusyReason`), renames the parent course when a
+  section is selected (the mac's `courseThatCanBeRenamed`), and F2 is scoped
+  by asking `FocusManager.GetFocusedElement` first: a TextBox, RichEditBox,
+  PasswordBox, AutoSuggestBox or NumberBox keeps its F2 and the accelerator
+  leaves the key unhandled. One limit, said plainly: WinUI's MenuBar has no
+  Opening event, so the dimmed state is redrawn on selection change and on
+  every re-apply of the window's state, and the accelerator re-checks live —
+  a preview started with the File menu already open is caught by the check
+  when the item is invoked, not by the row going grey under the pointer.
+
+  Two recommendations from the same item, not shipped. (a) The backup
+  pane's sentence: Windows says "Restoring puts {code} back to exactly this
+  moment — the current version is archived first, and the backup is kept.";
+  the mac's advertises the delete and omits the reassurance. The reassurance
+  is the better half; the two should converge on it, from both sides at once.
+  (b) The picker's breadcrumbs: a plain click walks nowhere, as on the main
+  bar (item 6's decision), though on a PICKER walking up the tree is the
+  obvious reading. If that is wanted it is a change to
+  `workingFolderPathBar` for both platforms, not one side's shortcut.
+
 - **Windows' two synced-folder views are built, and one thing about the store
   behind them is worth knowing before a privacy question arrives** (Windows,
   2026-09-07, branch `issue/18-cloud-synced-folder-views`; item 18 struck;
