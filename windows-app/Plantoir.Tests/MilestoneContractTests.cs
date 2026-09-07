@@ -129,9 +129,12 @@ public class MilestoneContractTests
     ///
     /// <para>This is how <c>"Example Course installed to"</c> and
     /// <c>"EXAMPLE_COURSE_CODE="</c> were found: printed by
-    /// <c>scripts/setup_course.py</c>, matched by Windows' own
-    /// <c>TaskMilestones.ExampleCourse</c>, and classified nowhere, because the
-    /// mac has no example-course task to have listed them from.</para>
+    /// <c>scripts/setup_course.py</c>, matched by BOTH apps' example-course
+    /// task, and classified nowhere — because the mac's classification test
+    /// walks the contract's generated <c>milestones</c> readout, and
+    /// <c>AppRulesContract.milestones()</c> leaves that one task out of it. A
+    /// forward check is only as complete as the list it walks; this one does
+    /// not walk a list at all.</para>
     /// </summary>
     [Fact]
     public void AMarkerTheSharedScriptsPrintIsClassifiedAsShared()
@@ -245,6 +248,16 @@ public class MilestoneContractTests
             ["buildAndDeploy"] = TaskMilestones.BuildAndDeploy,
             ["buildAndDeployToFolder"] = TaskMilestones.BuildAndDeployToFolder,
             ["buildAndDeployToCloudflare"] = TaskMilestones.BuildAndDeployToCloudflare,
+
+            // Answered before the contract asks. Both apps have an
+            // example-course task and always did, but the mac's
+            // AppRulesContract.milestones() omits it from the readout, so it is
+            // not in `milestones` yet — which is why its two markers were
+            // classified by nobody until 2026-09-06. Listing it here means the
+            // mac's fix (MAC-HANDOFF.md, "Open") regenerates the contract and
+            // lands GREEN, instead of failing this suite by name for a change
+            // that is entirely correct.
+            ["exampleCourse"] = TaskMilestones.ExampleCourse,
         };
 
         // Every task the contract names must be answered here. A task list the
@@ -292,20 +305,28 @@ public class MilestoneContractTests
     }
 
     /// <summary>
-    /// This app's own extra list, which the mac has no counterpart for, still
-    /// has to be made of real markers — so it is covered by the classification
-    /// tests above rather than by the parity test, and this records why.
+    /// The example-course task's markers are classified, even though the
+    /// contract's <c>milestones</c> readout does not yet mention that task.
+    ///
+    /// <para>Both apps have the task — the mac's
+    /// <c>TaskMilestones.exampleCourse</c> holds the same two markers — but
+    /// <c>AppRulesContract.milestones()</c> omits it from the readout, so the
+    /// parity test above never visits it and the mac's own classification test
+    /// never saw its markers. That is how they came to be printed by
+    /// <c>setup_course.py</c> and classified by nobody. Until the mac's readout
+    /// is fixed (MAC-HANDOFF.md), this is the only thing checking them.</para>
     /// </summary>
     [Fact]
-    public void TheExampleCourseListIsOursAloneAndTheContractKnowsItsMarkers()
+    public void TheExampleCourseMarkersAreClassifiedThoughTheReadoutOmitsTheTask()
     {
         var origins = Origins();
         foreach (var milestone in TaskMilestones.ExampleCourse)
         {
             Assert.True(origins.ContainsKey(milestone.Marker) || AppearsInAWindowsLauncher(milestone.Marker),
-                $"\"{milestone.Marker}\" belongs to the example-course task, which the mac does not " +
-                "have. That is not a reason for it to be unclassified: it is printed by the shared " +
-                "setup script, so it belongs in markerOrigins.origins like every other shared line.");
+                $"\"{milestone.Marker}\" belongs to the example-course task, which the contract's " +
+                "milestones readout leaves out. That is not a reason for it to be unclassified: it " +
+                "is printed by the shared setup script, so it belongs in markerOrigins.origins like " +
+                "every other shared line.");
         }
     }
 }

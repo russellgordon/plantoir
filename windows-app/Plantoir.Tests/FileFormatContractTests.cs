@@ -97,7 +97,11 @@ public sealed class FileFormatContractTests : IDisposable
             string key = entry!["key"]!.ToString();
             if (knowinglyAbsent.Contains(key)) continue;
 
-            Assert.True(source.Contains($"\"{key}\"", StringComparison.Ordinal),
+            // The dictionary-entry shape, not bare containment: `SkeletonCatalog`
+            // is already in this app and "referenced only from a comment"
+            // (item 25), which is exactly how a source search goes green for a
+            // question nobody asks.
+            Assert.True(source.Contains($"[\"{key}\"]", StringComparison.Ordinal),
                 $"The wizard writes no \"{key}\" into course_config.json. setup_course.py will " +
                 "take its own default for it and the teacher is never asked — which is not a " +
                 "missing feature a teacher can report, because nothing on screen says the " +
@@ -120,7 +124,7 @@ public sealed class FileFormatContractTests : IDisposable
     [Fact(Skip = "WINDOWS-HANDOFF item 25 — the wizard never asks the skeleton question")]
     public void TheWizardWritesUseSkeleton()
     {
-        Assert.Contains("\"use_skeleton\"", InterfaceSource(), StringComparison.Ordinal);
+        Assert.Contains("[\"use_skeleton\"]", InterfaceSource(), StringComparison.Ordinal);
     }
 
     // ---- Where a section's first publish leaves its mark ------------------
@@ -243,6 +247,11 @@ public sealed class FileFormatContractTests : IDisposable
                 case "recorded":
                     Assert.Equal("2026-08-14", value.GetString());
                     break;
+                case "section":
+                    // Presence is not enough: `section: 0` would satisfy a
+                    // TryGetProperty and tell the other app nothing.
+                    Assert.Equal(2, value.GetInt32());
+                    break;
             }
         }
 
@@ -280,12 +289,21 @@ public sealed class FileFormatContractTests : IDisposable
                 "removed on the mac and this test is answering a question nobody asked.");
         }
 
-        // A page written in the old spelling KEEPS it, inverted.
-        // ---------------------------------------------------------------
-        // NOT answered here: this app deliberately does the opposite, and the
-        // divergence is real rather than a mistake in either direction. See
-        // TheOldSpellingIsKeptRatherThanMigrated below, and MAC-HANDOFF.md.
-        Answered("A page written in the old spelling KEEPS it, inverted");
+        // This app does the OPPOSITE of the first rule, deliberately, and
+        // saying so is not the same as answering it. Marking a rule "answered"
+        // without asserting it would make the completeness check below report
+        // four of four when the truth is three of four and one open question —
+        // the same shape of comfort as a `knownDivergence` note, which is the
+        // thing that let item 25 stand for three weeks.
+        //
+        // So it is removed by NAME and the set is asserted to hold exactly
+        // that: un-skipping TheOldSpellingIsKeptRatherThanMigrated without
+        // deleting this line fails too, which is what stops a resolved
+        // divergence being recorded as a live one for ever.
+        var knowinglyNotFollowed = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "A page written in the old spelling KEEPS it, inverted",
+        };
 
         // Edit the LINE, never round-trip the YAML.
         string withComment =
@@ -316,6 +334,15 @@ public sealed class FileFormatContractTests : IDisposable
         Assert.False(noEdit.Changed);
         Assert.Equal(already, untouched);
         Answered("Writing the value it already has changes nothing");
+
+        foreach (string rule in knowinglyNotFollowed)
+        {
+            Assert.True(unanswered.Remove(rule),
+                $"\"{rule}\" is recorded here as a rule this app knowingly does not follow, and the " +
+                "contract no longer contains it — or a test above has just answered it. Either way " +
+                "the divergence is over: delete it from knowinglyNotFollowed and un-skip " +
+                nameof(TheOldSpellingIsKeptRatherThanMigrated) + ".");
+        }
 
         Assert.True(unanswered.Count == 0,
             "contracts/file-formats.json names rules for writing a page's visibility that no test " +
@@ -348,10 +375,30 @@ public sealed class FileFormatContractTests : IDisposable
     [Fact(Skip = "Divergence, not a defect — the mac keeps the old key, this app migrates it. See MAC-HANDOFF.md")]
     public void TheOldSpellingIsKeptRatherThanMigrated()
     {
-        string legacy = "---\ntitle: Day one\ndraftSection1: true\n---\nBody.\n";
-        var (written, _) = PageFrontmatter.SetDraft(legacy, "publishForSection1", draft: false);
+        // The per-section spelling, on a course-level page.
+        string shared = "---\ntitle: Day one\ndraftSection1: true\n---\nBody.\n";
+        var (writtenShared, _) = PageFrontmatter.SetDraft(shared, "publishForSection1", draft: false);
+        Assert.Contains("draftSection1: false", writtenShared, StringComparison.Ordinal);
+        Assert.DoesNotContain("publishForSection1", writtenShared, StringComparison.Ordinal);
 
-        Assert.Contains("draftSection1: false", written, StringComparison.Ordinal);
-        Assert.DoesNotContain("publishForSection1", written, StringComparison.Ordinal);
+        // And the plain one, on a page inside a section's own folder.
+        string local = "---\ntitle: Day one\ndraft: true\n---\nBody.\n";
+        var (writtenLocal, _) = PageFrontmatter.SetDraft(local, "publish", draft: false);
+        Assert.Contains("draft: false", writtenLocal, StringComparison.Ordinal);
+        Assert.DoesNotContain("publish:", writtenLocal, StringComparison.Ordinal);
+
+        // Rule 4 has to hold for the OLD spelling too. This app currently
+        // rewrites a legacy page whose value is already right, purely to
+        // migrate the key — so a page nobody changed gets a new modification
+        // time, and the next build believes its content changed.
+        string alreadyRight = "---\ndraftSection1: false\n---\nBody.\n";
+        var (untouched, edit) = PageFrontmatter.SetDraft(alreadyRight, "publishForSection1", draft: false);
+        Assert.False(edit.Changed);
+        Assert.Equal(alreadyRight, untouched);
+
+        // The mac leaves a leftover legacy key alone; this app removes it.
+        string both = "---\npublishForSection1: true\ndraftSection1: false\n---\nBody.\n";
+        var (kept, _) = PageFrontmatter.SetDraft(both, "publishForSection1", draft: true);
+        Assert.Contains("draftSection1: false", kept, StringComparison.Ordinal);
     }
 }

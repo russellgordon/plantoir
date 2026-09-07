@@ -209,9 +209,37 @@ outstanding.
   files, and a course does not stay on one machine: a page edited on Windows
   comes back to the mac migrated, and the mac then keeps the NEW key, so the
   file quietly converts the first time a Windows machine touches it. Nothing is
-  broken by that — both spellings build identically — but the contract asserts
-  a property of the teacher's file that is not true of the product as shipped,
-  and one of the two has to give.
+  broken by that — both spellings build identically (`build_site.py` and
+  `patches/publish.ts` read both, and neither `SectionAdder` widens or narrows
+  it) — but the contract asserts a property of the teacher's file that is not
+  true of the product as shipped, and one of the two has to give.
+
+  **`documentation/` has already taken a side, and it is not the contract's.**
+  Found by grepping for the behaviour rather than trusting memory of where it
+  is described, which is what rule 11 asks for and what my first pass here did
+  not do:
+
+  - `documentation/04-course-setup.md` — *"Plantoir rewrites a page's key only
+    when something edits that page."*
+  - `documentation/08-course-config-reference.md` — *"rewritten to `publish` the
+    first time anything edits the page."*
+
+  So the split is not contract-versus-row-140. It is **the contract and the mac
+  code** on one side, and **row 140, both documentation files and the Windows
+  code** on the other — and the documentation is false for the mac TODAY,
+  whichever way this goes. If the contract wins, those two files change too.
+
+  **Two smaller differences the decision should cover**, both found while
+  writing the test:
+  - Where a page carries BOTH spellings, Windows deletes the leftover legacy
+    key; the mac leaves it.
+  - Windows rewrites a legacy page whose value is already correct, purely to
+    migrate the key — so `writingRules`' fourth rule, *"writing the value it
+    already has changes nothing"*, holds here only for the new spelling. That
+    rule exists because a no-op write still moves the modification time and the
+    next build then believes the content changed. The publish path filters
+    already-correct pages out before it gets there, but the unpublish path does
+    not.
 
   **What the mac owes:** pick one, and say which.
   - *If the contract wins*, Windows changes `SetDraft` to keep the old key
@@ -1603,6 +1631,37 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **`AppRulesContract.milestones()` leaves the example-course task out of the
+  readout, so two shared markers were classified by nobody** (found 2026-09-06,
+  branch `issue/29-windows-contract-case-lists`). **A one-line fix, and the
+  smallest item here.**
+
+  `mac-app/QuartzTeachers/Models/Assist/AppRulesContract.swift` writes eight
+  milestone lists into `app-rules.json`; `TaskMilestones.swift` has nine.
+  `exampleCourse` is the missing one, and it carries `"Example Course installed
+  to"` and `"EXAMPLE_COURSE_CODE="` — both printed by `setup_course.py`, both
+  shared, and both invisible to `testEveryMarkerIsClassified`, which walks the
+  readout rather than the code it is a readout of.
+
+  ```swift
+  ("exampleCourse", TaskMilestones.exampleCourse),
+  ```
+
+  Add it to the `lists` array and run `Plantoir --write-contracts contracts`.
+  **Windows is already ready for that**: the two markers were added to
+  `markerOrigins.origins` on 2026-09-06 (see the awareness entry below), and
+  `MilestoneContractTests`' parity map already answers `exampleCourse`, so the
+  regeneration lands green rather than failing the Windows suite by name. The
+  shared steps agree in order on both sides — checked by hand before writing
+  this.
+
+  **Worth taking the general lesson, not just the line.** A readout cannot fail
+  when the code it reads changes — `contracts/README.md` says exactly that
+  about the generated halves — and this is that rule biting the readout's own
+  COMPLETENESS rather than its contents. A test that walks
+  `TaskMilestones.allLists` and asserts every list appears in the readout would
+  have caught it, and is worth more than the one-line fix.
+
 - **`--image` is the mac's flag alone, and the contract listed it as shared;
   and a completeness check the mac may want** (Windows + shared, 2026-09-06,
   branch `issue/29-windows-contract-case-lists`). **The mac suite stays green**
@@ -1680,16 +1739,23 @@ rather than being deleted.
   `markerOrigins.origins` did not classify. Both are now in it as
   `shared-python`.
 
-  **They went missing for a structural reason worth knowing.** The mac's
-  `testEveryMarkerIsClassified` walks the markers its OWN milestone lists use
-  and looks each one up, so a shared line the mac has no task for is invisible
-  to it however loudly the shared script prints it — and Windows has an
-  `ExampleCourse` milestone list the mac has no counterpart for. The Windows
-  test is written the other way round as well as the same way: a marker the
-  contract does not name, which something under `scripts/` nevertheless prints,
-  FAILS and says to classify it. That reverse direction is the half that
-  found these two, and it is worth adding on the mac if the mac ever grows a
-  task list of its own that the contract does not describe.
+  **Why they went missing is the part to keep** — and my first write-up of it
+  was wrong, corrected here after review. It is not that the mac has no
+  example-course task: `TaskMilestones.exampleCourse` has existed since
+  2026-08-23 and holds exactly these two markers. It is that
+  `AppRulesContract.milestones()` does not list it, so the generated readout
+  carries eight tasks where the mac has nine. The mac's classification test
+  walks the READOUT, so a marker missing from there is invisible to it however
+  loudly the shared script prints it. **A classification is only as complete as
+  the list it is checked against**, and nothing checked that list against the
+  code it was a readout of. The one-line fix is under "Open" above.
+
+  The Windows test is written the other way round as well as the same way: a
+  marker the contract does not name, which something under `scripts/`
+  nevertheless prints, FAILS and says to classify it. That reverse direction is
+  what found these two, and it is worth adding on the mac — it does not depend
+  on the readout being complete, which is exactly why it saw what the forward
+  check could not.
 
   **`knownDivergence` was one stale pair.** It said `"Setting up this Mac"` →
   `"Setting up this PC"`, and Windows stopped printing that string on

@@ -1278,10 +1278,31 @@ to run in the background.
 
 29. **~20 contract case lists the mac suite runs and the Windows suite does
     not, which is why gaps like item 25 go unannounced (found 2026-09-06).**
+
+    **In progress on branch `issue/29-windows-contract-case-lists`.** The audit
+    that opened this item counted ~20; running it properly found 23, and two of
+    its bullets below were wrong — corrections are marked inline. Landed so
+    far: the progress markers, the file formats, the publish state, the
+    credentials, the launcher's extra flags and the preview's ports. What the
+    wiring has turned up, none of which any inspection had: two shared markers
+    classified by nobody (because the mac's contract readout omits a whole
+    task), a live divergence in how the two apps write a teacher's own
+    frontmatter, a field both apps write that no contract named, and `--image`
+    listed as shared when it is the mac's alone. All four are written up in
+    [`MAC-HANDOFF.md`](MAC-HANDOFF.md).
+
     None is unreachable — `Contracts.cs` is a plain JSON loader — each is
     simply a test never written. **This is the highest-leverage item on the
-    list**: wiring it is mechanical, and it would have caught item 25 and half
-    of item 28 by itself, without anybody thinking to look.
+    list**: wiring it is mechanical, and it would have caught item 25 by itself,
+    without anybody thinking to look.
+
+    ("And half of item 28" was too strong — checked 2026-09-06. None of item
+    28's four gaps is caught outright by any list here: three are wiring a view
+    never does, which the test project cannot reach, and the fourth is an event
+    declared but not emitted, where the contract pins the DECLARATION. The
+    nearest thing is `shared-rules.json` → `scheduledDeployRefusals.alsoSaid`,
+    which says the plan must name the section's unpublished class pages — item
+    28's first gap — and which the list below missed entirely.)
 
     Worth doing first, roughly in this order:
 
@@ -1304,8 +1325,14 @@ to run in the background.
       `example-content.json` → `rules` (5).
     - **Neither side** tests `cloudSyncedFolders.detection.windowsMarkers` (4),
       which item 18 depends on.
-    - `stopPreview.cases` (23) ARE covered, but by `test_stop_preview.ps1`,
-      outside `dotnet test` — so they do not run in the gate.
+    - ~~`stopPreview.cases` (23) ARE covered, but by `test_stop_preview.ps1`,
+      outside `dotnet test` — so they do not run in the gate.~~ **WRONG,
+      corrected 2026-09-06.** `ReclaimedProcessesTests.TheLauncherMatcherAnswersTheContract`
+      runs that script under `powershell.exe` from INSIDE `dotnet test` and
+      asserts its exit code and failure count, so the cases are gated. Do not
+      port them to C#: the `.ps1` lifts the matcher out of `preview.ps1` with
+      the PowerShell parser and runs the REAL launcher code, which a C# port
+      cannot — it would be a third implementation of one rule.
 
 30. **Smaller still, and listed only so they are not rediscovered as
     surprises**: the Archived/Backup detail pane offers Restore but not Delete
@@ -2043,11 +2070,14 @@ the comment rather than a recorded Edge test. Low-risk to leave as-is; still
 worth doing the hand test and recording the result either way.
 
 **2. Which progress markers you must match, and which are yours to write.**
-`app-rules.json` → `markerOrigins` classifies all twenty-five. Seventeen come
+`app-rules.json` → `markerOrigins` classifies twenty-eight. Nineteen come
 from `scripts/*.py`, which both platforms run, and must match to the
 character. Seven come from the launchers, which exist separately as `.sh` and
-`.ps1` — those you write, and they already differ. One is "elsewhere"
-(`Quartz v4`, from the build) and wants a human to look.
+`.ps1` — those you write, and they already differ; since the native runtime
+landed they do not even pair up, so `knownDivergence.macOnlyLauncherMarkers`
+lists the mac phrasings a milestone here must never watch for. Two are
+"elsewhere" (`Quartz v4` and `Done processing`, both Quartz's own output) and
+want a human to look.
 
 **This example is now WRONG and is kept only as a warning: an earlier version
 of this section said "the mac watches for 'Setting up this Mac' where
