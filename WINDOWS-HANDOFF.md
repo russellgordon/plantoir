@@ -1442,8 +1442,17 @@ to run in the background.
     `NoCurriculumFolderYet` and `NoneChosen` to the swept text, and give the
     fixture no curriculum folder.
 
-33. **A folder named `index.md` is now REFUSED with a sentence of its own, and
-    the trail records the refusal.** You already found this bug on the mac and
+33. ~~**A folder named `index.md` is now REFUSED with a sentence of its own, and
+    the trail records the refusal.**~~ ✅ Done 2026-09-07 (branch
+    `issue/33-repair-refused-folder-in-the-way`, `GUI-IMPROVEMENTS.md` row 428).
+    `Result.Refused` is the fourth answer, `FolderWhereTheFrontPageBelongs`
+    is the sentence (pinned to the contract by
+    `TheRefusalSentenceIsTheContractsWordForWord`), and `RestoreIndex` writes
+    `folder problem not repaired` from the directory branch only. The two
+    contract sentences that still say Windows owes this are the mac's to
+    regenerate — `MAC-HANDOFF.md`, top of "Open". The original item follows.
+
+    You already found this bug on the mac and
     were right about it (`MAC-HANDOFF.md`, 2026-09-06): `restoreIndex` asked
     `fileExists(atPath:)` with no `isDirectory:` out-parameter, so a directory
     called `index.md` came back `.alreadyFine` and the teacher was told the
@@ -1472,8 +1481,13 @@ to run in the background.
     The section below explains both, including what was REJECTED — moving the
     folder aside and writing a proper front page in its place — and why.
 
-34. **The mac's repair now answers one result per FINDING, and the rule is
-    contract data you can run.** This is your OTHER finding of 2026-09-06, and
+34. ~~**The mac's repair now answers one result per FINDING, and the rule is
+    contract data you can run.**~~ ✅ Done 2026-09-07 (same branch as 33).
+    `ARepairReportsOneResultPerFindingNeverOnePerCheckName` deserialises the
+    two `reportedOncePerFinding` cases in place of the hand-written test, and
+    the stale `<remarks>` on `Repair` is reworded. The original item follows.
+
+    This is your OTHER finding of 2026-09-06, and
     you were right about it too: `repair(_:in:)` came back as a dictionary keyed
     by the check's NAME, so two sections each missing a front page — two
     findings, one name — collapsed to whichever ran last. Both were repaired;
