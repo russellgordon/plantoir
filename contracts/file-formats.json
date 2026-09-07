@@ -284,6 +284,11 @@
   "sectionTimetable": {
     "fields": [
       {
+        "field": "section",
+        "type": "number",
+        "why": "Which section these dates belong to. Both apps have always WRITTEN it and this list did not name it until 2026-09-06, when wiring the list into the Windows suite turned it up — a field carried by two apps and described by nobody is one a third reader would drop. It is redundant with the file's own name, which is why nothing broke: the mac reads it with the filename's section as the fallback, and Windows does not read it at all. Keep writing it — a timetable copied out of its folder, or attached to a problem report, still says what it is for."
+      },
+      {
         "field": "dates",
         "type": "array of YYYY-MM-DD strings",
         "why": "Plain dates, not a recurrence rule. A school timetable has holidays, PA days and the week the schedule turned inside out for exams — no rule survives contact with it."

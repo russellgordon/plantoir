@@ -58,18 +58,46 @@ executed against the real function.
 from. It decides whether your app must match the string exactly:
 
 - **`shared-python`** — printed by `scripts/*.py`, identical output on both
-  platforms. Match it to the character. Seventeen of the twenty-five are these.
+  platforms. Match it to the character. Nineteen of the twenty-eight are these.
 - **`launcher`** — printed by `setup.sh` / `preview.sh` / `deploy.sh`, which
-  have separately written `.ps1` counterparts. These **deliberately differ**:
-  the mac watches for "Setting up this Mac" and Windows for "Setting up this
-  PC". Seven of the twenty-five.
+  have separately written `.ps1` counterparts. These **deliberately differ**,
+  and since 2026-08-19 they no longer even pair up: Windows dropped Docker for
+  a native runtime, so the mac's "Setting up this Mac" has no Windows
+  counterpart at all rather than being answered by "Setting up this PC", and
+  neither container marker has one either. `knownDivergence` carries the five
+  strings a Windows milestone must therefore never watch for; Windows' OWN
+  launcher text is not here, because it is the platform's rather than the
+  product's. Seven of the twenty-eight.
 - **`elsewhere`** — printed by the Docker build or a tool; check by hand.
 
-A mac test verifies the classification against the actual files, so a marker
-that moves from a launcher into shared Python (or the reverse) fails here
-rather than silently changing what Windows should be matching. Getting this
-wrong crashes nothing: the progress bar simply stops moving, which reads as a
+**Both suites verify the classification against the actual files**, so a marker
+that moves from a launcher into shared Python (or the reverse) fails rather
+than silently changing what the other app should be matching. The mac walks the
+markers its own lists use and looks each one up; Windows
+(`MilestoneContractTests`) does the same and then the reverse — a marker the
+contract does NOT name, which something under `scripts/` nevertheless prints,
+fails and says to classify it. That reverse direction is what found the two
+example-course markers — which the mac DOES have a task for, but which
+`AppRulesContract.milestones()` leaves out of the readout its own check walks.
+Getting this wrong crashes nothing: the progress bar simply stops moving, which reads as a
 slow build.
+
+One of the twenty-eight is in no milestone list on either side. "Launching
+Quartz preview" is printed by `build_site.py` BEFORE `quartz build --serve`
+has started, so a bar that waited on it completed every remaining step at once
+and sat there for the whole real build (Windows found this;
+`TaskMilestones.Preview` uses Quartz's own "Done processing" instead). It stays
+classified because the line is still printed and a future list may want it.
+
+Two more — `"Example Course installed to"` and `"EXAMPLE_COURSE_CODE="` — went
+unclassified until 2026-09-06, and how is worth knowing, because the mechanism
+can hide any marker. Both apps have an example-course task and always did
+(`TaskMilestones.exampleCourse`), but `AppRulesContract.milestones()` does not
+list it, so the generated `milestones` readout has eight tasks where the mac
+has nine. The mac's classification test walks the READOUT, so a marker missing
+from it is invisible to the test however loudly the shared script prints it —
+and the classification is only as complete as the readout it is checked
+against.
 
 ## Proposing a case from the Windows side
 
@@ -191,6 +219,63 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
 | Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
 | What a teacher is told when a folder a feature needs has gone | `shared-rules.json` → `siteHealth` | SiteHealthContract (5), SiteHealthFinding (11), and `scripts/test_site_health.py` |
+
+### Which of these the WINDOWS suite runs
+
+The table above says what the MAC draws on, and for a long time nothing said
+the same about Windows. That turned out to matter: an audit on 2026-09-06
+(WINDOWS-HANDOFF item 29) found **23 case lists the mac ran and the Windows
+gate did not read at all** — none of them unreachable, each simply a test
+nobody had written. Wiring them found a divergence in how the two apps write
+teachers' frontmatter, four tool arguments that differ by design and were
+recorded only in a Swift comment, two shared markers classified by nobody, and
+a launcher flag listed as shared that only one platform has.
+
+So the state is worth writing down rather than re-derived. Windows now runs
+every list that audit counted, plus two it missed (`linkRules.browserSafe` and
+`example-content.sentinels`), through these classes in
+`windows-app/Plantoir.Tests/`:
+
+| What it runs | Class |
+|---|---|
+| `markerOrigins` both directions, and the shared steps of each `milestones` list | `MilestoneContractTests` |
+| `wizardAnswerKeys`, `firstDeployMarkers`, `sectionTimetable`, `pageVisibility.writingRules` | `FileFormatContractTests` |
+| `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts`, `linkRules.browserSafe` | `PublishAndLauncherContractTests` |
+| `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
+| `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
+
+**Three habits came out of that work and are worth copying on either side.**
+
+- **Ask the list both ways.** A test that walks the contract and looks each
+  case up in the code cannot notice a case the CODE has and the contract does
+  not. Three of the gaps above were found ONLY that way — a credential request
+  the contract does not describe, twelve MCP tools, and sixteen tool arguments
+  — and no forward walk could have seen any of them. (The others came the
+  ordinary way: the frontmatter divergence and `--image` both failed a walk of
+  the contract. Both directions earn their keep; only one of them was being
+  done.)
+- **Check completeness, not just correctness.** A hand-written mirror answers
+  the cases that existed the day somebody read the contract. Where a rule's
+  cases are prose keyed to behaviour, map each case to a named test and assert
+  no case is left unmapped, so a case the other platform ADDS fails by name.
+  (Map to names rather than draining a shared set: xUnit builds a fresh
+  instance per `[Fact]` and fixes no order, so a set filled by ten tests and
+  emptied by an eleventh passes on whatever happened to run.)
+- **Say what cannot be executed, in the test.** Some rules are about how work
+  is done rather than what the code does — the routing suite's polarity veto,
+  the payload rules that belong to `setup_course.py`'s own tests. Naming them
+  in the completeness check keeps them owned; dropping them silently is how a
+  rule stops being anybody's.
+
+**What is deliberately NOT executed, on either side.** These are English, not
+cases, and a "test" of them could only assert that a string exists:
+
+| Rule | Why no test |
+|---|---|
+| `cloudSyncedFolders.detection.macMarkers` / `.windowsMarkers` | Four paragraphs describing what each platform exposes. The BEHAVIOUR they produce is covered by hand on both sides; the paragraphs are the reasoning behind it. |
+| `stopPreview.notShared` | Names the three things about stopping a preview that are the platform's, and says why. The cases themselves ARE run — on Windows by `test_stop_preview.ps1`, which `TheLauncherMatcherAnswersTheContract` (in `ReclaimedProcessesTests.cs`) runs inside `dotnet test`, so it is a gate rather than a script somebody remembers. |
+| `modelTiers.requirements` — the polarity veto | A rule about how a MODEL is chosen, governing the by-hand routing suite in `research/ai-assist/`. |
+| `example-content.rules` — the three about the installer | They constrain how `setup_course.py` is written, and **nothing automated holds them on either platform** — said plainly because the first draft of this row named an owner that does not exist. `setup_course.py` has no test file; `lint_payload.py` and `lint_skeletons.py` are run BY HAND through the `example-content` skill, and `verify.sh` runs neither. The fourth rule, "anything in the payload trees must be named in the manifest", IS executed — `SharedRuleContractTests` walks every payload against the allow-lists the installer really reads. |
 
 **Not shared, and why.** Each of these is a deliberate decision, not an
 oversight:
