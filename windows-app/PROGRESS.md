@@ -88,6 +88,39 @@ take, because the old ones were the wrong shape rather than absent:
   `BuildOutputLocation.BuildsRootFor` is a rare flake that looks exactly like a
   production bug about where built sites go.
 
+## Driving the real interface — what the table points at (2026-09-06)
+
+The Layout table above says "see 'Driving the real interface' below" and, until
+now, there was no such section: the prose lives in
+[`documentation/12-windows-app.md`](../documentation/12-windows-app.md). Rather
+than move it, here is what a session needs to know before running the suite,
+and the one thing measurement added.
+
+Run it **from the repository root**, not from `windows-app/`:
+
+```powershell
+.\run-ui-tests.ps1                 # all of it, about 3 minutes
+.\run-ui-tests.ps1 -Filter "FullyQualifiedName~TheSheetCloses"
+```
+
+It closes a running Plantoir before it starts, says so, and does not reopen it.
+`--state-dir` moves the whole state folder for the run, so nothing of the
+teacher's is touched.
+
+**One test is intermittent, and it is worth knowing which.**
+`SpecialFoldersHelpUiTests.TheSheetShowsAMarksFolderTickedButNotYetSaved`
+failed once in a full run on 2026-09-06 and then passed twice — once alone (30
+s) and once in a full run (6/6, 3 m 16 s). It is the test that ticks a marks
+folder and waits for the sheet to be rebuilt through the dispatcher, and it
+already retries for 20 seconds at half-second intervals. Nothing in that run
+had touched the app or the UI project.
+
+**So: if it fails, re-run it alone before believing it.** Recorded because an
+intermittent nobody writes down is rediscovered as a regression by the next
+session, which then goes looking for a cause that is not there. If it starts
+failing in isolation, that is different and is a real finding — the retry is
+generous enough that a genuine break would not hide behind it.
+
 ## A model layer exists ahead of its UI — four types nothing calls yet (2026-09-06)
 
 `SpecialFolderRenamer`, `FolderPathRewriter`, `CloudSyncedFolder` and
