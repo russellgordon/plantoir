@@ -96,12 +96,12 @@ product, not of one platform.
 ~~**One is outstanding, proposed 2026-09-06: a folder rename breaks Markdown
 links when the new name contains a space — on BOTH platforms.**~~
 **✅ Done 2026-09-06 (mac).** Implemented here, with the five proposed cases
-plus three more, in `contracts/shared-rules.json` →
+plus six more, in `contracts/shared-rules.json` →
 `specialNames.renameFolder.linkRewriting`. The ledger entry below — **"A folder
 rename to a name with a space broke every Markdown link into it"** — carries
 the reasoning, INCLUDING the part Windows now owes: the escaping SET was
 measured against Quartz and `Uri.EscapeDataString` turned out to be wrong, so
-one of the nine cases fails on Windows today. That is the mechanism working
+three of the eleven cases fail on Windows today — one change fixes all three. That is the mechanism working
 rather than damage; what to do about it is in `WINDOWS-HANDOFF.md`.
 
 What is still waiting in this section is the `specialFoldersHelp` pair, below.
@@ -2624,7 +2624,7 @@ where.
   `decodeURI("C%2B%2B/Quiz.md")` unchanged.
 
   So the set left unescaped is what JavaScript's `encodeURI` leaves alone,
-  minus `(`, `)`, `#` and `?` — which a Markdown destination or a slug cannot
+  minus `(`, `)` and `#` — which a Markdown destination or a slug cannot
   hold — and minus `/` and `:`, which the rename sheet refuses anyway. It is
   written down in the contract as `escapingSet.leaveUnescaped` rather than
   described, so both sides can check a character against it. Nothing is
@@ -2632,9 +2632,16 @@ where.
   `Caf%C3%A9%20Notes` — and there is a case pinning that, because reading the
   set as “always encode” is the way the two apps would drift.
 
-  **Exactly one of the nine cases fails on Windows today** — “an ampersand is
-  left as it stands”. Read it as a request, not as damage; `WINDOWS-HANDOFF.md`
-  carries what to change.
+  **Three of the eleven cases fail on Windows today** — the ampersand, the
+  comma and the question mark — and ONE change fixes all three, because
+  `EscapeDataString` over-encodes `&`, `,`, `+`, `'`, `!` and `*` alike. The
+  comma is the one to notice: “Unit 1, Day 2” is this project's own naming
+  pattern, and Windows writes `Unit%201%2C%20Day%202`, which slugs to
+  `Unit-1-percent2C-Day-2` and 404s. Read them as a request, not as damage;
+  `WINDOWS-HANDOFF.md` carries what to change — and note that Windows owes a
+  SECOND thing besides the encoder: `Plantoir.Tests/FolderPathRewriterTests.cs`
+  retypes five cases of its own instead of deserialising these, so nothing over
+  there would go red on its own.
 
   **Two things this entry said first and got wrong, kept because the reason
   travels.** A lone `%` was added to what forces escaping at all, on the
@@ -2648,9 +2655,14 @@ where.
   so Windows passed it all along. And this entry claimed a folder named with
   `?` was broken in Quartz whichever spelling was used. It is not: `sluggify`
   strips the `?`, so an unescaped `Why?/Quiz.md` resolves and the escaped
-  `Why%3F` does not. `?` is escaped anyway — a bare `?` is a query delimiter
-  to every other reader of the file — but as a measured, deliberate loss
-  rather than a wash.
+  `Why%3F` does not. `?` was first left OUT of the allowed set on the
+  reasoning that a bare `?` is a query delimiter to any other reader — which
+  was never a rule this code applied (`?` is not a trigger, so `Why?` always
+  went in unescaped) and was measurably wrong when escaping DID run: the real
+  folder `Why Not?` slugs to `Why-Not`, and the escaped `Why%20Not%3F` slugs
+  to `Why-Not-percent3F`. `?` is in the allowed set now, so the two spellings
+  agree. Caught by a third review, which is also where the “both apps escape
+  `?` anyway” sentence — describing behaviour neither app had — was found.
 
   **What was REJECTED.** Matching `Uri.EscapeDataString` exactly, which was
   the first plan here, chosen precisely so the two platforms could not drift.

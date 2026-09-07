@@ -117,22 +117,25 @@ enum FolderPathRewriter {
     /// Measured against the running image on 2026-09-06.
     ///
     /// The set below is therefore what JavaScript's `encodeURI` leaves alone,
-    /// minus four: `(` and `)` close a destination, `#` starts a heading, and
-    /// `?` opens a query. `/` and `:` are left out too — the rename sheet
-    /// refuses both, so they cannot arrive, and encoding is the safer of the
-    /// two ways to be wrong if that ever changes. Everything else — the space,
-    /// `%`, the quotes and brackets, and every non-ASCII letter — is encoded
-    /// once escaping runs at all, and `decodeURI` gives all of it back.
+    /// minus three: `(` and `)` close a destination, and `#` starts a heading.
+    /// `/` and `:` are left out too — the rename sheet refuses both, so they
+    /// cannot arrive, and encoding is the safer of the two ways to be wrong if
+    /// that ever changes. Everything else — the space, `%`, the quotes and
+    /// brackets, and every non-ASCII letter — is encoded once escaping runs at
+    /// all, and `decodeURI` gives all of it back.
     ///
-    /// **`?` is the one deliberate loss here, and it was measured rather than
-    /// assumed.** `sluggify` strips a `?` from the real folder's name, so
-    /// `Why?` becomes `Why` — and an UNESCAPED `Why?/Quiz.md` slugs to the
-    /// same thing and resolves, while `Why%3F` survives `decodeURI` (a `?` is
-    /// in its reserved set) and slugs to `Why-percent3F`, which does not. So
-    /// escaping `?` is worse in Quartz, and it is escaped anyway: a bare `?`
-    /// in a destination is a query delimiter to every other reader of the
-    /// file, and a folder whose name contains one is close enough to
-    /// impossible that the ambiguity costs more than the slug does.
+    /// **`?` is in the set, and was very nearly not.** It was excluded at
+    /// first, on the reasoning that a bare `?` in a destination is a query
+    /// delimiter to any other reader of the file. That was never a rule this
+    /// code actually applied — `?` does not appear in
+    /// `wouldBreakAMarkdownTarget`, so `Why?` has always gone in unescaped —
+    /// and it was measurably wrong for the case where escaping DID run:
+    /// `sluggify` strips a `?`, so the real folder `Why Not?` slugs to
+    /// `Why-Not`, an unescaped `Why%20Not?` slugs to the same thing and
+    /// resolves, and the escaped `Why%20Not%3F` slugs to
+    /// `Why-Not-percent3F` and 404s. Excluding it meant the folder resolved
+    /// when its name was `Why?` and not when it was `Why Not?`, which is not a
+    /// rule anybody would choose.
     ///
     /// **Nothing here is encoded unless `wouldBreakAMarkdownTarget` fires, or
     /// the old segment arrived encoded.** `Café` goes into a link as `Café`;
@@ -141,7 +144,7 @@ enum FolderPathRewriter {
     /// rule is written this way so that a name needing nothing is left as the
     /// teacher typed it.
     nonisolated private static let charactersThatSurviveQuartzUndecoded: CharacterSet = CharacterSet(
-        charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'"
+        charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'?"
     )
 
     // MARK: - Functions
