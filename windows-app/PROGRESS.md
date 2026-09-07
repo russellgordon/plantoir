@@ -50,7 +50,76 @@ Two things that are NOT in that list and should be known:
   parity-tail was merged into it and the overnight capture was added. `dev` stood
   at 668 passed with 5 failing contract tests before this series; those five
   were each a real gap between what the contract says Windows does and what it
-  did.
+  did. **1,029 passed with 2 skipped** after item 29 wired the contract case
+  lists this suite was not reading (2026-09-06). The two skips are named
+  divergences rather than unfinished work: `use_skeleton` (item 25) and the
+  frontmatter-key question the mac has to settle, each carrying the test that
+  closes it.
+
+## Every contract case list is now RUN here (2026-09-06)
+
+WINDOWS-HANDOFF item 29. Twenty-three lists the mac suite ran and this one did
+not read — none unreachable, each simply a test nobody had written.
+`contracts/README.md` now names which class runs which, so the audit does not
+have to be repeated.
+
+**What matters for anyone adding to this suite** is the shape those tests
+take, because the old ones were the wrong shape rather than absent:
+
+- **Ask each list both ways.** Walking the contract and looking each case up in
+  the code cannot notice a case the CODE has and the contract does not. Every
+  gap item 29 found came from the reverse direction — an extra credential
+  request, twelve extra MCP tools, sixteen extra tool arguments.
+- **Assert completeness.** A hand-written mirror answers the cases that existed
+  when somebody read the contract, and stays green when the mac adds one. Where
+  cases are prose keyed to behaviour, map each to a named test by `nameof` and
+  assert nothing is unmapped. Map to NAMES rather than draining a shared set:
+  xUnit builds a fresh instance per `[Fact]` and fixes no order, so a set filled
+  by ten tests and emptied by an eleventh passes on whatever happened to run,
+  and reports nothing under `--filter`.
+- **Read the source only against the thing that decides.** Several rules live in
+  `Plantoir/` — the wizard, the composer, the report dialog — which this project
+  does not reference. Reading their source is legitimate (`ParsingTests` does it
+  for the `.ps1` launchers) but must be anchored: bare containment passed with a
+  guard moved into a comment, and with it deleted from one of two arrow keys.
+- **A new collection, `ProcessEnvironment`**, beside `SharedActivityState`, for
+  tests that read or write process-wide environment variables. Same reason:
+  `PLANTOIR_BUILD_ROOT` is global, and a class setting it while another calls
+  `BuildOutputLocation.BuildsRootFor` is a rare flake that looks exactly like a
+  production bug about where built sites go.
+
+## Driving the real interface — what the table points at (2026-09-06)
+
+The Layout table above says "see 'Driving the real interface' below" and, until
+now, there was no such section: the prose lives in
+[`documentation/12-windows-app.md`](../documentation/12-windows-app.md). Rather
+than move it, here is what a session needs to know before running the suite,
+and the one thing measurement added.
+
+Run it **from the repository root**, not from `windows-app/`:
+
+```powershell
+.\run-ui-tests.ps1                 # all of it, about 3 minutes
+.\run-ui-tests.ps1 -Filter "FullyQualifiedName~TheSheetCloses"
+```
+
+It closes a running Plantoir before it starts, says so, and does not reopen it.
+`--state-dir` moves the whole state folder for the run, so nothing of the
+teacher's is touched.
+
+**One test is intermittent, and it is worth knowing which.**
+`SpecialFoldersHelpUiTests.TheSheetShowsAMarksFolderTickedButNotYetSaved`
+failed once in a full run on 2026-09-06 and then passed twice — once alone (30
+s) and once in a full run (6/6, 3 m 16 s). It is the test that ticks a marks
+folder and waits for the sheet to be rebuilt through the dispatcher, and it
+already retries for 20 seconds at half-second intervals. Nothing in that run
+had touched the app or the UI project.
+
+**So: if it fails, re-run it alone before believing it.** Recorded because an
+intermittent nobody writes down is rediscovered as a regression by the next
+session, which then goes looking for a cause that is not there. If it starts
+failing in isolation, that is different and is a real finding — the retry is
+generous enough that a genuine break would not hide behind it.
 
 ## A model layer exists ahead of its UI — four types nothing calls yet (2026-09-06)
 

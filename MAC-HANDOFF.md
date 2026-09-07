@@ -147,6 +147,147 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ## Open — what the mac still owes
 
+- **`AppRulesContract.milestones()` leaves the example-course task out of the
+  readout, so two shared markers were classified by nobody** (found 2026-09-06,
+  branch `issue/29-windows-contract-case-lists`). **A one-line fix, and the
+  smallest item here.**
+
+  `mac-app/QuartzTeachers/Models/Assist/AppRulesContract.swift` writes eight
+  milestone lists into `app-rules.json`; `TaskMilestones.swift` has nine.
+  `exampleCourse` is the missing one, and it carries `"Example Course installed
+  to"` and `"EXAMPLE_COURSE_CODE="` — both printed by `setup_course.py`, both
+  shared, and both invisible to `testEveryMarkerIsClassified`, which walks the
+  readout rather than the code it is a readout of.
+
+  ```swift
+  ("exampleCourse", TaskMilestones.exampleCourse),
+  ```
+
+  Add it to the `lists` array and run `Plantoir --write-contracts contracts`.
+  **Windows is already ready for that**: the two markers were added to
+  `markerOrigins.origins` on 2026-09-06 (see the awareness entry below), and
+  `MilestoneContractTests`' parity map already answers `exampleCourse`, so the
+  regeneration lands green rather than failing the Windows suite by name. The
+  shared steps agree in order on both sides — checked by hand before writing
+  this.
+
+  **Worth taking the general lesson, not just the line.** A readout cannot fail
+  when the code it reads changes — `contracts/README.md` says exactly that
+  about the generated halves — and this is that rule biting the readout's own
+  COMPLETENESS rather than its contents. A test that walks
+  `TaskMilestones.allLists` and asserts every list appears in the readout would
+  have caught it, and is worth more than the one-line fix.
+
+- **The generator should emit the tool-schema DEPARTURES beside the schemas,
+  because the only record of them is a Swift comment** (found 2026-09-06 by
+  wiring `toolSchemas` into the Windows gate, branch
+  `issue/29-windows-contract-case-lists`). **Small, and it removes a copy
+  rather than adding one.** Reference:
+  `AssistSurfaceContractTests.AssertOnlyTheDeparturesWeHaveAgreed`.
+
+  `AssistToolSurface.swift` names "two deliberate departures from the Windows
+  schema": lists of page names reach the mac as ONE semicolon-separated string,
+  because that client's schema has no arrays and a comma-separated list would
+  cut "Unit 2, Day 3" in half; and the mac has no `preview` flag, because every
+  change rebuilds there. Both are good decisions with their reasons written
+  down — and written down **only in that doc comment**.
+
+  So when the Windows suite started running `toolSchemas`, four parameters came
+  up as type mismatches (`publish_pages.pages` and its three relatives: array
+  here, string there) with nothing in the contract to say they were meant. The
+  Windows test now carries the list, which makes it the SECOND home for a fact
+  the contract cannot hold — `toolSchemas` is a generated key, so the departure
+  cannot be written beside the schemas it applies to by hand.
+
+  **What is asked:** have `Plantoir --write-contracts` emit the departures into
+  the generated `toolSchemas` block — tool, parameter, each side's type, and
+  the reason — from the same place the doc comment states them. The Windows
+  test then reads them and deletes its copy. Until then the copy is asserted as
+  an exact set, so a NEW departure fails on this side and a resolved one fails
+  too, which is the best a second home can do.
+
+  **Not proposed: making the two agree.** The mac's shape is forced by its
+  client and the semicolon choice is reasoned; changing either app's schema is
+  a routing change needing the suite re-run, and that is not what this branch
+  is for.
+
+- **The two apps write a teacher's visibility flag DIFFERENTLY, and the
+  contract only describes one of them** (found 2026-09-06 by wiring
+  `pageVisibility.writingRules` into the Windows gate, branch
+  `issue/29-windows-contract-case-lists`). **What is owed is a decision, and it
+  is not this branch's to take** — both behaviours are deliberate and were
+  written down as such, in different places, by different sessions.
+
+  `contracts/file-formats.json` → `pageVisibility.writingRules[0]` says: *"A
+  page written in the old spelling KEEPS it, inverted — publishing a `draft:`
+  page writes `draft: false`, not `publish: true`,"* because *"rewriting the
+  key would change a page they did not ask to have changed, and a course half
+  in each spelling is harder to reason about than one consistently old."*
+
+  **The mac does exactly that.** `AssistPageVisibility.setting(published:…)`
+  asks `keyInUse` which spelling the page has, and writes that one, inverting
+  the value when it is the old key.
+
+  **Windows does the opposite, on purpose.** `PageFrontmatter.SetDraft` writes
+  `publishForSection<N>` into the position where `draftSection<N>` sat and
+  removes the old key. `GUI-IMPROVEMENTS.md` row 140 describes that as the
+  intent — *"writes the new key in the old key's position so a migrated page
+  shows a one-line diff rather than reordered frontmatter"* — with *"no flag
+  day: legacy courses build exactly as before, and a page migrates the first
+  time something edits it,"* which works because `build_site.py` and
+  `patches/publish.ts` read both spellings.
+
+  **Why it matters rather than being a tidy-up.** These are a teacher's own
+  files, and a course does not stay on one machine: a page edited on Windows
+  comes back to the mac migrated, and the mac then keeps the NEW key, so the
+  file quietly converts the first time a Windows machine touches it. Nothing is
+  broken by that — both spellings build identically (`build_site.py` and
+  `patches/publish.ts` read both, and neither `SectionAdder` widens or narrows
+  it) — but the contract asserts a property of the teacher's file that is not
+  true of the product as shipped, and one of the two has to give.
+
+  **`documentation/` has already taken a side, and it is not the contract's.**
+  Found by grepping for the behaviour rather than trusting memory of where it
+  is described, which is what rule 11 asks for and what my first pass here did
+  not do:
+
+  - `documentation/04-course-setup.md` — *"Plantoir rewrites a page's key only
+    when something edits that page."*
+  - `documentation/08-course-config-reference.md` — *"rewritten to `publish` the
+    first time anything edits the page."*
+
+  So the split is not contract-versus-row-140. It is **the contract and the mac
+  code** on one side, and **row 140, both documentation files and the Windows
+  code** on the other — and the documentation is false for the mac TODAY,
+  whichever way this goes. If the contract wins, those two files change too.
+
+  **Two smaller differences the decision should cover**, both found while
+  writing the test:
+  - Where a page carries BOTH spellings, Windows deletes the leftover legacy
+    key; the mac leaves it.
+  - Windows rewrites a legacy page whose value is already correct, purely to
+    migrate the key — so `writingRules`' fourth rule, *"writing the value it
+    already has changes nothing"*, holds here only for the new spelling. That
+    rule exists because a no-op write still moves the modification time and the
+    next build then believes the content changed. The publish path filters
+    already-correct pages out before it gets there, but the unpublish path does
+    not.
+
+  **What the mac owes:** pick one, and say which.
+  - *If the contract wins*, Windows changes `SetDraft` to keep the old key
+    inverted, and row 140's migration paragraph gets a correction. The test is
+    written and waiting:
+    `FileFormatContractTests.TheOldSpellingIsKeptRatherThanMigrated`, currently
+    `[Fact(Skip = …)]`. Un-skipping it is the whole change on this side.
+  - *If migration wins*, `writingRules[0]` is rewritten to say so and the mac
+    adopts it, which is the larger change of the two — it is the mac's
+    behaviour that would move.
+
+  **Not decided here**, deliberately: the branch this was found on wires
+  contract lists into the Windows suite and changes no product behaviour, and
+  guessing at a rule about teachers' files in a test-wiring commit is how a
+  divergence becomes two divergences.
+
 - **Windows' MCP server has drifted a dozen tools ahead of the mac's, and
   nothing was going to tell either side** (found 2026-09-06 by an audit asking
   whether the parity list was COMPLETE, not whether it was correct).
@@ -1486,6 +1627,178 @@ rather than being deleted.
   green suite as proof.
 
 ## For awareness — no mac code needed
+
+- **`workingFolderPathBar.ancestorPaths` now carries `windowsCases`, and two
+  rules were being pinned by nobody on either side** (Windows + shared,
+  2026-09-06, branch `issue/29-windows-contract-case-lists`). **The mac suite
+  stays green** — one authored list added, nothing changed. Reference:
+  `SharedRuleContractTests` in `windows-app/Plantoir.Tests/`.
+
+  The path bar's cases were `/Users/teacher/…` with the Windows spelling left
+  as a prose `windowsEquivalent`, so this side hand-typed its own crumbs in
+  `ContractTests`. `windowsCases` says the same thing as DATA — three cases,
+  including one on a second drive, since `D:\` is an ordinary place for a
+  teacher to keep their courses and its root is not `/`. The RULE is shared
+  ("every ancestor, root first, folder last"); only the spelling of a root is
+  the platform's, and that is exactly what a per-platform case list is for.
+
+  **Two lists the contract carried that neither suite ran**, now run here:
+
+  - `buildOutputLocation.windowsLocation.buildsRoot`. Its own note said it was
+    "asserted by nobody on either side", and it stayed that way for the obvious
+    reason — it describes a Windows path, so the mac cannot check it and nobody
+    on this side had. It is now checked against `BuildOutputLocation.BuildsRootFor`,
+    including that the folder identifier is ONE path segment and stable for a
+    given working folder, which is what makes a course's build location
+    resolvable from both sides.
+  - `scheduledDeployRefusals.alsoSaid` — "list the class pages students cannot
+    see yet, by name". `ScheduledDeploy.Describe()` does. **This list is not on
+    item 29's own inventory**: the audit that opened the item missed it, which
+    is worth knowing because it is the second time a list has gone unnoticed
+    for want of being indexed rather than for want of being implementable.
+    (Item 28 records separately that this side's interface does not yet CALL
+    `Describe()`. That gap is real and this test cannot see it: the test
+    project references `Plantoir.Core` and `Plantoir.Mcp`, never the interface
+    project — the honest limit of everything wired in this branch.)
+
+  **Rejected, and worth recording so they are not proposed again:**
+
+  - *A `windowsOrigins`-style mirror for the path bar* — a second list on this
+    side rather than a case list in the contract. Rejected for the reason the
+    marker-origins one was: the RULE is shared and only the spelling of a root
+    is the platform's, so the contract is the right home and a mirror would be
+    a second one.
+  - *Creating a real Windows scheduled task to prove the rename cancels it.*
+    That puts a job on the machine, and `CourseRenamer.Rename` would then
+    delete a real one — so what is asserted is the notice a teacher reads, on a
+    hand-built outcome, and the course code in the test was changed to one no
+    real task could carry. Proving the cancellation itself wants a seam in
+    `TaskScheduling`, which is a product change and not this branch's.
+  - *Walking a payload's trees recursively.* `setup_course.py`'s
+    `top_level_allowed` filters only the TOP level and copies whole folders
+    below it, so a recursive walk would report files the installer does in fact
+    install.
+
+- **`--image` is the mac's flag alone, and the contract listed it as shared;
+  and a completeness check the mac may want** (Windows + shared, 2026-09-06,
+  branch `issue/29-windows-contract-case-lists`). **The mac suite stays green**
+  — the flag entry gains a `macOnly` note, nothing is removed. Reference:
+  `PublishAndLauncherContractTests` in `windows-app/Plantoir.Tests/`.
+
+  `launcherFlags.deployExtras` named `--diagnose` and `--image <tag>` as flags
+  the launchers must both accept. `deploy.sh` parses `--image`; `deploy.ps1`
+  does not, and cannot — Windows has had no image to name since it dropped
+  Docker on 2026-08-19. Recorded as `macOnly` rather than closed by adding a
+  dead flag to `deploy.ps1` so a test would go green, which is the shape of fix
+  `WINDOWS-BOOTSTRAP.md` §0 exists to forbid.
+
+  **The part worth copying is the shape of the tests, not the finding.** Both
+  suites had been walking the contract and asking "does the app do this?" —
+  which cannot notice a case, request or flag the app has and the contract does
+  not. Three checks here run the other way:
+
+  - **By reflection over the real definitions.** Every `CredentialRequest`
+    declared in the code must be described in `credentialPrompts.everyRequest`.
+    A request added and not written down is one the other app cannot show, so
+    the same first publish stops at a prompt on one platform and asks properly
+    on the other. `AssistToolSurface` would take the same treatment, and it is
+    the same hole the MCP-tool drift below went through.
+  - **By a name map, not a drained set.** `whenShown`'s nine cases are answered
+    by nine named tests, checked by reflection: a case the mac ADDS fails here
+    naming itself. A `HashSet` filled by ten tests and emptied by an eleventh
+    would have been the obvious shape and is wrong — xUnit builds a fresh
+    instance per `[Fact]` and fixes no order, so such a set passes or fails on
+    what happened to run, and reports nothing under `--filter`.
+  - **Against the parser, not the help text.** `--diagnose` appears three times
+    in `deploy.ps1`, twice of them in usage prose, so plain containment stays
+    green after the flag stops being accepted — which is exactly when a
+    teacher's publish "just does not start".
+
+  **Two `whenShown` cases had no answer on this side at all** and now do:
+  `course_config.json has changed`, and the accepted false negative where a
+  page restored from a backup keeps its size and modification date. The second
+  is worth having as a test precisely because it asserts the LIMIT — if it ever
+  starts reporting an edit, the fingerprint has begun reading file contents,
+  which is a real cost paid every time a window comes to the front.
+
+- **A field both apps have always written was named in no contract:
+  `sectionTimetable.fields` listed three of four** (Windows + shared,
+  2026-09-06, branch `issue/29-windows-contract-case-lists`). **The mac suite
+  stays green** — the field is now described, not changed. Reference:
+  `FileFormatContractTests.TheRememberedTimetableIsWhereTheContractSaysAndCarriesItsFields`.
+
+  `courses/<CODE>/.internal/timetable/section<N>.json` carries `section`,
+  `dates`, `source` and `recorded`. The contract named the last three. Both
+  apps write all four — the mac's `SectionTimetable` encodes `section` and
+  reads it back with the filename's number as a fallback; Windows' `Stored`
+  record writes it and does not read it — so nothing has ever been wrong, and
+  that is the point: **a field two apps write and no contract describes is one
+  a third reader drops without anybody noticing.** It is now described,
+  including why it is redundant with the file's own name and worth keeping
+  anyway (a timetable copied out of its folder still says what it is for).
+
+  Found by wiring the list into the Windows gate rather than by reading it,
+  which is the argument for item 29 in miniature: the list had been correct
+  enough to pass every inspection and was never executed against a real file.
+
+- **Two shared-Python progress markers were classified nowhere, and
+  `markerOrigins.knownDivergence` had been stale since the native runtime
+  landed** (Windows + shared, 2026-09-06, branch
+  `issue/29-windows-contract-case-lists`). **The mac suite stays green.** It
+  reads `origins`, but only to look up the markers its own lists use, and it
+  never uses these two; `knownDivergence` is read by no Swift at all. So this
+  is a know, not an ask.
+  Reference: `windows-app/Plantoir.Tests/MilestoneContractTests.cs`.
+
+  Wiring `markerOrigins` into the Windows gate (WINDOWS-HANDOFF item 29) turned
+  up two markers that `scripts/setup_course.py` prints — `"Example Course
+  installed to"` and `"EXAMPLE_COURSE_CODE="` — and that
+  `markerOrigins.origins` did not classify. Both are now in it as
+  `shared-python`.
+
+  **Why they went missing is the part to keep** — and my first write-up of it
+  was wrong, corrected here after review. It is not that the mac has no
+  example-course task: `TaskMilestones.exampleCourse` has existed since
+  2026-08-23 and holds exactly these two markers. It is that
+  `AppRulesContract.milestones()` does not list it, so the generated readout
+  carries eight tasks where the mac has nine. The mac's classification test
+  walks the READOUT, so a marker missing from there is invisible to it however
+  loudly the shared script prints it. **A classification is only as complete as
+  the list it is checked against**, and nothing checked that list against the
+  code it was a readout of. The one-line fix is under "Open" above.
+
+  The Windows test is written the other way round as well as the same way: a
+  marker the contract does not name, which something under `scripts/`
+  nevertheless prints, FAILS and says to classify it. That reverse direction is
+  what found these two, and it is worth adding on the mac — it does not depend
+  on the readout being complete, which is exactly why it saw what the forward
+  check could not.
+
+  **`knownDivergence` was one stale pair.** It said `"Setting up this Mac"` →
+  `"Setting up this PC"`, and Windows stopped printing that string on
+  2026-08-19 when it dropped Docker for the native runtime — so the contract's
+  only record of how the two platforms' launcher text differs described a
+  correspondence that no longer exists, and the container markers it did not
+  mention have no Windows counterpart at all. It now carries a `note` and
+  `macOnlyLauncherMarkers`: the five strings a Windows milestone must never
+  watch for.
+
+  **Why a LIST of the mac's wording, rather than Windows' own text in the
+  contract.** Windows' launcher markers are the platform's, not the product's,
+  so by `contracts/README.md`'s own test they do not belong here, and they are
+  pinned against the real `.ps1` files by `TaskMilestoneLauncherMarkerTests`
+  instead. What does belong is the guard: Windows had a hand-typed array of the
+  mac's five phrasings, and a hand-kept copy of the OTHER platform's words is
+  precisely what goes stale the day that platform changes them — which is how
+  four markers came to be matched against launchers that had stopped printing
+  them (WINDOWS-HANDOFF item 5). That array is gone; the test reads the five
+  from here. If the mac ever renames one of its launcher lines, changing it
+  here is what tells Windows.
+
+  **Rejected: a `markerOrigins.windowsOrigins` map.** It would have put six
+  facts in two places — the contract and `ParsingTests.LauncherOnlyMarkers` —
+  validated by nobody on the mac, which is the four-copies problem this folder
+  exists to end. Caught in review before it was written.
 
 - **A UI test suite that drives the real app, and `--state-dir`, the product
   change that made it safe** (Windows, 2026-09-06, branch

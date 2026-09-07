@@ -1224,9 +1224,11 @@ to run in the background.
     list, which is the only thing a Windows session reads first. Two places
     described it and neither was an index.
 
-    The test that would have announced it is `wizardAnswerKeys.keys`, which
-    the mac suite runs and Windows does not — see item 29. Medium: a wizard
-    field, the key, and one contract test.
+    The test that would have announced it now EXISTS and is skipped, naming
+    this item: `FileFormatContractTests.TheWizardWritesUseSkeleton` (item 29,
+    done 2026-09-06). Un-skipping it, and deleting `use_skeleton` from the
+    `knowinglyAbsent` set beside it, is this item's acceptance test — so what
+    is left is the wizard field and the key, not the test. Medium.
 
 26. **The marks checklist offers only TOP-LEVEL folders, so a nested one
     cannot be ticked and loses its marks silently (found 2026-09-06).**
@@ -1279,36 +1281,107 @@ to run in the background.
       `MainWindow` has a frame in `AppSettings`. Row 164's note says "Windows
       has its own placement memory", which is true of the main window only.
 
-29. **~20 contract case lists the mac suite runs and the Windows suite does
-    not, which is why gaps like item 25 go unannounced (found 2026-09-06).**
+29. ~~**~20 contract case lists the mac suite runs and the Windows suite does
+    not, which is why gaps like item 25 go unannounced (found 2026-09-06).**~~
+    — ✅ Done 2026-09-06, branch `issue/29-windows-contract-case-lists`.
+    All 23 lists are wired; `contracts/README.md` has a section naming which
+    class runs which, so the next session does not repeat the audit. Two of the
+    bullets below were WRONG and are struck with their corrections inline.
+
+    **What the wiring found, none of which any inspection had.** This is the
+    argument for the item, so it is recorded rather than left in commit
+    messages:
+
+    - **Two shared-Python markers classified by nobody.** Not for the reason I
+      first wrote — the mac HAS an example-course task; its
+      `AppRulesContract.milestones()` leaves that task out of the generated
+      readout, and the mac's classification test walks the readout. A
+      classification is only as complete as the list it is checked against.
+    - **The two apps write a teacher's own frontmatter differently.** The
+      contract says a page in the old `draft:` spelling keeps it, inverted, and
+      the mac does that; this side migrates the key to `publishForSection<N>`,
+      which `GUI-IMPROVEMENTS.md` row 140 records as intended. Both are
+      defensible, they cannot both be true of a course opened on one machine and
+      then the other, and `documentation/` had already taken the Windows side —
+      so it is wrong for the mac today whichever way it is decided.
+    - **Four tool arguments differ by design and were recorded only in a Swift
+      doc comment**, plus sixteen more this server takes that the contract does
+      not describe — `preview` among them, which is the mac's own second
+      documented departure.
+    - **A field both apps have always written that no contract named**
+      (`sectionTimetable.section`), and **`--image` listed as a shared launcher
+      flag** when `deploy.ps1` cannot accept it.
+
+    All of it is written up in [`MAC-HANDOFF.md`](MAC-HANDOFF.md); the
+    frontmatter divergence is a decision, not a fix, and is at the top of what
+    the mac owes.
+
+    **The habits are the transferable part**, and they are in
+    `contracts/README.md`: ask each list BOTH ways — three of the gaps above
+    could ONLY be found by walking the code and looking it up in the contract
+    (a credential request, twelve MCP tools, sixteen tool arguments), and the
+    rest came from the ordinary forward walk, so both directions earn their
+    keep and only one was being done; assert completeness so a case the other
+    platform adds fails by name; and say in the test which rules cannot be
+    executed, rather than dropping them.
+
     None is unreachable — `Contracts.cs` is a plain JSON loader — each is
     simply a test never written. **This is the highest-leverage item on the
-    list**: wiring it is mechanical, and it would have caught item 25 and half
-    of item 28 by itself, without anybody thinking to look.
+    list**: wiring it is mechanical, and it would have caught item 25 by itself,
+    without anybody thinking to look.
 
-    Worth doing first, roughly in this order:
+    ("And half of item 28" was too strong — checked 2026-09-06. None of item
+    28's four gaps is caught outright by any list here: three are wiring a view
+    never does, which the test project cannot reach, and the fourth is an event
+    declared but not emitted, where the contract pins the DECLARATION. The
+    nearest thing is `shared-rules.json` → `scheduledDeployRefusals.alsoSaid`,
+    which says the plan must name the section's unpublished class pages — item
+    28's first gap — and which the list below missed entirely.)
+
+    The order they were done in, kept because the reasons are still the
+    reasons — and each is marked with what became of it:
 
     - `app-rules.json` → `markerOrigins.origins` (26) and `milestones` (57).
       `contracts/README.md` calls `markerOrigins` "the one easiest to get
       wrong", and getting it wrong stops the progress bar moving, which reads
-      as a slow build rather than a bug.
-    - `file-formats.json` → `wizardAnswerKeys.keys` (3) — item 25.
+      as a slow build rather than a bug. **Done**, and it found the two
+      unclassified markers.
+    - `file-formats.json` → `wizardAnswerKeys.keys` (3) — item 25. **Wired, and
+      it fails as predicted**: the test for `use_skeleton` is `[Fact(Skip = …)]`
+      naming item 25, and un-skipping it is that item's acceptance test. The
+      other two keys pass.
     - `app-rules.json` → `credentialPrompts.everyRequest` (7): whether a typed
       token is echoed on screen. Windows runs `credentialPrompts.cases` only.
+      **Done**, in BOTH directions — the reverse one, by reflection over the
+      real `CredentialRequests`, is the half that would catch a request added
+      here and written down nowhere.
     - `app-rules.json` → `publishedFreshness.whenShown` (9) / `whenRecorded`
-      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/25, the
-      descriptions the model actually sees); `course-management.json` →
-      `courseCode.renameEffects` (6); `shared-rules.json` →
-      `buildOutputLocation.windowsLocation.buildsRoot` (asserted by nobody on
-      either side), `problemReportDialog.askAboutPromptsWhen`,
-      `workingFolderPathBar.ancestorPaths` (Windows hardcodes its own crumbs),
+      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/25 — the NAMES
+      and ARGUMENTS, not the descriptions, which `Briefly()` rewrites here for
+      measured reasons); `course-management.json` → `courseCode.renameEffects`
+      (6); `shared-rules.json` → `buildOutputLocation.windowsLocation.buildsRoot`
+      (was asserted by nobody on either side; now run here),
+      `problemReportDialog.askAboutPromptsWhen`,
+      `workingFolderPathBar.ancestorPaths` (Windows hardcoded its own crumbs;
+      the contract now carries `windowsCases` and the copy is gone),
       `assistantModelChoice.comfortFraction`/`guidance`;
       `file-formats.json` → `firstDeployMarkers.paths` (3);
-      `example-content.json` → `rules` (5).
+      `example-content.json` → `rules` (5). **All done.**
     - **Neither side** tests `cloudSyncedFolders.detection.windowsMarkers` (4),
-      which item 18 depends on.
-    - `stopPreview.cases` (23) ARE covered, but by `test_stop_preview.ps1`,
-      outside `dotnet test` — so they do not run in the gate.
+      which item 18 depends on. **Still true, and deliberately so**: those four
+      are prose paragraphs describing what each platform exposes, not cases. The
+      behaviour they produce IS covered by hand in `CloudSyncedFolderTests`, and
+      `contracts/README.md` now records them among the rules no test executes,
+      with the reason — which is the honest answer rather than a test that
+      asserts a paragraph exists.
+    - ~~`stopPreview.cases` (23) ARE covered, but by `test_stop_preview.ps1`,
+      outside `dotnet test` — so they do not run in the gate.~~ **WRONG,
+      corrected 2026-09-06.** `ReclaimedProcessesTests.TheLauncherMatcherAnswersTheContract`
+      runs that script under `powershell.exe` from INSIDE `dotnet test` and
+      asserts its exit code and failure count, so the cases are gated. Do not
+      port them to C#: the `.ps1` lifts the matcher out of `preview.ps1` with
+      the PowerShell parser and runs the REAL launcher code, which a C# port
+      cannot — it would be a third implementation of one rule.
 
 30. **Smaller still, and listed only so they are not rediscovered as
     surprises**: the Archived/Backup detail pane offers Restore but not Delete
@@ -2099,11 +2172,14 @@ the comment rather than a recorded Edge test. Low-risk to leave as-is; still
 worth doing the hand test and recording the result either way.
 
 **2. Which progress markers you must match, and which are yours to write.**
-`app-rules.json` → `markerOrigins` classifies all twenty-five. Seventeen come
+`app-rules.json` → `markerOrigins` classifies twenty-eight. Nineteen come
 from `scripts/*.py`, which both platforms run, and must match to the
 character. Seven come from the launchers, which exist separately as `.sh` and
-`.ps1` — those you write, and they already differ. One is "elsewhere"
-(`Quartz v4`, from the build) and wants a human to look.
+`.ps1` — those you write, and they already differ; since the native runtime
+landed they do not even pair up, so `knownDivergence.macOnlyLauncherMarkers`
+lists the mac phrasings a milestone here must never watch for. Two are
+"elsewhere" (`Quartz v4` and `Done processing`, both Quartz's own output) and
+want a human to look.
 
 **This example is now WRONG and is kept only as a warning: an earlier version
 of this section said "the mac watches for 'Setting up this Mac' where
@@ -2224,7 +2300,10 @@ for behaviour only your side has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 23-tool MCP one.
+the 13-tool local surface and the 25-tool MCP one. (It said 23; corrected
+2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
+serves 37, and the twelve it has beyond the contract are named in
+`AssistSurfaceContractTests` and in `MAC-HANDOFF.md`.)
 
 The descriptions are the part to take seriously. They are measured artifacts,
 not commentary: the "TEACHERS SAY:" phrasings came out of the routing suite,

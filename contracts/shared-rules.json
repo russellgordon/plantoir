@@ -942,7 +942,35 @@
         }
       ],
       "note": "Every ancestor from the volume root DOWN TO and including the folder itself. The root is included — a teacher scanning for where their folder lives reads the whole line.",
-      "windowsEquivalent": "Start at the drive rather than at '/': C:\\\\ , C:\\\\Users, C:\\\\Users\\\\teacher, … The RULE is 'every ancestor, root first, folder last'; the spelling of a root is the platform's."
+      "windowsCases": [
+        {
+          "expect": [
+            "C:\\",
+            "C:\\Users",
+            "C:\\Users\\teacher",
+            "C:\\Users\\teacher\\Desktop",
+            "C:\\Users\\teacher\\Desktop\\Courses"
+          ],
+          "path": "C:\\Users\\teacher\\Desktop\\Courses"
+        },
+        {
+          "expect": [
+            "C:\\",
+            "C:\\Users",
+            "C:\\Users\\teacher"
+          ],
+          "path": "C:\\Users\\teacher"
+        },
+        {
+          "expect": [
+            "D:\\",
+            "D:\\Teaching"
+          ],
+          "path": "D:\\Teaching",
+          "why": "A second drive is ordinary on a Windows machine and its root is 'D:\\', not '/'. The rule is the same; only the spelling of a root is the platform's."
+        }
+      ],
+      "windowsEquivalent": "Start at the drive rather than at '/': C:\\\\ , C:\\\\Users, C:\\\\Users\\\\teacher, … The RULE is 'every ancestor, root first, folder last'; the spelling of a root is the platform's. Added 2026-09-06: `windowsCases` above says the same thing as DATA, so the Windows suite runs the list rather than keeping its own hand-typed copy of it — proposed from the Windows side, and the mac needs nothing for it."
     },
     "everyCrumbIsLive": {
       "rule": "EVERY ancestor is clickable, not just the last one.",

@@ -136,11 +136,25 @@ watches the output for progress markers and advances the stage bar as each one
 appears.
 
 **Read your own `.ps1` files rather than copying the mac's marker list**, and
-note that `markerOrigins` in the contract is the MAC's set — it still lists
-markers about containers starting, which nothing here prints. The list this app
-actually matches is `TaskMilestones.cs`, and `TaskMilestoneLauncherMarkerTests`
-reads the real `.ps1` files so a launcher rewrite that drops a line fails the
-suite instead of silently stalling a teacher's progress bar.
+note that `markerOrigins` in the contract classifies markers from BOTH sides —
+it still lists ones about containers starting, which nothing here prints. The
+list this app actually matches is `TaskMilestones.cs`, and two test classes
+hold it to the contract:
+
+- `TaskMilestoneLauncherMarkerTests` reads the real `.ps1` files, so a launcher
+  rewrite that drops a line fails the suite instead of silently stalling a
+  teacher's progress bar.
+- `MilestoneContractTests` runs `markerOrigins` itself. Every marker here that
+  the contract calls **shared Python** must still be printed by something under
+  `scripts/`; every marker the contract does NOT name must not be printed there
+  either, which is what caught the two example-course markers nobody had
+  classified; and the shared-Python steps of each mac milestone list must
+  appear in this app's list for the same task, in the same order, so a step the
+  mac gains is not one this side quietly stops showing. The mac's own launcher
+  phrasings — the five in `markerOrigins.knownDivergence.macOnlyLauncherMarkers`
+  — are read from the contract rather than copied here, because a hand-kept
+  list of the other platform's words goes stale the day that platform changes
+  them.
 
 That test exists because this failed silently once: four markers had been
 copied verbatim from the mac's `.sh` scripts, describing events — a one-time
