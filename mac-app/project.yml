@@ -137,6 +137,13 @@ targets:
         SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Plantoir.app/Contents/MacOS/Plantoir"
         BUNDLE_LOADER: "$(TEST_HOST)"
+        # Instantiated when the test bundle loads, before any test class is
+        # enumerated, and all it does is take AppKit's sheet slide animation
+        # out of the test host. Without it the host segfaults inside
+        # NSMoveHelper's nested runloop every few runs and blames an innocent
+        # test — see Tests/QuartzTeachersTests/SheetAnimationSuppressor.swift
+        # for the stack, the measurements, and the levers that do not work.
+        INFOPLIST_KEY_NSPrincipalClass: PlantoirTestBundleSetup
 
   QuartzTeachersUITests:
     type: bundle.ui-testing
