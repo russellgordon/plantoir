@@ -469,10 +469,26 @@ public sealed class CourseConfiguration
     /// they touched, taking the assessed marks off every other one. Called on
     /// the way in to any edit of the pool — a tick, an untick, or a folder
     /// leaving the list.</para>
+    ///
+    /// <param name="choices">
+    /// Every folder that could hold work counting for marks — normally
+    /// <see cref="GradedFolderChoices.For(CourseConfiguration, string)"/>,
+    /// which walks the course folder.
+    ///
+    /// <para><b>Required rather than defaulted, on purpose.</b> This used to
+    /// infer from <c>shared_folders</c> + <c>per_section_folders</c> alone,
+    /// which is narrower than what the build counts — the build matches a
+    /// folder at ANY depth — so a teacher with <c>Portfolios/Tasks</c> had it
+    /// silently dropped by their first tick. A parameter with a default would
+    /// read as "the pool" and be picked by the next caller without thought,
+    /// which is the same silent narrowing arriving a second time. Passing the
+    /// top-level lists is still a legitimate answer where there is no course
+    /// folder to walk; it just has to be a visible choice at the call
+    /// site.</para>
+    /// </param>
     /// </summary>
-    public List<string> MaterializedGradedFolders() =>
-        GradedFolders ?? GradedFolderRule.InferredPool(
-            SharedFolders.Concat(PerSectionFolders));
+    public List<string> MaterializedGradedFolders(IEnumerable<string> choices) =>
+        GradedFolders ?? GradedFolderRule.InferredPool(choices);
 
     /// <summary>Whether a page counts for marks in this course.</summary>
     public bool CountsForMarks(string relativePath) =>

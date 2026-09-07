@@ -495,6 +495,89 @@
       "rule": "A FOLDER segment \u2014 never the file name \u2014 equals a pooled name, case-insensitively, at ANY depth.",
       "why": "At any depth so a teacher who files by unit inside `Tasks` does not lose credit. Never the file name, because a page is not assessed work on account of what it is called."
     },
+    "choices": {
+      "rule": "The folders the Marks checklist OFFERS: the course's `shared_folders`, then its `per_section_folders`, then every folder found inside the course folder itself \u2014 in that order, de-duplicated by exact name.",
+      "why": "`matching` counts a folder at ANY depth, but a checklist built from the two top-level lists offers depth 1, and `absentIsNotEmpty` means the FIRST TICK FREEZES THE POOL. So anything the build counts today and this list omits loses its marks from that tick onwards, silently and permanently: a teacher who files assessed work in `Portfolios/Tasks` cannot tick it, and every expectation that folder addresses reads as never evaluated on the coverage map. The pool the first tick materialises must be built from this SAME list \u2014 a checklist that shows the walked names while the materialised value is inferred from the top-level lists alone loses the marks just as quietly, and a test covering only the visible list would not catch it.",
+      "walk": {
+        "maxDepth": 4,
+        "maxDepthWhy": "The course folder's immediate children are level 1, so levels 1 to 4 are offered and level 5 is not. An affordability judgement rather than completeness, and it is honest about that: a graded folder five levels down is still absent. It must be the same number on both platforms \u2014 a different cap would mean the two apps offer different pools for the same course, so a teacher's tick would freeze a different answer depending on which app they were sitting at.",
+        "skipped": [".merged_output", "merged_output", ".internal", ".obsidian", "node_modules", "Media", ".git"],
+        "skippedWhy": "Build output, Plantoir's own bookkeeping, and `Media`. Skipped at ANY depth, and never walked INTO. `Media` is defensible either way \u2014 a teacher grading video portfolios might want it \u2014 and stays out because media is not assessed work in either app today, and differing here would change what the coverage map says. The two build-output names are skipped even where built websites are kept outside the course folder, so a folder left behind from before that move cannot turn up in the list.",
+        "skippedMatching": "EXACT, case included. A teacher's own folder called `media` is offered.",
+        "hidden": "A folder whose name begins with a dot, or which the platform marks hidden, is never offered and never walked into.",
+        "links": "A symbolic link or junction is not followed — but a folder is only treated as one when it genuinely has a LINK TARGET, rather than merely carrying a reparse point. The distinction is a Windows caution: the Cloud Files API documents a sync provider's unmaterialised placeholders as reparse points, so an attribute test could skip every folder in a cloud-synced working folder and put that course straight back on the top-level-only list this rule exists to fix. NOT reproduced on the machine this was written on — probing its OneDrive with Files On-Demand on found no reparse-point directories at all — so read it as a hazard the narrower test costs nothing to avoid, rather than as a measured fault.",
+        "sectionFolders": "A `sectionN` folder is NOT offered, and its children ARE walked. Its contents are merged into the site and its own name never appears in a page's path there, so ticking it would count nothing \u2014 while a graded folder inside it certainly does count.",
+        "excludedItems": "A name in `excluded_items` is not offered and is not walked into. Filtered at the two levels the build's preflight scan actually discovers: the course folder's own children against `excluded_items.shared`, and a section folder's children against `excluded_items.per_section`. Matched EXACTLY, case included, the same way preflight matches. Without it, removing a folder from a course breaks the promise the removal confirmation makes \u2014 'Removing it will take it out of your course's marks pool' \u2014 on the very next redraw, because the folder is still sitting on disk; ticking it again then writes a `graded_folders` naming a folder `excluded_items` tells the build to skip, so nothing counts for marks while the settings claim something does. (It does NOT suppress the `noGradedFolders` warning, whatever an older comment on this side said: `_has_graded_folders` walks the MERGED tree, so a pool matching nothing published raises the finding exactly as an empty pool would.)",
+        "order": "Declared names first, in list order; then the walked names DEPTH-FIRST: each folder's children in case-insensitive name order, and a folder's children before its own next sibling. NOT shallowest-first — `Alpha/Middle` comes before a top-level `Zebra`. Directory enumeration order is the filesystem's business and is promised by neither platform, so children are sorted, to give a teacher the same list every time and to let these cases pin an order at all.",
+        "duplicates": "By exact name, so a folder name appearing in two places is offered once — at the position the walk FIRST reaches it, which, the walk being depth-first, may be the deeper of the two."
+      },
+      "cases": [
+        { "name": "a graded folder nested inside another is offered",
+          "sharedFolders": ["Concepts", "Portfolios"], "perSectionFolders": [],
+          "directories": ["Portfolios", "Portfolios/Tasks"],
+          "expect": ["Concepts", "Portfolios", "Tasks"],
+          "why": "The case the whole rule is for. `Portfolios/Tasks` counts for marks today under the historical rule, and a top-level-only list drops it at the first tick." },
+
+        { "name": "a section folder is not offered, but its children are",
+          "sharedFolders": [], "perSectionFolders": ["All Classes"],
+          "directories": ["section1", "section1/All Classes", "section1/Tasks"],
+          "expect": ["All Classes", "Tasks"] },
+
+        { "name": "the folders Plantoir looks after itself are never offered, at any depth",
+          "sharedFolders": ["Tasks"], "perSectionFolders": [],
+          "directories": [".obsidian", "Media", "Media/Portfolios", "merged_output", "node_modules", "Tasks", "Tasks/Media", "Tasks/Media/Clips", "Tasks/Unit 1"],
+          "expect": ["Tasks", "Unit 1"],
+          "why": "`Tasks/Media` pins that the skip list applies below the top level too, and `Media/Portfolios` that a skipped folder's contents are not walked." },
+
+        { "name": "the walk stops four levels down",
+          "sharedFolders": [], "perSectionFolders": [],
+          "directories": ["A", "A/B", "A/B/C", "A/B/C/D", "A/B/C/D/E"],
+          "expect": ["A", "B", "C", "D"] },
+
+        { "name": "declared folders first, then what is on disk",
+          "sharedFolders": ["Tasks"], "perSectionFolders": ["All Classes"],
+          "directories": ["Alpha", "Alpha/Middle", "Zebra", "section1", "section1/All Classes"],
+          "expect": ["Tasks", "All Classes", "Alpha", "Middle", "Zebra"],
+          "why": "Pins the ORDER, and that it is depth-first: breadth-first would put Zebra before Middle. `Alpha` sorts before `section1` before `Zebra` case-insensitively." },
+
+        { "name": "a folder on disk that is in neither list is still offered",
+          "sharedFolders": ["Concepts"], "perSectionFolders": [],
+          "directories": ["Concepts", "Old Tests"],
+          "expect": ["Concepts", "Old Tests"],
+          "why": "The next build's preflight scan adds a folder like this to `shared_folders`, after which it counts for marks \u2014 so offering it is right rather than premature. It is also what a teacher is promised: 'you can also simply create new folders in Obsidian'." },
+
+        { "name": "nothing on disk: the declared lists stand alone",
+          "sharedFolders": ["Tasks"], "perSectionFolders": ["All Classes"],
+          "directories": [],
+          "expect": ["Tasks", "All Classes"],
+          "why": "A guard rather than a new rule: a course folder that cannot be read must still offer what the course declares." },
+
+        { "name": "hidden folders are never offered",
+          "sharedFolders": ["Tasks"], "perSectionFolders": [],
+          "directories": [".git", ".git/objects", ".obsidian", "Tasks"],
+          "expect": ["Tasks"] },
+
+        { "name": "the same folder name in two places is offered once",
+          "sharedFolders": [], "perSectionFolders": [],
+          "directories": ["Unit 1", "Unit 1/Tasks", "Unit 2", "Unit 2/Tasks"],
+          "expect": ["Unit 1", "Tasks", "Unit 2"] },
+
+        { "name": "numbered folders sort by character, not the way a person counts",
+          "proposedBy": "Windows, 2026-09-06",
+          "sharedFolders": [], "perSectionFolders": [],
+          "directories": ["Unit 2", "Unit 10", "Unit 1"],
+          "expect": ["Unit 1", "Unit 10", "Unit 2"],
+          "why": "Pins WHICH case-insensitive comparison. Ordinal puts `Unit 10` before `Unit 2`; a locale-aware or Finder-style comparison puts `Unit 2` first, and that is the comparison each platform reaches for by default. Without a case carrying a run of digits, both implementations pass and still show a teacher two different lists. Ordinal is what shipped rather than what is nicest to read — changing it to natural order would be a shared decision, and this case is where that argument has to be had." },
+
+        { "name": "a folder the teacher removed from the course is not offered back",
+          "proposedBy": "Windows, 2026-09-06",
+          "sharedFolders": ["Concepts"], "perSectionFolders": ["All Classes"],
+          "excludedItems": { "shared": ["Tasks"], "per_section": ["Handouts"] },
+          "directories": ["Concepts", "Tasks", "Tasks/Unit 1", "section1", "section1/All Classes", "section1/Handouts"],
+          "expect": ["Concepts", "All Classes"],
+          "why": "Proposed FROM Windows and not implemented on the mac yet. Walking the course folder is what makes this case exist at all: before it, a folder removed from a list simply left the checklist with it. Now the folder is still on disk, so without this it comes back unticked one redraw after the app told the teacher 'Removing it will take it out of your course's marks pool'. Its children go with it: nothing under a removed folder reaches the site either. The cost, recorded rather than hidden: a pooled name found ONLY inside the removed folder then has no row to untick until the folder is put back. It is not silent — the build's health check walks the MERGED tree, so a pool naming nothing the site publishes still reports that no folder counts for marks — and nothing is lost, because a pooled name with no row is preserved rather than dropped." }
+      ]
+    },
     "cases": [
       { "name": "not configured: the historical substring rule", "configured": false, "graded": [], "path": "Tasks/Culminating.md", "expect": true },
       { "name": "not configured: a folder that merely contains the word", "configured": false, "graded": [], "path": "Thinking Tasks/Problem 3.md", "expect": true,
