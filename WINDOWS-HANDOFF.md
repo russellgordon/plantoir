@@ -595,8 +595,8 @@ this side is expected to say so when the contract is wrong.
 
 13. **Renaming a course folder from inside the app — HALF DONE 2026-09-06.**
     The model layer is built and under test: `FolderPathRewriter` (the link
-    rewriting, 22 tests) and `SpecialFolderRenamer` (the refusals, the move
-    list, the check-every-destination-first rule, 22 tests), plus the two
+    rewriting, 32 test methods over 119 cases since item 31 wired the contract) and `SpecialFolderRenamer` (the refusals, the move
+    list, the check-every-destination-first rule, 27 test methods over 38 cases — the “22” written here on 2026-09-06 was already stale that day), plus the two
     trail events, which are DECLARED AND NOT YET EMITTED because nothing
     raises them until the sheet exists — see `windows-app/PROGRESS.md`.
     **Still owed: the sheet itself**, the method that performs the moves, the
@@ -1417,9 +1417,16 @@ to run in the background.
     have none of the main window's icons, tooltip or menu; and there is no Edit
     menu or keyboard route to Rename Course — it is context-menu only.
 
-31. **A folder rename spells the new name inside a Markdown link
+31. ~~**A folder rename spells the new name inside a Markdown link
     differently from the way you do it, and three contract cases will fail
-    until you change it.** You found and fixed the defect itself on
+    until you change it.**~~ **✅ Done 2026-09-07**, branch
+    `issue/31-rename-link-escaping`, commit `2bed7c83`. `Spelled` now calls a
+    `PercentEncoded` driven by `leaveUnescaped`, in BOTH branches, and
+    `FolderPathRewriterTests` deserialises the cases instead of retyping five.
+    A TWELFTH case went into the contract with it, for the second branch, which
+    the original eleven never reached — see "What Windows owed" below, and
+    `MAC-HANDOFF.md`. 1125 passed, 2 skipped, 0 failed (1031 before). Original
+    text: You found and fixed the defect itself on
     2026-09-06 — a Markdown destination ends at the first space, so renaming
     `Tasks` to `All Tasks` broke every Markdown-style link into the folder —
     and the mac took your rule unchanged. **What the mac did NOT take is
@@ -5725,7 +5732,14 @@ described, so either side can test a character against it:
 
     contracts/shared-rules.json
       -> specialNames.renameFolder.linkRewriting.escapingSet.leaveUnescaped
-      =  ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'
+      =  ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'?
+
+(This line lost its trailing `?` when the correction two paragraphs down
+was written, and said the wrong thing for a day. Copy the string from the
+contract, never from here — or better, assert against it: Windows'
+`TheEscapingSetIsTheContractsCharacterForCharacter` pins the code's copy
+against the contract's, which is the only check that catches a character
+quietly added to or dropped from either.)
 
 Everything else — the space, `%`, the quotes and brackets, and every non-ASCII
 letter — is percent-encoded as UTF-8 **once escaping runs at all**, and
@@ -5760,9 +5774,30 @@ the correction is the useful part.
   cannot arise on Windows, where a folder name may not contain one, but the
   encoder is a pure string transform so the case still runs there.
 
-### What Windows owes
+### What Windows owed — ✅ done 2026-09-07
 
-**Three** of the eleven cases fail on Windows today, and they are a request
+Kept as it was written, because the reasoning is the point of the section and a
+deleted obligation takes its reason with it. Landed on branch
+`issue/31-rename-link-escaping`, commit `2bed7c83`: `Spelled` calls a
+`PercentEncoded` driven by `leaveUnescaped` in BOTH branches, and
+`FolderPathRewriterTests` deserialises every case. 1125 passed, 2 skipped, 0
+failed (1031 before).
+
+**A TWELFTH case went in with the fix**, and it is the part worth reading even
+now the work is done. `Spelled` has two reasons to escape — the new name would
+break a Markdown destination, or the OLD segment arrived percent-encoded — and
+NONE of the original eleven reaches the second. Eight take the first (a space or
+a bracket in the new name); the other three reach no encoder at all, because
+`Assignments` and `Café` need no escaping and the wikilink case is not a
+Markdown link. A `Uri.EscapeDataString` left behind in the second branch alone
+would have passed all eleven. The new case
+(`[q](All%20Tasks/Quiz.md)`, "All Tasks" → `Q&A`, expecting
+`[q](Q&A/Quiz.md)`) is the only one that reaches it. It is named in
+`MAC-HANDOFF.md`, and it should be green on the mac already.
+
+**What was originally owed, and why:**
+
+**Three** of the eleven cases failed on Windows, and they were a request
 rather than damage:
 
 - **“an ampersand is left as it stands”** — `Tasks` → `Tasks & Quizzes`,
@@ -5776,22 +5811,37 @@ rather than damage:
   folder name may not contain `?`, but the encoder is a pure string transform
   so the case still runs.
 
-All three are ONE change in
+All three were ONE change in
 `windows-app/Plantoir.Core/Models/FolderPathRewriter.cs`: replace
 `Uri.EscapeDataString` in `Spelled` with an encoder driven by `leaveUnescaped`
-above. It keeps only `A-Za-z0-9-._~`, so it over-encodes `&`, `,`, `+`, `'`,
-`!` and `*` alike — every one of which `decodeURI` then leaves encoded and
-`sluggify` turns into `-percent…`. Nothing else in the rule changes, and the
+above — in BOTH of its branches, which is the half that reads as optional and
+is not. It keeps only `A-Za-z0-9-._~`, so it over-encodes `&`, `,`, `+`, `'`,
+`!` and `*` alike. **Not all eleven break, and this line said they did.** The
+ones that 404 are the eight characters `decodeURI` leaves encoded and
+`sluggify` then turns into `-percent…`: `; , @ & = + $ ?`. `?` is an ordinary
+member of that set and not a special case — `Why%20Not%3F` slugs to
+`Why-Not-percent3F` by the same mechanism as the rest. (What IS peculiar to `?`
+is why the UNESCAPED spelling works: `sluggify` strips it from the real
+folder's name too, so both sides land on `Why-Not`.) `%27`, `%21` and `%2A` decode back to `'`, `!` and
+`*` and resolve fine, so over-encoding those three is noise rather than damage.
+Corrected 2026-09-07 by an adversarial review of the fix; the encoder is
+unchanged by the correction, because the eight that DO break include both of
+the ones a teacher will actually type. Nothing else in the rule changes, and the
 mac's version of it is `spelled(_:likeThe:in:)` in
 `mac-app/QuartzTeachers/Models/FolderPathRewriter.swift`.
 
-**And a second obligation that is easy to miss.**
-`windows-app/Plantoir.Tests/FolderPathRewriterTests.cs` retypes five cases of
-its own rather than deserialising `linkRewriting.cases`, so **nothing on the
-Windows side goes red on its own** — the three failures above are invisible
+**And a second obligation that is easy to miss** — done in the same commit;
+the file deserialises `linkRewriting.cases` now, keeps its five as named
+anchors, and pins the code's copy of `leaveUnescaped` against the contract's
+string directly. That last check is the one worth copying to the mac: a
+behavioural walk over the set can only test the characters the CODE has, so a
+character quietly ADDED to either app's constant is invisible to it.
+`windows-app/Plantoir.Tests/FolderPathRewriterTests.cs` used to retype five
+cases of its own rather than deserialising `linkRewriting.cases`, so **nothing
+on the Windows side went red on its own** — the three failures above are invisible
 there until the cases are wired in. `contracts/README.md`'s own rule is to
-deserialise and never retype; this file is one of the places that does not
-yet.
+deserialise and never retype, and this file was one of the places that did not
+— until 2026-09-07.
 
 The per-cent case, “a per-cent sign is escaped” (`Top 10%` →
 `[q](Top%2010%25/Quiz.md)`), **passes on Windows already** and is not work:
