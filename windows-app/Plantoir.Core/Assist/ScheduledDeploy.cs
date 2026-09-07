@@ -1,3 +1,5 @@
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -98,6 +100,62 @@ public sealed class ScheduledDeploy
 
     /// <summary>Classes that are not published yet, and so would not reach students.</summary>
     public required IReadOnlyList<string> UnpublishedClasses { get; init; }
+
+    /// <summary>
+    /// The class pages of a section that are dated on or before a day and are
+    /// still unpublished — the ones a deploy on that day would put the site up
+    /// without. For the sidebar's own "Schedule Deploy…", which has no list of
+    /// named classes the way the assistant's tool does: there the model names
+    /// the classes to check, here the DATE does. A class dated after the deploy
+    /// is legitimately unpublished and is not named.
+    ///
+    /// <para>Walks the same folders <c>AssistWorkspace.ClassPages</c> walks
+    /// and leaves out the same <c>index.md</c>, for the same reason: a
+    /// section's front page carries the first class's date and is not a
+    /// class. Names, not paths, because the dialog shows them to a teacher.</para>
+    /// </summary>
+    public static List<string> UnpublishedClassesOnOrBefore(Course course, int sectionNumber, DateOnly day)
+    {
+        var names = new List<(DateOnly Date, string Name)>();
+        foreach (string folder in course.Configuration.PerSectionFolders)
+        {
+            string root = Path.Combine(course.SectionDirectory(sectionNumber), folder);
+            if (!Directory.Exists(root)) continue;
+            foreach (string page in PagePaths.MarkdownPages(root, sectionNumber))
+            {
+                if (string.Equals(Path.GetFileName(page), "index.md", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string text;
+                try { text = File.ReadAllText(page); } catch { continue; }
+                if (!PageFrontmatter.IsDraft(text, sectionNumber)) continue;
+                var date = PageFrontmatter.CreatedOn(text, sectionNumber,
+                    PagePaths.IsSectionLocal(course.DirectoryPath, page));
+                if (date is not { } when || when > day) continue;
+                names.Add((when, Path.GetFileNameWithoutExtension(page)));
+            }
+        }
+        return names.OrderBy(n => n.Date).ThenBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(n => n.Name).ToList();
+    }
+
+    /// <summary>
+    /// The sentence that goes with that list — the same content
+    /// <see cref="Describe"/> gives the assistant, in prose rather than in
+    /// bullets, because a dialog is not a chat transcript. Null when nothing
+    /// is unpublished.
+    /// </summary>
+    public static string? UnpublishedClassesSentence(IReadOnlyList<string> unpublished)
+    {
+        if (unpublished.Count == 0) return null;
+        int count = unpublished.Count;
+        string listed = string.Join(", ", unpublished.Take(8));
+        if (count > 8) listed += $", and {count - 8} more";
+        string are = count == 1 ? "class is" : "classes are";
+        string them = count == 1 ? "it" : "them";
+        return $"One thing first — {count} {are} not published yet: {listed}. " +
+               $"Deploying then would put the site up without {them}. " +
+               "Publish first, look the preview over, then schedule this.";
+    }
 
     /// <summary>Where the deploy would land.</summary>
     public required string Destination { get; init; }

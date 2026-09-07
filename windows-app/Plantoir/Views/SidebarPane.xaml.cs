@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
@@ -625,6 +626,22 @@ public sealed partial class SidebarPane : UserControl
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                 "SystemFillColorCautionBrush"],
         };
+        // Advice, not a refusal: the classes a deploy on the chosen day would
+        // put the site up without. The assistant's tool has said this since
+        // it existed (ScheduledDeploy.Describe); this door said nothing, so a
+        // teacher scheduled 6:30 AM without being told tomorrow's page was
+        // unpublished — the one thing the description exists to tell them.
+        // The list follows the DAY, so it is recomputed as the day moves;
+        // the button stays enabled, because "publish first" is advice the
+        // teacher may have a reason to ignore.
+        var unpublished = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                "SystemFillColorCautionBrush"],
+        };
+        AutomationProperties.SetAutomationId(unpublished, "unpublishedClassesNote");
 
         var body = new StackPanel { Spacing = 12 };
         body.Children.Add(new TextBlock
@@ -636,6 +653,7 @@ public sealed partial class SidebarPane : UserControl
         });
         body.Children.Add(day);
         body.Children.Add(time);
+        body.Children.Add(unpublished);
         body.Children.Add(warning);
 
         var dialog = new ContentDialog
@@ -658,6 +676,13 @@ public sealed partial class SidebarPane : UserControl
             warning.Text = problem ?? "";
             warning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             dialog.IsPrimaryButtonEnabled = problem is null;
+
+            string? advice = chosen is { } on
+                ? ScheduledDeploy.UnpublishedClassesSentence(
+                    ScheduledDeploy.UnpublishedClassesOnOrBefore(course, number, DateOnly.FromDateTime(on)))
+                : null;
+            unpublished.Text = advice ?? "";
+            unpublished.Visibility = advice is null ? Visibility.Collapsed : Visibility.Visible;
         }
 
         DateTime? Chosen() => day.Date is { } picked
