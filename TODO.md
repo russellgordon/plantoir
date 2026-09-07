@@ -704,9 +704,14 @@ nothing under `mac-app/` or `scripts/` renames, clears or year-scopes it —
 reads it.
 
 So the first publish after a rollover lands on **last year's URL, which last
-year's students may still be reading**, and the teacher is not asked what to
-call the site because `HasDeployedBefore` finds the marker and reads it as
-proof the section has a home. Windows' own comment
+year's students may still be reading**, and the teacher is never asked what to
+call the new site. That last part is shared Python rather than either app:
+`deploy.py`'s `load_netlify_marker` (`scripts/deploy.py:454`) reuses the
+recorded site, and `maybe_create_netlify_site_simple` (`:415`) is the only
+thing that prompts for a name — it runs only when there is no marker to find.
+(The apps' own `hasDeployedBefore` reads the same marker, but it decides
+something else: whether a SCHEDULED deploy may be set up at all —
+`ScheduledDeploy.swift:225`.) Windows' own comment
 (`AssistWorkspace.cs:1864-1877`) says exactly why that is bad — and Windows
 still has the hole, because the sentence a teacher says does not reach the tool
 that closes it.
