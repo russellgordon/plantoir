@@ -221,14 +221,13 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > — `draft: true` is a page students cannot see. Those still work: the build
 > reads them, inverted. You never have to convert a course by hand.
 >
-> **The two apps disagree about what happens next, and it is being decided**
-> (found 2026-09-06). Windows rewrites the old key to the new one the first
-> time something edits that page — the sentence this note used to give as the
-> product's behaviour. The macOS app keeps the old key and inverts the value,
-> which is what `contracts/file-formats.json` → `pageVisibility.writingRules`
-> says. Either is safe, because the build reads both spellings; they cannot
-> both be true of a course carried between the two machines. See
-> `MAC-HANDOFF.md`. A page with
+> **What happens next is the same on both machines** (decided 2026-09-07):
+> the first time something edits such a page's visibility, the old key is
+> rewritten to the new one on the same line and the old key removed, so the
+> page shows a one-line change in Obsidian. Nothing converts a course by
+> hand, and nothing needs to: the build reads both spellings. (The macOS app
+> kept the old key inverted until then; `contracts/file-formats.json` →
+> `pageVisibility.writingRules` carries the rule and the reasoning.) A page with
 > **no** publication key at all is visible, so forgetting the key leaves work
 > showing rather than making it disappear unnoticed.
 
