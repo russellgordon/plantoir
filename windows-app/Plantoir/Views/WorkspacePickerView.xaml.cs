@@ -3,7 +3,6 @@ using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Plantoir.Core.Models;
-using Plantoir.Services;
 
 namespace Plantoir.Views;
 

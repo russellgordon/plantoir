@@ -231,6 +231,19 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ## Open — what the mac still owes
 
+- **Two small decisions from Windows item 30, both for the mac to make**
+  (Windows, 2026-09-07, branch `issue/30-polish-delete-crumbs-rename`).
+  (a) The backup pane's sentence: Windows says "Restoring puts {code} back to
+  exactly this moment — the current version is archived first, and the
+  backup is kept."; the mac's advertises the delete and omits the
+  reassurance. The reassurance is the better half; converge on it from both
+  sides at once, or say which wins. (b) The picker's breadcrumbs: a plain
+  click walks nowhere, as on the main bar (item 6's decision), though on a
+  PICKER walking up the tree is the obvious reading. If that is wanted it is a
+  change to `workingFolderPathBar` for both platforms, not one side's
+  shortcut. Neither blocks anything; both are wording-and-behaviour choices a
+  teacher can see, so they are the mac's call.
+
 - **Turning the skeleton toggle OFF leaves the skeleton's folders in the mac's
   structure editor, and Windows now puts the generic defaults back — decide
   which, and make it a contract case** (Windows, 2026-09-07, branch
@@ -1891,30 +1904,34 @@ rather than being deleted.
   top-level Edit menu conventionally holds Cut/Copy/Paste, and one holding a
   single Rename Course reads as broken; File already holds a selection-scoped
   action ("Restore from Archive…"), so it is the established home. And the
-  mac omits a key for an AppKit reason — a bare Return equivalent is stolen by
-  every text field — that does not exist on Windows, where the item asks for
-  a keyboard route; F2 is Explorer's rename key. Rejected: an Edit menu for
+  mac omits a key for an AppKit reason — a bare Return as a menu key
+  equivalent is matched by AppKit before the key reaches the responder chain,
+  so it would be taken AWAY from every text field and default button
+  (`EditCommands.swift`) — that does not exist on Windows, where the item
+  asks for a keyboard route; F2 is Explorer's rename key. (The brief had that
+  reason the wrong way round; the review caught it.) Rejected: an Edit menu for
   parity; no key for parity; a new Course menu for one item. The item is
   dimmed WITH its reason, the way the course menu does it (a disabled row
   holding `CourseActivity.BusyReason`), renames the parent course when a
   section is selected (the mac's `courseThatCanBeRenamed`), and F2 is scoped
   by asking `FocusManager.GetFocusedElement` first: a TextBox, RichEditBox,
   PasswordBox, AutoSuggestBox or NumberBox keeps its F2 and the accelerator
-  leaves the key unhandled. One limit, said plainly: WinUI's MenuBar has no
-  Opening event, so the dimmed state is redrawn on selection change and on
-  every re-apply of the window's state, and the accelerator re-checks live —
-  a preview started with the File menu already open is caught by the check
-  when the item is invoked, not by the row going grey under the pointer.
+  leaves the key unhandled. Two blind spots, named: focus inside the
+  WebView2 preview reads as the WebView2 element, so F2 typed into the
+  previewed site's own search box would open the rename (if the WebView2
+  passes the key through at all, which was not measured); and F2 with another
+  dialog open fails silently, because `ShowDialogSafelyAsync` swallows the
+  second dialog. One limit, said plainly: WinUI's MenuBar has no Opening
+  event and `CourseActivity` raises no change event, so the dimmed row is
+  redrawn on selection change, on window activation and on every re-apply of
+  the window's state — a preview started while the window sat idle leaves the
+  item enabled until then. That is why the click has NO silent busy guard: the
+  rename dialog re-checks and explains ("…is previewing or deploying right
+  now. Stop that first, then rename."), the same answer the sidebar's route
+  gives, rather than a menu that simply closes.
 
-  Two recommendations from the same item, not shipped. (a) The backup
-  pane's sentence: Windows says "Restoring puts {code} back to exactly this
-  moment — the current version is archived first, and the backup is kept.";
-  the mac's advertises the delete and omits the reassurance. The reassurance
-  is the better half; the two should converge on it, from both sides at once.
-  (b) The picker's breadcrumbs: a plain click walks nowhere, as on the main
-  bar (item 6's decision), though on a PICKER walking up the tree is the
-  obvious reading. If that is wanted it is a change to
-  `workingFolderPathBar` for both platforms, not one side's shortcut.
+  The two decisions this item raises for the mac are at the top of "Open",
+  where a mac session will find them.
 
 - **Windows' two synced-folder views are built, and one thing about the store
   behind them is worth knowing before a privacy question arrives** (Windows,
