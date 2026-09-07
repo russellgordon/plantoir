@@ -51,6 +51,26 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
+**One proposed 2026-09-07: `activityTrail.mustRecord` → `section restored`,
+marked `appliesOn: ["windows"]` — and the mac suite goes RED on it anyway,
+which is the request arriving, not damage.** Branch
+`issue/27-assist-conversation-restore`. `SharedRulesContractTests.swift`'s
+`testTheTrailRecordsEveryEventTheContractRequires` builds its wanted set from
+every `mustRecord` entry with no `appliesOn` filter (the Windows twin honours
+it, since the mac's own `built site moved out of the working folder` is
+`appliesOn: ["mac"]`), so the mac fails by name until it either adopts the
+event or teaches its test the filter. Do both: the filter is what lets either
+side propose a platform-only event without reddening the other. The mac's
+"Restore Section N…" (`AssistSession.restoreSection`) records nothing on the
+trail; Windows' does, because a section whose pages are older than the
+conversation that changed them is exactly the thing a teacher asks about next
+week, and rule 5 says a feature a teacher can see leaves a line. What is
+asked: add `.sectionRestored` to `ActivityTrail.Event` on the mac, note it
+from `restoreSection()` with the course, section and the backup's file name,
+and drop the `appliesOn` so the event is pinned on both sides. The line
+Windows writes: "put the section back to how it was when this conversation
+started, from ICS3U_backup_…_assistant-section1.zip".
+
 > **v1.1.0 cut sheet — ✅ Done 2026-08-20.** Released the same day this sheet
 > was written: tag `v1.1.0`, release "Plantoir 1.1.0", published
 > 2026-08-20T21:20:09Z and marked Latest, not a draft. All three assets are
@@ -3262,6 +3282,82 @@ is what happened to the test-race item, sitting here for three days with
 
 
 ## Done — the ledger
+
+- **Windows has the way back for a whole conversation — and now saves one
+  backup per conversation instead of one per change** (Windows, 2026-09-07,
+  branch `issue/27-assist-conversation-restore`; `WINDOWS-HANDOFF.md` item 27
+  struck; `GUI-IMPROVEMENTS.md` row 435). **The mac is expected to KNOW, and
+  owes one trail event — the contract case at the top of this file.** ✅ DONE.
+
+  **A documented behaviour changed, on purpose.** Until this branch every
+  changing tool on Windows saved its own copy (`AssistWorkspace` called
+  `CourseArchiver.BackUpCourse` at seven sites, unconditionally), while
+  `MostBackupsKept` is five — so after six changes the copy from before the
+  conversation had already been pruned, and a Restore button could not have
+  kept its promise. `BackUpOnceForThisConversation` now mirrors
+  `AssistToolRunner.backUpOnceForThisConversation`: lazily, at the first
+  changing call, keyed by course code. Per-change undo is `UndoHistory`'s
+  promise and is unchanged. The key needs no section: on Windows the tools
+  run in `plantoir-mcp`, one process per assistant window, locked to one
+  course, so one `AssistWorkspace` IS one conversation; an unlocked Claude
+  Code session that touches several courses gets one copy per course, as the
+  mac does. Two windows on two sections of the same course are two processes
+  and two copies. Rejected, as the brief records: pinning the first per-change
+  copy against pruning (a guarantee with an exception, and a Backups list
+  that grows faster for nothing a teacher asked for); whole-course restore
+  (the mac's own reason — a teacher marking Section 2 in Obsidian while
+  chatting about Section 1); leaving `UndoHistory` as the story.
+
+  **How the window learns there is a copy.** The tools run in another
+  process and the answers are the only channel, so every answer after the
+  first change carries the copy's path in `_meta` under
+  `AssistToolAnswer.ConversationBackupKey` (`PlantoirTools.CarryingTheConversationBackup`),
+  the same slot the teacher's one-line summary already rides in; Claude Code
+  ignores `_meta` it does not know. The six write tools that answered in a
+  plain string now answer in a result so they can carry it too. A
+  conversation that only PUBLISHED counts as changed, because the publish
+  tools save the copy first — matching the mac's gate.
+
+  **What the restore does** (`CourseRestorer.RestoreSection`, a port of
+  `restoreSection`): unpack and check BEFORE touching the course; replace the
+  section folder's contents wholesale, hidden files included; put this
+  section's per-section keys on every shared page back as the copy had them
+  and change nothing else on those pages (`SettingPerSectionKeys`, the mac's
+  line for line, with `SectionAdder.PerSectionKeyNumber` made internal);
+  discard the section's built site. `SectionRestoreTests` covers the other
+  section untouched, a shared page's words and other sections' keys kept, an
+  unreadable copy leaving the section as it is, the key placement cases, one
+  copy after seven changes, and the refusals.
+
+  **Wording**: the mac's, verbatim, in `AssistSectionRestore` — banner,
+  button with its ellipsis, confirmation title, the three-paragraph message
+  whose third paragraph is the promise, the go-ahead, the done sentence
+  ("Ask me to rebuild the preview to see it."; nothing is auto-rebuilt), and
+  the three refusals. Not lifted into `contracts/`: the mac's file argues the
+  wording and the code belong together, and the BEHAVIOUR is not a tool call,
+  so it does not fit `assist-cases.json`'s `when: <tool>` shape — the intent
+  is here instead, as rule 2 allows. Not driven by hand: the banner, the
+  dialog and the note want one look at the real interface.
+
+  **Five things the review found, kept as they are and written down.** (1) A
+  recorded copy that has since gone — deleted from the Backups list, or pruned
+  by five LATER conversations on the same course — is still the one the
+  banner offers, and Restore then says "The copy saved for this conversation
+  (…) could not be read." A first draft took a fresh copy in that case, which
+  would have made the dialog's "exactly how it was when this conversation
+  started" false; the mac checks only its dictionary and fails honestly, and
+  so does Windows now. (2) The key restore's frontmatter parser is as strict
+  as the mac's `PageFrontmatter.block` — line 1, "---" — and stricter than
+  this app's own `Block.Parse`; a shared page whose block starts after a blank
+  line is left alone rather than given a second block. (3) The failure note
+  in the transcript is a plain "Assistant" turn; the mac marks it
+  `isProblem: true` and Windows' transcript has no problem style. (4) The
+  copy's path travels ABSOLUTE in `_meta`, which Claude Code can see; the
+  app's own `back_up_course` answers relative. Harmless, unpretty. (5)
+  `roll_over_section` answers in a string and cannot carry `_meta`; it takes
+  no conversation copy, so nothing is lost, but a future tool that answers in
+  a string and changes things would not raise the banner — answer in a
+  result.
 
 - **The Windows wizard asks the skeleton question, writes `use_skeleton`, and
   shows the skeleton's folders it is about to make** (Windows, 2026-09-07,

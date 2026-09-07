@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -146,6 +147,70 @@ public sealed partial class AssistWindow : Window
             App.Settings.Save();
         }
         catch (Exception ex) { App.LogDiagnostic($"AssistWindow placement not remembered: {ex.Message}"); }
+    }
+
+    // ---- The way back for the whole conversation ---------------------------
+
+    /// <summary>
+    /// The copy saved before this conversation's first change, learned from
+    /// the tools' answers. Null while the conversation has only read — and a
+    /// conversation that only PUBLISHED counts as changed, because the tools
+    /// save the copy before a publish too and publishing state is part of
+    /// what a restore puts back.
+    /// </summary>
+    private string? _conversationBackupPath;
+
+    private void ShowRestoreBanner()
+    {
+        if (_conversationBackupPath is null) return;
+        RestoreBannerTitle.Text = AssistSectionRestore.BannerTitle(_section);
+        RestoreBannerDetail.Text = AssistSectionRestore.BannerDetail();
+        RestoreSectionButton.Content = AssistSectionRestore.ButtonTitle(_section);
+        RestoreBanner.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Ask, then put the section back — and write the outcome into the
+    /// transcript either way. A restore that quietly failed would leave a
+    /// teacher believing their section had gone back when it had not.
+    /// Nothing is rebuilt afterwards; the sentence tells them to ask.
+    /// </summary>
+    private async void RestoreSection_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = AssistSectionRestore.ConfirmationTitle(_course.Code, _section),
+            Content = new TextBlock
+            {
+                Text = AssistSectionRestore.ConfirmationMessage(_course.Code, _section),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 460,
+            },
+            PrimaryButtonText = AssistSectionRestore.GoAheadTitle(_section),
+            CloseButtonText = "Cancel",
+            // The safe answer is the default: this discards work.
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Root.XamlRoot,
+        };
+        ContentDialogResult choice;
+        try { choice = await dialog.ShowAsync(); }
+        catch (Exception ex) { App.LogDiagnostic($"restore dialog: {ex.Message}"); return; }
+        if (choice != ContentDialogResult.Primary) return;
+
+        try
+        {
+            AssistSectionRestore.Restore(_conversationBackupPath, _course.Code, _section,
+                                         Workspace.CoursesDirectory(_folder));
+        }
+        catch (Exception error)
+        {
+            Say("Assistant", "Nothing was put back: " + error.Message);
+            return;
+        }
+        ActivityTrail.Note(ActivityTrail.Event.SectionRestored,
+            "put the section back to how it was when this conversation started, from " +
+            Path.GetFileName(_conversationBackupPath!), _course.Code, _section);
+        Say("Assistant", AssistSectionRestore.DoneMessage(_course.Code, _section));
     }
 
     private void OnceLoaded(object sender, RoutedEventArgs e)
@@ -434,6 +499,11 @@ public sealed partial class AssistWindow : Window
                 App.Settings.PlansAcceptedCount++;
                 try { App.Settings.Save(); } catch { }
             },
+            OnConversationBackup = path => DispatcherQueue.TryEnqueue(() =>
+            {
+                _conversationBackupPath = path;
+                ShowRestoreBanner();
+            }),
             DestinationProvider = () =>
             {
                 if (_course.Configuration.DeploysToLocalFolder) return "a folder on this computer";

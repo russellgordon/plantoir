@@ -1283,8 +1283,18 @@ to run in the background.
     in `GUI-IMPROVEMENTS.md`. Medium, and it interacts with the graded-folder
     rules already ported, so read `GradedFolderRule` before starting.
 
-27. **The assistant offers no way back for a whole conversation (found
-    2026-09-06).** The mac shows a "restore this section" banner once a
+27. ~~**The assistant offers no way back for a whole conversation (found
+    2026-09-06).**~~ ✅ Done 2026-09-07 (branch
+    `issue/27-assist-conversation-restore`, `GUI-IMPROVEMENTS.md` row 435).
+    `CourseRestorer.RestoreSection` (section folder replaced wholesale, this
+    section's per-section keys on shared pages put back, the built site
+    discarded), `AssistSectionRestore` with the mac's sentences verbatim, the
+    banner above the transcript, the destructive confirmation, the transcript
+    note, and the trail line `section restored`. **And the backup is now made
+    ONCE per conversation, not once per change** — the hazard that made this
+    two changes rather than a button: with five copies kept, the copy from
+    before a six-change conversation had already been pruned. The original
+    item follows. The mac shows a "restore this section" banner once a
     conversation has changed something, behind a destructive confirmation
     (`AssistWindowView.swift`, backed by `Models/Assist/AssistSectionRestore.swift`).
     `AssistSectionRestore` appears nowhere in `windows-app/` — zero hits.

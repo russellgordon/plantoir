@@ -9,6 +9,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -28,14 +29,37 @@
             <ContentControl x:Name="PromptShelfHost" HorizontalContentAlignment="Stretch" />
         </Border>
 
+        <!-- The way back for the whole conversation. Above the transcript, and
+             it does not scroll away with it: a teacher six changes in must be
+             able to find it without scrolling up. -->
+        <Border x:Name="RestoreBanner" Grid.Row="2" Visibility="Collapsed"
+                Padding="12" CornerRadius="6"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock x:Name="RestoreBannerTitle" TextWrapping="Wrap" FontWeight="SemiBold" />
+                    <TextBlock x:Name="RestoreBannerDetail" TextWrapping="Wrap" Opacity="0.7"
+                               Style="{ThemeResource CaptionTextBlockStyle}" />
+                </StackPanel>
+                <Button x:Name="RestoreSectionButton" Grid.Column="1" VerticalAlignment="Center"
+                        Click="RestoreSection_Click"
+                        AutomationProperties.AutomationId="assistRestoreSectionButton" />
+            </Grid>
+        </Border>
+
         <!-- The transcript. Every turn is a card, so a plan the teacher is
              being asked to approve is visibly a thing said, not chrome. -->
-        <ScrollViewer x:Name="TranscriptScroller" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="TranscriptScroller" Grid.Row="3" VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="Transcript" Spacing="10" />
         </ScrollViewer>
 
         <!-- Approval actions. No banner or repeated question text — just the choice buttons right above the input. -->
-        <StackPanel x:Name="ApprovalBar" Grid.Row="3" Visibility="Collapsed"
+        <StackPanel x:Name="ApprovalBar" Grid.Row="4" Visibility="Collapsed"
                     Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,2,0,4">
             <Button x:Name="DeclineButton" Content="Cancel"
                     Click="Decline_Click"
@@ -45,7 +69,7 @@
                     AutomationProperties.AutomationId="assistApproveButton" />
         </StackPanel>
 
-        <Grid Grid.Row="4" ColumnSpacing="8">
+        <Grid Grid.Row="5" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
