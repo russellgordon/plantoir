@@ -23,7 +23,7 @@ mechanics, a measurement taken on one machine: not.
 | [`toolchain.json`](toolchain.json) | The image both platforms build from the same recipe: the four pins with the REASON each sits where it does, and what each of the seven Quartz patches changes and why it cannot be dropped. |
 | [`example-content.json`](example-content.json) | The ready-made courses: how a payload is discovered, the manifest's keys, and the allow-list rule that decides what actually installs. |
 | [`file-formats.json`](file-formats.json) | **The two files both apps WRITE and the Python then reads**: every `course_config.json` key with its type and default, and the frontmatter that decides whether students see a page — including the legacy `draft:` spelling, which means the opposite. |
-| [`shared-rules.json`](shared-rules.json) | Nineteen rule sets on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**, and **which processes belong to a section's preview, and must therefore be stopped**, and **which of a course's own folders the build treats specially, and what a teacher is told about each**. |
+| [`shared-rules.json`](shared-rules.json) | Nineteen rule sets on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks, and which a teacher is OFFERED when they are asked**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**, and **which processes belong to a section's preview, and must therefore be stopped**, and **which of a course's own folders the build treats specially, and what a teacher is told about each**. |
 | [`course-management.json`](course-management.json) | The names the three kinds of zip carry and how they are told apart, what section number is offered next and which entries are refused in whose words, and the grade a course code names. |
 | [`class-planning.json`](class-planning.json) | Which page titles carry numbers, what "the next class" would be called, and — the highest-stakes data here — the ORDER renames must run in when room is made for a class. |
 | [`schedule-rules.json`](schedule-rules.json) | How a teacher's own list of class dates is read: every accepted date form, how an ambiguous `08/09/2026` column is settled or asked about, and what a pasted Google Sheet address becomes. |
@@ -167,7 +167,8 @@ assistant's tests". Two of them matter enough to repeat:
 ## Coverage: every mac test file, and where it stands
 
 No stone unturned — this table is the audit, and a file missing from it is a
-gap nobody has looked at. Counts are test functions, taken 2026-08-16.
+gap nobody has looked at. Counts are test functions, taken 2026-08-16; the `siteHealth` row was
+recounted 2026-09-07.
 
 **Shared through a contract** (the Windows suite can run the same cases):
 
@@ -218,7 +219,8 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
 | Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
-| What a teacher is told when a folder a feature needs has gone | `shared-rules.json` → `siteHealth` | SiteHealthContract (5), SiteHealthFinding (11), and `scripts/test_site_health.py` |
+| Which folders the marks checklist OFFERS | `shared-rules.json` → `gradedFolders.choices` | Proposed from Windows 2026-09-06 and run there by `GradedFolderChoicesTests` (10 cases). **The mac has the behaviour and runs no case list**, so its suite does not go red for this one — see `MAC-HANDOFF.md`. |
+| What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (15), SiteHealthRepair (25), and `scripts/test_site_health.py` |
 
 ### Which of these the WINDOWS suite runs
 
@@ -244,7 +246,28 @@ as WINDOWS-HANDOFF item 31), through these classes in
 | `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts`, `linkRules.browserSafe` | `PublishAndLauncherContractTests` |
 | `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
+| `gradedFolders.cases` | `GradedFolderContractTests` |
+| `gradedFolders.choices` (cases, the depth cap and the skip list) | `GradedFolderChoicesTests` |
+| `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution` | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
 | `specialNames.renameFolder.linkRewriting` — every case, plus `escapingSet.leaveUnescaped` character by character | `FolderPathRewriterTests` |
+| `siteHealth.repair.reportedOncePerFinding` (both cases, built as `howToRunACase` says) and `siteHealth.repair.refusedWhenSomethingIsInTheWay` (the sentence, word for word) | `SiteHealthRepairTests`, `SiteHealthContractTests` |
+**Two notes on the two `specialNames` rows**, because they are not part of the audit's
+count and reading them as though they were would mislead. The `specialNames`
+lists in the first were already being run — those test classes predate item 29
+— and were simply never written down here. `linkRewriting` is newer than the audit — it was added to
+`shared-rules.json` on 2026-09-06, the same day, and fell outside the sweep; the
+row is here so it is not missed a second time. `FolderPathRewriterTests` has
+deserialised every case since 2026-09-07 (item 31 in
+[`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md), struck that day); before that it
+retyped five of its own.
+
+**One list was added after that audit and wired the same day it reached
+Windows.** `siteHealth.repair.reportedOncePerFinding` (mac, 2026-09-07) says a
+repair reports one result per FINDING rather than one per check name, and
+names each thing once in the sentence however many findings produced it.
+Windows shipped that shape first and proved it with a hand-written test; on
+2026-09-07 the test was replaced by the contract's cases, so the rule has one
+home. `WINDOWS-HANDOFF.md` items 33 and 34 have the detail.
 
 **Three habits came out of that work and are worth copying on either side.**
 

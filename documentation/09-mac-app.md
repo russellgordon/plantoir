@@ -123,7 +123,10 @@ Four things about it are deliberate:
   is left exactly as the teacher typed it. The rule, the measurements and the
   twelve cases both apps run are in
   [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
-  `specialNames.renameFolder.linkRewriting`; the reasoning is in
+  `specialNames.renameFolder.linkRewriting`, and which suite deserialises them
+  is recorded in [`contracts/README.md`](../contracts/README.md) rather than
+  here, because that is the kind of fact this page cannot keep true; the
+  reasoning is in
   [`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md) → "Spelling a folder's new name
   inside a link".
 
