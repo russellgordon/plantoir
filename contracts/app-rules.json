@@ -457,7 +457,9 @@
       },
       {
         "flag" : "--image <tag>",
-        "meaning" : "As above."
+        "macOnly" : true,
+        "meaning" : "Publish using a particular already-built image instead of the one the recipe hashes to.",
+        "why" : "NOT shared, recorded 2026-09-06 when this list was first run against the launchers. `deploy.sh` parses it; `deploy.ps1` does not, and cannot — Windows dropped Docker for a native runtime on 2026-08-19 (GUI-IMPROVEMENTS.md entry 290), so there is no image for a tag to name. The right answer was to write the divergence down rather than add a flag that does nothing to a launcher so a test would pass. `--diagnose` above IS shared and both launchers take it."
       }
     ],
     "note" : "What the APP passes the launchers, beyond the deploy arguments already above. Both platforms drive their own launcher — `preview.sh` here, `preview.ps1` there — and those scripts must accept the same flags, because the apps are written against the same behaviour. A flag renamed in one script and not the other fails at the worst moment: the launcher prints 'Unknown option' and exits, and to a teacher that is a preview that just did not start.",

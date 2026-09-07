@@ -1603,6 +1603,48 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **`--image` is the mac's flag alone, and the contract listed it as shared;
+  and a completeness check the mac may want** (Windows + shared, 2026-09-06,
+  branch `issue/29-windows-contract-case-lists`). **The mac suite stays green**
+  — the flag entry gains a `macOnly` note, nothing is removed. Reference:
+  `PublishAndLauncherContractTests` in `windows-app/Plantoir.Tests/`.
+
+  `launcherFlags.deployExtras` named `--diagnose` and `--image <tag>` as flags
+  the launchers must both accept. `deploy.sh` parses `--image`; `deploy.ps1`
+  does not, and cannot — Windows has had no image to name since it dropped
+  Docker on 2026-08-19. Recorded as `macOnly` rather than closed by adding a
+  dead flag to `deploy.ps1` so a test would go green, which is the shape of fix
+  `WINDOWS-BOOTSTRAP.md` §0 exists to forbid.
+
+  **The part worth copying is the shape of the tests, not the finding.** Both
+  suites had been walking the contract and asking "does the app do this?" —
+  which cannot notice a case, request or flag the app has and the contract does
+  not. Three checks here run the other way:
+
+  - **By reflection over the real definitions.** Every `CredentialRequest`
+    declared in the code must be described in `credentialPrompts.everyRequest`.
+    A request added and not written down is one the other app cannot show, so
+    the same first publish stops at a prompt on one platform and asks properly
+    on the other. `AssistToolSurface` would take the same treatment, and it is
+    the same hole the MCP-tool drift below went through.
+  - **By a name map, not a drained set.** `whenShown`'s nine cases are answered
+    by nine named tests, checked by reflection: a case the mac ADDS fails here
+    naming itself. A `HashSet` filled by ten tests and emptied by an eleventh
+    would have been the obvious shape and is wrong — xUnit builds a fresh
+    instance per `[Fact]` and fixes no order, so such a set passes or fails on
+    what happened to run, and reports nothing under `--filter`.
+  - **Against the parser, not the help text.** `--diagnose` appears three times
+    in `deploy.ps1`, twice of them in usage prose, so plain containment stays
+    green after the flag stops being accepted — which is exactly when a
+    teacher's publish "just does not start".
+
+  **Two `whenShown` cases had no answer on this side at all** and now do:
+  `course_config.json has changed`, and the accepted false negative where a
+  page restored from a backup keeps its size and modification date. The second
+  is worth having as a test precisely because it asserts the LIMIT — if it ever
+  starts reporting an edit, the fingerprint has begun reading file contents,
+  which is a real cost paid every time a window comes to the front.
+
 - **A field both apps have always written was named in no contract:
   `sectionTimetable.fields` listed three of four** (Windows + shared,
   2026-09-06, branch `issue/29-windows-contract-case-lists`). **The mac suite
