@@ -99,18 +99,44 @@ enum SiteHealthRepair {
 
         var restored: [String] = []
         var failed: [String] = []
+        // A repair the teacher must clear the way for before it can go ahead.
+        // It is a failure — it goes into `failed` with the rest, so the
+        // preview is not offered and "Could not put the front page back."
+        // still appears — but it brings its own reason, and that reason
+        // replaces the generic one below.
+        var reasonsItCouldNotGoAhead: [String] = []
+        var somethingSimplyFailed: Bool = false
         for (name, result) in results {
             switch result {
             case .restored:
                 restored.append(name)
             case .failed:
                 failed.append(name)
+                somethingSimplyFailed = true
+            case .blockedByAFolderWhereTheFrontPageBelongs(let sectionNumber):
+                failed.append(name)
+                reasonsItCouldNotGoAhead.append(folderWhereTheFrontPageBelongs(
+                    course: course.code, section: sectionNumber
+                ))
             case .alreadyFine:
                 break
             }
         }
         restored.sort()
         failed.sort()
+        reasonsItCouldNotGoAhead.sort()
+
+        // The generic explanation is added only when something failed for a
+        // reason nobody has a better sentence for. When BOTH happen at once —
+        // a file where Media belongs and a folder where the front page belongs
+        // — both are said, and in that order: the specific one first, because
+        // "you can make it yourself in Obsidian" is true of the Media folder
+        // and is exactly what cannot be done about the front page until the
+        // folder in the way has been moved.
+        if somethingSimplyFailed || reasonsItCouldNotGoAhead.isEmpty {
+            reasonsItCouldNotGoAhead.append(couldNotExplanation)
+        }
+        let whyNot: String = reasonsItCouldNotGoAhead.joined(separator: " ")
 
         // Nothing to do: every one of them was already there. Pressing Fix
         // twice must not read as a permissions problem.
@@ -125,7 +151,7 @@ enum SiteHealthRepair {
         if restored.isEmpty {
             return Outcome(
                 headline: "Plantoir could not put that back.",
-                detail: couldNotExplanation,
+                detail: whyNot,
                 canRebuild: false
             )
         }
@@ -138,7 +164,7 @@ enum SiteHealthRepair {
         if let alsoFailed = whatCouldNotBePutBack(failed) {
             return Outcome(
                 headline: putBack,
-                detail: alsoFailed + " " + couldNotExplanation,
+                detail: alsoFailed + " " + whyNot,
                 canRebuild: false
             )
         }
@@ -157,6 +183,26 @@ enum SiteHealthRepair {
     static let couldNotExplanation: String =
         "You can make it yourself in Obsidian, or check that the folder holding "
         + "this course isn't locked or read-only."
+
+    /// What a teacher is told when a FOLDER is sitting where a section's front
+    /// page belongs.
+    ///
+    /// Named here and pinned to `contracts/shared-rules.json` →
+    /// `siteHealth.repair.refusedWhenSomethingIsInTheWay`, so the two apps say
+    /// one sentence about one problem rather than inventing two.
+    ///
+    /// It names the COURSE as well as the section folder because every course
+    /// has a `section1`, and the dialog this appears in shows only a headline
+    /// and this sentence — nothing else in it says which course is meant.
+    static func folderWhereTheFrontPageBelongs(
+        course courseCode: String, section sectionNumber: Int
+    ) -> String {
+        return "There is a folder called index.md in the section\(sectionNumber) folder "
+            + "of your \(courseCode) course, where the front page should be. Plantoir "
+            + "has left it exactly as it is, in case your own pages are inside it. Move "
+            + "anything you want to keep somewhere else, then delete or rename that "
+            + "folder, and Plantoir can put the front page back."
+    }
 
     static func whatCouldNotBePutBack(_ names: [String]) -> String? {
         guard let described = whatWasPutBack(names) else {
@@ -253,6 +299,21 @@ enum SiteHealthRepair {
         case restored
         case alreadyFine
         case failed
+        /// A repair that cannot go ahead until the TEACHER moves something.
+        ///
+        /// Counted as a failure, because it is one — but it carries its own
+        /// explanation, and that is the whole point of the case. A folder
+        /// named `index.md` used to satisfy a bare `fileExists` check and be
+        /// reported as "already put right", while the section still had no
+        /// front page; answering `failed` instead would at least be honest,
+        /// but the sentence that goes with it — "check the folder isn't
+        /// locked or read-only" — sends a teacher looking for the wrong
+        /// thing entirely.
+        ///
+        /// It carries the SECTION rather than the sentence: this type says
+        /// how a repair went, and `outcome(ofRepairing:in:)` chooses every
+        /// word in this file.
+        case blockedByAFolderWhereTheFrontPageBelongs(section: Int)
     }
 
     @discardableResult
@@ -291,7 +352,29 @@ enum SiteHealthRepair {
         }
         let index: URL = course.sectionDirectoryURL(forSection: sectionNumber)
             .appendingPathComponent("index.md")
-        if FileManager.default.fileExists(atPath: index.path) {
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: index.path, isDirectory: &isDirectory) {
+            // A FOLDER named `index.md` is not "already fine" — the section
+            // still has no front page, so the build still produces no site and
+            // the publish still refuses. Without the `isDirectory:` form this
+            // reported the one dialog written to end silence as "that is
+            // already put right", which is the worst answer available: the
+            // teacher stops looking.
+            //
+            // And it REFUSES rather than clearing the way. Moving the folder
+            // aside and writing a proper front page was considered and
+            // rejected: that relocates a folder which may hold the teacher's
+            // own pages, without asking, and neither app can see what is
+            // inside it.
+            if isDirectory.boolValue {
+                ActivityTrail.note(
+                    .folderProblemNotRepaired,
+                    "found a folder called index.md where the front page belongs, "
+                    + "and left it alone",
+                    course: course.code, section: sectionNumber
+                )
+                return .blockedByAFolderWhereTheFrontPageBelongs(section: sectionNumber)
+            }
             return .alreadyFine
         }
         return restoreSectionIndex(forSection: sectionNumber, in: course) ? .restored : .failed
