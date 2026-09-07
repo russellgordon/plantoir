@@ -1230,8 +1230,36 @@ to run in the background.
     `knowinglyAbsent` set beside it, is this item's acceptance test — so what
     is left is the wizard field and the key, not the test. Medium.
 
-26. **The marks checklist offers only TOP-LEVEL folders, so a nested one
-    cannot be ticked and loses its marks silently (found 2026-09-06).**
+26. ~~**The marks checklist offers only TOP-LEVEL folders, so a nested one
+    cannot be ticked and loses its marks silently (found 2026-09-06).**~~
+    — ✅ Done 2026-09-06, branch `issue/26-marks-checklist-nested-folders`,
+    commit `02cf58b2`. `GradedFolderChoices.cs` walks the course folder four
+    levels deep with the mac's cap, skip list and `sectionN` handling;
+    `CourseSettingsView.xaml.cs` feeds the checklist, the frozen pool, the
+    removal path and the protection rules from that one list. **The item was
+    right that the gap was in two places**, and the second is the one that
+    mattered: `MaterializedGradedFolders()` now REQUIRES its pool rather than
+    defaulting to the top-level lists, so no future caller can re-narrow it by
+    accident. Ten contract cases in `gradedFolders.choices`; 16 tests; suite
+    1047 green.
+
+    **Two things this side does that the mac does not**, both written up in
+    `MAC-HANDOFF.md`: `excluded_items` names are not offered back (copying the
+    mac would have REGRESSED Windows, where removing a folder used to take it
+    out of the checklist in the same gesture), and each folder's children are
+    sorted so the list has a promised order at all. **And one caution worth
+    keeping** even though the item is closed: translating the mac's "do not
+    follow symlinks" as `FileAttributes.ReparsePoint` risks skipping every
+    folder in a cloud-synced working folder, because the Cloud Files API
+    documents unmaterialised placeholders as reparse points — which would put
+    synced courses straight back on the broken list with no test able to catch
+    it. **Not reproduced**: probing this machine's OneDrive with Files
+    On-Demand on found zero reparse-point directories, so it is a documented
+    hazard rather than an observed fault, and the narrower test costs nothing.
+    `child.Attributes.HasFlag(ReparsePoint) && child.LinkTarget is not null`
+    is what shipped, the attribute first only to skip a syscall per folder.
+    `CourseArchiver.cs:226` still uses the blanket version. Original text:
+
     `CourseSettingsView.xaml.cs` builds the pool from
     `SharedFolders.Concat(PerSectionFolders)`. The mac unions those with
     `nestedFolderNames`, four levels deep, and says why in a comment above it:
