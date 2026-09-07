@@ -179,6 +179,55 @@ outstanding.
 
 ## Open — what the mac still owes
 
+- **The two apps write a teacher's visibility flag DIFFERENTLY, and the
+  contract only describes one of them** (found 2026-09-06 by wiring
+  `pageVisibility.writingRules` into the Windows gate, branch
+  `issue/29-windows-contract-case-lists`). **What is owed is a decision, and it
+  is not this branch's to take** — both behaviours are deliberate and were
+  written down as such, in different places, by different sessions.
+
+  `contracts/file-formats.json` → `pageVisibility.writingRules[0]` says: *"A
+  page written in the old spelling KEEPS it, inverted — publishing a `draft:`
+  page writes `draft: false`, not `publish: true`,"* because *"rewriting the
+  key would change a page they did not ask to have changed, and a course half
+  in each spelling is harder to reason about than one consistently old."*
+
+  **The mac does exactly that.** `AssistPageVisibility.setting(published:…)`
+  asks `keyInUse` which spelling the page has, and writes that one, inverting
+  the value when it is the old key.
+
+  **Windows does the opposite, on purpose.** `PageFrontmatter.SetDraft` writes
+  `publishForSection<N>` into the position where `draftSection<N>` sat and
+  removes the old key. `GUI-IMPROVEMENTS.md` row 140 describes that as the
+  intent — *"writes the new key in the old key's position so a migrated page
+  shows a one-line diff rather than reordered frontmatter"* — with *"no flag
+  day: legacy courses build exactly as before, and a page migrates the first
+  time something edits it,"* which works because `build_site.py` and
+  `patches/publish.ts` read both spellings.
+
+  **Why it matters rather than being a tidy-up.** These are a teacher's own
+  files, and a course does not stay on one machine: a page edited on Windows
+  comes back to the mac migrated, and the mac then keeps the NEW key, so the
+  file quietly converts the first time a Windows machine touches it. Nothing is
+  broken by that — both spellings build identically — but the contract asserts
+  a property of the teacher's file that is not true of the product as shipped,
+  and one of the two has to give.
+
+  **What the mac owes:** pick one, and say which.
+  - *If the contract wins*, Windows changes `SetDraft` to keep the old key
+    inverted, and row 140's migration paragraph gets a correction. The test is
+    written and waiting:
+    `FileFormatContractTests.TheOldSpellingIsKeptRatherThanMigrated`, currently
+    `[Fact(Skip = …)]`. Un-skipping it is the whole change on this side.
+  - *If migration wins*, `writingRules[0]` is rewritten to say so and the mac
+    adopts it, which is the larger change of the two — it is the mac's
+    behaviour that would move.
+
+  **Not decided here**, deliberately: the branch this was found on wires
+  contract lists into the Windows suite and changes no product behaviour, and
+  guessing at a rule about teachers' files in a test-wiring commit is how a
+  divergence becomes two divergences.
+
 - **Windows' MCP server has drifted a dozen tools ahead of the mac's, and
   nothing was going to tell either side** (found 2026-09-06 by an audit asking
   whether the parity list was COMPLETE, not whether it was correct).
@@ -1554,17 +1603,39 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **A field both apps have always written was named in no contract:
+  `sectionTimetable.fields` listed three of four** (Windows + shared,
+  2026-09-06, branch `issue/29-windows-contract-case-lists`). **The mac suite
+  stays green** — the field is now described, not changed. Reference:
+  `FileFormatContractTests.TheRememberedTimetableIsWhereTheContractSaysAndCarriesItsFields`.
+
+  `courses/<CODE>/.internal/timetable/section<N>.json` carries `section`,
+  `dates`, `source` and `recorded`. The contract named the last three. Both
+  apps write all four — the mac's `SectionTimetable` encodes `section` and
+  reads it back with the filename's number as a fallback; Windows' `Stored`
+  record writes it and does not read it — so nothing has ever been wrong, and
+  that is the point: **a field two apps write and no contract describes is one
+  a third reader drops without anybody noticing.** It is now described,
+  including why it is redundant with the file's own name and worth keeping
+  anyway (a timetable copied out of its folder still says what it is for).
+
+  Found by wiring the list into the Windows gate rather than by reading it,
+  which is the argument for item 29 in miniature: the list had been correct
+  enough to pass every inspection and was never executed against a real file.
+
 - **Two shared-Python progress markers were classified nowhere, and
   `markerOrigins.knownDivergence` had been stale since the native runtime
   landed** (Windows + shared, 2026-09-06, branch
-  `issue/29-windows-contract-case-lists`). **The mac suite stays green** — both
-  edits are additive and the mac reads neither — so this is a know, not an ask.
+  `issue/29-windows-contract-case-lists`). **The mac suite stays green.** It
+  reads `origins`, but only to look up the markers its own lists use, and it
+  never uses these two; `knownDivergence` is read by no Swift at all. So this
+  is a know, not an ask.
   Reference: `windows-app/Plantoir.Tests/MilestoneContractTests.cs`.
 
   Wiring `markerOrigins` into the Windows gate (WINDOWS-HANDOFF item 29) turned
   up two markers that `scripts/setup_course.py` prints — `"Example Course
-  installed to"` (line 1279) and `"EXAMPLE_COURSE_CODE="` (line 1306) — and
-  that `markerOrigins.origins` did not classify. Both are now in it as
+  installed to"` and `"EXAMPLE_COURSE_CODE="` — and that
+  `markerOrigins.origins` did not classify. Both are now in it as
   `shared-python`.
 
   **They went missing for a structural reason worth knowing.** The mac's

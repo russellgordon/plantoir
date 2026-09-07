@@ -58,18 +58,37 @@ executed against the real function.
 from. It decides whether your app must match the string exactly:
 
 - **`shared-python`** — printed by `scripts/*.py`, identical output on both
-  platforms. Match it to the character. Seventeen of the twenty-five are these.
+  platforms. Match it to the character. Nineteen of the twenty-eight are these.
 - **`launcher`** — printed by `setup.sh` / `preview.sh` / `deploy.sh`, which
-  have separately written `.ps1` counterparts. These **deliberately differ**:
-  the mac watches for "Setting up this Mac" and Windows for "Setting up this
-  PC". Seven of the twenty-five.
+  have separately written `.ps1` counterparts. These **deliberately differ**,
+  and since 2026-08-19 they no longer even pair up: Windows dropped Docker for
+  a native runtime, so the mac's "Setting up this Mac" has no Windows
+  counterpart at all rather than being answered by "Setting up this PC", and
+  neither container marker has one either. `knownDivergence` carries the five
+  strings a Windows milestone must therefore never watch for; Windows' OWN
+  launcher text is not here, because it is the platform's rather than the
+  product's. Seven of the twenty-eight.
 - **`elsewhere`** — printed by the Docker build or a tool; check by hand.
 
-A mac test verifies the classification against the actual files, so a marker
-that moves from a launcher into shared Python (or the reverse) fails here
-rather than silently changing what Windows should be matching. Getting this
+**Both suites verify the classification against the actual files**, so a marker
+that moves from a launcher into shared Python (or the reverse) fails rather
+than silently changing what the other app should be matching. The mac walks the
+markers its own lists use and looks each one up; Windows
+(`MilestoneContractTests`) does the same and then the reverse — a marker the
+contract does NOT name, which something under `scripts/` nevertheless prints,
+fails and says to classify it. That reverse direction is what found the two
+example-course markers, which the mac has no task to have listed. Getting this
 wrong crashes nothing: the progress bar simply stops moving, which reads as a
 slow build.
+
+Three of the twenty-eight appear in no mac milestone list, and that is expected
+rather than drift. The two example-course markers are Windows' alone — the mac
+has no such task. "Launching Quartz preview" is now matched by NEITHER app:
+`build_site.py` prints it before `quartz build --serve` has started, so it
+completed every remaining step at once and pinned the bar there for the whole
+real build (Windows found this; `TaskMilestones.Preview` uses Quartz's own
+"Done processing" instead). It stays classified because the line is still
+printed and a future list may want it.
 
 ## Proposing a case from the Windows side
 

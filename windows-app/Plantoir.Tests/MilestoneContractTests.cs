@@ -62,11 +62,25 @@ public class MilestoneContractTests
                     yield return milestone.Marker;
     }
 
+    /// <summary>
+    /// Whether anything under <c>scripts/</c> carries this text.
+    ///
+    /// <para>Plain containment, so a marker named in a COMMENT or a docstring
+    /// counts as printed — <c>"Netlify site"</c> and <c>"timetable section
+    /// numbers"</c> both appear in both forms today. Deliberately the same
+    /// weakness as the mac's <c>text(_:appearsUnder:)</c>: the two suites
+    /// should go red together or not at all, and tightening one side alone
+    /// would mean a marker that fails here and passes there, which is worse
+    /// than a shared false positive. Tighten both, or neither.</para>
+    /// </summary>
     private static bool AppearsUnderScripts(string marker)
     {
         string scripts = Path.Combine(RepoRoot, "scripts");
         foreach (string file in Directory.EnumerateFiles(scripts, "*.py", SearchOption.AllDirectories))
         {
+            // A stale .pyc from an earlier Python can carry a string the source
+            // no longer prints, which would keep this green after a rename.
+            if (file.Contains("__pycache__", StringComparison.Ordinal)) continue;
             if (File.ReadAllText(file).Contains(marker, StringComparison.Ordinal)) return true;
         }
         return false;
@@ -259,9 +273,14 @@ public class MilestoneContractTests
                     expected.Add(marker);
             }
 
+            // Built from the CLASSIFICATION, not by filtering to what the mac
+            // happens to list. Filtering the other way would drop a shared step
+            // this app shows and the mac does not — the one direction the mac
+            // cannot see from its side — and print two identical lists while
+            // passing.
             var actual = new List<string>();
             foreach (var milestone in ours[task])
-                if (expected.Contains(milestone.Marker, StringComparer.Ordinal))
+                if (origins.TryGetValue(milestone.Marker, out string? origin) && origin == "shared-python")
                     actual.Add(milestone.Marker);
 
             Assert.True(expected.SequenceEqual(actual, StringComparer.Ordinal),
