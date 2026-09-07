@@ -85,7 +85,7 @@ computing its own path (see "The flags the app answers"):
 
 | Folder | What |
 |---|---|
-| `builds\<folder id>\` | Built websites, OUTSIDE the working folder. `<CODE>\section<N>\public` is the built site; `work\<CODE>\section<N>` is the Quartz project a preview serves from. |
+| `builds\<folder id>\` | Built websites, OUTSIDE the working folder. `<CODE>\section<N>\public` is the built site; `work\<CODE>\section<N>` is the Quartz project a preview serves from. Each `builds\<id>\` also holds `working-folder.txt`, naming the working folder it belongs to; at launch the app deletes any builds folder whose named working folder is under the home folder and the system says is NOT THERE (error 2 or 3) — never one that is merely unreachable. |
 | `Logs\` | The activity trail — the breadcrumb file a problem report gathers. |
 | `scheduled\` | The wrapper script each scheduled deploy runs. |
 | `scheduled\pending\` | Sentinels a finished scheduled deploy leaves for the app to pick up next time it runs. |
