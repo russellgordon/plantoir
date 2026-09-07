@@ -133,6 +133,7 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         _workspacePath = path;
         Settings.WorkspacePath = path;
         Settings.Save();
+        BuildOutputLocation.WriteWorkingFolderMarker(path);
         Plantoir.Core.Scripting.ActivityTrail.Note(
             Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderOpened,
             $"working folder opened — {path}");
@@ -151,6 +152,7 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
             return;
         }
         _workspacePath = path;
+        BuildOutputLocation.WriteWorkingFolderMarker(path);
         Plantoir.Core.Scripting.ActivityTrail.Note(
             Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderOpened,
             $"working folder opened — {path}");

@@ -84,6 +84,21 @@ public partial class App : Application
             Settings = new AppSettings();
         }
 
+        // Name every builds folder this app can name, then sweep the ones
+        // whose working folder is gone. Once per process, here, never per
+        // window. Both are best-effort and silent: a teacher cannot see
+        // either, so neither leaves a trail line.
+        try
+        {
+            var known = new List<string>();
+            if (Settings.WorkspacePath is { } open) known.Add(open);
+            foreach (var rememberedWindow in Settings.RememberedWindows) known.Add(rememberedWindow.Path);
+            BuildOutputLocation.AdoptWorkingFolderMarkers(known);
+            var swept = BuildOutputLocation.DiscardBuildsForMissingWorkingFolders();
+            if (swept.Count > 0) LogDiagnostic($"Swept {swept.Count} builds folder(s) whose working folder is gone");
+        }
+        catch (Exception ex) { LogDiagnostic($"builds sweep: {ex.Message}"); }
+
         string rawArgs = args.Arguments ?? "";
         string[] cmdArgs = Environment.GetCommandLineArgs();
         string outputDir = "";
