@@ -131,10 +131,20 @@ final class SheetAnimationSuppressorTests: XCTestCase {
             """
         )
 
-        // Given back rather than merely hidden: an ordered-out window stays in
-        // NSApp.windows for the rest of the run, and this suite has tests that
+        // Given back rather than merely hidden — an ordered-out window stays in
+        // `NSApp.windows` for the rest of the run, and this suite has tests that
         // photograph whatever window is up.
-        alert.window.close()
+        //
+        // `isReleasedWhenClosed` is NOT decoration. Closing this window with it
+        // left at its default over-releases an `_NSWindowTransformAnimation`
+        // during the next autorelease pool pop, and the host segfaults inside
+        // `CA::Context::commit_transaction` — reproduced 9 times out of 9, in
+        // `SidebarRestorationProbeTests`, which is simply the class that runs
+        // next. It has nothing to do with the animation this file suppresses:
+        // it crashes identically with the suppressor turned off. And do not
+        // close the ALERT's window; the alert owns it, `endSheet` has already
+        // ordered it out, and closing it is half of what caused the above.
+        window.isReleasedWhenClosed = false
         window.close()
     }
 }
