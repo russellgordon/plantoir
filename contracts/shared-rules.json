@@ -840,6 +840,7 @@
         "rule": "A repair reports one result per FINDING, never one per check NAME. Two sections each missing a front page are two findings with one name: both are repaired either way, but keyed by the name only the LAST result survives, so \"section 1 restored, section 2 was already there\" comes back as \"That is already put right. Nothing needed changing.\" with no preview offered — for a repair that really did put a page back. The SENTENCE, on the other hand, names each thing ONCE however many findings produced it: \"Put the front page and the front page back.\" is not a sentence.",
         "cases": [
           {
+            "check": "sectionIndexMissing",
             "sections": [
               {"number": 1, "frontPage": "missing"},
               {"number": 2, "frontPage": "theTeachersOwn"}
@@ -850,6 +851,7 @@
             "note": "The case a name-keyed result gets wrong: the second answer overwrites the first, and the teacher is told nothing needed changing."
           },
           {
+            "check": "sectionIndexMissing",
             "sections": [
               {"number": 1, "frontPage": "missing"},
               {"number": 2, "frontPage": "missing"}
@@ -860,9 +862,10 @@
             "note": "Two repairs, one sentence. The de-duplication that stops \"the front page and the front page\"."
           }
         ],
+        "howToRunACase": "One finding per listed section, all of the named `check`, all `fixable: true`, for a course whose `section_numbers` are exactly the listed numbers. `frontPage` says what is on disk in that section before the repair: \"missing\" is nothing at all, \"theTeachersOwn\" is an index.md the teacher wrote, which must survive untouched. `expectResults` is one answer per finding IN THE ORDER GIVEN, drawn from restored | alreadyFine | failed | refused (\"refused\" is refusedWhenSomethingIsInTheWay, which the mac has and Windows still owes). `expectHeadline` and `expectCanRebuild` are what the report says; the occasion does not matter here, because it only changes the DETAIL. Ask for the report and the results on separate copies of the course: every repair runs as it goes, so a second pass answers alreadyFine to everything.",
         "reachability": "Unreachable from either app's own front end today, and fixed anyway. A section window owns one runner and the checks announce per section, so the findings handed to a repair have always been one section's. The collapse is SILENT and the constraint was written down nowhere, so the next caller — the assistant, a second window, a whole-course fix — would have met it as a wrong report rather than as a compile error. Recorded as latent rather than as a shipped bug, so nobody later reads it as damage a teacher met.",
         "why": "Windows found it by porting the mac's file line by line and shipped the per-finding shape first (MAC-HANDOFF.md, 2026-09-06); the mac followed on 2026-09-07. Both now return one entry per finding and de-duplicate the names when building the sentence.",
-        "knownLimit": "One name with TWO different outcomes — section 1 restored, section 2 failed — still reads \"Put the front page back.\" followed by \"Could not put the front page back.\", because the sentence has no way to say which section is which. Left as it is on both platforms: it is as unreachable as the collapse was, and new wording nobody has weighed is harder to take back than a paragraph of explanation. The refusal case does not have the problem, because its own sentence names the section folder."
+        "knownLimit": "One name with TWO different outcomes — section 1 restored, section 2 failed — still reads \"Put the front page back.\" followed by \"Could not put the front page back.\", because the sentence has no way to say which section is which. Left as it is on both platforms: it is as unreachable as the collapse was, and new wording nobody has weighed is harder to take back than a paragraph of explanation. On the MAC the refusal case does not have the problem, because its own sentence names the section folder — but Windows has no refusal case yet (WINDOWS-HANDOFF.md item 33), so over there a blocked section falls into `failed` with the generic explanation and the same nameless pairing. It stops being a Windows limit the day item 33 lands."
       },
       "oneAlertAtATime": {
         "rule": "The outcome is shown AFTER the dialog it was requested from has gone, never raised from inside that dialog's own button action.",

@@ -363,8 +363,9 @@ enum SiteHealthRepair {
     /// Windows reads the same way. Inventing wording for it was rejected: it
     /// is as unreachable as the collapse was, and a sentence nobody has
     /// weighed is harder to take back than a paragraph of explanation. The
-    /// blocked case does not have the problem — its own sentence names the
-    /// section folder.
+    /// blocked case does not have the problem HERE — its own sentence names
+    /// the section folder — but Windows has no blocked case yet, so over there
+    /// it reads namelessly too until `WINDOWS-HANDOFF.md` item 33 lands.
     struct Attempt: Equatable {
 
         // MARK: - Stored properties
