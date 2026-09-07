@@ -87,6 +87,7 @@ public sealed partial class MainWindow : Window
                 // window on the same section, would otherwise sit invisible
                 // here until something else happened to reload the tree.
                 if (Workspace.State == WorkspaceState.Ready) Sidebar.Refresh();
+                RefreshRenameCourseItem();
             }
         };
         // Covers app launch itself, in case the window's first Activated
@@ -604,9 +605,10 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// A centred title, a sentence, and up to two buttons: the accented one
-    /// is the thing this pane is for, the plain one beside it the other
-    /// thing a teacher might have come here to do (the mac's own archived and
+    /// A centred title, a sentence, and up to two buttons — the second only
+    /// ever beside a first: the accented one is the thing this pane is for,
+    /// the plain one beside it the other thing a teacher might have come here
+    /// to do (the mac's own archived and
     /// backup panes, `Restore…` prominent and `Delete …` plain).
     /// </summary>
     private static UIElement EmptyState(string title, string description, string? actionLabel, Action? action,
@@ -941,10 +943,17 @@ public sealed partial class MainWindow : Window
 
     private void RenameCourse_Click(object sender, RoutedEventArgs e) => RenameSelectedCourse();
 
+    /// <summary>
+    /// No busy guard here on purpose: the dialog re-checks and EXPLAINS ("…is
+    /// previewing or deploying right now. Stop that first, then rename."),
+    /// and the menu item can be stale — the MenuBar has no Opening event and
+    /// nothing redraws it when a preview starts — so a silent return here
+    /// would be a dead click with no answer, where the sidebar's route gives
+    /// one.
+    /// </summary>
     private void RenameSelectedCourse()
     {
         if (CourseThatCanBeRenamed is not { } course) return;
-        if (WhyRenameIsUnavailable(course) is not null) { RefreshRenameCourseItem(); return; }
         _ = Sidebar.OpenRenameCourseDialog(course);
     }
 
