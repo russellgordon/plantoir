@@ -1884,6 +1884,29 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Windows' two synced-folder views are built, and one thing about the store
+  behind them is worth knowing before a privacy question arrives** (Windows,
+  2026-09-07, branch `issue/18-cloud-synced-folder-views`; item 18 struck;
+  `GUI-IMPROVEMENTS.md` row 436). **Nothing for the mac to do.**
+  `AppSettings.AcceptedSyncedFolders` holds FULL folder paths in
+  `settings.json`, keyed by resolved path, with no cap and no "forget these"
+  affordance — the contract's `rememberedPerFolder` rule says the list is
+  never pruned, and that is what it does. It is the same shape as the mac's
+  remembered-per-folder store, recorded here because a list of a teacher's
+  folder paths in a settings file is the kind of thing somebody asks about
+  later, and the answer should be "yes, on purpose, and here is why".
+
+  Two decisions the brief left to the session. **Two windows on the same
+  folder**: a notice shown in one window is suppressed in every other window
+  of the same process for that resolved path, until the teacher answers
+  (`MainWindow._syncNoticedThisProcess`); cheap, and the remembered answer in
+  settings covers everything after. **The InfoBar overlay at 900×600**: it
+  sits at the top of the content area, over the sidebar and detail, not in a
+  row of its own, so the window's bottom band cannot be pushed off screen —
+  the mac's inline-banner regression is not reproduced by construction. Not
+  measured on screen: the overlay's height at the minimum size wants one look
+  at the real interface with "Show Details" open.
+
 - **Windows brings the main window forward for an assistant-driven build
   ONLY when it was minimised or hidden — a chosen divergence from row 300,
   not an oversight** (Windows, 2026-09-07, branch `issue/28-four-small-gaps`,
@@ -3282,6 +3305,23 @@ is what happened to the test-race item, sitting here for three days with
 
 
 ## Done — the ledger
+
+- **The two synced-folder views exist on Windows** (Windows, 2026-09-07,
+  branch `issue/18-cloud-synced-folder-views`; `WINDOWS-HANDOFF.md` item 18
+  struck; `GUI-IMPROVEMENTS.md` row 436). **The mac is expected to KNOW.**
+  ✅ DONE. Every sentence is the contract's (`CloudSyncWording`, pinned by
+  `CloudSyncedFolderTests`, untouched). At the picker: `ContentDialog`, path
+  first, `DefaultButton = None`, "Choose a Different Folder…" reopens the OS
+  picker in a loop — rejected: returning to the picker view (one more click
+  for somebody who has already said what they want) and showing only the
+  notice (the contract names two buttons for this moment). A folder the
+  picker will not take anyway (neither a working folder nor empty) gets no
+  note; re-choosing the open folder takes the notice form. Restored or
+  inherited: an `InfoBar` overlay above the path bar, "Show Details" in
+  place, "Got It" to dismiss, and dismissing is remembered as going ahead.
+  `synced folder noticed` is written when either form is shown, `synced folder
+  accepted` when the teacher goes ahead from either; both carry the service's
+  name and never the folder. Not driven by hand.
 
 - **Windows has the way back for a whole conversation — and now saves one
   backup per conversation instead of one per change** (Windows, 2026-09-07,
