@@ -1631,6 +1631,39 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **The generator should emit the tool-schema DEPARTURES beside the schemas,
+  because the only record of them is a Swift comment** (found 2026-09-06 by
+  wiring `toolSchemas` into the Windows gate, branch
+  `issue/29-windows-contract-case-lists`). **Small, and it removes a copy
+  rather than adding one.** Reference:
+  `AssistSurfaceContractTests.AssertOnlyTheDeparturesWeHaveAgreed`.
+
+  `AssistToolSurface.swift` names "two deliberate departures from the Windows
+  schema": lists of page names reach the mac as ONE semicolon-separated string,
+  because that client's schema has no arrays and a comma-separated list would
+  cut "Unit 2, Day 3" in half; and the mac has no `preview` flag, because every
+  change rebuilds there. Both are good decisions with their reasons written
+  down — and written down **only in that doc comment**.
+
+  So when the Windows suite started running `toolSchemas`, four parameters came
+  up as type mismatches (`publish_pages.pages` and its three relatives: array
+  here, string there) with nothing in the contract to say they were meant. The
+  Windows test now carries the list, which makes it the SECOND home for a fact
+  the contract cannot hold — `toolSchemas` is a generated key, so the departure
+  cannot be written beside the schemas it applies to by hand.
+
+  **What is asked:** have `Plantoir --write-contracts` emit the departures into
+  the generated `toolSchemas` block — tool, parameter, each side's type, and
+  the reason — from the same place the doc comment states them. The Windows
+  test then reads them and deletes its copy. Until then the copy is asserted as
+  an exact set, so a NEW departure fails on this side and a resolved one fails
+  too, which is the best a second home can do.
+
+  **Not proposed: making the two agree.** The mac's shape is forced by its
+  client and the semicolon choice is reasoned; changing either app's schema is
+  a routing change needing the suite re-run, and that is not what this branch
+  is for.
+
 - **`AppRulesContract.milestones()` leaves the example-course task out of the
   readout, so two shared markers were classified by nobody** (found 2026-09-06,
   branch `issue/29-windows-contract-case-lists`). **A one-line fix, and the
