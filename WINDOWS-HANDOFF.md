@@ -1247,13 +1247,17 @@ to run in the background.
     `MAC-HANDOFF.md`: `excluded_items` names are not offered back (copying the
     mac would have REGRESSED Windows, where removing a folder used to take it
     out of the checklist in the same gesture), and each folder's children are
-    sorted so the list has a promised order at all. **And one trap worth
+    sorted so the list has a promised order at all. **And one caution worth
     keeping** even though the item is closed: translating the mac's "do not
-    follow symlinks" as `FileAttributes.ReparsePoint` would have skipped every
-    folder in a OneDrive working folder with Files On-Demand on — an
-    unmaterialised directory is a reparse point too — putting synced courses
-    straight back on the broken list, and no test would have caught it.
-    `DirectoryInfo.LinkTarget is not null` is the correct test.
+    follow symlinks" as `FileAttributes.ReparsePoint` risks skipping every
+    folder in a cloud-synced working folder, because the Cloud Files API
+    documents unmaterialised placeholders as reparse points — which would put
+    synced courses straight back on the broken list with no test able to catch
+    it. **Not reproduced**: probing this machine's OneDrive with Files
+    On-Demand on found zero reparse-point directories, so it is a documented
+    hazard rather than an observed fault, and the narrower test costs nothing.
+    `child.Attributes.HasFlag(ReparsePoint) && child.LinkTarget is not null`
+    is what shipped, the attribute first only to skip a syscall per folder.
     `CourseArchiver.cs:226` still uses the blanket version. Original text:
 
     `CourseSettingsView.xaml.cs` builds the pool from
