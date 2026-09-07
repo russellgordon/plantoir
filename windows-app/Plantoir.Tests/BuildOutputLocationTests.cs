@@ -16,6 +16,7 @@ namespace Plantoir.Tests;
 /// real <c>%LOCALAPPDATA%\Plantoir\builds</c> — the same mistake that once put
 /// 263 lines about a fixture course into a teacher's real activity trail.</para>
 /// </summary>
+[Collection(ProcessEnvironment.Name)]
 public class BuildOutputLocationTests : IDisposable
 {
     private readonly string _root;
