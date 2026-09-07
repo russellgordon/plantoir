@@ -328,21 +328,35 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   **know**; the two below are genuine **do**s for this side, both found by
   porting the mac's code line by line and asking what each branch answers.
 
-  1. **A DIRECTORY named `index.md` is reported to the teacher as ALREADY PUT
-     RIGHT.** `SiteHealthRepair.restoreIndex` (`SiteHealthRepair.swift:294`)
-     asks `FileManager.fileExists(atPath:)`, which is TRUE for a directory, so
-     it returns `.alreadyFine` — "That is already put right. Nothing needed
-     changing." The section still has no front page, so the build still
-     produces no site and the publish still refuses; the one dialog written to
-     end silence says the problem is dealt with. `restoreMedia` two functions
-     above gets this right, with the `isDirectory:` form and a comment saying
-     why. **Windows returns `Failed` here**, which is the honest answer of the
-     two available (the teacher is at least told nothing was put back), though
-     its sentence — "check that the folder isn't locked or read-only" — is
-     still not quite the reason. If the mac wants a better sentence than
-     either, that is a contract case worth proposing back.
-     Windows reference: `SiteHealthRepair.RestoreIndex`, test
-     `ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine`.
+  1. ~~**A DIRECTORY named `index.md` is reported to the teacher as ALREADY PUT
+     RIGHT.**~~ — ✅ **Done 2026-09-07**, branch
+     `issue/repair-index-md-directory`, `GUI-IMPROVEMENTS.md` row 426.
+     `SiteHealthRepair.restoreIndex` asked `FileManager.fileExists(atPath:)`,
+     which is TRUE for a directory, so it returned `.alreadyFine` — "That is
+     already put right. Nothing needed changing." — about a section that still
+     had no front page, so the build still produced no site and the publish
+     still refused; the one dialog written to end silence said the problem was
+     dealt with. `restoreMedia`, the function directly above it, got this
+     right, with the
+     `isDirectory:` form and a comment saying why. You were right, and the fix
+     is yours as much as ours.
+
+     **The mac took the better sentence you invited it to propose, so this
+     comes back to you as work.** Windows returned `Failed`, which is the
+     honest answer of the two that existed; the mac now REFUSES with a
+     sentence of its own, touching nothing —
+     `contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`,
+     `expect: "refused"`. So `SiteHealthRepair.Result` needs a FOURTH answer on
+     your side and
+     `ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine`
+     needs updating. The refusal also records a new trail event, `folder
+     problem not repaired`, which `activityTrail.mustRecord` pins by equality
+     — **your suite is red until you add it**, and that is the mechanism
+     working. Both are written up as `WINDOWS-HANDOFF.md` item 33, with the
+     rejected alternative (move the folder aside and write a proper front page
+     — no: it relocates a folder that may hold their pages, without asking,
+     and neither app can see inside it) and the reason the event is named for
+     the outcome rather than for its cause.
 
   2. **`repair(_:in:)` returns `[String: Result]`, keyed by check NAME, so two
      findings with the same name collapse.** Two sections each missing a front
