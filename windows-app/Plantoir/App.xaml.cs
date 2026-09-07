@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.UI.Xaml;
@@ -184,6 +186,23 @@ public partial class App : Application
         }
     }
 
+
+    /// <summary>
+    /// An open main window showing this working folder, or null. For the
+    /// assistant, whose own main window may have been closed under it: the
+    /// build then goes to another window on the same folder rather than to
+    /// a second one opened beside it.
+    /// </summary>
+    public static MainWindow? WindowFor(string folderPath)
+    {
+        foreach (var window in _windows)
+        {
+            if (window.IsClosed || window.Workspace.WorkspacePath is not { } open) continue;
+            if (string.Equals(Path.GetFullPath(open), Path.GetFullPath(folderPath), StringComparison.OrdinalIgnoreCase))
+                return window;
+        }
+        return null;
+    }
 
     /// <summary>Ctrl+N: inherit the key window's folder; alone → the picker.</summary>
     public static MainWindow OpenNewWindow()

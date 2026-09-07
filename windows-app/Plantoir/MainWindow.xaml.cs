@@ -92,7 +92,7 @@ public sealed partial class MainWindow : Window
         // fires before this runs (or does not fire at all on some launch
         // paths) — cheap and idempotent when there is nothing pending.
         _ = System.Threading.Tasks.Task.Run(ScheduledDeployCompletion.ConsumePending);
-        Closed += (_, _) => Workspace.UnregisterWindow();
+        Closed += (_, _) => { IsClosed = true; Workspace.UnregisterWindow(); };
 
         // The Preview menu tracks whichever section is currently shown —
         // one callback registered once, rather than a refresh call threaded
@@ -213,6 +213,33 @@ public sealed partial class MainWindow : Window
         });
     }
 
+    /// <summary>True once this window has closed; a closed window cannot show anything.</summary>
+    public bool IsClosed { get; private set; }
+
+    /// <summary>
+    /// Bring this window onto the screen ONLY if it is not already there —
+    /// minimised, or hidden. A window the teacher can already see is left
+    /// exactly as it is, and in particular is NOT activated: the assistant is
+    /// a separate window they may still be typing in, and stealing keyboard
+    /// focus mid-sentence to show them a build that was already in view is a
+    /// worse trade than the mac's unconditional bring-to-front (row 300).
+    ///
+    /// <para>"Not already there" is decided by two cheap, honest tests —
+    /// <c>OverlappedPresenter.State == Minimized</c>, and
+    /// <c>AppWindow.IsVisible</c> being false. A window fully covered by
+    /// another window is NOT detected: there is no cheap answer to occlusion
+    /// on WinUI, and guessing wrong would steal focus. Recorded in
+    /// MAC-HANDOFF.md as a chosen divergence rather than an oversight.</para>
+    /// </summary>
+    private void ComeForwardIfHidden()
+    {
+        bool minimised = AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
+        if (!minimised && AppWindow.IsVisible) return;
+        if (minimised && AppWindow.Presenter is OverlappedPresenter presenter) presenter.Restore();
+        if (!AppWindow.IsVisible) AppWindow.Show();
+        Activate();
+    }
+
     /// <summary>
     /// Bring a section's preview onto the screen, for the assistant.
     ///
@@ -221,9 +248,12 @@ public sealed partial class MainWindow : Window
     /// watched it finish, and had nothing to look at. So after a tool that
     /// leaves a fresh build behind, the assistant's window asks this one to
     /// select the section and start its preview. If a preview is already
-    /// serving, starting is skipped — live reload is showing the change — but
-    /// the window still comes forward so the teacher actually sees it.
-    /// May be called from any thread.
+    /// serving, starting is skipped — live reload is showing the change. The
+    /// window comes forward only when it is minimised or hidden
+    /// (<see cref="ComeForwardIfHidden"/>); one the teacher can already see is
+    /// not activated, so the assistant window keeps keyboard focus. Until
+    /// 2026-09-07 nothing here activated at all, and this comment described
+    /// a behaviour that had never been built. May be called from any thread.
     /// </summary>
     public void ShowPreviewFor(string courseCode, int section)
     {
@@ -238,6 +268,7 @@ public sealed partial class MainWindow : Window
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
                 }
                 if (DetailHost.Content is SectionDetailView detail) detail.StartPreviewIfIdle();
+                ComeForwardIfHidden();
             }
             catch (Exception ex)
             {
@@ -264,6 +295,7 @@ public sealed partial class MainWindow : Window
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
                 }
                 if (DetailHost.Content is SectionDetailView detail) detail.StartDeployForAutomation();
+                ComeForwardIfHidden();
             }
             catch (Exception ex)
             {
