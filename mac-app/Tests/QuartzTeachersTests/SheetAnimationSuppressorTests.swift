@@ -1,20 +1,21 @@
 import AppKit
+import CoreFoundation
 import ObjectiveC
 import XCTest
 @testable import QuartzTeachers
 
 /// Pins the one thing standing between this suite and a segfaulting test host.
 ///
-/// `SheetAnimationSuppressor` explains the crash and why the animation has to
-/// go. These tests exist so that it cannot stop working QUIETLY — if the
-/// principal class is dropped from `project.yml`, or macOS moves the method,
-/// the suite says so here rather than going back to dying twice in ten runs
-/// and blaming whichever test was running at the time.
+/// `SheetAnimationSuppressor` explains the crash and why the sheet animation has
+/// to go. These tests exist so that it cannot stop working QUIETLY — if the
+/// principal class is dropped from `project.yml`, or a future macOS stops
+/// honouring the switch, the suite says so here rather than going back to dying
+/// a third of the time and blaming whichever test was running.
 final class SheetAnimationSuppressorTests: XCTestCase {
 
     // MARK: - Functions
 
-    /// The bundle's principal class is what installs the override, and it is
+    /// The bundle's principal class is what throws the switch, and it is
     /// declared in `project.yml`. A regenerated project that lost the setting
     /// would leave every other test passing and the crash back.
     func testTheTestBundleAsksForTheSuppressorByName() throws {
@@ -30,22 +31,28 @@ final class SheetAnimationSuppressorTests: XCTestCase {
         )
     }
 
-    /// Installed before any test ran, not lazily by whoever remembered.
-    func testTheAnimationWasSuppressedBeforeTheSuiteStarted() {
+    /// Thrown before any test ran, not lazily by whoever remembered.
+    func testTheAnimationWasSkippedBeforeTheSuiteStarted() {
         XCTAssertEqual(
             SheetAnimationSuppressor.outcome,
-            SheetAnimationSuppressor.Outcome.addedToSheetMoveHelper,
-            "expected the empty override to have been added to NSSheetMoveHelper"
+            SheetAnimationSuppressor.Outcome.sheetsSkipTheirAnimation,
+            "expected NSSheetMoveHelper's own shouldSkipAnimation to have been forced true"
         )
     }
 
-    /// The shape this depends on: `_doAnimation` belongs to `NSMoveHelper`,
-    /// which animates ordinary window moves too, and `NSSheetMoveHelper`
-    /// inherits it. That is what lets sheets be taken out of the animation on
-    /// their own. If macOS ever changes it, this says so in one sentence
-    /// instead of leaving somebody to read a crash report.
+    /// The SHAPE the scoping rests on, which is all this one checks:
+    /// `shouldSkipAnimation` is declared on `NSSheetMoveHelper` AND on its
+    /// superclass `NSMoveHelper`, which animates ordinary window moves. Because
+    /// the subclass has its own, replacing it leaves window moves alone. If
+    /// macOS ever collapses the two, this says so in one sentence instead of
+    /// leaving somebody to read a crash report.
+    ///
+    /// It deliberately does NOT prove the switch was thrown — it passes either
+    /// way, since the two classes ship different implementations regardless.
+    /// That is `testTheAnimationWasSkippedBeforeTheSuiteStarted`'s job, and the
+    /// runloop test below's.
     func testOnlySheetsWereTakenOutOfTheAnimation() throws {
-        let selector: Selector = NSSelectorFromString("_doAnimation")
+        let selector: Selector = NSSelectorFromString("shouldSkipAnimation")
         let sheetMoveHelper: AnyClass = try XCTUnwrap(NSClassFromString("NSSheetMoveHelper"))
         let moveHelper: AnyClass = try XCTUnwrap(NSClassFromString("NSMoveHelper"))
 
@@ -53,30 +60,44 @@ final class SheetAnimationSuppressorTests: XCTestCase {
             class_getSuperclass(sheetMoveHelper) === moveHelper,
             "NSSheetMoveHelper is expected to be an NSMoveHelper"
         )
-        XCTAssertNotNil(
+
+        let sheetSwitch: Method = try XCTUnwrap(
             SheetAnimationSuppressor.declaredMethod(on: sheetMoveHelper, named: selector),
-            "the sheet subclass should now declare its own (empty) _doAnimation"
+            "the sheet subclass must still declare its own switch — that is what makes this scoped"
         )
-
-        let sheetImplementation: IMP? = SheetAnimationSuppressor
-            .declaredMethod(on: sheetMoveHelper, named: selector)
-            .map { method in return method_getImplementation(method) }
-        let moveImplementation: IMP? = SheetAnimationSuppressor
-            .declaredMethod(on: moveHelper, named: selector)
-            .map { method in return method_getImplementation(method) }
-
-        XCTAssertNotNil(moveImplementation, "NSMoveHelper still declares the real one")
+        let moveSwitch: Method = try XCTUnwrap(
+            SheetAnimationSuppressor.declaredMethod(on: moveHelper, named: selector),
+            "and NSMoveHelper must still declare the one ordinary window moves use"
+        )
         XCTAssertFalse(
-            sheetImplementation == moveImplementation,
+            method_getImplementation(sheetSwitch) == method_getImplementation(moveSwitch),
             "an ordinary window move must still animate — only sheets were changed"
         )
     }
 
-    /// And the point of all of it: a sheet raised on a real window comes down
-    /// again, completely, without AppKit spinning a nested runloop to do it.
-    /// This is the case that used to kill the host.
+    /// The one that would catch a regression: a real `NSAlert` sheet is raised
+    /// on a real window and taken down again, and AppKit's private animation
+    /// runloop mode must never be entered while that happens.
+    ///
+    /// That mode is the frame the 38 crash reports die in — a nested runloop
+    /// spun from inside a display-cycle callback. Watching for the mode itself,
+    /// rather than timing the close, is what makes this a test rather than a
+    /// stopwatch: it fails for the reason that matters and cannot be talked out
+    /// of failing by a busy machine.
     @MainActor
-    func testASheetStillOpensAndClosesCompletely() async throws {
+    func testASheetGoesUpAndDownWithoutTheNestedAnimationRunLoop() async throws {
+        var nestedModeWasEntered: Bool = false
+        let observer: CFRunLoopObserver = try XCTUnwrap(CFRunLoopObserverCreateWithHandler(
+            nil, CFRunLoopActivity.allActivities.rawValue, true, 0
+        ) { _, _ in
+            nestedModeWasEntered = true
+        })
+        let mode: CFRunLoopMode = CFRunLoopMode(
+            SheetAnimationSuppressor.animationRunLoopMode as CFString
+        )
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, mode)
+        defer { CFRunLoopRemoveObserver(CFRunLoopGetMain(), observer, mode) }
+
         let window: NSWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
             styleMask: [.titled, .closable],
@@ -84,7 +105,6 @@ final class SheetAnimationSuppressorTests: XCTestCase {
             defer: false
         )
         window.makeKeyAndOrderFront(nil)
-        defer { window.orderOut(nil) }
 
         var completionRan: Bool = false
         let alert: NSAlert = NSAlert()
@@ -103,5 +123,18 @@ final class SheetAnimationSuppressorTests: XCTestCase {
         XCTAssertNil(window.attachedSheet, "and came back down")
         XCTAssertTrue(completionRan, "with its completion handler run")
         XCTAssertFalse(alert.window.isVisible, "and its window off screen")
+        XCTAssertFalse(
+            nestedModeWasEntered,
+            """
+            AppKit spun its animation runloop for a sheet. That is the nested loop \
+            the test host segfaults inside — see SheetAnimationSuppressor.
+            """
+        )
+
+        // Given back rather than merely hidden: an ordered-out window stays in
+        // NSApp.windows for the rest of the run, and this suite has tests that
+        // photograph whatever window is up.
+        alert.window.close()
+        window.close()
     }
 }
