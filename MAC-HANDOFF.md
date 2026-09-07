@@ -1864,6 +1864,48 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Windows brings the main window forward for an assistant-driven build
+  ONLY when it was minimised or hidden — a chosen divergence from row 300,
+  not an oversight** (Windows, 2026-09-07, branch `issue/28-four-small-gaps`,
+  item 28 (b); `GUI-IMPROVEMENTS.md` row 433). **Nothing for the mac to do;
+  read so the difference is not "fixed" into parity.**
+
+  The mac activates unconditionally. On Windows the assistant is a separate
+  top-level window the teacher may still be typing in, so an unconditional
+  `Activate()` would take keyboard focus mid-sentence to show them a build
+  that was, in the common case, already in view beside them. Rejected: full
+  activation for parity (that cost, for no gain when the window is visible);
+  a taskbar flash only (on a maximised assistant window the build stays
+  invisible until the teacher acts, which is the original complaint); and
+  fixing only the two doc comments that described a behaviour never built.
+  The test used — `MainWindow.ComeForwardIfHidden` — is exactly two cheap
+  checks: `OverlappedPresenter.State == Minimized`, and `AppWindow.IsVisible`
+  false. A window fully covered by another window is NOT detected; there is
+  no cheap answer to occlusion on WinUI and guessing wrong steals focus. When
+  the main window has been closed under the assistant, a build goes to another
+  window on the same working folder if one is open, else a new one is opened
+  and used by identity (row 300's trap). Not driven by hand: the minimised and
+  no-window paths want one look at the real interface.
+
+- **Two smaller things from the same item, both now matching the mac.** (a)
+  The sidebar's "Schedule Deploy…" dialog on Windows now says which classes
+  are still unpublished — the same content `ScheduledDeploy.Describe()` has
+  always given the assistant and the mac's sheet has always rendered
+  (`ScheduleDeploySheet.swift`, `plan.description`). A first draft filtered
+  the list by the chosen day; the review caught that the contract's
+  `scheduledDeployRefusals.alsoSaid` rule has no date qualifier and the mac's
+  `unpublishedClasses(course:sectionNumber:)` names every one, so Windows
+  does too. Advice, not a refusal: the button stays enabled, and while a
+  refusal is showing the advice is hidden, as the mac shows the problem
+  alone. One difference, recorded rather than fixed: Windows names pages by
+  FILE name, as its own `PlanScheduledDeploy` already does, where the mac uses
+  the page's title. If that ever matters, it wants a case, not two fixes.
+  (d) The Windows assistant window remembers its placement per section
+  (row 164's rule) in a type deliberately separate from the windows replayed
+  at launch, so a multi-gigabyte model is never loaded unasked; it clamps to
+  the displays that exist now and prunes with the working folder. Nothing
+  the mac need change.
+
 - **Windows now spells a renamed folder the way Quartz reads it — item 31's
   debt is paid, and the escaping rule is executed on both sides**
   (Windows + shared, 2026-09-07, branch `issue/31-rename-link-escaping`,

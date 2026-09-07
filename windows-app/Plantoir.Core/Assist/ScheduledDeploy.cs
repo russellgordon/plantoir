@@ -1,3 +1,5 @@
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -98,6 +100,62 @@ public sealed class ScheduledDeploy
 
     /// <summary>Classes that are not published yet, and so would not reach students.</summary>
     public required IReadOnlyList<string> UnpublishedClasses { get; init; }
+
+    /// <summary>
+    /// Every class page of a section that is still unpublished — the ones a
+    /// deploy would put the site up without. For the sidebar's own "Schedule
+    /// Deploy…", which has no list of named classes the way the assistant's
+    /// tool does. Date-independent, as the contract's
+    /// <c>scheduledDeployRefusals.alsoSaid</c> rule has it ("list the class
+    /// pages students cannot see yet, by name") and as the mac's
+    /// <c>unpublishedClasses(course:sectionNumber:)</c> has always done: a
+    /// class dated after the deploy is still a page students cannot see.
+    ///
+    /// <para>Walks the same folders <c>AssistWorkspace.ClassPages</c> walks
+    /// and leaves out the same <c>index.md</c>, for the same reason: a
+    /// section's front page is not a class. Named by FILE name, as this
+    /// app's own tool names them (<c>AssistWorkspace.PlanScheduledDeploy</c>);
+    /// the mac uses the page's title, a recorded difference.</para>
+    /// </summary>
+    public static List<string> UnpublishedClassesIn(Course course, int sectionNumber)
+    {
+        var names = new List<string>();
+        foreach (string folder in course.Configuration.PerSectionFolders)
+        {
+            string root = Path.Combine(course.SectionDirectory(sectionNumber), folder);
+            if (!Directory.Exists(root)) continue;
+            foreach (string page in PagePaths.MarkdownPages(root, sectionNumber))
+            {
+                if (string.Equals(Path.GetFileName(page), "index.md", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string text;
+                try { text = File.ReadAllText(page); } catch { continue; }
+                if (PageFrontmatter.IsDraft(text, sectionNumber))
+                    names.Add(Path.GetFileNameWithoutExtension(page));
+            }
+        }
+        names.Sort(StringComparer.OrdinalIgnoreCase);
+        return names;
+    }
+
+    /// <summary>
+    /// The sentence that goes with that list — the same content
+    /// <see cref="Describe"/> gives the assistant, in prose rather than in
+    /// bullets, because a dialog is not a chat transcript. Null when nothing
+    /// is unpublished.
+    /// </summary>
+    public static string? UnpublishedClassesSentence(IReadOnlyList<string> unpublished)
+    {
+        if (unpublished.Count == 0) return null;
+        int count = unpublished.Count;
+        string listed = string.Join(", ", unpublished.Take(8));
+        if (count > 8) listed += $" …and {count - 8} more";
+        string are = count == 1 ? "class is" : "classes are";
+        string them = count == 1 ? "it" : "them";
+        return $"One thing first — {count} {are} not published yet: {listed}. " +
+               $"Deploying now would put the site up without {them}. " +
+               "Publish first, look the preview over, then schedule this.";
+    }
 
     /// <summary>Where the deploy would land.</summary>
     public required string Destination { get; init; }

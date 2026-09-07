@@ -76,12 +76,76 @@ public sealed partial class AssistWindow : Window
         Subheading.Text = "Ask for a change in plain words. Every change is backed up and can be undone, " +
                           "and nothing reaches students until the section deploys — which always waits for your OK.";
 
-        Closed += (_, _) => Shutdown();
+        RestorePlacement();
+        // Sampled while the window is alive: reading AppWindow inside its own
+        // Closed handler is the one thing the rest of this app avoids
+        // (App.OpenWindow drops a closing window before remembering the rest).
+        AppWindow.Changed += (sender, args) => { if (args.DidPositionChange) _lastPosition = sender.Position; };
+        Closed += (_, _) => { RememberPlacement(); Shutdown(); };
 
         // Started on Loaded, not here: the download offer is a ContentDialog,
         // and a dialog needs a XamlRoot, which does not exist until the
         // window's content has actually been loaded. Raised once.
         Root.Loaded += OnceLoaded;
+    }
+
+    /// <summary>
+    /// The main window a build or deploy should run in. The one this window
+    /// was opened from, while it is still open; otherwise another window on
+    /// the same working folder; otherwise a NEW one, opened here so that a
+    /// teacher who closed the main window and kept revising still sees the
+    /// build they approved (mac row 300's case). The fresh window is used by
+    /// IDENTITY — the object just returned — never looked up by the folder
+    /// it will end up showing, which is the trap row 300 records. Must be
+    /// called on the UI thread, which every caller here is.
+    /// </summary>
+    private MainWindow? MainWindowForBuilds()
+    {
+        if (_main is { IsClosed: false }) return _main;
+        if (App.WindowFor(_folder) is { } other) return other;
+        try { return App.OpenWindow(_folder, null); }
+        catch (Exception ex) { App.LogDiagnostic($"AssistWindow could not open a main window: {ex}"); return null; }
+    }
+
+    // ---- Where this window sits -------------------------------------------
+
+    private string PlacementKey => AppSettings.AssistWindowKey(_folder, _course.Code, _section);
+    private Windows.Graphics.PointInt32? _lastPosition;
+
+    /// <summary>
+    /// Put the window where this SECTION's assistant was last left —
+    /// placement only, the size is the window's own — and only if that point
+    /// is still on a display. A remembered monitor that is gone would put
+    /// the window where a teacher cannot find it, so the point is checked
+    /// against the displays that exist now and the default placement wins
+    /// otherwise (the clamp MainWindow applies to its own frame).
+    /// </summary>
+    private void RestorePlacement()
+    {
+        try
+        {
+            if (!App.Settings.AssistWindowPlacements.TryGetValue(PlacementKey, out var placement)) return;
+            var point = new Windows.Graphics.PointInt32((int)placement.X, (int)placement.Y);
+            var display = Microsoft.UI.Windowing.DisplayArea.GetFromPoint(point, Microsoft.UI.Windowing.DisplayAreaFallback.None);
+            if (display is null) return;
+            var area = display.WorkArea;
+            // Some of the title bar must be inside the work area, or there is nothing to grab.
+            if (point.X > area.X + area.Width - 120 || point.Y > area.Y + area.Height - 60) return;
+            AppWindow.Move(point);
+            _lastPosition = point;
+        }
+        catch (Exception ex) { App.LogDiagnostic($"AssistWindow placement not restored: {ex.Message}"); }
+    }
+
+    private void RememberPlacement()
+    {
+        try
+        {
+            if (_lastPosition is not { } position) return;     // never moved, nothing new to remember
+            App.Settings.AssistWindowPlacements[PlacementKey] = new RememberedPlacement(position.X, position.Y);
+            App.Settings.Save();
+        }
+        catch (Exception ex) { App.LogDiagnostic($"AssistWindow placement not remembered: {ex.Message}"); }
     }
 
     private void OnceLoaded(object sender, RoutedEventArgs e)
@@ -343,12 +407,14 @@ public sealed partial class AssistWindow : Window
             OnToolProgress = NoteToolProgress,
             // Building and deploying automate the main window's own flows —
             // once, on screen — rather than running again behind the chat.
-            ShowPreviewInApp = () => _main?.ShowPreviewFor(_course.Code, _section),
-            StartDeployInApp = () => _main?.DeployFor(_course.Code, _section),
+            ShowPreviewInApp = () => MainWindowForBuilds()?.ShowPreviewFor(_course.Code, _section),
+            StartDeployInApp = () => MainWindowForBuilds()?.DeployFor(_course.Code, _section),
             StartDeployInAppAsync = async () =>
             {
-                if (_main is null) return null;
-                return await _main.DeployForAsync(_course.Code, _section);
+                // The path a real deploy_section takes (the sync one above is
+                // the busy-section fallback), so it must find a window too.
+                if (MainWindowForBuilds() is not { } main) return null;
+                return await main.DeployForAsync(_course.Code, _section);
             },
             StopPreviewInApp = () => _main?.StopPreviewFor(_course.Code, _section),
             StopPreviewInAppAsync = async () =>
