@@ -420,26 +420,13 @@ public class TaskMilestoneLauncherMarkerTests
         }
     }
 
-    /// <summary>
-    /// The four mac-only strings this class exists to keep out of
-    /// TaskMilestones.cs — a plain guard so a future edit that reaches for
-    /// the mac's phrasing (the exact mistake that shipped 2026-08-18) fails
-    /// immediately rather than waiting for a teacher's progress bar to stall.
-    /// </summary>
-    [Fact]
-    public void NoMilestoneMatchesAMacOnlyLauncherString()
-    {
-        string[] macOnly =
-        {
-            "Setting up this Mac",
-            "Setting up this PC",
-            "Building your website builder",
-            "Ensuring container is running",
-            "Starting container if needed",
-        };
-        foreach (var list in TaskMilestones.AllLists)
-            foreach (var milestone in list)
-                foreach (var mac in macOnly)
-                    Assert.DoesNotContain(mac, milestone.Marker, StringComparison.Ordinal);
-    }
+    // The guard against reaching for the MAC's phrasing — the exact mistake
+    // that shipped 2026-08-18 — used to live here as a hand-typed array of
+    // five strings. It now reads the same five from contracts/app-rules.json →
+    // markerOrigins.knownDivergence.macOnlyLauncherMarkers, in
+    // MilestoneContractTests.NoMilestoneWatchesForTheMacsOwnLauncherWording:
+    // a hand-kept copy of the other platform's words is exactly what goes
+    // stale the day that platform changes them, which is how the four strings
+    // above came to be matched against launchers that had stopped printing
+    // them (WINDOWS-HANDOFF.md item 5).
 }
