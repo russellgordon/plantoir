@@ -87,7 +87,7 @@ public sealed partial class CourseSettingsView : UserControl
     /// </summary>
     private void DropFromMarksPool(string name)
     {
-        var pool = Config.MaterializedGradedFolders();
+        var pool = MarksPool();
         if (pool.RemoveAll(f => string.Equals(f, name, StringComparison.OrdinalIgnoreCase)) == 0) return;
         Config.GradedFolders = pool;
     }
@@ -199,6 +199,41 @@ public sealed partial class CourseSettingsView : UserControl
         RebuildProtectedRows();
     }
 
+    // ---- The marks pool ---------------------------------------------------
+
+    /// <summary>
+    /// The folder names found inside the course folder, as of the last time
+    /// the form was drawn.
+    ///
+    /// <para>Cached for one <see cref="BuildForm"/> pass rather than walked on
+    /// demand, because the protection rules are asked afresh for every row of
+    /// every list — a disk walk per row, on the UI thread, for an answer that
+    /// cannot change between two rows of the same pass. Everything that DOES
+    /// change it goes through <see cref="BuildForm"/> anyway: the constructor,
+    /// <see cref="RebuildProtectedRows"/> after any list edit or tick, and
+    /// Revert. The one thing it cannot see is the disk changing underneath —
+    /// a folder made in Obsidian while this page is open — which the next tick
+    /// picks up.</para>
+    /// </summary>
+    private IReadOnlyList<string> _nestedFolderNames = Array.Empty<string>();
+
+    /// <summary>
+    /// Every folder the Marks checklist may offer, read from the config LIVE
+    /// so a folder added or removed in the lists above is reflected at once,
+    /// over the walked names cached for this pass.
+    /// </summary>
+    private List<string> GradedFolderChoicesNow() =>
+        GradedFolderChoices.For(Config, _nestedFolderNames);
+
+    /// <summary>
+    /// The pool as it stands, materialised from the SAME choices the checklist
+    /// displays. Feeding the two from one place is the point: a pool
+    /// materialised from a narrower list than the one on screen is how a
+    /// teacher's first tick drops a folder the build was counting.
+    /// </summary>
+    private List<string> MarksPool() =>
+        Config.MaterializedGradedFolders(GradedFolderChoicesNow());
+
     private ProtectionContext Protection() => new(
         InWizard: false,
         CurriculumCoverageEnabled: Config.OverallIncludesCurriculumCoverage,
@@ -207,7 +242,7 @@ public sealed partial class CourseSettingsView : UserControl
         CurriculumPagesEnabled: false,
         Jurisdiction: SpecialNames.DefaultJurisdiction,
         ResolvedCurriculumFolder: Config.ResolvedCurriculumFolder,
-        GradedFolders: Config.MaterializedGradedFolders(),
+        GradedFolders: MarksPool(),
         PerSectionFolders: Config.PerSectionFolders,
         ResolvedClassFolder: ClassFolderRule.Name(Config.ClassFolder, Config.PerSectionFolders));
 
@@ -242,6 +277,13 @@ public sealed partial class CourseSettingsView : UserControl
     {
         Form.Children.Clear();
         _fontSampleHeaders.Clear();   // rebuilt below; Revert re-enters here
+
+        // Walked once per pass, before anything asks what the Marks list
+        // offers or what the pool currently holds.
+        _nestedFolderNames = GradedFolderChoices.NestedFolderNames(
+            _course.DirectoryPath,
+            Config.ExcludedItems(CourseConfiguration.SharedScope),
+            Config.ExcludedItems(CourseConfiguration.PerSectionScope));
 
         // -------- Settings — Overall --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Settings — Overall", null));
@@ -404,12 +446,18 @@ public sealed partial class CourseSettingsView : UserControl
         Form.Children.Add(FormBuilders.ExampleCaption(
             "Tick the folders holding work that counts for marks. The Curriculum Coverage map shows an expectation as evaluated when a page in one of these addresses it."));
         Form.Children.Add(FormBuilders.MembershipToggleList("Folders that count for marks",
-            Config.SharedFolders.Concat(Config.PerSectionFolders).ToList(),
-            // Materialised on the way IN, so a course that has never been asked
-            // starts from what it was already counting rather than from empty -
-            // a first tick must not take the marks off every other folder whose
-            // name mentioned tasks.
-            () => Config.MaterializedGradedFolders(),
+            // Not just the two top-level lists. The build counts a folder at
+            // ANY depth, so a course with `Portfolios/Tasks` has assessed work
+            // those lists never mention - and the first tick FREEZES the pool,
+            // so a name this list failed to offer stops counting from that
+            // moment, silently and for good.
+            GradedFolderChoicesNow(),
+            // Materialised on the way IN from that SAME pool, so a course that
+            // has never been asked starts from what it was already counting
+            // rather than from empty - a first tick must not take the marks off
+            // every other folder whose name mentioned tasks. Offering a folder
+            // this list did not also materialise would lose it just as quietly.
+            MarksPool,
             v => Config.GradedFolders = v,
             // Ticking a SECOND folder is exactly what unblocks the first, and
             // it unblocks that folder's row in the lists above too.
