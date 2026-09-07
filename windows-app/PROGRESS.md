@@ -22,14 +22,14 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Thirty-two of its thirty-seven
+with its headline still reading as open work. **Thirty-three of its thirty-eight
 items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
 day (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
 the contract case lists this suite was not reading); items 33 and 34 — the
 refusal of a folder named `index.md`, and the per-finding repair report as
-contract cases — struck on 2026-09-07, along with 18, 19, 25, 26, 27, 28, 30, 31 and
-32 the same day. Items 35–37 were added the
+contract cases — struck on 2026-09-07, along with 18, 19, 25, 26, 27, 28, 30, 31, 32 and
+38 the same day. Items 35–37 were added the
 same day by an audit of these two documents and are open.
 
 **Count them rather than trusting this line.** It read "sixteen of its
@@ -92,10 +92,10 @@ Two more things, one of which is now ON that list:
   after item 31 wired the twelfth of them — `linkRewriting`, which item 29's
   audit missed because it was added the same day (2026-09-07); 1,150 with 2
   skipped once items 26, 31, 33 and 34 were all merged; and **1,153 with 1
-  skipped** once item 25 made the wizard ask the skeleton question. The one
-  skip left is a named divergence rather than unfinished work: the
-  frontmatter-key question the mac has to settle, carrying the test that
-  closes it.
+  skipped** once item 25 made the wizard ask the skeleton question; and **no
+  skips at all** once the frontmatter-key divergence was decided in this
+  app's favour on 2026-09-07 (item 38) and its test rewritten to assert
+  migration.
 
 ## Every contract case list is now RUN here (2026-09-06)
 

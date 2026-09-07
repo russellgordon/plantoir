@@ -1711,6 +1711,23 @@ to run in the background.
     that. **Not for tonight** — it is a decision about what a teacher reads,
     not a defect.
 
+38. ~~**The two apps wrote a teacher's visibility flag differently, and the
+    contract described the mac's way.**~~ ✅ Done 2026-09-07 (branch
+    `issue/frontmatter-draft-key-divergence`). Found 2026-09-06 and until
+    today indexed only as a bullet inside item 29, which is struck — so from
+    this list it read as finished. Russell's decision: Windows keeps
+    migrating (`PageFrontmatter.SetDraft` is untouched), the contract's
+    `pageVisibility.writingRules[0]` now describes migration with the
+    reasoning and the rejected alternative in its `why`, the skipped test is
+    rewritten to assert migration and runs, and the mac is asked to adopt it
+    at the top of `MAC-HANDOFF.md`. The one design question — may an
+    already-correct legacy page be rewritten purely to migrate — is answered
+    yes, once, as the contract's deliberate exception to "writing the value it
+    already has changes nothing": the case is reachable only inside a batch
+    that is changing other pages, so the build was happening anyway, and a
+    rule that migrated only on a genuine change would leave the pages nobody
+    flips old forever.
+
 ## Windows no longer runs any of this in a container
 
 **Read this before the architecture sections below.** Windows dropped Docker,
