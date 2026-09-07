@@ -56,6 +56,10 @@ final class FolderPathRewriterTests: XCTestCase {
     /// A percent-encoded segment must come back percent-encoded, or the link
     /// stops resolving — which would be a rename that broke the very links it
     /// set out to keep working.
+    ///
+    /// This is the case the ONE encoding test used to be, and it starts from
+    /// an already-encoded segment, which is exactly why it could not see the
+    /// defect the contract cases below catch.
     func testAPercentEncodedSegmentStaysEncoded() {
         XCTAssertEqual(
             FolderPathRewriter.rewriting(
@@ -141,6 +145,99 @@ final class FolderPathRewriterTests: XCTestCase {
         XCTAssertEqual(FolderPathRewriter.rewriting(text, folderNamed: "Tasks", to: "Tasks"), text)
     }
 
+    // MARK: - How the new name is spelled
+
+    /// The cases both apps run, read from the contract rather than retyped.
+    ///
+    /// `FolderPathRewriter` used to decide whether to percent-encode the new
+    /// name from whether the OLD segment was encoded, which is wrong for a
+    /// Markdown link: a destination ends at the first space, so renaming
+    /// `Tasks` to `All Tasks` produced `[q](All Tasks/Quiz%201.md)` and broke
+    /// every Markdown-style link into the folder. Nothing here could see it,
+    /// because the one encoding test above starts from a segment that was
+    /// already encoded.
+    func testTheNewNameIsSpelledTheWayTheContractSays() throws {
+        let rules: [String: Any] = try FolderPathRewriterTests.linkRewritingRules()
+        let cases: [[String: Any]] = try XCTUnwrap(rules["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty, "The contract carries no link-rewriting cases")
+
+        for testCase in cases {
+            let given: String = try XCTUnwrap(testCase["given"] as? String)
+            let oldName: String = try XCTUnwrap(testCase["oldName"] as? String)
+            let newName: String = try XCTUnwrap(testCase["newName"] as? String)
+            let expected: String = try XCTUnwrap(testCase["expect"] as? String)
+            let why: String = testCase["why"] as? String ?? ""
+            XCTAssertEqual(
+                FolderPathRewriter.rewriting(given, folderNamed: oldName, to: newName),
+                expected,
+                "Renaming “\(oldName)” to “\(newName)” in \(given) — \(why)"
+            )
+        }
+    }
+
+    /// The escaping set is measured against Quartz rather than chosen, so the
+    /// contract writes it down and this checks the code agrees with it: a
+    /// character the contract says survives untouched must come through a
+    /// rename untouched.
+    ///
+    /// The one that matters is `&`. Quartz resolves an internal link with
+    /// JavaScript's `decodeURI`, which leaves `%26` alone, and then slugs `&`
+    /// to `-and-` and `%` to `-percent` — so an over-encoded `Tasks & Quizzes`
+    /// 404s for students while looking perfectly healthy in Obsidian.
+    func testEveryCharacterTheContractLeavesAloneSurvivesARename() throws {
+        let rules: [String: Any] = try FolderPathRewriterTests.linkRewritingRules()
+        let set: [String: Any] = try XCTUnwrap(rules["escapingSet"] as? [String: Any])
+        let untouched: String = try XCTUnwrap(set["leaveUnescaped"] as? String)
+
+        for character in untouched {
+            // A space forces the escaping to run at all; the character under
+            // test then has to come out the other side as itself.
+            let newName: String = "New " + String(character)
+            let rewritten: String = FolderPathRewriter.rewriting(
+                "[q](Tasks/Quiz.md)", folderNamed: "Tasks", to: newName
+            )
+            XCTAssertEqual(
+                rewritten, "[q](New%20" + String(character) + "/Quiz.md)",
+                "The contract says “\(character)” is left as it stands"
+            )
+        }
+    }
+
+    /// Anything the contract does NOT list is percent-encoded, and the point
+    /// of encoding it is that Quartz gets the real name back.
+    func testACharacterOutsideTheSetIsEncoded() {
+        XCTAssertEqual(
+            FolderPathRewriter.rewriting("[q](Tasks/Quiz.md)", folderNamed: "Tasks", to: "Café Notes"),
+            "[q](Caf%C3%A9%20Notes/Quiz.md)"
+        )
+        XCTAssertEqual(
+            FolderPathRewriter.rewriting("[q](Tasks/Quiz.md)", folderNamed: "Tasks", to: "Unit [2]"),
+            "[q](Unit%20%5B2%5D/Quiz.md)"
+        )
+    }
+
+    /// A wikilink keeps the plain spelling whatever the name contains, which
+    /// is the mirror-image mistake this rule has to avoid making.
+    func testAWikiLinkKeepsAPlainNameWhateverItContains() {
+        XCTAssertEqual(
+            FolderPathRewriter.rewriting("[[Tasks/Quiz 1]]", folderNamed: "Tasks", to: "Work(new)"),
+            "[[Work(new)/Quiz 1]]"
+        )
+    }
+
+    /// Rewriting the same page twice must produce the same text, because a
+    /// rename interrupted between the move and the settings write is resumed
+    /// and re-runs the relinking pass over pages it may already have changed.
+    func testRelinkingTwiceChangesNothingTheSecondTime() {
+        let once: String = FolderPathRewriter.rewriting(
+            "[q](Tasks/Quiz.md) and [[Tasks/Quiz 1]]", folderNamed: "Tasks", to: "All Tasks"
+        )
+        XCTAssertEqual(once, "[q](All%20Tasks/Quiz.md) and [[All Tasks/Quiz 1]]")
+        XCTAssertEqual(
+            FolderPathRewriter.rewriting(once, folderNamed: "Tasks", to: "All Tasks"), once
+        )
+    }
+
     // MARK: - Counting
 
     func testCountingFindsOnlyQualifiedLinks() {
@@ -151,6 +248,26 @@ final class FolderPathRewriterTests: XCTestCase {
     func testCountingIsZeroWhenNothingPointsIn() {
         XCTAssertEqual(
             FolderPathRewriter.countReferences(to: "Tasks", in: "[[Quiz 1]] and [[Concepts/Loops]]"), 0
+        )
+    }
+
+    // MARK: - Functions
+
+    /// The contract's rules for spelling a new name inside a link, read from
+    /// the file both apps run rather than copied into Swift.
+    private static func linkRewritingRules() throws -> [String: Any] {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let specialNames: [String: Any] = try XCTUnwrap(all["specialNames"] as? [String: Any])
+        let rename: [String: Any] = try XCTUnwrap(specialNames["renameFolder"] as? [String: Any])
+        return try XCTUnwrap(
+            rename["linkRewriting"] as? [String: Any],
+            "No specialNames.renameFolder.linkRewriting in shared-rules.json"
         )
     }
 }
