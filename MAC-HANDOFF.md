@@ -358,8 +358,10 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      and neither app can see inside it) and the reason the event is named for
      the outcome rather than for its cause.
 
-  2. **`repair(_:in:)` returns `[String: Result]`, keyed by check NAME, so two
-     findings with the same name collapse.** Two sections each missing a front
+  2. ~~**`repair(_:in:)` returns `[String: Result]`, keyed by check NAME, so two
+     findings with the same name collapse.**~~ — ✅ **Done 2026-09-07**, branch
+     `issue/repair-results-keyed-by-name`, `GUI-IMPROVEMENTS.md` row 427.
+     Two sections each missing a front
      page are both repaired — the loop runs — but only the LAST result is
      reported. Section 1 restored and section 2 already fine therefore reads as
      "That is already put right", with `canRebuild: false` and no preview
@@ -371,6 +373,22 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      the NAMES when building the sentence, so "Put the front page and the front
      page back." cannot occur either. Reference: `SiteHealthRepair.Repair`,
      test `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer`.
+
+     **The mac now returns `[Attempt]` — the same shape, arrived at second.**
+     You were right on both counts, and this one you had already fixed, so the
+     mac copied rather than invented. What came back the other way is the RULE
+     as data: `contracts/shared-rules.json` →
+     `siteHealth.repair.reportedOncePerFinding` carries two cases, a
+     `howToRunACase` note, and the `expectResults` vocabulary, so the behaviour
+     can be checked against one source instead of proved twice in parallel.
+     **Nothing of yours goes red** — no list pins it by equality — so
+     deserialising those two cases in place of
+     `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer` is a should, not a
+     must; it is written up as `WINDOWS-HANDOFF.md` item 34. One stale comment
+     is left for you rather than edited from this side: the `<remarks>` on
+     `SiteHealthRepair.cs:241-250` still call the per-finding list "a deliberate
+     divergence from the mac, whose dictionary is keyed by name", and it is no
+     longer a divergence.
 
   **Two places Windows is deliberately BROADER than the mac, and the mac may
   want to match — a know rather than a do, but the second one is visible.**

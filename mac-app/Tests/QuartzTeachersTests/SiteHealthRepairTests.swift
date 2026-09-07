@@ -7,14 +7,14 @@ final class SiteHealthRepairTests: XCTestCase {
 
     // MARK: - Functions
 
-    private func makeCourse() throws -> (URL, Course) {
+    private func makeCourse(sections: [Int] = [1]) throws -> (URL, Course) {
         let root: URL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("health-repair-\(UUID().uuidString)")
         let courseURL: URL = root.appendingPathComponent("courses/ICS3U")
         try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
         let configuration: [String: Any] = [
             "course_code": "ICS3U", "course_name": "Introduction to Computer Science",
-            "section_numbers": [1], "num_sections": 1,
+            "section_numbers": sections, "num_sections": sections.count,
             "shared_folders": [], "per_section_folders": ["All Classes"],
             "shared_files": [], "per_section_files": [],
         ]
@@ -60,7 +60,8 @@ final class SiteHealthRepairTests: XCTestCase {
         let repaired = SiteHealthRepair.repair(
             [finding("mediaFolderMissing", fixable: true)], in: course
         )
-        XCTAssertEqual(repaired["mediaFolderMissing"], .restored)
+        XCTAssertEqual(repaired.count, 1)
+        XCTAssertEqual(repaired.first?.result, .restored)
         XCTAssertTrue(FileManager.default.fileExists(atPath: media.path))
     }
 
@@ -74,6 +75,140 @@ final class SiteHealthRepairTests: XCTestCase {
             .appendingPathComponent("index.md")
         let written: String = try String(contentsOf: index, encoding: .utf8)
         XCTAssertTrue(written.contains("title: Introduction to Computer Science"), written)
+    }
+
+    /// Two findings of the same KIND keep separate answers.
+    ///
+    /// The shape claim, made directly against `repair` rather than through the
+    /// report: the result used to be a dictionary keyed by the check's name,
+    /// and two sections each missing a front page share one name. Both were
+    /// repaired; only the last was reported. What the teacher then read is
+    /// pinned by `testTheContractsSameNameCasesAreReportedSeparately` below.
+    ///
+    /// Unreachable from the app — a section window owns one runner, and the
+    /// checks announce per section — which is why the collapse survived so
+    /// long, and why this is written as a latent defect rather than as one a
+    /// teacher met.
+    func testTwoFindingsWithOneNameDoNotCollapseIntoOneResult() throws {
+        let (root, course) = try makeCourse(sections: [1, 2])
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let theirs: URL = course.sectionDirectoryURL(forSection: 2)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(
+            at: theirs.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try "---\ntitle: My own front page\n---\nWelcome!\n"
+            .write(to: theirs, atomically: true, encoding: .utf8)
+
+        let attempts: [SiteHealthRepair.Attempt] = SiteHealthRepair.repair(
+            [finding("sectionIndexMissing", fixable: true, section: 1),
+             finding("sectionIndexMissing", fixable: true, section: 2)],
+            in: course
+        )
+
+        XCTAssertEqual(attempts.count, 2, "one entry per finding, not one per check name")
+        XCTAssertEqual(attempts.first?.finding.section, 1)
+        XCTAssertEqual(attempts.first?.result, .restored)
+        XCTAssertEqual(attempts.last?.finding.section, 2)
+        XCTAssertEqual(attempts.last?.result, .alreadyFine)
+        XCTAssertTrue(
+            try String(contentsOf: theirs, encoding: .utf8).contains("Welcome!"),
+            "the teacher's own page must survive"
+        )
+    }
+
+    /// And what the teacher is TOLD, from the contract rather than retyped.
+    ///
+    /// `siteHealth.repair.reportedOncePerFinding` carries both halves of the
+    /// rule as cases both apps can run: a result that must not collapse, and a
+    /// sentence that must name each thing once however many findings produced
+    /// it.
+    func testTheContractsSameNameCasesAreReportedSeparately() throws {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let siteHealth: [String: Any] = try XCTUnwrap(all["siteHealth"] as? [String: Any])
+        let repair: [String: Any] = try XCTUnwrap(siteHealth["repair"] as? [String: Any])
+        let rule: [String: Any] = try XCTUnwrap(
+            repair["reportedOncePerFinding"] as? [String: Any]
+        )
+        let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty, "the contract carries no case to run")
+
+        for testCase in cases {
+            let check: String = try XCTUnwrap(testCase["check"] as? String)
+            let sections: [[String: Any]] = try XCTUnwrap(testCase["sections"] as? [[String: Any]])
+            var sectionNumbers: [Int] = []
+            for section in sections {
+                sectionNumbers.append(try XCTUnwrap(section["number"] as? Int))
+            }
+
+            let (root, course) = try makeCourse(sections: sectionNumbers)
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            var findings: [SiteHealthFinding] = []
+            for section in sections {
+                let number: Int = try XCTUnwrap(section["number"] as? Int)
+                findings.append(finding(check, fixable: true, section: number))
+                guard section["frontPage"] as? String == "theTeachersOwn" else {
+                    continue
+                }
+                let theirs: URL = course.sectionDirectoryURL(forSection: number)
+                    .appendingPathComponent("index.md")
+                try FileManager.default.createDirectory(
+                    at: theirs.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                try "---\ntitle: My own front page\n---\nWelcome!\n"
+                    .write(to: theirs, atomically: true, encoding: .utf8)
+            }
+
+            // The report is asked for FIRST, because it repairs as it goes:
+            // asking `repair` and then `outcome` would run every repair twice,
+            // and anything the first pass RESTORED answers `alreadyFine` to
+            // the second.
+            let outcome = try XCTUnwrap(
+                SiteHealthRepair.outcome(ofRepairing: findings, in: course)
+            )
+            XCTAssertEqual(outcome.headline, testCase["expectHeadline"] as? String)
+            XCTAssertEqual(outcome.canRebuild, testCase["expectCanRebuild"] as? Bool)
+
+            // And the results themselves, on a fresh copy of the same course.
+            let (secondRoot, secondCourse) = try makeCourse(sections: sectionNumbers)
+            defer { try? FileManager.default.removeItem(at: secondRoot) }
+            for section in sections where section["frontPage"] as? String == "theTeachersOwn" {
+                let number: Int = try XCTUnwrap(section["number"] as? Int)
+                let theirs: URL = secondCourse.sectionDirectoryURL(forSection: number)
+                    .appendingPathComponent("index.md")
+                try FileManager.default.createDirectory(
+                    at: theirs.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                try "---\ntitle: My own front page\n---\nWelcome!\n"
+                    .write(to: theirs, atomically: true, encoding: .utf8)
+            }
+            let attempts: [SiteHealthRepair.Attempt] = SiteHealthRepair.repair(
+                findings, in: secondCourse
+            )
+            var howEachWent: [String] = []
+            for attempt in attempts {
+                switch attempt.result {
+                case .restored:
+                    howEachWent.append("restored")
+                case .alreadyFine:
+                    howEachWent.append("alreadyFine")
+                case .failed:
+                    howEachWent.append("failed")
+                case .blockedByAFolderWhereTheFrontPageBelongs:
+                    howEachWent.append("refused")
+                }
+            }
+            XCTAssertEqual(howEachWent, testCase["expectResults"] as? [String],
+                           "one answer per finding, in the order they were given")
+        }
     }
 
     /// A repair whose outcome is invisible is one nobody trusts the second
@@ -294,8 +429,9 @@ final class SiteHealthRepairTests: XCTestCase {
         let repaired = SiteHealthRepair.repair(
             [finding("sectionIndexMissing", fixable: true)], in: course
         )
+        XCTAssertEqual(repaired.count, 1)
         XCTAssertEqual(
-            repaired["sectionIndexMissing"],
+            repaired.first?.result,
             .blockedByAFolderWhereTheFrontPageBelongs(section: 1),
             "a folder called index.md satisfies a bare existence check, and used "
             + "to be reported as already put right"
@@ -498,7 +634,8 @@ final class SiteHealthRepairTests: XCTestCase {
         let repaired = SiteHealthRepair.repair(
             [finding("sectionIndexMissing", fixable: true)], in: course
         )
-        XCTAssertEqual(repaired["sectionIndexMissing"], .alreadyFine,
+        XCTAssertEqual(repaired.count, 1)
+        XCTAssertEqual(repaired.first?.result, .alreadyFine,
                        "already there is not a failure")
         XCTAssertTrue(
             try String(contentsOf: index, encoding: .utf8).contains("Welcome!"),
