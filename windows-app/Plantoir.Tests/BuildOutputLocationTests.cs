@@ -221,4 +221,72 @@ public class BuildOutputLocationTests : IDisposable
         Assert.True(Directory.Exists(Path.Combine(_buildsRoot, "work", "ICS3U", "section1")));
         Assert.True(Directory.Exists(BuildOutputLocation.WorkspaceForSection(_buildsRoot, "ADA1O", 1)));
     }
+
+    // ---------------------------------------------- the marker and the sweep
+
+    private string MarkerFor(string workingFolder) =>
+        Path.Combine(_buildsRoot, FolderContainers.FolderIdentifier(workingFolder), BuildOutputLocation.WorkingFolderMarkerName);
+
+    [Fact]
+    public void TheMarkerNamesTheWorkingFolderAndIsAdoptedWhereItIsMissing()
+    {
+        string working = Path.Combine(_root, "Teaching");
+        Directory.CreateDirectory(working);
+        BuildOutputLocation.WriteWorkingFolderMarker(working, _buildsRoot);
+        Assert.Equal(FolderContainers.PhysicalPath(working), File.ReadAllText(MarkerFor(working)).Trim());
+
+        // A builds folder some launcher made without the app: named on the
+        // next launch, because the app can name its working folder.
+        string other = Path.Combine(_root, "Other");
+        Directory.CreateDirectory(other);
+        Directory.CreateDirectory(Path.Combine(_buildsRoot, FolderContainers.FolderIdentifier(other)));
+        BuildOutputLocation.AdoptWorkingFolderMarkers(new[] { other, Path.Combine(_root, "never-opened") }, _buildsRoot);
+        Assert.True(File.Exists(MarkerFor(other)));
+
+        // One nobody has ever opened the app on is left alone, unnamed.
+        string stranger = Path.Combine(_buildsRoot, "deadbeef00");
+        Directory.CreateDirectory(stranger);
+        Assert.False(File.Exists(Path.Combine(stranger, BuildOutputLocation.WorkingFolderMarkerName)));
+    }
+
+    [Fact]
+    public void TheSweepRemovesOnlyABuildWhoseWorkingFolderIsGenuinelyGone()
+    {
+        string home = Path.Combine(_root, "home");
+        string gone = Path.Combine(home, "Deleted Teaching");
+        string alive = Path.Combine(home, "Teaching");
+        string outsideHome = Path.Combine(_root, "elsewhere", "Teaching");
+        string unplugged = @"Q:\Teaching";                 // a drive letter that is not there
+        string unreadable = Path.Combine(home, "Locked");
+        Directory.CreateDirectory(alive);
+        foreach (string folder in new[] { gone, alive, outsideHome, unplugged, unreadable })
+            Directory.CreateDirectory(Path.Combine(_buildsRoot, FolderContainers.FolderIdentifier(folder)));
+        foreach (string folder in new[] { gone, alive, outsideHome, unplugged, unreadable })
+            File.WriteAllText(MarkerFor(folder), folder);
+        string unmarked = Path.Combine(_buildsRoot, "0123456789");
+        Directory.CreateDirectory(unmarked);
+
+        // "May still exist" is answered by the system in production; here it
+        // is answered by hand so the test can say what each case IS: only the
+        // deleted folder is gone, the locked one and the unplugged drive are
+        // "cannot tell", and cannot-tell keeps.
+        var swept = BuildOutputLocation.DiscardBuildsForMissingWorkingFolders(_buildsRoot, home,
+            workingFolderMayStillExist: path => path != gone);
+
+        Assert.Single(swept);
+        Assert.False(Directory.Exists(Path.GetDirectoryName(MarkerFor(gone))!));
+        foreach (string kept in new[] { alive, outsideHome, unplugged, unreadable })
+            Assert.True(Directory.Exists(Path.GetDirectoryName(MarkerFor(kept))!), kept);
+        Assert.True(Directory.Exists(unmarked));
+    }
+
+    [Fact]
+    public void TheSystemIsAskedWhyAFolderIsMissingNotJustWhetherItIs()
+    {
+        // The real answer for the two cases a test can make on any machine:
+        // a folder that is there, and one that is not.
+        Assert.True(BuildOutputLocation.WorkingFolderMayStillExist(_root));
+        Assert.False(BuildOutputLocation.WorkingFolderMayStillExist(Path.Combine(_root, "no-such-folder")));
+        Assert.False(BuildOutputLocation.WorkingFolderMayStillExist(Path.Combine(_root, "no", "such", "path")));
+    }
 }

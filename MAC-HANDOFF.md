@@ -3318,6 +3318,53 @@ is what happened to the test-race item, sitting here for three days with
 
 ## Done — the ledger
 
+- **Windows writes the builds-folder marker and sweeps abandoned builds —
+  from the app, not the launchers, which is the opposite of what the mac's
+  review argued** (Windows, 2026-09-07, branch
+  `issue/19-build-marker-and-sweep`; `WINDOWS-HANDOFF.md` item 19 struck;
+  `GUI-IMPROVEMENTS.md` row 437). **The mac is expected to KNOW; it owes the
+  counter-argument a reading, not code.** ✅ DONE.
+
+  **Why the app and not `Enter-NativeRuntime`.** The mac's review argued for
+  the launchers, because a launcher run without the app (a command line, a
+  scheduled deploy) makes a builds folder the app would never name. Two
+  things decided it the other way here. `Enter-NativeRuntime` is defined
+  THREE times, not once (`preview.ps1`, `deploy.ps1`, `setup.ps1`), each
+  needing a `New-Item -Force` before the write because none of them creates
+  the builds folder; and `verify.sh` does not run on Windows, so a launcher
+  edit made unattended has no automated gate at all. What the launcher
+  version bought is recovered instead: at launch, for the open folder and
+  every remembered window's, a builds folder that exists without a marker is
+  named retroactively (`AdoptWorkingFolderMarkers`). After a launch or two
+  every builds folder belonging to a working folder the app has ever opened
+  is named, whichever tool created it; the only unmarked ones left belong to
+  somebody who has never opened the app on that folder, and those are left
+  alone rather than guessed at. The marker's content is
+  `FolderContainers.PhysicalPath` — the same string the id was hashed from.
+
+  **The sweep's bar, said plainly.** `DiscardBuildsForMissingWorkingFolders`
+  runs once per process from `App.OnLaunched`, silently, with no trail line
+  (a teacher cannot see it; rule 5 is about what they can). It reads each
+  builds folder's marker, ignores unmarked folders and any path not under
+  `%USERPROFILE%`, and asks `GetFileAttributesW` rather than
+  `Directory.Exists`, which swallows the reason it says no: only
+  `ERROR_FILE_NOT_FOUND` (2) and `ERROR_PATH_NOT_FOUND` (3) mean gone. Access
+  denied (5), a drive letter that is not there (3 is NOT what an unplugged
+  letter gives — it gives 21 or 15), a sleeping network share (53, 1231) and a
+  OneDrive folder not on this computer just now all keep the build. Erring
+  toward litter is the safe direction. `TheSweepRemovesOnlyABuildWhoseWorkingFolderIsGenuinelyGone`
+  pins each case with the answer injected, and
+  `TheSystemIsAskedWhyAFolderIsMissingNotJustWhetherItIs` pins the real
+  system answer for the two cases any machine can make.
+
+  **The adjacent question, answered.** Can
+  `%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>` outlive an archived course and
+  be adopted by a later restore into the same code? No: `CourseArchiver`
+  discards the course's builds on archive (course and section), and
+  `CourseRestorer` discards them again on every restore, so a restored course
+  starts with no build and the freshness check says rebuild. Looked at, and
+  already handled.
+
 - **The two synced-folder views exist on Windows** (Windows, 2026-09-07,
   branch `issue/18-cloud-synced-folder-views`; `WINDOWS-HANDOFF.md` item 18
   struck; `GUI-IMPROVEMENTS.md` row 436). **The mac is expected to KNOW.**

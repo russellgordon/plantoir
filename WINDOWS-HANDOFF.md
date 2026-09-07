@@ -676,8 +676,19 @@ this side is expected to say so when the contract is wrong.
     outside the folder. Full write-up in "A cloud-synced working folder:
     explain it, never refuse it" below.
 
-19. **Builds outside the working folder — ONE of the two owed things is done
-    (2026-09-06); the OTHER is still open.** The `appliesOn` filter is in
+19. ~~**Builds outside the working folder — ONE of the two owed things is done
+    (2026-09-06); the OTHER is still open.**~~ ✅ Done 2026-09-07, both
+    halves (branch `issue/19-build-marker-and-sweep`, `GUI-IMPROVEMENTS.md`
+    row 437). The marker `working-folder.txt` is written from the APP —
+    `BuildOutputLocation.WriteWorkingFolderMarker`, on every adoption of a
+    working folder — not from the launchers, and builds folders made without
+    the app are named retroactively at launch for every working folder the
+    app can name (`AdoptWorkingFolderMarkers`). The sweep
+    (`DiscardBuildsForMissingWorkingFolders`) runs once per process from
+    `App.OnLaunched`, only under the home folder, and treats ONLY
+    `ERROR_FILE_NOT_FOUND` / `ERROR_PATH_NOT_FOUND` from `GetFileAttributesW`
+    as "gone"; access denied, an unplugged drive and a sleeping network path
+    all keep the build. No `.ps1` touched. The original item follows. The `appliesOn` filter is in
     (`ContractTests`), the retired sentence is asserted absent
     (`CloudSyncedFolderTests`), and Windows already built outside the folder
     (row 290).

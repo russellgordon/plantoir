@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace Plantoir.Core.Models;
 
@@ -151,6 +153,135 @@ public static class BuildOutputLocation
     /// MAC-HANDOFF.</para>
     /// </summary>
     private const string WorkspaceDirectoryName = "work";
+
+    // ---- Naming a builds folder, and sweeping the abandoned ones ----------
+
+    /// <summary>
+    /// The file inside a builds folder that names the working folder it
+    /// belongs to. The folder's own name is a hash and cannot be reversed,
+    /// so without this a sweep could not tell an abandoned builds folder from
+    /// a live one. The same name the mac uses.
+    /// </summary>
+    public const string WorkingFolderMarkerName = "working-folder.txt";
+
+    /// <summary>Where every working folder's builds folder lives, unless a test redirects it.</summary>
+    public static string BuildsParent => AppDataRoot.Combine("builds");
+
+    /// <summary>
+    /// Writes the marker for one working folder, creating its builds folder
+    /// if need be. Written from the APP, not the launchers: the launchers'
+    /// <c>Enter-NativeRuntime</c> is defined three times over and has no
+    /// automated gate on Windows (<c>verify.sh</c> is bash). What that costs
+    /// — a builds folder made by a launcher run without the app — is
+    /// recovered by <see cref="AdoptWorkingFolderMarkers"/> on the next
+    /// launch. Best-effort: a marker that could not be written costs a
+    /// sweep, never a build.
+    /// </summary>
+    public static void WriteWorkingFolderMarker(string workingFolderPath, string? buildsParent = null)
+    {
+        try
+        {
+            string builds = buildsParent is null
+                ? BuildsRootFor(workingFolderPath)
+                : Path.Combine(buildsParent, FolderContainers.FolderIdentifier(workingFolderPath));
+            Directory.CreateDirectory(builds);
+            File.WriteAllText(Path.Combine(builds, WorkingFolderMarkerName),
+                              FolderContainers.PhysicalPath(workingFolderPath) + Environment.NewLine);
+        }
+        catch (Exception) { /* see the summary */ }
+    }
+
+    /// <summary>
+    /// Names, retroactively, every builds folder that belongs to a working
+    /// folder the app can name — the open one, and every remembered window's
+    /// — and that has no marker yet, whichever tool created it. After a launch
+    /// or two the only unmarked folders left belong to a working folder
+    /// nobody has ever opened the app on, and those are left alone rather
+    /// than guessed at.
+    /// </summary>
+    public static void AdoptWorkingFolderMarkers(IEnumerable<string> workingFolders, string? buildsParent = null)
+    {
+        foreach (string folder in workingFolders)
+        {
+            if (string.IsNullOrWhiteSpace(folder)) continue;
+            try
+            {
+                if (!Directory.Exists(folder)) continue;
+                string builds = buildsParent is null
+                    ? BuildsRootFor(folder)
+                    : Path.Combine(buildsParent, FolderContainers.FolderIdentifier(folder));
+                if (!Directory.Exists(builds)) continue;
+                if (File.Exists(Path.Combine(builds, WorkingFolderMarkerName))) continue;
+                WriteWorkingFolderMarker(folder, buildsParent);
+            }
+            catch (Exception) { /* best-effort, per folder */ }
+        }
+    }
+
+    /// <summary>
+    /// Deletes the builds folders whose working folder is GONE, and only
+    /// those. Once per process, at launch, silently — a teacher cannot see
+    /// this, so it leaves no trail line.
+    ///
+    /// <para>Two Windows specifics the mac's sweep never meets. Only paths
+    /// under the home folder are swept, so a marker naming a network share or
+    /// another drive is left alone. And "gone" means exactly
+    /// <c>ERROR_FILE_NOT_FOUND</c> or <c>ERROR_PATH_NOT_FOUND</c> from the
+    /// system: <c>Directory.Exists</c> also answers false for access denied,
+    /// an unplugged drive letter, a sleeping network path and a OneDrive
+    /// folder that is not on this computer just now, and clearing a
+    /// teacher's build because a USB stick was unplugged would be worse
+    /// than the litter. Anything but those two codes is "may still exist"
+    /// and is kept. Erring toward litter is the safe direction.</para>
+    /// </summary>
+    public static IReadOnlyList<string> DiscardBuildsForMissingWorkingFolders(
+        string? buildsParent = null, string? homeDirectory = null,
+        Func<string, bool>? workingFolderMayStillExist = null)
+    {
+        var swept = new List<string>();
+        string parent = buildsParent ?? BuildsParent;
+        string home = (homeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var mayExist = workingFolderMayStillExist ?? WorkingFolderMayStillExist;
+
+        string[] entries;
+        try { entries = Directory.GetDirectories(parent); }
+        catch (Exception) { return swept; }
+
+        foreach (string entry in entries)
+        {
+            string recorded;
+            try { recorded = File.ReadAllText(Path.Combine(entry, WorkingFolderMarkerName)).Trim(); }
+            catch (Exception) { continue; }                 // unmarked: not ours to judge
+            if (recorded.Length == 0) continue;
+            if (!recorded.StartsWith(home, StringComparison.OrdinalIgnoreCase)) continue;
+            if (mayExist(recorded)) continue;
+            try { CourseRestorer.DeleteTree(entry); swept.Add(entry); }
+            catch (Exception) { /* a build in use is litter, not an error */ }
+        }
+        return swept;
+    }
+
+    private const int ErrorFileNotFound = 2;
+    private const int ErrorPathNotFound = 3;
+    private const uint InvalidFileAttributes = 0xFFFFFFFF;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetFileAttributesW(string path);
+
+    /// <summary>
+    /// True unless the system says, specifically, that the path is not there.
+    /// Asked of the system directly because <c>Directory.Exists</c> swallows
+    /// the reason it answers false.
+    /// </summary>
+    public static bool WorkingFolderMayStillExist(string path)
+    {
+        if (!OperatingSystem.IsWindows()) return Directory.Exists(path) || File.Exists(path);
+        uint attributes = GetFileAttributesW(path);
+        if (attributes != InvalidFileAttributes) return true;
+        int error = Marshal.GetLastWin32Error();
+        return error != ErrorFileNotFound && error != ErrorPathNotFound;
+    }
 
     private static bool WouldCollideWithEveryCourse(string courseCode) =>
         courseCode.Equals(WorkspaceDirectoryName, StringComparison.OrdinalIgnoreCase);

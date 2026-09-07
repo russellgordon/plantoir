@@ -22,7 +22,7 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Twenty-nine of its thirty-seven
+with its headline still reading as open work. **Thirty of its thirty-seven
 items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
 day (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
@@ -54,7 +54,7 @@ What is genuinely left, smallest first:
 
 | Item | What is left | Size |
 |---|---|---|
-| 19 | The `working-folder.txt` marker AND a sweep that reads it. Do both or neither — the marker alone is ceremony. Two Windows specifics for the sweep are written into item 19. | Small |
+| ~~19~~ | ✅ Done 2026-09-07 — `working-folder.txt` is written by the app and adopted retroactively; the launch-time sweep removes only builds whose working folder the system says is not there. | — |
 | 30 | Three small parity gaps, listed so they are not rediscovered as surprises: no Delete in the Archived/Backup detail pane, no icons or menu on the empty-folder picker's breadcrumbs, and no keyboard route to Rename Course. | Small |
 | 32 | `SpecialFoldersHelpContractTests` sweeps the teacher's own folder names for jargon and the contract says not to. Cannot fail on today's fixture, so it is a divergence rather than a bug. The mac fixed its own copy and the fix is worth copying, trap included. | Small |
 | ~~28~~ | ✅ Done 2026-09-07 — the scheduled-deploy dialog names the unpublished classes, the main window comes forward for an assistant build when hidden, settings saves reach the trail, and the assistant window remembers its placement per section. | — |
