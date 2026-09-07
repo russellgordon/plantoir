@@ -99,7 +99,7 @@ never had one — a rename is the one moment Plantoir witnesses the change, and
 without it the guess that finds those folders stops finding them with nobody
 told.
 
-Three things about it are deliberate:
+Four things about it are deliberate:
 
 - **It commits to disk immediately, not at Save**, and the sheet says so.
   Settings otherwise holds edits in memory with Cancel reverting them, and a
@@ -109,6 +109,18 @@ Three things about it are deliberate:
 - **It runs off the main actor.** The move is quick; reading every page in the
   course to rewrite links is not, on an iCloud-backed vault where an evicted
   file downloads on read.
+- **The new name is spelled differently in the two kinds of link**, and this
+  is measured rather than chosen. A Markdown destination ends at the first
+  space, so a name containing one is percent-encoded on the way in
+  (`[q](All%20Tasks/Quiz.md)`); a wikilink keeps the plain spelling, because
+  `[[All Tasks/Quiz 1]]` is exactly how Obsidian writes one. Which characters
+  are encoded is fixed by what the built site can decode, not by any general
+  URL rule — `&` is left alone on purpose, and a lone `%` is encoded on
+  purpose. The rule, the measurements and the eight cases both apps run are in
+  [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
+  `specialNames.renameFolder.linkRewriting`; the reasoning is in
+  [`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md) → "Spelling a folder's new name
+  inside a link".
 
 Two neighbouring behaviours changed with it: adding a folder name now CREATES
 the folder (it used to write an entry pointing at nothing), and removing one

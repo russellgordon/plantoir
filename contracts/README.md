@@ -157,7 +157,7 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | Validation messages | `app-rules.json` → `configurationRules` | CourseConfiguration (10), CustomDomain (4) |
 | Progress milestones and marker origins | `app-rules.json` → `milestones`, `markerOrigins` | TaskMilestone (12) |
 | Failure explanations | `app-rules.json` → `failureExplanations` | FailureExplainer (8) |
-| Special folder names: what is blocked, what is confirmed, what a rename says and which keys it carries | `shared-rules.json` → `specialNames` | SharedRulesContractTests (24), SpecialFolderRenamer (22) |
+| Special folder names: what is blocked, what is confirmed, what a rename says, which keys it carries, and how the new name is SPELLED inside a link | `shared-rules.json` → `specialNames` | SharedRulesContractTests (24), SpecialFolderRenamer (22), FolderPathRewriterTests (2) |
 | Which of a course's OWN folders the build treats specially, and what the sheet says about each | `shared-rules.json` → `specialFoldersHelp` | SpecialFoldersHelpContract (5) — mac side not yet adopted, see MAC-HANDOFF.md |
 | Which folder holds class pages, and which count | `class-planning.json` → `classFolder` | ClassFolderContractTests (6), and `scripts/test_class_folder.py` |
 | What a course calls a unit | `class-planning.json` → `pageNaming` (the `term` field) and `file-formats.json` → `unit_word` | ClassPageTerm (11), and `scripts/test_class_pages.py` |
