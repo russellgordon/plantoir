@@ -84,4 +84,22 @@ $code = $LASTEXITCODE
 $env:PLANTOIR_UI_TESTS = $null
 # A crashed run can leave the app behind; it was ours, so it goes.
 Get-Process -Name Plantoir -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+# ...and so can a LAUNCHER the app had started. Killing Plantoir.exe kills only
+# Plantoir.exe: the whole-tree kill lives in ConPty.Kill(), which runs when the
+# APP terminates a task, not when the app is terminated from outside. So a test
+# that fails while setup.ps1 is mid-run leaves powershell.exe and python.exe
+# alive, holding the temp working folder open - DrivenApp's own
+# Directory.Delete then fails silently (it must never turn a passing test red)
+# and the folder survives with nothing to say where it came from.
+#
+# Matched on the command line naming one of THIS suite's temp folders, whose
+# names DrivenApp builds as "plantoir-ui-<8 hex>". Nothing of anyone else's can
+# match that, which is what makes a force-kill here safe.
+$orphans = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='python.exe'" -ErrorAction SilentlyContinue |
+             Where-Object { $_.CommandLine -match 'plantoir-ui-[0-9a-f]{8}' })
+if ($orphans.Count -gt 0) {
+    Write-Host "Cleaning up $($orphans.Count) launcher process(es) left behind by a test run." -ForegroundColor Yellow
+    foreach ($o in $orphans) { Stop-Process -Id $o.ProcessId -Force -ErrorAction SilentlyContinue }
+}
 exit $code

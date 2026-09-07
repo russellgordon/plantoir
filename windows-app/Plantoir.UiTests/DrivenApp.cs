@@ -35,10 +35,17 @@ namespace Plantoir.UiTests;
 /// wrapper bakes the same into the script it registers. So a redirected run
 /// that PREVIEWED would look for its build where the launcher did not put it,
 /// and one that SCHEDULED a deploy would register a REAL Task Scheduler task
-/// whose sentinels land in the teacher's real pending folder. Nothing in the
-/// suite does either today — but a UI test that drives Preview is the obvious
-/// next thing somebody writes.
-/// None of it is reached by a Course Settings test.</para>
+/// whose sentinels land in the teacher's real pending folder. Neither is done
+/// by any test today, and neither should be without reading this first.
+///
+/// <para><b>One launcher IS run now:</b> <c>NewCourseWizardUiTests</c> presses
+/// Create, which runs <c>setup.ps1</c>. That is safe for one narrow reason —
+/// <c>setup_course.py</c> never resolves <c>merged_output_root</c>, so
+/// <c>PLANTOIR_BUILD_ROOT</c> is set and the folder it names is never made.
+/// Checked by hand on 2026-09-07: no new folder under the real
+/// <c>%LOCALAPPDATA%\Plantoir\builds</c>, and the real breadcrumb trail
+/// untouched. Nothing enforces that property, so check it again before a test
+/// runs a DIFFERENT launcher.</para>
 ///
 /// <para><b>A running Plantoir is closed, not worked around.</b> Russell's
 /// standing instruction (2026-09-06, and CLAUDE.md's Windows setup notes):
@@ -111,7 +118,29 @@ public sealed class DrivenApp : IDisposable
             ["RestoreWindowsOnLaunch"] = false,
         }.ToJsonString(), new UTF8Encoding(false));
 
-        var psi = new ProcessStartInfo(ExecutablePath) { UseShellExecute = false };
+        // UseShellExecute = TRUE, and this is not a detail. It is the one line
+        // that decides whether a test can drive anything the app SHELLS OUT to
+        // — preview, publish, or creating a course.
+        //
+        // Plantoir is a WinExe, so it never allocates a console of its own; but
+        // a GUI process started with UseShellExecute = false INHERITS its
+        // parent's, and the parent here is the `dotnet test` host, which has
+        // one. The app then hands its launcher a ConPTY pseudo console while
+        // the child quietly writes to the INHERITED console instead — so the
+        // app captures nothing, the child's stdin is never the app's, and
+        // `input()` in setup_course.py hits EOF and dies. What that looks like
+        // from a test is a launcher that "failed (exit code 1) after 1s" with
+        // an EMPTY transcript, which reads like a broken toolchain and is not.
+        //
+        // Measured, 2026-09-07: identical code, identical workspace, the only
+        // change this flag. False → exit 1 in one second, nothing captured,
+        // no course made. True → the create runs to the end, 47 s for the
+        // whole test. The same failure reproduces with no test harness at all
+        // by typing `.\Plantoir.exe` in a console — see
+        // documentation/12-windows-app.md, "Do not launch it from a terminal".
+        // ShellExecute is also what a teacher's shortcut does, so this is the
+        // faithful launch as well as the working one.
+        var psi = new ProcessStartInfo(ExecutablePath) { UseShellExecute = true };
         psi.ArgumentList.Add("--state-dir");
         psi.ArgumentList.Add(stateDir);   // ArgumentList quotes for us
         _app = Application.Launch(psi);
@@ -216,6 +245,19 @@ public sealed class DrivenApp : IDisposable
         catch { }
         // Deleted last, and never fatally: a locked file must not turn a
         // passing test red, and the folder is under TEMP either way.
+        //
+        // PLANTOIR_UI_KEEP=1 leaves it behind instead. A UI test that fails
+        // inside the app has almost nothing to say from out here — the useful
+        // evidence is the run's own startup.log, breadcrumb trail and working
+        // folder, and all three are inside this folder being deleted. Written
+        // after an afternoon of guessing at a launcher failure whose reason
+        // was sitting in a log that had already been thrown away. It prints
+        // the path, because a folder kept silently is litter.
+        if (Environment.GetEnvironmentVariable("PLANTOIR_UI_KEEP") == "1")
+        {
+            Console.WriteLine($"PLANTOIR_UI_KEEP: leaving this run's files at {_root}");
+            return;
+        }
         try { Directory.Delete(_root, recursive: true); } catch { }
     }
 }
