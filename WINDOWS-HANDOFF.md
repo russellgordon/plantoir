@@ -1457,7 +1457,7 @@ to run in the background.
     (`SiteHealthRepairTests.cs:180`) pins it. The mac has gone one further:
     `contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`
     now carries `expect: "refused"` and the sentence a teacher reads, so your
-    `Result` needs a third answer beside `Restored`/`AlreadyFine`/`Failed` and
+    `Result` needs a FOURTH answer beside `Restored`/`AlreadyFine`/`Failed`, and
     that test needs updating. The sentence is in the contract; do not retype it.
 
     Second, the TRAIL. `activityTrail.mustRecord` gained `folder problem not
@@ -5681,9 +5681,15 @@ changing."** The section still had no front page: `build_site.py` produces no
 root `index.html`, so there is no site to publish and the deploy refuses. The
 one dialog written to end silence was the thing telling them it was dealt with.
 
-`restoreMedia`, four functions above in the same file, has used the
-`isDirectory:` form since it was written, with a comment saying why. The two
-were written weeks apart and only one of them was thought about.
+`restoreMedia`, the function DIRECTLY above it, has used the `isDirectory:`
+form since it was written, with a comment saying why. And the two were written
+in the same sitting — `git log -S` puts both in commit `04dfd0cd`, 2026-08-23 —
+so this is not a case of an old habit and a new one. The careful form and the
+bare one were typed one function apart, on the same afternoon, by somebody who
+had just explained in a comment why the careful one was needed. That is the
+useful lesson in it: knowing the rule does not make the next call site obey it,
+and a grep for `fileExists` / `File.Exists` with no `isDirectory:` is worth more
+than remembering.
 
 ### What it does now, and the decision behind it
 
@@ -5719,14 +5725,15 @@ This is the first teacher-facing sentence on either platform to name a
 Obsidian's file tree shows, and both apps already offer "Reveal in Finder" on
 exactly that folder.
 
-**And the generic explanation is REPLACED, not appended to.** "You can make it
-yourself in Obsidian, or check that the folder holding this course isn't locked
-or read-only" is the right thing to say about a read-only volume and the wrong
-thing to say here: permissions are not what is wrong, and a teacher gets one
-prompt to act on. When BOTH kinds of failure happen at once — a file where
+**And the generic explanation is REPLACED, not appended to.** That is
+`SiteHealthRepair.couldNotExplanation` on the mac — the one that sends a teacher
+to check whether a folder is locked or read-only. It is the right thing to say
+about a read-only volume and the wrong thing to say here: permissions are not
+what is wrong, and a teacher gets one prompt to act on. When BOTH kinds of failure happen at once — a file where
 `Media` belongs and a folder where the front page belongs — both sentences are
 said, generic first and specific last. Both orders were read aloud. The other
-way round ends the paragraph on "You can make it yourself in Obsidian"
+way round ends the paragraph on the generic explanation's opening clause —
+"You can make it yourself in Obsidian" —
 immediately after "…and Plantoir can put the front page back", so "it" lands on
 the front page — the one thing that cannot be made until the folder in the way
 has moved. There is a test on the order
