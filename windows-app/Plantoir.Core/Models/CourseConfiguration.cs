@@ -79,6 +79,60 @@ public sealed class CourseConfiguration
         _lastSavedData = data;
     }
 
+    /// <summary>
+    /// Writes ONE change to the file on disk from a fresh read, leaving every
+    /// other unsaved edit in this object unsaved — the recorder a folder
+    /// rename uses, because the folder has really moved and a Cancel that
+    /// appeared to undo it would be a lie. <see cref="Write"/> is left exactly
+    /// as it is: making it read-compare-write would change what
+    /// <see cref="HasUnsavedChanges"/> and <see cref="DiscardChanges"/> mean,
+    /// and Cancel in Course Settings would stop doing what it says.
+    ///
+    /// <para>Read, change, and write only if nothing else wrote in between. A
+    /// build's own <c>preflight_update_course_config</c> writes this same
+    /// file, and the loser of that race used to be silent; the Python side
+    /// does the same compare-and-swap, so a rename and a build can no longer
+    /// quietly undo each other. Three tries, then write anyway — a folder
+    /// that has MOVED with a configuration that does not say so is the worse
+    /// state, so this ends by recording the truth — but from the FRESHEST
+    /// bytes, never the computation the compare just proved stale.</para>
+    ///
+    /// <para>Afterwards the change is applied to this object too, and the
+    /// bytes written become its last-saved state, so Revert keeps the rename
+    /// (it is on disk) and drops only what was never saved.</para>
+    /// </summary>
+    public void RecordOnDisk(Func<JObject, JObject> change, string path)
+    {
+        byte[] before;
+        byte[] written;
+        int attempts = 0;
+        while (true)
+        {
+            before = File.ReadAllBytes(path);
+            written = Serialize(change(ParseObject(before)));
+            byte[] nowOnDisk;
+            try { nowOnDisk = File.ReadAllBytes(path); } catch (IOException) { nowOnDisk = before; }
+            if (nowOnDisk.AsSpan().SequenceEqual(before)) break;
+            attempts++;
+            if (attempts < 3) continue;
+            written = Serialize(change(ParseObject(nowOnDisk)));
+            break;
+        }
+        string temp = path + ".tmp";
+        File.WriteAllBytes(temp, written);
+        File.Move(temp, path, overwrite: true);
+
+        _values = change(_values);
+        _lastSavedData = written;
+    }
+
+    private static JObject ParseObject(byte[] data) =>
+        JToken.Parse(Encoding.UTF8.GetString(data)) as JObject
+        ?? throw new InvalidDataException("course_config.json does not hold a JSON object.");
+
+    private static byte[] Serialize(JObject values) =>
+        new CourseConfiguration(values, Array.Empty<byte>()).SerializedBytes();
+
     /// <summary>The Revert button: put the values back the way the last save left them.</summary>
     public void DiscardChanges()
     {

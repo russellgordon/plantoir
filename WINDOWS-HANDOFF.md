@@ -593,7 +593,17 @@ this side is expected to say so when the contract is wrong.
       - *The contract holds 5 resolution cases*, not the 10 row 379 claimed.
       - *Size the flyout for the longest sentence.* The mac popover truncated to one line until it was given a fixed width and allowed to wrap; the `lastGradedFolderBlocked` sentence is the longest in `specialNames`, so test the flyout with that one.
 
-13. **Renaming a course folder from inside the app — HALF DONE 2026-09-06.**
+13. ~~**Renaming a course folder from inside the app — HALF DONE 2026-09-06.**~~
+    ✅ Done 2026-09-07, with item 17 in the same piece (branch
+    `issue/13-rename-folder-and-config-writers`, `GUI-IMPROVEMENTS.md` rows
+    441–443). A pencil on each folder row opens the sheet; `Rename` moves the
+    folder in every section (every destination checked first, a half-failure
+    naming the section that stopped it, no roll-back), rewrites the links,
+    and `Renaming` carries every key in `KeysThatCarryAcross` across on a
+    FRESH read of the file (`CourseConfiguration.RecordOnDisk`), materialising
+    `class_folder` and `curriculum_folder`; Add creates the folder and says
+    so, Remove says the folder stays; both trail events are emitted. The
+    original item follows.
     The model layer is built and under test: `FolderPathRewriter` (the link
     rewriting, 32 test methods over 119 cases since item 31 wired the contract) and `SpecialFolderRenamer` (the refusals, the move
     list, the check-every-destination-first rule, 27 test methods over 38 cases — the “22” written here on 2026-09-06 was already stale that day), plus the two
@@ -627,15 +637,23 @@ this side is expected to say so when the contract is wrong.
     until you read `pageNaming`'s new `term` field with a default.** Full
     write-up in "What a course calls a unit" below.
 
-16. ~~What a course calls its class folder~~ — ✅ Done 2026-09-06 (`ClassFolderRule.Name/Names` with the recorded key, the wizard writing it, and `ItemProtectionRule` protecting it). **The rename that MATERIALISES the key is NOT part of this item and is not owed by it** — it belongs to item 13's sheet and is tracked there, as open work, with the rest of the rename. Nothing under this heading is outstanding; read item 13 for what is. (Corrected 2026-09-06: this rider used to read "NOT yet done", which put a live-sounding obligation inside a struck item, where anybody skimming the list for open work would never see it.) Original text: `class_folder` in
+16. ~~What a course calls its class folder~~ — ✅ Done 2026-09-06 (`ClassFolderRule.Name/Names` with the recorded key, the wizard writing it, and `ItemProtectionRule` protecting it). **The rename that MATERIALISES the key landed with item 13 on 2026-09-07** (`SpecialFolderRenamer.Renaming`, pinned by `TheClassFolderAndTheCurriculumFolderAreMaterialisedByARename`). Nothing under this heading is outstanding. (Corrected 2026-09-06: this rider used to read "NOT yet done", which put a live-sounding obligation inside a struck item, where anybody skimming the list for open work would never see it.) Original text: `class_folder` in
     `course_config.json`, recorded rather than guessed, materialised by a
     rename along with `curriculum_folder`. Replaces the class-folder refusal
     item 13 described, which no longer exists. **Eight new contract cases will
     fail your suite until `ClassFolderRule.cs` reads the key.** Full write-up
     in "What a course calls its class folder" below.
 
-17. **`course_config.json`'s two writers, and the interrupted-rename dead end
-    (2026-09-05).** The Python half of the first is shared and you inherit it;
+17. ~~**`course_config.json`'s two writers, and the interrupted-rename dead end
+    (2026-09-05).**~~ ✅ Done 2026-09-07 with item 13. The app-side writer is
+    a separate `RecordOnDisk` (read, change, write only if nothing else wrote
+    in between; three tries, then the FRESHEST bytes), and `Write` is
+    untouched so Revert still does what it says — asserted by
+    `WriteIsUnchangedAndRevertStillDoesWhatItSays`. A rename is recorded
+    under `courses/.internal/renames/<CODE>.json` before anything moves,
+    cleared once the configuration is written, and the clash check is relaxed
+    only when the record and the disk agree; the sheet pre-fills the target
+    and says what happened. The original item follows. The Python half of the first is shared and you inherit it;
     the app-side writer and the whole of the second are yours. Full write-ups
     in "`course_config.json` has two writers" and "A rename interrupted after
     the folders moved was a dead end" below.
