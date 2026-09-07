@@ -3367,6 +3367,20 @@ is what happened to the test-race item, sitting here for three days with
 
 ## Done — the ledger
 
+- **Windows' folders-help jargon sweep now matches the mac's: it scans what
+  the product writes, not the teacher's folder names** (Windows, 2026-09-07,
+  branch `issue/32-folders-help-jargon-sweep`; item 32 struck). **The mac is
+  expected to KNOW.** ✅ DONE. The trap the mac's first draft fell into is
+  avoided the same way: only course-named rows drop out, and the four
+  `namedFrom: "fixed"` names (Media, index.md, Key Links.md, Curriculum
+  Coverage) stay swept, asserted as exactly four. The fixture has a marks
+  folder called "Scripts" and no curriculum folder, so the exclusion is
+  exercised rather than written and "Your curriculum folder" / "None chosen"
+  are rendered by a test for the first time. All six product strings exist on
+  Windows; nothing was added or weakened. The test count is unchanged — one
+  test rewritten, not one added — which the brief's "goes up" did not
+  foresee.
+
 - **Windows writes the builds-folder marker and sweeps abandoned builds —
   from the app, not the launchers, which is the opposite of what the mac's
   review argued** (Windows, 2026-09-07, branch
