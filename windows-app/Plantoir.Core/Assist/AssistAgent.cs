@@ -466,6 +466,13 @@ public sealed class AssistAgent
     /// <summary>Invoked whenever a pending plan/write action is accepted by the teacher.</summary>
     public Action? OnPlanAccepted { get; set; }
 
+    /// <summary>
+    /// The copy saved before this conversation's first change, the moment an
+    /// answer first names it. The window shows "Restore Section N…" from
+    /// then on. Any thread.
+    /// </summary>
+    public Action<string>? OnConversationBackup { get; set; }
+
     /// <summary>Provides the human-readable destination for publishing/deploying (e.g. "Netlify", "Cloudflare Pages", "a folder on this computer").</summary>
     public Func<string>? DestinationProvider { get; set; }
 
@@ -768,6 +775,7 @@ public sealed class AssistAgent
     private async Task<List<Line>> ShowPlan(string twinName, JsonObject call, CancellationToken cancellation)
     {
         var answer = await _tools.CallTool(twinName, ArgumentsOf(call), OnToolProgress, cancellation);
+        if (answer.ConversationBackupPath is { } savedCopy) OnConversationBackup?.Invoke(savedCopy);
 
         // A plan twin can come back with a REFUSAL — no such page, no such
         // section — and a refusal is an answer, not a proposal. "Shall I go
@@ -1103,6 +1111,7 @@ public sealed class AssistAgent
         }
 
         var answer = await _tools.CallTool(name, arguments, OnToolProgress, cancellation);
+        if (answer.ConversationBackupPath is { } savedCopy) OnConversationBackup?.Invoke(savedCopy);
         // The MODEL is given the long half; the teacher's line is added by
         // whoever called this, from the short one.
         _messages.Add(new JsonObject
