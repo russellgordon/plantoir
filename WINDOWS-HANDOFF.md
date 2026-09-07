@@ -1484,8 +1484,10 @@ to run in the background.
     `GUI-IMPROVEMENTS.md` row 427).
 
     **You inherit the code for free and owe one small piece of wiring.** Your
-    `Repair` has returned `IReadOnlyList<(SiteHealthFinding, Result)>` since you
-    ported the file (`SiteHealthRepair.cs:251`), and your
+    `Repair` returns `IReadOnlyList<(SiteHealthFinding, Result)>`
+    (`SiteHealthRepair.cs:251`) — arrived at in `014ee031`, your second commit
+    on that file, having ported the mac's dictionary in `3ddd4af4` a few hours
+    earlier and thought better of it the same day — and your
     `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer` already pins the
     behaviour — the mac has simply caught up to a shape you shipped first, which
     is worth saying out loud because this list is usually the other direction.
@@ -1512,7 +1514,7 @@ to run in the background.
     side it will too, the day item 33 lands.
 
     One stale comment left for you rather than edited from here: the `<remarks>`
-    on `SiteHealthRepair.cs:243-247` call the per-finding list "a deliberate
+    on `SiteHealthRepair.cs:241-250` call the per-finding list "a deliberate
     divergence from the mac, whose dictionary is keyed by name". It is no longer
     a divergence. Reword it when you next touch the file.
 
