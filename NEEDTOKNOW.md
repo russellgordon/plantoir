@@ -162,7 +162,7 @@ so the nested loop is spun from inside a display-cycle callback already running.
 Measured today, same command and same machine: **10 crashes in 30 runs before,
 0 in 30 after.** The fix asks AppKit to skip the sheet animation inside the test
 host only — `mac-app/Tests/QuartzTeachersTests/SheetAnimationSuppressor.swift`
-carries the stack, the numbers, and the five levers that look like they should
+carries the stack, the numbers, and the six levers that look like they should
 work and do not.
 
 **One thing here is still true and worth keeping**: a test host that dies still

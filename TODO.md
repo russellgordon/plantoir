@@ -31,16 +31,26 @@ an item when it ships (finished behaviour is recorded in
   almost certainly a dead end too: no accessibility key is among the four
   read on that path.
 
-  What DID work is an empty `_doAnimation` added to `NSSheetMoveHelper`,
-  which inherits the method from `NSMoveHelper` rather than declaring its
-  own — so sheets, and only sheets, come out of the animation, and ordinary
-  window moves are untouched. It lives in the test bundle
-  (`mac-app/Tests/QuartzTeachersTests/SheetAnimationSuppressor.swift`) and is
-  installed from the bundle's `NSPrincipalClass`, so nothing in the shipped
-  app changes. Measured on this Mac (Apple M4 Pro, macOS 26.6 25G72), same
-  command, same session: **10 crashes in 30 runs before, 0 in 30 after** for
-  that class alone, and the full suite likewise. See `GUI-IMPROVEMENTS.md`
-  row 444 and `WINDOWS-HANDOFF.md`.
+  What DOES work is AppKit's own switch. `NSSheetMoveHelper` declares its own
+  `-shouldSkipAnimation`, overriding `NSMoveHelper`'s, and forcing it true is
+  how AppKit itself takes a sheet out of the animation — the same branch it
+  takes for `inhibitWindowAnimations`. One `method_setImplementation` on the
+  subclass leaves ordinary window moves animating. (An empty `_doAnimation`
+  override also works and was tried first; the switch was preferred because
+  AppKit's own skip path leaves the state AppKit intends to leave, and because
+  it needs no `class_addMethod` and no fallback branch.) It lives in the test
+  bundle (`mac-app/Tests/QuartzTeachersTests/SheetAnimationSuppressor.swift`)
+  and is installed from the bundle's `NSPrincipalClass`, so nothing in the
+  shipped app changes.
+
+  Measured on this Mac (Apple M4 Pro, macOS 26.6 25G72), same command, same
+  session: **10 crashes in 30 runs before, 0 in 30 after** for that class
+  alone, and the FULL suite 0 host deaths in 8 runs afterwards. Those are two
+  separate measurements on purpose — the class-alone figure was clean while
+  the full suite was still aborting 8 times out of 8 on an unrelated crash
+  this work had just introduced, which is the whole reason to measure at the
+  scope a gate runs. See `GUI-IMPROVEMENTS.md` row 444 and
+  `WINDOWS-HANDOFF.md`.
 
   **What it looks like.** `xcodebuild ... test` exits 65 and prints
   `** TEST FAILED **` with a "Failing tests:" line naming one
