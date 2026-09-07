@@ -137,6 +137,49 @@ final class SiteHealthContractTests: XCTestCase {
         )
     }
 
+    /// The sentence a teacher reads when a FOLDER is sitting where a section's
+    /// front page belongs, deserialised rather than retyped.
+    ///
+    /// Both apps have to say one thing about one problem. Windows answers
+    /// `Failed` here today with the generic "check the folder isn't locked or
+    /// read-only", which sends a teacher to look at permissions on a folder
+    /// that is not locked — so this is the sentence they adopt.
+    func testTheRefusalSentenceIsTheOneInTheContract() throws {
+        let repair: [String: Any] = try XCTUnwrap(siteHealth["repair"] as? [String: Any])
+        let refused: [String: Any] = try XCTUnwrap(
+            repair["refusedWhenSomethingIsInTheWay"] as? [String: Any]
+        )
+        let cases: [[String: Any]] = try XCTUnwrap(refused["cases"] as? [[String: Any]])
+        XCTAssertFalse(cases.isEmpty, "the contract carries no refusal case")
+
+        for refusal in cases {
+            XCTAssertEqual(refusal["check"] as? String, "sectionIndexMissing",
+                           "an unknown refusal case has appeared with nothing behind it")
+            XCTAssertEqual(refusal["expect"] as? String, "refused")
+            let sentence: String = try XCTUnwrap(refusal["sentence"] as? String)
+                .replacingOccurrences(of: "{course}", with: "ICS3U")
+                .replacingOccurrences(of: "{section}", with: "2")
+            XCTAssertEqual(
+                SiteHealthRepair.folderWhereTheFrontPageBelongs(course: "ICS3U", section: 2),
+                sentence,
+                "the app and the contract word the same refusal differently"
+            )
+        }
+    }
+
+    /// Rule 1 again, for the refusal — which `testNoCheckNamesTheMachinery`
+    /// below does not reach, because it walks `checks` and this sentence lives
+    /// under `repair`.
+    func testTheRefusalSentenceNamesNoMachinery() throws {
+        let said: String = SiteHealthRepair
+            .folderWhereTheFrontPageBelongs(course: "ICS3U", section: 1)
+            .lowercased()
+        for word in ["toolchain", "script", "docker", "container", "wsl", "python",
+                     "stdout", "quartz", "repository", "config"] {
+            XCTAssertFalse(said.contains(word), "the refusal says \"\(word)\" to a teacher")
+        }
+    }
+
     private func sample(named name: String, fixable: Bool) -> SiteHealthFinding {
         return SiteHealthFinding(
             name: name, sentence: "s", detail: "d",

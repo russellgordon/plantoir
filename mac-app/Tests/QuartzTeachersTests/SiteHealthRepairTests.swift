@@ -274,6 +274,128 @@ final class SiteHealthRepairTests: XCTestCase {
         )
     }
 
+    /// A FOLDER named `index.md` is not a front page, and saying "that is
+    /// already put right" about one is the worst answer available: the section
+    /// still has none, so the build still produces no site and the publish
+    /// still refuses, and the teacher stops looking.
+    ///
+    /// Found by Windows porting this file line by line (`MAC-HANDOFF.md`,
+    /// 2026-09-06). `restoreMedia` four functions above has always used the
+    /// `isDirectory:` form; this one did not.
+    func testAFolderWhereTheFrontPageBelongsIsRefusedRatherThanCalledAlreadyFine() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+
+        let repaired = SiteHealthRepair.repair(
+            [finding("sectionIndexMissing", fixable: true)], in: course
+        )
+        XCTAssertEqual(
+            repaired["sectionIndexMissing"],
+            .blockedByAFolderWhereTheFrontPageBelongs(section: 1),
+            "a folder called index.md satisfies a bare existence check, and used "
+            + "to be reported as already put right"
+        )
+    }
+
+    /// The decision Russell made about this case: refuse and explain, touch
+    /// nothing. Moving the folder aside was rejected because it relocates a
+    /// folder that may hold the teacher's own pages, without asking, and
+    /// neither app can see what is inside it.
+    func testTheFolderInTheWayAndEverythingInItIsLeftExactlyAsItWas() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+        let theirPage: URL = index.appendingPathComponent("Unit 1, Day 1.md")
+        try "# a lesson they wrote".write(to: theirPage, atomically: true, encoding: .utf8)
+
+        _ = SiteHealthRepair.outcome(
+            ofRepairing: [finding("sectionIndexMissing", fixable: true)], in: course
+        )
+
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: index.path, isDirectory: &isDirectory),
+            "the folder must still be there"
+        )
+        XCTAssertTrue(isDirectory.boolValue, "and must still be a folder")
+        XCTAssertEqual(
+            try String(contentsOf: theirPage, encoding: .utf8), "# a lesson they wrote",
+            "nothing inside it may be moved, renamed or overwritten"
+        )
+    }
+
+    /// The refusal must say what is actually wrong. "Check the folder isn't
+    /// locked or read-only" is the generic explanation, and it sends a teacher
+    /// to look at permissions on a folder that is not locked.
+    func testTheRefusalNamesTheFolderRatherThanBlamingPermissions() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+
+        let outcome = SiteHealthRepair.outcome(
+            ofRepairing: [finding("sectionIndexMissing", fixable: true)], in: course
+        )
+        XCTAssertEqual(outcome?.headline, "Plantoir could not put that back.")
+        XCTAssertEqual(
+            outcome?.detail,
+            SiteHealthRepair.folderWhereTheFrontPageBelongs(course: "ICS3U", section: 1)
+        )
+        XCTAssertFalse(outcome?.detail.contains("read-only") ?? true,
+                       "the generic explanation is replaced, not appended to")
+        XCTAssertEqual(outcome?.canRebuild, false,
+                       "there is nothing to look at, so do not offer the preview")
+    }
+
+    /// It has to be findable. Every course has a `section1`, and this dialog
+    /// shows a headline and one sentence and nothing else — so a teacher with
+    /// two courses would otherwise be sent to a folder that exists twice.
+    func testTheRefusalNamesBothTheCourseAndTheSectionFolder() {
+        let said: String = SiteHealthRepair.folderWhereTheFrontPageBelongs(
+            course: "ICS3U", section: 2
+        )
+        XCTAssertTrue(said.contains("index.md"), said)
+        XCTAssertTrue(said.contains("section2"), said)
+        XCTAssertTrue(said.contains("ICS3U"), said)
+    }
+
+    /// A blocked repair beside a genuine one: what came back is announced,
+    /// what did not is named, and BOTH explanations are given — the specific
+    /// one first, because "you can make it yourself in Obsidian" is true of
+    /// the Media folder and is exactly what cannot be done about the front
+    /// page until the folder in the way has been moved.
+    func testABlockedRepairBesideARestoredOneSaysBothHalves() throws {
+        let (root, course) = try makeCourse()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let index: URL = course.sectionDirectoryURL(forSection: 1)
+            .appendingPathComponent("index.md")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: true)
+
+        let outcome = SiteHealthRepair.outcome(
+            ofRepairing: [
+                finding("mediaFolderMissing", fixable: true),
+                finding("sectionIndexMissing", fixable: true),
+            ],
+            in: course
+        )
+        XCTAssertEqual(outcome?.headline, "Put the Media folder back.")
+        XCTAssertTrue(outcome?.detail.contains("Could not put the front page back") ?? false,
+                      outcome?.detail ?? "")
+        XCTAssertTrue(outcome?.detail.contains("There is a folder called index.md") ?? false,
+                      outcome?.detail ?? "")
+        XCTAssertEqual(outcome?.canRebuild, false)
+    }
+
     /// Pressing it twice, or pressing it after fixing the problem in Obsidian,
     /// must change nothing — a repair that overwrote would destroy the very
     /// page the teacher had just written.
