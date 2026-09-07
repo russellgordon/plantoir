@@ -11,6 +11,7 @@
             <KeyboardAccelerator Modifiers="Control" Key="O" Invoked="OpenWorkingFolderAccelerator" />
             <KeyboardAccelerator Modifiers="Control" Key="N" Invoked="NewWindowAccelerator" />
             <KeyboardAccelerator Modifiers="Control,Shift" Key="R" Invoked="ReloadCoursesAccelerator" />
+            <KeyboardAccelerator Key="F2" Invoked="RenameCourseAccelerator" />
             <!-- Global Preview shortcuts, mirroring mac's ⌘[/⌘]/⌘R: WinUI
                  resolves a key combo declared at more than one scope by
                  preferring the one nearest the focused element, so these
@@ -37,6 +38,14 @@
                 <MenuFlyoutItem x:Name="NewWindowItem" Text="New Window" Click="NewWindow_Click" KeyboardAcceleratorTextOverride="Ctrl+N" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="RestoreFromArchiveItem" Text="Restore from Archive…" Click="RestoreFromArchive_Click" IsEnabled="False" />
+                <!-- File, not an Edit menu: on Windows a top-level Edit holds
+                     Cut/Copy/Paste, and one holding a single item reads as
+                     broken; File already holds a selection-scoped action.
+                     Dimmed WITH its reason, the way the course menu does it. -->
+                <MenuFlyoutItem x:Name="RenameCourseItem" Text="Rename Course…" Click="RenameCourse_Click"
+                                IsEnabled="False" KeyboardAcceleratorTextOverride="F2"
+                                AutomationProperties.AutomationId="fileRenameCourse" />
+                <MenuFlyoutItem x:Name="RenameCourseReason" IsEnabled="False" Visibility="Collapsed" />
                 <MenuFlyoutItem x:Name="ReloadCoursesItem" Text="Reload Courses" Click="ReloadCourses_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+R" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="SettingsItem" Text="Settings…" Click="Settings_Click" KeyboardAcceleratorTextOverride="Ctrl+," />
