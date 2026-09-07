@@ -22,7 +22,7 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Twenty-eight of its thirty-seven
+with its headline still reading as open work. **Twenty-nine of its thirty-seven
 items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
 day (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
@@ -61,7 +61,7 @@ What is genuinely left, smallest first:
 | ~~31~~ | ✅ Done 2026-09-07 — `Uri.EscapeDataString` replaced by a contract-driven encoder in both branches of `Spelled`; `FolderPathRewriterTests` deserialises every `linkRewriting` case. | — |
 | 36 | A decision, not code: `verify-deploy.ps1` is the only automated check of the PowerShell half of publishing and no gate runs it. Schedule it, make it a release-cut step, or write down that it is hand-run. | Small |
 | 37 | A decision the MAC makes: the Course Settings tip sentence is pinned by no contract on either platform and the two apps word it differently. Windows owes only taking the mac's wording once it is chosen. | Small |
-| 18 | The two VIEWS: the choice at the folder picker, and the dismissable notice for a folder the window restored. Detection, wording and the remembered-per-folder store are built — the store's API is `AppSettings.HasAcceptedSyncFor` / `RememberAcceptedSyncFor`, and the two moments belong in `WorkspacePickerView` (a folder just chosen) and `MainWindow`'s restore path (a folder the window reopened). | Medium |
+| ~~18~~ | ✅ Done 2026-09-07 — the choice at the folder picker and the dismissable notice for a restored folder both exist, and `synced folder noticed` / `synced folder accepted` are emitted. | — |
 | 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
 | ~~27~~ | ✅ Done 2026-09-07 — “Restore Section N…” puts a section back to how it was when the conversation started; the assistant now saves one copy per conversation rather than one per change. | — |
 | ~~26~~ | ✅ Done 2026-09-06 — the marks checklist offers folders nested up to four levels deep (`GradedFolderChoices`), and the frozen pool is fed from the same list. | — |
@@ -175,22 +175,22 @@ is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code. The same goes for the four trail events below: the
 features that would raise them are these same two.
 
-## FOUR activity-trail events are declared but not yet emitted (2026-09-06; six then, two of them emitted since)
+## TWO activity-trail events are declared but not yet emitted (2026-09-06; six then, four of them emitted since)
 
 `ActivityTrail.Event` names `folder renamed`, `folder created`,
 `synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,
 `settings saved` and `settings could not be saved`, which belonged to no
 unbuilt view at all: `CourseSettingsView.Save_Click` wrote the config and
 recorded nothing, while the mac records both. That pair was handoff item 28
-and has been emitted since 2026-09-07. The four that remain are in
+and has been emitted since 2026-09-07; the two synced-folder events followed
+the same day with item 18's views. The two that remain are in
 `contracts/shared-rules.json` → `activityTrail.mustRecord`, and
 `ContractTests.SharedRules_ActivityTrailEvents_Exist` compares that list
 against the enum — so declaring them is what makes the suite green.
 
-**Nothing raises any of them yet**, because the features that would are only
-half built: WINDOWS-HANDOFF item 13's rename sheet does not exist (the model
-layer — `SpecialFolderRenamer`, `FolderPathRewriter` — does), and item 18's
-two views do not exist (the detection and the wording do).
+**Nothing raises the two that remain yet**, because the feature that would
+is only half built: WINDOWS-HANDOFF item 13's rename sheet does not exist
+(the model layer — `SpecialFolderRenamer`, `FolderPathRewriter` — does).
 
 This is written here rather than left in a commit message because a green
 suite that is green on a promise is exactly the kind of thing a later session

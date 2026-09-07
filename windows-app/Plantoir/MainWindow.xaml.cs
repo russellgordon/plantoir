@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Plantoir.Core.Assist;
@@ -122,6 +123,7 @@ public sealed partial class MainWindow : Window
             App.LogDiagnostic($"MainWindow ctor: AdoptRestoredPath('{folderPath}') starting");
             Workspace.AdoptRestoredPath(folderPath);
             App.LogDiagnostic("MainWindow ctor: AdoptRestoredPath done");
+            ShowSyncNoticeIfNeeded();
         }
         App.LogDiagnostic("MainWindow ctor: ApplyState starting");
         ApplyState();
@@ -637,12 +639,231 @@ public sealed partial class MainWindow : Window
 
     public async void OpenWorkingFolder_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new Windows.Storage.Pickers.FolderPicker();
-        WinRT.Interop.InitializeWithWindow.Initialize(picker,
-            WinRT.Interop.WindowNative.GetWindowHandle(this));
-        picker.FileTypeFilter.Add("*");
-        var folder = await picker.PickSingleFolderAsync();
-        if (folder is not null) Workspace.ChooseWorkspace(folder.Path);
+        // Looped, because "Choose a Different Folder…" in the synced-folder
+        // note reopens the OS picker rather than stranding the teacher on the
+        // picker view: they have already said what they want. Cancelling the
+        // picker ends the loop.
+        while (true)
+        {
+            var picker = new Windows.Storage.Pickers.FolderPicker();
+            WinRT.Interop.InitializeWithWindow.Initialize(picker,
+                WinRT.Interop.WindowNative.GetWindowHandle(this));
+            picker.FileTypeFilter.Add("*");
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder is null) return;
+
+            if (IsTheOpenFolder(folder.Path))
+            {
+                // A restore, not a choice: the notice form, never the
+                // picker's — and a notice already showing stays exactly as it
+                // is, so their courses are not hidden behind the picker.
+                Workspace.ChooseWorkspace(folder.Path);
+                return;
+            }
+            switch (await SyncedFolderChoiceAsync(folder.Path))
+            {
+                case SyncedFolderChoice.GoAhead:
+                    Workspace.ChooseWorkspace(folder.Path);
+                    ShowSyncNoticeIfNeeded();
+                    return;
+                case SyncedFolderChoice.ChooseAnother:
+                    continue;
+            }
+        }
+    }
+
+    // ---- A working folder a cloud service keeps in sync -------------------
+    //
+    // Explained, never refused — contracts/shared-rules.json ->
+    // cloudSyncedFolders. Two moments: a choice at the picker for a folder
+    // just chosen (a dialog, two buttons, neither the default), and a quiet
+    // notice for a folder the window restored (the InfoBar under the menu
+    // bar). Going ahead from either is remembered for that folder. The one
+    // question both moments ask — should this folder be talked about at all
+    // — is answered in ONE place, SyncNoteWanted, so the two cannot drift.
+
+    private enum SyncedFolderChoice { GoAhead, ChooseAnother }
+
+    /// <summary>
+    /// Folders a note has been SHOWN for in this process, keyed by resolved
+    /// path, so a second window on the same folder does not repeat it before
+    /// the teacher has answered. Added only once a note is actually on
+    /// screen — a dialog that could not be shown must not count as told. The
+    /// remembered answer itself is in <see cref="AppSettings.AcceptedSyncedFolders"/>.
+    /// </summary>
+    private static readonly HashSet<string> _syncNoticedThisProcess = new(StringComparer.OrdinalIgnoreCase);
+
+    private static string ResolvedFolder(string path)
+    {
+        try { return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
+        catch { return path; }
+    }
+
+    private bool IsTheOpenFolder(string path) =>
+        Workspace.WorkspacePath is { } open &&
+        string.Equals(ResolvedFolder(open), ResolvedFolder(path), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The service to name, or null when there is nothing to say: the folder
+    /// is not synced, was already accepted, has already had its note in this
+    /// process (in any window), or cannot be used anyway — neither a working
+    /// folder nor empty, so the teacher is about to choose again, and a note
+    /// about a folder they cannot use is noise beside the guidance that says
+    /// what to choose. The mac's <c>noticeCloudSync</c>, in one place.
+    /// </summary>
+    private static string? SyncNoteWanted(string path)
+    {
+        if (CloudSyncedFolder.ServiceFor(path) is not { } service) return null;
+        if (App.Settings.HasAcceptedSyncFor(path)) return null;
+        if (_syncNoticedThisProcess.Contains(ResolvedFolder(path))) return null;
+        if (Plantoir.Core.Models.Workspace.Classify(path) == WorkspaceState.Unrecognized) return null;
+        return service;
+    }
+
+    /// <summary>The picker moment.</summary>
+    private async Task<SyncedFolderChoice> SyncedFolderChoiceAsync(string path)
+    {
+        if (SyncNoteWanted(path) is not { } service) return SyncedFolderChoice.GoAhead;
+
+        // The path FIRST, then the headline, then the explanation: the
+        // sentences say "this folder", and a teacher reads that and looks for
+        // which folder. The dialog's own title stays empty for that reason.
+        var body = new StackPanel { Spacing = 10 };
+        body.Children.Add(new TextBlock { Text = path, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
+        body.Children.Add(new TextBlock
+        {
+            Text = CloudSyncWording.Headline(service),
+            TextWrapping = TextWrapping.Wrap,
+            Style = (Style)Application.Current.Resources["SubtitleTextBlockStyle"],
+        });
+        foreach (string paragraph in CloudSyncWording.Explanation(service))
+            body.Children.Add(new TextBlock { Text = paragraph, TextWrapping = TextWrapping.Wrap });
+
+        var dialog = new ContentDialog
+        {
+            Content = new ScrollViewer { Content = body, MaxHeight = 440 },
+            PrimaryButtonText = CloudSyncWording.UseAnywayButton,
+            CloseButtonText = CloudSyncWording.ChooseDifferentFolderButton,
+            // Neither button is the default: this is the one moment the choice
+            // is free, and a Return pressed out of habit must not decide it.
+            DefaultButton = ContentDialogButton.None,
+            XamlRoot = Content.XamlRoot,
+        };
+        AutomationProperties.SetAutomationId(dialog, "syncedFolderChoice");
+        ContentDialogResult answer;
+        try { answer = await dialog.ShowAsync(); }
+        catch (Exception ex)
+        {
+            // A dialog that could not be shown (another dialog holds the one
+            // slot WinUI allows) must not block the folder — "explained,
+            // never refused" — and must not be recorded as told, either.
+            App.LogDiagnostic($"synced-folder dialog: {ex.Message}");
+            return SyncedFolderChoice.GoAhead;
+        }
+        // Told, now — the line the contract asks for carries the service and
+        // the folder, which the trail redacts on the way in.
+        _syncNoticedThisProcess.Add(ResolvedFolder(path));
+        ActivityTrail.Note(ActivityTrail.Event.SyncedFolderNoticed,
+            $"noticed that the folder just chosen is kept in sync with {service} — {path}");
+        // Escape or the close box are read as "choose a different folder":
+        // the teacher arrived from the picker and gets it back.
+        if (answer != ContentDialogResult.Primary) return SyncedFolderChoice.ChooseAnother;
+
+        RememberSyncAccepted(path, service, "chose to use the folder anyway");
+        return SyncedFolderChoice.GoAhead;
+    }
+
+    private void RememberSyncAccepted(string path, string service, string how)
+    {
+        App.Settings.RememberAcceptedSyncFor(path);
+        try { App.Settings.Save(); } catch (Exception ex) { App.LogDiagnostic($"settings: {ex.Message}"); }
+        ActivityTrail.Note(ActivityTrail.Event.SyncedFolderAccepted,
+            $"{how} — a folder kept in sync with {service} — {path}");
+        // Once is information; twice is nagging: a notice still open in
+        // another window on the same folder goes with this answer.
+        App.HideSyncNoticesFor(path, except: this);
+    }
+
+    private string? _syncNoticeService;
+    private string? _syncNoticePath;
+
+    /// <summary>
+    /// The restored moment: the headline, the one-line summary, a way to open
+    /// the full explanation in place, and a button to dismiss it — once per
+    /// folder, in this window or any other. Called whenever a working folder
+    /// is adopted, because folders move into cloud services after they are
+    /// made and the check costs nothing.
+    /// </summary>
+    public void ShowSyncNoticeIfNeeded()
+    {
+        // Forget the previous notice BEFORE closing it: Closed fires for a
+        // programmatic close too, and must not read as the teacher dismissing
+        // a note about the folder this window has just moved on from.
+        _syncNoticeService = null;
+        _syncNoticePath = null;
+        SyncNotice.IsOpen = false;
+        if (Workspace.WorkspacePath is not { } path) return;
+        if (SyncNoteWanted(path) is not { } service) return;
+
+        _syncNoticeService = service;
+        _syncNoticePath = path;
+        SyncNotice.Title = CloudSyncWording.Headline(service);
+        SyncNotice.Message = CloudSyncWording.Summary;
+        SyncNoticeDetails.Children.Clear();
+        foreach (string paragraph in CloudSyncWording.Explanation(service))
+            SyncNoticeDetails.Children.Add(new TextBlock { Text = paragraph, TextWrapping = TextWrapping.Wrap });
+        SyncNoticeDetails.Visibility = Visibility.Collapsed;
+        SyncNoticeDetailsButton.Content = CloudSyncWording.ShowDetailsButton;
+        SyncNoticeDismissButton.Content = CloudSyncWording.DismissNoticeButton;
+        SyncNotice.IsOpen = true;
+        _syncNoticedThisProcess.Add(ResolvedFolder(path));
+        ActivityTrail.Note(ActivityTrail.Event.SyncedFolderNoticed,
+            $"noticed that the working folder is kept in sync with {service} — {path}");
+    }
+
+    /// <summary>
+    /// Another window answered for this folder, or this one's set-up went
+    /// ahead: the notice leaves without being counted as a dismissal.
+    /// </summary>
+    public void HideSyncNoticeFor(string path)
+    {
+        if (_syncNoticePath is not { } shown) return;
+        if (!string.Equals(ResolvedFolder(shown), ResolvedFolder(path), StringComparison.OrdinalIgnoreCase)) return;
+        _syncNoticeService = null;
+        _syncNoticePath = null;
+        SyncNotice.IsOpen = false;
+    }
+
+    /// <summary>
+    /// Setting up an empty synced folder IS going ahead: the notice showing
+    /// over the picker's guidance is answered by the set-up, not left
+    /// floating over the freshly set-up window.
+    /// </summary>
+    public void SyncNoticeAnsweredBySetUp()
+    {
+        if (_syncNoticeService is not { } service || _syncNoticePath is not { } path) return;
+        _syncNoticeService = null;
+        _syncNoticePath = null;
+        SyncNotice.IsOpen = false;
+        RememberSyncAccepted(path, service, "set up the folder");
+    }
+
+    private void SyncNoticeDetails_Click(object sender, RoutedEventArgs e)
+    {
+        bool showing = SyncNoticeDetails.Visibility == Visibility.Visible;
+        SyncNoticeDetails.Visibility = showing ? Visibility.Collapsed : Visibility.Visible;
+        SyncNoticeDetailsButton.Content = showing ? CloudSyncWording.ShowDetailsButton : CloudSyncWording.HideDetailsButton;
+    }
+
+    private void SyncNoticeDismiss_Click(object sender, RoutedEventArgs e) => SyncNotice.IsOpen = false;
+
+    /// <summary>Dismissing — "Got It" or the close box — IS going ahead: remembered for the folder.</summary>
+    private void SyncNotice_Closed(InfoBar sender, InfoBarClosedEventArgs args)
+    {
+        if (_syncNoticeService is not { } service || _syncNoticePath is not { } path) return;
+        _syncNoticeService = null;
+        _syncNoticePath = null;
+        RememberSyncAccepted(path, service, "dismissed the note about the working folder");
     }
 
     private void NewWindow_Click(object sender, RoutedEventArgs e) => App.OpenNewWindow();

@@ -1884,6 +1884,41 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Windows' two synced-folder views are built, and one thing about the store
+  behind them is worth knowing before a privacy question arrives** (Windows,
+  2026-09-07, branch `issue/18-cloud-synced-folder-views`; item 18 struck;
+  `GUI-IMPROVEMENTS.md` row 436). **Nothing for the mac to do.**
+  `AppSettings.AcceptedSyncedFolders` holds FULL folder paths in
+  `settings.json`, keyed by resolved path, with no cap and no "forget these"
+  affordance — the contract's `rememberedPerFolder` rule says the list is
+  never pruned, and that is what it does. It is the same shape as the mac's
+  remembered-per-folder store, recorded here because a list of a teacher's
+  folder paths in a settings file is the kind of thing somebody asks about
+  later, and the answer should be "yes, on purpose, and here is why".
+
+  Two decisions the brief left to the session. **Two windows on the same
+  folder**: a note shown in one window — either form — is not shown again in
+  any other window of the process for that resolved path
+  (`MainWindow._syncNoticedThisProcess`, consulted by the one function both
+  moments ask, `SyncNoteWanted`), and an answer given in one window closes
+  the notice still open in another (`App.HideSyncNoticesFor`), as the mac's
+  `WorkspaceModel` does. **The InfoBar at 900×600**: a first draft overlaid
+  it on the content area, and the review read off the XAML that it would sit
+  exactly over the section toolbar — Preview and Deploy hidden and
+  unclickable until dismissed. It is now a row of its own between the menu
+  bar and the content; the content row is the star-sized one, so the notice's
+  height comes out of the content and the path bar cannot be pushed off
+  screen. The mac's inline-banner regression was an unbounded SwiftUI text
+  height, not a reason to avoid a row. Not measured on screen: the row's
+  height at the minimum size with "Show Details" open wants one look.
+
+  **One divergence from the brief, in the contract's favour.** The brief said
+  "record the service name, not the folder"; the contract's `carries` for
+  `synced folder noticed` says the service AND the folder path, redacted, and
+  the mac writes it that way. Windows now does too — the trail redacts on the
+  way in — so a teacher with two synced folders can tell from the trail which
+  one was noticed.
+
 - **Windows brings the main window forward for an assistant-driven build
   ONLY when it was minimised or hidden — a chosen divergence from row 300,
   not an oversight** (Windows, 2026-09-07, branch `issue/28-four-small-gaps`,
@@ -3282,6 +3317,33 @@ is what happened to the test-race item, sitting here for three days with
 
 
 ## Done — the ledger
+
+- **The two synced-folder views exist on Windows** (Windows, 2026-09-07,
+  branch `issue/18-cloud-synced-folder-views`; `WINDOWS-HANDOFF.md` item 18
+  struck; `GUI-IMPROVEMENTS.md` row 436). **The mac is expected to KNOW.**
+  ✅ DONE. Every sentence is the contract's (`CloudSyncWording`, pinned by
+  `CloudSyncedFolderTests`, untouched). At the picker: `ContentDialog`, path
+  first, `DefaultButton = None`, "Choose a Different Folder…" reopens the OS
+  picker in a loop — rejected: returning to the picker view (one more click
+  for somebody who has already said what they want) and showing only the
+  notice (the contract names two buttons for this moment). Escape or the
+  close box read as "choose a different folder". A folder the picker will
+  not take anyway (neither a working folder nor empty) gets no note in either
+  form; re-choosing the open folder leaves whatever notice is showing exactly
+  as it is, and opens no dialog. Restored or inherited: an `InfoBar` in its
+  own row under the menu bar, "Show Details" in place, "Got It" always
+  visible beside it, and dismissing — the button or the close box — is
+  remembered as going ahead; setting up an empty synced folder from the
+  picker's guidance counts as going ahead too and takes the notice with it.
+  `synced folder noticed` is written only once a note is actually on screen
+  (a dialog WinUI could not show is not "told"), `synced folder accepted` when
+  the teacher goes ahead from either; both carry the service and the folder,
+  redacted. A first draft had the picker's headline in the dialog title
+  (above the path, against the contract's "path FIRST"), the summary at the
+  picker moment (the mac shows it only in the notice), and "Got It" hidden
+  inside the collapsed details; all three corrected on review. Not driven by
+  hand, and no UI test was added: the four guards live behind one static
+  function, `SyncNoteWanted`, which is the seam a test would use.
 
 - **Windows has the way back for a whole conversation — and now saves one
   backup per conversation instead of one per change** (Windows, 2026-09-07,
