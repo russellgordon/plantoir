@@ -1628,6 +1628,62 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **The prose every Windows session plans from was corrected, and one habit
+  is worth stealing** (Windows, 2026-09-06, branch
+  `issue/docs-handoff-and-progress-corrections`). **No mac code, no contract
+  change, no `.cs` touched at all** — this is a documentation pass, listed here
+  because one of its findings is a failure mode this side has exactly as much
+  of. Reference: `WINDOWS-HANDOFF.md` items 10, 16 and the new 33–35;
+  `windows-app/PROGRESS.md`'s "Where parity stands"; `contracts/README.md`'s
+  Windows table.
+
+  **What was wrong.** An audit of the two documents a Windows session reads
+  before planning found four false statements. Item 10's caveat said the
+  folder-problems front end "is item 21, which is not built" — item 21 landed
+  the same week and `FolderProblemsDialog.cs` has existed since, so anyone
+  planning from item 10 believed the findings still reached nobody. Item 16 was
+  struck through with a rider reading "**NOT yet done**", carrying a live
+  obligation inside an item the eye skips. `PROGRESS.md` said "sixteen of its
+  twenty-four items are done" when the list held 32 with eleven open, and its
+  "what is genuinely left" table named four of them, missing seven entirely.
+  And `contracts/README.md`'s Windows table had no row for
+  `specialNames.renameFolder.linkRewriting`, which was added to the contract
+  the same day as the audit that built the table and fell outside its sweep.
+
+  **The sentence worth carrying**, which is the whole reason this is in the
+  ledger rather than a commit message: **an item struck through with live work
+  inside it is invisible, and a status line that has drifted from the code is
+  worse than no status line, because it gets believed.** Both files are read
+  top-down and abandoned partway — that is what they are FOR — so a
+  correction buried below the point a reader stops is not a correction. This
+  side has the same shape of exposure in `MAC-HANDOFF.md`'s own first two
+  sections; the v1.1.0 cut sheet at the top of this file sat as an open
+  instruction for seventeen days after the release shipped, which is the
+  identical failure pointing the other way.
+
+  **What was rejected.** Un-striking item 16 so its rider would be visible:
+  rejected, because item 16 itself IS done and the obligation belongs to item
+  13, which is open and was being worked the same night. Two items claiming the
+  same work is how the count drifted in the first place; the rider now says
+  plainly that item 16 owes nothing and names item 13 as where the work is
+  tracked. Also rejected: writing an absolute pass/fail into `contracts/README.md`
+  for whether `FolderPathRewriterTests` deserialises its eleven cases. **That
+  row and the wiring that makes it true landed in the same overnight batch**
+  (Windows item 31), so any status sentence written there would have been wrong
+  in one direction or the other by morning. The row names the list and the
+  class and points at item 31's struck-or-not state for the answer, which is
+  the one fact that cannot go stale. The same reasoning changed one line of
+  `documentation/09-mac-app.md`, which described those eleven cases as ones
+  "both apps run" — true of the mac, not yet of Windows.
+
+  **What the mac is expected to do: nothing.** One thing this audit surfaced IS
+  the mac's, and it is already in the Open section above rather than duplicated
+  here — the Course Settings tip sentence, pinned by no contract on either
+  platform and worded differently by the two apps. It is now indexed on the
+  Windows side as item 35 as well, recorded honestly as waiting on the mac's
+  choice with nobody having picked it up. Windows owes only taking the mac's
+  wording verbatim once it is chosen.
+
 - **`workingFolderPathBar.ancestorPaths` now carries `windowsCases`, and two
   rules were being pinned by nobody on either side** (Windows + shared,
   2026-09-06, branch `issue/29-windows-contract-case-lists`). **The mac suite

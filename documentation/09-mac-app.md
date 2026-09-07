@@ -121,9 +121,12 @@ Four things about it are deliberate:
   are encoded is fixed by what the built site can decode, not by any general
   URL rule — `&` and `,` are left alone on purpose, and a name needing nothing
   is left exactly as the teacher typed it. The rule, the measurements and the
-  eleven cases both apps run are in
+  eleven cases are in
   [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
-  `specialNames.renameFolder.linkRewriting`; the reasoning is in
+  `specialNames.renameFolder.linkRewriting`, and which suite deserialises them
+  is recorded in [`contracts/README.md`](../contracts/README.md) rather than
+  here, because that is the kind of fact this page cannot keep true; the
+  reasoning is in
   [`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md) → "Spelling a folder's new name
   inside a link".
 

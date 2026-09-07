@@ -481,7 +481,7 @@ this side is expected to say so when the contract is wrong.
    index, and re-check badge contrast on a highlighted row) apply whether you
    end up hand-building or wiring the real control's template.
 
-10. ~~Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check~~ — ✅ Done, merged to `dev` 2026-09-06 (`GradedFolderRule.cs`, `SiteHealthFinding.cs`; GUI-IMPROVEMENTS rows 411-414). **PARSING AND THE TRAIL ONLY.** The bullet below says Windows "displays the contract-authored sentence and detail" — it does not. `ScriptRunner.HealthFindings` is the seam a front end would attach to, and that front end is item 21, which is not built. (Item 21 refers to "the correction in item 10"; this is it.)
+10. ~~Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check~~ — ✅ Done, merged to `dev` 2026-09-06 (`GradedFolderRule.cs`, `SiteHealthFinding.cs`; GUI-IMPROVEMENTS rows 411-414). **PARSING AND THE TRAIL ONLY — on the day this item landed.** The bullet below says Windows "displays the contract-authored sentence and detail"; when this was written it did not, and `ScriptRunner.HealthFindings` was a seam with nothing attached to it. **Corrected 2026-09-06: that front end is item 21, and item 21 LANDED the same day** — `windows-app/Plantoir/Views/FolderProblemsDialog.cs`, `GUI-IMPROVEMENTS.md` row 420 — so the bullet below is true today and this caveat is history rather than open work. (Item 21 refers to "the correction in item 10"; this is it, and item 21 is what answered it.)
     - **`setup_course.py:graded_folders_for` reconciliation** — When a new
       course is created, `graded_folders_for` now checks the declared pool
       against the actual folder lists (`shared_folders` +
@@ -627,7 +627,7 @@ this side is expected to say so when the contract is wrong.
     until you read `pageNaming`'s new `term` field with a default.** Full
     write-up in "What a course calls a unit" below.
 
-16. ~~What a course calls its class folder~~ — ✅ Done 2026-09-06 (`ClassFolderRule.Name/Names` with the recorded key, the wizard writing it, and `ItemProtectionRule` protecting it). **NOT yet done: the rename that MATERIALISES the key** — that belongs to item 13's sheet, which is still owed. Original text: `class_folder` in
+16. ~~What a course calls its class folder~~ — ✅ Done 2026-09-06 (`ClassFolderRule.Name/Names` with the recorded key, the wizard writing it, and `ItemProtectionRule` protecting it). **The rename that MATERIALISES the key is NOT part of this item and is not owed by it** — it belongs to item 13's sheet and is tracked there, as open work, with the rest of the rename. Nothing under this heading is outstanding; read item 13 for what is. (Corrected 2026-09-06: this rider used to read "NOT yet done", which put a live-sounding obligation inside a struck item, where anybody skimming the list for open work would never see it.) Original text: `class_folder` in
     `course_config.json`, recorded rather than guessed, materialised by a
     rename along with `curriculum_folder`. Replaces the class-folder refusal
     item 13 described, which no longer exists. **Eight new contract cases will
@@ -1441,6 +1441,64 @@ to run in the background.
     Then add `Title`, `Intro`, `OpenedBy`, `DismissedBy`,
     `NoCurriculumFolderYet` and `NoneChosen` to the swept text, and give the
     fixture no curriculum folder.
+
+33. **The wizard's Create button and the new-site dialog have never been
+    driven through the real interface (audited onto this list 2026-09-06; the
+    gap itself is older).** Both are the first things a teacher meets, and
+    neither has ever been clicked in a running app by anybody checking that it
+    works. `windows-app/PROGRESS.md` records both, and until today that was the
+    only place either was written down: the wizard's Create button was proven
+    "underneath" — the `setup.ps1` plus answer-pump path ran to completion
+    through `PtyDriver`, which is not the same as the button reaching it — and
+    the verified deploy was a repeat publish to a site that already existed, so
+    the new-site dialog a BRAND-NEW section's deploy raises has never been
+    seen. **What Windows owes: two `[UiFact]` cases in `Plantoir.UiTests`**,
+    which is the project that exists for exactly this (`--state-dir` moves the
+    whole state folder, so nothing of the teacher's is touched) — today it
+    holds only `SpecialFoldersHelpUiTests`. The new-site half needs
+    credentials, so it may have to stay a hand-driven check with a written
+    procedure instead; say which it became. **Not for tonight**, and not a
+    defect report: it is an untested path, listed so it is a choice.
+
+34. **`verify-deploy.ps1` is wired into nothing, and that is a standing
+    exposure rather than a task (audited onto this list 2026-09-06).** It is
+    the ONLY automated check of the PowerShell half of publishing — it
+    publishes to every destination and every pairing against real sites and
+    fetches each one back, 36 passed / 0 failed on 2026-09-06 — and no gate
+    runs it. `verify.sh` and `verify-deploy.sh` are bash and do not run here,
+    so if this one is not run by hand, the publishing path on Windows has no
+    coverage at all beyond unit tests of its parts. It needs three credentials
+    and the network, which is WHY it is opt-in, and that reasoning is sound;
+    what was missing is anybody being told. Evidence:
+    `windows-app/PROGRESS.md` (the "Two things that are NOT in that list"
+    bullet) and [`documentation/12-windows-app.md`](documentation/12-windows-app.md).
+    **Windows owes nothing here except a decision** — run it on a schedule, run
+    it as a release-cut step, or leave it hand-run and say so in `RELEASING.md`.
+    **Not for tonight.**
+
+35. **The Course Settings tip sentence is pinned by no contract on either
+    platform, and the two apps word the same rule differently (audited onto
+    this list 2026-09-06).** A sentence a teacher READS belongs in `contracts/`
+    by CLAUDE.md rule 2, and this one is in neither app's contract:
+    `grep -rn "added to your site automatically" contracts/` returns nothing.
+    So Windows wrote its own, in
+    `windows-app/Plantoir/Views/CourseSettingsView.xaml.cs`:
+
+    > "Tip: you can also simply create new folders in Obsidian — they're added
+    > to your site automatically the next time you preview. The exception is
+    > anything you remove here: it stays off your site, even if you make it
+    > again in Obsidian, until you add it back on this page."
+
+    while the mac ships its own wording for the same rule (`GUI-IMPROVEMENTS.md`
+    row 375). **It is not ownerless, but nobody has picked it up.**
+    `MAC-HANDOFF.md`'s "Open — what the mac still owes" already says choosing
+    WHICH sentence becomes the contract is the mac's call, and says why no case
+    was proposed: proposing one would redden the mac suite over wording the mac
+    already ships. That has been sitting there unactioned, which is the actual
+    state and is why it is now indexed here too. **What Windows owes: taking
+    the mac's wording verbatim once the mac picks it**, and nothing before
+    that. **Not for tonight** — it is a decision about what a teacher reads,
+    not a defect.
 
 ## Windows no longer runs any of this in a container
 
