@@ -262,9 +262,10 @@
     ],
     "writingRules": [
       {
-        "detail": "Publishing a `draft:` page writes `draft: false`, not `publish: true`.",
-        "rule": "A page written in the old spelling KEEPS it, inverted",
-        "why": "The teacher's file is theirs. Rewriting the key would change a page they did not ask to have changed, and a course half in each spelling is harder to reason about than one consistently old."
+        "detail": "Publishing a `draftSection1: true` page writes `publishForSection1: true` on the SAME line, and the `draftSection1` line is gone; a page carrying BOTH spellings loses the legacy one. The new key takes the old key's position, so a migrated page shows a one-line diff in Obsidian rather than reordered frontmatter.",
+        "rule": "A page written in the old spelling is MIGRATED to the new key, and the legacy key removed, the first time something edits its visibility",
+        "why": "Decided 2026-09-07 (Russell), replacing the rule this list carried since it was written — 'a page written in the old spelling KEEPS it, inverted' — which the mac implemented and Windows never did. Migration leaves a teacher's file in one current spelling rather than two competing ones, stops the old key accumulating forever, and is what documentation/04-course-setup.md and 08-course-config-reference.md have described all along. There is no flag day: the build reads both spellings, so a legacy course builds exactly as before and converts one page at a time. Rejected: keeping the old key inverted (the mac's behaviour until it adopts this) — it would make both documentation files wrong and leave teachers' pages carrying a legacy key indefinitely; and leaving the divergence recorded but unresolved, which is how a knownDivergence becomes permanent.",
+        "migrationIsTheOneExceptionToRule4": "A legacy page whose value is already right is still rewritten, once, to migrate the key — although 'writing the value it already has changes nothing' says a no-op write must not touch the file. Deliberate: the case is reachable only inside a batch that is changing OTHER pages (a plan in which nothing changes never writes), so the build that follows was happening anyway, and the cost — one page's modification time moves once — buys a course that converges on one spelling instead of carrying legacy keys on exactly the pages nobody ever flips. A rule that migrated only on a genuine change would leave those pages old forever."
       },
       {
         "rule": "Edit the LINE, never round-trip the YAML",
@@ -274,7 +275,7 @@
         "rule": "A page with no frontmatter at all gets a block of its own"
       },
       {
-        "detail": "Report 'no change' rather than rewriting the file.",
+        "detail": "Report 'no change' rather than rewriting the file. One exception, on purpose: a legacy-spelled page is migrated even when its value is already right — see the first rule.",
         "rule": "Writing the value it already has changes nothing",
         "why": "A no-op write still updates the modification time, which makes the next build think the content changed."
       }
