@@ -30,21 +30,14 @@ final class AssistantRolloverUITests: XCTestCase {
     /// Skips unless asked for, and says what is missing rather than failing
     /// mysteriously.
     private func requireUITestsAreWanted() throws {
-        // **PARKED until tests stop writing into the teacher's own state.**
-        // A UI-driven app does not know it is under test: `isRunningTests` asks
+        // **This writes into the teacher's OWN state, deliberately.** A
+        // UI-driven app does not know it is under test: `isRunningTests` asks
         // whether `XCTestCase` is loaded, and it is loaded in the RUNNER, not
-        // in the app. So the driven app persists settings to the real
-        // preferences domain, writes to the real `~/Library/Logs/Plantoir`
-        // breadcrumb trail, and resolves the real `~/Library/LaunchAgents`.
-        // Three runs of this file on 2026-09-08 put three launch lines into a
-        // real trail before that was noticed. Windows bought this property with
-        // `--state-dir`; the mac has no equivalent yet, and CLAUDE.md rule 9
-        // cannot be satisfied by tidying up afterwards.
-        throw XCTSkip(
-            "Parked: a UI-driven app writes to the teacher's real settings, trail and LaunchAgents. "
-            + "Land the test-state redirect first — see TODO.md."
-        )
-        // swiftlint:disable:next unreachable_code
+        // in the app. So settings persist to the real preferences domain and
+        // lines land in the real breadcrumb trail. Russell chose that on
+        // 2026-09-08 — "I'd rather know that it works" — and the test-state
+        // redirect is still owed (TODO.md). Until it lands, run these knowing
+        // the trail will carry their launches.
         let environment: [String: String] = ProcessInfo.processInfo.environment
         guard environment["PLANTOIR_UI_TESTS"] == "1" else {
             throw XCTSkip(
@@ -88,11 +81,104 @@ final class AssistantRolloverUITests: XCTestCase {
         let application: XCUIApplication = try launchWithARolloverReadySection()
 
         openTheAssistant(on: "EXC2O", section: 1, in: application)
-        say("what do students see right now?", in: application)
 
+        // Dumped BEFORE anything is typed, because typing is the step that
+        // has been failing and the tree is what says why: the composer sits at
+        // x≈2043 on this Mac, which is a second display, and a window that is
+        // not key cannot take a synthesized keystroke.
         print("=== CONVERSATION TREE BEGIN ===")
         print(application.debugDescription)
         print("=== CONVERSATION TREE END ===")
+
+        print("=== WINDOWS ===")
+        for index in 0..<application.windows.count {
+            let window: XCUIElement = application.windows.element(boundBy: index)
+            print("[\(index)] title=\(window.title) id=\(window.identifier) frame=\(window.frame)")
+        }
+    }
+
+
+    // MARK: - The rollover, through the window
+
+    /// The whole conversation, as a teacher has it.
+    ///
+    /// **This is the one thing the contract scenarios cannot prove.** They
+    /// drive a real `AssistAgent` and assert the transcript, which catches the
+    /// reply going into the wrong field — but they cannot say whether the words
+    /// reach a window, whether the plan card can be reached, or whether the
+    /// section's site marker actually moved on disk. All three are asserted
+    /// here.
+    ///
+    /// Four steps, not two, because asking before changing is ON: the rollover
+    /// plans, the teacher approves, the question arrives; the answer plans, the
+    /// teacher approves, the website changes.
+    func testARolloverAsksAboutTheWebsiteAndAnsweringItMovesTheMarker() throws {
+        try requireUITestsAreWanted()
+        let application: XCUIApplication = try launchWithARolloverReadySection()
+        openTheAssistant(on: "EXC2O", section: 1, in: application)
+
+        // 1 — the rollover is planned, not done.
+        say("roll this section over to a new year", in: application)
+        let approve: XCUIElement = application.buttons["assistApproveButton"]
+        if !approve.waitForExistence(timeout: 120) {
+            print("=== NO PLAN CARD — WHAT IS ON SCREEN ===")
+            print(application.windows["assistant-AppWindow-1"].debugDescription)
+            XCTFail("Asking before changing is on, so a rollover must offer a plan first.")
+            return
+        }
+        approve.click()
+
+        // 2 — and the question reaches the teacher.
+        XCTAssertTrue(
+            waitForTheAssistantToSay(
+                try sentence(named: "rolloverWebsiteQuestion"), in: application
+            ),
+            "The website question never appeared in the window."
+        )
+
+        let marker: URL = try XCTUnwrap(liveMarkerURL)
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: marker.path),
+            "Nothing has been answered yet, so the section must still be on last year's website."
+        )
+
+        // 3 — answering is a second turn, and plans again.
+        say("roll this section over onto a new website", in: application)
+        XCTAssertTrue(
+            approve.waitForExistence(timeout: 120),
+            "The answer is a write too, so it must offer its own plan."
+        )
+        approve.click()
+
+        // 4 — and this time the website really changes.
+        XCTAssertTrue(
+            waitForTheAssistantToSay(
+                try sentence(named: "rolloverIsOnANewWebsite"), in: application
+            ),
+            "The confirmation never appeared in the window."
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: marker.path),
+            "The section is still pinned to last year's website — the answer did nothing on disk."
+        )
+    }
+
+    /// One of the assistant's sentences, by NAME, read from the contract.
+    ///
+    /// A UI test bundle cannot `@testable import` the app, so the alternative
+    /// is typing the sentence here — the copy that keeps passing after the
+    /// product's words change. The repository is found the way the contract
+    /// tests find it, from this file's own path.
+    private func sentence(named key: String) throws -> String {
+        let contract: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/assist-wording.json")
+        let parsed: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: contract)) as? [String: Any]
+        )
+        let wording: [String: String] = try XCTUnwrap(parsed["wording"] as? [String: String])
+        return try XCTUnwrap(wording[key], "No sentence named \(key) in the contract")
     }
 
     // MARK: - Driving the app
@@ -123,6 +209,27 @@ final class AssistantRolloverUITests: XCTestCase {
             atomically: true, encoding: .utf8
         )
 
+        // The class dates. Written as JSON because a UI test bundle cannot
+        // `@testable import` the app to call `SectionTimetableStore` — and
+        // WITHOUT it the rollover refuses with "I don't know when this section
+        // meets" and opens the schedule sheet instead, which is a different
+        // test entirely and looks like a broken selector rather than a missing
+        // fixture.
+        let timetableURL: URL = courseURL
+            .appendingPathComponent(".internal").appendingPathComponent("timetable")
+        try FileManager.default.createDirectory(at: timetableURL, withIntermediateDirectories: true)
+        let timetable: [String: Any] = [
+            "sectionNumber": 1,
+            "source": "timetable.xlsx, block H",
+            // STRINGS, parsed by `CalendarDay(text:)` — not year/month/day
+            // objects. Getting that wrong throws `halfRemembered`, and the
+            // assistant then answers about the remembered timetable instead of
+            // planning, which looks exactly like a missing plan card.
+            "dates": ["2026-09-08", "2026-09-10"],
+        ]
+        try JSONSerialization.data(withJSONObject: timetable, options: [.sortedKeys])
+            .write(to: timetableURL.appendingPathComponent("section1.json"))
+
         let markerURL: URL = courseURL.appendingPathComponent(".netlify_sites")
         try FileManager.default.createDirectory(at: markerURL, withIntermediateDirectories: true)
         try "{\"site\":\"last-year\"}".write(
@@ -132,6 +239,11 @@ final class AssistantRolloverUITests: XCTestCase {
 
         let application: XCUIApplication = XCUIApplication()
         application.launchEnvironment["UITEST_WORKSPACE"] = workspaceURL.path
+        // Plan mode follows the real preference, so "with plan mode ON, the
+        // default" would really mean "with whatever was last chosen on this
+        // Mac". Pinned through the argument domain, the way the marketing
+        // tests pin window frames.
+        application.launchArguments += ["-assistantAsksBeforeChanging", "YES"]
         application.launch()
         liveMarkerURL = markerURL.appendingPathComponent("section1.json")
         return application
@@ -186,14 +298,35 @@ final class AssistantRolloverUITests: XCTestCase {
 
     /// Types one sentence and sends it.
     private func say(_ sentence: String, in application: XCUIApplication) {
-        // The app has to be frontmost for synthesized keystrokes to land, and
-        // a UI test can lose the front to anything the machine does while it
-        // runs.
+        // **The WINDOW has to be key, not just the app frontmost.** Activating
+        // the app is not enough when the assistant opens on a second display —
+        // this Mac puts it at x≈2022 — and a window that is not key rejects a
+        // synthesized keystroke with "Neither element nor any descendant has
+        // keyboard focus", which reads like a broken selector rather than a
+        // window that simply is not focused.
         application.activate()
+        let window: XCUIElement = application.windows["assistant-AppWindow-1"]
+        XCTAssertTrue(window.waitForExistence(timeout: 30), "The assistant window is not open.")
+        window.click()
+
         let field: XCUIElement = application.textFields["assistInputField"]
         XCTAssertTrue(field.isEnabled, "The assistant is not accepting typing yet.")
         field.click()
         field.typeText(sentence)
         application.typeKey(.return, modifierFlags: [])
+    }
+
+    /// Waits for any bubble in the conversation to carry this text.
+    ///
+    /// A reply surfaces as a `StaticText` whose VALUE is the sentence — read
+    /// off the real element tree rather than assumed — so this matches on
+    /// value rather than on an identifier the transcript does not carry.
+    @discardableResult
+    private func waitForTheAssistantToSay(
+        _ fragment: String, in application: XCUIApplication, timeout: TimeInterval = 180
+    ) -> Bool {
+        let carries: NSPredicate = NSPredicate(format: "value CONTAINS %@", fragment)
+        let bubble: XCUIElement = application.staticTexts.matching(carries).firstMatch
+        return bubble.waitForExistence(timeout: timeout)
     }
 }
