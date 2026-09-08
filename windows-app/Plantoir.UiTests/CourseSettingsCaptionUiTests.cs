@@ -116,18 +116,51 @@ public class CourseSettingsCaptionUiTests
     /// Visibility on this platform — and a shared scroll walk would leave
     /// whichever failed ambiguous about which caption was missing.</para>
     ///
-    /// <para>This is also the guard on the change that moved the caption
-    /// BELOW its list. Above it, "a page in one of these" followed the section
-    /// header and referred to nothing; a unit test comparing constants cannot
-    /// see where a control was drawn, only what it says.</para>
+    /// <para>It also pins WHERE the caption is drawn, which is a contract
+    /// requirement rather than a preference: <c>gradedFolders.wording.rule</c>
+    /// says the caption goes BELOW its list, because it reads "a page in one of
+    /// these" and above the list "these" followed the section header "Marks"
+    /// and referred to nothing. An earlier version of this test claimed to
+    /// guard that and did not — it asserted only that the sentence was on
+    /// screen, and passed just as happily with the caption back on top.</para>
     /// </summary>
     [UiFact]
-    public void TheMarksCaptionIsOnScreenInCourseSettings()
+    public void TheMarksCaptionIsOnScreenBelowItsList()
     {
         using var app = new DrivenApp(CourseFixtures.WriteBoth);
         app.SelectCourse(CourseFixtures.Renamed);
 
         var form = app.Find("courseSettingsForm", "the Course Settings form");
-        ScrollUntilVisible(form, MarksCaption(), "the Marks caption");
+        string caption = MarksCaption();
+        ScrollUntilVisible(form, caption, "the Marks caption");
+
+        // Tree order is draw order here: the form is a StackPanel, so the
+        // caption's position among the form's descendants is where a teacher
+        // meets it. Compared against the marks CHECKBOXES rather than the list
+        // title, because the title is a Text like the caption and the point is
+        // that the caption comes after the whole control.
+        string marksTitle = JsonNode.Parse(File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "contracts", "shared-rules.json")))!
+            ["gradedFolders"]!["wording"]!["listTitle"]!.ToString();
+
+        var everything = form.FindAllDescendants();
+        int lastTickBox = -1, captionAt = -1;
+        for (int i = 0; i < everything.Length; i++)
+        {
+            string id = SafeAutomationId(everything[i]);
+            if (id.StartsWith($"member:{marksTitle}:", StringComparison.Ordinal)) lastTickBox = i;
+            if (captionAt < 0 && SafeName(everything[i]) == caption) captionAt = i;
+        }
+
+        Assert.True(lastTickBox >= 0, $"no marks tick-boxes found under 'member:{marksTitle}:'");
+        Assert.True(captionAt > lastTickBox,
+            $"the Marks caption is drawn at {captionAt}, before the last tick-box at {lastTickBox} "
+            + "- gradedFolders.wording.rule says it belongs BELOW its list");
+    }
+
+    /// <summary>An automation id that cannot throw when the element has gone.</summary>
+    private static string SafeAutomationId(AutomationElement element)
+    {
+        try { return element.AutomationId ?? ""; } catch { return ""; }
     }
 }

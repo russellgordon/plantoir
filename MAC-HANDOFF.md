@@ -53,8 +53,9 @@ product, not of one platform.
 
 **One proposed 2026-09-08, and nothing goes red for it: the Marks list's title
 and caption** — `shared-rules.json` → `gradedFolders.wording`, branch
-`issue/marks-wording-contract`. The second and last Course Settings divergence,
-found in the same audit as the tip above. Four strings pinned by nothing; the
+`issue/marks-wording-contract`. The second Course Settings divergence,
+found in the same audit as the tip above — second, not last: see the end of
+this entry for what is still unpinned. Four strings pinned by nothing; the
 mac's title WINS unchanged, so the mac's only real change is the caption.
 
 > **Title:** Folders whose work counts for marks
@@ -116,6 +117,15 @@ coverage map's own word is "**assessed**", and this sentence says "evaluated".
 It says it because `specialFoldersHelp` has said it since that sheet was
 written; changing it means changing that row, on both platforms, which is a
 separate piece.
+
+**And this is the SECOND divergence in Course Settings, not the last** — an
+earlier draft of this entry said "last", which would have told you the audit
+was finished. One control above this one, the coverage-notes toggle says
+"Explain the map on the page" on the mac and "Include explanations on
+Curriculum Coverage page" on Windows, and Windows draws two caption sentences
+there that the mac has no counterpart for. None of the four is in any
+contract. Nothing is owed on it yet; it is `WINDOWS-HANDOFF.md` item 43 so it
+is not lost.
 
 **One proposed 2026-09-07, and nothing goes red for it: the Course Settings
 tip sentence, which item 37 had been waiting on this side to choose** —

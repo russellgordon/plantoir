@@ -302,8 +302,15 @@ public class GradedFolderContractTests
         string caption = SharedRules["gradedFolders"]!["wording"]!["caption"]!.ToString();
 
         Assert.Contains("tick", caption, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("add ", caption, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("remove", caption, StringComparison.OrdinalIgnoreCase);
+
+        // The exact verb forms, as whole words. Two failed alternatives are
+        // worth naming so they are not tried again: DoesNotContain("add ")
+        // lets through "adding", "add." and "add" at end-of-string, while the
+        // obvious tightening -- a \badd\w*\b pattern -- matches "ADDRESSES
+        // it", which this caption legitimately contains and which would fail
+        // the test for a word that is not a verb at all.
+        foreach (string verb in new[] { "add", "adds", "adding", "remove", "removes", "removing" })
+            Assert.DoesNotMatch(@"\b" + verb + @"\b", caption);
     }
 
     /// <summary>
@@ -321,10 +328,13 @@ public class GradedFolderContractTests
     {
         string caption = SharedRules["gradedFolders"]!["wording"]!["caption"]!.ToString();
 
-        // Case-insensitively: the phrase opens a sentence here, so it is
-        // "The curriculum coverage map". What must NOT appear is the
-        // capitalised PAGE title, which is what this app used to say.
-        Assert.Contains("curriculum coverage map", caption, StringComparison.OrdinalIgnoreCase);
+        // ORDINAL, because casing is the entire point. The phrase opens a
+        // sentence, so the article is capitalised and the noun is not:
+        // "The curriculum coverage map". A case-insensitive check here would
+        // have accepted "Curriculum Coverage map" -- the built PAGE's title,
+        // which is what this app used to say and what the next assertion
+        // exists to keep out.
+        Assert.Contains("curriculum coverage map", caption, StringComparison.Ordinal);
         Assert.DoesNotContain("Curriculum Coverage map", caption, StringComparison.Ordinal);
         Assert.Contains("curriculum coverage map", SpecialNames.LastGradedFolderBlocked,
                         StringComparison.OrdinalIgnoreCase);
