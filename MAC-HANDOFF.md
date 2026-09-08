@@ -89,9 +89,33 @@ one deliberate exception to "writing the value it already has changes
 nothing", reasoned in `migrationIsTheOneExceptionToRule4`. `GUI-IMPROVEMENTS.md`
 row 140's migration paragraph was right all along and needs no correction.
 
-**One proposed 2026-09-07: `activityTrail.mustRecord` → `section restored`,
+**~~One proposed 2026-09-07: `activityTrail.mustRecord` → `section restored`,
 marked `appliesOn: ["windows"]` — and the mac suite goes RED on it anyway,
-which is the request arriving, not damage.** Branch
+which is the request arriving, not damage.~~ ✅ DONE 2026-09-07 (mac, branch
+`issue/section-restored-trail-event`).** Both halves, as asked. The mac's
+`AssistSession.restoreSection()` now notes `.sectionRestored` with the course,
+the section and the backup's file name, on the success path only; the sentence
+lives in `AssistSectionRestore.trailLine` so a test pins it by name rather than
+by a quoted copy. `SharedRulesContractTests.macMustRecord` is the `appliesOn`
+filter. It agrees with the Windows twin on every well-formed value and differs
+on two malformed ones, both deliberately: anything it cannot READ as a list of
+platform names is treated as "belongs to both" rather than excusing the mac —
+**and that now includes a well-formed list naming no platform anybody
+recognises**, so `["windwos"]`, `["macos"]`, `["Mac"]` or `[]` keep the event
+required instead of deleting it from BOTH suites with nothing going red. That
+last case is the one worth copying: erring towards "required" turns a typo
+into a red suite naming the event, which is a five-minute fix, where erring
+the other way makes the requirement vanish and nobody finds out. (On the
+wrong-TYPE shape — `"appliesOn": "windows"` — the mac returns "required" while
+Windows throws; both end red, so this is a difference in the message, not in
+the outcome.) `appliesOn` is now GONE from the case, so it is pinned on both sides
+and the `why` no longer describes a state of affairs that has ended.
+
+**One thing this leaves for whoever adds the next platform-only event:** there
+is now NO `appliesOn: ["windows"]` entry in the contract, so the mac's filter
+has no live case exercising it. `SectionRestoredTrailTests` pins it with
+entries of its own for exactly that reason. `GUI-IMPROVEMENTS.md` row 445.
+Original text: Branch
 `issue/27-assist-conversation-restore`. `SharedRulesContractTests.swift`'s
 `testTheTrailRecordsEveryEventTheContractRequires` builds its wanted set from
 every `mustRecord` entry with no `appliesOn` filter (the Windows twin honours

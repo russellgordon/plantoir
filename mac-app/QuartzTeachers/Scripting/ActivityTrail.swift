@@ -45,6 +45,20 @@ nonisolated enum ActivityTrail {
         case assistantReady = "assistant ready"
         case assistantWouldNotStart = "assistant would not start"
         case assistantEngineSaid = "assistant engine said"
+        /// A teacher put a section back to how it was when an assistant
+        /// conversation started ("Restore Section N…"). Carries the course,
+        /// the section and the backup's FILE NAME — never a page.
+        ///
+        /// It is the one line that explains a section whose pages are older
+        /// than the conversation that changed them. Without it the trail shows
+        /// the assistant's changes and then nothing, which reads as a teacher
+        /// who never pressed the button — and "why are my pages back to how
+        /// they were on Tuesday?" is exactly the question that arrives a week
+        /// later, with the conversation long closed.
+        ///
+        /// Windows recorded this first (`AssistWindow.xaml.cs`); the mac had
+        /// the same button and wrote nothing.
+        case sectionRestored = "section restored"
         case assistantAsked = "assistant asked"
         case assistantChoseATool = "assistant chose a tool"
         case assistantCouldNotAnswer = "assistant could not answer"
