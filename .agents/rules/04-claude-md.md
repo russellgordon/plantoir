@@ -9,6 +9,8 @@ description: "Plantoir project rules, part 4 of 9 - Rules that override default 
 
 ## Rules that override default behaviour (continued)
 
+    Three things make this go wrong quietly, all of them met in practice:
+
     - **`xcodebuild test` is not a build you can leave behind.** It rebuilds the
       bundle as a TEST HOST, with XCTest frameworks inside it, and it TERMINATES
       any running copy — the test host is the app. So a plain `build` has to come

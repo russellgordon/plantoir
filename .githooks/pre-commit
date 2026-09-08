@@ -84,5 +84,75 @@ if [ -n "$touched" ]; then
     printf '\n'
 fi
 
+# ---------------------------------------------------------------------------
+# Carriage returns in a file that should be LF.
+#
+# Added 2026-09-08, after a session committed four files as CRLF with stray
+# lone CRs in them: 7,672 insertions for 264 lines of work, and git blame on
+# WINDOWS-HANDOFF.md attributing all 6,655 of its lines to one commit. It was
+# caught by review, which is not a mechanism.
+#
+# .gitattributes closes most of it: an explicit "text" attribute stops git
+# mistaking a CR-carrying file for binary and skipping normalisation. It does
+# NOT close the case that actually happened. An editor writing CR CR LF leaves
+# one CR per line still in the blob, because git only strips the CR directly
+# before each newline. So this checks what is really about to be stored.
+#
+# Against the INDEX, not the working tree: on Windows the working tree is
+# legitimately CRLF for nearly everything, and only the blob matters.
+crlf=""
+for path in $(git diff --cached --name-only --diff-filter=ACM); do
+    case "$path" in
+        support/obsidian_defaults/.obsidian/themes/*) continue ;;
+    esac
+    # Binary blobs are nobody's business here; numstat prints "-" for them.
+    if git diff --cached --numstat -- "$path" | cut -f1 | grep -qx -- '-'; then
+        continue
+    fi
+    # Byte counts rather than a grep for CR: a CR inside a command
+    # substitution is stripped, which silently turns the pattern into the
+    # empty string and matches every file. That happened writing this.
+    with_cr=$(git cat-file blob ":$path" 2>/dev/null | wc -c)
+    without_cr=$(git cat-file blob ":$path" 2>/dev/null | tr -d '\015' | wc -c)
+    if [ "$with_cr" != "$without_cr" ]; then
+        crlf="$crlf  $path
+"
+    fi
+done
+
+if [ -n "$crlf" ]; then
+    printf '
+'
+    printf 'These staged files carry carriage returns, and this repository is LF:
+'
+    printf '%s' "$crlf"
+    printf '
+'
+    printf 'Almost always an editor wrote CRLF, or CR CR LF, into a file it was
+'
+    printf 'appending to. Left alone that produces a whole-file diff, destroys
+'
+    printf 'git blame for the file, and hands the other platform a file it will
+'
+    printf 'renormalise straight back.
+'
+    printf '
+'
+    printf 'To fix: rewrite the file with every CR removed, then git add it again.
+'
+    printf 'Collapse CR CR LF to one newline FIRST -- stripping CRs one at a time
+'
+    printf 'turns it into two newlines and double-spaces the whole file. That
+'
+    printf 'mistake was made too, fixing this one.
+'
+    printf '
+'
+    printf 'This hook will not stop you.
+'
+    printf '
+'
+fi
+
 # Never block. See the note at the top.
 exit 0
