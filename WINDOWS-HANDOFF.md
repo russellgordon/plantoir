@@ -1963,7 +1963,7 @@ to run in the background.
     teacher says reaches the tool that does NOT cut the section loose from
     `.netlify_sites/section<N>.json`, and the first publish afterwards lands
     on last year's URL, which last year's students may still be reading. Your
-    own comment at `AssistWorkspace.cs:1864-1877` says precisely why that is
+    own comment at `AssistWorkspace.cs:1915-1927` says precisely why that is
     bad. The mac has the identical hole (`AssistCardCommand.swift:395`) and no
     `ReleaseSite` at all. **Do not fix this unilaterally**: whether a rolled-
     over section keeps its address or starts a new site is a product choice —
