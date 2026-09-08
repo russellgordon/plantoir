@@ -113,6 +113,32 @@ Build FAILED.
 '@ -ExitCode 1
 Check "verdict" 'NoResult' $v.Verdict
 
+Write-Host "A test that merely QUOTES the banner is not a crash"
+# The markers are anchored to the start of a line for this: a failing test whose
+# own output or assertion diff contains the sentence would otherwise be reported
+# as a dead host, which hides a real failure behind "do not re-run this".
+# This very file contains both sentences, so the risk is not hypothetical.
+$v = Get-TestRunOutcome -Output @'
+  Failed SomeTests.TheRunnerExplainsACrash [12 ms]
+  Error Message:
+   Assert.Contains() Failure: expected "Test Run Aborted." in the output
+   The active test run was aborted. Reason: Test host process crashed : quoted, not real
+
+Failed!  - Failed:     1, Passed:    41, Skipped:     0, Total:    42, Duration: 3 s - Plantoir.Tests.dll (net9.0)
+'@ -ExitCode 1
+Check "verdict"      'Failed' $v.Verdict
+Check "failed count" 1        $v.Failed
+
+Write-Host "A missed banner degrades to NoResult, never to a pass"
+# The safe direction, asserted rather than assumed: if the wording ever changes
+# and neither marker matches, a crashed run still has no totals line, so it
+# lands on NoResult - not Passed, and not Failed.
+$v = Get-TestRunOutcome -Output @'
+Test run for C:\...\Plantoir.Tests.dll (.NETCoreApp,Version=v9.0)
+The run stopped for some reason vstest words differently next year.
+'@ -ExitCode 1
+Check "verdict" 'NoResult' $v.Verdict
+
 Write-Host "A crash wins over totals that printed for another assembly"
 # A solution-wide run can summarise one project and crash in the next. A
 # partial answer to "did the suite pass" is not an answer.

@@ -86,12 +86,22 @@ function Get-TestRunOutcome {
         [Parameter(Mandatory)][int]$ExitCode
     )
 
-    # Both markers are checked, not just one. "Test host process crashed" is
-    # the specific reason and is what appears today; "Test Run Aborted." is the
-    # general abort banner and also covers a host killed from outside, which
-    # prints a different reason and the same banner.
-    $crashed = $Output -match 'Test host process crashed' -or
-               $Output -match 'Test Run Aborted\.'
+    # Both markers are checked, not just one. "The active test run was aborted"
+    # carries the specific reason and is what appears today; "Test Run Aborted."
+    # is the general banner and also covers a host killed from OUTSIDE, which
+    # gives a different reason and the same banner.
+    #
+    # ANCHORED TO THE START OF A LINE, and the direction of the risk is why.
+    # vstest prints both unindented. A test's own output, a stack frame or an
+    # assertion diff quoting one of these sentences is indented or embedded, so
+    # anchoring costs nothing and closes a false POSITIVE - which is the
+    # dangerous direction: calling a genuinely failing suite a HostCrash hides
+    # a real failure behind "not a failing test, do not re-run". A false
+    # NEGATIVE is safe by construction: a crashed run prints no totals line, so
+    # missing the banner lands on NoResult, which is still neither a pass nor a
+    # test failure. Wrong in the harmless direction rather than the harmful one.
+    $crashed = $Output -match '(?m)^The active test run was aborted' -or
+               $Output -match '(?m)^Test Run Aborted\.'
 
     # Every totals line, summed. One per test assembly, so a solution-wide run
     # prints several and reading only the first would answer for one project
