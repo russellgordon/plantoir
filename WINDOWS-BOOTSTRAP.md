@@ -171,6 +171,14 @@ dotnet build Plantoir/Plantoir.csproj -c Debug
 dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 ```
 
+**Read the TOTALS line, not the exit code.** `dotnet test` exits 1 for a failing
+test, for a test host that DIED underneath the run, and for a project that did
+not compile; only the output tells them apart, and a dead host prints no totals
+line at all. `.\run-tests.ps1` (repo root) runs the same command and says which
+happened — a convenience, not a gate, so the raw command stays correct.
+`documentation/12-windows-app.md` → "Reading a test run" has the measured
+output of each, and why getting this wrong cost the mac a fortnight.
+
 **There is a second suite, and it is opt-in.** `run-ui-tests.ps1` (repo root)
 drives the REAL app through UI Automation, for the things `dotnet test` cannot
 see: whether a control can be REACHED, whether clicking it opens anything,

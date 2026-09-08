@@ -24,7 +24,7 @@ happens. This page is not a status report and should not be read as one.
 |---|---|
 | `Plantoir/` | The WinUI 3 app. Unpackaged (`WindowsPackageType: None`), self-contained, Windows App SDK included, `net9.0-windows10.0.19041.0` / `win-x64` — so a teacher installs no runtime. Bundles the toolchain recipe under `Toolchain/` and mirrors it into each working folder's `.toolchain/`. |
 | `Plantoir.Core/` | Everything with no UI: configuration round-trip, the build location, port leases, freshness, archiver and restorer, the script runner, failure explanations, catalogs — and the whole assistant under `Assist/`. This is where a rule belongs unless it cannot be expressed without a window. |
-| `Plantoir.Tests/` | xUnit, and it runs without Docker or a network: `dotnet test`. Classes touching process-wide state share a serialized collection — see `SharedActivityState`. |
+| `Plantoir.Tests/` | xUnit, and it runs without Docker or a network: `dotnet test`. Classes touching process-wide state share a serialized collection — see `SharedActivityState`. Read the TOTALS line rather than the exit code — see "Reading a test run" below. |
 | `PtyDriver/` | A console harness that runs a command under a ConPTY and answers prompts from scripted rules. It exercises the same `ConPtyProcess` the app uses, which is the point: it tests the launchers the way the app drives them. |
 | `Plantoir.Mcp/` | A standalone MCP server exposing one working folder to an AI assistant. It SHIPS: `publish.ps1` copies `plantoir-mcp.exe` beside `Plantoir.exe` and signs it. |
 | `Plantoir.UiTests/` | Drives the REAL built app through UI Automation (FlaUI/UIA3), for what a unit test cannot reach — see "Driving the real interface" below. Opt-in: skipped unless `PLANTOIR_UI_TESTS=1`, and compiled by a SOLUTION build (not by the per-project commands used day to day). References `Plantoir.Core` only, never the app project — the Windows App SDK has no business in a test host. |
@@ -326,6 +326,77 @@ while the line explaining it went to the redirected trail, where nobody would
 look. Everything now derives from `AppDataRoot`, so the next thing somebody
 adds inherits the isolation instead of leaking.
 
+## Reading a test run: the exit code cannot tell you what happened
+
+`dotnet test` exits 1 when a test fails. It also exits 1 when the test HOST
+dies underneath the run, and when the test project failed to compile. Three
+events, three different responses, one exit code — and the middle one is the
+expensive one, because it does not look like an infrastructure problem. A test
+is NAMED, so the name gets investigated; re-running it passes, so it gets filed
+as flaky. On the mac that mistake rejected 3 of 7 pieces of correct work in a
+single overnight batch and was raised in `TODO.md` twice, a fortnight apart,
+before anybody noticed the two entries were one defect.
+
+**The honest signal is the TOTALS line, never the exit code.** Measured
+2026-09-08 on this machine (Lenovo 20QES70500, Intel Core i5-8365U @ 1.60 GHz,
+16 GB; Windows 11 Pro 26200, .NET 9 SDK, xunit 2.9.2, Microsoft.NET.Test.Sdk
+17.12.0) by putting each failure in deliberately:
+
+| What happened | Exit | What it prints |
+|---|---|---|
+| A test failed | 1 | `Failed!  - Failed: 1, Passed: 0, Skipped: 0, Total: 1, Duration: 17 ms` (column-padded in reality, and it ends with the assembly name) |
+| The host died | 1 | `The active test run was aborted. Reason: Test host process crashed` and `Test Run Aborted.` — and **no totals line at all** |
+| It never compiled | 1 | neither: a build error, and no totals |
+
+`windows-app/TestRunOutcome.ps1` reads that rather than the exit code, and is
+shared by `run-tests.ps1`, `run-ui-tests.ps1` and the untracked batch driver,
+so all three agree and there is one place to correct if vstest changes its
+wording. They share the CAPTURE too (`Invoke-TestRun`), which is the subtler
+half: the banner goes to stderr, `2>&1` is a terminating error under
+`$ErrorActionPreference = 'Stop'`, and the ErrorRecord has to be flattened back
+into a plain line. The batch driver had the first of those wrong, so it could
+not have seen the banner even had it been looking — it judged by the exit code
+alone.
+
+Its verdicts are `Passed`, `Failed`, `HostCrash`, `RanNothing` and `NoResult`;
+`HostCrash` wins over any partial totals, because a partial answer to "did the
+suite pass" is not an answer. **The two runner scripts exit 0 only for a
+genuine pass** — 3 for a dead host, 8 for a run that executed nothing, and for
+no result at all whatever `dotnet` returned, or 4 when even that was 0. The
+numbers follow Microsoft.Testing.Platform's published meanings, so they survive
+an xunit v3 migration. (2 is deliberately avoided: MTP means
+"at least one test failed" by it, which would invert the one distinction this
+draws.) Neither a crash nor an empty run is retried: a crash retried until it
+passes is a crash nobody measures, and the mac's was fixed only once somebody
+counted it.
+
+`RanNothing` is worth knowing about on its own, because it is the case a
+green exit code lies about most often. **A filter that matches nothing exits
+0** — measured: vstest prints "No test matches the given testcase filter" and
+no totals line at all — so before this, a typo'd `--filter` reported success on
+a run that executed nothing. It has a third dress too: an opt-in suite whose
+switch did not take reports every test *skipped* and a healthy-looking Total.
+Run `dotnet test Plantoir.UiTests.csproj` directly and that is what you get
+(not through `run-ui-tests.ps1`, which sets `PLANTOIR_UI_TESTS` itself).
+
+**Typing `dotnet test` directly is still correct**, and `run-tests.ps1` is a
+convenience rather than a new gate — nothing depends on it. If you type the raw
+command, look for the totals line yourself: if it is absent, the test named
+above it is a bystander. `--blame` names the bystander properly, writing a
+`<guid>_Sequence.xml` under `TestResults\` saying which test was running when
+the host died (`run-tests.ps1 -Blame`); `--blame-crash` adds a full process
+dump, tens to hundreds of megabytes, which is worth it only once you are
+hunting one. Both paths are gitignored.
+
+The reader's own checks run inside `dotnet test`
+(`TheTestRunReaderTellsACrashFromAFailure`, which shells out to
+`windows-app/test_run_outcome.ps1`). Three of its fixtures are pasted from real
+output — a crash, an ordinary failure and a clean gate run — and the rest are
+edge cases constructed by editing those, which the file says of itself rather
+than implying every line came off a run. **Nothing here has ever been seen to
+crash its host**; this exists so that if one ever does, it is read correctly
+the first time.
+
 ## Driving the real interface
 
 `run-ui-tests.ps1` launches the x64 Debug build and drives it with UI
@@ -350,6 +421,19 @@ and not reopening it — that part is the teacher's).
 
 It does **not** judge anything visual: colour, contrast, dark-mode legibility,
 how a long name wraps. That is a screenshot pass, not this.
+
+**It cannot crash its host, and that was measured rather than assumed**
+(2026-09-08). The question came from the mac, where the unit suite segfaulted
+its own test host about a third of the time because the test bundle is injected
+INTO the app, so the app's crash IS the host's crash. Nothing of that shape
+exists here: `DrivenApp` launches the real `Plantoir.exe` as a SEPARATE process
+and talks to it over UIA3 COM. A throwaway probe killed the driven app
+mid-test and then touched its window — the result was an
+`InvalidOperationException` after `DrivenApp`'s 30 s patience, an ordinary test
+failure, host untouched. **So a flaky UI test here is a flaky assertion, and
+re-running it is the right response** — the opposite of the advice a mac host
+crash deserves. The suite hosts no window of its own either: the project sets
+`UseWPF`/`UseWindowsForms` false and references `Plantoir.Core` only.
 
 **Two switches worth knowing.** `PLANTOIR_UI_KEEP=1` stops the run deleting
 its temporary folders — EVERY test's, not just a failed one's, since the

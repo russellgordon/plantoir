@@ -2587,6 +2587,101 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Item 39 answered: `Plantoir.UiTests` cannot crash its host the way the
+  mac's suite did — measured — and the strengthened `oneAlertAtATime` reason
+  has one clause the mac should NOT weaken further** (Windows, 2026-09-08,
+  branch `issue/ui-test-host-crash-signal`). This closes `WINDOWS-HANDOFF.md`
+  item 39, which asked for exactly two things: a look-and-see, and a re-read.
+  Both done. **Nothing for the mac to implement**, but three things are worth
+  knowing, and the third is a request.
+
+  **1. The mac's shape is structurally impossible here, and that was measured
+  rather than reasoned about.** On the mac the test bundle is injected INTO the
+  app, so the app's crash IS the host's crash. `Plantoir.UiTests` launches the
+  real `Plantoir.exe` as a SEPARATE process and drives it over UIA3 COM
+  (`windows-app/Plantoir.UiTests/DrivenApp.cs`). A throwaway probe killed the
+  driven app mid-test and then touched its window: the result was an
+  `InvalidOperationException` after `DrivenApp`'s 30 s patience — an ordinary
+  test failure, 54 s, host untouched. The full opt-in suite then ran 11 of 11
+  green in **5 m 17 s** with no host death. So: re-running a flaky UI test here
+  IS the right response, which is the opposite of the advice that applies to a
+  mac host crash.
+
+  **2. What the mac sent over — "the honest signal is the TOTALS, never the
+  exit code" — turned out to be true here too, and nothing was reading them.**
+  Measured on this machine (Lenovo 20QES70500, Intel Core i5-8365U @ 1.60 GHz,
+  16 GB; Windows 11 Pro 26200, .NET 9 SDK, xunit 2.9.2, Microsoft.NET.Test.Sdk
+  17.12.0) by putting each failure in deliberately, same project, same command:
+
+  | | Exit code | Totals line |
+  |---|---|---|
+  | Test host dies (`Environment.FailFast`) | **1** | **absent**; says `The active test run was aborted. Reason: Test host process crashed` and `Test Run Aborted.` |
+  | An ordinary failing assertion | **1** | `Failed!  - Failed: 1, Passed: 0, Skipped: 0, Total: 1, Duration: 17 ms` |
+
+  Identical at the exit code, completely different in the output — the same
+  asymmetry `xcodebuild` has, in different words. The reference implementation
+  is `windows-app/TestRunOutcome.ps1`, shared by `run-ui-tests.ps1`, the new
+  `run-tests.ps1` and the untracked `batch/run-batch.ps1`, which until now
+  would have reported a dead host as **"TESTS FAILED (0 failed)"** — the exact
+  shape of the mac's `exit 65` with `0 failures`. (That last claim is one
+  nobody can check afterwards, including me: `batch/` has no history, which is
+  the very thing the next paragraph is about.) Its own checks run inside
+  `dotnet test` (`TheTestRunReaderTellsACrashFromAFailure`), on fixtures pasted
+  from real output rather than written from memory.
+
+  **One design point worth stealing, and it is the reason this is here rather
+  than in a commit message.** Both platforms keep their batch driver OUTSIDE
+  git — the mac's `overnight/` and Windows' `batch/` are both untracked — so
+  crash-detection logic living inside the driver is logic the other side cannot
+  read, cannot test, and loses whenever the driver is regenerated. Windows has
+  split it: the READING is a tracked, unit-tested function; the untracked
+  driver only calls it. If `overnight/run.sh` still carries its HOST-CRASH
+  regex inline, the same split would make it reviewable. Offered, not owed.
+
+  A verdict the mac does not have and might want: **`RanNothing`**. A suite
+  that finishes having executed nothing is not green, and it has a second dress
+  beyond `Total: 0` — an opt-in suite whose switch did not take reports every
+  test *skipped* and a healthy-looking Total. Counting `Total` alone calls that
+  a pass.
+
+  **3. The request. `siteHealth.repair.oneAlertAtATime`'s reason was
+  strengthened to say the mac CRASHED, and it now half-dismisses the clause
+  that is the Windows failure mode. Please keep that clause.** The re-read
+  found Windows compliant — but by a different mechanism, and the write-up
+  would be wrong if it said "same as the mac":
+
+  - Windows obeys the rule as written — the outcome is presented only after
+    `await ShowHealthDialogAsync(...)` has returned, never from inside the
+    dialog's button action — but ordering ALONE is not enough here, which is
+    the part worth knowing. WinUI's `ShowAsync` completes when the dialog
+    BEGINS closing rather than when it has gone, so the second request can
+    still land while the first is dismissing; it survives because
+    `ShowHealthDialogAsync` RETRIES five times at 150 ms
+    (`windows-app/Plantoir/Views/SectionDetailView.xaml.cs`, whose doc comment
+    says exactly this). Ordering plus a retry, not a retry instead of
+    ordering.
+  - So AppKit's consequence is a crash and WinUI's is a refusal — and a refusal
+    is swallowed by `ShowDialogSafelyAsync`, which loses the report the teacher
+    just pressed a button for. **That is precisely "asking for a second while
+    the first is dismissing loses one of them"** — the clause
+    `WINDOWS-HANDOFF.md` item 39 glosses as having "understated" it. It
+    understates the MAC. It is exact for Windows.
+
+  To be fair to the contract: it already keeps both halves —
+  `siteHealth.repair.oneAlertAtATime.why` states the lost alert in full and
+  then adds "It is worse than a lost alert: …". Nothing needs changing today.
+  This is only a request for the next edit: if that reason is ever rewritten to
+  be about the crash alone, Windows loses the only written statement of the
+  failure it actually has.
+
+  Two smaller things found on the way, neither in item 39's scope and neither
+  acted on: `SidebarPane.xaml.cs`'s post-rename notice is fired as
+  `_ = ShowDialogSafelyAsync(...)`, so a refusal there is lost silently; and
+  `dotnet test`'s exit 1 is in fact THREE-way ambiguous, not two — a test
+  failure, a dead host, or a test project that failed to compile. The reader
+  above reports that third case as `NoResult` rather than calling it a pass or
+  a failure.
+
 - **Windows now clicks the New Course wizard's Create button in a running app,
   and found that a GUI app started from a console cannot shell out at all**
   (Windows, 2026-09-07, branch `issue/35-first-run-ui-checks`, handoff item 35).
