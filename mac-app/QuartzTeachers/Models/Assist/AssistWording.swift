@@ -231,10 +231,20 @@ nonisolated enum AssistWording {
     /// for the teacher who wants last year's website back. Windows says the
     /// same thing in the same shape, so a shared sentence stays shared.
     static func rolloverStartedANewWebsite(keptAs: String) -> String {
-        return "This section is no longer tied to last year's website. Last year's details are "
+        return rolloverIsOnANewWebsite + " Last year's details are "
              + "kept at \(keptAs), so you can go back to it. The next time you publish this "
              + "section, Plantoir will ask what to call the new website."
     }
+
+    /// The half of that sentence with no filename in it.
+    ///
+    /// **Named so a contract case can assert it.** The whole sentence carries
+    /// the kept file's name, which has a timestamp in it, so no fixed string
+    /// can ever match the whole thing — and a test that cannot name the
+    /// sentence ends up matching prose it typed itself, which is the copy that
+    /// keeps passing after the product's words change.
+    static let rolloverIsOnANewWebsite: String =
+        "This section is no longer tied to last year's website." 
 
     /// Confirming a new website for a section that had never been published.
     static let rolloverHadNoWebsiteYet: String =

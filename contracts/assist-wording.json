@@ -30,6 +30,7 @@
     "rolloverCouldNotStartANewWebsite" : "I could not move this section off .netlify_sites/section1.json, so publishing it will still replace last year's website there. Try again, or check whether that file is locked or open somewhere else.",
     "rolloverCouldNotTurnOffTheScheduledPublish" : "This section was also set to publish on its own, and Plantoir could not turn that off. It may still try to publish, and it has no way to ask what the new website should be called — turn it off from the section's menu.",
     "rolloverHadNoWebsiteYet" : "This section had not been published anywhere yet, so there was no website to move away from. The first time you publish it, Plantoir will ask what to call it.",
+    "rolloverIsOnANewWebsite" : "This section is no longer tied to last year's website.",
     "rolloverKeptTheSameWebsite" : "This section still publishes to the same website as last year, so every link anybody saved keeps working. Nothing goes out until you publish.",
     "rolloverSayToKeepTheSameWebsite" : "roll this section over, keeping the same website",
     "rolloverSayToStartANewWebsite" : "roll this section over onto a new website",
