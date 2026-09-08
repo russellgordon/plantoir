@@ -153,7 +153,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    a hand smoke of create → preview → publish on a real course.
 
    > **Check the TOTALS line before calling it green**, or use
-   > `.un-tests.ps1`, which reads it for you. `dotnet test` exits 1 for a
+   > `.\run-tests.ps1`, which reads it for you. `dotnet test` exits 1 for a
    > failing test, for a dead test host and for a project that did not compile,
    > and a release is exactly the moment that distinction gets waved through.
 

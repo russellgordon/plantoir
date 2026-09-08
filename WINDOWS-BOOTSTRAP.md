@@ -176,7 +176,7 @@ test, for a test host that DIED underneath the run, and for a project that did
 not compile. A dead host prints no totals line at all and says `Test Run
 Aborted.` — and it NAMES a test, so the bystander gets investigated and
 re-running it passes, which is how the mac spent a fortnight and rejected 3 of 7
-pieces of correct work in one night. `.un-tests.ps1` (repo root) runs exactly
+pieces of correct work in one night. `.\run-tests.ps1` (repo root) runs exactly
 the command above and says which of the three happened; it is a convenience,
 not a gate, so the raw command stays correct. `documentation/12-windows-app.md`
 → "Reading a test run" has the measured output of each.
