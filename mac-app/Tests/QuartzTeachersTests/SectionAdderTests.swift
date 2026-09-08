@@ -122,7 +122,7 @@ final class SectionAdderTests: XCTestCase {
         ---
         title: Snippets
         draft: true
-        created: 2026-09-08T07:00:00.000-0400
+        created: 2020-01-15T07:00:00.000-0400
         transcludeTitleSize: h2
         ---
         Kept out of the published site on purpose.
@@ -132,7 +132,7 @@ final class SectionAdderTests: XCTestCase {
         let siblingIndex: String = """
         ---
         title: Grade 11 Introduction to Computer Science, Section 1
-        created: 2026-09-08T07:00:00.000-0400
+        created: 2020-01-15T07:00:00.000-0400
         enableToc: false
         excludeBacklinks: true
         draft: false
@@ -148,8 +148,12 @@ final class SectionAdderTests: XCTestCase {
                       "A page the siblings keep as a draft must start as a draft here too")
         XCTAssertTrue(newSnippets.contains("transcludeTitleSize: h2"),
                       "Display flags the teacher set should carry over")
-        XCTAssertFalse(newSnippets.contains("2026-09-08"),
-                       "created: should be freshened, not copied")
+        XCTAssertFalse(newSnippets.contains("2020-01-15"),
+                       "created: should be freshened, not copied. The sibling's date is "
+                       + "deliberately in the PAST: this assertion used to use a date that was "
+                       + "\"today\" when it was written, and it began failing on 2026-09-08 when "
+                       + "the clock reached it — the freshened value it was proving correct was "
+                       + "the very string it was checking for.")
 
         let newIndex: String = try String(contentsOf: course.sectionDirectoryURL(forSection: 2).appendingPathComponent("index.md"), encoding: .utf8)
         XCTAssertTrue(newIndex.contains("title: Grade 11 Introduction to Computer Science, Section 2"),
