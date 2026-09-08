@@ -61,7 +61,7 @@ What is genuinely left, smallest first:
 | ~~32~~ | ✅ Done 2026-09-07 — the folders-help jargon sweep scans only what the product writes, keeps the four fixed names, and reaches the no-curriculum-folder branch. | — |
 | ~~28~~ | ✅ Done 2026-09-07 — the scheduled-deploy dialog names the unpublished classes, the main window comes forward for an assistant build when hidden, settings saves reach the trail, and the assistant window remembers its placement per section. | — |
 | ~~31~~ | ✅ Done 2026-09-07 — `Uri.EscapeDataString` replaced by a contract-driven encoder in both branches of `Spelled`; `FolderPathRewriterTests` deserialises every `linkRewriting` case. | — |
-| 36 | A decision, not code: `verify-deploy.ps1` is the only automated check of the PowerShell half of publishing and no gate runs it. Schedule it, make it a release-cut step, or write down that it is hand-run. | Small |
+| ~~36~~ | ✅ Done 2026-09-07 — decided: `verify-deploy.ps1` stays opt-in (it makes real sites), `.githooks/pre-commit` warns when a commit touches the publishing path, `RELEASING.md` requires a nothing-skipped run for a release that changes it, and the real win — all fifteen shared `scripts/test_*.py` now run inside `dotnet test`, which nothing here did before. | — |
 | 37 | A decision the MAC makes: the Course Settings tip sentence is pinned by no contract on either platform and the two apps word it differently. Windows owes only taking the mac's wording once it is chosen. | Small |
 | ~~18~~ | ✅ Done 2026-09-07 — the choice at the folder picker and the dismissable notice for a restored folder both exist, and `synced folder noticed` / `synced folder accepted` are emitted. | — |
 | ~~17~~ | ✅ Done 2026-09-07 — `CourseConfiguration.RecordOnDisk` (a fresh-read recorder beside an untouched `Write`) and the interrupted-rename record under `courses/.internal/renames`. | — |
@@ -74,15 +74,26 @@ What is genuinely left, smallest first:
 
 Two more things, one of which is now ON that list:
 
-- **The deploy gate exists now — and is wired into nothing, which is handoff
-  item 36.** `verify-deploy.ps1` publishes to every
-  destination and every pairing against real sites and fetches each one back:
-  36 passed, 0 failed on 2026-09-06. It needs credentials and the network, so
-  it is opt-in and wired into nothing. Run it when the publishing path
-  changes. It is the only automated check of the PowerShell half of
-  publishing — `verify.sh` and `verify-deploy.sh` are bash and do not run
-  here. Listed as item 36 on 2026-09-06 so that "no gate runs it" is a
-  decision somebody makes rather than something nobody was told.
+- **The deploy gate exists, and item 36 decided what runs it (2026-09-07).**
+  `verify-deploy.ps1` publishes to every destination and every pairing against
+  real sites and fetches each one back: 36 passed, 0 failed on 2026-09-06. It
+  needs three credentials, the network and about twenty minutes, and it creates
+  real sites that nothing deletes — so **it stays opt-in and no suite runs
+  it**, which was the right posture all along; what was missing was anybody
+  being told. Now `.githooks/pre-commit` says so when a commit touches the
+  publishing path (a warning — it never blocks, because those files change on
+  16 of every 22 active days and a blocking hook would be `--no-verify`'d once
+  and never fire again), and `RELEASING.md` requires a run with **nothing
+  skipped** for a release that changes that path.
+
+  **The bigger find was underneath it.** `verify.sh` runs fifteen shared
+  `scripts/test_*.py` files on the mac; Windows ran **none** of them. All
+  fifteen pass here, so `PythonToolchainTests` now runs every one inside
+  `dotnet test` — 156 tests in about eight seconds, no Docker, no network, no
+  credentials. A rejected first design (a stamp file recording when
+  `verify-deploy.ps1` last passed, with a unit test reddening when the
+  publishing files changed afterwards) is written up in `WINDOWS-HANDOFF.md`
+  item 36 with the measurements that killed it.
 - **The unit suite is green**: 911 passed, 0 failed at the time this section
   was written; 945 after the folder-problems front end, and 979 once
   parity-tail was merged into it and the overnight capture was added. `dev` stood
