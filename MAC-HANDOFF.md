@@ -891,8 +891,26 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   nothing was going to tell either side** (found 2026-09-06 by an audit asking
   whether the parity list was COMPLETE, not whether it was correct).
   `plantoir-mcp.exe` declares **37** tools; the mac's `AssistToolSurface`
-  serves **25** (22 plus three MCP-only). So the same question asked of Claude
+  serves **32** (22 plus ten MCP-only, seven of them built on 2026-09-08 out
+  of this very list). So the same question asked of Claude
   Code gets a different toolbox depending on the machine.
+
+  **✅ ALL SIX BUILT 2026-09-08.** Russell asked for the whole product bucket
+  ("build all six tools"), and each one is done with its own tests and write-up:
+  `list_courses` (row 452), the `add_classes` pair (449), the
+  `make_room_for_classes` pair (450), and `explain_publishing` with
+  `back_up_course` (451). **What is left of the twelve-tool gap is what this
+  sorting said should be left**: `read_timetable` and `list_recent_changes`,
+  which are Windows-shaped by design, `sync_page_dates`, which needs a
+  teacher's problem first, and the `plan_` twins that travel with their writes.
+  The mac's MCP surface is 32 (22 shared plus ten MCP-only).
+
+  **The shape Russell set for all six**, which is the part worth carrying
+  forward: an MCP tool for Claude Code, plus a card phrasing so the app can
+  reach it, with the phrasing offering everything the tool does. MCP-only
+  constrains which client the MODEL is shown a tool on; it says nothing about
+  what a teacher can ask for. A fixed phrasing is matched in code and never
+  reaches a model, so it costs the router nothing.
 
   **✅ Sorted 2026-09-06** on `issue/mcp-tool-surface-divergence` — the twelve
   are gone through one at a time below, with the reasoning. **What is still
@@ -914,7 +932,10 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
   The twelve, verified by set difference rather than read off a list: exactly
   twelve Windows-only, **zero mac-only**, and **zero hits for any of the twelve
-  names anywhere under `mac-app/QuartzTeachers` or `contracts/`** —
+  names anywhere under `mac-app/QuartzTeachers` or `contracts/`** — true when
+  it was measured on 2026-09-06, and SEVEN of them have since been built here —
+  all six tools this entry sorted as the mac's, on 2026-09-08 — so the
+  difference is five today —
   `add_classes`, `back_up_course`, `explain_publishing`, `list_courses`,
   `list_recent_changes`, `make_room_for_classes`, `plan_add_classes`,
   `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,
@@ -1021,7 +1042,15 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
   **PRODUCT — belongs on the mac. In this order.**
 
-  1. **`list_courses`** — MCP-only, and the cheapest real gain of the twelve.
+  1. **`list_courses`** — ✅ **BUILT 2026-09-08** (`GUI-IMPROVEMENTS.md` row
+     452). MCP-only as judged here, plus two phrasings matched in code — "what
+     courses do I have?" and "list my courses" — so a teacher can ask without
+     the model being shown a tool. The reasoning that came out of building it,
+     and which applies to the rest of this list: MCP-only constrains which
+     client the MODEL sees a tool on, and says nothing about what the app can
+     do. The original entry follows.
+
+     MCP-only, and the cheapest real gain of the twelve.
      `Plantoir --mcp-stdio <working-folder>` is scoped to a WORKING FOLDER,
      which routinely holds several courses. The server answers only
      `initialize`, `tools/list` and `tools/call` — no `resources/list`, no
@@ -1062,7 +1091,13 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      last year's website". It is a product decision rather than a missing
      tool, which is why it is there and not here.
 
-  3. **`plan_add_classes` / `add_classes`** — smaller than it looks, and the
+  3. **`plan_add_classes` / `add_classes`** — ✅ **BUILT 2026-09-08**
+     (`GUI-IMPROVEMENTS.md` row 453). Smaller even than this entry says: the
+     capability already shipped behind the "add five more days to Unit 4"
+     phrasing, so only the published door was missing. The original entry
+     follows.
+
+     Smaller than it looks, and the
      first draft of this entry got it wrong in a way worth recording.
      `PlaceholderClassPlanner` (340 lines) lays down a unit's worth of class
      pages on the days the section actually meets, skipping days already taken
@@ -1079,7 +1114,16 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      makes the assistant surface the ONLY way a teacher gets at them and raises
      the value of (3) and (4) rather than lowering it.)
 
-  4. **`plan_make_room_for_classes` / `make_room_for_classes`** — and this one
+  4. **`plan_make_room_for_classes` / `make_room_for_classes`** — ✅ **BUILT
+     2026-09-08** (`GUI-IMPROVEMENTS.md` row 454), MCP-only as this entry asked,
+     plus a parsed card phrasing. **One thing this entry got wrong, worth
+     correcting rather than deleting:** it said what was missing is "a count
+     above one, and the ability to name an arbitrary insertion point".
+     `ClassInsertionPlanner.plan` has taken `unit`, `atDay` and `count` from the
+     start — nothing was missing but a way to SAY them. The original entry
+     follows.
+
+     And this one
      is **already covered under another name, for the one-class case**.
      `ClassInsertionPlanner` (574 lines, its own contract in
      `contracts/class-planning.json`) is what runs when a teacher says
@@ -1098,7 +1142,10 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      it only through a sentence naming one specific page. If it is built,
      **MCP-only** — a person is reading every step there. Never the local list.
 
-  5. **`back_up_course`** — MCP-only, and mechanically the smallest of all: it
+  5. **`back_up_course`** — ✅ **BUILT 2026-09-08** (`GUI-IMPROVEMENTS.md` row
+     455). The original entry follows.
+
+     MCP-only, and mechanically the smallest of all: it
      wraps `CourseArchiver.backUpCourse`, which exists. A LOCAL tool would be
      redundant, because `AssistToolRunner.backUpOnceForThisConversation`
      already saves a copy before the assistant's first write. Windows' own
@@ -1110,7 +1157,14 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      builds one `AssistToolRunner` for the process, so the automatic copy fires
      once per server session and only ahead of a tool write.
 
-  6. **`explain_publishing`** — MCP-only. The publish-versus-deploy distinction
+  6. **`explain_publishing`** — ✅ **BUILT 2026-09-08** (`GUI-IMPROVEMENTS.md`
+     row 451), as a TOOL rather than the cheaper `instructions` field this entry
+     suggested trying first: a paragraph sent at startup is read once by a
+     session that may not need it, while a tool is there at the moment the
+     question arises and can say "already explained" the second time. The
+     original entry follows.
+
+     MCP-only. The publish-versus-deploy distinction
      reaches the local model through `AssistAgent.systemPrompt`, whose own
      comment says the paragraph "is not padding … saying plainly that they are
      different is what stops 'publish tomorrow's class' turning into a live

@@ -307,10 +307,14 @@ and the deploy button — are the app's, not the tool's: over MCP the client is
 told which tools write (`readOnlyHint`) and does its own asking. The app itself answers the flag —
 `Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio <working-folder>` — rather
 than shipping a second binary, so no packaging step can leave it out. Claude
-Code is offered a slightly LONGER list than the local model: the tools that
-read the curriculum and point a page at the expectations that fit are a
-judgement about meaning: 25 tools against 13, and the local model sees exactly
-the thirteen its routing was measured against.
+Code is offered a LONGER list than the local model — 32 tools against 13, with
+the local model seeing exactly the thirteen its routing was measured against.
+The ten it does not see are off its list for three different reasons: reading
+the curriculum and pointing a page at the expectations that fit is a judgement
+about meaning; listing the folder's courses and explaining what publishing
+means are things a window scoped to one section never has to ask; and filling
+out a unit, making room in one and taking a copy are things it can already
+reach through a fixed phrasing, matched in code, that never consults a model.
 
 How all of that fits together — what the model is, how it is configured, and
 the path a typed sentence takes to become a Swift function call — is
