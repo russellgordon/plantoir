@@ -75,8 +75,13 @@ enum AssistContract {
             "cancelled": AssistWording.cancelled,
             "deployWasCancelled": AssistWording.deployWasCancelled,
             "rolloverWebsiteQuestion": AssistWording.rolloverWebsiteQuestion,
-            "rolloverWantsANewWebsite": AssistWording.rolloverWantsANewWebsite,
-            "rolloverWantsTheSameWebsite": AssistWording.rolloverWantsTheSameWebsite,
+            "rolloverSayToStartANewWebsite": AssistCardCommand.rollOverOntoANewWebsite,
+            "rolloverSayToKeepTheSameWebsite": AssistCardCommand.rollOverKeepingTheSameWebsite,
+            "rolloverCouldNotStartANewWebsite": AssistWording.rolloverCouldNotStartANewWebsite(
+                stillPinned: ".netlify_sites/section1.json"
+            ),
+            "rolloverCouldNotTurnOffTheScheduledPublish":
+                AssistWording.rolloverCouldNotTurnOffTheScheduledPublish,
             "rolloverStartedANewWebsite": AssistWording.rolloverStartedANewWebsite(
                 keptAs: ".netlify_sites/section1.previous-2026-09-08_071500.json"
             ),

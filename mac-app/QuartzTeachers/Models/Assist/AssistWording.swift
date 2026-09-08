@@ -216,9 +216,6 @@ nonisolated enum AssistWording {
     static let rolloverWebsiteQuestion: String =
         "Should this be a new website, or the same one students used last year?"
 
-    /// The two answers, in the order they are offered.
-    static let rolloverWantsANewWebsite: String = "A new website"
-    static let rolloverWantsTheSameWebsite: String = "The same one as last year"
 
     /// Confirming a new website, when the section had one to be cut loose from.
     ///
@@ -262,6 +259,21 @@ nonisolated enum AssistWording {
         "I have not changed which website this section publishes to — publishing it will still "
         + "go to last year's website. Ask me to roll it over again if you would like to choose."
 
+    /// A destination that could not be released, so the section is still
+    /// pinned to it.
+    ///
+    /// **Its own sentence because the alternative said the opposite.** A
+    /// marker that exists and cannot be moved used to produce the same empty
+    /// result as one that was never there, so a teacher was told "this section
+    /// had not been published anywhere yet" about a section that is still
+    /// publishing over last year's site. That is a lie about the one fact this
+    /// whole feature turns on.
+    static func rolloverCouldNotStartANewWebsite(stillPinned: String) -> String {
+        return "I could not move this section off \(stillPinned), so publishing it will still "
+             + "replace last year's website there. Try again, or check whether that file is "
+             + "locked or open somewhere else."
+    }
+
     /// Added when releasing a website turned off a publish that was set to
     /// happen on its own.
     ///
@@ -274,6 +286,18 @@ nonisolated enum AssistWording {
         "This section was set to publish on its own. Starting a new website turned that off — "
         + "set it again from the section's menu once you have published the new website for the "
         + "first time."
+
+    /// When turning that scheduled publish off did NOT work.
+    ///
+    /// The dangerous state, and so the one that must not be described by the
+    /// sentence above. A publish still set to run has nobody to ask what the
+    /// new website should be called, so it would go ahead and make one — the
+    /// exact outcome turning it off exists to prevent. Renaming a course says
+    /// the same thing for the same reason.
+    static let rolloverCouldNotTurnOffTheScheduledPublish: String =
+        "This section was also set to publish on its own, and Plantoir could not turn that off. "
+        + "It may still try to publish, and it has no way to ask what the new website should be "
+        + "called — turn it off from the section's menu."
 
     /// There is nothing on the list at all.
     ///
