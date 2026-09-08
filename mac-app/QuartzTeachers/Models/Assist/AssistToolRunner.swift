@@ -2205,7 +2205,25 @@ final class AssistToolRunner {
             if asked.plan.changesNothing {
                 let already: String = "Every page in \(asked.located.course.code) Section "
                                     + "\(asked.located.sectionNumber) is already on the day it should be."
-                return AssistToolOutcome.wrote(already, detail: already)
+                // The website is settled HERE TOO, and this is the SECOND TURN
+                // of the whole conversation. A teacher answers the website
+                // question by saying one of the two sentences, which comes back
+                // through this same tool — and by then the pages are already on
+                // their dates, so the plan changes nothing. Returning early on
+                // that made the answer a no-op: the reply talked about dates,
+                // never mentioned the website, and left the section pinned to
+                // last year's. An offer that looks like it worked is worse than
+                // no offer at all.
+                var detail: String = already
+                let aboutTheWebsite: String = settleTheWebsiteAfterARollover(
+                    arguments,
+                    course: asked.located.course,
+                    sectionNumber: asked.located.sectionNumber
+                )
+                if aboutTheWebsite.isEmpty == false {
+                    detail += "\n\n" + aboutTheWebsite
+                }
+                return AssistToolOutcome.wrote(already, detail: detail)
             }
 
             let backedUp: Bool = backUpOnceForThisConversation(
@@ -2299,6 +2317,14 @@ final class AssistToolRunner {
             forSection: sectionNumber, in: course
         )
         guard release.releasedAnything else {
+            // Still pinned is NOT the same as never published, and telling a
+            // teacher the wrong one of those is telling them the opposite of
+            // the truth about the only fact this feature turns on.
+            if release.somethingIsStillPinned {
+                return AssistWording.rolloverCouldNotStartANewWebsite(
+                    stillPinned: release.stillPinned.joined(separator: ", ")
+                )
+            }
             ActivityTrail.note(
                 .sectionStartedANewWebsiteOnRollover,
                 "rolled the section over onto a new website — it had not been published anywhere yet",
@@ -2322,8 +2348,20 @@ final class AssistToolRunner {
         var said: String = AssistWording.rolloverStartedANewWebsite(
             keptAs: release.keptFiles.joined(separator: ", ")
         )
-        if turnOffAnyScheduledPublish(course: course, sectionNumber: sectionNumber) {
+        // Some destinations released and others not: say so, rather than
+        // letting the success sentence stand for the whole section.
+        if release.somethingIsStillPinned {
+            said += "\n\n" + AssistWording.rolloverCouldNotStartANewWebsite(
+                stillPinned: release.stillPinned.joined(separator: ", ")
+            )
+        }
+        switch turnOffAnyScheduledPublish(course: course, sectionNumber: sectionNumber) {
+        case .noneWasSet:
+            break
+        case .turnedOff:
             said += "\n\n" + AssistWording.rolloverTurnedOffTheScheduledPublish
+        case .couldNotTurnOff:
+            said += "\n\n" + AssistWording.rolloverCouldNotTurnOffTheScheduledPublish
         }
         ActivityTrail.note(
             .sectionStartedANewWebsiteOnRollover,
@@ -2345,17 +2383,35 @@ final class AssistToolRunner {
     /// `<code>-s<n>-<year>-<name>` and publish there, while the address the
     /// teacher's students actually read quietly stopped updating. Renaming a
     /// course turns scheduled publishes off for the same reason and says so.
-    private func turnOffAnyScheduledPublish(course: Course, sectionNumber: Int) -> Bool {
+    private func turnOffAnyScheduledPublish(
+        course: Course, sectionNumber: Int
+    ) -> ScheduledPublishOutcome {
         let plistURL: URL = ScheduledDeploy.plistURL(
             courseCode: course.code, sectionNumber: sectionNumber
         )
         guard FileManager.default.fileExists(atPath: plistURL.path) else {
-            return false
+            return .noneWasSet
         }
-        _ = ScheduledDeploy.cancelScheduledDeploy(
-            courseCode: course.code, sectionNumber: sectionNumber
+        // `runner: launchControl` is not optional here. The default runs the
+        // real `launchctl` against the real `~/Library/LaunchAgents`, so a test
+        // driving this would boot out and delete a scheduled publish belonging
+        // to whoever is running the suite — the fixture course is ICS3U, which
+        // is a course a teacher plausibly has.
+        let problem: String? = ScheduledDeploy.cancelScheduledDeploy(
+            courseCode: course.code, sectionNumber: sectionNumber, runner: launchControl
         )
-        return true
+        // The failure is REPORTED, never swallowed: a plist left behind is
+        // loaded again at next login, so the publish really can still fire —
+        // with nobody to ask what the new website should be called, which is
+        // the whole thing turning it off exists to prevent.
+        return problem == nil ? .turnedOff : .couldNotTurnOff
+    }
+
+    /// What became of a publish that was set to happen on its own.
+    private enum ScheduledPublishOutcome {
+        case noneWasSet
+        case turnedOff
+        case couldNotTurnOff
     }
 
     private struct PlannedReDate {

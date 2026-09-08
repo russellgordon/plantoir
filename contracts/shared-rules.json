@@ -207,7 +207,7 @@
         "why": "The count is the point. Stopping a preview, closing a window or cancelling a publish asks the launcher to end whatever that section still has running, and nothing else on the trail can tell “there was nothing left to stop” from “a build was still going and was ended” — which are the two competing explanations when a teacher reports that their publish stopped halfway. Recorded from 2026-09-05, when the sweep began ending a mid-flight BUILD and its driver rather than only a preview server: that is a change in what a teacher can lose, and it had no line describing it. The launcher prints the number and the app used to discard it."
       },
       {
-        "carries": "the course code, the section number, and where last year's website details were kept",
+        "carries": "the course code, the section number, and \u2014 when there was a website to move away from \u2014 where last year's details were kept",
         "event": "section started a new website",
         "why": "A rollover that cuts a section loose is the moment its published address changes, and nothing else on the trail records it. The same act turns off any publish that was set to happen on its own \u2014 a section with no agreed website and a scheduled run with nobody to ask would otherwise create a website nobody named \u2014 so a teacher whose overnight publish stops happening has one line explaining both."
       },

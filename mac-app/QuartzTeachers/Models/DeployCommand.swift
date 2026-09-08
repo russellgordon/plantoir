@@ -148,11 +148,30 @@ enum DeployCommand {
         /// year's website rather than leaving it orphaned.
         let savedFiles: [AssistSavedFile]
 
+        /// Destinations this section is STILL pinned to, because releasing
+        /// them failed.
+        ///
+        /// **Kept apart from "there was nothing to release", which is the
+        /// distinction that matters.** Both used to produce an empty
+        /// `keptFiles`, so a marker that existed and could not be moved was
+        /// reported to the teacher as "this section had not been published
+        /// anywhere yet" — the opposite of the truth, about the one fact the
+        /// whole feature turns on. The section is still pinned, the next
+        /// publish still overwrites last year's site, and the sentence said it
+        /// could not.
+        let stillPinned: [String]
+
         // MARK: - Computed properties
 
         /// Whether this section was pinned to any website at all.
         var releasedAnything: Bool {
             return keptFiles.isEmpty == false
+        }
+
+        /// Whether anything was left pinned — either because a release failed
+        /// or because only some of several destinations came loose.
+        var somethingIsStillPinned: Bool {
+            return stillPinned.isEmpty == false
         }
     }
 
@@ -163,11 +182,7 @@ enum DeployCommand {
     /// filename whichever app they are sitting at. Pinned in
     /// `contracts/file-formats.json` → `firstDeployMarkers`.
     static func releasedMarkerName(forSection sectionNumber: Int, at moment: Date) -> String {
-        let formatter: DateFormatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        return "section\(sectionNumber).previous-\(formatter.string(from: moment)).json"
+        return "section\(sectionNumber).previous-" + stamp(moment) + ".json"
     }
 
     /// Cut a section loose from the website it publishes to, so the next
@@ -194,6 +209,7 @@ enum DeployCommand {
     ) -> SiteRelease {
         var keptFiles: [String] = []
         var savedFiles: [AssistSavedFile] = []
+        var stillPinned: [String] = []
 
         for destinationType in CourseConfiguration.knownDeployTargetTypes {
             guard let markerURL = firstDeployMarkerURL(
@@ -203,7 +219,13 @@ enum DeployCommand {
                 // pinning it to anywhere.
                 continue
             }
+            guard FileManager.default.fileExists(atPath: markerURL.path) else {
+                // Nothing pinning this destination, which is the ordinary case
+                // for a course that only publishes one way.
+                continue
+            }
             guard let contents = try? String(contentsOf: markerURL, encoding: .utf8) else {
+                stillPinned.append(nameForTeacher(markerURL))
                 continue
             }
             let keptURL: URL = markerURL.deletingLastPathComponent()
@@ -211,19 +233,66 @@ enum DeployCommand {
             do {
                 try FileManager.default.moveItem(at: markerURL, to: keptURL)
             } catch {
-                // Leave the rest alone rather than half-releasing a section:
-                // a marker that could not be moved is one this section is
-                // still pinned to, and the reply says so.
+                // A marker that could not be moved is one this section is
+                // still pinned to, and the reply has to say so rather than
+                // reporting the same empty result as "never published".
+                stillPinned.append(nameForTeacher(markerURL))
                 continue
             }
-            keptFiles.append(
-                keptURL.deletingLastPathComponent().lastPathComponent + "/" + keptURL.lastPathComponent
-            )
+            keptFiles.append(nameForTeacher(keptURL))
             savedFiles.append(AssistSavedFile(fileURL: markerURL, before: contents, after: nil))
             savedFiles.append(AssistSavedFile(fileURL: keptURL, before: nil, after: contents))
         }
 
-        return SiteRelease(keptFiles: keptFiles, savedFiles: savedFiles)
+        // The LEGACY marker, which `deploy.py` still reads and migrates back
+        // into the stable path (`load_netlify_marker`, `scripts/deploy.py:454`).
+        // Leaving it would make a rollover report "never published" and then
+        // publish over last year's site on the next deploy — the whole defect,
+        // in exactly the folders old enough to have taught somebody something.
+        // Netlify only: there has never been a Cloudflare equivalent.
+        let legacyURL: URL = course.directoryURL
+            .appendingPathComponent("section\(sectionNumber)")
+            .appendingPathComponent(".netlify_site.json")
+        if FileManager.default.fileExists(atPath: legacyURL.path) {
+            if let contents = try? String(contentsOf: legacyURL, encoding: .utf8) {
+                let keptURL: URL = legacyURL.deletingLastPathComponent()
+                    .appendingPathComponent(
+                        ".netlify_site.previous-" + stamp(moment) + ".json"
+                    )
+                do {
+                    try FileManager.default.moveItem(at: legacyURL, to: keptURL)
+                    keptFiles.append(nameForTeacher(keptURL))
+                    savedFiles.append(
+                        AssistSavedFile(fileURL: legacyURL, before: contents, after: nil)
+                    )
+                    savedFiles.append(
+                        AssistSavedFile(fileURL: keptURL, before: nil, after: contents)
+                    )
+                } catch {
+                    stillPinned.append(nameForTeacher(legacyURL))
+                }
+            } else {
+                stillPinned.append(nameForTeacher(legacyURL))
+            }
+        }
+
+        return SiteRelease(keptFiles: keptFiles, savedFiles: savedFiles, stillPinned: stillPinned)
+    }
+
+    /// The moment, spelled the way both apps spell it in a kept filename.
+    private static func stamp(_ moment: Date) -> String {
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd_HHmmss"
+        return formatter.string(from: moment)
+    }
+
+    /// A marker named the way a teacher would find it — the folder it sits in
+    /// and the file, without the rest of the path.
+    private static func nameForTeacher(_ markerURL: URL) -> String {
+        return markerURL.deletingLastPathComponent().lastPathComponent
+             + "/" + markerURL.lastPathComponent
     }
 
     /// True when this section has been deployed to the given destination

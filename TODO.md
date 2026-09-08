@@ -791,7 +791,7 @@ an item when it ships (finished behaviour is recorded in
   course-level pages, but for a "sample course" it does not name — a
   different measurement from the 32 above, not a contradiction of it.)
 
-## A rolled-over section publishes over last year's website
+## ✅ Done — A rolled-over section publishes over last year's website
 
 Noted 2026-09-06 on `issue/mcp-tool-surface-divergence`, while sorting the
 twelve MCP tools Windows serves and the mac does not (`MAC-HANDOFF.md`). Found
@@ -874,7 +874,28 @@ behaviour rather than an accident — the question at rollover is what makes it 
 choice — and the teacher who wants the year revealed class by class hides the
 pages themselves, which is an act they already have.
 
-**What is still to BUILD — a separate piece, not done here.**
+**✅ BUILT 2026-09-08** on `issue/rollover-asks-about-the-website`,
+`GUI-IMPROVEMENTS.md` row 448. All three parts below are done on the MAC; the
+Windows half is `WINDOWS-HANDOFF.md` item 42. Three things were found by
+adversarial review while building and are worth keeping, because each was a
+way of shipping something worse than the defect:
+
+- **Cutting a section loose had to turn off any publish set to happen on its
+  own.** `runScheduled` re-validates nothing and `deploy.py`'s name prompt
+  returns its DEFAULT with no terminal rather than failing, so the overnight
+  run would have created a website nobody named while the address students read
+  stopped updating.
+- **Answering the question is the SECOND turn**, by which time the pages are
+  already on their dates — so the re-date plan changes nothing, and returning
+  early on that made the answer a no-op with an offer that looked like it had
+  worked.
+- **"Still pinned" and "never published" cannot share a sentence.** A marker
+  that could not be moved was reported as "had not been published anywhere
+  yet", which is the opposite of the truth about the one fact this turns on.
+
+The original list of what had to be built follows.
+
+**What was to BUILD — a separate piece, not done in the deciding session.**
 
 1. **The sentence, in `contracts/`**, so both platforms ask identically. It is
    the only part of this that is teacher-facing, and it is the reason this

@@ -197,6 +197,14 @@
         "why": "A folder deploy asks nothing, so it keeps no marker and counts as always-deployed."
       }
     ],
+  "releasedWhenASectionRollsOver": {
+    "name": "section<N>.previous-yyyy-MM-dd_HHmmss.json, beside the marker it replaces",
+    "legacyName": ".netlify_site.previous-yyyy-MM-dd_HHmmss.json, for the older marker inside section<N>/ that deploy.py still reads and migrates",
+    "rule": "Cutting a section loose from last year's website RENAMES its marker aside, never deletes it, and does so for EVERY destination type rather than only the one the course is configured for now.",
+    "why": "Renamed rather than deleted because the file holds the site's id and its admin address, and a teacher who decides they wanted last year's website after all has no other way back to it. Every destination rather than the primary one because markers are keyed purely by destination TYPE and a course can carry additional targets, so releasing only the primary leaves an additional destination still overwriting last year's site. The name is frozen and shared so a teacher is told the same filename whichever app they are sitting at.",
+    "windowsOwes": "Windows' AssistWorkspace.ReleaseSite returns inside the first folder that holds a marker, so a section pinned to both Netlify and Cloudflare has only its Netlify marker released and still publishes over last year's Cloudflare site. It also does not know the legacy path.",
+    "safeBecause": "deploy.py and build_site.py build exact marker paths and never glob the folder, so a .previous-*.json sitting beside them is inert."
+  },
     "rule": "Read the marker for the destination the course is configured for NOW — not any marker, and not the other one.",
     "why": "A course deployed to Netlify and then switched to Cloudflare has NEVER been deployed to Cloudflare, and its first Cloudflare deploy will ask what to call the site. Treating the old Netlify marker as proof schedules exactly the deploy that stops at a prompt at half six with nobody there — the failure the 'never been deployed' refusal exists to prevent."
   },

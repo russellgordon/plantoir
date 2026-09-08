@@ -288,6 +288,106 @@ final class RolloverWebsiteTests: XCTestCase {
         XCTAssertTrue(said.contains(AssistWording.rolloverHadNoWebsiteYet), said)
     }
 
+
+    /// Cutting a section loose turns off a publish set to happen on its own,
+    /// and says so.
+    ///
+    /// **The most consequential behaviour here and it had no test.** A section
+    /// with no agreed website and a scheduled run has nobody to ask what the
+    /// new one should be called — and `deploy.py`'s prompt returns its DEFAULT
+    /// with no terminal rather than failing, so the overnight run would create
+    /// a website nobody named while the address students read stopped updating.
+    @MainActor
+    func testStartingANewWebsiteTurnsOffAScheduledPublish() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let plistURL: URL = ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1)
+        try "<plist/>".write(to: plistURL, atomically: true, encoding: .utf8)
+
+        let said: String = await reDate(
+            runner, course: course, arguments: ["rollover": "yes", "website": "new"]
+        )
+
+        XCTAssertTrue(
+            said.contains(AssistWording.rolloverTurnedOffTheScheduledPublish),
+            "A teacher must be told their scheduled publish was turned off: \(said)"
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: plistURL.path),
+            "The scheduled publish must actually be gone, not just described as gone."
+        )
+    }
+
+    /// A section with no scheduled publish is told nothing about one.
+    @MainActor
+    func testWithNoScheduledPublishNothingIsSaidAboutOne() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let said: String = await reDate(
+            runner, course: course, arguments: ["rollover": "yes", "website": "new"]
+        )
+        XCTAssertFalse(said.contains("set to publish on its own"), said)
+    }
+
+    /// Answering the question is the SECOND turn, and by then the pages are
+    /// already on their dates.
+    ///
+    /// The plan then changes nothing, and an early return on that made the
+    /// whole answer a no-op: the reply talked about dates, never mentioned the
+    /// website, and left the section pinned to last year's — with an offer that
+    /// looked like it had worked.
+    @MainActor
+    func testAnsweringTheQuestionOnASecondTurnStillCutsTheSectionLoose() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // First turn: re-dates, and asks.
+        let asked: String = await reDate(runner, course: course, arguments: ["rollover": "yes"])
+        XCTAssertTrue(asked.contains(AssistWording.rolloverWebsiteQuestion), asked)
+
+        // Second turn: the teacher says one of the two sentences back.
+        let answered: String = await reDate(
+            runner, course: course, arguments: ["rollover": "yes", "website": "new"]
+        )
+        XCTAssertTrue(
+            answered.contains("no longer tied to last year"),
+            "Answering must settle the website even though the re-date now changes nothing: \(answered)"
+        )
+        let live: URL = course.directoryURL.appendingPathComponent(".netlify_sites/section1.json")
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: live.path),
+            "The section is still pinned — the answer did nothing."
+        )
+    }
+
+    /// A destination that could not be released must not be reported as one
+    /// that was never published.
+    @MainActor
+    func testAMarkerThatCannotBeReleasedIsNotCalledNeverPublished() throws {
+        let (root, course, _, _) = try makeCourseWithMarkers(netlify: true, cloudflare: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // A directory sitting where the kept file would go makes the move fail
+        // without touching the marker.
+        var parts: DateComponents = DateComponents()
+        parts.year = 2026; parts.month = 9; parts.day = 8
+        parts.hour = 7; parts.minute = 15; parts.second = 0
+        let moment: Date = try XCTUnwrap(Calendar.current.date(from: parts))
+        let blocker: URL = course.directoryURL
+            .appendingPathComponent(".netlify_sites")
+            .appendingPathComponent(DeployCommand.releasedMarkerName(forSection: 1, at: moment))
+        try FileManager.default.createDirectory(at: blocker, withIntermediateDirectories: true)
+
+        let release: DeployCommand.SiteRelease = DeployCommand.releaseSite(
+            forSection: 1, in: course, at: moment
+        )
+        XCTAssertFalse(release.releasedAnything)
+        XCTAssertTrue(release.somethingIsStillPinned, "The section is still pinned and must say so.")
+        XCTAssertEqual(release.stillPinned, [".netlify_sites/section1.json"])
+    }
+
     // MARK: - Helpers
 
 
@@ -299,6 +399,19 @@ final class RolloverWebsiteTests: XCTestCase {
         withMarker: Bool = false
     ) throws -> (root: URL, course: Course, runner: AssistToolRunner) {
         let made = try AssistFixture.makeRunner(hasDeployedBefore: withMarker)
+
+        // Point scheduled-publish lookups at a throwaway folder. Without this
+        // `plistURL` resolves to the REAL ~/Library/LaunchAgents, and the
+        // fixture's course is ICS3U — a course a teacher plausibly has
+        // scheduled — so a test could boot out and delete their agent.
+        let agentsDirectory: URL = made.root.appendingPathComponent("LaunchAgents")
+        try FileManager.default.createDirectory(
+            at: agentsDirectory, withIntermediateDirectories: true
+        )
+        ScheduledDeploy.launchAgentsDirectoryOverride = agentsDirectory
+        addTeardownBlock {
+            MainActor.assumeIsolated { ScheduledDeploy.launchAgentsDirectoryOverride = nil }
+        }
 
         let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
             dates: ["2026-09-08", "2026-09-10"], source: "timetable.xlsx, block H",
