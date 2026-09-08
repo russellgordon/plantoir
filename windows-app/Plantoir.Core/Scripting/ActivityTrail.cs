@@ -82,6 +82,25 @@ public static class ActivityTrail
         /// wrong, the other says somebody acted on it.
         /// </summary>
         FolderProblemRepaired,
+        /// <summary>
+        /// A repair the teacher ASKED for that did not happen. Carries the
+        /// course, the section and what was in the way -- never anything from
+        /// inside it. Written today from ONE place only: the refusal when a
+        /// folder named index.md sits where the front page belongs. A repair
+        /// that simply failed (read-only volume, permissions) still records
+        /// nothing, deliberately; the event is named for the OUTCOME rather
+        /// than for its one cause so that gap can be closed later without a
+        /// rename on either platform.
+        /// </summary>
+        FolderProblemNotRepaired,
+        /// <summary>
+        /// A teacher put a section back to how it was when an assistant
+        /// conversation started. Carries the course, the section and the
+        /// backup's file name -- never a page. The one line that explains a
+        /// section whose pages are older than the conversation that changed
+        /// them; without it the trail shows six changes and then nothing.
+        /// </summary>
+        SectionRestored,
         AssistantEngineSaid,
         // The three below are named by contracts/shared-rules.json ->
         // activityTrail.mustRecord, which SharedRules_ActivityTrailEvents_Exist
@@ -146,6 +165,8 @@ public static class ActivityTrail
         Event.SyncedFolderAccepted => "synced folder accepted",
         Event.FolderProblemFound => "folder problem found",
         Event.FolderProblemRepaired => "folder problem repaired",
+        Event.FolderProblemNotRepaired => "folder problem not repaired",
+        Event.SectionRestored => "section restored",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",
         Event.ItemReIncluded => "item re-included",

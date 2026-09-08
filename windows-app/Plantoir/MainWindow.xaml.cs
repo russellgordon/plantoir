@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Plantoir.Core.Assist;
@@ -86,13 +87,14 @@ public sealed partial class MainWindow : Window
                 // window on the same section, would otherwise sit invisible
                 // here until something else happened to reload the tree.
                 if (Workspace.State == WorkspaceState.Ready) Sidebar.Refresh();
+                RefreshRenameCourseItem();
             }
         };
         // Covers app launch itself, in case the window's first Activated
         // fires before this runs (or does not fire at all on some launch
         // paths) — cheap and idempotent when there is nothing pending.
         _ = System.Threading.Tasks.Task.Run(ScheduledDeployCompletion.ConsumePending);
-        Closed += (_, _) => Workspace.UnregisterWindow();
+        Closed += (_, _) => { IsClosed = true; Workspace.UnregisterWindow(); };
 
         // The Preview menu tracks whichever section is currently shown —
         // one callback registered once, rather than a refresh call threaded
@@ -106,7 +108,7 @@ public sealed partial class MainWindow : Window
                 or nameof(WorkspaceViewModel.WorkspacePath)
                 or nameof(WorkspaceViewModel.WorkspaceProblem)) ApplyState();
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)
-                or nameof(WorkspaceViewModel.Courses)) ShowDetailForSelection();
+                or nameof(WorkspaceViewModel.Courses)) { ShowDetailForSelection(); RefreshRenameCourseItem(); }
             // The selection is part of the window's memory (row 99).
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)) App.RememberOpenWindows();
         };
@@ -122,6 +124,7 @@ public sealed partial class MainWindow : Window
             App.LogDiagnostic($"MainWindow ctor: AdoptRestoredPath('{folderPath}') starting");
             Workspace.AdoptRestoredPath(folderPath);
             App.LogDiagnostic("MainWindow ctor: AdoptRestoredPath done");
+            ShowSyncNoticeIfNeeded();
         }
         App.LogDiagnostic("MainWindow ctor: ApplyState starting");
         ApplyState();
@@ -213,6 +216,33 @@ public sealed partial class MainWindow : Window
         });
     }
 
+    /// <summary>True once this window has closed; a closed window cannot show anything.</summary>
+    public bool IsClosed { get; private set; }
+
+    /// <summary>
+    /// Bring this window onto the screen ONLY if it is not already there —
+    /// minimised, or hidden. A window the teacher can already see is left
+    /// exactly as it is, and in particular is NOT activated: the assistant is
+    /// a separate window they may still be typing in, and stealing keyboard
+    /// focus mid-sentence to show them a build that was already in view is a
+    /// worse trade than the mac's unconditional bring-to-front (row 300).
+    ///
+    /// <para>"Not already there" is decided by two cheap, honest tests —
+    /// <c>OverlappedPresenter.State == Minimized</c>, and
+    /// <c>AppWindow.IsVisible</c> being false. A window fully covered by
+    /// another window is NOT detected: there is no cheap answer to occlusion
+    /// on WinUI, and guessing wrong would steal focus. Recorded in
+    /// MAC-HANDOFF.md as a chosen divergence rather than an oversight.</para>
+    /// </summary>
+    private void ComeForwardIfHidden()
+    {
+        bool minimised = AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
+        if (!minimised && AppWindow.IsVisible) return;
+        if (minimised && AppWindow.Presenter is OverlappedPresenter presenter) presenter.Restore();
+        if (!AppWindow.IsVisible) AppWindow.Show();
+        Activate();
+    }
+
     /// <summary>
     /// Bring a section's preview onto the screen, for the assistant.
     ///
@@ -221,9 +251,12 @@ public sealed partial class MainWindow : Window
     /// watched it finish, and had nothing to look at. So after a tool that
     /// leaves a fresh build behind, the assistant's window asks this one to
     /// select the section and start its preview. If a preview is already
-    /// serving, starting is skipped — live reload is showing the change — but
-    /// the window still comes forward so the teacher actually sees it.
-    /// May be called from any thread.
+    /// serving, starting is skipped — live reload is showing the change. The
+    /// window comes forward only when it is minimised or hidden
+    /// (<see cref="ComeForwardIfHidden"/>); one the teacher can already see is
+    /// not activated, so the assistant window keeps keyboard focus. Until
+    /// 2026-09-07 nothing here activated at all, and this comment described
+    /// a behaviour that had never been built. May be called from any thread.
     /// </summary>
     public void ShowPreviewFor(string courseCode, int section)
     {
@@ -238,6 +271,7 @@ public sealed partial class MainWindow : Window
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
                 }
                 if (DetailHost.Content is SectionDetailView detail) detail.StartPreviewIfIdle();
+                ComeForwardIfHidden();
             }
             catch (Exception ex)
             {
@@ -264,6 +298,7 @@ public sealed partial class MainWindow : Window
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
                 }
                 if (DetailHost.Content is SectionDetailView detail) detail.StartDeployForAutomation();
+                ComeForwardIfHidden();
             }
             catch (Exception ex)
             {
@@ -295,6 +330,7 @@ public sealed partial class MainWindow : Window
                 {
                     Workspace.Selection = new SidebarSelection.SectionItem(courseCode, section);
                 }
+                ComeForwardIfHidden();
                 if (DetailHost.Content is SectionDetailView detail)
                 {
                     string? outcome = await detail.StartDeployForAutomationAsync();
@@ -449,6 +485,7 @@ public sealed partial class MainWindow : Window
         }
         RefreshPathBar();
         RestoreFromArchiveItem.IsEnabled = Workspace.SelectedArchivedItem is not null;
+        RefreshRenameCourseItem();
         App.RememberOpenWindows();
     }
 
@@ -536,14 +573,19 @@ public sealed partial class MainWindow : Window
                 when Workspace.ArchivedItems.FirstOrDefault(a => a.Id == id) is { } item:
                 DetailHost.Content = EmptyState(item.Title,
                     $"{item.Subtitle}. It is not part of your courses until you restore it.",
-                    "Restore…", () => Sidebar.ConfirmRestore(item));
+                    "Restore…", () => Sidebar.ConfirmRestore(item),
+                    // The SAME confirmation the sidebar's menu asks: a
+                    // destructive action reached from a different place must
+                    // not ask a different question.
+                    "Delete Archive…", () => Sidebar.ConfirmDeleteArchive(item));
                 break;
             case SidebarSelection.BackupEntry(var backupId)
                 when Workspace.BackupItems.FirstOrDefault(b => b.Id == backupId) is { } backup:
                 DetailHost.Content = EmptyState(backup.Title,
                     $"{backup.Subtitle}. Restoring puts {backup.CourseCode} back to exactly this " +
                     "moment — the current version is archived first, and the backup is kept.",
-                    "Restore…", () => Sidebar.ConfirmRestoreBackup(backup));
+                    "Restore…", () => Sidebar.ConfirmRestoreBackup(backup),
+                    "Delete Backup…", () => Sidebar.ConfirmDeleteBackup(backup));
                 break;
             case null when Workspace.Courses.Count == 0:
                 DetailHost.Content = EmptyState("No Courses Yet",
@@ -562,7 +604,15 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private static UIElement EmptyState(string title, string description, string? actionLabel, Action? action)
+    /// <summary>
+    /// A centred title, a sentence, and up to two buttons — the second only
+    /// ever beside a first: the accented one is the thing this pane is for,
+    /// the plain one beside it the other thing a teacher might have come here
+    /// to do (the mac's own archived and
+    /// backup panes, `Restore…` prominent and `Delete …` plain).
+    /// </summary>
+    private static UIElement EmptyState(string title, string description, string? actionLabel, Action? action,
+                                        string? secondLabel = null, Action? secondAction = null)
     {
         var panel = new StackPanel
         {
@@ -595,7 +645,26 @@ public sealed partial class MainWindow : Window
                 Margin = new Thickness(0, 8, 0, 0),
             };
             button.Click += (_, _) => action();
-            panel.Children.Add(button);
+            if (secondLabel is not null && secondAction is not null)
+            {
+                var row = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 8,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 8, 0, 0),
+                };
+                button.Margin = new Thickness(0);
+                var second = new Button { Content = secondLabel };
+                second.Click += (_, _) => secondAction();
+                row.Children.Add(button);
+                row.Children.Add(second);
+                panel.Children.Add(row);
+            }
+            else
+            {
+                panel.Children.Add(button);
+            }
         }
         return panel;
     }
@@ -604,12 +673,231 @@ public sealed partial class MainWindow : Window
 
     public async void OpenWorkingFolder_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new Windows.Storage.Pickers.FolderPicker();
-        WinRT.Interop.InitializeWithWindow.Initialize(picker,
-            WinRT.Interop.WindowNative.GetWindowHandle(this));
-        picker.FileTypeFilter.Add("*");
-        var folder = await picker.PickSingleFolderAsync();
-        if (folder is not null) Workspace.ChooseWorkspace(folder.Path);
+        // Looped, because "Choose a Different Folder…" in the synced-folder
+        // note reopens the OS picker rather than stranding the teacher on the
+        // picker view: they have already said what they want. Cancelling the
+        // picker ends the loop.
+        while (true)
+        {
+            var picker = new Windows.Storage.Pickers.FolderPicker();
+            WinRT.Interop.InitializeWithWindow.Initialize(picker,
+                WinRT.Interop.WindowNative.GetWindowHandle(this));
+            picker.FileTypeFilter.Add("*");
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder is null) return;
+
+            if (IsTheOpenFolder(folder.Path))
+            {
+                // A restore, not a choice: the notice form, never the
+                // picker's — and a notice already showing stays exactly as it
+                // is, so their courses are not hidden behind the picker.
+                Workspace.ChooseWorkspace(folder.Path);
+                return;
+            }
+            switch (await SyncedFolderChoiceAsync(folder.Path))
+            {
+                case SyncedFolderChoice.GoAhead:
+                    Workspace.ChooseWorkspace(folder.Path);
+                    ShowSyncNoticeIfNeeded();
+                    return;
+                case SyncedFolderChoice.ChooseAnother:
+                    continue;
+            }
+        }
+    }
+
+    // ---- A working folder a cloud service keeps in sync -------------------
+    //
+    // Explained, never refused — contracts/shared-rules.json ->
+    // cloudSyncedFolders. Two moments: a choice at the picker for a folder
+    // just chosen (a dialog, two buttons, neither the default), and a quiet
+    // notice for a folder the window restored (the InfoBar under the menu
+    // bar). Going ahead from either is remembered for that folder. The one
+    // question both moments ask — should this folder be talked about at all
+    // — is answered in ONE place, SyncNoteWanted, so the two cannot drift.
+
+    private enum SyncedFolderChoice { GoAhead, ChooseAnother }
+
+    /// <summary>
+    /// Folders a note has been SHOWN for in this process, keyed by resolved
+    /// path, so a second window on the same folder does not repeat it before
+    /// the teacher has answered. Added only once a note is actually on
+    /// screen — a dialog that could not be shown must not count as told. The
+    /// remembered answer itself is in <see cref="AppSettings.AcceptedSyncedFolders"/>.
+    /// </summary>
+    private static readonly HashSet<string> _syncNoticedThisProcess = new(StringComparer.OrdinalIgnoreCase);
+
+    private static string ResolvedFolder(string path)
+    {
+        try { return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
+        catch { return path; }
+    }
+
+    private bool IsTheOpenFolder(string path) =>
+        Workspace.WorkspacePath is { } open &&
+        string.Equals(ResolvedFolder(open), ResolvedFolder(path), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The service to name, or null when there is nothing to say: the folder
+    /// is not synced, was already accepted, has already had its note in this
+    /// process (in any window), or cannot be used anyway — neither a working
+    /// folder nor empty, so the teacher is about to choose again, and a note
+    /// about a folder they cannot use is noise beside the guidance that says
+    /// what to choose. The mac's <c>noticeCloudSync</c>, in one place.
+    /// </summary>
+    private static string? SyncNoteWanted(string path)
+    {
+        if (CloudSyncedFolder.ServiceFor(path) is not { } service) return null;
+        if (App.Settings.HasAcceptedSyncFor(path)) return null;
+        if (_syncNoticedThisProcess.Contains(ResolvedFolder(path))) return null;
+        if (Plantoir.Core.Models.Workspace.Classify(path) == WorkspaceState.Unrecognized) return null;
+        return service;
+    }
+
+    /// <summary>The picker moment.</summary>
+    private async Task<SyncedFolderChoice> SyncedFolderChoiceAsync(string path)
+    {
+        if (SyncNoteWanted(path) is not { } service) return SyncedFolderChoice.GoAhead;
+
+        // The path FIRST, then the headline, then the explanation: the
+        // sentences say "this folder", and a teacher reads that and looks for
+        // which folder. The dialog's own title stays empty for that reason.
+        var body = new StackPanel { Spacing = 10 };
+        body.Children.Add(new TextBlock { Text = path, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
+        body.Children.Add(new TextBlock
+        {
+            Text = CloudSyncWording.Headline(service),
+            TextWrapping = TextWrapping.Wrap,
+            Style = (Style)Application.Current.Resources["SubtitleTextBlockStyle"],
+        });
+        foreach (string paragraph in CloudSyncWording.Explanation(service))
+            body.Children.Add(new TextBlock { Text = paragraph, TextWrapping = TextWrapping.Wrap });
+
+        var dialog = new ContentDialog
+        {
+            Content = new ScrollViewer { Content = body, MaxHeight = 440 },
+            PrimaryButtonText = CloudSyncWording.UseAnywayButton,
+            CloseButtonText = CloudSyncWording.ChooseDifferentFolderButton,
+            // Neither button is the default: this is the one moment the choice
+            // is free, and a Return pressed out of habit must not decide it.
+            DefaultButton = ContentDialogButton.None,
+            XamlRoot = Content.XamlRoot,
+        };
+        AutomationProperties.SetAutomationId(dialog, "syncedFolderChoice");
+        ContentDialogResult answer;
+        try { answer = await dialog.ShowAsync(); }
+        catch (Exception ex)
+        {
+            // A dialog that could not be shown (another dialog holds the one
+            // slot WinUI allows) must not block the folder — "explained,
+            // never refused" — and must not be recorded as told, either.
+            App.LogDiagnostic($"synced-folder dialog: {ex.Message}");
+            return SyncedFolderChoice.GoAhead;
+        }
+        // Told, now — the line the contract asks for carries the service and
+        // the folder, which the trail redacts on the way in.
+        _syncNoticedThisProcess.Add(ResolvedFolder(path));
+        ActivityTrail.Note(ActivityTrail.Event.SyncedFolderNoticed,
+            $"noticed that the folder just chosen is kept in sync with {service} — {path}");
+        // Escape or the close box are read as "choose a different folder":
+        // the teacher arrived from the picker and gets it back.
+        if (answer != ContentDialogResult.Primary) return SyncedFolderChoice.ChooseAnother;
+
+        RememberSyncAccepted(path, service, "chose to use the folder anyway");
+        return SyncedFolderChoice.GoAhead;
+    }
+
+    private void RememberSyncAccepted(string path, string service, string how)
+    {
+        App.Settings.RememberAcceptedSyncFor(path);
+        try { App.Settings.Save(); } catch (Exception ex) { App.LogDiagnostic($"settings: {ex.Message}"); }
+        ActivityTrail.Note(ActivityTrail.Event.SyncedFolderAccepted,
+            $"{how} — a folder kept in sync with {service} — {path}");
+        // Once is information; twice is nagging: a notice still open in
+        // another window on the same folder goes with this answer.
+        App.HideSyncNoticesFor(path, except: this);
+    }
+
+    private string? _syncNoticeService;
+    private string? _syncNoticePath;
+
+    /// <summary>
+    /// The restored moment: the headline, the one-line summary, a way to open
+    /// the full explanation in place, and a button to dismiss it — once per
+    /// folder, in this window or any other. Called whenever a working folder
+    /// is adopted, because folders move into cloud services after they are
+    /// made and the check costs nothing.
+    /// </summary>
+    public void ShowSyncNoticeIfNeeded()
+    {
+        // Forget the previous notice BEFORE closing it: Closed fires for a
+        // programmatic close too, and must not read as the teacher dismissing
+        // a note about the folder this window has just moved on from.
+        _syncNoticeService = null;
+        _syncNoticePath = null;
+        SyncNotice.IsOpen = false;
+        if (Workspace.WorkspacePath is not { } path) return;
+        if (SyncNoteWanted(path) is not { } service) return;
+
+        _syncNoticeService = service;
+        _syncNoticePath = path;
+        SyncNotice.Title = CloudSyncWording.Headline(service);
+        SyncNotice.Message = CloudSyncWording.Summary;
+        SyncNoticeDetails.Children.Clear();
+        foreach (string paragraph in CloudSyncWording.Explanation(service))
+            SyncNoticeDetails.Children.Add(new TextBlock { Text = paragraph, TextWrapping = TextWrapping.Wrap });
+        SyncNoticeDetails.Visibility = Visibility.Collapsed;
+        SyncNoticeDetailsButton.Content = CloudSyncWording.ShowDetailsButton;
+        SyncNoticeDismissButton.Content = CloudSyncWording.DismissNoticeButton;
+        SyncNotice.IsOpen = true;
+        _syncNoticedThisProcess.Add(ResolvedFolder(path));
+        ActivityTrail.Note(ActivityTrail.Event.SyncedFolderNoticed,
+            $"noticed that the working folder is kept in sync with {service} — {path}");
+    }
+
+    /// <summary>
+    /// Another window answered for this folder, or this one's set-up went
+    /// ahead: the notice leaves without being counted as a dismissal.
+    /// </summary>
+    public void HideSyncNoticeFor(string path)
+    {
+        if (_syncNoticePath is not { } shown) return;
+        if (!string.Equals(ResolvedFolder(shown), ResolvedFolder(path), StringComparison.OrdinalIgnoreCase)) return;
+        _syncNoticeService = null;
+        _syncNoticePath = null;
+        SyncNotice.IsOpen = false;
+    }
+
+    /// <summary>
+    /// Setting up an empty synced folder IS going ahead: the notice showing
+    /// over the picker's guidance is answered by the set-up, not left
+    /// floating over the freshly set-up window.
+    /// </summary>
+    public void SyncNoticeAnsweredBySetUp()
+    {
+        if (_syncNoticeService is not { } service || _syncNoticePath is not { } path) return;
+        _syncNoticeService = null;
+        _syncNoticePath = null;
+        SyncNotice.IsOpen = false;
+        RememberSyncAccepted(path, service, "set up the folder");
+    }
+
+    private void SyncNoticeDetails_Click(object sender, RoutedEventArgs e)
+    {
+        bool showing = SyncNoticeDetails.Visibility == Visibility.Visible;
+        SyncNoticeDetails.Visibility = showing ? Visibility.Collapsed : Visibility.Visible;
+        SyncNoticeDetailsButton.Content = showing ? CloudSyncWording.ShowDetailsButton : CloudSyncWording.HideDetailsButton;
+    }
+
+    private void SyncNoticeDismiss_Click(object sender, RoutedEventArgs e) => SyncNotice.IsOpen = false;
+
+    /// <summary>Dismissing — "Got It" or the close box — IS going ahead: remembered for the folder.</summary>
+    private void SyncNotice_Closed(InfoBar sender, InfoBarClosedEventArgs args)
+    {
+        if (_syncNoticeService is not { } service || _syncNoticePath is not { } path) return;
+        _syncNoticeService = null;
+        _syncNoticePath = null;
+        RememberSyncAccepted(path, service, "dismissed the note about the working folder");
     }
 
     private void NewWindow_Click(object sender, RoutedEventArgs e) => App.OpenNewWindow();
@@ -618,6 +906,69 @@ public sealed partial class MainWindow : Window
     {
         Workspace.Reload();
         ApplyState();
+    }
+
+    // ---- Rename Course, from the File menu and F2 -------------------------
+
+    /// <summary>
+    /// The course a rename would apply to: the selected course, or the
+    /// parent of the selected section — a teacher who has clicked into a
+    /// section has not stopped meaning the course (the mac's
+    /// <c>courseThatCanBeRenamed</c>).
+    /// </summary>
+    private Course? CourseThatCanBeRenamed => Workspace.SelectedCourse;
+
+    /// <summary>
+    /// Read at the moment of asking, never captured earlier (the staleness
+    /// lesson, row 104): a preview that started since the menu was drawn
+    /// still counts.
+    /// </summary>
+    private string? WhyRenameIsUnavailable(Course course) =>
+        Workspace.WorkspacePath is { } folder ? CourseActivity.BusyReason(folder, course.Code) : null;
+
+    /// <summary>
+    /// The File menu has no Opening event to hang this on, so the item is
+    /// redrawn when the selection changes and whenever the window's state is
+    /// re-applied; the accelerator re-checks live regardless.
+    /// </summary>
+    private void RefreshRenameCourseItem()
+    {
+        var course = CourseThatCanBeRenamed;
+        string? reason = course is null ? null : WhyRenameIsUnavailable(course);
+        RenameCourseItem.IsEnabled = course is not null && reason is null;
+        RenameCourseItem.Text = course is null ? "Rename Course…" : $"Rename {course.Code}…";
+        RenameCourseReason.Text = reason ?? "";
+        RenameCourseReason.Visibility = reason is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void RenameCourse_Click(object sender, RoutedEventArgs e) => RenameSelectedCourse();
+
+    /// <summary>
+    /// No busy guard here on purpose: the dialog re-checks and EXPLAINS ("…is
+    /// previewing or deploying right now. Stop that first, then rename."),
+    /// and the menu item can be stale — the MenuBar has no Opening event and
+    /// nothing redraws it when a preview starts — so a silent return here
+    /// would be a dead click with no answer, where the sidebar's route gives
+    /// one.
+    /// </summary>
+    private void RenameSelectedCourse()
+    {
+        if (CourseThatCanBeRenamed is not { } course) return;
+        _ = Sidebar.OpenRenameCourseDialog(course);
+    }
+
+    /// <summary>
+    /// F2 renames the selected course — unless the teacher is typing. A
+    /// root-scoped accelerator fires wherever focus is, so it asks what has
+    /// focus first: any text-entry control keeps its F2, and the key is left
+    /// unhandled so nothing else swallows it either.
+    /// </summary>
+    private void RenameCourseAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        var focused = FocusManager.GetFocusedElement(Content.XamlRoot);
+        if (focused is TextBox or RichEditBox or PasswordBox or AutoSuggestBox or NumberBox) return;
+        RenameSelectedCourse();
+        args.Handled = true;
     }
 
     private void RestoreFromArchive_Click(object sender, RoutedEventArgs e)

@@ -209,4 +209,22 @@ public static class SpecialNames
     /// <summary>"your Mac" in the contract; "this PC" here, as above.</summary>
     public const string RenameNothingWasThere =
         "There was no folder by that name on this PC, so only this course’s settings changed. Make it in Obsidian when you need it.";
+
+    /// <summary>Adding a name creates the folder; the teacher is told so.</summary>
+    public const string AddCreatesTheFolder =
+        "Plantoir made the folder “{name}” for you. Open it in Obsidian to put pages in it.";
+
+    /// <summary>Removal excludes; it has never deleted anything, and teachers could not tell.</summary>
+    public const string RemoveLeavesTheFolderOnDisk =
+        "“{name}” and everything in it stays on this PC — this only takes it off your website. Add it back here to include it again.";
+
+    /// <summary>
+    /// Shown inside the rename sheet when it opens on a rename that stopped
+    /// after the folders moved: the field is filled with the name it was
+    /// heading for, and this says why. Proposed to the contract from Windows
+    /// 2026-09-07 (<c>specialNames.renameFolder.interruptedRename</c>); the mac
+    /// pre-fills silently.
+    /// </summary>
+    public const string RenameInterrupted =
+        "Plantoir started renaming “{old}” to “{new}” and did not finish — the folder has its new name, but this course’s settings still use the old one. Press Rename to finish.";
 }

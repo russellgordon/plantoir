@@ -147,15 +147,30 @@ presents one alert at a time, so the two this feature adds are modelled as one.
 Any test written with "\n" proves nothing about real output. Write them with
 "\r\n".
 
-## The test suite crashes about one run in four, and it is NOT this work
-(2026-08-23)
+## ~~The test suite crashes about one run in four, and it is NOT this work~~
+— FIXED 2026-09-07 (raised 2026-08-23)
 
-Measured on a clean `origin/dev` worktree: one crash in four full runs, same
-rate as the branch. `EXC_BAD_ACCESS` in `SwiftUI.AppKitDialogBridge.updateExistingAlert`
-while an NSAlert sheet closes; the run aborts partway and `xcodebuild` exits 65
-with ZERO failed test CASES. **Grep for `^Failing tests:` rather than trusting
-the exit code**, and re-run before believing a failure. Written up with both of
-the wrong diagnoses that preceded the right one in `TODO.md`.
+**Do not follow the advice that used to be here.** It said to re-run before
+believing a failure, which was right at the time and is wrong now: the crash it
+described is fixed, so a red suite is a red suite again.
+
+What it was: `EXC_BAD_ACCESS` in `SwiftUI.AppKitDialogBridge.updateExistingAlert`
+while an NSAlert sheet closes, aborting the run partway with `xcodebuild` exiting
+65 and ZERO failed test CASES. AppKit's sheet-close animation spins a nested
+runloop, and SwiftUI ends the modal session from inside `NSHostingView.layout()`,
+so the nested loop is spun from inside a display-cycle callback already running.
+Measured today, same command and same machine: **10 crashes in 30 runs before,
+0 in 30 after.** The fix asks AppKit to skip the sheet animation inside the test
+host only — `mac-app/Tests/QuartzTeachersTests/SheetAnimationSuppressor.swift`
+carries the stack, the numbers, and the six levers that look like they should
+work and do not.
+
+**One thing here is still true and worth keeping**: a test host that dies still
+exits 65 and prints a `Failing tests:` line naming a bystander, while the totals
+above say `0 failures`. If you ever see that pair again it is a crash, not a
+failing test — `overnight/run.sh` now parses for exactly it and reports
+`HOST-CRASH`. Both of the wrong diagnoses that preceded the right one are in
+`TODO.md`, and they are worth reading before guessing at the next one.
 
 ## verify.sh exits early on a missing fixture (2026-08-23)
 

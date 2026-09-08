@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
@@ -625,6 +626,25 @@ public sealed partial class SidebarPane : UserControl
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                 "SystemFillColorCautionBrush"],
         };
+        // Advice, not a refusal: the classes a deploy would put the site up
+        // without. The assistant's tool has said this since it existed
+        // (ScheduledDeploy.Describe), and so has the mac's sheet; this door
+        // said nothing, so a teacher scheduled 6:30 AM without being told
+        // tomorrow's page was unpublished — the one thing the description
+        // exists to tell them. Date-independent, so it is read once; the
+        // button stays enabled, because "publish first" is advice the teacher
+        // may have a reason to ignore. Shown only while there is no refusal,
+        // as on the mac, where the problem is shown alone.
+        string? advice = ScheduledDeploy.UnpublishedClassesSentence(
+            ScheduledDeploy.UnpublishedClassesIn(course, number));
+        var unpublished = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                "SystemFillColorCautionBrush"],
+        };
+        AutomationProperties.SetAutomationId(unpublished, "unpublishedClassesNote");
 
         var body = new StackPanel { Spacing = 12 };
         body.Children.Add(new TextBlock
@@ -636,6 +656,7 @@ public sealed partial class SidebarPane : UserControl
         });
         body.Children.Add(day);
         body.Children.Add(time);
+        body.Children.Add(unpublished);
         body.Children.Add(warning);
 
         var dialog = new ContentDialog
@@ -658,6 +679,10 @@ public sealed partial class SidebarPane : UserControl
             warning.Text = problem ?? "";
             warning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             dialog.IsPrimaryButtonEnabled = problem is null;
+
+            bool showAdvice = problem is null && advice is not null;
+            unpublished.Text = showAdvice ? advice! : "";
+            unpublished.Visibility = showAdvice ? Visibility.Visible : Visibility.Collapsed;
         }
 
         DateTime? Chosen() => day.Date is { } picked
@@ -957,7 +982,7 @@ public sealed partial class SidebarPane : UserControl
         && !Workspace.ArchivedItems.Any(a => a.CourseCode == courseCode && a.SectionNumber is null && a.FilePath != zipPath)
         && !Workspace.BackupItems.Any(b => b.CourseCode == courseCode && b.FilePath != zipPath);
 
-    private async void ConfirmDeleteBackup(BackupItem item)
+    public async void ConfirmDeleteBackup(BackupItem item)
     {
         string consequence = IsOnlyRemainingCopy(item.CourseCode, item.FilePath)
             ? $"This backup is the only remaining copy of {item.CourseCode} — the course is no longer " +

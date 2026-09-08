@@ -162,10 +162,9 @@
         {
           "defaultWhenAbsent": true,
           "key": "use_skeleton",
-          "knownDivergence": "Windows: not written as of 2026-08-16, so the Python's default of true wins and the teacher is never asked. To be closed by asking the question in the wizard.",
           "requirement": "BOTH apps ask the teacher and write the answer. Decided 2026-08-16: Windows matches macOS.",
           "type": "boolean",
-          "why": "Whether a course with no ready-made payload starts from its subject's SKELETON — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing. Around 1,900 course codes have a skeleton and no payload, so this is the question most teachers actually meet. The mac writes `hasSkeleton(code) && teacherSaidYes`; **Windows does not write it at all**, so the Python takes its own default of TRUE and a Windows teacher cannot decline."
+          "why": "Whether a course with no ready-made payload starts from its subject's SKELETON — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing. Around 1,900 course codes have a skeleton and no payload, so this is the question most teachers actually meet. Both apps write `hasSkeleton(code) && teacherSaidYes`. (Windows did not write it at all until 2026-09-07, so for three weeks the Python took its own default of TRUE and a Windows teacher could not decline.)"
         },
         {
           "key": "prepopulate_example_content",
@@ -263,9 +262,10 @@
     ],
     "writingRules": [
       {
-        "detail": "Publishing a `draft:` page writes `draft: false`, not `publish: true`.",
-        "rule": "A page written in the old spelling KEEPS it, inverted",
-        "why": "The teacher's file is theirs. Rewriting the key would change a page they did not ask to have changed, and a course half in each spelling is harder to reason about than one consistently old."
+        "detail": "Publishing a `draftSection1: true` page writes `publishForSection1: true` on the SAME line, and the `draftSection1` line is gone; a page carrying BOTH spellings loses the legacy one. The new key takes the old key's position, so a migrated page shows a one-line diff in Obsidian rather than reordered frontmatter.",
+        "rule": "A page written in the old spelling is MIGRATED to the new key, and the legacy key removed, the first time something edits its visibility",
+        "why": "Decided 2026-09-07 (Russell), replacing the rule this list carried since it was written — 'a page written in the old spelling KEEPS it, inverted' — which the mac implemented and Windows never did. Migration leaves a teacher's file in one current spelling rather than two competing ones, stops the old key accumulating forever, and is what documentation/04-course-setup.md and 08-course-config-reference.md have described all along. There is no flag day: the build reads both spellings, so a legacy course builds exactly as before and converts one page at a time. Rejected: keeping the old key inverted (the mac's behaviour until it adopts this) — it would make both documentation files wrong and leave teachers' pages carrying a legacy key indefinitely; and leaving the divergence recorded but unresolved, which is how a knownDivergence becomes permanent.",
+        "migrationIsTheOneExceptionToRule4": "A legacy page whose value is already right is still rewritten, once, to migrate the key — although 'writing the value it already has changes nothing' says a no-op write must not touch the file. Deliberate: the case is reachable only inside a batch that is changing OTHER pages (a plan in which nothing changes never writes), so the build that follows was happening anyway, and the cost — one page's modification time moves once — buys a course that converges on one spelling instead of carrying legacy keys on exactly the pages nobody ever flips. A rule that migrated only on a genuine change would leave those pages old forever."
       },
       {
         "rule": "Edit the LINE, never round-trip the YAML",
@@ -275,7 +275,7 @@
         "rule": "A page with no frontmatter at all gets a block of its own"
       },
       {
-        "detail": "Report 'no change' rather than rewriting the file.",
+        "detail": "Report 'no change' rather than rewriting the file. One exception, on purpose: a legacy-spelled page is migrated even when its value is already right — see the first rule.",
         "rule": "Writing the value it already has changes nothing",
         "why": "A no-op write still updates the modification time, which makes the next build think the content changed."
       }
@@ -283,6 +283,11 @@
   },
   "sectionTimetable": {
     "fields": [
+      {
+        "field": "section",
+        "type": "number",
+        "why": "Which section these dates belong to. Both apps have always WRITTEN it and this list did not name it until 2026-09-06, when wiring the list into the Windows suite turned it up — a field carried by two apps and described by nobody is one a third reader would drop. It is redundant with the file's own name, which is why nothing broke: the mac reads it with the filename's section as the fallback, and Windows does not read it at all. Keep writing it — a timetable copied out of its folder, or attached to a problem report, still says what it is for."
+      },
       {
         "field": "dates",
         "type": "array of YYYY-MM-DD strings",

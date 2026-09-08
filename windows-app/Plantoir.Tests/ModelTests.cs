@@ -18,6 +18,23 @@ public class SharedActivityStateCollection { }
 
 public static class SharedActivityState { public const string Name = "Process-wide preview and publish state"; }
 
+/// <summary>
+/// For tests that read or write PROCESS-WIDE ENVIRONMENT — which is a
+/// different shared thing from the preview and publish statics above, and
+/// needs its own serialisation for the same reason.
+///
+/// <para>Added 2026-09-06. <c>BuildOutputLocation.BuildsRootFor</c> honours
+/// <c>PLANTOIR_BUILD_ROOT</c>, so a test that sets it to prove that is
+/// invisible to every other class until one of them calls the same function
+/// while it is set — and then that class fails, roughly one run in a hundred,
+/// looking exactly like a production bug about where built sites go. Found by
+/// review before it could happen.</para>
+/// </summary>
+[CollectionDefinition(ProcessEnvironment.Name, DisableParallelization = true)]
+public class ProcessEnvironmentCollection { }
+
+public static class ProcessEnvironment { public const string Name = "Process-wide environment variables"; }
+
 [Collection(SharedActivityState.Name)]
 public class PreviewLeaseTests : IDisposable
 {

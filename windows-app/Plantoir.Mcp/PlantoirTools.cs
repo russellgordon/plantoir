@@ -443,13 +443,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "course installed without curriculum still builds. Call plan_curriculum_mentions FIRST and get " +
                  "the teacher's agreement to the specific codes. Changes nothing else on the page, and changes " +
                  "no page's visibility. The course is backed up first.")]
-    public string AddCurriculumMentions(
+    public CallToolResult AddCurriculumMentions(
         [Description("The course code, for example ADA1O.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("The page title, for example \"Movement Concepts\".")] string page,
         [Description("The expectation codes to add, separated by commas — for example \"A1.1, A2.2\".")]
         string codes)
-        => Guarded(() =>
+        => GuardedResult(() =>
         {
             var plan = workspace.PlanCurriculumMentions(course, section, page,
                 codes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -483,13 +483,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course is " +
                  "backed up first and undo_last_change reverses the whole thing. Afterwards, tell them to look " +
                  "the section over in Plantoir before deploying — many pages moved at once.")]
-    public string MakeRoomForClasses(
+    public CallToolResult MakeRoomForClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
         [Description("The day number the new class takes. Existing days from here on are renumbered.")] int atDay,
         [Description("How many classes to make room for. 1 unless the teacher asked for more.")] int howMany = 1)
-        => Guarded(() =>
+        => GuardedResult(() =>
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
             return workspace.ApplyInsertClasses(plan).Message;
@@ -517,14 +517,14 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "\n\nThe pages are created UNPUBLISHED — empty skeletons for the teacher to write, which stay out " +
                  "of the site until they publish them. An existing page is never written over. The course is " +
                  "backed up first, and undo_last_change removes what this created.")]
-    public string AddClasses(
+    public CallToolResult AddClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
         [Description("How many class pages to add.")] int howMany,
         [Description("The day number to start at within the unit. 1 unless the earlier days already exist.")]
         int firstDay = 1)
-        => Guarded(() =>
+        => GuardedResult(() =>
         {
             var plan = workspace.PlanAddClasses(course, section, unit, firstDay, howMany);
             return workspace.ApplyAddClasses(plan).Message;
@@ -770,13 +770,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "as a teacher tells you when their class meets, however they say it. Replaces anything recorded " +
                  "before, so send the WHOLE list every time, not just new dates. Dates are YYYY-MM-DD, separated " +
                  "by commas or spaces.")]
-    public string RememberTimetable(
+    public CallToolResult RememberTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("Every date this section meets, as YYYY-MM-DD, separated by commas.")] string dates,
         [Description("Where these came from, in the teacher's words — \"timetable.xlsx, block H\", \"typed in by hand\".")]
         string source = "the teacher")
-        => Guarded(() =>
+        => GuardedResult(() =>
         {
             var found = workspace.Course(course);
             int number = workspace.Section(found, section);
@@ -1043,12 +1043,12 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("Set the date of the pages a class links to, to match that class. The course is backed up first, " +
                  "automatically. Only call this after plan_sync_page_dates and after the teacher has agreed. " +
                  "This changes dates only — nothing is published, and no page's visibility changes.")]
-    public string SyncPageDates(
+    public CallToolResult SyncPageDates(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("Class page titles whose linked pages should be brought into date. Leave empty for all.")]
         string[]? classes = null)
-        => Guarded(() =>
+        => GuardedResult(() =>
         {
             var plan = workspace.PlanSyncDates(course, section, classes ?? Array.Empty<string>());
             var result = workspace.ApplySyncDates(plan);
@@ -1144,7 +1144,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                    ReadOnly = true, Destructive = false)]
     [Description("List what this conversation has changed, newest first, so the teacher can see what could be " +
                  "taken back. This history is only kept while this conversation is open. Anything older lives in " +
-                 "Plantoir's Backups list, which is made before every change.")]
+                 "Plantoir's Backups list, which is made before a conversation's first change.")]
     public string ListRecentChanges()
     {
         var entries = workspace.History?.Entries;
@@ -1173,7 +1173,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "else. Can be called more than once to step further back. " +
                  "\n\nOnly changes made in THIS conversation can be undone this way; the history is not kept " +
                  "afterwards. For anything older, Plantoir's Backups list has a full copy of the course taken " +
-                 "before each change. " +
+                 "before the conversation's first change. " +
                  "\n\nIf the teacher had already published the section themselves, undoing the pages does not " +
                  "un-publish the live site — they need to publish again in Plantoir to bring it back in step.")]
     public CallToolResult UndoLastChange()
@@ -1370,9 +1370,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("Make a full backup of one course, which the teacher can restore from inside Plantoir. " +
                  "Do this before any bulk editing of a course's files — including edits you make directly rather than " +
                  "through these tools. Course folders are not in version control, so a backup is the only undo.")]
-    public string BackUpCourse(
+    public CallToolResult BackUpCourse(
         [Description("The course code, for example ICS3U.")] string course)
-        => Guarded(() => $"Backed up to {workspace.BackUp(course)}");
+        => GuardedResult(() => $"Backed up to {workspace.BackUp(course)}");
 
     // ---- Shared ----------------------------------------------------------
 
@@ -1473,24 +1473,52 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// teacher's chat window: one string cannot be short for a person and
     /// complete for a model at the same time.
     /// </summary>
-    private static CallToolResult Answering(string summary, string detail) => new()
+    private CallToolResult Answering(string summary, string detail) => CarryingTheConversationBackup(new()
     {
         Content = [new TextContentBlock { Text = detail }],
         Meta = new JsonObject { [AssistToolAnswer.TeacherSummaryKey] = summary },
-    };
+    });
 
     /// <summary>
     /// An answer that is the same words to both — every refusal, and every
     /// tool whose whole reply is already one sentence. No <c>_meta</c> is
     /// sent, and the client reads that absence as "show what you were given".
     /// </summary>
-    private static CallToolResult Answering(string both) => new()
+    private CallToolResult Answering(string both) => CarryingTheConversationBackup(new()
     {
         Content = [new TextContentBlock { Text = both }],
-    };
+    });
+
+    /// <summary>
+    /// Every answer after this conversation's first change names the copy
+    /// saved before it, under <see cref="AssistToolAnswer.ConversationBackupKey"/>.
+    /// Stamped by the two <c>Answering</c> builders and both <c>Proposing</c>
+    /// ones — the ONLY ways an answer is made here — rather than by
+    /// <c>Guarded</c>, because five tools (publish, whole-unit, publish-on,
+    /// re-date, roll-over's helpers) build their answers from their own
+    /// try/catch and never pass through it; a first draft stamped in
+    /// <c>Guarded</c> and the banner never appeared for a publish. The window
+    /// reads it to offer "Restore Section N…"; a refusal carries it too,
+    /// because the copy exists whether or not this call changed anything, and
+    /// Claude Code ignores <c>_meta</c> it does not know.
+    /// </summary>
+    private CallToolResult CarryingTheConversationBackup(CallToolResult result)
+    {
+        if (workspace.ConversationBackupPath is not { } backup) return result;
+        result.Meta ??= new JsonObject();
+        result.Meta[AssistToolAnswer.ConversationBackupKey] = backup;
+        return result;
+    }
+
+    /// <summary>
+    /// A WRITE tool that answers in one string. Wrapped into a result here
+    /// rather than left to the SDK, so the conversation's backup can ride in
+    /// <c>_meta</c> on its answer -- a string return has no <c>_meta</c>.
+    /// </summary>
+    private CallToolResult GuardedResult(Func<string> work) => Guarded(() => Answering(work()));
 
     /// <summary><see cref="Guarded(Func{string})"/>, for a tool that answers in two halves.</summary>
-    private static CallToolResult Guarded(Func<CallToolResult> work)
+    private CallToolResult Guarded(Func<CallToolResult> work)
     {
         try { return work(); }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
@@ -1512,7 +1540,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// ahead" was being addressed as though they were the model, about
     /// machinery, directly above the asking it described.
     /// </summary>
-    private static CallToolResult Proposing(PublishPlan plan) =>
+    private CallToolResult Proposing(PublishPlan plan) =>
         plan.NothingToDoSentence is { } already
             ? Answering(already)
             : (plan.ChangesNothing && plan.UnknownNames.Count > 0)
@@ -1534,7 +1562,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// can be done invites a teacher to approve a dead end. The mac transcript
     /// that produced this rule shows them declining one four times in a row.
     /// </summary>
-    private static CallToolResult Proposing(string plan) => new()
+    private CallToolResult Proposing(string plan) => CarryingTheConversationBackup(new()
     {
         Content = [new TextContentBlock { Text = plan + "\n\n" + AskBeforeGoingAhead }],
         Meta = new JsonObject
@@ -1542,7 +1570,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             [AssistToolAnswer.TeacherSummaryKey] = plan,
             [AssistToolAnswer.IsPlanKey] = true,
         },
-    };
+    });
 
     /// <summary>Said to a caller that has no Go and Cancel of its own. Never to a teacher.</summary>
     private const string AskBeforeGoingAhead =
