@@ -31,7 +31,7 @@ DOCKERFILE = SCRIPTS.parent / "Dockerfile"
 
 def baked_scripts() -> set:
     """The script file names the image copies into /opt/scripts."""
-    text = DOCKERFILE.read_text()
+    text = DOCKERFILE.read_text(encoding="utf-8")
     return set(re.findall(r"^COPY scripts/([A-Za-z0-9_]+)\.py ", text, re.M))
 
 
@@ -52,7 +52,7 @@ def imported_by(module: str) -> set:
     word inside a docstring or a comment, and this test failing for a sentence
     somebody wrote would teach everyone to ignore it.
     """
-    tree = ast.parse((SCRIPTS / f"{module}.py").read_text())
+    tree = ast.parse((SCRIPTS / f"{module}.py").read_text(encoding="utf-8"))
     siblings = local_modules()
     found = set()
     for node in ast.walk(tree):
