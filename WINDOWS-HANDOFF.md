@@ -1809,11 +1809,26 @@ to run in the background.
        --build-only` into it. A gate that stays green while the code a publish
        runs changes underneath it is theatre.
     2. **The churn argument condemned the set it kept.** Measured over the 60
-       days to 2026-09-07: the watched five changed on **16 distinct days**,
-       `build_site.py` on **16 distinct days**, out of **22 active days**. Not
-       "less churn" — identical. The gate would have been red three days in
-       four, and a gate red most days gets waived by reflex, which was the
-       stated reason for the exclusion in the first place.
+       days to 2026-09-07, on `dev`: the rejected design's five watched files
+       — `deploy.ps1`, `deploy.bat`, `scripts/deploy.py`,
+       `scripts/toolchain_paths.py`, `scripts/netlify_badge.py` — changed on
+       **16 distinct days**; `scripts/build_site.py` on **16 distinct days**;
+       out of **22 active days**. Not "less churn" — identical. The gate would
+       have been red three days in four, and a gate red most days gets waived
+       by reflex, which was the stated reason for the exclusion in the first
+       place.
+
+       **The command, because the number is only useful if it can be
+       re-taken** — a review of this write-up got 17–19 from differently
+       chosen sets and read that as a contradiction, which it is not: the
+       figure is about the REJECTED set, and a wider set naturally churns more:
+
+           git log --since=60.days --format=%ad --date=short -- <paths> | sort -u | wc -l
+
+       Run it with the five paths above, then with `scripts/build_site.py`,
+       then with no paths at all for the 22. (The hook's broader eleven-file
+       publishing closure gives 19 over the same window — a different question
+       with a different answer, and not a correction of this one.)
     3. **Its preflight could not pass.** The plan had the script refuse unless
        the working folder's launchers matched the repo byte-for-byte. The
        Debug bin's bundled toolchain is already stale by several files;

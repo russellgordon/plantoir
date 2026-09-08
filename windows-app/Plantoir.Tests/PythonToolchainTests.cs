@@ -28,6 +28,18 @@ namespace Plantoir.Tests;
 /// much" argument for excluding it condemned the set that was kept. Running
 /// every file costs seconds and needs no such judgement.</para>
 ///
+/// <para><b>Why this class needs no <c>[Collection]</c>, though it shells out
+/// while 60-odd other classes run beside it.</b> CLAUDE.md warns that anything
+/// touching process-wide state must be serialised, and this looks like exactly
+/// that kind of test. It is safe because of the PROCESS BOUNDARY: every Python
+/// file writes only into its own <c>TemporaryDirectory</c>, and the one
+/// environment variable any of them sets (<c>PLANTOIR_BUILD_ROOT</c>, in
+/// <c>test_deploy_course_dir_resolution.py</c>) is set inside the CHILD, so it
+/// cannot reach this process. xUnit also serialises the cases within a class,
+/// so the fifteen never run concurrently with each other. Written down because
+/// it is not obvious, and the next person to review this will otherwise spend
+/// an hour re-deriving it.</para>
+///
 /// <para><b>These need nothing.</b> No Docker, no network, no credentials — the
 /// files say so in their own docstrings, which is why <c>verify.sh</c> runs
 /// them before its Docker build. That is what makes them fit in a suite you can
@@ -119,10 +131,19 @@ public class PythonToolchainTests
     [Fact]
     public void TheSharedPythonTestsAreActuallyFound()
     {
+        // Fifteen files on 2026-09-07. The floor is that count rather than a
+        // loose one, because a loose floor half-delivers what this test
+        // promises: at ">= 10", five files could stop being discovered and
+        // nothing would say so. Adding a file keeps this green; RETIRING one
+        // means lowering the floor on purpose, in a diff somebody reads.
+        const int KnownFileCount = 15;
+
+        int found = PythonTestFiles().Count();
         Assert.True(
-            PythonTestFiles().Count() >= 10,
-            $"Expected the shared Python tests in {ScriptsDirectory}; found "
-            + $"{PythonTestFiles().Count()}. A suite that passes having run nothing is worse than no suite.");
+            found >= KnownFileCount,
+            $"Expected at least {KnownFileCount} shared Python test files in {ScriptsDirectory}; found {found}. "
+            + "If one was deliberately retired, lower the floor and say so. A suite that passes "
+            + "having run nothing is worse than no suite.");
     }
 
     // MARK: - Running one
@@ -157,6 +178,14 @@ public class PythonToolchainTests
         start.Environment["PYTHONUTF8"] = "1";
         start.Environment["PYTHONIOENCODING"] = "utf-8";
 
+        // Leave no `__pycache__` behind. `Plantoir.csproj` globs `scripts/**`
+        // into the app's bundled toolchain, so a .pyc written by a test run
+        // ships into the Debug bin and from there into a working folder's
+        // `.toolchain/`. Harmless — the Windows launchers use the native
+        // runtime and compute no image tag from it — but it is our litter, and
+        // one line stops it.
+        start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
+
         using var process = Process.Start(start)
             ?? throw new InvalidOperationException($"Could not start {PythonExecutable}.");
 
@@ -168,8 +197,27 @@ public class PythonToolchainTests
 
         if (!process.WaitForExit(TimeoutMilliseconds))
         {
+            // entireProcessTree, not Kill(): `test_stop_preview.py` launches two
+            // dozen child interpreters, and a plain Kill would orphan every one.
             try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
-            return (124, $"scripts/{fileName} did not finish within {TimeoutMilliseconds / 1000} seconds.");
+
+            // Drain whatever the run managed to say before the pipes close with
+            // the process. WaitForExit(int) does not pump the redirected
+            // streams, so without this the two readers are still pending when
+            // `using` disposes the process, and they fault unobserved — losing
+            // the output at the one moment somebody needs it, which is when a
+            // test hung and nobody knows where.
+            string partial = "";
+            try
+            {
+                Task.WaitAll(new Task[] { stdout, stderr }, 5_000);
+                partial = (stdout.IsCompletedSuccessfully ? stdout.Result : "")
+                        + (stderr.IsCompletedSuccessfully ? stderr.Result : "");
+            }
+            catch { /* the pipes went with the process; report the timeout alone */ }
+
+            return (124,
+                $"scripts/{fileName} did not finish within {TimeoutMilliseconds / 1000} seconds.\n\n{partial}".Trim());
         }
 
         // unittest writes its report to stderr, so the failure detail is there
