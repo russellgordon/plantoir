@@ -234,6 +234,37 @@ nonisolated enum AssistWording {
         "If you had already deployed this section, undoing it here does not change what students "
         + "see. Deploy again when you want the live site to match."
 
+    // MARK: - What publishing means here
+
+    /// The two acts, in a teacher's words, said once.
+    ///
+    /// **The one thing a Claude Code session is never told.** The local model
+    /// is given this in `AssistAgent.systemPrompt`, whose own comment says the
+    /// paragraph "is not padding … saying plainly that they are different is
+    /// what stops 'publish tomorrow's class' turning into a live site". The
+    /// mac's MCP server sends no `instructions` in its `initialize` result, so
+    /// a session driving it had no way to learn the distinction at all.
+    static let whatPublishingMeans: String =
+        "Publishing a page decides whether students can see it in this section's website. "
+        + "Deploying sends the whole website out to the web. They are different acts: a page "
+        + "can be published for days and still not be online, and deploying puts everything "
+        + "already published in front of students straight away. Plantoir opens the preview "
+        + "after a change so the teacher can look it over first, which is the safer order."
+
+    /// Said instead when this section has already been told.
+    static func publishingAlreadyExplained(course: String, section: String) -> String {
+        return "\(course) Section \(section) has had this explained already — carry on with what "
+             + "the teacher asked rather than saying it twice."
+    }
+
+    // MARK: - Backing a course up
+
+    /// Where the copy went.
+    static func backedUpCourse(course: String, to name: String) -> String {
+        return "Backed up \(course) to \(name). It is in Plantoir's Backups list, and restoring "
+             + "from it puts the whole course back as it is right now."
+    }
+
     // MARK: - Listing what is here
 
     /// A working folder with nothing in it yet.

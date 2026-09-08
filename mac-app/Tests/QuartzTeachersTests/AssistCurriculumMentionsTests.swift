@@ -71,6 +71,7 @@ final class AssistCurriculumMentionsTests: XCTestCase {
             "list_courses",
             "plan_add_classes", "add_classes",
             "plan_make_room_for_classes", "make_room_for_classes",
+            "explain_publishing", "back_up_course",
             "list_curriculum_expectations", "plan_curriculum_mentions", "add_curriculum_mentions",
         ]
         for name in added {

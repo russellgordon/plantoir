@@ -316,6 +316,19 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         // the model, so this costs the router nothing and still answers a
         // teacher who is looking at one section and wants to know what else is
         // in the folder.
+        // The publish/deploy distinction, on demand. The local model is told
+        // it in its system prompt and a teacher never was — the shelf explains
+        // what the assistant can DO, not what its words mean.
+        ("what does publishing mean?",
+         AssistCardCommand(toolName: "explain_publishing", arguments: [:])),
+        ("what is the difference between publishing and deploying?",
+         AssistCardCommand(toolName: "explain_publishing", arguments: [:])),
+
+        // A copy before a big edit. No arguments: the window is scoped to one
+        // course, so the only course it could mean is that one.
+        ("back up this course",
+         AssistCardCommand(toolName: "back_up_course", arguments: [:])),
+
         ("what courses do i have?",
          AssistCardCommand(toolName: "list_courses", arguments: [:])),
         ("list my courses",

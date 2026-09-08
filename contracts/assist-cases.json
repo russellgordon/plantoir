@@ -5,6 +5,27 @@
         "arguments" : {
 
         },
+        "phrasing" : "what does publishing mean?",
+        "tool" : "explain_publishing"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "what is the difference between publishing and deploying?",
+        "tool" : "explain_publishing"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "back up this course",
+        "tool" : "back_up_course"
+      },
+      {
+        "arguments" : {
+
+        },
         "phrasing" : "what courses do i have?",
         "tool" : "list_courses"
       },
@@ -646,6 +667,8 @@
       "add_classes",
       "plan_make_room_for_classes",
       "make_room_for_classes",
+      "explain_publishing",
+      "back_up_course",
       "list_curriculum_expectations",
       "plan_curriculum_mentions",
       "add_curriculum_mentions"
@@ -1783,6 +1806,49 @@
               "section",
               "unit",
               "atDay"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Call this FIRST, before doing anything else with a section. It returns a short explanation of what publishing and deploying mean in Plantoir — say it to the teacher word for word. It answers once per section: after that it says so, and you should get straight on with what was asked rather than repeating it.",
+          "name" : "explain_publishing",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Make a full copy of one course, which the teacher can restore from inside Plantoir. Do this before any bulk editing of a course's files — INCLUDING edits you make directly rather than through these tools, which nothing else backs up. Course folders are not in version control, so a copy is the only way back.",
+          "name" : "back_up_course",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              }
+            },
+            "required" : [
+              "course"
             ],
             "type" : "object"
           }
