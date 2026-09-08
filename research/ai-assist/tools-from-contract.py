@@ -22,7 +22,7 @@ shipping surface if the descriptions are the shipping ones too.
     python3 research/ai-assist/shipped-surface-suite.py 8099 10 /tmp/real-tools.json
 
 `local` (the default) is what the on-device model is shown — 13 tools, and the
-list the routing figures were measured against. `mcp` is the 23 Claude Code
+list the routing figures were measured against. `mcp` is the 25 Claude Code
 sees.
 """
 import json
