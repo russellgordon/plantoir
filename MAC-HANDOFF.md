@@ -51,6 +51,58 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
+**One proposed 2026-09-07, and nothing goes red for it: the Course Settings
+tip sentence, which item 37 had been waiting on this side to choose** —
+`shared-rules.json` → `specialNames.contentStructureTip`, branch
+`issue/course-settings-tip-contract`. Russell made the call in a Windows
+session; **the decision went the other way from what item 37 assumed** (it said
+Windows owed taking the mac's wording verbatim), so the mac has a small change
+to make rather than nothing:
+
+> Tip: you can also simply create new folders and files in Obsidian — they’re
+> added to your site automatically the next time you preview. The exception is
+> anything you remove here: it stays off your site, even if you make it again
+> in Obsidian, until you add it back here.
+
+The mac's own sentence in `CourseSettingsView.swift:176` said the exception in
+a six-word bracket — "(unless you have removed them here)" — and named no
+remedy. **That was rejected as under-weight for the rule it glosses**, which
+row 377 made permanent the same day it was written: `excluded_items` is
+authoritative, so preflight now DROPS an excluded name it finds back in a copy
+list, the exclusion is by NAME and never expires, and this page is the only
+thing that can undo it. Windows' longer sentence was adopted with two changes.
+"on this page" became **"here"**, because the sibling sentence
+`removeLeavesTheFolderOnDisk` — shown at the moment of removal, in this same
+view — already says "Add it back here to include it again", and Windows was
+using two names for one place in one sentence; "in these lists" was considered
+and rejected as marginally more precise but breaking that parallel.
+
+**The third change is the one worth reading even if you disagree about the
+rest.** Both apps said "folders". The caption sits under FOUR list editors, two
+of which are FILE lists, and the behaviour is identical for files:
+`discover_shared_items` / `discover_section_items` append top-level files, and
+`build_site.py` skips and drops excluded ones from `shared_files` and
+`per_section_files` exactly as it does folders (`documentation/08` —
+"**Folder and file** names the teacher removed in Settings"). So a teacher who
+removed a file met the same permanent, silent rule with nothing anywhere
+warning them, on both platforms. The sentence now says "folders and files" —
+"pages" was rejected, because discovery is not limited to `.md` and "files" is
+the word the four list labels above the caption already use.
+
+**What the mac does:** move the literal out of `CourseSettingsView.swift:176`
+into a `SpecialNames.contentStructureTip` constant, take the sentence above,
+and assert it in `testSpecialNamesSentencesMatchContract`. **Nothing on the mac
+is red meanwhile** — no mac test pins this key — so this is a request to adopt
+the line, not a break. Reference implementation:
+`SpecialNames.ContentStructureTip` and the three facts in
+`SpecialNamesContractTests` (`TheContentStructureTipMatchesContract`,
+`…CoversFilesAsWellAsFolders`, `…IsNotABlockedSentence`). Two traps if you
+mirror those: the entry deliberately carries **no `reason` key**, because
+Windows' `NoBlockedSentenceInTheContractIsUnusedHere` sweeps every `reason` and
+would demand this be one of the seven flyout sentences; and it must stay OUT of
+any "longest sentence" assertion, since it is a caption that wraps and is far
+longer than the flyout sentence such a test exists to name.
+
 **One proposed 2026-09-07, and nothing goes red for it: the New Course
 wizard's affirmative button reads "Create Course" on both platforms** —
 `NewCourseDialog.cs` on Windows, `NewCourseWizardView.swift:520` on the mac —
@@ -292,6 +344,20 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   `windows-app/Plantoir.Tests/GradedFolderChoicesTests.cs`.
 
 ## Open — what the mac still owes
+
+- **One sentence to adopt: the Course Settings tip is now a contract case, and
+  the mac's copy of it is the one that changes.** (Windows, 2026-09-07, branch
+  `issue/course-settings-tip-contract`, handoff item 37.) Russell chose
+  Windows' wording, widened to say "folders and files" because the caption sits
+  under four lists of which two are file lists and both apps had promised only
+  the folder half. **Nothing on the mac is red** — no mac test pins the key —
+  so this is small and it can wait for a convenient session: move the literal
+  at `CourseSettingsView.swift:176` into a `SpecialNames` constant, take the
+  contract's `specialNames.contentStructureTip.message`, and assert it in
+  `testSpecialNamesSentencesMatchContract`. The full reasoning, the rejected
+  alternatives, and two traps in mirroring the Windows tests are in **"Contract
+  cases waiting on the mac"** above; this line exists so the work is on the
+  list rather than only in prose.
 
 - **Two small things, and a decision you may want to copy: the shared Python
   tests now run on Windows too, and one of them was broken there.** (Windows +
@@ -995,6 +1061,18 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   wording the mac already ships, and choosing WHICH sentence becomes the
   contract is the mac's call. If the mac agrees it belongs there, add it under
   `specialNames` and Windows will take the mac's wording verbatim.
+
+  **✅ Resolved 2026-09-07 — but not the way this paragraph expected, so read
+  the top of this file rather than the sentence above.** Russell made the call
+  in a Windows session and chose Windows' substance, widened to cover FILES as
+  well as folders, which neither app's wording did. The case is now
+  `specialNames.contentStructureTip` and the mac has a small adoption to make;
+  the sentence, the reasoning, the two rejected alternatives and the two traps
+  in mirroring the tests are in **"Contract cases waiting on the mac"** at the
+  top of this file. The paragraph above stands as written because it is the
+  honest record of what was true until today — but its last sentence is now
+  wrong in both directions: a case HAS been proposed, and it is not the mac's
+  wording Windows took.
 
   **2. `reconciledGradedFolders` on the MAC does not match the Python, and
   that is a finding rather than a question.** This entry originally asked which

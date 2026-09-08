@@ -248,7 +248,7 @@ as WINDOWS-HANDOFF item 31), through these classes in
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
 | `gradedFolders.cases` | `GradedFolderContractTests` |
 | `gradedFolders.choices` (cases, the depth cap and the skip list) | `GradedFolderChoicesTests` |
-| `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution` | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
+| `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution`, and `contentStructureTip` (proposed from Windows 2026-09-07) | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
 | `specialNames.renameFolder.materialisesOnRename`, `addCreatesTheFolder`, `removeLeavesTheFolderOnDisk`, `renameFolder.interruptedRename` (proposed from Windows 2026-09-07) | `FolderRenameApplyTests` |
 | `specialNames.renameFolder.linkRewriting` — every case, plus `escapingSet.leaveUnescaped` character by character | `FolderPathRewriterTests` |
 | `siteHealth.repair.reportedOncePerFinding` (both cases, built as `howToRunACase` says) and `siteHealth.repair.refusedWhenSomethingIsInTheWay` (the sentence, word for word) | `SiteHealthRepairTests`, `SiteHealthContractTests` |

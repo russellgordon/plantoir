@@ -73,11 +73,25 @@ exist, and that the requested section is one of the course's
 <a name="preflight-discovery"></a>
 
 It scans the course root and section folder for top-level folders/files that
-are *not yet listed* in `course_config.json` and appends them. The four copy
-lists are add-only — nothing is ever removed from them automatically — but a
-newly discovered folder is also taken OUT of `hidden` if it is listed there
+are *not yet listed* in `course_config.json` and appends them. A newly
+discovered folder is also taken OUT of `hidden` if it is listed there
 and added to `expandable`, so it appears with a chevron like any other. The updated config is written atomically
 with a `course_config.backup.json` safety copy.
+
+**The one thing discovery does not do is re-add what the teacher took away.**
+Names the teacher removed in Course Settings are recorded in `excluded_items`
+(keyed `shared` / `per_section`), and preflight skips them: not discovered, not
+un-hidden, not expanded, and — since 2026-08-24 — actively **dropped** from
+`shared_folders`, `shared_files`, `per_section_folders` and `per_section_files`
+if it finds one back in a copy list, with the config written back. So the four
+copy lists are *not* add-only: `excluded_items` is authoritative, and this
+paragraph said the opposite until 2026-09-07. The exclusion is by NAME and does
+not expire, because discovery cannot tell "the folder I excluded" from "the new
+folder I just made" — which is the rule teachers are told about in
+`contracts/shared-rules.json` → `specialNames.contentStructureTip`. An excluded
+folder that already has an `index.md` gets a sentinel-delimited note explaining
+why, removed again on re-inclusion. See
+[`08-course-config-reference.md`](08-course-config-reference.md) for the key.
 
 **Rationale:** teachers create folders in Obsidian mid-course. Without
 discovery, every new folder would require re-running the setup wizard;
