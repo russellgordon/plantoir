@@ -1963,7 +1963,7 @@ to run in the background.
     teacher says reaches the tool that does NOT cut the section loose from
     `.netlify_sites/section<N>.json`, and the first publish afterwards lands
     on last year's URL, which last year's students may still be reading. Your
-    own comment at `AssistWorkspace.cs:1915-1927` says precisely why that is
+    own comment at `AssistWorkspace.cs:1915-1928` says precisely why that is
     bad. The mac has the identical hole (`AssistCardCommand.swift:395`) and no
     `ReleaseSite` at all. **Do not fix this unilaterally**: whether a rolled-
     over section keeps its address or starts a new site is a product choice —
@@ -3188,6 +3188,12 @@ same rules — the model is simply shown fewer.
   strings, so dates the model supplies are dates it may have invented — and
   a wrong one schedules a class on the wrong day silently. The schedule UI
   owns that path. `read_remembered_timetable` stays, because reading is safe.
+- **`re_date_classes` is hidden from the model**, and this bullet was missing
+  while the count beside it already said nine. The phrasings that reach it are
+  matched in CODE (`AssistCardCommand.swift`), and re-dating a whole section
+  rewrites the date on every page in it — far too large a change to reach
+  through a router that is right four times in five. Like the others it still
+  RUNS, and Claude Code still sees it.
 
 Result: 22 tools down to **13** for the model — the seven `plan_` twins,
 `remember_timetable` and `re_date_classes` are the nine taken off the list.

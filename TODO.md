@@ -821,7 +821,7 @@ thing that prompts for a name — it runs only when there is no marker to find.
 (The apps' own `hasDeployedBefore` reads the same marker, but it decides
 something else: whether a SCHEDULED deploy may be set up at all —
 `ScheduledDeploy.swift:225`.) Windows' own comment
-(`AssistWorkspace.cs:1915-1927`) says exactly why that is bad — and Windows
+(`AssistWorkspace.cs:1915-1928`) says exactly why that is bad — and Windows
 still has the hole, because the sentence a teacher says does not reach the tool
 that closes it.
 
