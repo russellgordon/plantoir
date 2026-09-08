@@ -2102,12 +2102,22 @@ to run in the background.
     divergence, surfaced by the same audit as item 37 and flagged there as
     out of scope. Now `shared-rules.json` → `gradedFolders.wording`.
 
+    **The SECOND such divergence, not the last.** "and last" was in the first
+    draft of this item and is gone, because it would have closed an audit that
+    is not finished. Still unpinned, one control ABOVE this one: the
+    coverage-notes toggle reads "Explain the map on the page" on the mac
+    (`CourseSettingsView.swift:51`) and "Include explanations on Curriculum
+    Coverage page" here (`CourseSettingsView.xaml.cs:551`), and this app draws
+    two `ExampleCaption` sentences in that block the mac has no counterpart
+    for. `grep` over `contracts/` finds none of the four. That is item 43.
+
     **Russell chose the MAC's title** — "Folders whose work counts for marks"
     — so this app gave one up; it also matches `specialFoldersHelp`'s pinned
     "Work that counts for marks". The caption is a union of the two apps',
-    with its middle sentence lifted verbatim from `specialFoldersHelp.rows`,
-    so the control and the help sheet now say the same sentence rather than
-    two paraphrases.
+    and its middle sentence is `specialFoldersHelp.rows`' with ONE word changed
+    — the map's name. NOT identical to that row: an earlier draft of this item
+    said "verbatim", which would have told a mac session the two strings now
+    match when the help sheet still says "the curriculum map" on purpose.
 
     **Three decisions inside it, each argued the other way first.** The map is
     called "the curriculum coverage map" — Russell's call, because both
@@ -2135,6 +2145,33 @@ to run in the background.
     **The mac owes only the caption** (its title already matches) and is not
     red meanwhile — no mac test names the key. Listed at the top of
     `MAC-HANDOFF.md`'s "Open". 1209 unit tests and all 11 UI tests green.
+
+43. **The coverage-notes toggle is worded differently on the two apps, and
+    Windows draws two caption sentences beside it that the mac has not.**
+    Found 2026-09-08 by adversarial review of item 42, which had claimed to be
+    the LAST Course Settings divergence and was not. Nothing is pinned:
+
+    - The toggle. mac — "Explain the map on the page"
+      (`CourseSettingsView.swift:51`). Windows — "Include explanations on
+      Curriculum Coverage page" (`CourseSettingsView.xaml.cs:551`).
+    - Two `ExampleCaption` sentences Windows alone shows, in the same block:
+      "Generates a page showing which specific and overall expectations are
+      addressed" (`:542`) and "Shows “What counts” and “Reading it
+      honestly” sections on the page" (`:553`).
+
+    `grep -rn` over `contracts/` finds none of the four. **Two things make this
+    less mechanical than item 42 was.** The switch it sits under is already
+    pinned by name — `SpecialNames.CoverageSwitchLabelInSettings`, "Publish the
+    curriculum coverage map" — and `EveryBlockedSentenceNamesASwitchTheAppActuallyHas`
+    asserts the blocked sentences quote it, so the LABEL is load-bearing in a
+    way a caption is not. And Windows' captions have no mac counterpart at all,
+    so this is not "pick one of two": it is a decision about whether the mac
+    gains two sentences or Windows loses them, which is Russell's.
+
+    Windows' label also spells "Curriculum Coverage page" with capitals —
+    defensible, since that IS the built page's title, but it is the same
+    capital-C pattern item 42 removed from the caption one control below, and
+    the two should be decided together rather than a year apart.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 

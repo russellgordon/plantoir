@@ -21,12 +21,13 @@ Docker Desktop) unless marked otherwise.
 ## Where parity stands (2026-09-08)
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index. **Counted 2026-09-08 with
-the two commands below: 42 items, 39 struck, THREE open — 39, 40 and 41.**
+the two commands below: 43 items, 39 struck, FOUR open — 39, 40, 41 and 43.**
 
 Item 37 (the Course Settings tip) and item 42 (the Marks wording) were closed
-on 2026-09-07 and 2026-09-08; item 36 closed on 2026-09-07. Item 41 is new on
-2026-09-07 and is the only open one raised HERE — shared Python, found while
-pinning the tip. **39 and 40 both wait on the mac and both came from it**: 39
+on 2026-09-07 and 2026-09-08; item 36 closed on 2026-09-07. Items 41 and 43 are new, on 2026-09-07
+and 2026-09-08, and are the only open ones raised HERE — 41 is shared Python
+found while pinning the tip, 43 is the Course Settings divergence item 42
+wrongly believed it had finished off. **39 and 40 both wait on the mac and both came from it**: 39
 is a check and a re-read, 40 is the only open item that is code.
 
 Items 35–37 were added by an audit of these two documents (`556646e2`, a
@@ -67,6 +68,7 @@ What is genuinely left, smallest first:
 | ~~36~~ | ✅ Done 2026-09-07 — decided: `verify-deploy.ps1` stays opt-in (it makes real sites), `.githooks/pre-commit` warns when a commit touches the publishing path, `RELEASING.md` requires a nothing-skipped run for a release that changes it, and the real win — all fifteen shared `scripts/test_*.py` now run inside `dotnet test`, which nothing here did before. | — |
 | ~~37~~ | ✅ Done 2026-09-07 — Russell chose WINDOWS' wording, not the mac's, and it is now `shared-rules.json` → `specialNames.contentStructureTip`: the literal is gone from `CourseSettingsView.xaml.cs`, `SpecialNames.ContentStructureTip` is the single source, and three facts pin it. "on this page" became "here" (matching `removeLeavesTheFolderOnDisk` in the same view) and "folders" became "folders and files" — the caption sits under four lists, two of them FILE lists, and both apps had promised only the folder half of what `build_site.py` actually does. The mac owes the adoption and is not red meanwhile; it is at the top of `MAC-HANDOFF.md`'s "Open". | — |
 | ~~42~~ | ✅ Done 2026-09-08 — the Marks list's title and caption are now `shared-rules.json` → `gradedFolders.wording`. Russell chose the MAC's title, so this app took "Folders whose work counts for marks"; the caption is a union whose middle sentence is lifted from `specialFoldersHelp`, names the map "the curriculum coverage map" (matching the flyout and switch on this same screen — capital-C "Curriculum Coverage map" was the built PAGE title and was drift), and says "tick" rather than the mac's "add"/"remove", which named actions this tick list does not offer. The caption also MOVED below its list in both Course Settings and the wizard, so "a page in one of these" has something to refer to. Trap met: `FormBuilders` builds checkbox automation ids from the list title, and a UI test had the old one hard-coded — it now reads the contract. The mac owes only the caption and is not red. | — |
+| 43 | Found here 2026-09-08 reviewing item 42, which wrongly called itself the last Course Settings divergence: the coverage-notes toggle reads "Explain the map on the page" on the mac and "Include explanations on Curriculum Coverage page" here, and this app draws two caption sentences beside it the mac has no counterpart for. None of the four is in any contract. Not "pick one of two" — whether the mac GAINS two sentences or this app loses them is Russell's call. `WINDOWS-HANDOFF.md` item 43. | Small |
 | 41 | Shared Python, found here 2026-09-07: `_dropping_excluded_items` matches `excluded_items` case-insensitively while every other consumer matches exactly, so `build_site.py` gives two answers in one file. **Do not fix it by case-folding the live path** — exact matching is the deliberate rule (`gradedFolders.choices.walk.excludedItems`, reasoned in `GUI-IMPROVEMENTS.md` row 412), and case-folding breaks that case and re-introduces the app/build disagreement 412 rejected. Full write-up in `TODO.md`; `WINDOWS-HANDOFF.md` item 41. Gateable here now that `dotnet test` runs the shared Python. | Small |
 | 39 | From the mac, after its test host stopped segfaulting: check whether `Plantoir.UiTests` can CRASH its host rather than fail an assertion (the shape to look for is a modal torn down inside a layout pass; the honest signal is the test TOTALS, never the exit code), and re-read `shared-rules.json` → `siteHealth.repair.oneAlertAtATime`, whose reason has been strengthened. Added to `WINDOWS-HANDOFF.md` on 2026-09-07 and never given a row here. | Small |
 | 40 | Code, from the mac: `TheRowsAreTheContractsRowsInTheContractsOrder` builds ONE course, which has a curriculum folder, so the retired placeholder sentence could come back unguarded. Loop `specialFoldersHelp.cases` instead — the mac's fix ports line for line, traps included. | Small |
