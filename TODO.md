@@ -847,6 +847,51 @@ mac has never made one. Three options:
 Whichever is chosen it needs the same sentence on both sides. Windows' half is
 item 41 in `WINDOWS-HANDOFF.md`.
 
+### ✅ DECIDED 2026-09-08 by Russell — **ASK**, and leave visibility alone
+
+The third option. A rollover asks the teacher whether this should be a new
+website or the same one as last year, and does not guess either way.
+
+**And a second question was settled at the same time, because the first one
+raised it.** Asked whether a rollover should HIDE the pages that were visible
+to students last year, Russell said **leave visibility alone**: re-dating moves
+dates, and hiding stays a separate deliberate act. So the two answers together
+are "ask about the address, change nothing about who can see what".
+
+**His words on the shape of it:** *"Rollover should redate class pages but not
+immediately publish the revised class pages."* Re-dating already satisfies that
+and says so — `re_date_classes` deploys nothing and ends with "Nothing was
+published or hidden, so students see no change until you deploy." The one
+exception is not a bug and stays: overflow classes, which have no class date
+left to land on, are set to draft by `SectionReDatePlanner`
+(`SectionReDatePlanner.swift:142`) and the reply names each one.
+
+**What this means in practice, said plainly because it is the consequence of
+these two answers together.** Pages published last year stay published. So a
+teacher who rolls over, chooses "the same website", and then deploys, puts the
+whole re-dated year in front of students in one go. That is now a CHOSEN
+behaviour rather than an accident — the question at rollover is what makes it a
+choice — and the teacher who wants the year revealed class by class hides the
+pages themselves, which is an act they already have.
+
+**What is still to BUILD — a separate piece, not done here.**
+
+1. **The sentence, in `contracts/`**, so both platforms ask identically. It is
+   the only part of this that is teacher-facing, and it is the reason this
+   option was the expensive one.
+2. **The mac needs the machinery at all.** There is no `ReleaseSite` anywhere
+   under `mac-app/` or `scripts/` — Windows' is at `AssistWorkspace.cs:1929`,
+   called from exactly one place, `roll_over_section`
+   (`PlantoirTools.cs:911`). It renames the marker aside rather than deleting
+   it, because the marker holds the site id and admin URL and a teacher who
+   changes their mind has no other way back. Copy that property.
+3. **The card phrasing has to move with it on BOTH platforms.** "Roll this
+   section over to a new year" is matched in code
+   (`AssistCardCommand.swift:395`, `AssistCardCommand.cs:50`) and routed
+   straight to `re_date_classes`. Until it reaches something that can ask the
+   question, the decision changes nothing a teacher meets — this is the step
+   that makes the other two matter, and it is the one easiest to leave out.
+
 ## A folder rename does not follow an angle-bracket Markdown link
 
 Noted 2026-09-06, while fixing the neighbouring defect (a rename to a name

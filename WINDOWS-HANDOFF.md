@@ -1932,7 +1932,8 @@ to run in the background.
 
 41. **Your MCP server serves 37 tools and the mac's serves 25 — and TWO
     things now fall to you: a rollover that publishes over last year's
-    website, and seventeen measured phrasings you do not have.**
+    website (DECIDED 2026-09-08 — build it, do not re-open it), and seventeen
+    measured phrasings you do not have.**
     Found 2026-09-06 by a mac audit asking whether the parity list was
     COMPLETE rather than whether it was correct. Full write-up: "The two MCP
     surfaces are not the same product" below, and the sorting of all twelve
@@ -1965,11 +1966,33 @@ to run in the background.
     on last year's URL, which last year's students may still be reading. Your
     own comment at `AssistWorkspace.cs:1915-1928` says precisely why that is
     bad. The mac has the identical hole (`AssistCardCommand.swift:395`) and no
-    `ReleaseSite` at all. **Do not fix this unilaterally**: whether a rolled-
-    over section keeps its address or starts a new site is a product choice —
-    plenty of teachers want one address forever — and `TODO.md` ("A rolled-over
-    section publishes over last year's website") puts three options to Russell. Whatever is chosen needs the same sentence on
-    both platforms, so the wording belongs in `contracts/`.
+    `ReleaseSite` at all.
+
+    **✅ Russell DECIDED this on 2026-09-08, and it is the option that needs
+    new wording: ASK.** A rollover asks the teacher whether this should be a
+    new website or the same one as last year, and guesses neither way. He
+    settled a second question in the same breath — a rollover does **not** hide
+    the pages that were visible last year; re-dating moves dates, and hiding
+    stays a separate deliberate act. Full reasoning, and what it means for a
+    teacher who then deploys, in `TODO.md` → "A rolled-over section publishes
+    over last year's website".
+
+    **So this is no longer a question, and three things fall out of it. Still
+    do not fix it unilaterally — the WORDING has to be shared.**
+
+    1. **The sentence belongs in `contracts/`** before either side builds it,
+       so both apps ask identically. Nobody has written it yet.
+    2. **You already have the machinery and the mac does not.** `ReleaseSite`
+       (`AssistWorkspace.cs:1929`) renames the marker aside rather than
+       deleting it, because it holds the site id and admin URL. Keep that.
+       What changes on your side is only WHO calls it: today only
+       `roll_over_section` does.
+    3. **The card phrasing has to move on both platforms.**
+       `AssistCardCommand.cs:50` sends "roll this section over to a new year"
+       straight to `re_date_classes`. Until that sentence reaches something
+       that can ask the question, the decision changes nothing a teacher meets.
+       It is the step easiest to leave out and the one that makes the other two
+       matter.
 
     **Two of two, still open — seventeen `TEACHERS SAY:` phrasings the mac
     has and you do not.**
