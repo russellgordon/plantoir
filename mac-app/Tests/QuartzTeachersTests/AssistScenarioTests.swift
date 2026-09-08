@@ -34,6 +34,18 @@ final class AssistScenarioTests: XCTestCase {
         let expectEvents: [String]?
         let expectReply: String?
         let expectTranscript: [String]?
+
+        /// The same ordered check, matched by CONTAINS rather than equality.
+        ///
+        /// **Needed because a composed reply cannot be pinned by equality.**
+        /// A rollover answers two things at once — "Re-dated 3 classes and 2
+        /// pages they use." and then the website question — so no single named
+        /// sentence equals the line. Asserting the line CONTAINS the named
+        /// sentence keeps the wording in the contract, where it belongs, while
+        /// letting each platform arrange a composed reply its own way. Order
+        /// is portable; exact composition is not, which is the same reason
+        /// `expectTranscript` checks order rather than adjacency.
+        let expectTranscriptContains: [String]?
     }
 
     // MARK: - Functions
@@ -209,15 +221,107 @@ final class AssistScenarioTests: XCTestCase {
                 page: "Unit 1, Day 1", publish: "false", date: "2026-09-09", body: "one", in: made.course
             )
         }
+        // A rollover needs THREE things or it refuses before reaching anything
+        // worth asserting, and each refusal looks like a different bug: with no
+        // class dates on file it offers the schedule sheet instead ("I don't
+        // know when this section meets"); with no class pages there is nothing
+        // to move; and with no site marker the release reports "had no website
+        // yet" and the interesting branch never runs.
+        if pending == "re_date_classes" {
+            // Dated a day the section does not meet, so the FIRST turn has
+            // something real to move — and so the second turn meets the
+            // "already on its dates" branch, which is the one that was broken.
+            try AssistFixture.write(
+                page: "Unit 1, Day 1", publish: "false", date: "2020-01-15", body: "one", in: made.course
+            )
+            let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+                dates: ["2026-09-08", "2026-09-10"], source: "timetable.xlsx, block H",
+                forSection: 1, in: made.course
+            )
+            try SectionTimetableStore.applyRememberTimetable(plan)
+
+            let markerFolder: URL = made.course.directoryURL.appendingPathComponent(".netlify_sites")
+            try FileManager.default.createDirectory(
+                at: markerFolder, withIntermediateDirectories: true
+            )
+            try "{\"site\":\"last-year\"}".write(
+                to: markerFolder.appendingPathComponent("section1.json"),
+                atomically: true, encoding: .utf8
+            )
+        }
 
         let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner)
-        await agent.say(try AssistScenarioTests.phrasingReaching(pending))
-        XCTAssertNotNil(agent.pendingApproval, "\(scenario.name): nothing is waiting to be agreed to")
 
-        if scenario.when == "approve" {
-            await agent.approvePending()
+        // A conversation, not a single turn. `saying` lists what the teacher
+        // types, in order, each one approved before the next — because some
+        // behaviour only exists across turns: a rollover asks about the
+        // website on the FIRST turn and is answered on the SECOND, and the
+        // answer was a no-op for a while precisely because nothing exercised
+        // two turns in a row. When `saying` is absent this is the old
+        // single-turn behaviour, unchanged.
+        var conversation: [String] = []
+        if let saying = scenario.given["saying"] as? [String] {
+            conversation = saying
         } else {
-            agent.declinePending()
+            conversation = [try AssistScenarioTests.phrasingReaching(pending)]
+        }
+
+        for (turn, phrasing) in conversation.enumerated() {
+            await agent.say(phrasing)
+            let isLastTurn: Bool = turn == conversation.count - 1
+            guard agent.pendingApproval != nil else {
+                XCTAssertFalse(
+                    isLastTurn && scenario.when == "approve",
+                    "\(scenario.name): nothing is waiting to be agreed to after \"\(phrasing)\""
+                )
+                continue
+            }
+            if isLastTurn && scenario.when != "approve" {
+                agent.declinePending()
+            } else {
+                await agent.approvePending()
+            }
+        }
+
+        try assertTranscript(of: agent, matches: scenario)
+    }
+
+    /// Both ordered transcript checks, so a scenario can use either.
+    private func assertTranscript(of agent: AssistAgent, matches scenario: Scenario) throws {
+        if let contains = scenario.expectTranscriptContains {
+            var actual: [String] = []
+            for entry in agent.entries {
+                actual.append(AssistScenarioTests.transcriptLine(from: entry))
+            }
+            var searchedFrom: Int = 0
+            for line in contains {
+                // The speaker is matched as a PREFIX and the sentence as a
+                // substring, separately. Resolving the whole thing and asking
+                // whether the line contains it would demand that the sentence
+                // follow the speaker immediately — which is exactly what a
+                // composed reply does not do: "tool(x): Re-dated 1 class.\n\n
+                // Should this be a new website…" contains the sentence, and
+                // does not contain "tool(x): Should this be a new website…".
+                let (speaker, wanted) = try AssistScenarioTests.speakerAndSentence(of: line)
+                var found: Int? = nil
+                for index in searchedFrom..<actual.count
+                where actual[index].hasPrefix(speaker) && actual[index].contains(wanted) && found == nil {
+                    found = index
+                }
+                guard let at = found else {
+                    XCTFail(
+                        "\(scenario.name): no line in the transcript contains \"\(wanted)\" — it says \(actual)"
+                    )
+                    return
+                }
+                // The SAME line may satisfy the next expectation too, which is
+                // the whole point of matching by contains: one reply composes
+                // several named sentences — the question, how to answer it, and
+                // what has not changed — and they are one bubble to a teacher.
+                // Advancing past the line would demand a separate reply for
+                // each, which is an arrangement no platform should be held to.
+                searchedFrom = at
+            }
         }
 
         guard let expected = scenario.expectTranscript else {
@@ -284,6 +388,20 @@ final class AssistScenarioTests: XCTestCase {
     }
 
     /// "assistant: wording.deployWasCancelled" → "assistant: Deploy cancelled."
+    /// A contract transcript line split into who said it and what they said,
+    /// with a `wording.` name resolved to the real sentence.
+    private static func speakerAndSentence(of line: String) throws -> (String, String) {
+        guard let split = line.range(of: ": ") else {
+            return ("", line)
+        }
+        let speaker: String = String(line[line.startIndex..<split.upperBound])
+        let rest: String = String(line[split.upperBound...])
+        if rest.hasPrefix("wording.") {
+            return (speaker, try sentence(named: rest))
+        }
+        return (speaker, rest)
+    }
+
     private static func resolve(transcriptLine line: String) throws -> String {
         guard let split = line.range(of: ": ") else {
             return line
@@ -342,7 +460,8 @@ final class AssistScenarioTests: XCTestCase {
                 when: try XCTUnwrap(entry["when"] as? String),
                 expectEvents: entry["expectEvents"] as? [String],
                 expectReply: entry["expectReply"] as? String,
-                expectTranscript: entry["expectTranscript"] as? [String]
+                expectTranscript: entry["expectTranscript"] as? [String],
+                expectTranscriptContains: entry["expectTranscriptContains"] as? [String]
             ))
         }
         return read

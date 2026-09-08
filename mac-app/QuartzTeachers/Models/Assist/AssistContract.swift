@@ -85,6 +85,7 @@ enum AssistContract {
             "rolloverStartedANewWebsite": AssistWording.rolloverStartedANewWebsite(
                 keptAs: ".netlify_sites/section1.previous-2026-09-08_071500.json"
             ),
+            "rolloverIsOnANewWebsite": AssistWording.rolloverIsOnANewWebsite,
             "rolloverHadNoWebsiteYet": AssistWording.rolloverHadNoWebsiteYet,
             "rolloverKeptTheSameWebsite": AssistWording.rolloverKeptTheSameWebsite,
             "rolloverWebsiteNotDecided": AssistWording.rolloverWebsiteNotDecided,
