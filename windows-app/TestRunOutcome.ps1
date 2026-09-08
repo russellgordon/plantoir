@@ -209,10 +209,11 @@ function Invoke-TestRun {
 
 .DESCRIPTION
     This exists because the CAPTURE is the subtle half, not the parsing, and it
-    was copied into three scripts - one of which (the gitignored batch driver)
-    had got it wrong and could never have seen the banner it was looking for.
-    A correction that has to land in three places, one of them in no diff
-    anyone reviews, is a correction that will land in two.
+    was copied into three scripts - one of them the UNTRACKED batch driver,
+    which had `2>&1` missing and so could not have seen the banner even had it
+    been looking (it judged by the exit code alone). A correction that has to
+    land in three places, one of them in no diff anyone reviews, is a
+    correction that will land in two.
 
     Three details, each of which has already cost something:
 

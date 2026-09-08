@@ -351,18 +351,20 @@ before anybody noticed the two entries were one defect.
 `windows-app/TestRunOutcome.ps1` reads that rather than the exit code, and is
 shared by `run-tests.ps1`, `run-ui-tests.ps1` and the untracked batch driver,
 so all three agree and there is one place to correct if vstest changes its
-wording. It shares the CAPTURE too (`Invoke-TestRun`), which is the subtler
+wording. They share the CAPTURE too (`Invoke-TestRun`), which is the subtler
 half: the banner goes to stderr, `2>&1` is a terminating error under
 `$ErrorActionPreference = 'Stop'`, and the ErrorRecord has to be flattened back
-into a plain line. The batch driver had the first of those wrong and could
-never have seen the banner it was looking for.
+into a plain line. The batch driver had the first of those wrong, so it could
+not have seen the banner even had it been looking — it judged by the exit code
+alone.
 
 Its verdicts are `Passed`, `Failed`, `HostCrash`, `RanNothing` and `NoResult`;
 `HostCrash` wins over any partial totals, because a partial answer to "did the
 suite pass" is not an answer. **The two runner scripts exit 0 only for a
-genuine pass** — 3 for a dead host, 8 for a run that executed nothing, 4 for no
-result at all, following Microsoft.Testing.Platform's published meanings so the
-numbers survive an xunit v3 migration. (2 is deliberately avoided: MTP means
+genuine pass** — 3 for a dead host, 8 for a run that executed nothing, and for
+no result at all whatever `dotnet` returned, or 4 when even that was 0. The
+numbers follow Microsoft.Testing.Platform's published meanings, so they survive
+an xunit v3 migration. (2 is deliberately avoided: MTP means
 "at least one test failed" by it, which would invert the one distinction this
 draws.) Neither a crash nor an empty run is retried: a crash retried until it
 passes is a crash nobody measures, and the mac's was fixed only once somebody

@@ -88,8 +88,9 @@ if ($Blame)  { $dotnetArgs += "--blame" }
 # The capture is the subtle half - stderr, the preference juggling,
 # flattening the ErrorRecord - so it is SHARED rather than copied into each
 # runner. Invoke-TestRun's own comment carries the three details and what
-# each one cost; the batch driver had one of them wrong and could never have
-# seen the banner it was looking for, which is the argument against copies.
+# each one cost; the untracked batch driver had the first of them wrong, so it
+# could not have seen the banner even had it been looking - which is the
+# argument against keeping three copies of this.
 $run = $null
 Invoke-TestRun -DotnetArguments $dotnetArgs -Result ([ref]$run)
 $outcome = Get-TestRunOutcome -Output $run.Output -ExitCode $run.ExitCode

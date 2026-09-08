@@ -111,9 +111,9 @@ Write-Host "Driving the interface..." -ForegroundColor Cyan
 # The capture is the subtle half - stderr, the preference juggling, flattening
 # the ErrorRecord - so it is SHARED rather than copied into each runner.
 # Invoke-TestRun's own comment carries the three details and what each one
-# cost; the batch driver had one of them wrong and could never have seen the
-# banner it was looking for, which is the argument against keeping three
-# copies.
+# cost; the untracked batch driver had the first of them wrong, so it could not
+# have seen the banner even had it been looking - which is the argument against
+# keeping three copies of this.
 #
 # The tidying up is in a FINALLY, and not for tidiness. `& dotnet` throws
 # CommandNotFoundException if dotnet is not on PATH - terminating even at
