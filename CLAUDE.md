@@ -377,6 +377,19 @@ Neither app contains toolchain logic of its own: they write the same
       "nothing to act on" is an acceptable answer, or it will invent findings
       to justify its existence.
 
+      **Standing order for Tuesday 2026-09-08: run SUBAGENT work on Opus, not
+      on Fable or on whatever the harness would pick by default.** From
+      Russell, that day, after a review agent died mid-run with "You're out of
+      usage credits … to keep using Fable 5.1" — the account has no
+      Fable credit today, so the sentence above naming Fable cannot be followed
+      and the fallback the rule already allows ("a fresh context at the very
+      least") is what applies. Pass the model EXPLICITLY when spawning an agent
+      rather than relying on the default, because the default subagent model is
+      configured outside this repository and a session that omits it cannot
+      tell what it got. This is dated deliberately: it is a fact about the
+      account on one day, not a revision of the rule above, and Fable goes back
+      to being the first choice for a review the moment it can run.
+
       **Verify what a review claims rather than acting on it.** A reviewer is
       wrong often enough to matter, and a finding accepted without checking is
       just a second opinion with extra steps. Equally, when it is right about
