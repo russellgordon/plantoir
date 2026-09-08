@@ -4,6 +4,51 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **The assistant's features are tested at the tool and nowhere above it, and
+  that is exactly where the bugs have been** (mac, 2026-09-08; Russell:
+  *"you MUST drive the real app to test these features. They should be part of
+  the full UI suite that is run"*).
+
+  **The evidence, and it is not a hunch.** Building the rollover
+  (`GUI-IMPROVEMENTS.md` row 448) took three adversarial reviews, and every
+  serious finding was at a SEAM above the tool rather than in its logic — each
+  one behind a fully green suite:
+
+  | What was wrong | Which seam |
+  |---|---|
+  | The question never reached the teacher: it was written into `detail`, and `AssistToolOutcome.wrote` leaves `teacherDetail` nil | tool → window |
+  | Plan mode is ON by default and `showPlan` returns early on a non-plan outcome, so the answer turn never ran the real call — the release was unreachable in the default configuration | tool → plan card |
+  | A Claude Code session had no declared argument to answer with | tool → MCP schema |
+  | Answering was a no-op, because by the second turn the dates are already right and the plan changes nothing | tool → its own early return |
+
+  A unit suite that calls `AssistToolRunner` directly cannot see any of those.
+  Three of the four were caught by reading rather than by testing, which is not
+  a process anyone should rely on twice.
+
+  **What to build.** `mac-app/Tests/QuartzTeachersUITests/` already exists and
+  is a real target (15 tests, wizard and settings), and
+  `AssistantTreeDump.testDumpAssistantTree` already prints the assistant
+  window's element tree — so addressing the conversation by what it actually is
+  is groundwork that is done. What is missing is any test that opens the
+  assistant, types a phrasing, and reads what comes back. Start with the
+  rollover, because it is the one whose seams are known to be load-bearing:
+  type "roll this section over to a new year", assert the QUESTION is on
+  screen; say one of the two answers back, assert the confirmation is on screen
+  and the marker actually moved; and do it once with plan mode ON, since that
+  is the default and the configuration nothing exercises.
+
+  **Two things to decide when picking this up.** Whether it is opt-in and part
+  of no gate, as Windows' `run-ui-tests.ps1` deliberately is (`[UiFact]`,
+  `PLANTOIR_UI_TESTS=1`) — the same reasoning applies here, since it needs the
+  foreground and takes minutes; and whether the assistant is driven with a
+  stubbed model, which the card phrasings make possible because they are
+  matched in code and never reach a model at all. That second point is what
+  makes this tractable: the deterministic phrasings are exactly the ones worth
+  covering, and they need no `llama-server` running.
+
+  **Rule 9 applies while writing it**: driving the real app is encouraged, and
+  the terminal comes back to the front afterwards.
+
 - **Start the Windows app with its output redirected and every launcher fails,
   silently and unrecognisably** (Windows, 2026-09-07, met while writing the
   wizard's UI test - the research below is done, so picking this up is cheap).
@@ -791,7 +836,7 @@ an item when it ships (finished behaviour is recorded in
   course-level pages, but for a "sample course" it does not name — a
   different measurement from the 32 above, not a contradiction of it.)
 
-## A rolled-over section publishes over last year's website
+## ✅ Done — A rolled-over section publishes over last year's website
 
 Noted 2026-09-06 on `issue/mcp-tool-surface-divergence`, while sorting the
 twelve MCP tools Windows serves and the mac does not (`MAC-HANDOFF.md`). Found
@@ -845,7 +890,7 @@ mac has never made one. Three options:
   `contracts/` so both platforms say it identically.
 
 Whichever is chosen it needs the same sentence on both sides. Windows' half is
-item 42 in `WINDOWS-HANDOFF.md`.
+item 45 in `WINDOWS-HANDOFF.md`.
 
 ### ✅ DECIDED 2026-09-08 by Russell — **ASK**, and leave visibility alone
 
@@ -874,7 +919,28 @@ behaviour rather than an accident — the question at rollover is what makes it 
 choice — and the teacher who wants the year revealed class by class hides the
 pages themselves, which is an act they already have.
 
-**What is still to BUILD — a separate piece, not done here.**
+**✅ BUILT 2026-09-08** on `issue/rollover-asks-about-the-website`,
+`GUI-IMPROVEMENTS.md` row 451. All three parts below are done on the MAC; the
+Windows half is `WINDOWS-HANDOFF.md` item 45. Three things were found by
+adversarial review while building and are worth keeping, because each was a
+way of shipping something worse than the defect:
+
+- **Cutting a section loose had to turn off any publish set to happen on its
+  own.** `runScheduled` re-validates nothing and `deploy.py`'s name prompt
+  returns its DEFAULT with no terminal rather than failing, so the overnight
+  run would have created a website nobody named while the address students read
+  stopped updating.
+- **Answering the question is the SECOND turn**, by which time the pages are
+  already on their dates — so the re-date plan changes nothing, and returning
+  early on that made the answer a no-op with an offer that looked like it had
+  worked.
+- **"Still pinned" and "never published" cannot share a sentence.** A marker
+  that could not be moved was reported as "had not been published anywhere
+  yet", which is the opposite of the truth about the one fact this turns on.
+
+The original list of what had to be built follows.
+
+**What was to BUILD — a separate piece, not done in the deciding session.**
 
 1. **The sentence, in `contracts/`**, so both platforms ask identically. It is
    the only part of this that is teacher-facing, and it is the reason this

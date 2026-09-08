@@ -2155,22 +2155,117 @@ to run in the background.
     teacher who then deploys, in `TODO.md` → "A rolled-over section publishes
     over last year's website".
 
-    **So this is no longer a question, and three things fall out of it. Still
-    do not fix it unilaterally — the WORDING has to be shared.**
+    **✅ BUILT ON THE MAC 2026-09-08** (`GUI-IMPROVEMENTS.md` row 448). The
+    sentences are in `contracts/assist-wording.json` and the marker rules in
+    `contracts/file-formats.json`, so your half is a port rather than a design.
+    What follows is what to copy, what to copy DIFFERENTLY, and the three traps
+    that cost real time here.
 
-    1. **The sentence belongs in `contracts/`** before either side builds it,
-       so both apps ask identically. Nobody has written it yet.
-    2. **You already have the machinery and the mac does not.** `ReleaseSite`
-       (`AssistWorkspace.cs:1929`) renames the marker aside rather than
-       deleting it, because it holds the site id and admin URL. Keep that.
-       What changes on your side is only WHO calls it: today only
-       `roll_over_section` does.
-    3. **The card phrasing has to move on both platforms.**
-       `AssistCardCommand.cs:50` sends "roll this section over to a new year"
-       straight to `re_date_classes`. Until that sentence reaches something
-       that can ask the question, the decision changes nothing a teacher meets.
-       It is the step easiest to leave out and the one that makes the other two
-       matter.
+    **The shape: the question hangs off the CARD PHRASING, never the tool.**
+    Four phrasings reach `re_date_classes` and only one is a rollover; the
+    other three are ordinary re-dating — a snow day, a timetable that shifted.
+    Asking those about websites lets a teacher answer "a new website"
+    mid-semester and abandon the address their students are reading right now.
+    So the mac's rollover phrasing carries `rollover: yes` and the others do
+    not, and the key is deliberately ABSENT from the tool's published schema —
+    exactly as `unit`, `scope` and `revise` already are. That costs no routing
+    accuracy and does not touch the argument set your
+    `AssistSurfaceContractTests` pins as an exact departure list, so copying
+    this shape keeps your suite green. `contracts/assist-cases.json` →
+    `cardPhrasings` carries all three phrasings and their arguments, and your
+    `AssistCardCommandTests` already asserts every key and value, so **your
+    suite will go red until you add them** — that is the mechanism working.
+
+    **Answered in WORDS, not with a dialog.** The reply asks the question and
+    names two sentences; saying either one comes back through the same tool
+    with `website: new` or `website: same`. A dialog cannot appear for a
+    request arriving over MCP, and your `PlantoirTools` advertises this
+    phrasing to Claude Code exactly as the mac's surface does — so a dialog
+    would leave that path silently pinned with the write already done. Both
+    answer sentences are in the wording contract
+    (`rolloverSayToStartANewWebsite`, `rolloverSayToKeepTheSameWebsite`).
+
+    **Three traps, all met here, all costly.**
+
+    1. **Answering is the SECOND turn, and by then the pages are already on
+       their dates.** The re-date plan then changes nothing, and an early
+       return on "already on the right day" made the whole answer a no-op —
+       the reply talked about dates, never mentioned the website, and left the
+       section pinned, with an offer that looked like it had worked. Settle the
+       website on BOTH paths. Found by review, not by testing.
+    2. **Cutting a section loose must turn off a publish set to happen on its
+       own, and say so.** A released section has no agreed website, and a
+       scheduled run has nobody to ask — and `deploy.py`'s name prompt returns
+       its DEFAULT when there is no terminal rather than failing, so the
+       overnight run creates `<code>-s<n>-<year>-<name>` and publishes there
+       while the address students read stops updating. That is a WORSE failure
+       than the defect being fixed. Renaming a course already turns scheduled
+       publishes off for the same reason. Report it honestly when turning it
+       off FAILS (`rolloverCouldNotTurnOffTheScheduledPublish`): a plist left
+       behind is loaded again at next login.
+    3. **"Still pinned" and "never published" must not share a sentence.** A
+       marker that exists and cannot be moved used to produce the same empty
+       result as one that was never there, so a teacher was told "this section
+       had not been published anywhere yet" about a section still publishing
+       over last year's site — the opposite of the truth about the one fact the
+       feature turns on. `rolloverCouldNotStartANewWebsite` is its own sentence.
+
+    **What you must copy DIFFERENTLY — two real defects on your side.**
+
+    - **`ReleaseSite` releases only the FIRST destination it finds.** The loop
+      at `AssistWorkspace.cs:1931-1952` `return`s inside the first folder
+      holding a marker, so a section pinned to both Netlify and Cloudflare has
+      only its Netlify marker released and still publishes over last year's
+      Cloudflare site. Markers are keyed purely by destination TYPE and a
+      course can carry additional targets. The mac releases every type; the
+      rule is now `contracts/file-formats.json` →
+      `firstDeployMarkers.releasedWhenASectionRollsOver`.
+    - **The LEGACY marker is not released either, and it is NOT where you would
+      guess.** `deploy.py` still reads it and migrates it back into the stable
+      path (`load_netlify_marker`, `scripts/deploy.py:454`), and it lives at
+      `<CODE>/.merged_output/section<N>/.netlify_site.json` — in the BUILT
+      OUTPUT, never beside the teacher's pages. The mac got this wrong first
+      time and released a content-folder path that has never held a marker in
+      any version of the layout, so the fix did nothing at all; `section_dir`
+      in `deploy.py` is `merged_output_root(...)/section<N>`
+      (`scripts/deploy.py:1001-1004`). A folder old enough to hold one is told
+      "never published" and then publishes over last year's site. Netlify only
+      — there has never been a Cloudflare equivalent. The mac releases it as
+      `.netlify_site.previous-<stamp>.json`, and tolerates the output folder
+      being absent, which is ordinary.
+
+    **Three traps found only at the third review, all of them "the feature is
+    invisible or unreachable" rather than "the feature is wrong".** Read these
+    before you build, because each passed a green suite.
+
+    - **The question has to be in the SUMMARY, not the detail.** On the mac
+      `AssistToolOutcome.wrote` leaves `teacherDetail` nil and the window
+      renders that, so text put in `detail` never reaches a teacher: the
+      feature worked over MCP alone and showed "Re-dated 3 classes…" and no
+      question in the app. Check whatever the equivalent is on your side before
+      assuming your reply is seen.
+    - **Plan mode is ON by default, and a plan twin that returns a WRITE
+      dead-ends the answer.** The mac's `showPlan` returns early whenever the
+      twin hands back something that is not a plan — and the twin's "already on
+      the day it should be" is a write, which is exactly what the answer turn
+      produces, since the dates are right by then. In the default configuration
+      the release was unreachable. The twin now still offers a plan when only
+      the website would change.
+    - **`website` is on the PUBLISHED schema; `rollover` is not.** In the app
+      the card supplies both and no model is involved. Over MCP there is no
+      card, so a client with no declared argument could not roll a section over
+      at all — which made the "answer in words rather than with a sheet"
+      reasoning wrong for the one surface that reasoning was about. It costs no
+      routing: `re_date_classes` is hidden from the local model, so only Claude
+      Code ever sees the schema. **This changes `toolSchemas` on your side of
+      the contract**, so expect `AssistSurfaceContractTests` to ask for
+      `website` — that is the request arriving, not damage.
+
+    **What you inherit unchanged:** the kept filename
+    `section<N>.previous-yyyy-MM-dd_HHmmss.json` is yours already and the mac
+    copied it; renaming aside rather than deleting is yours and the mac copied
+    the reason with it; and recording the move for undo is yours — the mac had
+    to widen its own history type to express a move at all before it could.
 
     **Two of two, still open — seventeen `TEACHERS SAY:` phrasings the mac
     has and you do not.**
@@ -2394,6 +2489,27 @@ to run in the background.
     not — `SpecialNames.CoverageSwitchLabelInSettings` is quoted by the blocked
     sentences and `EveryBlockedSentenceNamesASwitchTheAppActuallyHas` asserts
     it, so that one cannot be changed alone.
+
+45. **A rollover now ASKS whether the section should publish to a new website
+    or last year's, and your side has the same defect plus two of its own.**
+    Built on the mac 2026-09-08 to Russell's decision; `GUI-IMPROVEMENTS.md`
+    row 448. Your half is a PORT — the sentences are already in
+    `contracts/assist-wording.json` and the marker rules in
+    `contracts/file-formats.json` → `firstDeployMarkers.releasedWhenASectionRollsOver`.
+
+    **You inherit free:** the whole design, and the reasoning for the three
+    near-misses that shaped it. **You owe:** the three card phrasings (your
+    `AssistCardCommandTests` pins phrasing arguments against the contract, so
+    your suite goes red until you add them — a request, not damage), plus TWO
+    defects that are yours alone. `AssistWorkspace.ReleaseSite` returns inside
+    the first folder holding a marker, so a section pinned to both Netlify and
+    Cloudflare still publishes over last year's Cloudflare site; and it does
+    not know the legacy `section<N>/.netlify_site.json` path that `deploy.py`
+    still reads and migrates.
+
+    The detail, including why the question hangs off the card phrasing rather
+    than the tool and why cutting a section loose MUST turn off a scheduled
+    publish, is in item 41's rollover section above.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 
