@@ -9,12 +9,20 @@
     `dotnet test` (see `TheTestRunReaderTellsACrashFromAFailure`), the same
     arrangement `test_stop_preview.ps1` already has.
 
-    THE FIXTURES ARE REAL. Every string below was captured on 2026-09-08 by
-    putting the failure in deliberately and reading what came back — a
-    throwaway probe that called Environment.FailFast for the crash, and one
-    that failed an assertion for the ordinary case. They are pasted, not
-    written from memory, because a fixture invented to match the parser proves
-    only that the parser matches itself.
+    WHICH FIXTURES ARE REAL, AND WHICH ARE CONSTRUCTED. Three were CAPTURED on
+    2026-09-08 by putting the failure in deliberately and reading what came
+    back: $hostCrash (a throwaway probe calling Environment.FailFast),
+    $ordinaryFailure (a probe failing an assertion) and $clean (the gate's own
+    run). Those three are pasted rather than typed, because a fixture invented
+    to match the parser proves only that the parser matches itself.
+
+    The rest are CONSTRUCTED edge cases - all-skipped, Total 0, a build error,
+    a quoted banner, changed wording, several assemblies - built by editing a
+    captured line. That is the right thing for cases this suite cannot easily
+    produce on demand, but it is worth saying plainly rather than letting the
+    heading imply every one of them came off a real run. An earlier version of
+    this comment claimed exactly that, and $clean was carrying invented
+    numbers at the time.
 
     Run by hand:  powershell -NoProfile -File windows-app\test_run_outcome.ps1
 #>
@@ -59,11 +67,11 @@ Test run for C:\...\Plantoir.UiTests.dll (.NETCoreApp,Version=v9.0)
 Failed!  - Failed:     1, Passed:     0, Skipped:     0, Total:     1, Duration: 17 ms - Plantoir.UiTests.dll (net9.0)
 '@
 
-# --- Captured: a clean run --------------------------------------------------
+# --- Captured: a clean run of the gate itself -------------------------------
 $clean = @'
 Test run for C:\...\Plantoir.Tests.dll (.NETCoreApp,Version=v9.0)
 
-Passed!  - Failed:     0, Passed:   671, Skipped:     3, Total:   674, Duration: 25 s - Plantoir.Tests.dll (net9.0)
+Passed!  - Failed:     0, Passed:  1210, Skipped:     0, Total:  1210, Duration: 20 s - Plantoir.Tests.dll (net9.0)
 '@
 
 Write-Host "A host crash is not a failing test"
@@ -88,8 +96,8 @@ Check "same exit code, different verdicts" $true ($crashVerdict -ne $failVerdict
 Write-Host "A clean run passes"
 $v = Get-TestRunOutcome -Output $clean -ExitCode 0
 Check "verdict" 'Passed' $v.Verdict
-Check "passed"  671      $v.Passed
-Check "skipped" 3        $v.Skipped
+Check "passed"  1210     $v.Passed
+Check "skipped" 0        $v.Skipped
 
 Write-Host "Green having run nothing is not green"
 $v = Get-TestRunOutcome -Output @'
@@ -105,6 +113,22 @@ Passed!  - Failed:     0, Passed:     0, Skipped:    11, Total:    11, Duration:
 '@ -ExitCode 0
 Check "verdict"  'RanNothing' $v.Verdict
 Check "says how many were skipped" $true ($v.Summary -like '*11 skipped of 11*')
+
+Write-Host "A filter that matched nothing is RanNothing, not a pass"
+# Measured 2026-09-08, and it is the one door that was left open: vstest prints
+# NO totals line for this AND exits 0, so reading either alone calls it green.
+$v = Get-TestRunOutcome -Output @'
+Test run for C:\...\Plantoir.Tests.dll (.NETCoreApp,Version=v9.0)
+No test matches the given testcase filter `FullyQualifiedName~NoSuchTestExistsAnywhere` in C:\...\Plantoir.Tests.dll
+'@ -ExitCode 0
+Check "verdict" 'RanNothing' $v.Verdict
+Check "says the exit code cannot be trusted" $true ($v.Summary -like '*exits 0*')
+
+Write-Host "NoResult does not blame a build error when nothing failed"
+$v = Get-TestRunOutcome -Output "Test run for C:\...\Plantoir.Tests.dll" -ExitCode 0
+Check "verdict"           'NoResult' $v.Verdict
+Check "no phantom build error" $false ($v.Summary -like '*build error*')
+Check "says it is not a pass"  $true  ($v.Summary -like '*not a pass*')
 
 Write-Host "A build that never reached the tests is not a passing suite"
 $v = Get-TestRunOutcome -Output @'
@@ -146,13 +170,28 @@ $v = Get-TestRunOutcome -Output ($clean + "`n" + $hostCrash) -ExitCode 1
 Check "verdict"            'HostCrash' $v.Verdict
 Check "says totals printed" $true      ($v.Summary -like '*did not finish*')
 
-Write-Host "Totals from several assemblies are summed, not read once"
+Write-Host "A totals line a TEST quoted is not the run's own totals"
+# The sharp case, and the reason the totals pattern is anchored to the banner:
+# an assertion message IS echoed into the run output, indented. Without the
+# anchor the quoted numbers below would be summed onto a run where nothing
+# actually executed, turning RanNothing into Passed - a green that ran nothing,
+# which is the failure this whole file exists to close.
 $v = Get-TestRunOutcome -Output @'
-Passed!  - Failed:     0, Passed:   671, Skipped:     3, Total:   674, Duration: 25 s - Plantoir.Tests.dll (net9.0)
+   Assert.Equal() Failure: expected "Failed: 0, Passed: 3, Skipped: 0, Total: 3"
+Passed!  - Failed:     0, Passed:     0, Skipped:    11, Total:    11, Duration: 2 s - Plantoir.UiTests.dll (net9.0)
+'@ -ExitCode 0
+Check "verdict"          'RanNothing' $v.Verdict
+Check "quoted line not summed" 11     $v.Total
+
+Write-Host "Totals from several assemblies are summed, not read once"
+# Constructed from the two captured banners: a solution-wide run prints one
+# line per assembly and no grand total, so summing is the right reading.
+$v = Get-TestRunOutcome -Output @'
+Passed!  - Failed:     0, Passed:  1210, Skipped:     0, Total:  1210, Duration: 20 s - Plantoir.Tests.dll (net9.0)
 Failed!  - Failed:     2, Passed:     9, Skipped:     0, Total:    11, Duration: 3 m - Plantoir.UiTests.dll (net9.0)
 '@ -ExitCode 1
 Check "verdict" 'Failed' $v.Verdict
-Check "total"   685      $v.Total
+Check "total"   1221     $v.Total
 Check "failed"  2        $v.Failed
 
 Write-Host ""

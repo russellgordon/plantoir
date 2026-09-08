@@ -173,13 +173,11 @@ dotnet test  Plantoir.Tests/Plantoir.Tests.csproj
 
 **Read the TOTALS line, not the exit code.** `dotnet test` exits 1 for a failing
 test, for a test host that DIED underneath the run, and for a project that did
-not compile. A dead host prints no totals line at all and says `Test Run
-Aborted.` — and it NAMES a test, so the bystander gets investigated and
-re-running it passes, which is how the mac spent a fortnight and rejected 3 of 7
-pieces of correct work in one night. `.\run-tests.ps1` (repo root) runs exactly
-the command above and says which of the three happened; it is a convenience,
-not a gate, so the raw command stays correct. `documentation/12-windows-app.md`
-→ "Reading a test run" has the measured output of each.
+not compile; only the output tells them apart, and a dead host prints no totals
+line at all. `.\run-tests.ps1` (repo root) runs the same command and says which
+happened — a convenience, not a gate, so the raw command stays correct.
+`documentation/12-windows-app.md` → "Reading a test run" has the measured
+output of each, and why getting this wrong cost the mac a fortnight.
 
 **There is a second suite, and it is opt-in.** `run-ui-tests.ps1` (repo root)
 drives the REAL app through UI Automation, for the things `dotnet test` cannot

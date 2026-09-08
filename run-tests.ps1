@@ -44,9 +44,10 @@
     Both are exit code 1. **The totals line is the honest signal; the exit code
     is not.** If it is absent, the test named above it is a bystander.
 
-    `--blame` names the bystander properly: it writes a Sequence_<guid>.xml
-    under TestResults\ saying which test was running when the host died. That
-    is the cheap flag. `--blame-crash` additionally writes a full process dump,
+    `--blame` names it properly: it writes TestResults\<guid>\<guid>_Sequence.xml
+    saying which test was running when the host died (the name is that way
+    round - checked against `dotnet test --help`, not remembered). That is the
+    cheap flag. `--blame-crash` additionally writes a full process dump,
     which is tens to hundreds of megabytes — worth it once you are actually
     hunting one, not by default. Both paths are gitignored.
 
@@ -82,31 +83,16 @@ $dotnetArgs = @("test", $project, "--nologo")
 if ($Filter) { $dotnetArgs += @("--filter", $Filter) }
 if ($Blame)  { $dotnetArgs += "--blame" }
 
-# Captured as well as shown. `2>&1` is required — the crash banner goes to
-# stderr, so capturing stdout alone keeps the live output and silently loses
-# the one marker this exists to find. And `2>&1` on a native command is a
-# TERMINATING error while $ErrorActionPreference is 'Stop', so the preference
-# is lowered around the call and put straight back.
-$previousPreference = $ErrorActionPreference
-$ErrorActionPreference = 'Continue'
-try {
-    # Flattened to plain strings, then Tee'd. Both halves earn their place:
-    # `"$_"` turns the ErrorRecord that `2>&1` produces back into the line the
-    # tool actually wrote (PowerShell 5.1 otherwise renders each stderr line as
-    # a multi-line NativeCommandError blob with CategoryInfo and
-    # FullyQualifiedErrorId, which buries the banner it is here to surface);
-    # and Tee-Object leaves them on the SUCCESS stream, so the run still shows
-    # live AND a caller redirecting this script to a file gets the transcript.
-    # Write-Host would have been simpler and captures to nothing.
-    & dotnet @dotnetArgs 2>&1 | ForEach-Object { "$_" } | Tee-Object -Variable teed
-    $code = $LASTEXITCODE
-} finally {
-    $ErrorActionPreference = $previousPreference
-}
-$captured = ($teed | Out-String)
-
 . "$repo\windows-app\TestRunOutcome.ps1"
-$outcome = Get-TestRunOutcome -Output $captured -ExitCode $code
+
+# The capture is the subtle half - stderr, the preference juggling,
+# flattening the ErrorRecord - so it is SHARED rather than copied into each
+# runner. Invoke-TestRun's own comment carries the three details and what
+# each one cost; the batch driver had one of them wrong and could never have
+# seen the banner it was looking for, which is the argument against copies.
+$run = $null
+Invoke-TestRun -DotnetArguments $dotnetArgs -Result ([ref]$run)
+$outcome = Get-TestRunOutcome -Output $run.Output -ExitCode $run.ExitCode
 
 $colour = switch ($outcome.Verdict) {
     'Passed'    { 'Green' }
@@ -123,13 +109,10 @@ if ($outcome.Verdict -eq 'HostCrash') {
     }
 }
 if ($outcome.Verdict -eq 'RanNothing') {
-    Write-Host "A suite that ran nothing is not a suite that passed. Check the filter, and" -ForegroundColor Red
-    Write-Host "check that python is on PATH - PythonToolchainTests FAILS rather than skips" -ForegroundColor Red
-    Write-Host "without one, deliberately, so this should be reachable only by a bad filter." -ForegroundColor Red
+    Write-Host "A suite that ran nothing is not a suite that passed - check the filter." -ForegroundColor Red
 }
 
-# 2 and 3, not 1, so a caller can tell a dead host and an empty run from a red
-# suite without parsing anything. Everything else keeps dotnet's own code.
-if ($outcome.Verdict -eq 'HostCrash')  { exit 2 }
-if ($outcome.Verdict -eq 'RanNothing') { exit 3 }
-exit $code
+# Zero only for a genuine pass, and the numbers follow Microsoft.Testing.
+# Platform's published meanings where they fit. Get-TestRunExitCode explains
+# the whole scheme, including why 2 is avoided even though it looks free.
+exit (Get-TestRunExitCode -Verdict $outcome.Verdict -ExitCode $run.ExitCode)

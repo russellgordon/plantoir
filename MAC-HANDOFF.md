@@ -2621,9 +2621,11 @@ rather than being deleted.
   Identical at the exit code, completely different in the output — the same
   asymmetry `xcodebuild` has, in different words. The reference implementation
   is `windows-app/TestRunOutcome.ps1`, shared by `run-ui-tests.ps1`, the new
-  `run-tests.ps1` and the (gitignored) `batch/run-batch.ps1`, which until now
+  `run-tests.ps1` and the untracked `batch/run-batch.ps1`, which until now
   would have reported a dead host as **"TESTS FAILED (0 failed)"** — the exact
-  shape of the mac's `exit 65` with `0 failures`. Its own checks run inside
+  shape of the mac's `exit 65` with `0 failures`. (That last claim is one
+  nobody can check afterwards, including me: `batch/` has no history, which is
+  the very thing the next paragraph is about.) Its own checks run inside
   `dotnet test` (`TheTestRunReaderTellsACrashFromAFailure`), on fixtures pasted
   from real output rather than written from memory.
 
@@ -2648,22 +2650,29 @@ rather than being deleted.
   found Windows compliant — but by a different mechanism, and the write-up
   would be wrong if it said "same as the mac":
 
-  - The mac obeys by ORDERING. Windows cannot: WinUI's `ShowAsync` completes
-    when the dialog BEGINS closing, not when it has gone, so
-    `PresentRepairOutcomeAsync` is genuinely asked for while the findings
-    dialog is still dismissing. It is compliant because `ShowHealthDialogAsync`
-    RETRIES five times at 150 ms
-    (`windows-app/Plantoir/Views/SectionDetailView.xaml.cs`, and the code says
-    exactly this in its own doc comment).
+  - Windows obeys the rule as written — the outcome is presented only after
+    `await ShowHealthDialogAsync(...)` has returned, never from inside the
+    dialog's button action — but ordering ALONE is not enough here, which is
+    the part worth knowing. WinUI's `ShowAsync` completes when the dialog
+    BEGINS closing rather than when it has gone, so the second request can
+    still land while the first is dismissing; it survives because
+    `ShowHealthDialogAsync` RETRIES five times at 150 ms
+    (`windows-app/Plantoir/Views/SectionDetailView.xaml.cs`, whose doc comment
+    says exactly this). Ordering plus a retry, not a retry instead of
+    ordering.
   - So AppKit's consequence is a crash and WinUI's is a refusal — and a refusal
     is swallowed by `ShowDialogSafelyAsync`, which loses the report the teacher
     just pressed a button for. **That is precisely "asking for a second while
-    the first is dismissing loses one of them"**, the sentence the new reason
-    calls understated. It understates the MAC. It is exact for Windows.
+    the first is dismissing loses one of them"** — the clause
+    `WINDOWS-HANDOFF.md` item 39 glosses as having "understated" it. It
+    understates the MAC. It is exact for Windows.
 
-  If that reason is ever rewritten to be about the crash alone, Windows loses
-  the only written statement of the failure it actually has. Both halves want
-  to stay.
+  To be fair to the contract: it already keeps both halves —
+  `siteHealth.repair.oneAlertAtATime.why` states the lost alert in full and
+  then adds "It is worse than a lost alert: …". Nothing needs changing today.
+  This is only a request for the next edit: if that reason is ever rewritten to
+  be about the crash alone, Windows loses the only written statement of the
+  failure it actually has.
 
   Two smaller things found on the way, neither in item 39's scope and neither
   acted on: `SidebarPane.xaml.cs`'s post-rename notice is fired as

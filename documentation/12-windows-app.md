@@ -344,42 +344,56 @@ before anybody noticed the two entries were one defect.
 
 | What happened | Exit | What it prints |
 |---|---|---|
-| A test failed | 1 | `Failed!  - Failed: 1, Passed: 0, Skipped: 0, Total: 1, Duration: 17 ms` |
+| A test failed | 1 | `Failed!  - Failed: 1, Passed: 0, Skipped: 0, Total: 1, Duration: 17 ms` (column-padded in reality, and it ends with the assembly name) |
 | The host died | 1 | `The active test run was aborted. Reason: Test host process crashed` and `Test Run Aborted.` — and **no totals line at all** |
 | It never compiled | 1 | neither: a build error, and no totals |
 
 `windows-app/TestRunOutcome.ps1` reads that rather than the exit code, and is
-shared by `run-tests.ps1`, `run-ui-tests.ps1` and the (gitignored) batch
-driver, so all three agree and there is one place to correct if vstest changes
-its wording. Its verdicts are `Passed`, `Failed`, `HostCrash`, `RanNothing` and
-`NoResult`; `HostCrash` wins over any partial totals, because a partial answer
-to "did the suite pass" is not an answer. `HostCrash` exits **2** and
-`RanNothing` exits **3**, so a caller need not parse anything. Neither is
-retried: a crash retried until it passes is a crash nobody measures, and the
-mac's was fixed only once somebody counted it.
+shared by `run-tests.ps1`, `run-ui-tests.ps1` and the untracked batch driver,
+so all three agree and there is one place to correct if vstest changes its
+wording. It shares the CAPTURE too (`Invoke-TestRun`), which is the subtler
+half: the banner goes to stderr, `2>&1` is a terminating error under
+`$ErrorActionPreference = 'Stop'`, and the ErrorRecord has to be flattened back
+into a plain line. The batch driver had the first of those wrong and could
+never have seen the banner it was looking for.
 
-`RanNothing` is worth knowing about on its own. A run that finishes having
-executed nothing is not green, and it has a second dress beyond `Total: 0` —
-an opt-in suite whose switch did not take reports every test *skipped* and a
-healthy-looking Total. Run `run-ui-tests.ps1` with `PLANTOIR_UI_TESTS` unset
-and that is exactly what you get.
+Its verdicts are `Passed`, `Failed`, `HostCrash`, `RanNothing` and `NoResult`;
+`HostCrash` wins over any partial totals, because a partial answer to "did the
+suite pass" is not an answer. **The two runner scripts exit 0 only for a
+genuine pass** — 3 for a dead host, 8 for a run that executed nothing, 4 for no
+result at all, following Microsoft.Testing.Platform's published meanings so the
+numbers survive an xunit v3 migration. (2 is deliberately avoided: MTP means
+"at least one test failed" by it, which would invert the one distinction this
+draws.) Neither a crash nor an empty run is retried: a crash retried until it
+passes is a crash nobody measures, and the mac's was fixed only once somebody
+counted it.
+
+`RanNothing` is worth knowing about on its own, because it is the case a
+green exit code lies about most often. **A filter that matches nothing exits
+0** — measured: vstest prints "No test matches the given testcase filter" and
+no totals line at all — so before this, a typo'd `--filter` reported success on
+a run that executed nothing. It has a third dress too: an opt-in suite whose
+switch did not take reports every test *skipped* and a healthy-looking Total.
+Run `dotnet test Plantoir.UiTests.csproj` directly and that is what you get
+(not through `run-ui-tests.ps1`, which sets `PLANTOIR_UI_TESTS` itself).
 
 **Typing `dotnet test` directly is still correct**, and `run-tests.ps1` is a
 convenience rather than a new gate — nothing depends on it. If you type the raw
 command, look for the totals line yourself: if it is absent, the test named
 above it is a bystander. `--blame` names the bystander properly, writing a
-`Sequence_<guid>.xml` under `TestResults\` saying which test was running when
+`<guid>_Sequence.xml` under `TestResults\` saying which test was running when
 the host died (`run-tests.ps1 -Blame`); `--blame-crash` adds a full process
 dump, tens to hundreds of megabytes, which is worth it only once you are
 hunting one. Both paths are gitignored.
 
 The reader's own checks run inside `dotnet test`
 (`TheTestRunReaderTellsACrashFromAFailure`, which shells out to
-`windows-app/test_run_outcome.ps1`), on fixtures pasted from real output rather
-than written from memory — a fixture invented to match the parser proves only
-that the parser matches itself. **Nothing here has ever been seen to crash its
-host**; this exists so that if one ever does, it is read correctly the first
-time.
+`windows-app/test_run_outcome.ps1`). Three of its fixtures are pasted from real
+output — a crash, an ordinary failure and a clean gate run — and the rest are
+edge cases constructed by editing those, which the file says of itself rather
+than implying every line came off a run. **Nothing here has ever been seen to
+crash its host**; this exists so that if one ever does, it is read correctly
+the first time.
 
 ## Driving the real interface
 

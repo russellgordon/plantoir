@@ -1985,9 +1985,11 @@ to run in the background.
     reads the totals, is shared by `run-ui-tests.ps1`, `run-tests.ps1` and the
     batch driver, and its own checks run inside `dotnet test`
     (`TheTestRunReaderTellsACrashFromAFailure`). Numbers, and the nuance found
-    in the `oneAlertAtATime` re-read — Windows complies by RETRY, not by
-    ordering, and the clause the mac now calls understated is exactly the
-    Windows failure mode — are in `MAC-HANDOFF.md`.
+    in the `oneAlertAtATime` re-read — Windows obeys the ordering rule AND
+    needs a retry, because WinUI's `ShowAsync` returns when a dialog begins
+    closing; and the lost-alert clause this item glosses as "understated" is
+    exactly the Windows failure mode — are in `MAC-HANDOFF.md`.
+
 
     **What it was.** The mac unit suite runs against the app's real window, so
     a test that sets alert state raises a real `NSAlert` sheet, and clearing it
@@ -2008,7 +2010,9 @@ to run in the background.
     produces this does not exist on your side. Do not go looking for it, and
     do not port the fix.
 
-    **What you owe — two small things.**
+    **What you owed — two small things, both now DONE. Kept as the original
+    text rather than deleted, so the list keeps its own history; nothing
+    under this number is outstanding.**
 
     - **Check whether `Plantoir.UiTests` can CRASH its host rather than fail an
       assertion.** The one intermittent you have recorded,
