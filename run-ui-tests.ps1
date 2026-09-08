@@ -100,8 +100,41 @@ $dotnetArgs = @("test", "$repo\windows-app\Plantoir.UiTests\Plantoir.UiTests.csp
 if ($Filter) { $dotnetArgs += @("--filter", $Filter) }
 
 Write-Host "Driving the interface..." -ForegroundColor Cyan
-& dotnet @dotnetArgs
-$code = $LASTEXITCODE
+
+# Captured as well as shown, because the exit code cannot say what happened.
+# Measured 2026-09-08 by putting each failure in deliberately: a test host that
+# DIES and a test that FAILS both come back as exit 1, and they differ only in
+# the output - a crashed run prints "Test Run Aborted." and no totals line at
+# all. windows-app\TestRunOutcome.ps1 carries the numbers and the reasoning.
+#
+# Two details, both learned the hard way rather than reasoned about:
+#
+#   * `2>&1` is REQUIRED. The crash banner goes to stderr, so a capture of
+#     stdout alone - `| Tee-Object -Variable out`, the obvious form - keeps
+#     the live output and silently loses the one marker this exists to find.
+#
+#   * ...and `2>&1` on a native command is a TERMINATING error while
+#     $ErrorActionPreference is 'Stop' (set at the top of this file), which
+#     would abort the script on the first stderr line and skip the cleanup
+#     below. So the preference is lowered around the call and put straight
+#     back.
+$previousPreference = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    # Flattened to plain strings, then Tee'd. Both halves earn their place:
+    # `"$_"` turns the ErrorRecord that `2>&1` produces back into the line the
+    # tool actually wrote (PowerShell 5.1 otherwise renders each stderr line as
+    # a multi-line NativeCommandError blob with CategoryInfo and
+    # FullyQualifiedErrorId, which buries the banner it is here to surface);
+    # and Tee-Object leaves them on the SUCCESS stream, so the run still shows
+    # live AND a caller redirecting this script to a file gets the transcript.
+    # Write-Host would have been simpler and captures to nothing.
+    & dotnet @dotnetArgs 2>&1 | ForEach-Object { "$_" } | Tee-Object -Variable teed
+    $code = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousPreference
+}
+$captured = ($teed | Out-String)
 
 $env:PLANTOIR_UI_TESTS = $null
 # A crashed run can leave the app behind; it was ours, so it goes.
@@ -149,5 +182,31 @@ if ($code -ne 0 -and $kept.Count -eq 0) {
     Write-Host 'Re-run with $env:PLANTOIR_UI_KEEP = 1 to keep the failed run''s logs and working folder.' -ForegroundColor Yellow
 }
 
+# What actually happened, rather than what exit 1 implies. A HOST CRASH is not
+# a failing test: the test named in the output is a bystander, and re-running
+# it proves nothing - which is the mistake that rejected three of seven pieces
+# of correct work on the mac in one night (GUI-IMPROVEMENTS.md row 444).
+. "$repo\windows-app\TestRunOutcome.ps1"
+$outcome = Get-TestRunOutcome -Output $captured -ExitCode $code
+
+$colour = switch ($outcome.Verdict) {
+    'Passed'    { 'Green' }
+    'HostCrash' { 'Magenta' }   # deliberately NOT the red a failing test gets
+    default     { 'Red' }
+}
+Write-Host ""
+Write-Host $outcome.Summary -ForegroundColor $colour
+
+if ($outcome.Verdict -eq 'HostCrash') {
+    Write-Host "Do not re-run it hoping for green. Count it: how often, and in which class." -ForegroundColor Magenta
+    Write-Host "To learn WHICH test was running when the host died, add --blame to the dotnet" -ForegroundColor Magenta
+    Write-Host "test arguments; it writes a Sequence_*.xml naming it (TestResults\ is ignored)." -ForegroundColor Magenta
+}
+
 $env:PLANTOIR_UI_RUN = $null
+
+# 2, not 1, so a caller can tell a dead host from a red suite without parsing
+# anything. Everything else keeps dotnet's own code.
+if ($outcome.Verdict -eq 'HostCrash') { exit 2 }
+if ($outcome.Verdict -eq 'RanNothing' -and $code -eq 0) { exit 3 }
 exit $code
