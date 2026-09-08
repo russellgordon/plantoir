@@ -12,14 +12,20 @@ import Foundation
 /// never NAMED by the model, so they are not put in front of it.
 ///
 /// **Keep these three numbers right.** They are 22, 13 and 9 as this is
-/// written, and all three are now PINNED — `AssistCurriculumMentionsTests`
+/// written, and all three are now pinned — `AssistCurriculumMentionsTests`
 /// asserts 22 and 13, and `testTheHiddenToolsAreStillServedToClaudeCode`
 /// asserts that the nine it names ARE the set difference, so hiding a tenth
-/// tool fails a test rather than quietly making a comment wrong. The nine was
-/// unpinned until 2026-09-06, which is exactly the one of the three that had
-/// rotted: they read 20, 13 and 7 for long enough that the stale figure
-/// reached `CLAUDE.md`, three documents, this file's neighbour and its own
-/// test's doc comment. A count nobody can check is a count that gets quoted.
+/// tool fails a test rather than quietly making this sentence wrong.
+///
+/// **A pin does not protect the PROSE, and the obvious lesson here is the
+/// wrong one.** It is tempting to read the rot as "9 was the unpinned one, so
+/// pinning fixes it" — but 22 was already pinned, by that same test, all the
+/// while this comment said "twenty" and so did `CLAUDE.md`, two documents and
+/// this file's own neighbour. A test compares the code to a number; nothing
+/// compares a SENTENCE to one. What the set-difference assertion actually buys
+/// is narrower and worth having anyway: hiding a tenth tool now fails rather
+/// than silently widening a gap nobody restates. The prose still has to be
+/// grepped for and corrected by hand, which is how these were found.
 ///
 /// The descriptions are the Windows server's own, put through the same
 /// shortening rule the narrowed surface uses there: keep the `TEACHERS SAY:`

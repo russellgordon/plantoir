@@ -629,6 +629,17 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   decision document instead, so this entry stays OPEN on purpose rather than
   being marked done — the sorting is finished, the product is not.
 
+  **Two of the four things this entry handed Windows were already done when it
+  merged, 2026-09-07.** The sorting ran on a branch cut before
+  `issue/29-windows-contract-case-lists` reached `dev`, so it could not see
+  `AssistSurfaceContractTests` — which enumerates `PlantoirTools` by reflection
+  and records `re_date_classes`' extra arguments as agreed departures. The
+  paragraphs below are corrected in place rather than deleted, because the
+  reasoning that was rejected on the way is still worth having. What is left
+  for Windows is the rollover decision and the seventeen phrasings; what is
+  left for the MAC is Russell's yes on the sorting, the one `check_section`
+  phrasing, and the generator change Windows asked for in this same file.
+
   The twelve, verified by set difference rather than read off a list: exactly
   twelve Windows-only, **zero mac-only**, and **zero hits for any of the twelve
   names anywhere under `mac-app/QuartzTeachers` or `contracts/`** —
@@ -651,11 +662,16 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      `mcpOnly` third of it compares the contract against a **hardcoded
      three-name list written inline in the test**, never against
      `PlantoirTools` at all.
-  2. **Nothing on either platform enumerates the 37.** No Windows test reads
-     `toolSchemas` (`grep toolSchemas windows-app/Plantoir.Tests` → 0 hits),
-     and no mac test knows `PlantoirTools.cs` exists. A tool added on Windows
-     and put in neither the contract nor the mac passes both suites silently —
-     which is exactly what happened twelve times.
+  2. **Nothing on either platform enumerated the 37 — true when this was
+     written, and Windows fixed it hours later.** The audit ran on a branch cut
+     before `issue/29-windows-contract-case-lists` reached `dev`, and reported
+     `grep toolSchemas windows-app/Plantoir.Tests` → 0 hits. Windows' new
+     `AssistSurfaceContractTests` reads `PlantoirTools` by REFLECTION, pins the
+     twelve extras by name in both directions, and reads `toolSchemas` for both
+     surfaces including argument names and types. What remains true is the
+     first half: `AssistCases_Tools_MatchesContract` still pins `AssistAgent`,
+     and no MAC test knows `PlantoirTools.cs` exists — nor should one, see
+     below.
 
   **The fix this entry PRESCRIBED was also wrong, and is the reason to read
   the next paragraph before acting.** It said to "put the survivors in
@@ -666,7 +682,15 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   nothing on Windows reads it anyway. The real order is decide → write Swift →
   regenerate.
 
-  ### The drift detector that would make this stick — PROPOSED, not built
+  ### The drift detector that would make this stick — BUILT, on the other side
+
+  **Windows built it, and their shape is better than the one proposed here.**
+  `AssistSurfaceContractTests.TheExtraToolsThisServerOffersAreTheOnesWeKnowAbout`
+  reflects over `PlantoirTools` and holds the twelve extras as a NAMED list —
+  their own comment says why named rather than counted: "a count stays at
+  twelve when one tool is added and another adopted into the contract, and it
+  cannot tell the reader WHICH". It fails on an unrecorded addition AND on a
+  listed name the contract has since adopted.
 
   Rejected on the way: **a mac test that reads
   `windows-app/Plantoir.Mcp/PlantoirTools.cs` and regexes out the
@@ -679,25 +703,23 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   must not have. And it couples the mac gate to Windows source rather than to
   data, which is not how anything else here crosses the gap.
 
-  What is proposed instead is symmetric and contract-mediated, the shape rule 4
-  already uses:
+  **WITHDRAWN — what this entry was going to propose instead.** An AUTHORED
+  `assist-cases.json` key, `mcpToolNames`, listing every name the MCP surface
+  is agreed to carry; Windows asserting its 37 against it, the mac asserting
+  its 25 plus a recorded "not served here, and why" list against the same one.
+  Authored keys do survive `--write-contracts`, so it would have worked. It is
+  not needed: reflection on the Windows side gets the complete list from the
+  compiler, with no new contract key and no second home for the list to drift
+  in. Recorded because it was reasoned about, and because the general lesson
+  outlived it — **enumerate a platform's surface ON that platform, and cross
+  the gap with the RESULT** — which is also why no mac test should learn to
+  read `PlantoirTools.cs`.
 
-  - `assist-cases.json` gains an AUTHORED key — call it `mcpToolNames` —
-    listing every name the MCP surface is agreed to carry. Authored keys
-    survive `--write-contracts` (`AssistContract.write` overwrites only
-    `generatedCaseKeys`), so it can be proposed from either side, which is the
-    whole point.
-  - **Windows** asserts its 37 `[McpServerTool]` names equal that list. That
-    is the test nobody has told them about; it is now item 33 in
-    `WINDOWS-HANDOFF.md`.
-  - **The mac** asserts `AssistToolRunner.mcpTools` plus an explicitly recorded
-    "not served here, and why" list equals the same list.
-
-  Then a tool added on either side fails the OTHER side's suite until somebody
-  writes down what they decided — a request rather than damage, exactly as
-  rule 4 describes. **Not built here**, because the "not served here, and why"
-  list IS the sorting below, and committing it to `contracts/` would make an
-  unapproved decision the acceptance list both suites run.
+  What is still NOT in any contract is the sorting below, and that stays
+  deliberate: its "and why" half is an unapproved product decision, and
+  committing it would make that decision the acceptance list both suites run.
+  Windows' list carries the twelve names with no verdict attached, which is
+  exactly the right amount to pin before Russell has chosen.
 
   ### The twelve, sorted
 
@@ -864,7 +886,13 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   Windows' actual parameters to it. **This is worse than a missing tool**: a
   missing tool is at least visible as missing, while a shared name with two
   shapes lets a client written against the contract send arguments one server
-  silently ignores. Written up for Windows as part of item 33.
+  silently ignores. **Answered on the Windows side while this was being
+  written:** `AssistSurfaceContractTests.AssertOnlyTheDeparturesWeHaveAgreed`
+  lists all six of the extra arguments as agreed departures, asserted as an
+  exact set, so a seventh fails and a resolved one that stays listed fails too.
+  What the mac still owes is the generator change Windows asked for in this
+  same file — emit the departures beside the schemas, so their test can read
+  them instead of holding a second copy.
 
   ### The `TEACHERS SAY:` phrasings have drifted five ways, mostly OURS
 
@@ -891,7 +919,7 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   **Nothing is fixed here on either side**, because adding a phrasing IS a
   routing change and routing is measured by hand against a local
   `llama-server`, which an unattended session cannot do. The mac owes itself
-  one phrasing; Windows owes itself seventeen, and item 33 tells them so.
+  one phrasing; Windows owes itself seventeen, and item 41 tells them so.
   (An earlier draft of this entry claimed the `check_section` case was the only
   difference of the 25 — that was a script that only looked in one direction,
   and it is exactly the failure this whole entry is about.)
@@ -914,7 +942,7 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   rather than handed over from Windows, the write-up and the three options live
   in **`TODO.md`** ("A rolled-over section publishes over last year's website").
   Listed here only so the sorting above does not point at nothing: item (2) of
-  the product bucket is this. Windows' half is item 33 in `WINDOWS-HANDOFF.md`.
+  the product bucket is this. Windows' half is item 41 in `WINDOWS-HANDOFF.md`.
 
 - **The folder-problem front end landed on Windows, and it found two defects in
   the mac's own repair** (Windows, 2026-09-06, branch
