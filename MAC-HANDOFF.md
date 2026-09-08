@@ -89,9 +89,26 @@ one deliberate exception to "writing the value it already has changes
 nothing", reasoned in `migrationIsTheOneExceptionToRule4`. `GUI-IMPROVEMENTS.md`
 row 140's migration paragraph was right all along and needs no correction.
 
-**One proposed 2026-09-07: `activityTrail.mustRecord` → `section restored`,
+**~~One proposed 2026-09-07: `activityTrail.mustRecord` → `section restored`,
 marked `appliesOn: ["windows"]` — and the mac suite goes RED on it anyway,
-which is the request arriving, not damage.** Branch
+which is the request arriving, not damage.~~ ✅ DONE 2026-09-07 (mac, branch
+`issue/section-restored-trail-event`).** Both halves, as asked. The mac's
+`AssistSession.restoreSection()` now notes `.sectionRestored` with the course,
+the section and the backup's file name, on the success path only; the sentence
+lives in `AssistSectionRestore.trailLine` so a test pins it by name rather than
+by a quoted copy. `SharedRulesContractTests.macMustRecord` is the `appliesOn`
+filter, behaving as the Windows twin does — with one deliberate difference
+worth knowing: a MALFORMED `appliesOn` (anything that is not a list of
+platform names) is treated as "belongs to both" rather than excusing the mac,
+because silently dropping a requirement is the failure the list exists to
+prevent. `appliesOn` is now GONE from the case, so it is pinned on both sides
+and the `why` no longer describes a state of affairs that has ended.
+
+**One thing this leaves for whoever adds the next platform-only event:** there
+is now NO `appliesOn: ["windows"]` entry in the contract, so the mac's filter
+has no live case exercising it. `SectionRestoredTrailTests` pins it with
+entries of its own for exactly that reason. `GUI-IMPROVEMENTS.md` row 445.
+Original text: Branch
 `issue/27-assist-conversation-restore`. `SharedRulesContractTests.swift`'s
 `testTheTrailRecordsEveryEventTheContractRequires` builds its wanted set from
 every `mustRecord` entry with no `appliesOn` filter (the Windows twin honours
