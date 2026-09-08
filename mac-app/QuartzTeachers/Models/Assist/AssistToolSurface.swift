@@ -140,7 +140,26 @@ extension AssistToolRunner {
     /// and it can do the one thing these tools need doing, which is deciding
     /// what a curriculum expectation MEANS. So the fuller surface is served
     /// there and nowhere else.
+    /// **Not all "judgement about meaning" any more, and the list says why per
+    /// tool.** It began as the three curriculum tools, which a large model does
+    /// well and a 4B does not. `list_courses` joined for a different reason —
+    /// the local model is scoped to one section and told its course, so it can
+    /// never need it, while a Claude Code session is handed a folder and has no
+    /// other way to look. The `add_classes` pair joined for a third: the local
+    /// model already reaches that capability through a phrasing matched in
+    /// CODE, so publishing its schema would spend routing accuracy to buy
+    /// something it already has.
+    ///
+    /// What they share is only the test that matters: none of them costs the
+    /// thirteen-tool surface the routing figures were measured against.
     static let mcpOnlyTools: [AssistToolDefinition] = [
+        listCoursesTool,
+        planAddClassesTool,
+        addClassesTool,
+        planMakeRoomForClassesTool,
+        makeRoomForClassesTool,
+        explainPublishingTool,
+        backUpCourseTool,
         listCurriculumExpectationsTool,
         planCurriculumMentionsTool,
         addCurriculumMentionsTool,
@@ -633,6 +652,205 @@ extension AssistToolRunner {
     private static let codesHelp: AssistSchemaProperty = AssistSchemaProperty(
         kind: .string,
         description: "The expectation codes to add, separated by commas — for example \"A1.1, A2.2\"."
+    )
+
+    /// What courses are in this working folder.
+    ///
+    /// **MCP-ONLY, and the reason is the asymmetry between the two clients.**
+    /// The local model is told which course and section it is working in by
+    /// `AssistAgent.systemPrompt`, and its window is scoped to one section, so
+    /// it never has to ask. A Claude Code session on the other end of
+    /// `--mcp-stdio` is given a working FOLDER, which holds several courses,
+    /// and the server answers only `initialize`, `tools/list` and
+    /// `tools/call` — no `resources/list`, no `instructions`. So it has no way
+    /// to find out what is there, and the first thing it does is guess a code
+    /// or read raw folders. Being MCP-only, this costs the local surface
+    /// nothing: routing accuracy is measured against the thirteen the model
+    /// sees, and this is not one of them.
+    ///
+    /// Inherited from Windows (`PlantoirTools.ListCourses`), which has had it
+    /// since before the mac's server existed.
+    private static let listCoursesTool: AssistToolDefinition = AssistToolDefinition(
+        name: "list_courses",
+        description: "TEACHERS SAY: \"what courses do I have?\", \"list my courses\". List the courses "
+                   + "in this working folder: the code, the name, which sections each one has, and where "
+                   + "each publishes to. Call this first when a teacher mentions a course and you are not "
+                   + "certain of its exact code — guessing a code reaches the wrong course silently.",
+        parameters: [:],
+        required: [],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    /// How many days a unit needs, said once instead of five times.
+    ///
+    /// **The engine already shipped; only the door was missing.** "Add five
+    /// more days to Unit 4" has reached `NextClassPlanner.plan(addingDays:
+    /// toUnit:)` through a card phrasing since that phrasing was written — but
+    /// `unit` and `days` are card-only keys, absent from `add_next_class`'
+    /// schema, so no MCP client could ask for it. This publishes the same
+    /// capability under a name of its own, which is how Windows has it.
+    ///
+    /// **No `firstDay`, and that is a deliberate divergence.** Windows takes
+    /// one, defaulting to 1, described as "1 unless the earlier days already
+    /// exist" — which is a question the caller has to answer by looking. The
+    /// mac's planner works it out: it continues from the last day that EXISTS
+    /// in that unit, published or not, because a page a teacher has written
+    /// and not yet shown anybody is still a day of the course and numbering
+    /// over it would collide with a real file. An argument nobody can get
+    /// wrong is better than one with a sensible default.
+    private static let planAddClassesTool: AssistToolDefinition = AssistToolDefinition(
+        name: "plan_add_classes",
+        description: "Work out what adding several class pages to a unit would do, and change nothing. "
+                   + "Shows what each page would be called and the day it would land on. Call this first "
+                   + "and show the teacher what it said.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+            "unit": unitHelp,
+            "howMany": howManyClassesHelp,
+        ],
+        required: ["course", "section", "unit", "howMany"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    private static let addClassesTool: AssistToolDefinition = AssistToolDefinition(
+        name: "add_classes",
+        description: "TEACHERS SAY: \"add five more days to Unit 4\". Add several class pages to a unit, "
+                   + "dated to the days this section actually meets, continuing from the last day that unit "
+                   + "already has. Call plan_add_classes first and show the teacher what it said.\n\n"
+                   + "The pages arrive UNPUBLISHED — empty skeletons for the teacher to write, which stay "
+                   + "out of the site until they publish them. An existing page is never written over, the "
+                   + "course is backed up first, and undo_last_change takes back what this created.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+            "unit": unitHelp,
+            "howMany": howManyClassesHelp,
+        ],
+        required: ["course", "section", "unit", "howMany"],
+        readOnly: false,
+        needsApproval: false
+    )
+
+    /// Room for a class PART-WAY through a unit, not on the end of it.
+    ///
+    /// **The most dangerous thing on this surface, by its own engine's
+    /// admission**: `ClassInsertionPlanner` renames the later days of a unit
+    /// and rewrites every wikilink that pointed at them. That is why it is
+    /// MCP-only — a person reads every step there — and why the write says
+    /// plainly that "Undo that" cannot take it back once other classes moved.
+    ///
+    /// The engine has taken `unit`, `atDay` and `count` from the start; what
+    /// was missing was any way to say them. Its one route was the fixed
+    /// phrasing "duplicate <page> as my next class", which pins the insertion
+    /// point to the day after a named page and the count to one.
+    private static let planMakeRoomForClassesTool: AssistToolDefinition = AssistToolDefinition(
+        name: "plan_make_room_for_classes",
+        description: "Work out what making room part-way through a unit would do, and change nothing. "
+                   + "Names every page that would be renamed, every class that would move to a later "
+                   + "day, and every link that would be rewritten. Call this first and show the teacher "
+                   + "what it said, in full — this moves more pages than anything else here.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+            "unit": unitHelp,
+            "atDay": atDayHelp,
+            "howMany": howManyRoomHelp,
+        ],
+        required: ["course", "section", "unit", "atDay"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    private static let makeRoomForClassesTool: AssistToolDefinition = AssistToolDefinition(
+        name: "make_room_for_classes",
+        description: "TEACHERS SAY: \"make room for a class at Unit 3, Day 4\". Insert one or more "
+                   + "classes part-way through a unit: the later days of that unit are renumbered, every "
+                   + "link that pointed at them is rewritten, the classes that follow move onto later "
+                   + "class days, and the new pages arrive unpublished.\n\n"
+                   + "Call plan_make_room_for_classes FIRST and show the teacher what it said. The course "
+                   + "is backed up first. Once other classes have moved, \"undo that\" can no longer take "
+                   + "this back and the backup is the way out — so tell the teacher to look the section "
+                   + "over in Plantoir before publishing anything.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+            "unit": unitHelp,
+            "atDay": atDayHelp,
+            "howMany": howManyRoomHelp,
+        ],
+        required: ["course", "section", "unit", "atDay"],
+        readOnly: false,
+        needsApproval: false
+    )
+
+    /// The distinction the local model is told and Claude Code was not.
+    private static let explainPublishingTool: AssistToolDefinition = AssistToolDefinition(
+        name: "explain_publishing",
+        description: "Call this FIRST, before doing anything else with a section. It returns a short "
+                   + "explanation of what publishing and deploying mean in Plantoir — say it to the "
+                   + "teacher word for word. It answers once per section: after that it says so, and "
+                   + "you should get straight on with what was asked rather than repeating it.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+        ],
+        required: ["course", "section"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    /// A copy of a whole course, before somebody edits it by hand.
+    ///
+    /// **`readOnly: false` and NO plan twin, like `rebuild_preview`.** It has a
+    /// side effect, so it is not read-only — but there is nothing to plan: a
+    /// backup takes nothing away and changes nothing a teacher would want to
+    /// approve. `AssistAgent` checks whether a twin exists before offering a
+    /// plan and executes directly when there is none, so this is a supported
+    /// shape rather than a gap.
+    ///
+    /// It exists even though `backUpOnceForThisConversation` already saves a
+    /// copy before the assistant's first write, and Windows' own description
+    /// says why: the case it does not cover is "edits you make DIRECTLY rather
+    /// than through these tools" — a Claude Code session about to change
+    /// Markdown with its own file tools, which no automatic backup sees.
+    private static let backUpCourseTool: AssistToolDefinition = AssistToolDefinition(
+        name: "back_up_course",
+        description: "Make a full copy of one course, which the teacher can restore from inside "
+                   + "Plantoir. Do this before any bulk editing of a course's files — INCLUDING "
+                   + "edits you make directly rather than through these tools, which nothing else "
+                   + "backs up. Course folders are not in version control, so a copy is the only "
+                   + "way back.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+        ],
+        required: ["course", "section"],
+        readOnly: false,
+        needsApproval: false
+    )
+
+    private static let atDayHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .integer,
+        description: "The day number the new class takes. That day and every later day in the unit are "
+                   + "renumbered to make room."
+    )
+
+    private static let howManyRoomHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .integer,
+        description: "How many classes to make room for. Leave empty for one."
+    )
+
+    private static let unitHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .integer,
+        description: "The unit number to add days to, for example 4."
+    )
+
+    private static let howManyClassesHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .integer,
+        description: "How many class pages to add to that unit."
     )
 
     private static let listCurriculumExpectationsTool: AssistToolDefinition = AssistToolDefinition(

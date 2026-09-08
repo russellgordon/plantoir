@@ -1461,7 +1461,7 @@ to run in the background.
       real `CredentialRequests`, is the half that would catch a request added
       here and written down nowhere.
     - `app-rules.json` → `publishedFreshness.whenShown` (9) / `whenRecorded`
-      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/25 — the NAMES
+      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/32 — the NAMES
       and ARGUMENTS, not the descriptions, which `Briefly()` rewrites here for
       measured reasons); `course-management.json` → `courseCode.renameEffects`
       (6); `shared-rules.json` → `buildOutputLocation.windowsLocation.buildsRoot`
@@ -2108,7 +2108,7 @@ to run in the background.
     first". Those are the two cases that reach the placeholder, by name. The
     numbers above hold.
 
-41. **Your MCP server serves 37 tools and the mac's serves 25 — and TWO
+41. **Your MCP server serves 37 tools and the mac's serves 32 — and TWO
     things now fall to you: a rollover that publishes over last year's
     website (DECIDED 2026-09-08 — build it, do not re-open it), and seventeen
     measured phrasings you do not have.**
@@ -2155,7 +2155,7 @@ to run in the background.
     teacher who then deploys, in `TODO.md` → "A rolled-over section publishes
     over last year's website".
 
-    **✅ BUILT ON THE MAC 2026-09-08** (`GUI-IMPROVEMENTS.md` row 448). The
+    **✅ BUILT ON THE MAC 2026-09-08** (`GUI-IMPROVEMENTS.md` row 451). The
     sentences are in `contracts/assist-wording.json` and the marker rules in
     `contracts/file-formats.json`, so your half is a port rather than a design.
     What follows is what to copy, what to copy DIFFERENTLY, and the three traps
@@ -2493,7 +2493,7 @@ to run in the background.
 45. **A rollover now ASKS whether the section should publish to a new website
     or last year's, and your side has the same defect plus two of its own.**
     Built on the mac 2026-09-08 to Russell's decision; `GUI-IMPROVEMENTS.md`
-    row 448. Your half is a PORT — the sentences are already in
+    row 451. Your half is a PORT — the sentences are already in
     `contracts/assist-wording.json` and the marker rules in
     `contracts/file-formats.json` → `firstDeployMarkers.releasedWhenASectionRollsOver`.
 
@@ -2510,6 +2510,84 @@ to run in the background.
     The detail, including why the question hangs off the card phrasing rather
     than the tool and why cutting a section loose MUST turn off a scheduled
     publish, is in item 41's rollover section above.
+
+46. **The mac now serves `list_courses` too, and the CARD PHRASING half is the
+    part worth copying.**
+    Built 2026-09-08, `GUI-IMPROVEMENTS.md` row 452 — the first of the six
+    tools from item 41's sorting that Russell asked for. You have had
+    `PlantoirTools.ListCourses` since before the mac's server existed; the mac
+    copied its shape, so a Claude Code session now gets the same three facts —
+    sections and destination alongside the code — on either platform.
+
+    **You owe two card phrasings**, and your suite will say so:
+    `AssistCardCommandTests` pins phrasing arguments against the contract, so
+    it goes red until "what courses do i have?" and "list my courses" are
+    added. That is the mechanism working, not damage.
+
+    **The idea to take, beyond this one tool.** MCP-only means the local MODEL
+    is not shown a tool — which is what protects routing accuracy, since that
+    is measured against the thirteen it sees. It does NOT mean the app cannot
+    do it. A fixed phrasing is matched in CODE and never reaches a model, so
+    adding one costs the router nothing and hands a teacher a capability that
+    was otherwise Claude-Code-only. Anything of yours that is MCP-only today is
+    a candidate for the same treatment.
+
+    **`add_classes` and `plan_add_classes` followed the same day**
+    (`GUI-IMPROVEMENTS.md` row 453), and they carry one divergence worth
+    knowing: **the mac takes no `firstDay`.** Yours defaults it to 1 and
+    describes it as "1 unless the earlier days already exist", which is a
+    question the caller has to answer by looking at the section. The mac's
+    planner continues from the last day that EXISTS in that unit, published or
+    not — a page a teacher has written and not yet shown anybody is still a day
+    of the course, and numbering over it would collide with a real file. An
+    argument nobody can get wrong is better than one with a sensible default;
+    if your planner can work the same thing out, dropping the argument removes
+    a way to be wrong. Nothing is owed here — your suite will not go red for
+    this pair, because the phrasing it corresponds to already existed on both
+    sides.
+
+    **`make_room_for_classes` and its twin landed the same day too**
+    (`GUI-IMPROVEMENTS.md` row 454), and this is the one where the card
+    phrasing needs care rather than copying. It is PARSED, not listed — "make
+    room for a class at Unit 3, Day 4", or "two classes" for more — because
+    the sentence is a fixed frame with numbers in it and no judgement anywhere.
+    **Take the near-miss list with it**, not just the happy path: "make room
+    for two class at Unit 3, Day 4" must NOT match, and a parser that shrugs at
+    a count and noun disagreeing is one that renames a teacher's pages on a
+    typo. Your `AssistCardCommandTests` will go red until the phrasing exists
+    on your side.
+
+    Two other things worth checking against your own implementation, because
+    the mac had to think about them and the engine is the same shape: whether
+    your reply says that "undo that" will NOT take it back once other classes
+    have moved — a half-undone renumbering is worse than no undo, so the mac
+    records nothing on the undo list and names the backup instead — and whether
+    it says so in the PLAN as well as afterwards, where a teacher can still say
+    no.
+
+    **`explain_publishing` and `back_up_course` completed the set**
+    (`GUI-IMPROVEMENTS.md` row 455), and with them **all six tools this sorting
+    judged the mac should have are built**. Two divergences to weigh against
+    your own: your `Briefing.AlreadyExplained` persists per FOLDER, so a teacher
+    is told once ever, while the mac's lasts one conversation — the reasoning is
+    that a session cannot repeat itself after it has ended, and a session a week
+    later is talking to somebody who may have forgotten, so writing a file to
+    suppress a sentence is a bigger promise than the problem needs. Neither is
+    obviously right. And the mac's `back_up_course` has no plan twin, which
+    yours does not need either: it has a side effect, so it is not a read, but
+    "shall I plan to take a copy?" is a card with no decision in it.
+
+    **Three more card phrasings will make your suite red** — "what does
+    publishing mean?", "what is the difference between publishing and
+    deploying?", and "back up this course".
+
+    **What this closes:** the twelve-tool gap is now the three you keep by
+    design (`read_timetable`, `list_recent_changes`, `sync_page_dates`) plus the
+    `plan_` twins that travel with their writes.
+
+    **One number moved:** the mac's MCP surface is 32 (22 shared + 10 MCP-only),
+    not 25. A pinned count made that a decision rather than drift — the test
+    failed the moment the tool was added, which is exactly what it is for.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 
@@ -3511,11 +3589,11 @@ for behaviour only your side has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 25-tool MCP one. (It said 23; corrected
+the 13-tool local surface and the 32-tool MCP one. (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
 serves 37, and the twelve it has beyond the contract are named in
 `AssistSurfaceContractTests` and in `MAC-HANDOFF.md`.) The mac's own test has
-pinned 22 + 3 MCP-only = 25 for longer than the prose said so. What the two
+pinned that sum for longer than the prose said so; it is 22 + 10 MCP-only = 32 since all six of the tools sorted as the mac's landed on 2026-09-08. What the two
 surfaces do and do not share is item 41 and "The two MCP surfaces are not the
 same product" below.
 
@@ -3548,16 +3626,28 @@ COMPLETE rather than whether it was correct. The numbered item is 41; this is
 the manual for it.
 
 **The measurement.** `Plantoir.Mcp/PlantoirTools.cs` declares **37** distinct
-`[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` serves **25**
-(22 tools plus three MCP-only). The set difference is exactly **12, all
-yours, none the mac's**, and **not one of the twelve appears anywhere under
-`mac-app/QuartzTeachers` or in `contracts/`** — there is no half-built mac
-version of any of them:
+`[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` served **25**
+when this was measured (22 tools plus three MCP-only). The set difference was
+exactly **12, all yours, none the mac's**, and not one of the twelve appeared
+anywhere under `mac-app/QuartzTeachers` or in `contracts/` — there was no
+half-built mac version of any of them:
 
 `add_classes`, `back_up_course`, `explain_publishing`, `list_courses`,
 `list_recent_changes`, `make_room_for_classes`, `plan_add_classes`,
 `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,
 `roll_over_section`, `sync_page_dates`.
+
+**Seven of those twelve are the mac's now**, and the surface is **32** (22 plus
+ten MCP-only). All six tools this sorting judged the mac should have were built
+on 2026-09-08 — `list_courses`, the `add_classes` pair, the
+`make_room_for_classes` pair, `explain_publishing` and `back_up_course`
+(`GUI-IMPROVEMENTS.md` rows 452–456, and item 46 below). So the set difference
+is **5**, and the sentence above about none of them existing on the mac
+describes the day it was measured rather than today. What is left is what the
+sorting said to leave: `read_timetable` and `list_recent_changes`, which are
+Windows-shaped by design; `sync_page_dates`, which needs a teacher's problem
+first; and `plan_sync_page_dates` and `roll_over_section`, whose writes are
+covered by decisions recorded elsewhere.
 
 **Why neither suite noticed — and how it is now caught.** Not a subset check
 — an earlier write-up said that and was wrong. `Assert.Equal` on `HashSet`s is

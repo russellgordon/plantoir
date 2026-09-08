@@ -5,6 +5,41 @@
         "arguments" : {
 
         },
+        "phrasing" : "what does publishing mean?",
+        "tool" : "explain_publishing"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "what is the difference between publishing and deploying?",
+        "tool" : "explain_publishing"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "back up this course",
+        "tool" : "back_up_course"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "what courses do i have?",
+        "tool" : "list_courses"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "list my courses",
+        "tool" : "list_courses"
+      },
+      {
+        "arguments" : {
+
+        },
         "phrasing" : "what would students see in this section right now?",
         "tool" : "check_section"
       },
@@ -279,6 +314,18 @@
     ],
     "note" : "Matched in CODE and never sent to the model. Trimmed, case-folded, trailing . and ! removed, then compared for EQUALITY. Measured: the model misrouted five of the eleven suggested phrasings in every trial while filling arguments perfectly, so the shapes with no ambiguity in them do not reach it.",
     "parsed" : [
+      {
+        "becauseNotThis" : "The count and the noun disagree, so it is a sentence somebody typed carelessly rather than one of these shapes — and this tool renames pages the teacher's links point at. Guessing which half they meant is exactly what a fixed shape exists to avoid.",
+        "example" : "make room for two classes at Unit 3, Day 4",
+        "fills" : {
+          "atDay" : "<day>",
+          "howMany" : "<count>, as a number — words up to twelve are understood",
+          "unit" : "<unit>"
+        },
+        "notThis" : "make room for two class at Unit 3, Day 4",
+        "shape" : "make room for <count> class|classes at unit <unit>, day <day>",
+        "tool" : "make_room_for_classes"
+      },
       {
         "becauseNotThis" : "A comma means one PAGE was named, which has a title in it for the model to read out. Only a bare unit number is a whole unit.",
         "example" : "publish unit 5",
@@ -674,6 +721,13 @@
       "add_next_class"
     ],
     "mcpOnly" : [
+      "list_courses",
+      "plan_add_classes",
+      "add_classes",
+      "plan_make_room_for_classes",
+      "make_room_for_classes",
+      "explain_publishing",
+      "back_up_course",
       "list_curriculum_expectations",
       "plan_curriculum_mentions",
       "add_curriculum_mentions"
@@ -682,9 +736,11 @@
       "deploy_section",
       "schedule_deploy"
     ],
-    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is offered to Claude Code on top of everything, being the three that ask for judgement about meaning.",
+    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is the ten offered to Claude Code on top of everything — three asking for judgement about meaning, the rest either never needed by a model scoped to one section or already reachable by it through a fixed phrasing.",
     "planTwins" : {
+      "add_classes" : "plan_add_classes",
       "add_next_class" : "plan_add_next_class",
+      "make_room_for_classes" : "plan_make_room_for_classes",
       "publish_class_on" : "plan_publish_class_on",
       "publish_pages" : "plan_publish_pages",
       "re_date_classes" : "plan_re_date_classes",
@@ -1651,6 +1707,211 @@
               "website" : {
                 "description" : "Either \"new\" or \"same\", when a teacher rolling this section over to a new year has said which website they want. Leave empty otherwise.",
                 "type" : "string"
+              }
+            },
+            "required" : [
+              "course",
+              "section"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "TEACHERS SAY: \"what courses do I have?\", \"list my courses\". List the courses in this working folder: the code, the name, which sections each one has, and where each publishes to. Call this first when a teacher mentions a course and you are not certain of its exact code — guessing a code reaches the wrong course silently.",
+          "name" : "list_courses",
+          "parameters" : {
+            "properties" : {
+
+            },
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Work out what adding several class pages to a unit would do, and change nothing. Shows what each page would be called and the day it would land on. Call this first and show the teacher what it said.",
+          "name" : "plan_add_classes",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "howMany" : {
+                "description" : "How many class pages to add to that unit.",
+                "type" : "integer"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              },
+              "unit" : {
+                "description" : "The unit number to add days to, for example 4.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section",
+              "unit",
+              "howMany"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "TEACHERS SAY: \"add five more days to Unit 4\". Add several class pages to a unit, dated to the days this section actually meets, continuing from the last day that unit already has. Call plan_add_classes first and show the teacher what it said.\n\nThe pages arrive UNPUBLISHED — empty skeletons for the teacher to write, which stay out of the site until they publish them. An existing page is never written over, the course is backed up first, and undo_last_change takes back what this created.",
+          "name" : "add_classes",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "howMany" : {
+                "description" : "How many class pages to add to that unit.",
+                "type" : "integer"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              },
+              "unit" : {
+                "description" : "The unit number to add days to, for example 4.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section",
+              "unit",
+              "howMany"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Work out what making room part-way through a unit would do, and change nothing. Names every page that would be renamed, every class that would move to a later day, and every link that would be rewritten. Call this first and show the teacher what it said, in full — this moves more pages than anything else here.",
+          "name" : "plan_make_room_for_classes",
+          "parameters" : {
+            "properties" : {
+              "atDay" : {
+                "description" : "The day number the new class takes. That day and every later day in the unit are renumbered to make room.",
+                "type" : "integer"
+              },
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "howMany" : {
+                "description" : "How many classes to make room for. Leave empty for one.",
+                "type" : "integer"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              },
+              "unit" : {
+                "description" : "The unit number to add days to, for example 4.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section",
+              "unit",
+              "atDay"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "TEACHERS SAY: \"make room for a class at Unit 3, Day 4\". Insert one or more classes part-way through a unit: the later days of that unit are renumbered, every link that pointed at them is rewritten, the classes that follow move onto later class days, and the new pages arrive unpublished.\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course is backed up first. Once other classes have moved, \"undo that\" can no longer take this back and the backup is the way out — so tell the teacher to look the section over in Plantoir before publishing anything.",
+          "name" : "make_room_for_classes",
+          "parameters" : {
+            "properties" : {
+              "atDay" : {
+                "description" : "The day number the new class takes. That day and every later day in the unit are renumbered to make room.",
+                "type" : "integer"
+              },
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "howMany" : {
+                "description" : "How many classes to make room for. Leave empty for one.",
+                "type" : "integer"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              },
+              "unit" : {
+                "description" : "The unit number to add days to, for example 4.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section",
+              "unit",
+              "atDay"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Call this FIRST, before doing anything else with a section. It returns a short explanation of what publishing and deploying mean in Plantoir — say it to the teacher word for word. It answers once per section: after that it says so, and you should get straight on with what was asked rather than repeating it.",
+          "name" : "explain_publishing",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Make a full copy of one course, which the teacher can restore from inside Plantoir. Do this before any bulk editing of a course's files — INCLUDING edits you make directly rather than through these tools, which nothing else backs up. Course folders are not in version control, so a copy is the only way back.",
+          "name" : "back_up_course",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
               }
             },
             "required" : [

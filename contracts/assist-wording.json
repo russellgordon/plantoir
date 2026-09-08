@@ -8,6 +8,7 @@
   },
   "wording" : {
     "aCreatedPageCanBeTakenBack" : "“Undo that” takes the page away again, as long as you have not written anything in it yet. Once you have, it is yours and I will leave it alone.",
+    "backedUpCourse" : "Backed up {course} to {course}_backup_2026-09-08_190000.zip. It is in Plantoir's Backups list, and restoring from it puts the whole course back as it is right now.",
     "builtWithNoWindowOpen" : "Rebuilt the site for {course} Section {section}. Open that section in Plantoir and press Preview to look it over — no window is showing it at the moment.",
     "cancelled" : "Cancel",
     "couldNotBuildBeforeDeploying" : "{course} Section {section} could not be built, so nothing was sent to students. The output is in that section's window in Plantoir.",
@@ -19,6 +20,7 @@
     "deployed" : "{course} Section {section} is deployed. Students can reach it now.",
     "deployQuestion" : "Shall I deploy?",
     "deployWasCancelled" : "Deploy cancelled.",
+    "noCoursesYet" : "This working folder has no courses in it yet. Add one in Plantoir, and it will appear here.",
     "nothingToDo" : "I am not sure what to do with that.",
     "nothingToUndo" : "There is nothing on my undo list — I have not changed any pages in this conversation yet. Anything older is in Plantoir's Backups list.",
     "planAccepted" : "Go",
@@ -26,6 +28,7 @@
     "planWasCancelled" : "Left as it was — nothing was changed.",
     "previewDidNotBuild" : "The preview for {course} Section {section} did not finish building. The output is in that section's window in Plantoir.",
     "previewIsRebuilding" : "The preview for {course} Section {section} is rebuilding now, and will appear in that section's window when it is ready.",
+    "publishingAlreadyExplained" : "I explained that for {course} Section {section} earlier in this conversation.",
     "rebuiltForACallerWithNoWindow" : "Rebuilt the preview for {course} Section {section}. Open that section in Plantoir to look it over.",
     "rolloverCouldNotStartANewWebsite" : "I could not move this section off .netlify_sites/section1.json, so publishing it will still replace last year's website there. Try again, or check whether that file is locked or open somewhere else.",
     "rolloverCouldNotTurnOffTheScheduledPublish" : "This section was also set to publish on its own, and Plantoir could not turn that off. It may still try to publish, and it has no way to ask what the new website should be called — turn it off from the section's menu.",
@@ -43,6 +46,7 @@
     "undidPartly" : "Earlier, you {change}. You have asked me to undo that, and I have put back everything I still recognised — but I left 2 pages alone, because they have been edited since.",
     "undoDoesNotReachTheLiveSite" : "If you had already deployed this section, undoing it here does not change what students see. Deploy again when you want the live site to match.",
     "undoIsStillAvailable" : "That change is still on the list, so you can ask me to undo it again once you have dealt with the pages I left alone.",
+    "whatPublishingMeans" : "Publishing a page decides whether students can see it in this section's website. Deploying sends the whole website out to the web. They are different acts: a page can be published for days and still not be online, and deploying puts everything already published in front of students straight away. Plantoir opens the preview after a change so the teacher can look it over first, which is the safer order.",
     "whereTheOutputIs" : "The output is in that section's window in Plantoir."
   }
 }
