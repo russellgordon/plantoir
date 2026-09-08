@@ -1862,11 +1862,22 @@ to run in the background.
     (`scripts/test_baked_modules.py` read the Dockerfile and product sources
     with the locale encoding, which fails on any Windows machine).
 
-37. **The Course Settings tip sentence is pinned by no contract on either
+37. ~~**The Course Settings tip sentence is pinned by no contract on either
     platform, and the two apps word the same rule differently (audited onto
-    this list 2026-09-06).** A sentence a teacher READS belongs in `contracts/`
+    this list 2026-09-06).**~~ ✅ Done 2026-09-07 (branch
+    `issue/course-settings-tip-contract`). Russell chose WINDOWS' wording, not
+    the mac's, and widened it to cover files; it is now
+    `shared-rules.json` → `specialNames.contentStructureTip`, Windows ships it
+    from `SpecialNames.ContentStructureTip`, and the mac owes only the
+    adoption. **The detail, and the reasoning worth keeping, is in the block at
+    the end of this item.** What follows first is the item as it was audited,
+    left as written because it is the honest record of what was true until
+    today.
+
+    A sentence a teacher READS belongs in `contracts/`
     by CLAUDE.md rule 2, and this one is in neither app's contract:
-    `grep -rn "added to your site automatically" contracts/` returns nothing.
+    ~~`grep -rn "added to your site automatically" contracts/` returns
+    nothing.~~ (It returns the new case as of 2026-09-07.)
     So Windows wrote its own, in
     `windows-app/Plantoir/Views/CourseSettingsView.xaml.cs`:
 
@@ -2046,6 +2057,33 @@ to run in the background.
     real answer" and "more than one class folder is listed, not just the
     first". Those are the two cases that reach the placeholder, by name. The
     numbers above hold.
+
+41. **An exclusion is escaped by re-creating the folder with different
+    capitalisation, and `build_site.py` disagrees with itself about it.**
+    Found 2026-09-07 by adversarial review while pinning the Course Settings
+    tip (item 37, `GUI-IMPROVEMENTS.md` row 447). Pre-existing on both
+    platforms, in SHARED Python, so it is neither side's in particular — it is
+    listed here because this side now runs `scripts/test_*.py` inside
+    `dotnet test` (item 36) and can therefore gate the fix, which it could not
+    before.
+
+    The live preflight path compares excluded names RAW — the
+    `excluded_shared` / `excluded_per_section` sets, the drop pass and the
+    discovery filter — while `_dropping_excluded_items`, the give-up path for
+    the same reconciliation, lowercases both sides. So `Old Tests` removed in
+    Course Settings and later remade in Obsidian as `old tests` is discovered,
+    appended and published. That is the exact outcome
+    `specialNames.contentStructureTip` now promises a teacher cannot happen.
+
+    **The sentence is right and the code is wrong**; narrowing the promise to
+    match the defect was considered and rejected. **The full write-up, the
+    shape of the fix and the one trap in it are in `TODO.md`** — "An exclusion
+    is escaped by re-creating the folder with different capitalisation" —
+    including that `gradedFolders.choices.walk.skippedMatching` already pins
+    the OPPOSITE rule for a different list, so the two want writing down side
+    by side. Whoever takes it owes a contract case, matching changes to
+    `CourseConfiguration` on both platforms, and a run of `verify.sh` from the
+    mac.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 
@@ -5168,7 +5206,10 @@ name.
   immediately before writing and, if it changed, redoes the whole discovery
   against the new contents — bounded at three tries, then it carries on with
   what is there rather than spinning. Redoing is safe because discovery is a
-  pure function of (what is on disk, what the config says) and is add-only.
+  pure function of (what is on disk, what the config says). It is not add-only
+  — an `excluded_items` name is dropped from the copy lists (row 377) — but
+  that is a function of the same two inputs, so the argument is unaffected.
+  Corrected 2026-09-07; it said "and is add-only" until then.
 - **The other writer is yours.** Whatever writes `course_config.json` from the
   Windows app must do the same read-compare-write, or the race is only half
   closed on your side. The mac's is `CourseConfiguration.recordOnDisk`. One

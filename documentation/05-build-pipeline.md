@@ -84,8 +84,8 @@ Names the teacher removed in Course Settings are recorded in `excluded_items`
 un-hidden, not expanded, and — since 2026-08-24 — actively **dropped** from
 `shared_folders`, `shared_files`, `per_section_folders` and `per_section_files`
 if it finds one back in a copy list, with the config written back. So the four
-copy lists are *not* add-only: `excluded_items` is authoritative, and this
-paragraph said the opposite until 2026-09-07. The exclusion is by NAME and does
+copy lists are *not* add-only: `excluded_items` is authoritative. The
+exclusion is by NAME and does
 not expire, because discovery cannot tell "the folder I excluded" from "the new
 folder I just made" — which is the rule teachers are told about in
 `contracts/shared-rules.json` → `specialNames.contentStructureTip`. An excluded
