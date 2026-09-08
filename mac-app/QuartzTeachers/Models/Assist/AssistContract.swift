@@ -74,6 +74,16 @@ enum AssistContract {
             "planAccepted": AssistWording.planAccepted,
             "cancelled": AssistWording.cancelled,
             "deployWasCancelled": AssistWording.deployWasCancelled,
+            "rolloverWebsiteQuestion": AssistWording.rolloverWebsiteQuestion,
+            "rolloverWantsANewWebsite": AssistWording.rolloverWantsANewWebsite,
+            "rolloverWantsTheSameWebsite": AssistWording.rolloverWantsTheSameWebsite,
+            "rolloverStartedANewWebsite": AssistWording.rolloverStartedANewWebsite(
+                keptAs: ".netlify_sites/section1.previous-2026-09-08_071500.json"
+            ),
+            "rolloverHadNoWebsiteYet": AssistWording.rolloverHadNoWebsiteYet,
+            "rolloverKeptTheSameWebsite": AssistWording.rolloverKeptTheSameWebsite,
+            "rolloverWebsiteNotDecided": AssistWording.rolloverWebsiteNotDecided,
+            "rolloverTurnedOffTheScheduledPublish": AssistWording.rolloverTurnedOffTheScheduledPublish,
             "planWasCancelled": AssistWording.planWasCancelled,
             "deployed": AssistWording.deployed(course: course, section: section),
             "couldNotBuildBeforeDeploying": AssistWording.couldNotBuildBeforeDeploying(

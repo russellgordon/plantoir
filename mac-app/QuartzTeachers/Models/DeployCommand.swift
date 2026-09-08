@@ -135,6 +135,97 @@ enum DeployCommand {
         )
     }
 
+    /// What cutting a section loose from its published website did.
+    struct SiteRelease: Equatable {
+
+        // MARK: - Stored properties
+
+        /// The kept files, named as a teacher would find them — relative to
+        /// the course folder — in the order they were released.
+        let keptFiles: [String]
+
+        /// The moves, recorded so an undo puts the section back on last
+        /// year's website rather than leaving it orphaned.
+        let savedFiles: [AssistSavedFile]
+
+        // MARK: - Computed properties
+
+        /// Whether this section was pinned to any website at all.
+        var releasedAnything: Bool {
+            return keptFiles.isEmpty == false
+        }
+    }
+
+    /// The name a released marker is kept under.
+    ///
+    /// **Frozen, and shared with Windows** (`AssistWorkspace.ReleaseSite`), so
+    /// a teacher who wants back onto last year's website is told the same
+    /// filename whichever app they are sitting at. Pinned in
+    /// `contracts/file-formats.json` → `firstDeployMarkers`.
+    static func releasedMarkerName(forSection sectionNumber: Int, at moment: Date) -> String {
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd_HHmmss"
+        return "section\(sectionNumber).previous-\(formatter.string(from: moment)).json"
+    }
+
+    /// Cut a section loose from the website it publishes to, so the next
+    /// publish makes a new one instead of overwriting last year's.
+    ///
+    /// **Renamed aside, never deleted.** The file holds the site's id and its
+    /// admin address, and a teacher who decides they wanted the old website
+    /// after all has no other way back to it. `deploy.py` and `build_site.py`
+    /// read markers by their exact path and never glob the folder, so a
+    /// `.previous-*.json` sitting beside them is inert.
+    ///
+    /// **Every destination type, not just this course's primary — and that is
+    /// a deliberate divergence from Windows**, whose `ReleaseSite` returns
+    /// inside the first folder that has a marker and so leaves a Cloudflare
+    /// marker pinned when a Netlify one was released first. Markers are keyed
+    /// purely by destination TYPE (see `firstDeployMarkerURL` above), and a
+    /// course can carry additional targets, so releasing only the primary
+    /// would leave an additional destination still overwriting last year's
+    /// site. Written up for Windows as work they owe.
+    static func releaseSite(
+        forSection sectionNumber: Int,
+        in course: Course,
+        at moment: Date = Date()
+    ) -> SiteRelease {
+        var keptFiles: [String] = []
+        var savedFiles: [AssistSavedFile] = []
+
+        for destinationType in CourseConfiguration.knownDeployTargetTypes {
+            guard let markerURL = firstDeployMarkerURL(
+                forSection: sectionNumber, in: course, destinationType: destinationType
+            ) else {
+                // A folder destination keeps no marker, so there is nothing
+                // pinning it to anywhere.
+                continue
+            }
+            guard let contents = try? String(contentsOf: markerURL, encoding: .utf8) else {
+                continue
+            }
+            let keptURL: URL = markerURL.deletingLastPathComponent()
+                .appendingPathComponent(releasedMarkerName(forSection: sectionNumber, at: moment))
+            do {
+                try FileManager.default.moveItem(at: markerURL, to: keptURL)
+            } catch {
+                // Leave the rest alone rather than half-releasing a section:
+                // a marker that could not be moved is one this section is
+                // still pinned to, and the reply says so.
+                continue
+            }
+            keptFiles.append(
+                keptURL.deletingLastPathComponent().lastPathComponent + "/" + keptURL.lastPathComponent
+            )
+            savedFiles.append(AssistSavedFile(fileURL: markerURL, before: contents, after: nil))
+            savedFiles.append(AssistSavedFile(fileURL: keptURL, before: nil, after: contents))
+        }
+
+        return SiteRelease(keptFiles: keptFiles, savedFiles: savedFiles)
+    }
+
     /// True when this section has been deployed to the given destination
     /// TYPE at least once, so a deploy to it asks the teacher nothing.
     static func hasDeployedBefore(section sectionNumber: Int, in course: Course, destinationType: String) -> Bool {

@@ -76,6 +76,20 @@ nonisolated enum ActivityTrail {
         /// leaves nothing to look at: the marker is derived, so its
         /// absence and its presence look identical on disk.
         case sectionContentMarkedPublished = "section content marked published"
+        /// A rollover started a NEW website for a section: it is no longer
+        /// tied to the one it published to last year, and the next publish
+        /// will ask what to call the new one. Carries the course, the section
+        /// and where last year's details were kept.
+        case sectionStartedANewWebsiteOnRollover = "section started a new website"
+        /// A rollover kept LAST YEAR'S website, so the next publish replaces
+        /// what is already there.
+        ///
+        /// **Both answers are recorded, and this is the one that matters more
+        /// for a report.** A teacher who writes in weeks later saying their old
+        /// class site was overwritten is describing THIS branch, so a trail
+        /// that recorded only the release could not answer the question anyone
+        /// actually reads it for.
+        case sectionKeptItsWebsiteOnRollover = "section kept its website"
         /// A folder a feature depends on was missing, renamed or emptied.
         /// Carries the check's NAME, never its wording: the sentence is
         /// product wording and will be reworded, while the name is what
