@@ -377,6 +377,19 @@ Neither app contains toolchain logic of its own: they write the same
       "nothing to act on" is an acceptable answer, or it will invent findings
       to justify its existence.
 
+      **Standing order for Tuesday 2026-09-08: run SUBAGENT work on Opus, not
+      on Fable or on whatever the harness would pick by default.** From
+      Russell, that day, after a review agent died mid-run with "You're out of
+      usage credits … to keep using Fable 5.1" — the account has no
+      Fable credit today, so the sentence above naming Fable cannot be followed
+      and the fallback the rule already allows ("a fresh context at the very
+      least") is what applies. Pass the model EXPLICITLY when spawning an agent
+      rather than relying on the default, because the default subagent model is
+      configured outside this repository and a session that omits it cannot
+      tell what it got. This is dated deliberately: it is a fact about the
+      account on one day, not a revision of the rule above, and Fable goes back
+      to being the first choice for a review the moment it can run.
+
       **Verify what a review claims rather than acting on it.** A reviewer is
       wrong often enough to matter, and a finding accepted without checking is
       just a second opinion with extra steps. Equally, when it is right about
@@ -864,7 +877,7 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
 | [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) | Architecture, the config contract, platform notes, and the WSL2 background — the reference a Windows session reads second, and where architectural decisions are written. Its outstanding-work section only; items verified DONE are moved to [`WINDOWS-HANDOFF-COMPLETED.md`](WINDOWS-HANDOFF-COMPLETED.md). |
-| [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Generated from the macOS app; never hand-edited. Its coverage table says what is deliberately NOT shared, and why. |
+| [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Three of the ten files are generated from the macOS app by `Plantoir --write-contracts` and must never be hand-edited; the other seven — `shared-rules.json` among them — are AUTHORED, and can be proposed or corrected from either platform. `contracts/README.md` says which is which, and this line used to say "never hand-edited" of all ten, which sent a Windows session on 2026-09-08 to ask the mac for an edit it could make itself. Its coverage table says what is deliberately NOT shared, and why. |
 | [`MAC-HANDOFF.md`](MAC-HANDOFF.md) | The mirror: work that originated on Windows or in shared `scripts/` and needs the mac's attention. Ordered by STATUS — contract cases waiting, then what is still owed, then awareness, then the finished ledger — so it can be read top-down and abandoned at any point. |
 | [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, and the frozen asset names both platforms depend on. |
 | [`website/`](website/README.md) | **plantoir.app.** The marketing site's SOURCES — a layout, a stylesheet, one file per page, and the screenshot harness. `python3 website/build.py` writes `site/`, and `--deploy` publishes it to Netlify — the site is not Git-connected, so nothing deploys on push. `site/` is a build output and hand-edits to it are overwritten. The release version line lives in `website/site.json`. Screenshots are captured from the real app and the real class sites by `website/shots/capture.py`, in both colour schemes. |
