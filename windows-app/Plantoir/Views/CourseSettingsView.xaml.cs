@@ -626,9 +626,7 @@ public sealed partial class CourseSettingsView : UserControl
         // "task", so a teacher who called theirs "Tests", or renamed "Tasks",
         // silently lost every assessed mark on the coverage map.
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Marks", null));
-        Form.Children.Add(FormBuilders.ExampleCaption(
-            "Tick the folders holding work that counts for marks. The Curriculum Coverage map shows an expectation as evaluated when a page in one of these addresses it."));
-        Form.Children.Add(FormBuilders.MembershipToggleList("Folders that count for marks",
+        Form.Children.Add(FormBuilders.MembershipToggleList(GradedFolderRule.ListTitle,
             // Not just the two top-level lists. The build counts a folder at
             // ANY depth, so a course with `Portfolios/Tasks` has assessed work
             // those lists never mention - and the first tick FREEZES the pool,
@@ -647,6 +645,10 @@ public sealed partial class CourseSettingsView : UserControl
             () => { MarkChanged(); RebuildProtectedRows(); },
             name => ItemProtectionRule.For(name, ItemList.GradedFolders, Protection()),
             (name, reason) => RecordRemovalBlocked("the marks list", name, reason)));
+        // BELOW the list, not above it: the caption says "a page in one of
+        // these", and above the list "these" followed the section header
+        // "Marks" and referred to nothing. The mac has always drawn it here.
+        Form.Children.Add(FormBuilders.ExampleCaption(GradedFolderRule.Caption));
 
         // The marks list is where a teacher is first told that a folder's NAME
         // decides what the site does with it, so it is where they are most

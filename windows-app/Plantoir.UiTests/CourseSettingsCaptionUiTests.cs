@@ -30,6 +30,11 @@ public class CourseSettingsCaptionUiTests
             Path.Combine(AppContext.BaseDirectory, "contracts", "shared-rules.json")))!
             ["specialNames"]!["contentStructureTip"]!["message"]!.ToString();
 
+    private static string MarksCaption() =>
+        JsonNode.Parse(File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "contracts", "shared-rules.json")))!
+            ["gradedFolders"]!["wording"]!["caption"]!.ToString();
+
     /// <summary>
     /// The tip is rendered in Course Settings, it is the CONTRACT's sentence
     /// rather than one the view invented, and it can actually be brought into
@@ -56,9 +61,23 @@ public class CourseSettingsCaptionUiTests
         app.SelectCourse(CourseFixtures.Renamed);
 
         var form = app.Find("courseSettingsForm", "the Course Settings form");
-        string tip = ContentStructureTip();
+        ScrollUntilVisible(form, ContentStructureTip(), "the Content Structure tip");
+    }
 
-        Assert.Contains(tip, DrivenApp.TextsUnder(form));
+    /// <summary>
+    /// Assert a sentence is both PRESENT in the form and can be brought into
+    /// its viewport.
+    ///
+    /// <para>The two are different claims and the second is the one that
+    /// matters: being in the UIA tree passes for a control scrolled off the
+    /// bottom of this long form. The form is walked with its OWN Scroll
+    /// pattern — a TextBlock in a StackPanel offers no ScrollItem pattern, so
+    /// asking the caption to bring itself into view would scroll nothing while
+    /// appearing to.</para>
+    /// </summary>
+    private static void ScrollUntilVisible(AutomationElement form, string sentence, string describedAs)
+    {
+        Assert.Contains(sentence, DrivenApp.TextsUnder(form));
 
         var scroll = form.Patterns.Scroll.PatternOrDefault;
         Assert.True(scroll is not null, "the Course Settings form offers no scroll pattern");
@@ -70,7 +89,7 @@ public class CourseSettingsCaptionUiTests
             visible = Retry.WhileFalse(() =>
             {
                 var caption = form.FindAllDescendants(cf => cf.ByControlType(ControlType.Text))
-                                  .FirstOrDefault(t => SafeName(t) == tip);
+                                  .FirstOrDefault(t => SafeName(t) == sentence);
                 return caption is not null
                        && !caption.IsOffscreen
                        && !caption.BoundingRectangle.IsEmpty
@@ -79,12 +98,68 @@ public class CourseSettingsCaptionUiTests
         }
 
         Assert.True(visible,
-            "the Content Structure tip never came into view anywhere in the Course Settings form");
+            $"{describedAs} never came into view anywhere in the Course Settings form");
     }
 
     /// <summary>A name that cannot throw when the element has gone.</summary>
     private static string SafeName(AutomationElement element)
     {
         try { return element.Name ?? ""; } catch { return ""; }
+    }
+
+    /// <summary>
+    /// The Marks caption is on screen too, and it is the contract's.
+    ///
+    /// <para>Its own test rather than a second assertion in the one above,
+    /// because it sits FURTHER down the form — Marks comes after Sidebar
+    /// Visibility on this platform — and a shared scroll walk would leave
+    /// whichever failed ambiguous about which caption was missing.</para>
+    ///
+    /// <para>It also pins WHERE the caption is drawn, which is a contract
+    /// requirement rather than a preference: <c>gradedFolders.wording.rule</c>
+    /// says the caption goes BELOW its list, because it reads "a page in one of
+    /// these" and above the list "these" followed the section header "Marks"
+    /// and referred to nothing. An earlier version of this test claimed to
+    /// guard that and did not — it asserted only that the sentence was on
+    /// screen, and passed just as happily with the caption back on top.</para>
+    /// </summary>
+    [UiFact]
+    public void TheMarksCaptionIsOnScreenBelowItsList()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+        app.SelectCourse(CourseFixtures.Renamed);
+
+        var form = app.Find("courseSettingsForm", "the Course Settings form");
+        string caption = MarksCaption();
+        ScrollUntilVisible(form, caption, "the Marks caption");
+
+        // Tree order is draw order here: the form is a StackPanel, so the
+        // caption's position among the form's descendants is where a teacher
+        // meets it. Compared against the marks CHECKBOXES rather than the list
+        // title, because the title is a Text like the caption and the point is
+        // that the caption comes after the whole control.
+        string marksTitle = JsonNode.Parse(File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "contracts", "shared-rules.json")))!
+            ["gradedFolders"]!["wording"]!["listTitle"]!.ToString();
+
+        var everything = form.FindAllDescendants();
+        int lastTickBox = -1, captionAt = -1;
+        for (int i = 0; i < everything.Length; i++)
+        {
+            string id = SafeAutomationId(everything[i]);
+            if (id.StartsWith($"member:{marksTitle}:", StringComparison.Ordinal)) lastTickBox = i;
+            if (captionAt < 0 && SafeName(everything[i]) == caption) captionAt = i;
+        }
+
+        Assert.True(lastTickBox >= 0, $"no marks tick-boxes found under 'member:{marksTitle}:'");
+        Assert.True(captionAt > lastTickBox,
+            $"the Marks caption is drawn at {captionAt}, before the last tick-box at {lastTickBox} "
+            + "- gradedFolders.wording.rule says it belongs BELOW its list");
+    }
+
+    /// <summary>An automation id that cannot throw when the element has gone.</summary>
+    private static string SafeAutomationId(AutomationElement element)
+    {
+        try { return element.AutomationId ?? ""; } catch { return ""; }
     }
 }
