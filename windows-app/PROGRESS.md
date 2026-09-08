@@ -22,16 +22,22 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Thirty-six of its thirty-eight
-items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
-day (the folder-problems front end, the same findings reaching the assistant,
+with its headline still reading as open work. **Thirty-six of its forty
+items are done**, counted 2026-09-07; items 21, 23, 24 and 29 landed on
+2026-09-06 (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
 the contract case lists this suite was not reading); items 33 and 34 — the
 refusal of a folder named `index.md`, and the per-finding repair report as
 contract cases — struck on 2026-09-07, along with 13, 17, 18, 19, 25, 26, 27, 28, 30, 31, 32,
 35 and 38 the same day. Items 35–37 were added the same day by an audit of
-these two documents; **36 and 37 are what is left**, and both are decisions
-rather than code.
+these two documents (`556646e2`, a Windows session, 2026-09-06 — the numbers
+have shifted since). **Four are open as of 2026-09-07: 36, 37, 39 and 40.**
+36 and 37 are decisions rather than code, 39 is a check and a re-read, and
+**40 is the only one that is code**. 37, 39 and 40 all wait on the mac; only 39
+and 40 came FROM it, 36 and 37 having been raised by that Windows audit.
+Neither 39 nor 40 had a row in the table below until they were added here —
+item 39 was written up at 09:33 on 2026-09-07 and given no row for twelve
+hours, which is exactly the drift the rule below exists to stop.
 
 **Count them rather than trusting this line.** It read "sixteen of its
 twenty-four" on a list that had grown to 32 items with eleven of them open,
@@ -63,6 +69,8 @@ What is genuinely left, smallest first:
 | ~~31~~ | ✅ Done 2026-09-07 — `Uri.EscapeDataString` replaced by a contract-driven encoder in both branches of `Spelled`; `FolderPathRewriterTests` deserialises every `linkRewriting` case. | — |
 | 36 | A decision, not code: `verify-deploy.ps1` is the only automated check of the PowerShell half of publishing and no gate runs it. Schedule it, make it a release-cut step, or write down that it is hand-run. | Small |
 | 37 | A decision the MAC makes: the Course Settings tip sentence is pinned by no contract on either platform and the two apps word it differently. Windows owes only taking the mac's wording once it is chosen. | Small |
+| 39 | From the mac, after its test host stopped segfaulting: check whether `Plantoir.UiTests` can CRASH its host rather than fail an assertion (the shape to look for is a modal torn down inside a layout pass; the honest signal is the test TOTALS, never the exit code), and re-read `shared-rules.json` → `siteHealth.repair.oneAlertAtATime`, whose reason has been strengthened. Added to `WINDOWS-HANDOFF.md` on 2026-09-07 and never given a row here. | Small |
+| 40 | Code, from the mac: `TheRowsAreTheContractsRowsInTheContractsOrder` builds ONE course, which has a curriculum folder, so the retired placeholder sentence could come back unguarded. Loop `specialFoldersHelp.cases` instead — the mac's fix ports line for line, traps included. | Small |
 | ~~18~~ | ✅ Done 2026-09-07 — the choice at the folder picker and the dismissable notice for a restored folder both exist, and `synced folder noticed` / `synced folder accepted` are emitted. | — |
 | ~~17~~ | ✅ Done 2026-09-07 — `CourseConfiguration.RecordOnDisk` (a fresh-read recorder beside an untouched `Write`) and the interrupted-rename record under `courses/.internal/renames`. | — |
 | ~~27~~ | ✅ Done 2026-09-07 — “Restore Section N…” puts a section back to how it was when the conversation started; the assistant now saves one copy per conversation rather than one per change. | — |
