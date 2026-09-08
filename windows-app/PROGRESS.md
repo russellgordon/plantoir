@@ -22,20 +22,22 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Thirty-six of its thirty-eight
-items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
-day (the folder-problems front end, the same findings reaching the assistant,
+with its headline still reading as open work. **Thirty-six of its forty
+items are done**, counted 2026-09-07; items 21, 23, 24 and 29 landed on
+2026-09-06 (the folder-problems front end, the same findings reaching the assistant,
 the overnight run's findings being captured and reported the next morning, and
 the contract case lists this suite was not reading); items 33 and 34 — the
 refusal of a folder named `index.md`, and the per-finding repair report as
 contract cases — struck on 2026-09-07, along with 13, 17, 18, 19, 25, 26, 27, 28, 30, 31, 32,
 35 and 38 the same day. Items 35–37 were added the same day by an audit of
-these two documents. **Four are open as of 2026-09-07: 36, 37, 39 and 40.**
+these two documents (`556646e2`, a Windows session, 2026-09-06 — the numbers
+have shifted since). **Four are open as of 2026-09-07: 36, 37, 39 and 40.**
 36 and 37 are decisions rather than code, 39 is a check and a re-read, and
-**40 is the only one that is code**. All but 36 came from the mac. Neither 39
-nor 40 had a row in the table below until they were added here — 39 arrived
-without one on 2026-09-07, which is exactly the drift the rule below exists to
-stop, and it went unnoticed for a day.
+**40 is the only one that is code**. 37, 39 and 40 all wait on the mac; only 39
+and 40 came FROM it, 36 and 37 having been raised by that Windows audit.
+Neither 39 nor 40 had a row in the table below until they were added here —
+item 39 was written up at 09:33 on 2026-09-07 and given no row for twelve
+hours, which is exactly the drift the rule below exists to stop.
 
 **Count them rather than trusting this line.** It read "sixteen of its
 twenty-four" on a list that had grown to 32 items with eleven of them open,

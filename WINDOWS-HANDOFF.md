@@ -1908,18 +1908,27 @@ to run in the background.
     the same `CourseFrom(figure)` the naming test already uses, asserting the
     count, `What`, `Why` and the `namedFrom: "fixed"` names per case with the
     case's own name in the message. Two of those cases END UP with no
-    curriculum folder at all, so both branches get compared and no new fixture is invented
-    to drift. (Three cases record no `curriculum_folder`; the third of them
-    has a folder the scan finds, which is the case whose whole point is that
-    recording none and having none are different things.) Two traps met on
-    the way: the count guard must `continue` rather than `return`, or one bad
-    case silences every case after it; and assert at
-    the END that both branches were actually reached (the mac keeps
+    curriculum folder at all, so both branches get compared and no new
+    fixture is invented to drift. (Three cases record no `curriculum_folder`;
+    the third of them has a folder the scan finds, which is the case whose
+    whole point is that recording none and having none are different things.)
+    Two traps met on the way: the count guard must `continue` rather than
+    `return`, or one bad case silences every case after it; and assert at the
+    END that both branches were actually reached (the mac keeps
     `sawResolvedFolder` and `sawPlaceholder` flags), because a case list that
     drifted until every course had a curriculum folder would leave the test
     green while covering exactly what it covered before. **Measured after the
     fix: the same reversion now fails 2 assertions naming both placeholder
     cases, where it failed 0 before.**
+
+    **Both measurements were re-run on 2026-09-07 rather than taken on
+    trust**, because the session that first made them also reported a test
+    total it had not measured. Putting the sentence back and running the mac
+    suite twice: against the OLD test, 5 tests / 0 failures; against the new
+    one, 5 tests / 2 failures, naming "asked and cleared: an empty pool is a
+    real answer" and "more than one class folder is listed, not just the
+    first". Those are the two cases that reach the placeholder, by name. The
+    numbers above hold.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 
