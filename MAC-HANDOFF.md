@@ -452,6 +452,26 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ## Open — what the mac still owes
 
+- **One clause in `specialFoldersHelp` describes a state that ended today, and
+  only the mac can regenerate it** (Windows, 2026-09-08, branch
+  `issue/folders-help-row-check-cases`). Small, and no suite is red for it.
+  The curriculum row's `whyPlaceholder` in
+  [`contracts/shared-rules.json`](contracts/shared-rules.json) ends:
+
+  > The mac has done this since 2026-09-06; as of that date Windows builds a
+  > single course for that check - item 40 in `WINDOWS-HANDOFF.md`.
+
+  **Windows no longer builds a single course for that check** — item 40 is
+  closed (see the ledger below). Read strictly the clause is still true, since
+  it says "as of that date"; read the way anyone will actually read it, it
+  names an open divergence and points at a handoff item that is now struck
+  through. **Please retire the last sentence when the contract is next
+  written**, leaving the paragraph before it, which is the part that carries
+  the reasoning and stays true. Windows did NOT edit it: the file is generated
+  on the mac and `contracts/README.md` says it is never hand-edited, and a
+  Windows-side edit would be reverted by the next `--write-contracts` while
+  looking like it had landed.
+
 - **Nothing to implement, one thing to switch on: line endings are enforced
   now, and the enforcement reaches this clone only if hooks are enabled.**
   (Windows, 2026-09-08, branch `issue/gitattributes-line-endings`.) A session
@@ -2587,6 +2607,19 @@ rather than being deleted.
 
 ## For awareness — no mac code needed
 
+- **Item 40 is closed, and it turned up one thing to know before the next
+  “ports line for line” instruction is written: xUnit's `Assert` throws
+  where XCTest records and carries on** (Windows, 2026-09-08, branch
+  `issue/folders-help-row-check-cases`). **Nothing for the mac to implement**
+  — the mac already made this fix on 2026-09-06 (`GUI-IMPROVEMENTS.md` row
+  446) and its test is unchanged. The generalisable half: an instruction that
+  tells Windows to keep going after a recorded failure — item 40's “the
+  count guard must `continue` not `return`” was exactly that — describes
+  a behaviour XCTest has and xUnit does not, so a literal port makes the guard
+  dead code and reports one failure where the mac reports several. Worth a
+  sentence when writing the next such item, rather than being rediscovered.
+  Full entry, with the numbers measured on this PC, in the ledger below.
+
 - **Item 39 answered: `Plantoir.UiTests` cannot crash its host the way the
   mac's suite did — measured — and the strengthened `oneAlertAtATime` reason
   has one clause the mac should NOT weaken further** (Windows, 2026-09-08,
@@ -4206,6 +4239,63 @@ is what happened to the test-race item, sitting here for three days with
 
 
 ## Done — the ledger
+
+- **The folders-help row check runs the contract's own case list — item 40**
+  (Windows, 2026-09-08, branch `issue/folders-help-row-check-cases`;
+  `GUI-IMPROVEMENTS.md` row 450). **The mac is expected only to KNOW; it owes
+  nothing** — it made this fix first, on 2026-09-06. ✅ DONE.
+
+  **What it fixed.** `SpecialFoldersHelpContractTests.TheRowsAreTheContractsRowsInTheContractsOrder`
+  built one hand-typed course whose `shared_folders` were `["Tasks","Ontario
+  Curriculum"]`, so the curriculum row always resolved to a real folder and the
+  PLACEHOLDER branch of that row's explanation was compared with nothing. It is
+  the only test on either platform comparing a row's `Why` with the contract's,
+  so the sentence the mac retired in row 425 could have arrived here unnoticed.
+  It now loops `specialFoldersHelp.cases` and builds each course through the
+  same `CourseFrom(figure)` the naming test already used — no second fixture
+  invented to drift — asserting the row count, `what`, `why` and the
+  `namedFrom: "fixed"` names per case with the case's own name in every message,
+  and asserting at the END that both branches were actually reached. Two of the
+  six cases end up with no curriculum folder at all, which is what makes the
+  placeholder branch reachable.
+
+  **Measured on this PC rather than inherited, because the mac's own numbers
+  were measured against Swift and prove nothing here.** The reversion was
+  reproduced as a placeholder-only variant of the curriculum `why` in
+  `SpecialFoldersHelp.cs` — Windows never shipped the sentence, so there was
+  nothing to put back, only the shape of it to introduce. Against the OLD test:
+  **5 tests, 0 failures.** Against the new one: **5 tests, 1 failed**, whose
+  message lists **2 mismatches** naming "asked and cleared: an empty pool is a
+  real answer" and "more than one class folder is listed, not just the first" —
+  the same two cases the mac's reversion named. The product code was restored
+  immediately after; the branch touches one test file and the documents.
+
+  **The one deliberate deviation from "ports line for line", and WHY.** Item 40
+  named two traps, and the first does not survive translation: **xUnit's
+  `Assert` throws where XCTest records a failure and carries on.** Written as a
+  straight sequence of `Assert` calls, the documented `continue` guard would be
+  unreachable — the first mismatch would end the test — and the
+  reversion above would have named ONE case where the mac names two, which is a
+  weaker signal for the same bug. So mismatches are collected into a list and
+  asserted together at the end, which gives the loop the record-and-continue
+  behaviour XCTest has natively and makes the `continue` guard real. **It is
+  also the established pattern in this test project rather than something
+  invented for this branch** — `AssistSurfaceContractTests`,
+  `SharedRuleContractTests`, `PublishAndLauncherContractTests`,
+  `MilestoneContractTests`, `GradedFolderContractTests` and `ContractTests` all
+  gather offenders into a `List<string>` and report them joined, for the same
+  reason. Confirmed by review rather than assumed. **Rejected:
+  leaving the Asserts to throw** (simpler, and the trap item 40 spelled out
+  would then be decoration), **and splitting the cases into an xUnit `[Theory]`
+  with a `MemberData` source** — tempting, since it would name each failing
+  case as its own test, but the both-branches-reached check has to see every
+  case in one run, and a Theory cannot assert across its own rows. That check is
+  the half that stops the case list quietly drifting back to all-have-a-folder,
+  so it decided it.
+
+  **Reference:** `windows-app/Plantoir.Tests/SpecialFoldersHelpContractTests.cs`;
+  the mac's equivalent is `SpecialFoldersHelpTests.swift`. No product code
+  changed and no teacher-facing sentence changed on either platform.
 
 - **Windows renames a course folder from inside the app, records the change
   from a fresh read, and can finish a rename that stopped half way — items 13
