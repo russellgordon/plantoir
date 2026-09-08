@@ -642,6 +642,8 @@
     ],
     "mcpOnly" : [
       "list_courses",
+      "plan_add_classes",
+      "add_classes",
       "list_curriculum_expectations",
       "plan_curriculum_mentions",
       "add_curriculum_mentions"
@@ -650,8 +652,9 @@
       "deploy_section",
       "schedule_deploy"
     ],
-    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is offered to Claude Code on top of everything, being the three that ask for judgement about meaning.",
+    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is offered to Claude Code on top of everything — three that ask for judgement about meaning, plus listing the working folder's courses and filling out a unit, which the local model reaches through fixed phrasings instead.",
     "planTwins" : {
+      "add_classes" : "plan_add_classes",
       "add_next_class" : "plan_add_next_class",
       "publish_class_on" : "plan_publish_class_on",
       "publish_pages" : "plan_publish_pages",
@@ -1634,6 +1637,74 @@
             "properties" : {
 
             },
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Work out what adding several class pages to a unit would do, and change nothing. Shows what each page would be called and the day it would land on. Call this first and show the teacher what it said.",
+          "name" : "plan_add_classes",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "howMany" : {
+                "description" : "How many class pages to add to that unit.",
+                "type" : "integer"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              },
+              "unit" : {
+                "description" : "The unit number to add days to, for example 4.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section",
+              "unit",
+              "howMany"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "TEACHERS SAY: \"add five more days to Unit 4\". Add several class pages to a unit, dated to the days this section actually meets, continuing from the last day that unit already has. Call plan_add_classes first and show the teacher what it said.\n\nThe pages arrive UNPUBLISHED — empty skeletons for the teacher to write, which stay out of the site until they publish them. An existing page is never written over, the course is backed up first, and undo_last_change takes back what this created.",
+          "name" : "add_classes",
+          "parameters" : {
+            "properties" : {
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "howMany" : {
+                "description" : "How many class pages to add to that unit.",
+                "type" : "integer"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              },
+              "unit" : {
+                "description" : "The unit number to add days to, for example 4.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section",
+              "unit",
+              "howMany"
+            ],
             "type" : "object"
           }
         },

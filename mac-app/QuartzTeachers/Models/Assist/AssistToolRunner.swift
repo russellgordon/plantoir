@@ -247,6 +247,10 @@ final class AssistToolRunner {
             return await reDateClasses(arguments)
         case "add_next_class":
             return addNextClass(arguments)
+        case "plan_add_classes":
+            return planAddNextClass(addClassesArguments(from: arguments))
+        case "add_classes":
+            return addNextClass(addClassesArguments(from: arguments))
         case "list_courses":
             return listCourses()
         case "list_curriculum_expectations":
@@ -2248,6 +2252,20 @@ final class AssistToolRunner {
         }
     }
 
+    /// `add_classes` said in the words the existing engine already speaks.
+    ///
+    /// The capability is not new — "add five more days to Unit 4" has reached
+    /// `NextClassPlanner.plan(addingDays:toUnit:)` for as long as that card
+    /// phrasing has existed — but it arrived through card-only keys the model
+    /// was never shown. Rather than a second path to the same planner, which
+    /// is how two behaviours drift apart, this renames the published arguments
+    /// onto the ones the tested path reads.
+    private func addClassesArguments(from arguments: [String: Any]) -> [String: Any] {
+        var translated: [String: Any] = arguments
+        translated["days"] = arguments["howMany"] ?? 0
+        return translated
+    }
+
     /// Every course in this working folder, with what a caller needs to pick
     /// one: the code to pass back, the name a teacher would recognise it by,
     /// the sections it has, and where it publishes.
@@ -2278,7 +2296,14 @@ final class AssistToolRunner {
             lines.append(
                 "\(course.code) — \(course.configuration.courseName)\n"
                 + "  sections: \(sectionList)\n"
-                + "  publishes to: \(DeployCommand.destinationDescription(for: course.configuration))"
+                // `AssistToolRunner.destination(of:)`, NOT
+                // `DeployCommand.destinationDescription`: that one returns the raw
+                // PATH for a folder destination, which is machinery a teacher is not
+                // the audience for, disagrees with what the deploy card says two
+                // functions away, disagrees with Windows' "a folder on this computer",
+                // and prints BLANK for a course set to a folder that has not been
+                // chosen yet — a state the product models on purpose.
+                + "  publishes to: \(AssistToolRunner.destination(of: course))"
             )
         }
 

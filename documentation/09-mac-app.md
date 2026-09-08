@@ -309,7 +309,7 @@ told which tools write (`readOnlyHint`) and does its own asking. The app itself 
 than shipping a second binary, so no packaging step can leave it out. Claude
 Code is offered a slightly LONGER list than the local model: the tools that
 read the curriculum and point a page at the expectations that fit are a
-judgement about meaning, plus listing the folder's courses: 26 tools against 13, and the local model sees exactly
+judgement about meaning, plus listing the folder's courses and filling out a unit: 28 tools against 13, and the local model sees exactly
 the thirteen its routing was measured against.
 
 How all of that fits together — what the model is, how it is configured, and
