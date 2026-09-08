@@ -441,8 +441,12 @@ and re-asks every time. On a machine without that team's certificate, point
 `DEVELOPMENT_TEAM` at your own or set `CODE_SIGN_IDENTITY: "-"` and live with
 the prompts.
 
-**Windows app.** Nothing is generated, the solution is committed, and the only
-prerequisite is the **.NET 9 SDK**. It targets `net9.0-windows10.0.19041.0` /
+**Windows app.** Nothing is generated, the solution is committed, and the
+prerequisites are the **.NET 9 SDK** and a **`python` on PATH** — the latter
+since 2026-09-07, when `dotnet test` began running the shared
+`scripts/test_*.py` files; the suite FAILS rather than skips without an
+interpreter, deliberately, because a suite that is green having run nothing is
+the failure mode that change was made to close. It targets `net9.0-windows10.0.19041.0` /
 `win-x64` and ships self-contained, Windows App SDK included, so a teacher
 installs no runtime.
 
