@@ -219,8 +219,15 @@ host's timezone offset (passed in as `HOST_TZ_OFFSET`).
 > **A note on `publish:` versus `draft:`.** Courses created before this
 > convention carry `draft:` and `draftSection<N>:`, which mean the *opposite*
 > — `draft: true` is a page students cannot see. Those still work: the build
-> reads them, inverted, and Plantoir rewrites a page's key only when something
-> edits that page. You never have to convert a course by hand. A page with
+> reads them, inverted. You never have to convert a course by hand.
+>
+> **What happens next is the same on both machines** (decided 2026-09-07):
+> the first time something edits such a page's visibility, the old key is
+> rewritten to the new one on the same line and the old key removed, so the
+> page shows a one-line change in Obsidian. Nothing converts a course by
+> hand, and nothing needs to: the build reads both spellings. (The macOS app
+> kept the old key inverted until then; `contracts/file-formats.json` →
+> `pageVisibility.writingRules` carries the rule and the reasoning.) A page with
 > **no** publication key at all is visible, so forgetting the key leaves work
 > showing rather than making it disappear unnoticed.
 

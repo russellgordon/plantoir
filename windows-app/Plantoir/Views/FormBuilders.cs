@@ -181,7 +181,8 @@ public static class FormBuilders
                                               Action<string>? onRemoved = null,
                                               Action<string>? onAdded = null,
                                               Func<string, ItemProtection>? protectionFor = null,
-                                              Action<string, string>? onRemovalBlocked = null)
+                                              Action<string, string>? onRemovalBlocked = null,
+                                              Action<string>? onRenameRequested = null)
     {
         var panel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 8, 0, 0) };
         panel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 13 });
@@ -266,6 +267,32 @@ public static class FormBuilders
                         remove.Click += (_, _) => DoRemove();
                     }
                     trailing = remove;
+                }
+
+                // A pencil beside the remove button, as on the mac. A rename
+                // living only in a context menu is invisible to everyone
+                // else (WINDOWS-BOOTSTRAP § 5), and double-click-to-edit
+                // fights the sheet the contract already words.
+                if (onRenameRequested is not null)
+                {
+                    var rename = new Button
+                    {
+                        Content = new FontIcon { Glyph = Glyphs.Edit, FontSize = 12 },
+                        Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                        BorderThickness = new Thickness(0),
+                        MinWidth = 28,
+                        MinHeight = 24,
+                        Padding = new Thickness(0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                    };
+                    ToolTipService.SetToolTip(rename, $"Rename {display}…");
+                    AutomationProperties.SetAutomationId(rename, "rename:" + display);
+                    string toRename = item;
+                    rename.Click += (_, _) => onRenameRequested(toRename);
+                    var pair = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+                    pair.Children.Add(rename);
+                    pair.Children.Add(trailing);
+                    trailing = pair;
                 }
 
                 Grid.SetColumn(trailing, 1);

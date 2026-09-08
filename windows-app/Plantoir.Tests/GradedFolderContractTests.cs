@@ -133,7 +133,8 @@ public class GradedFolderContractTests
             """));
 
         Assert.Null(config.GradedFolders);
-        Assert.Equal(new[] { "Tasks", "Thinking Tasks" }, config.MaterializedGradedFolders());
+        Assert.Equal(new[] { "Tasks", "Thinking Tasks" },
+            config.MaterializedGradedFolders(config.SharedFolders.Concat(config.PerSectionFolders)));
     }
 
     [Fact]
@@ -145,7 +146,8 @@ public class GradedFolderContractTests
              "graded_folders": ["Tasks"]}
             """));
 
-        Assert.Equal(new[] { "Tasks" }, config.MaterializedGradedFolders());
+        Assert.Equal(new[] { "Tasks" },
+            config.MaterializedGradedFolders(config.SharedFolders.Concat(config.PerSectionFolders)));
     }
 
     /// <summary>

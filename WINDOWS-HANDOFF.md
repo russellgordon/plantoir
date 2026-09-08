@@ -481,7 +481,7 @@ this side is expected to say so when the contract is wrong.
    index, and re-check badge contrast on a highlighted row) apply whether you
    end up hand-building or wiring the real control's template.
 
-10. ~~Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check~~ — ✅ Done, merged to `dev` 2026-09-06 (`GradedFolderRule.cs`, `SiteHealthFinding.cs`; GUI-IMPROVEMENTS rows 411-414). **PARSING AND THE TRAIL ONLY.** The bullet below says Windows "displays the contract-authored sentence and detail" — it does not. `ScriptRunner.HealthFindings` is the seam a front end would attach to, and that front end is item 21, which is not built. (Item 21 refers to "the correction in item 10"; this is it.)
+10. ~~Special folders hardening: Graded folders reconciliation and `noGradedFolders` health check~~ — ✅ Done, merged to `dev` 2026-09-06 (`GradedFolderRule.cs`, `SiteHealthFinding.cs`; GUI-IMPROVEMENTS rows 411-414). **PARSING AND THE TRAIL ONLY — on the day this item landed.** The bullet below says Windows "displays the contract-authored sentence and detail"; when this was written it did not, and `ScriptRunner.HealthFindings` was a seam with nothing attached to it. **Corrected 2026-09-06: that front end is item 21, and item 21 LANDED the same day** — `windows-app/Plantoir/Views/FolderProblemsDialog.cs`, `GUI-IMPROVEMENTS.md` row 420 — so the bullet below is true today and this caveat is history rather than open work. (Item 21 refers to "the correction in item 10"; this is it, and item 21 is what answered it.)
     - **`setup_course.py:graded_folders_for` reconciliation** — When a new
       course is created, `graded_folders_for` now checks the declared pool
       against the actual folder lists (`shared_folders` +
@@ -593,10 +593,20 @@ this side is expected to say so when the contract is wrong.
       - *The contract holds 5 resolution cases*, not the 10 row 379 claimed.
       - *Size the flyout for the longest sentence.* The mac popover truncated to one line until it was given a fixed width and allowed to wrap; the `lastGradedFolderBlocked` sentence is the longest in `specialNames`, so test the flyout with that one.
 
-13. **Renaming a course folder from inside the app — HALF DONE 2026-09-06.**
+13. ~~**Renaming a course folder from inside the app — HALF DONE 2026-09-06.**~~
+    ✅ Done 2026-09-07, with item 17 in the same piece (branch
+    `issue/13-rename-folder-and-config-writers`, `GUI-IMPROVEMENTS.md` rows
+    441–443). A pencil on each folder row opens the sheet; `Rename` moves the
+    folder in every section (every destination checked first, a half-failure
+    naming the section that stopped it, no roll-back), rewrites the links,
+    and `Renaming` carries every key in `KeysThatCarryAcross` across on a
+    FRESH read of the file (`CourseConfiguration.RecordOnDisk`), materialising
+    `class_folder` and `curriculum_folder`; Add creates the folder and says
+    so, Remove says the folder stays; both trail events are emitted. The
+    original item follows.
     The model layer is built and under test: `FolderPathRewriter` (the link
-    rewriting, 22 tests) and `SpecialFolderRenamer` (the refusals, the move
-    list, the check-every-destination-first rule, 22 tests), plus the two
+    rewriting, 32 test methods over 119 cases since item 31 wired the contract) and `SpecialFolderRenamer` (the refusals, the move
+    list, the check-every-destination-first rule, 27 test methods over 38 cases — the “22” written here on 2026-09-06 was already stale that day), plus the two
     trail events, which are DECLARED AND NOT YET EMITTED because nothing
     raises them until the sheet exists — see `windows-app/PROGRESS.md`.
     **Still owed: the sheet itself**, the method that performs the moves, the
@@ -627,20 +637,39 @@ this side is expected to say so when the contract is wrong.
     until you read `pageNaming`'s new `term` field with a default.** Full
     write-up in "What a course calls a unit" below.
 
-16. ~~What a course calls its class folder~~ — ✅ Done 2026-09-06 (`ClassFolderRule.Name/Names` with the recorded key, the wizard writing it, and `ItemProtectionRule` protecting it). **NOT yet done: the rename that MATERIALISES the key** — that belongs to item 13's sheet, which is still owed. Original text: `class_folder` in
+16. ~~What a course calls its class folder~~ — ✅ Done 2026-09-06 (`ClassFolderRule.Name/Names` with the recorded key, the wizard writing it, and `ItemProtectionRule` protecting it). **The rename that MATERIALISES the key landed with item 13 on 2026-09-07** (`SpecialFolderRenamer.Renaming`, pinned by `TheClassFolderAndTheCurriculumFolderAreMaterialisedByARename`). Nothing under this heading is outstanding. (Corrected 2026-09-06: this rider used to read "NOT yet done", which put a live-sounding obligation inside a struck item, where anybody skimming the list for open work would never see it.) Original text: `class_folder` in
     `course_config.json`, recorded rather than guessed, materialised by a
     rename along with `curriculum_folder`. Replaces the class-folder refusal
     item 13 described, which no longer exists. **Eight new contract cases will
     fail your suite until `ClassFolderRule.cs` reads the key.** Full write-up
     in "What a course calls its class folder" below.
 
-17. **`course_config.json`'s two writers, and the interrupted-rename dead end
-    (2026-09-05).** The Python half of the first is shared and you inherit it;
+17. ~~**`course_config.json`'s two writers, and the interrupted-rename dead end
+    (2026-09-05).**~~ ✅ Done 2026-09-07 with item 13. The app-side writer is
+    a separate `RecordOnDisk` (read, change, write only if nothing else wrote
+    in between; three tries, then the FRESHEST bytes), and `Write` is
+    untouched so Revert still does what it says — asserted by
+    `WriteIsUnchangedAndRevertStillDoesWhatItSays`. A rename is recorded
+    under `courses/.internal/renames/<CODE>.json` before anything moves,
+    cleared once the configuration is written, and the clash check is relaxed
+    only when the record and the disk agree; the sheet pre-fills the target
+    and says what happened. The original item follows. The Python half of the first is shared and you inherit it;
     the app-side writer and the whole of the second are yours. Full write-ups
     in "`course_config.json` has two writers" and "A rename interrupted after
     the folders moved was a dead end" below.
 
-18. **A cloud-synced working folder — HALF DONE 2026-09-06.** The
+18. ~~**A cloud-synced working folder — HALF DONE 2026-09-06.**~~ ✅ Done
+    2026-09-07 (branch `issue/18-cloud-synced-folder-views`,
+    `GUI-IMPROVEMENTS.md` row 436). The two views: a `ContentDialog` after the
+    OS picker (path first, then the headline, then the four explanation
+    paragraphs, "Use This Folder Anyway" / "Choose a Different Folder…" with
+    NO default button; the second reopens the OS picker), and a dismissable
+    `InfoBar` in a row of its own under the menu bar for a restored or
+    inherited folder, with "Show Details" opening the explanation in place and
+    "Got It" dismissing — which is remembered, as the contract says going
+    ahead from either button is. Both trail events are emitted, carrying the
+    service and the folder, which the trail redacts on the way in. The
+    original item follows. The
     detection is built and tested (`CloudSyncedFolder.cs`: OneDrive's three
     published roots, Dropbox's `info.json`, iCloud for Windows; never from a
     folder's NAME), the wording is pinned to the contract
@@ -665,8 +694,23 @@ this side is expected to say so when the contract is wrong.
     outside the folder. Full write-up in "A cloud-synced working folder:
     explain it, never refuse it" below.
 
-19. **Builds outside the working folder — ONE of the two owed things is done
-    (2026-09-06); the OTHER is still open.** The `appliesOn` filter is in
+19. ~~**Builds outside the working folder — ONE of the two owed things is done
+    (2026-09-06); the OTHER is still open.**~~ ✅ Done 2026-09-07, both
+    halves (branch `issue/19-build-marker-and-sweep`, `GUI-IMPROVEMENTS.md`
+    row 437). The marker `working-folder.txt` is written from the APP —
+    `BuildOutputLocation.WriteWorkingFolderMarker`, on every adoption of a
+    working folder — not from the launchers, and builds folders made without
+    the app are named retroactively at launch for every working folder the
+    app can name (`AdoptWorkingFolderMarkers`). The sweep
+    (`DiscardBuildsForMissingWorkingFolders`) runs once per process from
+    `App.OnLaunched`, only under the home folder, and treats ONLY
+    `ERROR_FILE_NOT_FOUND` / `ERROR_PATH_NOT_FOUND` from `GetFileAttributesW`
+    as "gone"; a sleeping network path (53) and a media-less reader (21) keep
+    the build. **An absent drive letter answers 3, measured** — so the
+    home-folder filter, not the error code, is what protects a USB stick's
+    working folder, exactly as on the mac. No `.ps1` touched. The original
+    item, as it stood, follows; its first paragraph was misfiled from item
+    18 before this session and is left where it was. The `appliesOn` filter is in
     (`ContractTests`), the retired sentence is asserted absent
     (`CloudSyncedFolderTests`), and Windows already built outside the folder
     (row 290).
@@ -681,7 +725,10 @@ this side is expected to say so when the contract is wrong.
     build WORKSPACE goes with the built site, because that is the half a
     preview serves from.
 
-    ⚠️ **STILL OPEN: the marker, and the sweep that would give it a point.**
+    ~~⚠️ STILL OPEN~~ — done 2026-09-07, see above; the launcher home
+    suggested at the end of this paragraph was REJECTED (`MAC-HANDOFF.md`
+    ledger has why), and the unplugged-drive claim in it was wrong.
+    **The marker, and the sweep that would give it a point.**
     Nothing on this side writes `working-folder.txt` or anything like it, and
     there is no Windows equivalent of the mac's
     `discardBuildsForMissingWorkingFolders`. **Writing the marker alone is
@@ -1206,8 +1253,18 @@ APP, not as the shell it happens to run, or the operating system tells the
 teacher that "bash" — or, on the second attempt here, a person's name — wants
 to run in the background.
 
-25. **The wizard never asks the skeleton question, so ~1,900 course codes get
-    an answer nobody chose (found 2026-09-06).** `use_skeleton` appears
+25. ~~**The wizard never asks the skeleton question, so ~1,900 course codes get
+    an answer nobody chose (found 2026-09-06).**~~ ✅ Done 2026-09-07 (branch
+    `issue/25-wizard-skeleton-question`, `GUI-IMPROVEMENTS.md` row 431). The
+    question is asked with the mac's two sentences verbatim (`skeletonToggle`),
+    `use_skeleton` is written as `hasSkeleton && teacherSaidYes`, the structure
+    editor adopts the skeleton's folders on entry and puts the generic defaults
+    back when the toggle goes off, and `TheWizardWritesUseSkeleton` runs. One
+    correction to the text below: `SkeletonCatalog.cs` was "referenced only from
+    a comment" in the UI project only — `SkeletonCatalogTests` had exercised it
+    since it was ported. The original item follows.
+
+    `use_skeleton` appears
     NOWHERE in `windows-app/` — verified by search, zero hits. The mac asks it
     (`NewCourseWizardView.swift`, "Start from a … skeleton") and writes the
     answer; `NewCourseDialog.cs` goes straight to the "no example content"
@@ -1224,12 +1281,42 @@ to run in the background.
     list, which is the only thing a Windows session reads first. Two places
     described it and neither was an index.
 
-    The test that would have announced it is `wizardAnswerKeys.keys`, which
-    the mac suite runs and Windows does not — see item 29. Medium: a wizard
-    field, the key, and one contract test.
+    The test that would have announced it now EXISTS and is skipped, naming
+    this item: `FileFormatContractTests.TheWizardWritesUseSkeleton` (item 29,
+    done 2026-09-06). Un-skipping it, and deleting `use_skeleton` from the
+    `knowinglyAbsent` set beside it, is this item's acceptance test — so what
+    is left is the wizard field and the key, not the test. Medium.
 
-26. **The marks checklist offers only TOP-LEVEL folders, so a nested one
-    cannot be ticked and loses its marks silently (found 2026-09-06).**
+26. ~~**The marks checklist offers only TOP-LEVEL folders, so a nested one
+    cannot be ticked and loses its marks silently (found 2026-09-06).**~~
+    — ✅ Done 2026-09-06, branch `issue/26-marks-checklist-nested-folders`,
+    commit `02cf58b2`. `GradedFolderChoices.cs` walks the course folder four
+    levels deep with the mac's cap, skip list and `sectionN` handling;
+    `CourseSettingsView.xaml.cs` feeds the checklist, the frozen pool, the
+    removal path and the protection rules from that one list. **The item was
+    right that the gap was in two places**, and the second is the one that
+    mattered: `MaterializedGradedFolders()` now REQUIRES its pool rather than
+    defaulting to the top-level lists, so no future caller can re-narrow it by
+    accident. Ten contract cases in `gradedFolders.choices`; 16 tests; suite
+    1047 green.
+
+    **Two things this side does that the mac does not**, both written up in
+    `MAC-HANDOFF.md`: `excluded_items` names are not offered back (copying the
+    mac would have REGRESSED Windows, where removing a folder used to take it
+    out of the checklist in the same gesture), and each folder's children are
+    sorted so the list has a promised order at all. **And one caution worth
+    keeping** even though the item is closed: translating the mac's "do not
+    follow symlinks" as `FileAttributes.ReparsePoint` risks skipping every
+    folder in a cloud-synced working folder, because the Cloud Files API
+    documents unmaterialised placeholders as reparse points — which would put
+    synced courses straight back on the broken list with no test able to catch
+    it. **Not reproduced**: probing this machine's OneDrive with Files
+    On-Demand on found zero reparse-point directories, so it is a documented
+    hazard rather than an observed fault, and the narrower test costs nothing.
+    `child.Attributes.HasFlag(ReparsePoint) && child.LinkTarget is not null`
+    is what shipped, the attribute first only to skip a syscall per folder.
+    `CourseArchiver.cs:226` still uses the blanket version. Original text:
+
     `CourseSettingsView.xaml.cs` builds the pool from
     `SharedFolders.Concat(PerSectionFolders)`. The mac unions those with
     `nestedFolderNames`, four levels deep, and says why in a comment above it:
@@ -1243,8 +1330,18 @@ to run in the background.
     in `GUI-IMPROVEMENTS.md`. Medium, and it interacts with the graded-folder
     rules already ported, so read `GradedFolderRule` before starting.
 
-27. **The assistant offers no way back for a whole conversation (found
-    2026-09-06).** The mac shows a "restore this section" banner once a
+27. ~~**The assistant offers no way back for a whole conversation (found
+    2026-09-06).**~~ ✅ Done 2026-09-07 (branch
+    `issue/27-assist-conversation-restore`, `GUI-IMPROVEMENTS.md` row 435).
+    `CourseRestorer.RestoreSection` (section folder replaced wholesale, this
+    section's per-section keys on shared pages put back, the built site
+    discarded), `AssistSectionRestore` with the mac's sentences verbatim, the
+    banner above the transcript, the destructive confirmation, the transcript
+    note, and the trail line `section restored`. **And the backup is now made
+    ONCE per conversation, not once per change** — the hazard that made this
+    two changes rather than a button: with five copies kept, the copy from
+    before a six-change conversation had already been pruned. The original
+    item follows. The mac shows a "restore this section" banner once a
     conversation has changed something, behind a destructive confirmation
     (`AssistWindowView.swift`, backed by `Models/Assist/AssistSectionRestore.swift`).
     `AssistSectionRestore` appears nowhere in `windows-app/` — zero hits.
@@ -1253,8 +1350,18 @@ to run in the background.
     was has to undo six times and know that is what they are doing. Written up
     nowhere before today. Medium.
 
-28. **Four small gaps, each too slight for an item of its own and none of them
-    written down before today (found 2026-09-06).**
+28. ~~**Four small gaps, each too slight for an item of its own and none of them
+    written down before today (found 2026-09-06).**~~ ✅ Done 2026-09-07, all
+    four, as four commits on `issue/28-four-small-gaps` (`GUI-IMPROVEMENTS.md`
+    rows 432–434). (a) the Schedule Deploy dialog names the unpublished
+    classes dated on or before the chosen day, as advice; (b) the main window
+    comes forward for an assistant-driven build only when it was minimised or
+    hidden — a chosen divergence, `MAC-HANDOFF.md` → For awareness; (c)
+    `settings saved` / `settings could not be saved` are emitted from
+    `Save_Click` with the mac's wording; (d) the assistant window remembers its
+    placement per section in `AppSettings.AssistWindowPlacements`, a type
+    apart from `RememberedWindows` so it is never reopened at launch. The
+    original item follows.
 
     - **A scheduled deploy is arranged without the teacher seeing the plan.**
       `ScheduledDeploy.Describe()` already composes it — destination, machine
@@ -1279,46 +1386,131 @@ to run in the background.
       `MainWindow` has a frame in `AppSettings`. Row 164's note says "Windows
       has its own placement memory", which is true of the main window only.
 
-29. **~20 contract case lists the mac suite runs and the Windows suite does
-    not, which is why gaps like item 25 go unannounced (found 2026-09-06).**
+29. ~~**~20 contract case lists the mac suite runs and the Windows suite does
+    not, which is why gaps like item 25 go unannounced (found 2026-09-06).**~~
+    — ✅ Done 2026-09-06, branch `issue/29-windows-contract-case-lists`.
+    All 23 lists are wired; `contracts/README.md` has a section naming which
+    class runs which, so the next session does not repeat the audit. Two of the
+    bullets below were WRONG and are struck with their corrections inline.
+
+    **What the wiring found, none of which any inspection had.** This is the
+    argument for the item, so it is recorded rather than left in commit
+    messages:
+
+    - **Two shared-Python markers classified by nobody.** Not for the reason I
+      first wrote — the mac HAS an example-course task; its
+      `AppRulesContract.milestones()` leaves that task out of the generated
+      readout, and the mac's classification test walks the readout. A
+      classification is only as complete as the list it is checked against.
+    - **The two apps write a teacher's own frontmatter differently.** The
+      contract says a page in the old `draft:` spelling keeps it, inverted, and
+      the mac does that; this side migrates the key to `publishForSection<N>`,
+      which `GUI-IMPROVEMENTS.md` row 140 records as intended. Both are
+      defensible, they cannot both be true of a course opened on one machine and
+      then the other, and `documentation/` had already taken the Windows side —
+      so it is wrong for the mac today whichever way it is decided.
+    - **Four tool arguments differ by design and were recorded only in a Swift
+      doc comment**, plus sixteen more this server takes that the contract does
+      not describe — `preview` among them, which is the mac's own second
+      documented departure.
+    - **A field both apps have always written that no contract named**
+      (`sectionTimetable.section`), and **`--image` listed as a shared launcher
+      flag** when `deploy.ps1` cannot accept it.
+
+    All of it is written up in [`MAC-HANDOFF.md`](MAC-HANDOFF.md); the
+    frontmatter divergence is a decision, not a fix, and is at the top of what
+    the mac owes.
+
+    **The habits are the transferable part**, and they are in
+    `contracts/README.md`: ask each list BOTH ways — three of the gaps above
+    could ONLY be found by walking the code and looking it up in the contract
+    (a credential request, twelve MCP tools, sixteen tool arguments), and the
+    rest came from the ordinary forward walk, so both directions earn their
+    keep and only one was being done; assert completeness so a case the other
+    platform adds fails by name; and say in the test which rules cannot be
+    executed, rather than dropping them.
+
     None is unreachable — `Contracts.cs` is a plain JSON loader — each is
     simply a test never written. **This is the highest-leverage item on the
-    list**: wiring it is mechanical, and it would have caught item 25 and half
-    of item 28 by itself, without anybody thinking to look.
+    list**: wiring it is mechanical, and it would have caught item 25 by itself,
+    without anybody thinking to look.
 
-    Worth doing first, roughly in this order:
+    ("And half of item 28" was too strong — checked 2026-09-06. None of item
+    28's four gaps is caught outright by any list here: three are wiring a view
+    never does, which the test project cannot reach, and the fourth is an event
+    declared but not emitted, where the contract pins the DECLARATION. The
+    nearest thing is `shared-rules.json` → `scheduledDeployRefusals.alsoSaid`,
+    which says the plan must name the section's unpublished class pages — item
+    28's first gap — and which the list below missed entirely.)
+
+    The order they were done in, kept because the reasons are still the
+    reasons — and each is marked with what became of it:
 
     - `app-rules.json` → `markerOrigins.origins` (26) and `milestones` (57).
       `contracts/README.md` calls `markerOrigins` "the one easiest to get
       wrong", and getting it wrong stops the progress bar moving, which reads
-      as a slow build rather than a bug.
-    - `file-formats.json` → `wizardAnswerKeys.keys` (3) — item 25.
+      as a slow build rather than a bug. **Done**, and it found the two
+      unclassified markers.
+    - `file-formats.json` → `wizardAnswerKeys.keys` (3) — item 25. **Wired, and
+      it failed as predicted** until 2026-09-07: the test for `use_skeleton`
+      was `[Fact(Skip = …)]` naming item 25, and un-skipping it was that item's
+      acceptance test. All three keys pass now.
     - `app-rules.json` → `credentialPrompts.everyRequest` (7): whether a typed
       token is echoed on screen. Windows runs `credentialPrompts.cases` only.
+      **Done**, in BOTH directions — the reverse one, by reflection over the
+      real `CredentialRequests`, is the half that would catch a request added
+      here and written down nowhere.
     - `app-rules.json` → `publishedFreshness.whenShown` (9) / `whenRecorded`
-      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/25, the
-      descriptions the model actually sees); `course-management.json` →
-      `courseCode.renameEffects` (6); `shared-rules.json` →
-      `buildOutputLocation.windowsLocation.buildsRoot` (asserted by nobody on
-      either side), `problemReportDialog.askAboutPromptsWhen`,
-      `workingFolderPathBar.ancestorPaths` (Windows hardcodes its own crumbs),
+      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/25 — the NAMES
+      and ARGUMENTS, not the descriptions, which `Briefly()` rewrites here for
+      measured reasons); `course-management.json` → `courseCode.renameEffects`
+      (6); `shared-rules.json` → `buildOutputLocation.windowsLocation.buildsRoot`
+      (was asserted by nobody on either side; now run here),
+      `problemReportDialog.askAboutPromptsWhen`,
+      `workingFolderPathBar.ancestorPaths` (Windows hardcoded its own crumbs;
+      the contract now carries `windowsCases` and the copy is gone),
       `assistantModelChoice.comfortFraction`/`guidance`;
       `file-formats.json` → `firstDeployMarkers.paths` (3);
-      `example-content.json` → `rules` (5).
+      `example-content.json` → `rules` (5). **All done.**
     - **Neither side** tests `cloudSyncedFolders.detection.windowsMarkers` (4),
-      which item 18 depends on.
-    - `stopPreview.cases` (23) ARE covered, but by `test_stop_preview.ps1`,
-      outside `dotnet test` — so they do not run in the gate.
+      which item 18 depends on. **Still true, and deliberately so**: those four
+      are prose paragraphs describing what each platform exposes, not cases. The
+      behaviour they produce IS covered by hand in `CloudSyncedFolderTests`, and
+      `contracts/README.md` now records them among the rules no test executes,
+      with the reason — which is the honest answer rather than a test that
+      asserts a paragraph exists.
+    - ~~`stopPreview.cases` (23) ARE covered, but by `test_stop_preview.ps1`,
+      outside `dotnet test` — so they do not run in the gate.~~ **WRONG,
+      corrected 2026-09-06.** `ReclaimedProcessesTests.TheLauncherMatcherAnswersTheContract`
+      runs that script under `powershell.exe` from INSIDE `dotnet test` and
+      asserts its exit code and failure count, so the cases are gated. Do not
+      port them to C#: the `.ps1` lifts the matcher out of `preview.ps1` with
+      the PowerShell parser and runs the REAL launcher code, which a C# port
+      cannot — it would be a third implementation of one rule.
 
-30. **Smaller still, and listed only so they are not rediscovered as
-    surprises**: the Archived/Backup detail pane offers Restore but not Delete
+30. ~~**Smaller still, and listed only so they are not rediscovered as
+    surprises**~~ ✅ Done 2026-09-07, all three (branch
+    `issue/30-polish-delete-crumbs-rename`, `GUI-IMPROVEMENTS.md` rows
+    438–440): Delete beside Restore in both detail panes, reusing the
+    sidebar's confirmations; the picker's breadcrumbs with the main bar's
+    icon, tooltip, menu and double-click; and Rename Course in the FILE menu
+    with F2 — a chosen divergence from the mac's Edit menu, `MAC-HANDOFF.md`
+    → For awareness. The original item follows: the Archived/Backup detail
+    pane offers Restore but not Delete
     (Delete exists in the sidebar menu); the empty-folder picker's breadcrumbs
     have none of the main window's icons, tooltip or menu; and there is no Edit
     menu or keyboard route to Rename Course — it is context-menu only.
 
-31. **A folder rename spells the new name inside a Markdown link
+31. ~~**A folder rename spells the new name inside a Markdown link
     differently from the way you do it, and three contract cases will fail
-    until you change it.** You found and fixed the defect itself on
+    until you change it.**~~ **✅ Done 2026-09-07**, branch
+    `issue/31-rename-link-escaping`, commit `2bed7c83`. `Spelled` now calls a
+    `PercentEncoded` driven by `leaveUnescaped`, in BOTH branches, and
+    `FolderPathRewriterTests` deserialises the cases instead of retyping five.
+    A TWELFTH case went into the contract with it, for the second branch, which
+    the original eleven never reached — see "What Windows owed" below, and
+    `MAC-HANDOFF.md`. 1125 passed, 2 skipped, 0 failed (1031 before). Original
+    text: You found and fixed the defect itself on
     2026-09-06 — a Markdown destination ends at the first space, so renaming
     `Tasks` to `All Tasks` broke every Markdown-style link into the folder —
     and the mac took your rule unchanged. **What the mac did NOT take is
@@ -1342,8 +1534,15 @@ to run in the background.
     one. Eight of the eleven pass on Windows today. See "Spelling a folder's
     new name inside a link".
 
-32. **Your folders-help jargon sweep reads the teacher's own folder names, and
-    the contract says not to.** Small, latent, and named here only so it is not
+32. ~~**Your folders-help jargon sweep reads the teacher's own folder names, and
+    the contract says not to.**~~ ✅ Done 2026-09-07 (branch
+    `issue/32-folders-help-jargon-sweep`). The sweep now scans what the
+    PRODUCT writes — title, intro, both buttons, both placeholders, every
+    row's what and why, and a row's name only where the contract marks it
+    `namedFrom: "fixed"` (the four kept, asserted as four) — against a course
+    with a marks folder called "Scripts" and no curriculum folder, so the
+    exclusion and the never-rendered branch are both exercised. No assertion
+    weakened; nothing a teacher sees changed. The original item follows. Small, latent, and named here only so it is not
     rediscovered as a puzzle.
     `SpecialFoldersHelpContractTests.TheSheetNamesNoMachineryAndPublishesNoMatchingRule`
     appends `entry.Name` to the text it scans for banned words. But
@@ -1369,7 +1568,369 @@ to run in the background.
     `NoCurriculumFolderYet` and `NoneChosen` to the swept text, and give the
     fixture no curriculum folder.
 
-33. **Your MCP server serves 37 tools and the mac's serves 25, nobody was
+33. ~~**A folder named `index.md` is now REFUSED with a sentence of its own, and
+    the trail records the refusal.**~~ ✅ Done 2026-09-07 (branch
+    `issue/33-repair-refused-folder-in-the-way`, `GUI-IMPROVEMENTS.md` row 428).
+    `Result.Refused` is the fourth answer, `FolderWhereTheFrontPageBelongs`
+    is the sentence (pinned to the contract by
+    `TheRefusalSentenceIsTheContractsWordForWord`), and `RestoreIndex` writes
+    `folder problem not repaired` from the directory branch only. The two
+    contract sentences that still say Windows owes this are the mac's to
+    regenerate — `MAC-HANDOFF.md`, top of "Open". The original item follows.
+
+    You already found this bug on the mac and
+    were right about it (`MAC-HANDOFF.md`, 2026-09-06): `restoreIndex` asked
+    `fileExists(atPath:)` with no `isDirectory:` out-parameter, so a directory
+    called `index.md` came back `.alreadyFine` and the teacher was told the
+    problem was already put right about a section that still had no front page.
+    Fixed on the mac 2026-09-07. **You inherit nothing free here — there are two
+    things you owe, and one of them changes a decision you have already made.**
+
+    First, the SENTENCE. You return `Failed`, which is the honest one of the two
+    answers that existed, and your test
+    `ADirectorySittingWhereTheFrontPageBelongsIsAFailureNotAnAlreadyFine`
+    (`SiteHealthRepairTests.cs:180`) pins it. The mac has gone one further:
+    `contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`
+    now carries `expect: "refused"` and the sentence a teacher reads, so your
+    `Result` needs a FOURTH answer beside `Restored`/`AlreadyFine`/`Failed`, and
+    that test needs updating. The sentence is in the contract; do not retype it.
+
+    Second, the TRAIL. `activityTrail.mustRecord` gained `folder problem not
+    repaired`, and `SharedRules_ActivityTrailEvents_Exist` (`ContractTests.cs`)
+    pins that list by EQUALITY — so **your suite is red until you add the
+    event**, and that is the mechanism working, not damage. Write it from the
+    directory-refusal branch only, not from every failed repair: the plain
+    failure path deliberately records nothing yet, and the event is named for
+    the OUTCOME rather than for its one cause so that gap can be closed later
+    without a rename on either side.
+
+    The section below explains both, including what was REJECTED — moving the
+    folder aside and writing a proper front page in its place — and why.
+
+34. ~~**The mac's repair now answers one result per FINDING, and the rule is
+    contract data you can run.**~~ ✅ Done 2026-09-07 (same branch as 33).
+    `ARepairReportsOneResultPerFindingNeverOnePerCheckName` deserialises the
+    two `reportedOncePerFinding` cases in place of the hand-written test, and
+    the stale `<remarks>` on `Repair` is reworded. The original item follows.
+
+    This is your OTHER finding of 2026-09-06, and
+    you were right about it too: `repair(_:in:)` came back as a dictionary keyed
+    by the check's NAME, so two sections each missing a front page — two
+    findings, one name — collapsed to whichever ran last. Both were repaired;
+    only one was reported. "Section 1 restored, section 2 was already there"
+    read as "That is already put right. Nothing needed changing." with no
+    preview offered, for a repair that really had put a page back. Fixed on the
+    mac 2026-09-07 (branch `issue/repair-results-keyed-by-name`,
+    `GUI-IMPROVEMENTS.md` row 427).
+
+    **You inherit the code for free and owe one small piece of wiring.** Your
+    `Repair` returns `IReadOnlyList<(SiteHealthFinding, Result)>`
+    (`SiteHealthRepair.cs:251`) — arrived at in `014ee031`, your second commit
+    on that file, having ported the mac's dictionary in `3ddd4af4` a few hours
+    earlier and thought better of it the same day — and your
+    `TwoSectionsMissingAFrontPageDoNotCollapseIntoOneAnswer` already pins the
+    behaviour — the mac has simply caught up to a shape you shipped first, which
+    is worth saying out loud because this list is usually the other direction.
+    What is new is that the rule is now DATA:
+    `contracts/shared-rules.json` → `siteHealth.repair.reportedOncePerFinding`
+    carries two cases, a `howToRunACase` note saying exactly how to build each
+    one, and the vocabulary `expectResults` draws on. Deserialise those two
+    cases in `Plantoir.Tests` in place of the hand-written test, so the rule is
+    checked against one source on both sides rather than proved twice in
+    parallel. **Your suite is not red without it** — nothing pins this list by
+    equality — so this is a should, not a must.
+
+    Two things in that entry to read rather than skim. `reachability` records
+    that the collapse was unreachable from either app's front end (a section
+    window owns one runner; the checks announce per section), so nobody later
+    reads it as damage a teacher met. And `knownLimit` records what was
+    deliberately NOT fixed: one check name with two DIFFERENT outcomes — section
+    1 restored, section 2 failed — still reads "Put the front page back."
+    followed by "Could not put the front page back.", because the sentence has
+    no way to say which section is which. Both platforms read that way, it is as
+    unreachable as the collapse was, and new wording nobody has weighed is
+    harder to take back than a paragraph of explanation. On the mac the REFUSAL
+    case escapes it, because its own sentence names the section folder; on your
+    side it will too, the day item 33 lands.
+
+    One stale comment left for you rather than edited from here: the `<remarks>`
+    on `SiteHealthRepair.cs:241-250` call the per-finding list "a deliberate
+    divergence from the mac, whose dictionary is keyed by name". It is no longer
+    a divergence. Reword it when you next touch the file.
+
+35. ~~**The wizard's Create button and the new-site dialog have never been
+    driven through the real interface.**~~ ✅ Done 2026-09-07, branch
+    `issue/35-first-run-ui-checks`. **It asked which each half became, so:
+    the Create button became three `[UiFact]` cases; the new-site dialog
+    became a hand-driven check with a written procedure.**
+
+    `NewCourseWizardUiTests` presses the button — the wizard opens from the
+    course list, a duplicate code explains itself beside the field with Create
+    still off, and Create makes a course that exists on disk and in the
+    sidebar. The suite went from 6 tests to 9, green in 4 m 12 s. **A later
+    reader must not "simplify" the third test into `--auto-createcourse`:**
+    that hook calls `StartCreation()` from the dialog's `Opened` event, so it
+    never presses the button, and swapping to it would delete the only
+    coverage of the thing this item was about while leaving a test with the
+    same name.
+
+    **What cost the afternoon, and is the reusable part.** The suite launched
+    the app with `UseShellExecute = false`, so the `dotnet test` host's own std
+    handles were handed to the app and leaked into the ConPTY child: the app
+    captured nothing, what it sent the launcher never arrived, and `input()` in
+    `setup_course.py` reached EOF and died. It presents as "failed (exit code
+    1) after 1s" with an empty transcript, which reads as a broken toolchain
+    and is not. (That those handles are PIPES is inferred, not measured — it
+    fits, since console handles would have put the output in the terminal and a
+    one-second EOF is what a closed pipe gives. Said as an inference on
+    purpose; the whole point of this paragraph is that the previous version
+    stated a guess as fact.)
+
+    **`ConPtyProcess.Start` already carried this**, in a CAUTION saying the
+    child binds to the pseudo console only when the CREATING process's std
+    handles are clean — "console handles or none, as in a GUI app" — and that
+    a harness must be ShellExecute-launched. Read it before theorising, as the
+    first version of this write-up did not: it claimed an inherited CONSOLE was
+    the problem, which is wrong and would have sent the next person after
+    `FreeConsole()`. **Three launches of one build settled it** (Lenovo
+    20QES70500, Intel Core i5-8365U @ 1.60 GHz, 16 GB, 2026-09-07): clean
+    console handles, from `cmd.exe` in its own window — course made,
+    `setup.ps1` succeeded after 21 s; ShellExecute — the same, 21 s; the same
+    with `> out.txt 2>&1` — nothing captured, hung on the first prompt, no
+    course. So an ordinary terminal is FINE and redirecting is not. Written up
+    in [`documentation/12-windows-app.md`](documentation/12-windows-app.md)
+    ("Never start the app with its output redirected"); whether
+    `ConPtyProcess.Start` should defend itself by zeroing std handles across
+    `CreateProcessW` — `GetStdHandle`/`SetStdHandle` are declared in
+    `ConPty.cs` and never called — is in `TODO.md` with the research done.
+
+    **This is also the first UI test to run a LAUNCHER**, which the suite had
+    deliberately avoided. It is safe for one narrow reason, checked rather
+    than assumed: `setup_course.py` never resolves `merged_output_root`, so
+    `PLANTOIR_BUILD_ROOT` is set and the folder it names is never made —
+    after a create there was no new folder under the real
+    `%LOCALAPPDATA%\Plantoir\builds` and the real breadcrumb trail was
+    untouched. Nothing enforces that. **Check it again before a test runs a
+    different launcher**; preview and schedule would NOT be safe.
+
+    **Why the new-site half is a hand-check, so it is not proposed again.**
+    The reason that settles it is not the obvious one: `deploy.ps1`'s
+    Credential Manager target is hardcoded and `--state-dir` does not redirect
+    Credential Manager, so whether a test reached the dialog or **published a
+    real website** would depend on whether the machine happened to have a
+    token saved — behaviour forking on developer machine state, one fork of
+    which creates a live site. Rejected too: a fake token (the launcher
+    validates it against Netlify before `deploy.py` starts, so it raises
+    "Connect to Netlify" instead); a stub `deploy.ps1` (`RefreshLaunchers`
+    rewrites any launcher differing from the bundled copy, on every
+    `Reload()`, with no once-per-folder guard — note `RefreshToolchain` DOES
+    have that guard, so a stub under `.toolchain\scripts` would survive, which
+    rescues nothing because the token check stops the run first); and leaning
+    on `verify-deploy.ps1` (it redirects stdin from a file precisely so
+    `deploy.py` asks nothing). The procedure says what to check and what NOT
+    to: the dialog's wording is already contract data
+    (the `siteName` entry in `app-rules.json`'s `credentialRequests.requests`,
+    asserted by equality in `ContractTests`), so eyeballing it adds nothing;
+    what nothing pins is the ORDER, the pre-filled address, Cancel's
+    behaviour, that the created site carries the typed name, and the trail
+    line. **Writing that sentence found a real gap**: the contract sweep
+    checked title, field label, secrecy, link and steps and skipped
+    `explanation`, the longest thing a teacher reads in one of these dialogs.
+    One `Assert.Equal` in `ContractTests`, green on all seven requests — so
+    the claim the procedure makes is now true rather than nearly true.
+
+    Whether that hand-check joins the release cut is deliberately left alone:
+    it is the same open question as item 36, and answering it here would
+    settle 36 by the back door. The original item follows.
+
+    **The wizard's Create button and the new-site dialog have never been
+    driven through the real interface (audited onto this list 2026-09-06; the
+    gap itself is older).** Both are the first things a teacher meets, and
+    neither has ever been clicked in a running app by anybody checking that it
+    works. `windows-app/PROGRESS.md` records both, and until today that was the
+    only place either was written down: the wizard's Create button was proven
+    "underneath" — the `setup.ps1` plus answer-pump path ran to completion
+    through `PtyDriver`, which is not the same as the button reaching it — and
+    the verified deploy was a repeat publish to a site that already existed, so
+    the new-site dialog a BRAND-NEW section's deploy raises has never been
+    seen. **What Windows owes: two `[UiFact]` cases in `Plantoir.UiTests`**,
+    which is the project that exists for exactly this (`--state-dir` moves the
+    whole state folder, so nothing of the teacher's is touched) — today it
+    holds only `SpecialFoldersHelpUiTests`. The new-site half needs
+    credentials, so it may have to stay a hand-driven check with a written
+    procedure instead; say which it became. **Not for tonight**, and not a
+    defect report: it is an untested path, listed so it is a choice.
+
+36. **`verify-deploy.ps1` is wired into nothing, and that is a standing
+    exposure rather than a task (audited onto this list 2026-09-06).** It is
+    the ONLY automated check of the PowerShell half of publishing — it
+    publishes to every destination and every pairing against real sites and
+    fetches each one back, 36 passed / 0 failed on 2026-09-06 — and no gate
+    runs it. `verify.sh` and `verify-deploy.sh` are bash and do not run here,
+    so if this one is not run by hand, the publishing path on Windows has no
+    coverage at all beyond unit tests of its parts. It needs three credentials
+    and the network, which is WHY it is opt-in, and that reasoning is sound;
+    what was missing is anybody being told. Evidence:
+    `windows-app/PROGRESS.md` (the "the deploy gate exists now" bullet below
+    its parity table) and [`documentation/12-windows-app.md`](documentation/12-windows-app.md).
+    **Windows owes nothing here except a decision** — run it on a schedule, run
+    it as a release-cut step, or leave it hand-run and say so in `RELEASING.md`.
+    **Not for tonight.**
+
+37. **The Course Settings tip sentence is pinned by no contract on either
+    platform, and the two apps word the same rule differently (audited onto
+    this list 2026-09-06).** A sentence a teacher READS belongs in `contracts/`
+    by CLAUDE.md rule 2, and this one is in neither app's contract:
+    `grep -rn "added to your site automatically" contracts/` returns nothing.
+    So Windows wrote its own, in
+    `windows-app/Plantoir/Views/CourseSettingsView.xaml.cs`:
+
+    > "Tip: you can also simply create new folders in Obsidian — they're added
+    > to your site automatically the next time you preview. The exception is
+    > anything you remove here: it stays off your site, even if you make it
+    > again in Obsidian, until you add it back on this page."
+
+    while the mac says the same thing differently, in
+    `mac-app/QuartzTeachers/Views/CourseSettings/CourseSettingsView.swift`
+    (the change is `GUI-IMPROVEMENTS.md` row 375, which records that the
+    callout was amended but does not carry the sentence):
+
+    > "Tip: you can also simply create new folders in Obsidian — they’re added
+    > to your site automatically the next time you preview (unless you have
+    > removed them here)."
+
+    Both are quoted here so whoever decides can read them side by side. The mac
+    says the exception in six words inside a bracket; Windows spends a second
+    sentence on it and tells the teacher what to DO about it. They also differ
+    in a detail that will matter when one becomes a contract case: the mac's
+    apostrophe in "they’re" is the curly one, Windows' is straight.
+    **It is not ownerless, but nobody has picked it up.**
+    `MAC-HANDOFF.md`'s "Open — what the mac still owes" already says choosing
+    WHICH sentence becomes the contract is the mac's call, and says why no case
+    was proposed: proposing one would redden the mac suite over wording the mac
+    already ships. That has been sitting there unactioned, which is the actual
+    state and is why it is now indexed here too. **What Windows owes: taking
+    the mac's wording verbatim once the mac picks it**, and nothing before
+    that. **Not for tonight** — it is a decision about what a teacher reads,
+    not a defect.
+
+38. ~~**The two apps wrote a teacher's visibility flag differently, and the
+    contract described the mac's way.**~~ ✅ Done 2026-09-07 (branch
+    `issue/frontmatter-draft-key-divergence`). Found 2026-09-06 and until
+    today indexed only as a bullet inside item 29, which is struck — so from
+    this list it read as finished. Russell's decision: Windows keeps
+    migrating (`PageFrontmatter.SetDraft` is untouched), the contract's
+    `pageVisibility.writingRules[0]` now describes migration with the
+    reasoning and the rejected alternative in its `why`, the skipped test is
+    rewritten to assert migration and runs, and the mac is asked to adopt it
+    at the top of `MAC-HANDOFF.md`. The one design question — may an
+    already-correct legacy page be rewritten purely to migrate — is answered
+    yes, once, as the contract's deliberate exception to "writing the value it
+    already has changes nothing": the case is reachable only inside a batch
+    that is changing other pages, so the build was happening anyway, and a
+    rule that migrated only on a genuine change would leave the pages nobody
+    flips old forever.
+
+39. **The mac's unit suite was segfaulting its own test host a third of the
+    time, and you owe almost nothing for it — but check one thing and re-read
+    one rule** (2026-09-07, mac). Fixed on the mac; listed here because rule 3
+    says a write-up nothing points at is, from your side, a write-up nobody
+    made, and because two halves of it do travel.
+
+    **What it was.** The mac unit suite runs against the app's real window, so
+    a test that sets alert state raises a real `NSAlert` sheet, and clearing it
+    takes the sheet down again. SwiftUI ends the modal session from inside
+    `NSHostingView.layout()`, and AppKit's sheet-close animation then spins a
+    **nested runloop** from inside a display-cycle callback that is already
+    running — the display cycle is re-entered and dereferences null.
+    `xcodebuild` reports that as exit 65, `** TEST FAILED **`, and a
+    `Failing tests:` line naming whichever test happened to be running, while
+    the totals two lines above say `0 failures`. Measured here, same command
+    and same machine: **10 crashes in 30 runs before, 0 in 30 after**, and 0 host
+    deaths in 13 full-suite runs of 1,062 cases. In an
+    overnight batch on 2026-09-06/07 it rejected 3 of 7 pieces of correct work.
+
+    **What Windows inherits free: nothing, and that is the right answer.**
+    There is no WinUI equivalent, and your unit suite hosts no window at all —
+    nothing in `Plantoir.Tests/` constructs one — so the configuration that
+    produces this does not exist on your side. Do not go looking for it, and
+    do not port the fix.
+
+    **What you owe — two small things.**
+
+    - **Check whether `Plantoir.UiTests` can CRASH its host rather than fail an
+      assertion.** The one intermittent you have recorded,
+      `SpecialFoldersHelpUiTests.TheSheetShowsAMarksFolderTickedButNotYetSaved`
+      (commit `680f7a96`), is a different class: a UI-Automation test timing out
+      waiting for a dispatcher rebuild, in an opt-in suite that gates nothing.
+      That is a flaky assertion, and re-running it is the right response. If one
+      ever kills the process instead, the shape to look for is a modal being
+      torn down from inside a layout pass — and the lesson from this side is
+      that the honest signal is the test TOTALS, never the exit code.
+    - **Re-read `shared-rules.json` → `siteHealth.repair.oneAlertAtATime`. Its
+      reason has been strengthened, because the old one understated it.** It
+      said that raising a second alert while the first is dismissing "loses one
+      of them". It does worse: on 2026-09-05 it CRASHED the shipping mac app
+      (`GUI-IMPROVEMENTS.md` row 391), the same stack as this whole item. Do
+      not dismiss a dialog and raise a message box in one step — show the
+      outcome after the dialog has gone, or inline, which is what the mac does
+      now.
+
+    **The section that explains it** is "A test host that segfaults, and the
+    six levers that look like they should fix it", below. Read it only if you
+    ever hit something of this shape; it is written for that moment.
+
+40. **Your `TheRowsAreTheContractsRowsInTheContractsOrder` builds ONE course,
+    so it cannot catch the retired placeholder sentence coming back.** The
+    other half of the same test file as item 32 — which is now done, and this
+    is not: item 32 fixed the jargon SWEEP, and a sweep cannot stand in for
+    this. Raised on the mac 2026-09-06 (`GUI-IMPROVEMENTS.md` row 446).
+
+    **The hole: it builds ONE course and that course has a curriculum
+    folder** (`SpecialFoldersHelpContractTests.cs:96-98`, shared
+    folders `["Tasks","Ontario Curriculum"]`). It is the only test on either
+    platform that compares a row's `Why` with the contract's, so the
+    PLACEHOLDER branch's copy of that sentence is pinned by nothing. The mac
+    had the identical hole and it is not theoretical: **putting the old
+    sentence back — "One page per expectation, in a folder whose name mentions
+    the curriculum" — left all five mac tests green, measured on this Mac on
+    2026-09-06 by doing exactly that.** The jargon sweep runs that branch and
+    still cannot see it, because "mentions" is not a banned word.
+
+    **Do not fix it by adding "mentions" to `saysNoMachinery.jargon`.**
+    Rejected on the mac: banning a word catches only that word, and "in a
+    folder named after the curriculum" would sail straight through. It also
+    makes a shared contract change that sweeps every other row's text, for a
+    weaker guarantee than pinning the sentence itself.
+
+    The fix the mac made, which ports line for line: stop hand-typing the
+    fixture and loop `specialFoldersHelp.cases`, building each course through
+    the same `CourseFrom(figure)` the naming test already uses, asserting the
+    count, `What`, `Why` and the `namedFrom: "fixed"` names per case with the
+    case's own name in the message. Two of those cases END UP with no
+    curriculum folder at all, so both branches get compared and no new
+    fixture is invented to drift. (Three cases record no `curriculum_folder`;
+    the third of them has a folder the scan finds, which is the case whose
+    whole point is that recording none and having none are different things.)
+    Two traps met on the way: the count guard must `continue` rather than
+    `return`, or one bad case silences every case after it; and assert at the
+    END that both branches were actually reached (the mac keeps
+    `sawResolvedFolder` and `sawPlaceholder` flags), because a case list that
+    drifted until every course had a curriculum folder would leave the test
+    green while covering exactly what it covered before. **Measured after the
+    fix: the same reversion now fails 2 assertions naming both placeholder
+    cases, where it failed 0 before.**
+
+    **Both measurements were re-run on 2026-09-07 rather than taken on
+    trust**, because the session that first made them also reported a test
+    total it had not measured. Putting the sentence back and running the mac
+    suite twice: against the OLD test, 5 tests / 0 failures; against the new
+    one, 5 tests / 2 failures, naming "asked and cleared: an empty pool is a
+    real answer" and "more than one class folder is listed, not just the
+    first". Those are the two cases that reach the placeholder, by name. The
+    numbers above hold.
+
+41. **Your MCP server serves 37 tools and the mac's serves 25, nobody was
     going to notice, and FOUR things fall to you — an enumeration test, a
     rollover that publishes over last year's website, a signature that differs
     from the mac's under the same name, and seventeen measured phrasings you
@@ -1472,6 +2033,148 @@ to run in the background.
     this section right now?" — two days after the mac wrote its three, and it
     never came back. Neither side is fixed here, because routing is measured by
     hand and an unattended session cannot do it.
+
+## A test host that segfaults, and the six levers that look like they should fix it
+
+Written 2026-09-07, for whoever meets a modal that kills a test process rather
+than failing an assertion. It is macOS mechanics — none of the code transfers —
+but the SHAPE of the fault and the way it was cornered do, and the dead ends are
+the expensive part. Item 39 in the outstanding list says what, if anything, you
+owe. This is the manual.
+
+### The fault
+
+The mac unit suite hosts the real app, so its tests act on the real window. A
+test setting `renameProblem` puts a genuine `NSAlert` sheet on screen; clearing
+it takes the sheet down. All 38 crash reports from 2026-09-01 to 09-07 share one
+stack, and every one carries `libXCTestBundleInject.dylib` — they are all test
+hosts. Innermost last:
+
+    XCTest pumps the runloop
+      CA::Transaction::commit()
+        -[NSWindow _layoutViewTree]                  <- a layout pass starts
+          NSHostingView.layout()
+            +[NSAnimationContext runAnimationGroup:]
+              ViewGraph.updateOutputs -> preferencesDidChange()
+                AppKitDialogBridge.updateExistingAlert(allAlerts:id:)
+                  NSWindowEndWindowModalSession
+                    -[NSWindow(NSSheets) _orderOutRelativeToWindow:]
+                      -[NSSheetMoveHelper closeSheet]
+                        -[NSMoveHelper _doAnimation] <- spins a NESTED runloop
+                          the display cycle is re-entered -> null deref
+
+Two independent things have to be true at once, and naming both is what made it
+tractable. SwiftUI ends the modal session from **inside a layout pass**; and
+AppKit's sheet animation **spins a nested runloop** — in its own private
+`_NSMoveTimerRunLoopMode` — to drive itself. A nested runloop entered from inside
+a display-cycle callback re-enters the display cycle. It is one call stack on one
+thread. **It is not a race**, which is the single most useful thing to know: no
+delay, no extra settling and no ordering tweak could ever have made it safe, and
+an afternoon spent adding sleeps would have been an afternoon wasted.
+
+### The six levers that do not work, with numbers
+
+Every one of these is the obvious answer, and all five are dead. Measured on
+macOS 26.6 (25G72) by swizzling `-[NSMoveHelper _doAnimation]` and timing it, in
+a standalone AppKit probe rather than in the suite:
+
+| lever | close animation |
+|---|---|
+| nothing (baseline) | 0.268 s |
+| `-NSAutomaticWindowAnimationsEnabled NO` | 0.268 s |
+| `NSWindow.animationBehavior = .none` on the sheet | 0.264 s |
+| the same on the sheet's PARENT window | 0.270 s |
+| `endSheet` inside a zero-duration `NSAnimationContext` group | 0.267 s |
+| `-NSOrderOutSheetWhenEnded NO` | 0.266 s |
+| parent window never ordered on screen | 0.264 s |
+
+The first is the cruel one. `NSAutomaticWindowAnimationsEnabled` is the key
+everybody reaches for, it is real, and AppKit **reads it on this very path** —
+hooking `-[NSUserDefaults objectForKey:]` during a sheet close shows it consulted
+alongside `NSOrderOutSheetWhenEnded` — and then ignores it for the sheet move. A
+reviewer checking "is this key real?" gets yes; only measuring gets the truth.
+Reduce Motion was not tried and is near-certainly dead too: no accessibility key
+appears among the four read on that path.
+
+### What does work: the class's own switch
+
+`NSSheetMoveHelper` declares its own `-shouldSkipAnimation`, overriding
+`NSMoveHelper`'s. Forcing it to answer true is how AppKit itself takes a sheet
+out of the animation. One `method_setImplementation` on the SUBCLASS's own
+method, in the test bundle only.
+
+**It is AppKit's own branch, not a hole punched in AppKit.** Disassembling
+`-[NSMoveHelper _doAnimation]` on macOS 26.6: the flag is read at +192, and true
+branches to +216 → `_stopAnimation` → return at +252 — before the
+`CFRunLoopRunInMode` at +488. That is the identical branch AppKit takes when its
+own `inhibitWindowAnimations` is set. A logging implementation over the live
+selector shows `shouldSkipAnimation` is consulted from exactly one place,
+`_doAnimation`, reached from `openSheet`/`closeSheet`/`animateResizeToFrame:`
+and nowhere else — so a sheet RESIZE is covered by the same switch, and nothing
+but the animation is gated by it.
+
+| | `_doAnimation` runs | nested mode entered | open / close blocked |
+|---|---|---|---|
+| unchanged | 2 | **yes** | 0.281 s / 0.267 s |
+| force `shouldSkipAnimation` | 2 | no | 0.020 s / 0.008 s |
+| empty `_doAnimation` override | 0 | no | 0.020 s / 0.005 s |
+
+Sheet frame identical in all three, completion handler run, window takes another
+sheet afterwards.
+
+**The empty override was tried first and rejected, and the reason generalises.**
+Both work. The switch is better because AppKit's own skip path leaves the state
+AppKit intends to leave, BY CONSTRUCTION, rather than by our having probed that
+dropping `setUpAnimation`/`cleanUpAnimation` happens to be symmetric; because the
+switch is declared on the sheet subclass, so scoping needs no `class_addMethod`
+and no fallback branch to reason about, where `_doAnimation` is declared only on
+`NSMoveHelper`, which animates ordinary window moves too; and because it puts the
+test host in a configuration the framework already ships to real people instead
+of one nobody runs. **Where a framework has its own switch for the behaviour you
+want off, use the switch rather than removing the behaviour** — that is the part
+worth carrying to WinUI.
+
+### Two things about testing it that cost time
+
+**A test that cannot fail is not a test.** The first version raised a sheet,
+closed it, and asserted the sheet had gone — which passes identically with the
+fix removed, because the assertions come after a sleep that outlasts the 0.268 s
+animation. It looked like a regression test for a day. The version that works
+registers a `CFRunLoopObserver` for `_NSMoveTimerRunLoopMode` and asserts it
+never fires: it watches for **the exact frame in the crash stack**, has no timing
+threshold to go flaky on a busy machine, and was checked by putting the fault
+back and watching it fail. If you pin an intermittent, pin the mechanism, not a
+symptom you can outlast.
+
+**Measure with enough runs to mean something.** The rate here was about one run
+in three, so a fix "confirmed" by two green runs would be confirmed 44% of the
+time by doing nothing at all. Baseline and fix were each run 30 times, same
+command, same machine, same session.
+
+**And measure at the scope the GATE runs, not the scope that reproduces
+fastest.** This is the one that nearly shipped a defect. The single class was
+clean 30 times out of 30, which is where an honest-looking session would have
+stopped. The full suite then aborted 8 times out of 8 — a DIFFERENT crash, an
+over-released `_NSWindowTransformAnimation`, in the class that happens to run
+next alphabetically. It was caused by the tidy-up a review had asked for
+(closing the window the new test borrowed), and a single-class loop can never
+see it, because the damage only lands on whatever runs afterwards. Isolating it
+took four runs, and the fourth is the one that mattered — reproducing it with
+the fix TURNED OFF, which is what proved the crash had nothing to do with the
+fix and everything to do with the tidy-up. **When two things changed and
+something broke, turn one of them off rather than reasoning about which is more
+suspicious.**
+
+### And the half of it that is a product rule, not a test rule
+
+This mechanism is reachable in the SHIPPING app, and has fired once:
+`GUI-IMPROVEMENTS.md` row 391, 2026-09-05, when a rename dismissed a sheet and
+raised an alert in the same breath. `contracts/shared-rules.json` →
+`siteHealth.repair.oneAlertAtATime` is the rule against it, and its stated reason
+used to say only that one of the two alerts is lost. It now says what actually
+happened. **A rule whose reason understates the consequence is a rule somebody
+will trade away**, and that is the reason to keep the sentence accurate rather
+than tidy.
 
 ## Windows no longer runs any of this in a container
 
@@ -2128,14 +2831,14 @@ ask:
 | Key | What it decides |
 |---|---|
 | `use_skeleton` | Whether a course with no ready-made payload starts from its subject's skeleton — folders that suit the subject, four units of class pages to rename, placeholders saying what belongs where — or from nothing at all. |
-| `prepopulate_example_content` | Whether one of the 37 ready-made courses is poured in. |
+| `prepopulate_example_content` | Whether one of the 38 ready-made courses is poured in. |
 | `include_curriculum_pages` | Whether that payload's Curriculum folder comes with it. |
 
-**`use_skeleton` is not written by the Windows wizard at all** (checked
-2026-08-16). The Python then falls back to its own default — `True` — so a
-Windows teacher gets a skeleton and is never asked. That is the question MOST
-teachers meet, because around 1,900 course codes have a skeleton and no
-payload; only 37 have a ready-made course.
+**`use_skeleton` was not written by the Windows wizard at all** (checked
+2026-08-16; written since 2026-09-07, item 25). The Python then fell back to
+its own default — `True` — so a Windows teacher got a skeleton and was never
+asked. That is the question MOST teachers meet, because around 1,900 course
+codes have a skeleton and no payload; only 38 have a ready-made course.
 
 **Decided 2026-08-16: match the mac — ask the question and write the answer.**
 The alternative was to always start from the skeleton and write
@@ -2203,11 +2906,14 @@ the comment rather than a recorded Edge test. Low-risk to leave as-is; still
 worth doing the hand test and recording the result either way.
 
 **2. Which progress markers you must match, and which are yours to write.**
-`app-rules.json` → `markerOrigins` classifies all twenty-five. Seventeen come
+`app-rules.json` → `markerOrigins` classifies twenty-eight. Nineteen come
 from `scripts/*.py`, which both platforms run, and must match to the
 character. Seven come from the launchers, which exist separately as `.sh` and
-`.ps1` — those you write, and they already differ. One is "elsewhere"
-(`Quartz v4`, from the build) and wants a human to look.
+`.ps1` — those you write, and they already differ; since the native runtime
+landed they do not even pair up, so `knownDivergence.macOnlyLauncherMarkers`
+lists the mac phrasings a milestone here must never watch for. Two are
+"elsewhere" (`Quartz v4` and `Done processing`, both Quartz's own output) and
+want a human to look.
 
 **This example is now WRONG and is kept only as a warning: an earlier version
 of this section said "the mac watches for 'Setting up this Mac' where
@@ -2328,10 +3034,13 @@ for behaviour only your side has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 25-tool MCP one. (This said 23 until
-2026-09-06; the mac's own test has pinned 22 + 3 MCP-only = 25 for longer than
-that. See "The two MCP surfaces are not the same product" below — and note
-that YOUR server serves 37, which is a different number again.)
+the 13-tool local surface and the 25-tool MCP one. (It said 23; corrected
+2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
+serves 37, and the twelve it has beyond the contract are named in
+`AssistSurfaceContractTests` and in `MAC-HANDOFF.md`.) The mac's own test has
+pinned 22 + 3 MCP-only = 25 for longer than the prose said so. What the two
+surfaces do and do not share is item 41 and "The two MCP surfaces are not the
+same product" below.
 
 The descriptions are the part to take seriously. They are measured artifacts,
 not commentary: the "TEACHERS SAY:" phrasings came out of the routing suite,
@@ -5641,7 +6350,14 @@ described, so either side can test a character against it:
 
     contracts/shared-rules.json
       -> specialNames.renameFolder.linkRewriting.escapingSet.leaveUnescaped
-      =  ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'
+      =  ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'?
+
+(This line lost its trailing `?` when the correction two paragraphs down
+was written, and said the wrong thing for a day. Copy the string from the
+contract, never from here — or better, assert against it: Windows'
+`TheEscapingSetIsTheContractsCharacterForCharacter` pins the code's copy
+against the contract's, which is the only check that catches a character
+quietly added to or dropped from either.)
 
 Everything else — the space, `%`, the quotes and brackets, and every non-ASCII
 letter — is percent-encoded as UTF-8 **once escaping runs at all**, and
@@ -5676,9 +6392,30 @@ the correction is the useful part.
   cannot arise on Windows, where a folder name may not contain one, but the
   encoder is a pure string transform so the case still runs there.
 
-### What Windows owes
+### What Windows owed — ✅ done 2026-09-07
 
-**Three** of the eleven cases fail on Windows today, and they are a request
+Kept as it was written, because the reasoning is the point of the section and a
+deleted obligation takes its reason with it. Landed on branch
+`issue/31-rename-link-escaping`, commit `2bed7c83`: `Spelled` calls a
+`PercentEncoded` driven by `leaveUnescaped` in BOTH branches, and
+`FolderPathRewriterTests` deserialises every case. 1125 passed, 2 skipped, 0
+failed (1031 before).
+
+**A TWELFTH case went in with the fix**, and it is the part worth reading even
+now the work is done. `Spelled` has two reasons to escape — the new name would
+break a Markdown destination, or the OLD segment arrived percent-encoded — and
+NONE of the original eleven reaches the second. Eight take the first (a space or
+a bracket in the new name); the other three reach no encoder at all, because
+`Assignments` and `Café` need no escaping and the wikilink case is not a
+Markdown link. A `Uri.EscapeDataString` left behind in the second branch alone
+would have passed all eleven. The new case
+(`[q](All%20Tasks/Quiz.md)`, "All Tasks" → `Q&A`, expecting
+`[q](Q&A/Quiz.md)`) is the only one that reaches it. It is named in
+`MAC-HANDOFF.md`, and it should be green on the mac already.
+
+**What was originally owed, and why:**
+
+**Three** of the eleven cases failed on Windows, and they were a request
 rather than damage:
 
 - **“an ampersand is left as it stands”** — `Tasks` → `Tasks & Quizzes`,
@@ -5692,22 +6429,37 @@ rather than damage:
   folder name may not contain `?`, but the encoder is a pure string transform
   so the case still runs.
 
-All three are ONE change in
+All three were ONE change in
 `windows-app/Plantoir.Core/Models/FolderPathRewriter.cs`: replace
 `Uri.EscapeDataString` in `Spelled` with an encoder driven by `leaveUnescaped`
-above. It keeps only `A-Za-z0-9-._~`, so it over-encodes `&`, `,`, `+`, `'`,
-`!` and `*` alike — every one of which `decodeURI` then leaves encoded and
-`sluggify` turns into `-percent…`. Nothing else in the rule changes, and the
+above — in BOTH of its branches, which is the half that reads as optional and
+is not. It keeps only `A-Za-z0-9-._~`, so it over-encodes `&`, `,`, `+`, `'`,
+`!` and `*` alike. **Not all eleven break, and this line said they did.** The
+ones that 404 are the eight characters `decodeURI` leaves encoded and
+`sluggify` then turns into `-percent…`: `; , @ & = + $ ?`. `?` is an ordinary
+member of that set and not a special case — `Why%20Not%3F` slugs to
+`Why-Not-percent3F` by the same mechanism as the rest. (What IS peculiar to `?`
+is why the UNESCAPED spelling works: `sluggify` strips it from the real
+folder's name too, so both sides land on `Why-Not`.) `%27`, `%21` and `%2A` decode back to `'`, `!` and
+`*` and resolve fine, so over-encoding those three is noise rather than damage.
+Corrected 2026-09-07 by an adversarial review of the fix; the encoder is
+unchanged by the correction, because the eight that DO break include both of
+the ones a teacher will actually type. Nothing else in the rule changes, and the
 mac's version of it is `spelled(_:likeThe:in:)` in
 `mac-app/QuartzTeachers/Models/FolderPathRewriter.swift`.
 
-**And a second obligation that is easy to miss.**
-`windows-app/Plantoir.Tests/FolderPathRewriterTests.cs` retypes five cases of
-its own rather than deserialising `linkRewriting.cases`, so **nothing on the
-Windows side goes red on its own** — the three failures above are invisible
+**And a second obligation that is easy to miss** — done in the same commit;
+the file deserialises `linkRewriting.cases` now, keeps its five as named
+anchors, and pins the code's copy of `leaveUnescaped` against the contract's
+string directly. That last check is the one worth copying to the mac: a
+behavioural walk over the set can only test the characters the CODE has, so a
+character quietly ADDED to either app's constant is invisible to it.
+`windows-app/Plantoir.Tests/FolderPathRewriterTests.cs` used to retype five
+cases of its own rather than deserialising `linkRewriting.cases`, so **nothing
+on the Windows side went red on its own** — the three failures above are invisible
 there until the cases are wired in. `contracts/README.md`'s own rule is to
-deserialise and never retype; this file is one of the places that does not
-yet.
+deserialise and never retype, and this file was one of the places that did not
+— until 2026-09-07.
 
 The per-cent case, “a per-cent sign is escaped” (`Top 10%` →
 `[q](Top%2010%25/Quiz.md)`), **passes on Windows already** and is not work:
@@ -5730,3 +6482,149 @@ not what triggers it.
   them — the segment reads as `<Tasks` — and neither app has ever matched them.
   Pre-existing on both sides and out of this piece's scope; noted here so it is
   not mistaken for a regression.
+
+
+## A folder named `index.md`, and why both apps refuse rather than clear the way (2026-09-07)
+
+The bug is yours — you found it porting `SiteHealthRepair` line by line, and
+`MAC-HANDOFF.md`'s entry of 2026-09-06 is what this fixes. What follows is the
+part that does not travel in a diff: what the mac chose, what it rejected, and
+why the two are not interchangeable.
+
+### The bug, stated once
+
+`FileManager.fileExists(atPath:)` — and `File.Exists`, and every other bare
+existence test — is answering a question about a NAME, not about a file. On the
+mac it returns `true` for a directory. So this:
+
+```swift
+if FileManager.default.fileExists(atPath: index.path) { return .alreadyFine }
+```
+
+reported `.alreadyFine` for a section whose `index.md` was a FOLDER, and
+`outcome(ofRepairing:)` sorts `.alreadyFine` into neither "restored" nor
+"failed", so the dialog said **"That is already put right. Nothing needed
+changing."** The section still had no front page: `build_site.py` produces no
+root `index.html`, so there is no site to publish and the deploy refuses. The
+one dialog written to end silence was the thing telling them it was dealt with.
+
+`restoreMedia`, the function DIRECTLY above it, has used the `isDirectory:`
+form since it was written, with a comment saying why. And the two were written
+in the same sitting — `git log -S` puts both in commit `04dfd0cd`, 2026-08-23 —
+so this is not a case of an old habit and a new one. The careful form and the
+bare one were typed one function apart, on the same afternoon, by somebody who
+had just explained in a comment why the careful one was needed. That is the
+useful lesson in it: knowing the rule does not make the next call site obey it,
+and a grep for `fileExists` / `File.Exists` with no `isDirectory:` is worth more
+than remembering.
+
+### What it does now, and the decision behind it
+
+**Refuse, explain, and touch nothing.** Russell decided this before the work
+started, and the alternative was live: move the folder aside and write a proper
+front page in its place, so the teacher's next publish just works.
+
+**That was rejected because the folder may hold their pages.** Neither app can
+see inside it — this is a teacher's Obsidian vault, and a folder called
+`index.md` is most often a sync conflict or a mis-drag, but it can perfectly
+well be a folder somebody made on purpose with a term's work in it. A repair
+that relocates a teacher's writing to make a warning go away is a worse outcome
+than the warning, and it is the kind of thing that gets discovered in May.
+Refusing costs one step by hand, in Finder or Explorer, and nothing else.
+
+It also fits the rule the whole health feature is built on
+(`siteHealth.checksTheFeatureNotTheFolder`): a fix must restore the FEATURE.
+Moving a folder out of the way and writing an empty page satisfies the check
+while possibly hiding the teacher's own pages, which is the same failure mode
+as recreating an empty curriculum folder, one step further along.
+
+### The sentence, and why it names the course
+
+`contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`
+carries it. On the mac it is `SiteHealthRepair.folderWhereTheFrontPageBelongs(course:section:)`.
+
+It names the course as well as the section folder, and that was a review
+finding rather than a first draft: the outcome dialog shows a headline and one
+sentence and NOTHING else — not the course, not the section — so "in your
+section1 folder" sends a teacher with two courses to a folder that exists twice.
+This is the first teacher-facing sentence on either platform to name a
+`section<N>` folder. It is safe to do: that is the on-disk name, it is what
+Obsidian's file tree shows, and both apps already offer "Reveal in Finder" on
+exactly that folder.
+
+**And the generic explanation is REPLACED, not appended to.** That is
+`SiteHealthRepair.couldNotExplanation` on the mac — the one that sends a teacher
+to check whether a folder is locked or read-only. It is the right thing to say
+about a read-only volume and the wrong thing to say here: permissions are not
+what is wrong, and a teacher gets one prompt to act on. When BOTH kinds of failure happen at once — a file where
+`Media` belongs and a folder where the front page belongs — both sentences are
+said, generic first and specific last. Both orders were read aloud. The other
+way round ends the paragraph on the generic explanation's opening clause —
+"You can make it yourself in Obsidian" —
+immediately after "…and Plantoir can put the front page back", so "it" lands on
+the front page — the one thing that cannot be made until the folder in the way
+has moved. There is a test on the order
+(`testWhenBothKindsOfFailureHappenTheGenericExplanationComesFirst`), because a
+comment claiming a paragraph reads well is worth nothing.
+
+### The shape of the answer, which is what you have to copy
+
+`Result` gained a fourth case:
+
+```swift
+case blockedByAFolderWhereTheFrontPageBelongs(section: Int)
+```
+
+Two things about it are deliberate.
+
+It carries the **section number, not the sentence**. `Result` says how a repair
+went — a fact — and `outcome(ofRepairing:in:occasion:)` chooses every word in
+that file. Putting the prose in the Result would have split the wording across
+two places, and the first adversarial review of the plan caught exactly that.
+
+It is counted as a **failure**: the check's name goes into the failed list, so
+"Could not put the front page back." still appears beside anything that did
+come back, and `canRebuild` stays false, so the "Preview Again" button is not
+offered. There is nothing to look at.
+
+### The trail line
+
+`ActivityTrail.Event.folderProblemNotRepaired` = `"folder problem not
+repaired"`, written from the refusal branch with the course and section:
+
+```
+ICS3U/1 · found a folder called index.md where the front page belongs, and left it alone
+```
+
+Without it the trail shows the problem being FOUND and then nothing at all,
+which reads exactly like a teacher who never pressed the button — and the
+folder in the way is something they will very likely have moved or deleted by
+the time they report anything, so it cannot be looked for afterwards.
+
+**Named for the OUTCOME, not for its one cause, and this is the part worth
+copying rather than re-deciding.** Only the directory refusal writes it today.
+A repair that simply FAILED — a read-only volume, a permissions problem — still
+records nothing, which is a real gap and is left open on purpose: closing it is
+a different piece of work, and it belongs to whoever also decides what
+`restoreMedia` should say when a FILE is sitting where the `Media` folder
+belongs (the same class of problem, still answering `.failed` with the generic
+sentence). Naming the event `folder problem repair blocked` would have forced a
+rename on both platforms and in the contract the day that gap closes. So: wire
+it to the directory branch, not to every failure, and leave the name alone.
+
+### What is still not right in this file, on both platforms
+
+Named here so it is not rediscovered as a puzzle, and NOT fixed by this piece:
+
+- `restoreMedia` answers plain `.failed` when a FILE sits where the `Media`
+  folder belongs. Same class of problem, same wrong explanation, no sentence of
+  its own. The machinery to give it one is now in place — a second `Result`
+  case and a second contract sentence — and nobody has decided the wording.
+- `SectionAdder` has the identical bare `fileExists` guard on `index.md` when a
+  section is added, so a folder by that name is skipped silently there too.
+- ~~`repair(_:in:)` returns `[String: Result]` keyed by check NAME, so two
+  findings with the same name collapse — your second finding of 2026-09-06,
+  owned by its own piece of work.~~ — ✅ Done 2026-09-07, branch
+  `issue/repair-results-keyed-by-name`. It returns `[Attempt]` now, one entry
+  per finding, and the rule is contract data both suites can run
+  (`siteHealth.repair.reportedOncePerFinding`). See item 34 above.

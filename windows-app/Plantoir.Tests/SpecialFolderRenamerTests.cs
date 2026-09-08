@@ -51,9 +51,9 @@ public class SpecialFolderRenamerTests : IDisposable
     {
         Assert.Equal(SpecialNames.RenameProblemUnchanged,
             SpecialFolderRenamer.Problem("Tasks", "Tasks", new[] { "Tasks" }));
-        // Case-insensitively, because the filesystem is.
-        Assert.Equal(SpecialNames.RenameProblemUnchanged,
-            SpecialFolderRenamer.Problem("tasks", "Tasks", new[] { "Tasks" }));
+        // A change of capitalisation only is a rename, as on the mac (until
+        // 2026-09-07 this side refused it; the filesystem lets it through).
+        Assert.Null(SpecialFolderRenamer.Problem("tasks", "Tasks", new[] { "Tasks" }));
     }
 
     [Fact]
