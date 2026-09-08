@@ -69,16 +69,76 @@ final class SectionRestoredTrailTests: XCTestCase {
         )
         session.restoreSection()
 
+        // NOT the event's raw value. `ActivityTrail.note` takes the event and
+        // never writes it — the file carries a timestamp, the course/section
+        // prefix and the sentence — so searching the trail for "section
+        // restored" would find nothing on ANY path, and this assertion would
+        // hold even with the note moved above the `catch`. Ask for the
+        // sentence that is actually written.
         XCTAssertFalse(
-            ActivityTrail.store.activityText(includingPrompts: true).contains(
-                ActivityTrail.Event.sectionRestored.rawValue
-            ),
+            ActivityTrail.store.activityText(includingPrompts: true)
+                .contains("put the section back to how it was"),
             "a refused restore must not claim on the trail that it happened"
         )
         XCTAssertTrue(
             session.restoreNotes.contains { note in return note.isProblem },
             "and the teacher is told, in the conversation, that nothing was put back"
         )
+    }
+
+    /// The whole line a problem report will carry, written by the same
+    /// function the success path calls.
+    ///
+    /// `restoreSection()`'s own success path cannot be reached from a test —
+    /// the backup arrives through `AssistToolRunner.conversationBackupURL`,
+    /// which is `private(set)` and only set by a real conversation — so this
+    /// pins the recording function instead. What it is really guarding is the
+    /// `course:section:` overload: calling `ActivityTrail.note`'s two-argument
+    /// one instead would silently drop the `ICS3U/1 · ` prefix that the
+    /// contract's `carries` requires, and nothing at the call site would look
+    /// wrong.
+    @MainActor
+    func testTheRecordedLineCarriesTheCourseTheSectionAndTheFile() throws {
+        let scratchFolderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("restore-trail-\(UUID().uuidString)", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: scratchFolderURL)
+        }
+
+        AssistSectionRestore.noteRestored(
+            courseCode: "ICS3U",
+            sectionNumber: 1,
+            backupURL: URL(fileURLWithPath: "/tmp/x/ICS3U_backup_2026-09-07-1200_assistant-section1.zip")
+        )
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("ICS3U/1 · "), "the course and the section, as `carries` requires: \(trail)")
+        XCTAssertTrue(trail.contains("ICS3U_backup_2026-09-07-1200_assistant-section1.zip"), "and the file: \(trail)")
+        XCTAssertFalse(trail.contains("/tmp/x/"), "the file's NAME, not its path: \(trail)")
+    }
+
+    /// The fallback exists because a line naming no file beats no line; it
+    /// cannot be reached through `restoreSection` (a restore that succeeded
+    /// had a backup), so it is exercised here rather than left untested.
+    @MainActor
+    func testALineIsStillWrittenWhenTheBackupHasNoName() throws {
+        let scratchFolderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("restore-trail-\(UUID().uuidString)", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: scratchFolderURL)
+        }
+
+        AssistSectionRestore.noteRestored(courseCode: "ICS3U", sectionNumber: 2, backupURL: nil)
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains("ICS3U/2 · "), "still says which section: \(trail)")
+        XCTAssertTrue(trail.contains(AssistSectionRestore.unnamedBackup), "and says so plainly: \(trail)")
     }
 
     // MARK: - The platform filter
@@ -129,6 +189,33 @@ final class SectionRestoredTrailTests: XCTestCase {
         XCTAssertTrue(SharedRulesContractTests.macMustRecord([
             "event": "badly written",
             "appliesOn": "windows",
+        ]))
+    }
+
+    /// A well-formed list that names no platform anybody recognises must not
+    /// excuse the event from BOTH suites at once. A typo is the likely way in
+    /// — `["windwos"]`, `["macos"]`, `["Mac"]` — and the failure it would
+    /// otherwise cause is the silent one: the requirement simply vanishes, on
+    /// both platforms, with nothing going red to say so.
+    @MainActor
+    func testATypoInThePlatformNameStillRequiresTheEvent() {
+        for misspelling in [["windwos"], ["macos"], ["Mac"], ["win"]] {
+            XCTAssertTrue(
+                SharedRulesContractTests.macMustRecord([
+                    "event": "typed wrong",
+                    "appliesOn": misspelling,
+                ]),
+                "\(misspelling) names no platform, so the event stays required"
+            )
+        }
+    }
+
+    /// An empty list is the same failure with no typo to spot.
+    @MainActor
+    func testAnEmptyPlatformListStillRequiresTheEvent() {
+        XCTAssertTrue(SharedRulesContractTests.macMustRecord([
+            "event": "nobody at all",
+            "appliesOn": [String](),
         ]))
     }
 }

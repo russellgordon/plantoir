@@ -543,11 +543,30 @@ final class SharedRulesContractTests: XCTestCase {
     ///
     /// There is no windows-only entry in the contract as this is written —
     /// `section restored` dropped its `appliesOn` when the mac adopted it —
-    /// so `SharedRulesPlatformFilterTests` exercises this with entries of its
-    /// own rather than leaving it to be discovered wrong by whoever adds the
-    /// next one.
+    /// so `SectionRestoredTrailTests` exercises this with entries of its own
+    /// rather than leaving it to be discovered wrong by whoever adds the next
+    /// one. (Windows' filter is still exercised by the data, because the
+    /// mac-only `built site moved out of the working folder` remains.)
+    ///
+    /// **Anything it cannot READ as a platform list means "both".** Not just a
+    /// value of the wrong type: an EMPTY list, or one naming no platform this
+    /// knows — `["macos"]`, `["Mac"]`, a typo like `["windwos"]` — would
+    /// otherwise excuse the event from both suites at once, silently, which is
+    /// the exact failure the list exists to prevent. Erring towards "required"
+    /// makes a typo show up as a red suite naming the event, which is a
+    /// five-minute fix; erring the other way makes it disappear, which is
+    /// nobody's five minutes because nobody finds out.
     static func macMustRecord(_ entry: [String: Any]) -> Bool {
         guard let platforms = entry["appliesOn"] as? [String] else {
+            return true
+        }
+        var namesAPlatformThisKnows: Bool = false
+        for platform in platforms {
+            if platform == "mac" || platform == "windows" {
+                namesAPlatformThisKnows = true
+            }
+        }
+        if !namesAPlatformThisKnows {
             return true
         }
         return platforms.contains("mac")

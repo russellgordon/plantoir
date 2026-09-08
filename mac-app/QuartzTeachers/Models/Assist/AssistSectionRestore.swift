@@ -117,10 +117,28 @@ enum AssistSectionRestore {
     }
 
     /// What `trailLine` says when the backup's name is somehow not to hand.
-    /// It should not happen — a restore that got as far as succeeding had a
-    /// backup — but a line naming no file is still worth more than a crash or
-    /// an empty one.
+    /// A restore that got as far as succeeding had a backup — `restore` refuses
+    /// without one — so this is defence rather than a case that happens. A line
+    /// naming no file is still worth more than no line at all.
     static let unnamedBackup: String = "a copy made when it started"
+
+    /// Writes the restore onto the breadcrumb trail.
+    ///
+    /// Its own function so that the whole line a teacher's problem report will
+    /// carry — the course and section prefix included — can be pinned by a
+    /// test. Calling `ActivityTrail.note`'s two-argument overload by mistake
+    /// would silently drop the `ICS3U/1 · ` prefix that
+    /// `contracts/shared-rules.json` → `activityTrail.mustRecord` requires
+    /// ("which course and section, AND the file name"), and nothing about the
+    /// call site would look wrong.
+    static func noteRestored(courseCode: String, sectionNumber: Int, backupURL: URL?) {
+        ActivityTrail.note(
+            .sectionRestored,
+            trailLine(backupFileName: backupURL?.lastPathComponent ?? unnamedBackup),
+            course: courseCode,
+            section: sectionNumber
+        )
+    }
 
     /// Do it — or refuse, when there is nothing saved to go back to.
     ///

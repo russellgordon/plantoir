@@ -609,14 +609,8 @@ final class AssistSession {
         // they ask why the section's pages are older than the changes above
         // them. The file NAME says which copy it came from without saying a
         // word about what is written on any page.
-        ActivityTrail.note(
-            .sectionRestored,
-            AssistSectionRestore.trailLine(
-                backupFileName: backupURL?.lastPathComponent
-                    ?? AssistSectionRestore.unnamedBackup
-            ),
-            course: courseCode,
-            section: sectionNumber
+        AssistSectionRestore.noteRestored(
+            courseCode: courseCode, sectionNumber: sectionNumber, backupURL: backupURL
         )
         restoreNotes.append(RestoreNote(
             text: AssistSectionRestore.doneMessage(

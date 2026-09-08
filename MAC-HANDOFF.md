@@ -97,11 +97,18 @@ which is the request arriving, not damage.~~ ✅ DONE 2026-09-07 (mac, branch
 the section and the backup's file name, on the success path only; the sentence
 lives in `AssistSectionRestore.trailLine` so a test pins it by name rather than
 by a quoted copy. `SharedRulesContractTests.macMustRecord` is the `appliesOn`
-filter, behaving as the Windows twin does — with one deliberate difference
-worth knowing: a MALFORMED `appliesOn` (anything that is not a list of
-platform names) is treated as "belongs to both" rather than excusing the mac,
-because silently dropping a requirement is the failure the list exists to
-prevent. `appliesOn` is now GONE from the case, so it is pinned on both sides
+filter. It agrees with the Windows twin on every well-formed value and differs
+on two malformed ones, both deliberately: anything it cannot READ as a list of
+platform names is treated as "belongs to both" rather than excusing the mac —
+**and that now includes a well-formed list naming no platform anybody
+recognises**, so `["windwos"]`, `["macos"]`, `["Mac"]` or `[]` keep the event
+required instead of deleting it from BOTH suites with nothing going red. That
+last case is the one worth copying: erring towards "required" turns a typo
+into a red suite naming the event, which is a five-minute fix, where erring
+the other way makes the requirement vanish and nobody finds out. (On the
+wrong-TYPE shape — `"appliesOn": "windows"` — the mac returns "required" while
+Windows throws; both end red, so this is a difference in the message, not in
+the outcome.) `appliesOn` is now GONE from the case, so it is pinned on both sides
 and the `why` no longer describes a state of affairs that has ended.
 
 **One thing this leaves for whoever adds the next platform-only event:** there
