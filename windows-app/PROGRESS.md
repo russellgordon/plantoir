@@ -18,26 +18,27 @@ Docker Desktop) unless marked otherwise.
 | `Plantoir.UiTests/` | Drives the REAL built app through UI Automation (FlaUI/UIA3), for what a unit test cannot reach — see "Driving the real interface" below. Opt-in: skipped unless `PLANTOIR_UI_TESTS=1`, and compiled by a SOLUTION build (not by the per-project commands used day to day). References `Plantoir.Core` only, never the app project — the Windows App SDK has no business in a test host. |
 | `Plantoir.Mcp/` | On `main` (`Plantoir.sln` lists it) and **it ships**: `publish.ps1` publishes it, copies `plantoir-mcp.exe` into the app's own output beside `Plantoir.exe`, and includes it in the signing list. A standalone MCP server exposing one working folder to an AI assistant. Load-bearing at runtime — `Plantoir/Services/ClaudeCodeLauncher.cs` looks for it beside the app, and `Plantoir/Services/McpClient.cs` launches it. See [its README](Plantoir.Mcp/README.md). |
 
-## Where parity stands (2026-09-06)
+## Where parity stands (2026-09-08)
 
-`WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
-date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Thirty-six of its forty
-items are done**, counted 2026-09-07; items 21, 23, 24 and 29 landed on
-2026-09-06 (the folder-problems front end, the same findings reaching the assistant,
-the overnight run's findings being captured and reported the next morning, and
-the contract case lists this suite was not reading); items 33 and 34 — the
-refusal of a folder named `index.md`, and the per-finding repair report as
-contract cases — struck on 2026-09-07, along with 13, 17, 18, 19, 25, 26, 27, 28, 30, 31, 32,
-35 and 38 the same day. Items 35–37 were added the same day by an audit of
-these two documents (`556646e2`, a Windows session, 2026-09-06 — the numbers
-have shifted since). **Four are open as of 2026-09-07: 36, 37, 39 and 40.**
-36 and 37 are decisions rather than code, 39 is a check and a re-read, and
-**40 is the only one that is code**. 37, 39 and 40 all wait on the mac; only 39
-and 40 came FROM it, 36 and 37 having been raised by that Windows audit.
-Neither 39 nor 40 had a row in the table below until they were added here —
-item 39 was written up at 09:33 on 2026-09-07 and given no row for twelve
-hours, which is exactly the drift the rule below exists to stop.
+`WINDOWS-HANDOFF.md`'s numbered list is the index. **Counted 2026-09-08 with
+the two commands below, after three branches merged into `dev`: 44 items, 39
+struck, FIVE open — 39, 40, 41, 42 and 44.**
+
+Item 36 closed 2026-09-07; item 37 (the Course Settings tip) and item 43 (the
+Marks wording) closed 2026-09-07 and 2026-09-08. **Item 41 came from the mac**
+— the MCP tool surface — and is the one with work in it rather than a decision.
+Items 42 and 44 were raised HERE, both while pinning wording: 42 is shared
+Python (`_dropping_excluded_items` matching case-insensitively where everything
+else matches exactly), 44 is the Course Settings divergence item 43 wrongly
+believed it had finished off. **39 and 40 both wait on the mac and both came
+from it**: 39 is a check and a re-read, 40 is the only open item that is code.
+
+**Three items were renumbered on 2026-09-08, and a reader of an older message
+should know it.** Two sessions worked in parallel and both appended to this
+list and to `GUI-IMPROVEMENTS.md`. The mac's MCP piece took item 41 and row
+447 first, so the Windows wording work moved down one: the exclusion item
+41→42, the Marks item 42→43, the coverage-notes item 43→44, and the log rows
+447→448 and 448→449. Every cross-reference was moved with them.
 
 **Count them rather than trusting this line.** It read "sixteen of its
 twenty-four" on a list that had grown to 32 items with eleven of them open,
@@ -69,6 +70,8 @@ What is genuinely left, smallest first:
 | ~~31~~ | ✅ Done 2026-09-07 — `Uri.EscapeDataString` replaced by a contract-driven encoder in both branches of `Spelled`; `FolderPathRewriterTests` deserialises every `linkRewriting` case. | — |
 | ~~36~~ | ✅ Done 2026-09-07 — decided: `verify-deploy.ps1` stays opt-in (it makes real sites), `.githooks/pre-commit` warns when a commit touches the publishing path, `RELEASING.md` requires a nothing-skipped run for a release that changes it, and the real win — all fifteen shared `scripts/test_*.py` now run inside `dotnet test`, which nothing here did before. | — |
 | ~~37~~ | ✅ Done 2026-09-07 — Russell chose WINDOWS' wording, not the mac's, and it is now `shared-rules.json` → `specialNames.contentStructureTip`: the literal is gone from `CourseSettingsView.xaml.cs`, `SpecialNames.ContentStructureTip` is the single source, and three facts pin it. "on this page" became "here" (matching `removeLeavesTheFolderOnDisk` in the same view) and "folders" became "folders and files" — the caption sits under four lists, two of them FILE lists, and both apps had promised only the folder half of what `build_site.py` actually does. The mac owes the adoption and is not red meanwhile; it is at the top of `MAC-HANDOFF.md`'s "Open". | — |
+| ~~43~~ | ✅ Done 2026-09-08 — the Marks list's title and caption are now `shared-rules.json` → `gradedFolders.wording`. Russell chose the MAC's title, so this app took "Folders whose work counts for marks"; the caption is a union whose middle sentence is `specialFoldersHelp`’s with ONE word changed — the map’s name, not identical to it — names the map "the curriculum coverage map" (matching the flyout and switch on this same screen — capital-C "Curriculum Coverage map" was the built PAGE title and was drift), and says "tick" rather than the mac's "add"/"remove", which named actions this tick list does not offer. The caption also MOVED below its list in both Course Settings and the wizard, so "a page in one of these" has something to refer to. Trap met: `FormBuilders` builds checkbox automation ids from the list title, and a UI test had the old one hard-coded — it now reads the contract. The mac owes only the caption and is not red. | — |
+| 44 | Found here 2026-09-08 reviewing item 43, which wrongly called itself the last Course Settings divergence: the coverage-notes toggle reads "Explain the map on the page" on the mac and "Include explanations on Curriculum Coverage page" here — in Course Settings AND the wizard, so twice — and the caption sentences beside it differ differently on each surface. **Eight strings, not four**, and a first draft of this row said the mac had no counterparts, which is true only of Course Settings: the mac has its own wizard captions and they are better. So the wizard is pick-one-of-two; Course Settings is the harder question. `WINDOWS-HANDOFF.md` item 43 quotes all of them. | Small |
 | 42 | Shared Python, found here 2026-09-07: `_dropping_excluded_items` matches `excluded_items` case-insensitively while every other consumer matches exactly, so `build_site.py` gives two answers in one file. **Do not fix it by case-folding the live path** — exact matching is the deliberate rule (`gradedFolders.choices.walk.excludedItems`, reasoned in `GUI-IMPROVEMENTS.md` row 412), and case-folding breaks that case and re-introduces the app/build disagreement 412 rejected. Full write-up in `TODO.md`; `WINDOWS-HANDOFF.md` item 41. Gateable here now that `dotnet test` runs the shared Python. | Small |
 | 39 | From the mac, after its test host stopped segfaulting: check whether `Plantoir.UiTests` can CRASH its host rather than fail an assertion (the shape to look for is a modal torn down inside a layout pass; the honest signal is the test TOTALS, never the exit code), and re-read `shared-rules.json` → `siteHealth.repair.oneAlertAtATime`, whose reason has been strengthened. Added to `WINDOWS-HANDOFF.md` on 2026-09-07 and never given a row here. | Small |
 | 40 | Code, from the mac: `TheRowsAreTheContractsRowsInTheContractsOrder` builds ONE course, which has a curriculum folder, so the retired placeholder sentence could come back unguarded. Loop `specialFoldersHelp.cases` instead — the mac's fix ports line for line, traps included. | Small |

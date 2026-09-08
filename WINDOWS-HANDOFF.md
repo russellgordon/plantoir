@@ -2250,6 +2250,103 @@ to run in the background.
     while answering row 412. Either owes a contract case and a `verify.sh` run
     from the mac.
 
+43. ~~**The Marks list's title and caption are worded differently on the two
+    apps and pinned by nothing.**~~ ✅ Done 2026-09-08 (branch
+    `issue/marks-wording-contract`). The second Course Settings
+    divergence, surfaced by the same audit as item 37 and flagged there as
+    out of scope. Now `shared-rules.json` → `gradedFolders.wording`.
+
+    **The SECOND such divergence, not the last.** "and last" was in the first
+    draft of this item and is gone, because it would have closed an audit that
+    is not finished. Still unpinned, one control ABOVE this one: the
+    coverage-notes toggle reads "Explain the map on the page" on the mac
+    (`CourseSettingsView.swift:51`) and "Include explanations on Curriculum
+    Coverage page" here (`CourseSettingsView.xaml.cs:551`), and this app draws
+    two `ExampleCaption` sentences in that block the mac has no counterpart
+    for. `grep` over `contracts/` finds none of the four. That is item 44.
+
+    **Russell chose the MAC's title** — "Folders whose work counts for marks"
+    — so this app gave one up; it also matches `specialFoldersHelp`'s pinned
+    "Work that counts for marks". The caption is a union of the two apps',
+    and its middle sentence is `specialFoldersHelp.rows`' with ONE word changed
+    — the map's name. NOT identical to that row: an earlier draft of this item
+    said "verbatim", which would have told a mac session the two strings now
+    match when the help sheet still says "the curriculum map" on purpose.
+
+    **Three decisions inside it, each argued the other way first.** The map is
+    called "the curriculum coverage map" — Russell's call, because both
+    spellings are pinned and this is the one on THIS control
+    (`lastGradedFolderBlocked`, and the switch labelled "Publish the
+    curriculum coverage map"), so the screen now says one name three times.
+    This app's capital-C "the Curriculum Coverage map" was drift: that is the
+    built PAGE's title. The caption says "tick", never "add" or "remove" — a
+    correction, not a preference: this is a tick list with no Add button, and
+    "remove what you don't" invited the action `lastGradedFolderBlocked`
+    refuses. And **the caption moved BELOW its list here**, in both Course
+    Settings and the wizard, because it says "a page in one of these" and
+    above the list "these" followed the header "Marks" and referred to
+    nothing. The mac has always drawn it below; that move is what lets one
+    string serve all four surfaces.
+
+    **The trap, and it would have been silent.**
+    `FormBuilders.MembershipToggleList` builds each checkbox's automation id
+    as `member:{list title}:{name}`, and `SpecialFoldersHelpUiTests` had the
+    old title hard-coded in one. Changing the title moved every marks
+    checkbox's id — in the opt-in UI suite, which gates nothing and would
+    have reported nothing. It now READS the title from the contract. Anything
+    else keyed on a list title is worth the same treatment.
+
+    **The mac owes only the caption** (its title already matches) and is not
+    red meanwhile — no mac test names the key. Listed at the top of
+    `MAC-HANDOFF.md`'s "Open". 1209 unit tests and all 11 UI tests green.
+
+44. **The coverage-notes toggle is worded differently on the two apps, on BOTH
+    surfaces, and the caption sentences beside it differ in a different way on
+    each.** Found 2026-09-08 by adversarial review of item 43, which had
+    claimed to be the LAST Course Settings divergence and was not. Nothing here
+    is pinned; `grep -rn` over `contracts/` finds none of these strings.
+
+    **The label, and it is the same divergence twice.** mac — "Explain the map
+    on the page", in Course Settings (`CourseSettingsView.swift:51`) and in the
+    wizard (`NewCourseWizardView.swift:761`). Windows — "Include explanations
+    on Curriculum Coverage page", in both (`CourseSettingsView.xaml.cs:551`,
+    `NewCourseDialog.cs:677`). Windows also spells "Curriculum Coverage page"
+    with capitals, which is defensible — that IS the built page's title — but
+    it is the same capital-C pattern item 43 removed from the caption one
+    control below, and the two want deciding together rather than a year apart.
+
+    **The captions are NOT the same problem on the two surfaces, and an earlier
+    draft of this item got that wrong in the direction that costs work.** It
+    said Windows draws two sentences "the mac has no counterpart for" and
+    therefore that the mac must GAIN them — true in Course Settings, false in
+    the wizard, where the mac has had its own for as long as Windows has:
+
+    - Coverage map. mac (`NewCourseWizardView.swift:756`) — "A page showing
+      every expectation coloured by how many pages address it — red in
+      September, greener as the year goes on. Linked from Key Links, and kept
+      out of the sidebar." Windows (`NewCourseDialog.cs:666`) — "Generates a
+      page showing which specific and overall expectations are addressed".
+    - The notes. mac (`NewCourseWizardView.swift:766`) — "Two short sections at
+      the foot of the map: what counts as addressing an expectation, and how to
+      read it honestly — red in September is normal, red in May is not. Turn
+      this off to publish the map on its own." Windows
+      (`NewCourseDialog.cs:679`) — "Shows “What counts” and “Reading it
+      honestly” sections on the page".
+
+    So the wizard is an ordinary pick-one-of-two (and the mac's are markedly
+    better — they say what a teacher will SEE), while Course Settings is the
+    harder question, because there the mac shows no caption at all and the
+    choice is whether it gains one or Windows drops two. **Eight strings, not
+    four.**
+
+    One thing that already agrees and should not be disturbed: the wizard's
+    coverage switch itself, `SpecialNames.CoverageSwitchLabelInWizard` =
+    "Include the curriculum coverage map" = `NewCourseWizardView.swift:753`.
+    And the Course Settings switch label is load-bearing in a way a caption is
+    not — `SpecialNames.CoverageSwitchLabelInSettings` is quoted by the blocked
+    sentences and `EveryBlockedSentenceNamesASwitchTheAppActuallyHas` asserts
+    it, so that one cannot be changed alone.
+
 ## A test host that segfaults, and the six levers that look like they should fix it
 
 Written 2026-09-07, for whoever meets a modal that kills a test process rather

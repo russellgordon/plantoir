@@ -967,9 +967,7 @@ public sealed class NewCourseDialog : ContentDialog
     private void RebuildMarksList()
     {
         _marksArea.Children.Clear();
-        _marksArea.Children.Add(FormBuilders.ExampleCaption(
-            "Tick the folders holding work that counts for marks. The Curriculum Coverage map shows an expectation as evaluated when a page in one of these addresses it."));
-        _marksArea.Children.Add(FormBuilders.MembershipToggleList("Folders that count for marks",
+        _marksArea.Children.Add(FormBuilders.MembershipToggleList(GradedFolderRule.ListTitle,
             _sharedFolders.Concat(_perSectionFolders).ToList(),
             CurrentGradedFolders,
             v => _gradedFolders = v,
@@ -977,6 +975,8 @@ public sealed class NewCourseDialog : ContentDialog
             RebuildFolderEditors,
             name => ItemProtectionRule.For(name, ItemList.GradedFolders, WizardProtection()),
             (name, reason) => RecordWizardRemovalBlocked("the marks list", name, reason)));
+        // Below the list, for the reason in GradedFolderRule.Caption.
+        _marksArea.Children.Add(FormBuilders.ExampleCaption(GradedFolderRule.Caption));
     }
 
     // ---- Validation and auto-fill ---------------------------------------
