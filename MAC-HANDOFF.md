@@ -452,6 +452,33 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ## Open — what the mac still owes
 
+- **Nothing to implement, one thing to switch on: line endings are enforced
+  now, and the enforcement reaches this clone only if hooks are enabled.**
+  (Windows, 2026-09-08, branch `issue/gitattributes-line-endings`.) A session
+  committed four files as CRLF with stray lone CRs — 7,672 insertions for 264
+  lines of work, and `git blame` on `WINDOWS-HANDOFF.md` attributing all 6,655
+  of its lines to one commit. Review caught it; nothing else would have.
+
+  `.gitattributes` is new and does most of it: `* text=auto` plus an explicit
+  `text` on the extensions that matter, so a file carrying a stray CR is
+  normalised instead of being mistaken for binary and skipped. **It changes
+  nothing anyone has checked out** — no `eol=` directives, so working trees
+  keep whatever their platform gives them. Measured before writing it:
+  `git ls-files --eol` said 13,091 tracked files were already LF in the index,
+  138 binary, and exactly two not LF, both vendored Obsidian theme files, which
+  are named one by one as `-text`. A wider `.obsidian/**` exclusion was tried
+  first and rejected — it also caught four files that ARE LF, and made
+  `git add --renormalize` stage their CRLF, which is the damage this is for.
+
+  **The half `.gitattributes` cannot do, and why the mac has to opt in.** Git
+  strips only the CR immediately before a newline, so a file written as
+  CR CR LF still reaches the index with one CR per line — the exact shape that
+  did the damage. `.githooks/pre-commit` now checks staged blobs for carriage
+  returns and says so, without blocking. Hooks are not installed by cloning:
+  run `git config core.hooksPath .githooks` on the mac if it has not been run
+  there, and check with `git config --get core.hooksPath`. That request was
+  already on this list for the publishing warning; it now carries this too.
+
 - **One caption to adopt: the Marks wording is now a contract case, and the
   mac's TITLE won.** (Windows, 2026-09-08, branch
   `issue/marks-wording-contract`.) The title at `CourseSettingsView.swift:185`
