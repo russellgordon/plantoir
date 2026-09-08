@@ -772,7 +772,16 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      The two are complements, not alternatives: the lock answers "which course
      is this about", `list_courses` answers "which courses are there".
 
-  2. **`roll_over_section`** — the one that is a DEFECT before it is a feature,
+  2. **`roll_over_section`** — ✅ **DECIDED 2026-09-08: ASK.** A rollover asks
+     the teacher whether this should be a new website or the same one as last
+     year; and it does NOT hide pages that were visible last year, because
+     re-dating moves dates and hiding is a separate act. The sentence has to be
+     written in `contracts/` first, the mac has no `ReleaseSite` to call at
+     all, and the card phrasing must move on both platforms or the decision
+     changes nothing a teacher meets. Reasoning in `TODO.md`. The original
+     entry, which is what the decision was taken against, follows.
+
+     The one that is a DEFECT before it is a feature,
      and it is a defect **on both platforms**: "roll this section over to a new
      year" is matched in code on each and routed to `re_date_classes`, which
      cuts the section loose from its published site on neither, so the first
