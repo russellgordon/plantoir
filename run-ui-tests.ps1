@@ -21,8 +21,11 @@
     They cover what a unit test cannot see: that a control can be reached, that
     clicking it opens something, that the RENDERED text is what the model said
     in the order the contract fixes, that a scrolling list is not cut off at the
-    bottom, and that the sheet follows the course a teacher selected rather than
-    going stale. They do NOT judge anything visual — colour, contrast, dark-mode
+    bottom, that the sheet follows the course a teacher selected rather than
+    going stale, and that a sentence the contract pins is actually RENDERED
+    where a teacher can see it rather than merely held in a constant.
+
+    They do NOT judge anything visual — colour, contrast, dark-mode
     legibility, how a long name wraps. That is a screenshot pass, not this.
 
     NOTHING OF YOURS IS TOUCHED

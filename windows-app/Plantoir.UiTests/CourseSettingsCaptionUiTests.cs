@@ -1,4 +1,7 @@
 using System.Text.Json.Nodes;
+using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Definitions;
+using FlaUI.Core.Tools;
 
 namespace Plantoir.UiTests;
 
@@ -28,13 +31,23 @@ public class CourseSettingsCaptionUiTests
             ["specialNames"]!["contentStructureTip"]!["message"]!.ToString();
 
     /// <summary>
-    /// The tip is rendered in Course Settings, and it is the CONTRACT's
-    /// sentence rather than one the view invented.
+    /// The tip is rendered in Course Settings, it is the CONTRACT's sentence
+    /// rather than one the view invented, and it can actually be brought into
+    /// view.
     ///
     /// <para>Read from the form rather than the window so a stray copy
     /// somewhere else could not satisfy it, and compared against the contract
     /// rather than against <c>SpecialNames</c> so that a constant edited to
     /// match a changed view still fails.</para>
+    ///
+    /// <para><b>Presence is checked separately from visibility, for the reason
+    /// <c>SpecialFoldersHelpUiTests.TheButtonIsInCourseSettingsWhereATeacherCanSeeIt</c>
+    /// was written.</b> Being in the UIA tree passes for a control scrolled off
+    /// the bottom of this same long form, and the caption sits below all four
+    /// list editors. So the form is walked with its own Scroll pattern until
+    /// the caption is inside the form's viewport — a plain TextBlock in a
+    /// StackPanel offers no ScrollItem pattern of its own, so asking it to
+    /// bring itself into view would scroll nothing while appearing to.</para>
     /// </summary>
     [UiFact]
     public void TheContentStructureTipIsOnScreenInCourseSettings()
@@ -43,8 +56,35 @@ public class CourseSettingsCaptionUiTests
         app.SelectCourse(CourseFixtures.Renamed);
 
         var form = app.Find("courseSettingsForm", "the Course Settings form");
-        var said = DrivenApp.TextsUnder(form);
+        string tip = ContentStructureTip();
 
-        Assert.Contains(ContentStructureTip(), said);
+        Assert.Contains(tip, DrivenApp.TextsUnder(form));
+
+        var scroll = form.Patterns.Scroll.PatternOrDefault;
+        Assert.True(scroll is not null, "the Course Settings form offers no scroll pattern");
+
+        bool visible = false;
+        for (int step = 0; step <= 10 && !visible; step++)
+        {
+            scroll!.SetScrollPercent(-1, Math.Min(100, step * 10));
+            visible = Retry.WhileFalse(() =>
+            {
+                var caption = form.FindAllDescendants(cf => cf.ByControlType(ControlType.Text))
+                                  .FirstOrDefault(t => SafeName(t) == tip);
+                return caption is not null
+                       && !caption.IsOffscreen
+                       && !caption.BoundingRectangle.IsEmpty
+                       && form.BoundingRectangle.Contains(caption.BoundingRectangle);
+            }, TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(150)).Result;
+        }
+
+        Assert.True(visible,
+            "the Content Structure tip never came into view anywhere in the Course Settings form");
+    }
+
+    /// <summary>A name that cannot throw when the element has gone.</summary>
+    private static string SafeName(AutomationElement element)
+    {
+        try { return element.Name ?? ""; } catch { return ""; }
     }
 }
