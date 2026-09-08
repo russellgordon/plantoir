@@ -2242,8 +2242,120 @@ final class AssistToolRunner {
             ))
             detail += "\n\nNothing was published or hidden, so students see no change until you "
                     + "deploy."
+            let aboutTheWebsite: String = settleTheWebsiteAfterARollover(
+                arguments, course: asked.located.course, sectionNumber: asked.located.sectionNumber
+            )
+            if aboutTheWebsite.isEmpty == false {
+                detail += "\n\n" + aboutTheWebsite
+            }
             return AssistToolOutcome.wrote(summary, detail: detail)
         }
+    }
+
+    /// What a rollover says about the website, and what it does about it.
+    ///
+    /// Returns the empty string for an ORDINARY re-date, which is three of the
+    /// four phrasings that reach this tool — a snow day, a timetable that
+    /// shifted. Those must never be asked about websites: answering "a new
+    /// website" to a mid-semester re-date abandons the address students are
+    /// reading right now. Only the rollover carries `rollover`.
+    ///
+    /// **The question is answered by SAYING one of two things, not by a sheet,
+    /// and that is the whole design.** A sheet cannot appear for a request
+    /// arriving over MCP — and `AssistToolSurface` actively tells a Claude Code
+    /// session that "roll this section over to a new year" means this tool — so
+    /// a sheet would leave that path silently pinned to last year's site while
+    /// the write had already happened. Answering in words works identically in
+    /// both clients, and the reply always states which of the two happened, so
+    /// a question nobody answers is visible rather than silent.
+    private func settleTheWebsiteAfterARollover(
+        _ arguments: [String: Any],
+        course: Course,
+        sectionNumber: Int
+    ) -> String {
+        guard text("rollover", in: arguments).lowercased() == "yes" else {
+            return ""
+        }
+
+        let answer: String = text("website", in: arguments).lowercased()
+        if answer == "same" {
+            ActivityTrail.note(
+                .sectionKeptItsWebsiteOnRollover,
+                "kept last year's website when rolling the section over",
+                course: course.code, section: sectionNumber
+            )
+            return AssistWording.rolloverKeptTheSameWebsite
+        }
+        guard answer == "new" else {
+            // Asked, and NOT acted on. The sentence says both halves: what was
+            // not changed, and how to change it.
+            return AssistWording.rolloverWebsiteQuestion + "\n\n"
+                 + "Say “\(AssistCardCommand.rollOverOntoANewWebsite)” or "
+                 + "“\(AssistCardCommand.rollOverKeepingTheSameWebsite)”.\n\n"
+                 + AssistWording.rolloverWebsiteNotDecided
+        }
+
+        let release: DeployCommand.SiteRelease = DeployCommand.releaseSite(
+            forSection: sectionNumber, in: course
+        )
+        guard release.releasedAnything else {
+            ActivityTrail.note(
+                .sectionStartedANewWebsiteOnRollover,
+                "rolled the section over onto a new website — it had not been published anywhere yet",
+                course: course.code, section: sectionNumber
+            )
+            return AssistWording.rolloverHadNoWebsiteYet
+        }
+
+        history.record(
+            AssistChange(
+                whatHappened: "started a new website for Section \(sectionNumber)",
+                courseCode: course.code,
+                sectionNumber: sectionNumber,
+                // Nothing a build reads changed — the pages are untouched and
+                // the website this points at is only consulted when publishing.
+                rebuildsThePreview: false,
+                files: release.savedFiles
+            )
+        )
+
+        var said: String = AssistWording.rolloverStartedANewWebsite(
+            keptAs: release.keptFiles.joined(separator: ", ")
+        )
+        if turnOffAnyScheduledPublish(course: course, sectionNumber: sectionNumber) {
+            said += "\n\n" + AssistWording.rolloverTurnedOffTheScheduledPublish
+        }
+        ActivityTrail.note(
+            .sectionStartedANewWebsiteOnRollover,
+            "rolled the section over onto a new website — last year's details kept at "
+            + release.keptFiles.joined(separator: ", "),
+            course: course.code, section: sectionNumber
+        )
+        return said
+    }
+
+    /// Turn off a publish that was set to happen on its own, and say whether
+    /// there was one.
+    ///
+    /// **Not politeness — the alternative is a website nobody named going
+    /// live.** A section cut loose has no agreed website to publish TO, and a
+    /// scheduled run has nobody to ask: `runScheduled` re-checks nothing, and
+    /// `deploy.py`'s name prompt returns its DEFAULT when there is no terminal
+    /// rather than failing. So the overnight run would create
+    /// `<code>-s<n>-<year>-<name>` and publish there, while the address the
+    /// teacher's students actually read quietly stopped updating. Renaming a
+    /// course turns scheduled publishes off for the same reason and says so.
+    private func turnOffAnyScheduledPublish(course: Course, sectionNumber: Int) -> Bool {
+        let plistURL: URL = ScheduledDeploy.plistURL(
+            courseCode: course.code, sectionNumber: sectionNumber
+        )
+        guard FileManager.default.fileExists(atPath: plistURL.path) else {
+            return false
+        }
+        _ = ScheduledDeploy.cancelScheduledDeploy(
+            courseCode: course.code, sectionNumber: sectionNumber
+        )
+        return true
     }
 
     private struct PlannedReDate {

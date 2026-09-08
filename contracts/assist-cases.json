@@ -255,9 +255,25 @@
       },
       {
         "arguments" : {
-
+          "rollover" : "yes"
         },
         "phrasing" : "roll this section over to a new year",
+        "tool" : "re_date_classes"
+      },
+      {
+        "arguments" : {
+          "rollover" : "yes",
+          "website" : "new"
+        },
+        "phrasing" : "roll this section over onto a new website",
+        "tool" : "re_date_classes"
+      },
+      {
+        "arguments" : {
+          "rollover" : "yes",
+          "website" : "same"
+        },
+        "phrasing" : "roll this section over, keeping the same website",
         "tool" : "re_date_classes"
       }
     ],

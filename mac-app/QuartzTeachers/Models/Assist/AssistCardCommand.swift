@@ -17,6 +17,21 @@ import Foundation
 /// of the model is reliability bought back.
 nonisolated struct AssistCardCommand: Sendable, Equatable {
 
+    // MARK: - The rollover answers
+
+    /// The sentence that means "roll over, and start a new website".
+    ///
+    /// Named rather than typed, because the assistant's own reply offers it
+    /// back to the teacher word for word — a phrasing a teacher is TOLD to say
+    /// and a phrasing the matcher accepts must be the same string, or the
+    /// feature invites a sentence it then does not understand.
+    static let rollOverOntoANewWebsite: String =
+        "roll this section over onto a new website"
+
+    /// The sentence that means "roll over, and keep last year's website".
+    static let rollOverKeepingTheSameWebsite: String =
+        "roll this section over, keeping the same website"
+
     // MARK: - Stored properties
 
     /// The tool this phrasing always means.
@@ -392,7 +407,30 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
          AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
         ("re-date this section",
          AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
+        // A ROLLOVER, and the only one of these four that is. The other three
+        // are ordinary re-dating — a snow day, a timetable that shifted — and
+        // must never be asked about websites: answering "a new website" to a
+        // mid-semester re-date abandons the address students are reading right
+        // now. So the rollover carries the fact that it is one.
+        //
+        // `rollover` is deliberately absent from the tool's schema, the same
+        // way `unit`, `scope` and `revise` are above: the model never needs to
+        // know it exists, so this adds a whole answer without touching the
+        // surface routing was measured against, and without changing the
+        // argument set Windows pins as an exact departure list.
         ("roll this section over to a new year",
-         AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
+         AssistCardCommand(toolName: "re_date_classes", arguments: ["rollover": "yes"])),
+
+        // The two answers to the website question, as whole sentences rather
+        // than "a new website" — which is an exact match a teacher could type
+        // meaning something else entirely. Each also works as a FIRST thing to
+        // say, for a teacher who already knows which they want, because
+        // re-dating a section that is already on its dates changes nothing.
+        (AssistCardCommand.rollOverOntoANewWebsite,
+         AssistCardCommand(toolName: "re_date_classes",
+                           arguments: ["rollover": "yes", "website": "new"])),
+        (AssistCardCommand.rollOverKeepingTheSameWebsite,
+         AssistCardCommand(toolName: "re_date_classes",
+                           arguments: ["rollover": "yes", "website": "same"])),
     ]
 }

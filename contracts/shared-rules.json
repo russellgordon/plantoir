@@ -205,6 +205,16 @@
         "carries": "which course and section, and HOW MANY website-builder processes were ended",
         "event": "section processes reclaimed",
         "why": "The count is the point. Stopping a preview, closing a window or cancelling a publish asks the launcher to end whatever that section still has running, and nothing else on the trail can tell “there was nothing left to stop” from “a build was still going and was ended” — which are the two competing explanations when a teacher reports that their publish stopped halfway. Recorded from 2026-09-05, when the sweep began ending a mid-flight BUILD and its driver rather than only a preview server: that is a change in what a teacher can lose, and it had no line describing it. The launcher prints the number and the app used to discard it."
+      },
+      {
+        "carries": "the course code, the section number, and where last year's website details were kept",
+        "event": "section started a new website",
+        "why": "A rollover that cuts a section loose is the moment its published address changes, and nothing else on the trail records it. The same act turns off any publish that was set to happen on its own \u2014 a section with no agreed website and a scheduled run with nobody to ask would otherwise create a website nobody named \u2014 so a teacher whose overnight publish stops happening has one line explaining both."
+      },
+      {
+        "carries": "the course code and the section number",
+        "event": "section kept its website",
+        "why": "The OTHER answer, and the one a problem report is more likely to be about: a teacher writing in weeks later to say last year's class site was replaced is describing this branch. A trail recording only the cut-loose could not answer the question it would actually be read for. Both answers are recorded because the question is asked every time and neither answer is a default."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
