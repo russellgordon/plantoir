@@ -141,6 +141,7 @@ extension AssistToolRunner {
     /// what a curriculum expectation MEANS. So the fuller surface is served
     /// there and nowhere else.
     static let mcpOnlyTools: [AssistToolDefinition] = [
+        listCoursesTool,
         listCurriculumExpectationsTool,
         planCurriculumMentionsTool,
         addCurriculumMentionsTool,
@@ -612,6 +613,34 @@ extension AssistToolRunner {
     private static let codesHelp: AssistSchemaProperty = AssistSchemaProperty(
         kind: .string,
         description: "The expectation codes to add, separated by commas — for example \"A1.1, A2.2\"."
+    )
+
+    /// What courses are in this working folder.
+    ///
+    /// **MCP-ONLY, and the reason is the asymmetry between the two clients.**
+    /// The local model is told which course and section it is working in by
+    /// `AssistAgent.systemPrompt`, and its window is scoped to one section, so
+    /// it never has to ask. A Claude Code session on the other end of
+    /// `--mcp-stdio` is given a working FOLDER, which holds several courses,
+    /// and the server answers only `initialize`, `tools/list` and
+    /// `tools/call` — no `resources/list`, no `instructions`. So it has no way
+    /// to find out what is there, and the first thing it does is guess a code
+    /// or read raw folders. Being MCP-only, this costs the local surface
+    /// nothing: routing accuracy is measured against the thirteen the model
+    /// sees, and this is not one of them.
+    ///
+    /// Inherited from Windows (`PlantoirTools.ListCourses`), which has had it
+    /// since before the mac's server existed.
+    private static let listCoursesTool: AssistToolDefinition = AssistToolDefinition(
+        name: "list_courses",
+        description: "TEACHERS SAY: \"what courses do I have?\", \"list my courses\". List the courses "
+                   + "in this working folder: the code, the name, which sections each one has, and where "
+                   + "each publishes to. Call this first when a teacher mentions a course and you are not "
+                   + "certain of its exact code — guessing a code reaches the wrong course silently.",
+        parameters: [:],
+        required: [],
+        readOnly: true,
+        needsApproval: false
     )
 
     private static let listCurriculumExpectationsTool: AssistToolDefinition = AssistToolDefinition(

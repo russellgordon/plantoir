@@ -234,6 +234,16 @@ nonisolated enum AssistWording {
         "If you had already deployed this section, undoing it here does not change what students "
         + "see. Deploy again when you want the live site to match."
 
+    // MARK: - Listing what is here
+
+    /// A working folder with nothing in it yet.
+    ///
+    /// Says what to do next rather than only what is absent: a Claude Code
+    /// session that reads "no courses" and stops has left the teacher exactly
+    /// where they were.
+    static let noCoursesYet: String =
+        "This working folder has no courses in it yet. Add one in Plantoir, and it will appear here."
+
     // MARK: - Asking for the class dates
 
     /// The question that stands in front of the schedule sheet.

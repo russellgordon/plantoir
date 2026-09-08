@@ -19,6 +19,7 @@
     "deployed" : "{course} Section {section} is deployed. Students can reach it now.",
     "deployQuestion" : "Shall I deploy?",
     "deployWasCancelled" : "Deploy cancelled.",
+    "noCoursesYet" : "This working folder has no courses in it yet. Add one in Plantoir, and it will appear here.",
     "nothingToDo" : "I am not sure what to do with that.",
     "nothingToUndo" : "There is nothing on my undo list — I have not changed any pages in this conversation yet. Anything older is in Plantoir's Backups list.",
     "planAccepted" : "Go",

@@ -74,6 +74,7 @@ enum AssistContract {
             "planAccepted": AssistWording.planAccepted,
             "cancelled": AssistWording.cancelled,
             "deployWasCancelled": AssistWording.deployWasCancelled,
+            "noCoursesYet": AssistWording.noCoursesYet,
             "planWasCancelled": AssistWording.planWasCancelled,
             "deployed": AssistWording.deployed(course: course, section: section),
             "couldNotBuildBeforeDeploying": AssistWording.couldNotBuildBeforeDeploying(

@@ -1461,7 +1461,7 @@ to run in the background.
       real `CredentialRequests`, is the half that would catch a request added
       here and written down nowhere.
     - `app-rules.json` → `publishedFreshness.whenShown` (9) / `whenRecorded`
-      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/25 — the NAMES
+      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/26 — the NAMES
       and ARGUMENTS, not the descriptions, which `Briefly()` rewrites here for
       measured reasons); `course-management.json` → `courseCode.renameEffects`
       (6); `shared-rules.json` → `buildOutputLocation.windowsLocation.buildsRoot`
@@ -2015,7 +2015,7 @@ to run in the background.
     first". Those are the two cases that reach the placeholder, by name. The
     numbers above hold.
 
-41. **Your MCP server serves 37 tools and the mac's serves 25 — and TWO
+41. **Your MCP server serves 37 tools and the mac's serves 26 — and TWO
     things now fall to you: a rollover that publishes over last year's
     website (DECIDED 2026-09-08 — build it, do not re-open it), and seventeen
     measured phrasings you do not have.**
@@ -2169,6 +2169,31 @@ to run in the background.
     against itself in `MAC-HANDOFF.md`, is the generator change that would let
     the departures live beside the schemas instead of in your test — which is
     your own request, not a new one.
+
+42. **The mac now serves `list_courses` too, and the CARD PHRASING half is the
+    part worth copying.**
+    Built 2026-09-08, `GUI-IMPROVEMENTS.md` row 448 — the first of the six
+    tools from item 41's sorting that Russell asked for. You have had
+    `PlantoirTools.ListCourses` since before the mac's server existed; the mac
+    copied its shape, so a Claude Code session now gets the same three facts —
+    sections and destination alongside the code — on either platform.
+
+    **You owe two card phrasings**, and your suite will say so:
+    `AssistCardCommandTests` pins phrasing arguments against the contract, so
+    it goes red until "what courses do i have?" and "list my courses" are
+    added. That is the mechanism working, not damage.
+
+    **The idea to take, beyond this one tool.** MCP-only means the local MODEL
+    is not shown a tool — which is what protects routing accuracy, since that
+    is measured against the thirteen it sees. It does NOT mean the app cannot
+    do it. A fixed phrasing is matched in CODE and never reaches a model, so
+    adding one costs the router nothing and hands a teacher a capability that
+    was otherwise Claude-Code-only. Anything of yours that is MCP-only today is
+    a candidate for the same treatment.
+
+    **One number moved:** the mac's MCP surface is 26 (22 shared + 4 MCP-only),
+    not 25. A pinned count made that a decision rather than drift — the test
+    failed the moment the tool was added, which is exactly what it is for.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 
@@ -3170,11 +3195,11 @@ for behaviour only your side has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 25-tool MCP one. (It said 23; corrected
+the 13-tool local surface and the 26-tool MCP one. (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
 serves 37, and the twelve it has beyond the contract are named in
 `AssistSurfaceContractTests` and in `MAC-HANDOFF.md`.) The mac's own test has
-pinned 22 + 3 MCP-only = 25 for longer than the prose said so. What the two
+pinned that sum for longer than the prose said so; it is 22 + 4 MCP-only = 26 since `list_courses` landed. What the two
 surfaces do and do not share is item 41 and "The two MCP surfaces are not the
 same product" below.
 
@@ -3207,7 +3232,7 @@ COMPLETE rather than whether it was correct. The numbered item is 41; this is
 the manual for it.
 
 **The measurement.** `Plantoir.Mcp/PlantoirTools.cs` declares **37** distinct
-`[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` serves **25**
+`[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` served **25** when this was measured, and 26 since `list_courses`
 (22 tools plus three MCP-only). The set difference is exactly **12, all
 yours, none the mac's**, and **not one of the twelve appears anywhere under
 `mac-app/QuartzTeachers` or in `contracts/`** — there is no half-built mac
