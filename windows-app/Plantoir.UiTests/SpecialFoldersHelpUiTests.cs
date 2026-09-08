@@ -278,8 +278,15 @@ public class SpecialFoldersHelpUiTests
         Assert.DoesNotContain(before, line => line.Contains("Concepts") && line.Contains("Tasks"));
         Dismiss(app);
 
-        // The marks list's checkboxes carry "member:{list title}:{name}".
-        var box = app.Find("member:Folders that count for marks:Concepts", "the marks tick-box for Concepts");
+        // The marks list's checkboxes carry "member:{list title}:{name}"
+        // (FormBuilders.MembershipToggleList). The title is a contract
+        // string, so it is READ rather than retyped: hard-coding it here is
+        // how this test silently stopped finding the box when the title
+        // changed, in a suite that gates nothing and so says nothing.
+        string marksTitle = JsonNode.Parse(File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "contracts", "shared-rules.json")))!
+            ["gradedFolders"]!["wording"]!["listTitle"]!.ToString();
+        var box = app.Find($"member:{marksTitle}:Concepts", "the marks tick-box for Concepts");
         box.AsCheckBox().IsChecked = true;
 
         // Ticking rebuilds the form through the dispatcher, so the button

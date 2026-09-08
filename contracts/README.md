@@ -246,7 +246,7 @@ as WINDOWS-HANDOFF item 31), through these classes in
 | `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts`, `linkRules.browserSafe` | `PublishAndLauncherContractTests` |
 | `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
-| `gradedFolders.cases` | `GradedFolderContractTests` |
+| `gradedFolders.cases`, and `gradedFolders.wording` — the Marks list's title and caption (proposed from Windows 2026-09-08; the mac runs nothing for it yet and is not red) | `GradedFolderContractTests`. Whether a teacher can SEE the caption is `CourseSettingsCaptionUiTests` in `Plantoir.UiTests/`, opt-in and part of no gate |
 | `gradedFolders.choices` (cases, the depth cap and the skip list) | `GradedFolderChoicesTests` |
 | `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution` | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
 | `specialNames.contentStructureTip` (proposed from Windows 2026-09-07; the mac runs nothing for it yet, and is not red — no mac test names the key) | `SpecialNamesContractTests`. Whether a teacher can actually SEE it is `CourseSettingsCaptionUiTests`, which is in `Plantoir.UiTests/` rather than this project, carries `[UiFact]`, and runs only under `PLANTOIR_UI_TESTS=1` — so it is part of no gate |

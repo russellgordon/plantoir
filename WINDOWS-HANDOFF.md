@@ -2096,6 +2096,46 @@ to run in the background.
     while answering row 412. Either owes a contract case and a `verify.sh` run
     from the mac.
 
+42. ~~**The Marks list's title and caption are worded differently on the two
+    apps and pinned by nothing.**~~ ✅ Done 2026-09-08 (branch
+    `issue/marks-wording-contract`). The second and last Course Settings
+    divergence, surfaced by the same audit as item 37 and flagged there as
+    out of scope. Now `shared-rules.json` → `gradedFolders.wording`.
+
+    **Russell chose the MAC's title** — "Folders whose work counts for marks"
+    — so this app gave one up; it also matches `specialFoldersHelp`'s pinned
+    "Work that counts for marks". The caption is a union of the two apps',
+    with its middle sentence lifted verbatim from `specialFoldersHelp.rows`,
+    so the control and the help sheet now say the same sentence rather than
+    two paraphrases.
+
+    **Three decisions inside it, each argued the other way first.** The map is
+    called "the curriculum coverage map" — Russell's call, because both
+    spellings are pinned and this is the one on THIS control
+    (`lastGradedFolderBlocked`, and the switch labelled "Publish the
+    curriculum coverage map"), so the screen now says one name three times.
+    This app's capital-C "the Curriculum Coverage map" was drift: that is the
+    built PAGE's title. The caption says "tick", never "add" or "remove" — a
+    correction, not a preference: this is a tick list with no Add button, and
+    "remove what you don't" invited the action `lastGradedFolderBlocked`
+    refuses. And **the caption moved BELOW its list here**, in both Course
+    Settings and the wizard, because it says "a page in one of these" and
+    above the list "these" followed the header "Marks" and referred to
+    nothing. The mac has always drawn it below; that move is what lets one
+    string serve all four surfaces.
+
+    **The trap, and it would have been silent.**
+    `FormBuilders.MembershipToggleList` builds each checkbox's automation id
+    as `member:{list title}:{name}`, and `SpecialFoldersHelpUiTests` had the
+    old title hard-coded in one. Changing the title moved every marks
+    checkbox's id — in the opt-in UI suite, which gates nothing and would
+    have reported nothing. It now READS the title from the contract. Anything
+    else keyed on a list title is worth the same treatment.
+
+    **The mac owes only the caption** (its title already matches) and is not
+    red meanwhile — no mac test names the key. Listed at the top of
+    `MAC-HANDOFF.md`'s "Open". 1209 unit tests and all 11 UI tests green.
+
 ## A test host that segfaults, and the six levers that look like they should fix it
 
 Written 2026-09-07, for whoever meets a modal that kills a test process rather
