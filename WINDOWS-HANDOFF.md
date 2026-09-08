@@ -2047,12 +2047,12 @@ to run in the background.
     reversion was reproduced here rather than the mac's numbers being
     inherited: introducing a placeholder-only variant of the curriculum `why`
     leaves the OLD test at 5 tests / 0 failures and the NEW one at 5 tests /
-    **1 failed**, whose message lists **2 mismatches** — not "2 failures",
-    which is the mac's number for the same reversion fifty lines below, and the
-    difference is the whole point of the deviation named next: naming
+    **1 failed, whose message lists 2 mismatches**, naming
     "asked and cleared: an empty pool is a real answer" and
     "more than one class folder is listed, not just the first" — the same
-    two cases the mac's reversion named. **One deviation, and it is a fact
+    two cases the mac's reversion named. **Read "1 failed / 2 mismatches", not
+    the mac's "5 tests / 2 failures" fifty lines below** — the two count
+    different things, for the reason named next. **One deviation, and it is a fact
     about the harnesses rather than a shortcut: xUnit's `Assert` THROWS where
     XCTest records and carries on**, so a literal port would have left the
     `continue` guard below unreachable and named ONE case where the mac names
