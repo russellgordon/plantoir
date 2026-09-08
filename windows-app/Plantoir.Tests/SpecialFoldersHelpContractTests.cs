@@ -240,7 +240,7 @@ public class SpecialFoldersHelpContractTests
     public void TheSheetNamesNoMachineryAndPublishesNoMatchingRule()
     {
         // A computer studies course with a folder called "Scripts", and NO
-        // curriculum folder — the branch no hand-typed fixture had ever
+        // curriculum folder — the branch no OTHER fixture here had ever
         // exercised, so "Your curriculum folder" and "None chosen" are
         // actually rendered here rather than merely declared. The row check
         // above now reaches that branch too, through the contract's own cases;
