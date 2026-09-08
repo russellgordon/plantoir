@@ -306,18 +306,10 @@ public class ContractTests
         Assert.NotNull(openAction);
         Assert.Equal("Open Folder", openAction["windowsLabel"]?.ToString());
 
-        // Ancestor paths on Windows
-        string path = @"C:\Users\teacher\Desktop\Courses";
-        var crumbs = FolderCrumb.AncestorPaths(path);
-        var expected = new[]
-        {
-            @"C:\",
-            @"C:\Users",
-            @"C:\Users\teacher",
-            @"C:\Users\teacher\Desktop",
-            @"C:\Users\teacher\Desktop\Courses",
-        };
-        Assert.Equal(expected, crumbs);
+        // The ancestor crumbs were hand-typed here until 2026-09-06 and are
+        // now DATA: shared-rules.json → workingFolderPathBar.ancestorPaths
+        // gained `windowsCases`, and SharedRuleContractTests runs them. A copy
+        // kept here as well would be the thing contracts/ exists to end.
     }
 
     [Fact]
@@ -362,6 +354,12 @@ public class ContractTests
             Assert.True(codeRequests.TryGetValue(name, out var codeReq), $"Missing request definition for {name}");
 
             Assert.Equal(req["title"]!.ToString(), codeReq!.Title);
+            // The explanation is the LONGEST thing a teacher reads in one of
+            // these dialogs and was the one field this sweep did not check —
+            // found 2026-09-07 while writing the hand-driven procedure for the
+            // new-site dialog, which told the checker not to eyeball it
+            // "because the contract pins it". It did not. It does now.
+            Assert.Equal(req["explanation"]!.ToString(), codeReq.Explanation);
             Assert.Equal(req["fieldLabel"]!.ToString(), codeReq.FieldLabel);
             Assert.Equal(req["isSecret"]!.GetValue<bool>(), codeReq.IsSecret);
             Assert.Equal(req["linkAddress"]!.ToString(), codeReq.LinkAddress);

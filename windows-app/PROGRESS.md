@@ -22,35 +22,165 @@ Docker Desktop) unless marked otherwise.
 
 `WINDOWS-HANDOFF.md`'s numbered list is the index, and it was corrected on this
 date after drifting in both directions — item 5 had been finished since August
-with its headline still reading as open work. **Sixteen of its twenty-four
-items are done**, items 21, 23 and 24 having landed on 2026-09-06 (the
-folder-problems front end, the same findings reaching the assistant, and the
-overnight run's findings being captured and reported the next morning).
+with its headline still reading as open work. **Thirty-six of its thirty-eight
+items are done**, counted 2026-09-06 with items 21, 23, 24 and 29 landing that
+day (the folder-problems front end, the same findings reaching the assistant,
+the overnight run's findings being captured and reported the next morning, and
+the contract case lists this suite was not reading); items 33 and 34 — the
+refusal of a folder named `index.md`, and the per-finding repair report as
+contract cases — struck on 2026-09-07, along with 13, 17, 18, 19, 25, 26, 27, 28, 30, 31, 32,
+35 and 38 the same day. Items 35–37 were added the same day by an audit of
+these two documents; **36 and 37 are what is left**, and both are decisions
+rather than code.
+
+**Count them rather than trusting this line.** It read "sixteen of its
+twenty-four" on a list that had grown to 32 items with eleven of them open,
+seven of which this table did not name at all. These two commands count it, run
+from the repository root — a plain `grep` over the whole file also counts every
+other numbered list in it, of which there are many:
+
+```bash
+awk '/^### What is still genuinely outstanding/,/^## Windows no longer runs/' WINDOWS-HANDOFF.md | grep -c '^[0-9]\+\. '
+awk '/^### What is still genuinely outstanding/,/^## Windows no longer runs/' WINDOWS-HANDOFF.md | grep -c '^[0-9]\+\. ~~'
+```
+
+The first is the total; the second is how many are struck, which is how many
+are done.
+
+**Striking an item in `WINDOWS-HANDOFF.md` means striking its row here too**,
+in the same session. This table is the second place the same fact lives, and a
+second place is only worth having if both are updated together — the whole
+reason the count above went wrong is that one of them was.
+
 What is genuinely left, smallest first:
 
 | Item | What is left | Size |
 |---|---|---|
-| 19 | The `working-folder.txt` marker AND a sweep that reads it. Do both or neither — the marker alone is ceremony. Two Windows specifics for the sweep are written into item 19. | Small |
-| 18 | The two VIEWS: the choice at the folder picker, and the dismissable notice for a folder the window restored. Detection, wording and the remembered-per-folder store are built — the store's API is `AppSettings.HasAcceptedSyncFor` / `RememberAcceptedSyncFor`, and the two moments belong in `WorkspacePickerView` (a folder just chosen) and `MainWindow`'s restore path (a folder the window reopened). | Medium |
-| 17 | The app-side `course_config.json` writer and the interrupted-rename recovery. Belongs with item 13's sheet. | Medium |
-| 13 | The rename SHEET, the method that performs the moves, the config keys carried across, and the materialisation of `class_folder`/`curriculum_folder`. The model layer (`FolderPathRewriter`, `SpecialFolderRenamer`) is built and has 52 test methods over 63 cases. Attach at `FormBuilders`' `protectionFor` hook, from `CourseSettingsView.xaml.cs`; the renamer exposes `Problem`, `Moves`, `WhyTheMovesCannotBeMade`, `HalfFailureMessage` and `KeysThatCarryAcross` — there is no apply/perform method yet. | Large |
+| ~~19~~ | ✅ Done 2026-09-07 — `working-folder.txt` is written by the app and adopted retroactively; the launch-time sweep removes only builds whose working folder the system says is not there. | — |
+| ~~30~~ | ✅ Done 2026-09-07 — Delete beside Restore in the detail panes, the picker's breadcrumbs with the main bar's affordances, and Rename Course in the File menu with F2. | — |
+| ~~32~~ | ✅ Done 2026-09-07 — the folders-help jargon sweep scans only what the product writes, keeps the four fixed names, and reaches the no-curriculum-folder branch. | — |
+| ~~28~~ | ✅ Done 2026-09-07 — the scheduled-deploy dialog names the unpublished classes, the main window comes forward for an assistant build when hidden, settings saves reach the trail, and the assistant window remembers its placement per section. | — |
+| ~~31~~ | ✅ Done 2026-09-07 — `Uri.EscapeDataString` replaced by a contract-driven encoder in both branches of `Spelled`; `FolderPathRewriterTests` deserialises every `linkRewriting` case. | — |
+| 36 | A decision, not code: `verify-deploy.ps1` is the only automated check of the PowerShell half of publishing and no gate runs it. Schedule it, make it a release-cut step, or write down that it is hand-run. | Small |
+| 37 | A decision the MAC makes: the Course Settings tip sentence is pinned by no contract on either platform and the two apps word it differently. Windows owes only taking the mac's wording once it is chosen. | Small |
+| ~~18~~ | ✅ Done 2026-09-07 — the choice at the folder picker and the dismissable notice for a restored folder both exist, and `synced folder noticed` / `synced folder accepted` are emitted. | — |
+| ~~17~~ | ✅ Done 2026-09-07 — `CourseConfiguration.RecordOnDisk` (a fresh-read recorder beside an untouched `Write`) and the interrupted-rename record under `courses/.internal/renames`. | — |
+| ~~27~~ | ✅ Done 2026-09-07 — “Restore Section N…” puts a section back to how it was when the conversation started; the assistant now saves one copy per conversation rather than one per change. | — |
+| ~~26~~ | ✅ Done 2026-09-06 — the marks checklist offers folders nested up to four levels deep (`GradedFolderChoices`), and the frozen pool is fed from the same list. | — |
+| ~~25~~ | ✅ Done 2026-09-07 — the wizard asks the skeleton question with the mac's sentences, writes `use_skeleton`, and the structure editor shows the skeleton's folders. | — |
+| ~~35~~ | ✅ Done 2026-09-07 — the Create button is three `[UiFact]` cases in `NewCourseWizardUiTests` (suite 6 → 9, green in 4 m 12 s); the new-site dialog became a written hand-check, because `deploy.ps1`'s Credential Manager target is hardcoded and `--state-dir` does not redirect it. Found on the way: started with `UseShellExecute = false` the app is handed the `dotnet test` host's PIPE std handles, which leak into the ConPTY child — every launcher then fails in one second with an empty transcript. `ConPtyProcess.Start`'s own CAUTION had already said so. | — |
+| ~~13~~ | ✅ Done 2026-09-07 — the rename sheet, the apply method, every key carried across and `class_folder`/`curriculum_folder` materialised; Add creates the folder, Remove says it stays. | — |
 | ~~22~~ | ✅ Done 2026-09-06 — the "Folders Plantoir uses" sheet, now shared as `shared-rules.json` → `specialFoldersHelp` rather than living inside a view. Two cases proposed back to the mac. | — |
 
-Two things that are NOT in that list and should be known:
+Two more things, one of which is now ON that list:
 
-- **The deploy gate exists now.** `verify-deploy.ps1` publishes to every
+- **The deploy gate exists now — and is wired into nothing, which is handoff
+  item 36.** `verify-deploy.ps1` publishes to every
   destination and every pairing against real sites and fetches each one back:
   36 passed, 0 failed on 2026-09-06. It needs credentials and the network, so
   it is opt-in and wired into nothing. Run it when the publishing path
   changes. It is the only automated check of the PowerShell half of
   publishing — `verify.sh` and `verify-deploy.sh` are bash and do not run
-  here.
+  here. Listed as item 36 on 2026-09-06 so that "no gate runs it" is a
+  decision somebody makes rather than something nobody was told.
 - **The unit suite is green**: 911 passed, 0 failed at the time this section
   was written; 945 after the folder-problems front end, and 979 once
   parity-tail was merged into it and the overnight capture was added. `dev` stood
   at 668 passed with 5 failing contract tests before this series; those five
   were each a real gap between what the contract says Windows does and what it
-  did.
+  did. **1,029 passed with 2 skipped** after item 29 wired the contract case
+  lists this suite was not reading (2026-09-06), and **1,125 with 2 skipped**
+  after item 31 wired the twelfth of them — `linkRewriting`, which item 29's
+  audit missed because it was added the same day (2026-09-07); 1,150 with 2
+  skipped once items 26, 31, 33 and 34 were all merged; and **1,153 with 1
+  skipped** once item 25 made the wizard ask the skeleton question; and **no
+  skips at all** once the frontmatter-key divergence was decided in this
+  app's favour on 2026-09-07 (item 38) and its test rewritten to assert
+  migration.
+
+## Every contract case list is now RUN here (2026-09-06)
+
+WINDOWS-HANDOFF item 29. Twenty-three lists the mac suite ran and this one did
+not read — none unreachable, each simply a test nobody had written.
+`contracts/README.md` now names which class runs which, so the audit does not
+have to be repeated.
+
+**What matters for anyone adding to this suite** is the shape those tests
+take, because the old ones were the wrong shape rather than absent:
+
+- **Ask each list both ways.** Walking the contract and looking each case up in
+  the code cannot notice a case the CODE has and the contract does not. Every
+  gap item 29 found came from the reverse direction — an extra credential
+  request, twelve extra MCP tools, sixteen extra tool arguments.
+- **Assert completeness.** A hand-written mirror answers the cases that existed
+  when somebody read the contract, and stays green when the mac adds one. Where
+  cases are prose keyed to behaviour, map each to a named test by `nameof` and
+  assert nothing is unmapped. Map to NAMES rather than draining a shared set:
+  xUnit builds a fresh instance per `[Fact]` and fixes no order, so a set filled
+  by ten tests and emptied by an eleventh passes on whatever happened to run,
+  and reports nothing under `--filter`.
+- **Read the source only against the thing that decides.** Several rules live in
+  `Plantoir/` — the wizard, the composer, the report dialog — which this project
+  does not reference. Reading their source is legitimate (`ParsingTests` does it
+  for the `.ps1` launchers) but must be anchored: bare containment passed with a
+  guard moved into a comment, and with it deleted from one of two arrow keys.
+- **A new collection, `ProcessEnvironment`**, beside `SharedActivityState`, for
+  tests that read or write process-wide environment variables. Same reason:
+  `PLANTOIR_BUILD_ROOT` is global, and a class setting it while another calls
+  `BuildOutputLocation.BuildsRootFor` is a rare flake that looks exactly like a
+  production bug about where built sites go.
+
+## Driving the real interface — what the table points at (2026-09-06)
+
+The Layout table above says "see 'Driving the real interface' below" and, until
+now, there was no such section: the prose lives in
+[`documentation/12-windows-app.md`](../documentation/12-windows-app.md). Rather
+than move it, here is what a session needs to know before running the suite,
+and the one thing measurement added.
+
+Run it **from the repository root**, not from `windows-app/`:
+
+```powershell
+.\run-ui-tests.ps1                 # all of it, about 4 minutes
+.\run-ui-tests.ps1 -Filter "FullyQualifiedName~TheSheetCloses"
+```
+
+**Two switches, both added 2026-09-07 with item 35.** `PLANTOIR_UI_KEEP=1`
+stops the run deleting its temporary folders — every test's, not just a failed
+one's, since the teardown cannot know the outcome — and the runner prints each
+path. A test that fails INSIDE the app has almost nothing to say from outside
+it, and the evidence (that run's `startup.log`, its trail, its per-run
+launcher log, its working folder) was being deleted on the way out. And the
+runner now sweeps orphaned `powershell.exe`/`python.exe` children afterwards,
+matched on **this run's token** — minted by the runner and folded by
+`DrivenApp` into every folder name (`plantoir-ui-<run>-<8 hex>`) — because
+matching the folder prefix would kill a parallel run's live launchers and a
+developer tailing a kept folder's log. Killing `Plantoir.exe` kills only
+`Plantoir.exe`: the whole-tree kill lives in `ConPty.Kill()` and runs when the
+APP ends a task, not when the app is ended from outside.
+
+It closes a running Plantoir before it starts, says so, and does not reopen it.
+`--state-dir` moves the whole state folder for the run, so nothing of the
+teacher's is touched.
+
+**One test is intermittent, and it is worth knowing which.**
+`SpecialFoldersHelpUiTests.TheSheetShowsAMarksFolderTickedButNotYetSaved`
+failed once in a full run on 2026-09-06 and then passed twice — once alone (30
+s) and once in a full run (6/6, 3 m 16 s). It is the test that ticks a marks
+folder and waits for the sheet to be rebuilt through the dispatcher, and it
+already retries for 20 seconds at half-second intervals. Nothing in that run
+had touched the app or the UI project.
+
+**It did it again on 2026-09-07**, on the item 35 branch: one failure in a
+full run, then a pass alone (23 s) and a pass in a full run (9/9, 4 m 13 s) —
+so roughly one full run in four across two days, on a branch that had touched
+neither this test nor the view it drives. Second data point, same conclusion.
+
+**So: if it fails, re-run it alone before believing it.** Recorded because an
+intermittent nobody writes down is rediscovered as a regression by the next
+session, which then goes looking for a cause that is not there. If it starts
+failing in isolation, that is different and is a real finding — the retry is
+generous enough that a genuine break would not hide behind it.
 
 ## A model layer exists ahead of its UI — four types nothing calls yet (2026-09-06)
 
@@ -63,32 +193,25 @@ the views are what remains.
 
 Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
-the types as dead code. The same goes for the four trail events below: the
-features that would raise them are these same two.
+the types as dead code.
 
-## SIX activity-trail events are declared but not yet emitted (2026-09-06; a seventh was, and now is)
+## ONE activity-trail event is declared without an emitter (2026-09-06; six were then, and all six have callers since 2026-09-07)
 
-`ActivityTrail.Event` names `folder renamed`, `folder created`,
+`ActivityTrail.Event` named `folder renamed`, `folder created`,
 `synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,
-`settings saved` and `settings could not be saved`, which belong to no
-unbuilt view at all: `CourseSettingsView.Save_Click` writes the config and
-records nothing, while the mac records both. That last pair is a small fix
-rather than a feature, and it is handoff item 28. The first four are in
-`contracts/shared-rules.json` → `activityTrail.mustRecord`, and
-`ContractTests.SharedRules_ActivityTrailEvents_Exist` compares that list
-against the enum — so declaring them is what makes the suite green.
-
-**Nothing raises any of them yet**, because the features that would are only
-half built: WINDOWS-HANDOFF item 13's rename sheet does not exist (the model
-layer — `SpecialFolderRenamer`, `FolderPathRewriter` — does), and item 18's
-two views do not exist (the detection and the wording do).
-
-This is written here rather than left in a commit message because a green
-suite that is green on a promise is exactly the kind of thing a later session
-should be able to find. **When either feature's front end lands, the events
-must actually be recorded** — the count and the names are in the contract
-entries, and `ReclaimedProcesses` is the worked example of parsing something
-out and putting it on the trail.
+`settings saved` and `settings could not be saved`, which belonged to no
+unbuilt view at all: `CourseSettingsView.Save_Click` wrote the config and
+recorded nothing, while the mac records both. All six are emitted now: the
+settings pair since item 28 (2026-09-07), the synced-folder pair the same day
+with item 18's views, and `folder renamed` / `folder created` with item 13's
+rename sheet (`CourseSettingsView`, `RenameFolderAsync` and
+`CreateFolderForNewEntry`). The one member still without a caller is
+`AssistantAsked`, whose line is written by `NotePrompt` without going through
+the enum — a recount should not be surprised by it. Check with `grep -c` per
+member rather than trusting this paragraph: a green suite that is green on a
+promise is exactly the kind of thing a later session should be able to find,
+and `ReclaimedProcesses` is the worked example of parsing something out and
+putting it on the trail.
 
 **There was a FIFTH, and this section did not name it: `folder problem
 repaired`.** Declared when the trail was built, still with no call site on
@@ -223,10 +346,17 @@ plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
   (`MainWindow.xaml`, handoff item 1). Corrected 2026-09-06: this paragraph
   outlived the work by a fortnight, and anyone planning from it would have
   built it twice.
-- Two paths proven underneath but never click-driven in-app: the wizard's
+- ~~Two paths proven underneath but never click-driven in-app: the wizard's
   Create button (the `setup.ps1` + answer-pump path ran to completion via
   PtyDriver), and the new-site dialog a BRAND-NEW section's deploy raises —
-  the verified deploy was a repeat publish to an existing site.
+  the verified deploy was a repeat publish to an existing site.~~ Closed
+  2026-09-07 as handoff item 35. The Create button is now click-driven by
+  `NewCourseWizardUiTests`; the new-site dialog is a hand-driven check with a
+  written procedure (`documentation/12-windows-app.md`), because reaching it
+  needs a real saved Netlify token and creates a real site. It was listed as
+  item 35 on 2026-09-06 — before that it was written down here and indexed
+  nowhere, so no session planning from the numbered list could see it, which
+  is the whole reason the audit added it.
 - Smoke-test hooks, all driving the real button code paths
   (`MainWindow.xaml.cs`, `RunAutomationHooks`): `--auto-select CODE N`,
   `--auto-preview CODE N`, `--auto-deploy CODE N`, `--auto-course CODE`,

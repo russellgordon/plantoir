@@ -75,10 +75,19 @@ public sealed partial class CourseSettingsView : UserControl
     /// <para>Without this the consequential dialog's own sentence is FALSE --
     /// it promises "Removing it will take it out of your course's marks pool"
     /// -- and `graded_folders` ends up naming a folder `excluded_items` tells
-    /// the build to skip. Worse, if it was the only entry the course is left
-    /// with a non-empty pool matching nothing on disk, which reads as "asked
-    /// and answered" and suppresses the `noGradedFolders` warning. This is the
-    /// mac's row 380 correction (3), ported rather than rediscovered.</para>
+    /// the build to skip. If it was the only entry, the course is left with a
+    /// non-empty pool matching nothing the site publishes, so nothing counts
+    /// for marks while the settings claim something does. This is the mac's
+    /// row 380 correction (3), ported rather than rediscovered.</para>
+    ///
+    /// <para><b>One thing this comment used to say is not true and was
+    /// corrected 2026-09-06</b>, because a wrong reason gets acted on: such a
+    /// pool does NOT read as "asked and answered" to the build and does not
+    /// suppress the `noGradedFolders` warning. `_has_graded_folders` in
+    /// <c>build_site.py</c> walks the MERGED tree and answers false when no
+    /// directory there matches a pooled name, so <c>site_health.py</c> raises
+    /// the finding exactly as it would for an empty pool. The reason to do
+    /// this is the promise in the dialog, which is reason enough.</para>
     ///
     /// <para>Materialised first, so a legacy course whose pool has never been
     /// set does not get one CREATED as an empty list by a removal -- that
@@ -87,7 +96,7 @@ public sealed partial class CourseSettingsView : UserControl
     /// </summary>
     private void DropFromMarksPool(string name)
     {
-        var pool = Config.MaterializedGradedFolders();
+        var pool = MarksPool();
         if (pool.RemoveAll(f => string.Equals(f, name, StringComparison.OrdinalIgnoreCase)) == 0) return;
         Config.GradedFolders = pool;
     }
@@ -199,6 +208,214 @@ public sealed partial class CourseSettingsView : UserControl
         RebuildProtectedRows();
     }
 
+    // ---- The two foot-guns behind the folder lists ----------------------------
+
+    private void ShowFolderNotice(string message)
+    {
+        FolderNotice.Message = message;
+        FolderNotice.IsOpen = true;
+    }
+
+    /// <summary>
+    /// Adding a name CREATES the folder — in every section for a per-section
+    /// one — and says so. It used to write a configuration entry pointing at
+    /// nothing, and the folder had to be made in Obsidian afterwards.
+    /// </summary>
+    private void CreateFolderForNewEntry(string name, FolderScope scope)
+    {
+        bool created = SpecialFolderRenamer.CreateFoldersOnDisk(
+            name, scope, _course.DirectoryPath, Config.SectionNumbers);
+        if (!created) return;
+        ActivityTrail.Note(ActivityTrail.Event.FolderCreated,
+            $"created the folder {name} in {_course.Code} ({SpecialFolderRenamer.ConfigurationKey(scope)})");
+        ShowFolderNotice(SpecialNames.AddCreatesTheFolder.Replace("{name}", name));
+    }
+
+    /// <summary>Removal excludes; it has never deleted anything, and teachers could not tell.</summary>
+    private void NoticeAfterRemoval(string name) =>
+        ShowFolderNotice(SpecialNames.RemoveLeavesTheFolderOnDisk.Replace("{name}", name));
+
+    // ---- Renaming a folder ---------------------------------------------------
+
+    private IReadOnlyList<string> NamesInScope(FolderScope scope) =>
+        scope == FolderScope.Shared ? Config.SharedFolders : Config.PerSectionFolders;
+
+    /// <summary>
+    /// The sheet: the name, the explanation, a live refusal as the teacher
+    /// types, and — when a rename of this folder stopped after the folders
+    /// moved — the field filled in with the name it was heading for and one
+    /// line saying why. Rename commits to DISK at once, not at Save: the
+    /// folder has really moved, and a Cancel that appeared to undo it would
+    /// be a lie. Only the keys a rename carries across are written, so the
+    /// teacher's other unsaved edits stay unsaved.
+    /// </summary>
+    private async Task OpenRenameFolderDialog(string oldName, FolderScope scope)
+    {
+        // Settled ONCE, when the sheet opens: it reads a record and asks the
+        // disk, which is not something to do per keystroke.
+        string? interruptedTarget = SpecialFolderRenamer.InterruptedRenameTarget(
+            oldName, scope, _course.DirectoryPath, Config.SectionNumbers);
+
+        var field = new TextBox { Text = interruptedTarget ?? oldName };
+        AutomationProperties.SetAutomationId(field, "renameField");
+        var explanation = new TextBlock { Text = SpecialNames.RenameExplanation, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
+        var problem = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+        };
+        AutomationProperties.SetAutomationId(problem, "renameProblem");
+
+        var body = new StackPanel { Spacing = 10 };
+        if (interruptedTarget is not null)
+        {
+            body.Children.Add(new TextBlock
+            {
+                Text = SpecialNames.RenameInterrupted.Replace("{old}", oldName).Replace("{new}", interruptedTarget),
+                TextWrapping = TextWrapping.Wrap,
+            });
+        }
+        body.Children.Add(field);
+        body.Children.Add(explanation);
+        body.Children.Add(problem);
+
+        var dialog = new ContentDialog
+        {
+            Title = SpecialNames.RenameSheetTitle.Replace("{name}", oldName),
+            Content = body,
+            PrimaryButtonText = "Rename",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+        AutomationProperties.SetAutomationId(dialog, "renameFolderDialog");
+
+        bool Finishing() => interruptedTarget is not null
+            && interruptedTarget.Equals(field.Text.Trim(), StringComparison.OrdinalIgnoreCase);
+        void Recheck()
+        {
+            string? why = SpecialFolderRenamer.Problem(field.Text, oldName, NamesInScope(scope), Finishing());
+            problem.Text = why ?? "";
+            problem.Visibility = why is null ? Visibility.Collapsed : Visibility.Visible;
+            dialog.IsPrimaryButtonEnabled = why is null;
+        }
+        field.TextChanged += (_, _) => Recheck();
+        Recheck();
+
+        // The sheet stays open on a failure, so the teacher can type a
+        // different name rather than start again.
+        dialog.PrimaryButtonClick += async (_, args) =>
+        {
+            var deferral = args.GetDeferral();
+            try
+            {
+                string newName = field.Text.Trim();
+                string? failure = await RenameFolderAsync(oldName, newName, scope, Finishing());
+                if (failure is not null)
+                {
+                    problem.Text = failure;
+                    problem.Visibility = Visibility.Visible;
+                    args.Cancel = true;
+                }
+            }
+            finally { deferral.Complete(); }
+        };
+
+        try { await dialog.ShowAsync(); }
+        catch (Exception ex) { App.LogDiagnostic($"rename dialog: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// Disk first, then the configuration, in that order: a move that fails
+    /// leaves the course exactly as it was, where the other order would leave
+    /// a configuration naming a folder that is not there — the state this
+    /// whole feature exists to make impossible. Returns the sentence to show
+    /// inside the sheet on failure, or null when the rename is whole.
+    /// </summary>
+    private async Task<string?> RenameFolderAsync(string oldName, string newName, FolderScope scope, bool finishing)
+    {
+        string courseDirectory = _course.DirectoryPath;
+        var sections = Config.SectionNumbers.ToList();
+        RenameOutcome outcome;
+        try
+        {
+            // Off the UI thread: the move is quick, but reading every page in
+            // the course to rewrite links is not on a synced vault.
+            outcome = await Task.Run(() =>
+            {
+                if (!finishing) return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections);
+                // The folders already moved; only the links and the record remain.
+                int relinked = SpecialFolderRenamer.RelinkPages(courseDirectory, oldName, newName);
+                return new RenameOutcome(true, SpecialFolderRenamer.DoneMessage(oldName, newName, relinked),
+                                         0, relinked, NothingWasThere: false);
+            });
+        }
+        catch (SpecialFolderRenamer.RenameException error)
+        {
+            return error.Message;
+        }
+
+        try
+        {
+            Config.RecordOnDisk(values => SpecialFolderRenamer.Renaming(values, oldName, newName, scope),
+                                _course.ConfigFilePath);
+        }
+        catch (Exception error)
+        {
+            // Recorded BEFORE returning: the folder has moved and the settings
+            // do not know, which is the state somebody will be asked to
+            // explain later. Not "the rename failed" — a rename whose
+            // bookkeeping did not land; the record stays so the next opening
+            // of the sheet can finish it.
+            ActivityTrail.Note(ActivityTrail.Event.FolderRenamed,
+                $"renamed the folder {oldName} to {newName} in {_course.Code} but could not write it to this course's settings — {error.Message}");
+            return $"“{oldName}” was renamed to “{newName}”, but Plantoir could not write the change to this course's settings: {error.Message}";
+        }
+        SpecialFolderRenamer.ClearRenameRecord(courseDirectory);
+        ActivityTrail.Note(ActivityTrail.Event.FolderRenamed,
+            $"renamed the folder {oldName} to {newName} in {_course.Code} ({SpecialFolderRenamer.ConfigurationKey(scope)}, {outcome.FoldersMoved} moved, {outcome.PagesRelinked} pages relinked)");
+
+        ShowFolderNotice(outcome.Message);
+        ChangedAndRedraw();
+        return null;
+    }
+
+    // ---- The marks pool ---------------------------------------------------
+
+    /// <summary>
+    /// The folder names found inside the course folder, as of the last time
+    /// the form was drawn.
+    ///
+    /// <para>Cached for one <see cref="BuildForm"/> pass rather than walked on
+    /// demand, because the protection rules are asked afresh for every row of
+    /// every list — a disk walk per row, on the UI thread, for an answer that
+    /// cannot change between two rows of the same pass. Everything that DOES
+    /// change it goes through <see cref="BuildForm"/> anyway: the constructor,
+    /// <see cref="RebuildProtectedRows"/> after any list edit or tick, and
+    /// Revert. The one thing it cannot see is the disk changing underneath —
+    /// a folder made in Obsidian while this page is open — which the next tick
+    /// picks up.</para>
+    /// </summary>
+    private IReadOnlyList<string> _nestedFolderNames = Array.Empty<string>();
+
+    /// <summary>
+    /// Every folder the Marks checklist may offer, read from the config LIVE
+    /// so a folder added or removed in the lists above is reflected at once,
+    /// over the walked names cached for this pass.
+    /// </summary>
+    private List<string> GradedFolderChoicesNow() =>
+        GradedFolderChoices.For(Config, _nestedFolderNames);
+
+    /// <summary>
+    /// The pool as it stands, materialised from the SAME choices the checklist
+    /// displays. Feeding the two from one place is the point: a pool
+    /// materialised from a narrower list than the one on screen is how a
+    /// teacher's first tick drops a folder the build was counting.
+    /// </summary>
+    private List<string> MarksPool() =>
+        Config.MaterializedGradedFolders(GradedFolderChoicesNow());
+
     private ProtectionContext Protection() => new(
         InWizard: false,
         CurriculumCoverageEnabled: Config.OverallIncludesCurriculumCoverage,
@@ -207,7 +424,7 @@ public sealed partial class CourseSettingsView : UserControl
         CurriculumPagesEnabled: false,
         Jurisdiction: SpecialNames.DefaultJurisdiction,
         ResolvedCurriculumFolder: Config.ResolvedCurriculumFolder,
-        GradedFolders: Config.MaterializedGradedFolders(),
+        GradedFolders: MarksPool(),
         PerSectionFolders: Config.PerSectionFolders,
         ResolvedClassFolder: ClassFolderRule.Name(Config.ClassFolder, Config.PerSectionFolders));
 
@@ -242,6 +459,13 @@ public sealed partial class CourseSettingsView : UserControl
     {
         Form.Children.Clear();
         _fontSampleHeaders.Clear();   // rebuilt below; Revert re-enters here
+
+        // Walked once per pass, before anything asks what the Marks list
+        // offers or what the pool currently holds.
+        _nestedFolderNames = GradedFolderChoices.NestedFolderNames(
+            _course.DirectoryPath,
+            Config.ExcludedItems(CourseConfiguration.SharedScope),
+            Config.ExcludedItems(CourseConfiguration.PerSectionScope));
 
         // -------- Settings — Overall --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Settings — Overall", null));
@@ -363,10 +587,11 @@ public sealed partial class CourseSettingsView : UserControl
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Content Structure", null));
         Form.Children.Add(FormBuilders.StringListEditor("Shared folders (all sections)", false,
             () => Config.SharedFolders, v => Config.SharedFolders = v, ChangedAndRedraw,
-            name => RecordExclusion(CourseConfiguration.SharedScope, "folder", name),
-            name => RecordReInclusion(CourseConfiguration.SharedScope, "folder", name),
+            name => { RecordExclusion(CourseConfiguration.SharedScope, "folder", name); NoticeAfterRemoval(name); },
+            name => { RecordReInclusion(CourseConfiguration.SharedScope, "folder", name); CreateFolderForNewEntry(name, FolderScope.Shared); },
             name => ItemProtectionRule.For(name, ItemList.SharedFolders, Protection()),
-            (name, reason) => RecordRemovalBlocked("the shared folders", name, reason)));
+            (name, reason) => RecordRemovalBlocked("the shared folders", name, reason),
+            name => _ = OpenRenameFolderDialog(name, FolderScope.Shared)));
         Form.Children.Add(FormBuilders.StringListEditor("Shared files (all sections)", true,
             () => Config.SharedFiles, v => Config.SharedFiles = v, ChangedAndRedraw,
             name => RecordExclusion(CourseConfiguration.SharedScope, "file", name),
@@ -375,10 +600,11 @@ public sealed partial class CourseSettingsView : UserControl
             (name, reason) => RecordRemovalBlocked("the shared files", name, reason)));
         Form.Children.Add(FormBuilders.StringListEditor("Per-section folders", false,
             () => Config.PerSectionFolders, v => Config.PerSectionFolders = v, ChangedAndRedraw,
-            name => RecordExclusion(CourseConfiguration.PerSectionScope, "folder", name),
-            name => RecordReInclusion(CourseConfiguration.PerSectionScope, "folder", name),
+            name => { RecordExclusion(CourseConfiguration.PerSectionScope, "folder", name); NoticeAfterRemoval(name); },
+            name => { RecordReInclusion(CourseConfiguration.PerSectionScope, "folder", name); CreateFolderForNewEntry(name, FolderScope.PerSection); },
             name => ItemProtectionRule.For(name, ItemList.PerSectionFolders, Protection()),
-            (name, reason) => RecordRemovalBlocked("the per-section folders", name, reason)));
+            (name, reason) => RecordRemovalBlocked("the per-section folders", name, reason),
+            name => _ = OpenRenameFolderDialog(name, FolderScope.PerSection)));
         Form.Children.Add(FormBuilders.StringListEditor("Per-section files", true,
             () => Config.PerSectionFiles, v => Config.PerSectionFiles = v, ChangedAndRedraw,
             name => RecordExclusion(CourseConfiguration.PerSectionScope, "file", name),
@@ -404,12 +630,18 @@ public sealed partial class CourseSettingsView : UserControl
         Form.Children.Add(FormBuilders.ExampleCaption(
             "Tick the folders holding work that counts for marks. The Curriculum Coverage map shows an expectation as evaluated when a page in one of these addresses it."));
         Form.Children.Add(FormBuilders.MembershipToggleList("Folders that count for marks",
-            Config.SharedFolders.Concat(Config.PerSectionFolders).ToList(),
-            // Materialised on the way IN, so a course that has never been asked
-            // starts from what it was already counting rather than from empty -
-            // a first tick must not take the marks off every other folder whose
-            // name mentioned tasks.
-            () => Config.MaterializedGradedFolders(),
+            // Not just the two top-level lists. The build counts a folder at
+            // ANY depth, so a course with `Portfolios/Tasks` has assessed work
+            // those lists never mention - and the first tick FREEZES the pool,
+            // so a name this list failed to offer stops counting from that
+            // moment, silently and for good.
+            GradedFolderChoicesNow(),
+            // Materialised on the way IN from that SAME pool, so a course that
+            // has never been asked starts from what it was already counting
+            // rather than from empty - a first tick must not take the marks off
+            // every other folder whose name mentioned tasks. Offering a folder
+            // this list did not also materialise would lose it just as quietly.
+            MarksPool,
             v => Config.GradedFolders = v,
             // Ticking a SECOND folder is exactly what unblocks the first, and
             // it unblocks that folder's row in the lists above too.
@@ -656,6 +888,10 @@ public sealed partial class CourseSettingsView : UserControl
         {
             Config.Write(_course.ConfigFilePath);
             RefreshDirtyState();
+            // The mac's wording, so the two trails read the same. Declared
+            // when the trail was built and emitted by nobody until 2026-09-07.
+            ActivityTrail.Note(ActivityTrail.Event.SettingsSaved,
+                "saved the settings for " + _course.Code);
             SaveStatus.Text = "Saved ✓";
             SaveStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
             await Task.Delay(3000);
@@ -663,6 +899,14 @@ public sealed partial class CourseSettingsView : UserControl
         }
         catch (Exception error)
         {
+            // The exception's message can carry a path under the teacher's
+            // home folder; LogRedactor redacts on the way IN
+            // (windowsHomeFolder, pinned by problemReportRedaction case 2).
+            // Its one known limit is pre-existing and shared with every other
+            // line: an account name with a space in it loses only its first
+            // word.
+            ActivityTrail.Note(ActivityTrail.Event.SettingsCouldNotBeSaved,
+                "could not save the settings for " + _course.Code + " — " + error.Message);
             SaveStatus.Text = $"Could not save: {error.Message}";
             SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
         }

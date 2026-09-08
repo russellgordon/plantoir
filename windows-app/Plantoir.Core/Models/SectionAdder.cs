@@ -261,7 +261,7 @@ public static class SectionAdder
         return null;
     }
 
-    private static int? PerSectionKeyNumber(string line)
+    internal static int? PerSectionKeyNumber(string line)
     {
         string[] prefixes = ["createdSection", "publishForSection", "draftSection"];
         foreach (string prefix in prefixes)

@@ -38,6 +38,53 @@ public sealed class ScheduledDeployTests : IDisposable
             Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", title + ".md"),
             $"---\ntitle: {title}\npublish: {(published ? "true" : "false")}\n---\nBody.\n");
 
+    private void DatedClassPage(string title, bool published, string created) =>
+        File.WriteAllText(
+            Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", title + ".md"),
+            $"---\ntitle: {title}\ncreated: {created}\npublish: {(published ? "true" : "false")}\n---\nBody.\n");
+
+    // ---- What the sidebar's own dialog says about unpublished classes ------
+
+    /// <summary>
+    /// The sidebar has no list of named classes the way the assistant's tool
+    /// does, so EVERY unpublished class is named — dated after the deploy or
+    /// not at all, it is still a page students cannot see, which is the
+    /// contract's rule and the mac's behaviour. The section's front page is
+    /// never a class, even when it sits inside the class folder.
+    /// </summary>
+    [Fact]
+    public void TheClassesADeployWouldLeaveBehindAreEveryUnpublishedOne()
+    {
+        DatedClassPage("Unit 1, Day 1", published: true, created: "2026-09-08");
+        DatedClassPage("Unit 1, Day 2", published: false, created: "2026-09-09");
+        DatedClassPage("Unit 1, Day 4", published: false, created: "2026-12-14");
+        ClassPage("Unit 9, Day 1", published: false);       // undated, still named
+        File.WriteAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "index.md"),
+            "---\ntitle: All Classes\npublish: false\n---\n");
+        var course = Open().Course("ICS3U");
+
+        Assert.Equal(new[] { "Unit 1, Day 2", "Unit 1, Day 4", "Unit 9, Day 1" },
+                     ScheduledDeploy.UnpublishedClassesIn(course, 1));
+    }
+
+    [Fact]
+    public void TheDialogsSentenceCarriesTheSameContentAsTheAssistantsDescription()
+    {
+        Assert.Null(ScheduledDeploy.UnpublishedClassesSentence(Array.Empty<string>()));
+
+        string one = ScheduledDeploy.UnpublishedClassesSentence(new[] { "Unit 1, Day 2" })!;
+        Assert.StartsWith("One thing first — 1 class is not published yet: Unit 1, Day 2.", one);
+        Assert.Contains("Deploying now would put the site up without it.", one);
+        Assert.EndsWith("Publish first, look the preview over, then schedule this.", one);
+
+        var many = Enumerable.Range(1, 10).Select(n => $"Unit 2, Day {n}").ToList();
+        string sentence = ScheduledDeploy.UnpublishedClassesSentence(many)!;
+        Assert.Contains("10 classes are not published yet", sentence);
+        Assert.Contains("Unit 2, Day 8 …and 2 more.", sentence);
+        Assert.DoesNotContain("Unit 2, Day 9", sentence);
+        Assert.Contains("without them.", sentence);
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_folder, recursive: true); } catch { }

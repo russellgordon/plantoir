@@ -16,6 +16,15 @@ public sealed record RememberedWindow(string Path, double X, double Y, double Wi
                                       string? Selection = null, bool ShowsBackups = false);
 
 /// <summary>
+/// Where an assistant window was last left — PLACEMENT only, no size, and
+/// deliberately a different type from <see cref="RememberedWindow"/>: that
+/// list is replayed at launch, and an assistant window restored at launch
+/// would load a multi-gigabyte model unasked. Keeping the two apart is what
+/// makes that refusal structural rather than a flag somebody could flip.
+/// </summary>
+public sealed record RememberedPlacement(double X, double Y);
+
+/// <summary>
 /// The app's own settings store (%LOCALAPPDATA%\Plantoir\settings.json).
 /// Windows has no system window restoration, so the remembered-windows
 /// list IS the restoration mechanism — recorded at quit while the windows
@@ -41,6 +50,38 @@ public sealed class AppSettings
     public string CloudflareAccountId { get; set; } = "";
 
     public List<RememberedWindow> RememberedWindows { get; set; } = new();
+
+    /// <summary>
+    /// Where each SECTION's assistant window was last left, keyed by
+    /// <see cref="AssistWindowKey"/>. Per section because a teacher genuinely
+    /// puts section 1's assistant on a second monitor and section 2's beside
+    /// the preview (mac row 164). Never replayed at launch — see
+    /// <see cref="RememberedPlacement"/>. Pruned on load with the same rule
+    /// as <see cref="RememberedWindows"/>: an entry whose working folder no
+    /// longer exists is dropped, so the list cannot grow forever.
+    /// </summary>
+    public Dictionary<string, RememberedPlacement> AssistWindowPlacements { get; set; } = new();
+
+    /// <summary>The key for one section's assistant window. The folder comes first so pruning can read it back.</summary>
+    public static string AssistWindowKey(string folderPath, string courseCode, int section) =>
+        $"{folderPath}|{courseCode}|{section}";
+
+    /// <summary>The working folder an <see cref="AssistWindowKey"/> was made for.</summary>
+    public static string FolderOfAssistWindowKey(string key)
+    {
+        int last = key.LastIndexOf('|');
+        int secondLast = last > 0 ? key.LastIndexOf('|', last - 1) : -1;
+        return secondLast > 0 ? key[..secondLast] : key;
+    }
+
+    /// <summary>Drops the placements whose working folder is gone. Called on load.</summary>
+    public void PruneAssistWindowPlacements(Func<string, bool> folderExists)
+    {
+        var gone = AssistWindowPlacements.Keys
+            .Where(key => !folderExists(FolderOfAssistWindowKey(key)))
+            .ToList();
+        foreach (string key in gone) AssistWindowPlacements.Remove(key);
+    }
     /// <summary>No OS-level setting exists here, so it is an app preference — default restore.</summary>
     public bool RestoreWindowsOnLaunch { get; set; } = true;
 
@@ -149,6 +190,7 @@ public sealed class AppSettings
                 if (settings.WorkspacePath is not null && !Directory.Exists(settings.WorkspacePath))
                     settings.WorkspacePath = null;
                 settings.RememberedWindows.RemoveAll(w => !Directory.Exists(w.Path));
+                settings.PruneAssistWindowPlacements(Directory.Exists);
                 return settings;
             }
         }

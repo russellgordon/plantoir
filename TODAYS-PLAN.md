@@ -546,10 +546,13 @@ file needed two rounds before it was safe to hand over.
   terminates any running copy, so a plain `build` must be the LAST build.
 * **The mac suite runs test classes serially on purpose.** Classes that reset
   process-wide statics corrupt each other in parallel.
-* **`xcodebuild` can exit 65 with ZERO failed cases.** Grep `^Failing tests:`
-  before believing a failure. There is a pre-existing intermittent crash in
-  `CourseRenameInterfaceTests` that also reproduces on `origin/dev` (measured: 1
-  in 4 runs) — do not attribute it to your change without measuring both.
+* **`xcodebuild` can exit 65 with ZERO failed cases.** That means the test HOST
+  died, not that a test failed, and the `Failing tests:` line names a bystander.
+  Compare the totals with the exit code before believing a failure. The
+  intermittent crash that made this a daily event — measured at 10 in 30 runs —
+  was fixed 2026-09-07 (`SheetAnimationSuppressor`), so a red suite is a red
+  suite again; if you do see the pattern, it is something new and worth
+  stopping for.
 * **Never `colima stop`** unless `docker ps -q` is empty; it is shared with his
   other projects.
 
