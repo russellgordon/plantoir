@@ -1558,7 +1558,7 @@ to run in the background.
     labels, the placeholder and every row's `what` and `why` — the text the
     PRODUCT writes — and running it against a course with NO curriculum
     folder, which is the branch neither platform's fixture had ever exercised.
-    Both of those changes are worth copying, and there is a trap in the obvious
+    Both changes are worth copying, and there is a trap in the obvious
     version of the first: drop only the COURSE-named `entry.Name`s from the
     sweep and KEEP the four the contract marks `namedFrom: "fixed"` — Media,
     index.md, Key Links.md, Curriculum Coverage — because those are the
@@ -1907,8 +1907,8 @@ to run in the background.
     fixture and loop `specialFoldersHelp.cases`, building each course through
     the same `CourseFrom(figure)` the naming test already uses, asserting the
     count, `What`, `Why` and the `namedFrom: "fixed"` names per case with the
-    case's own name in the message. Two of those cases record no curriculum
-    folder at all, so both branches get compared and no new fixture is invented
+    case's own name in the message. Two of those cases END UP with no
+    curriculum folder at all, so both branches get compared and no new fixture is invented
     to drift. (Three cases record no `curriculum_folder`; the third of them
     has a folder the scan finds, which is the case whose whole point is that
     recording none and having none are different things.) Two traps met on
