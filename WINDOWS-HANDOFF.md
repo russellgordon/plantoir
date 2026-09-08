@@ -1965,6 +1965,56 @@ to run in the background.
     six levers that look like they should fix it", below. Read it only if you
     ever hit something of this shape; it is written for that moment.
 
+40. **Your `TheRowsAreTheContractsRowsInTheContractsOrder` builds ONE course,
+    so it cannot catch the retired placeholder sentence coming back.** The
+    other half of the same test file as item 32 — which is now done, and this
+    is not: item 32 fixed the jargon SWEEP, and a sweep cannot stand in for
+    this. Raised on the mac 2026-09-06 (`GUI-IMPROVEMENTS.md` row 446).
+
+    **The hole: it builds ONE course and that course has a curriculum
+    folder** (`SpecialFoldersHelpContractTests.cs:96-98`, shared
+    folders `["Tasks","Ontario Curriculum"]`). It is the only test on either
+    platform that compares a row's `Why` with the contract's, so the
+    PLACEHOLDER branch's copy of that sentence is pinned by nothing. The mac
+    had the identical hole and it is not theoretical: **putting the old
+    sentence back — "One page per expectation, in a folder whose name mentions
+    the curriculum" — left all five mac tests green, measured on this Mac on
+    2026-09-06 by doing exactly that.** The jargon sweep runs that branch and
+    still cannot see it, because "mentions" is not a banned word.
+
+    **Do not fix it by adding "mentions" to `saysNoMachinery.jargon`.**
+    Rejected on the mac: banning a word catches only that word, and "in a
+    folder named after the curriculum" would sail straight through. It also
+    makes a shared contract change that sweeps every other row's text, for a
+    weaker guarantee than pinning the sentence itself.
+
+    The fix the mac made, which ports line for line: stop hand-typing the
+    fixture and loop `specialFoldersHelp.cases`, building each course through
+    the same `CourseFrom(figure)` the naming test already uses, asserting the
+    count, `What`, `Why` and the `namedFrom: "fixed"` names per case with the
+    case's own name in the message. Two of those cases END UP with no
+    curriculum folder at all, so both branches get compared and no new
+    fixture is invented to drift. (Three cases record no `curriculum_folder`;
+    the third of them has a folder the scan finds, which is the case whose
+    whole point is that recording none and having none are different things.)
+    Two traps met on the way: the count guard must `continue` rather than
+    `return`, or one bad case silences every case after it; and assert at the
+    END that both branches were actually reached (the mac keeps
+    `sawResolvedFolder` and `sawPlaceholder` flags), because a case list that
+    drifted until every course had a curriculum folder would leave the test
+    green while covering exactly what it covered before. **Measured after the
+    fix: the same reversion now fails 2 assertions naming both placeholder
+    cases, where it failed 0 before.**
+
+    **Both measurements were re-run on 2026-09-07 rather than taken on
+    trust**, because the session that first made them also reported a test
+    total it had not measured. Putting the sentence back and running the mac
+    suite twice: against the OLD test, 5 tests / 0 failures; against the new
+    one, 5 tests / 2 failures, naming "asked and cleared: an empty pool is a
+    real answer" and "more than one class folder is listed, not just the
+    first". Those are the two cases that reach the placeholder, by name. The
+    numbers above hold.
+
 ## A test host that segfaults, and the six levers that look like they should fix it
 
 Written 2026-09-07, for whoever meets a modal that kills a test process rather
