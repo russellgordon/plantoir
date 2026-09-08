@@ -3975,6 +3975,17 @@ lockstep.
   (An earlier version of this bullet said they were UNTESTED and told you to
   test them first. That was a week out of date and would have sent a session
   down a dead end.)
+- **A test that proves a date was FRESHENED must compare against a date in the
+  PAST, and yours already does — keep it that way.** `ModelTests.cs:179` reads
+  `Assert.DoesNotContain("2025-01-01", index)`, and the date being safely in the
+  past is what makes it a real assertion. The mac's twin used a date that was
+  "today" when it was written, and on **2026-09-08** the clock reached it: the
+  correctly-freshened value became the very string the test was checking for
+  absence of, so a passing behaviour failed its own test. `dev` was red that
+  morning for every branch, on a test nobody had touched in three weeks. Fixed
+  on the mac by moving the fixture to 2020-01-15. **Do not "modernise" your
+  fixture dates to something recent** — the whole point of that literal is that
+  the clock can never catch up with it.
 - `verify.sh` is the toolchain gate on macOS/Linux; a Windows verify
   script should mirror it, including its cross-check that every helper a
   launcher calls is defined in that same launcher file (a missing helper
