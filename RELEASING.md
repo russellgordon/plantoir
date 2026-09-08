@@ -152,6 +152,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 2. **Full test pass**: `dotnet test Plantoir.Tests` and the mac unit suite, plus
    a hand smoke of create → preview → publish on a real course.
 
+   > **Check the TOTALS line before calling it green**, or use
+   > `.un-tests.ps1`, which reads it for you. `dotnet test` exits 1 for a
+   > failing test, for a dead test host and for a project that did not compile,
+   > and a release is exactly the moment that distinction gets waved through.
+
    > The hand smoke is **not optional, and not a formality**. The bundle carries
    > the whole toolchain recipe (Dockerfile, `scripts/`, `patches/`, `contracts/`,
    > launchers)
