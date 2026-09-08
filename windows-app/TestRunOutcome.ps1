@@ -235,6 +235,18 @@ function Invoke-TestRun {
     captures to nothing. The captured text and exit code come back through
     -Result instead, precisely because the success stream is spoken for.
 
+    ONE COUPLING WORTH KNOWING, because removing the flattening would break
+    something that looks unrelated. Get-TestRunOutcome anchors its patterns to
+    the start of a line, so a wrapped line would stop matching and a green run
+    would read as NoResult. `Out-String` wraps FORMATTED OBJECTS to the console
+    width - but not plain strings, which it simply joins. Measured 2026-09-08
+    at widths 60, 80, 100, 120 and the default against the real 115-character
+    totals line: every one gives Passed and 1210, because `"$_"` has already
+    made them plain strings. Drop the flattening and ErrorRecords arrive as
+    objects, which DO wrap. So do not add `-Width` here to be safe, and do not
+    remove the `ForEach-Object` as redundant: it is what makes the width
+    irrelevant.
+
 .EXAMPLE
     $run = $null
     Invoke-TestRun -DotnetArguments $args -Result ([ref]$run)
