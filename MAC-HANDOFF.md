@@ -114,18 +114,15 @@ the caption line commented out and the app rebuilt, it fails; restored and
 rebuilt, it passes. The mac has no equivalent harness, so this is offered as
 awareness rather than as a debt.
 
-**One gap between the sentence and the code, found reviewing it and left
-deliberately unfixed** — it is in SHARED Python, so it is the mac's problem
-too. "even if you make it again in Obsidian" holds only when the name is remade
-with the same capitalisation: the live preflight path compares raw strings
-while `_dropping_excluded_items` lowercases both sides, so `Old Tests` removed
-and remade as `old tests` is discovered, appended and published. The sentence
-describes the intended rule and the code has the defect; narrowing the promise
-to fit it was rejected. Written up in `TODO.md` ("An exclusion is escaped by
-re-creating the folder with different capitalisation") and indexed as item 41
-in `WINDOWS-HANDOFF.md`. Whoever takes it owes a contract case, matching
-changes to `CourseConfiguration` on both platforms, and a `verify.sh` run from
-the mac — which is why it was not done inside a wording piece.
+**One edge worth knowing, in SHARED Python, so it is the mac's too — but it
+owes nothing today and is written up elsewhere.** "even if you make it again in
+Obsidian" holds for a name remade as it was and not for one remade with
+different capitalisation, because exact matching is the deliberate rule
+(`gradedFolders.choices.walk.excludedItems`, reasoned in
+`GUI-IMPROVEMENTS.md` row 412). The inconsistency worth fixing is narrower:
+`_dropping_excluded_items` lowercases both sides while every other consumer
+matches exactly. `TODO.md` carries it in full, `WINDOWS-HANDOFF.md` item 41
+indexes it, and both warn against the obvious wrong fix.
 
 **One proposed 2026-09-07, and nothing goes red for it: the New Course
 wizard's affirmative button reads "Create Course" on both platforms** —

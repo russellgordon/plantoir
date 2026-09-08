@@ -1872,7 +1872,9 @@ to run in the background.
     adoption. **The detail, and the reasoning worth keeping, is in the block at
     the end of this item.** What follows first is the item as it was audited,
     left as written because it is the honest record of what was true until
-    today.
+    today — so read its present tense as speaking of **2026-09-06**: "nobody
+    has picked it up" and "sitting there unactioned" were the state that day
+    and are not the state now.
 
     A sentence a teacher READS belongs in `contracts/`
     by CLAUDE.md rule 2, and this one is in neither app's contract:
@@ -2058,32 +2060,41 @@ to run in the background.
     first". Those are the two cases that reach the placeholder, by name. The
     numbers above hold.
 
-41. **An exclusion is escaped by re-creating the folder with different
-    capitalisation, and `build_site.py` disagrees with itself about it.**
-    Found 2026-09-07 by adversarial review while pinning the Course Settings
-    tip (item 37, `GUI-IMPROVEMENTS.md` row 447). Pre-existing on both
-    platforms, in SHARED Python, so it is neither side's in particular — it is
-    listed here because this side now runs `scripts/test_*.py` inside
-    `dotnet test` (item 36) and can therefore gate the fix, which it could not
-    before.
+41. **`_dropping_excluded_items` matches excluded names case-insensitively
+    while every other consumer matches exactly, so `build_site.py` gives two
+    answers in one file.** Found 2026-09-07 by adversarial review while pinning
+    the Course Settings tip (item 37, `GUI-IMPROVEMENTS.md` row 447).
+    Pre-existing on both platforms, in SHARED Python, so it is neither side's
+    in particular — it is listed here because this side now runs
+    `scripts/test_*.py` inside `dotnet test` (item 36) and can therefore gate a
+    fix, which it could not before.
 
-    The live preflight path compares excluded names RAW — the
-    `excluded_shared` / `excluded_per_section` sets, the drop pass and the
-    discovery filter — while `_dropping_excluded_items`, the give-up path for
-    the same reconciliation, lowercases both sides. So `Old Tests` removed in
-    Course Settings and later remade in Obsidian as `old tests` is discovered,
-    appended and published. That is the exact outcome
-    `specialNames.contentStructureTip` now promises a teacher cannot happen.
+    **Do not resolve it by case-folding the live path.** Exact, case-included
+    matching is the RULE, not an oversight: the contract says so at
+    `gradedFolders.choices.walk.excludedItems` — "the same way preflight
+    matches" — and row 412 gives the reason, that a case-insensitive answer
+    would have the app believe a folder is excluded while the build published
+    it. Case-folding breaks that live case, fails `GradedFolderChoicesTests`,
+    and re-introduces precisely the app/build disagreement row 412 rejected.
+    **This item was first written the wrong way round**, calling the exact
+    match a defect, and that is recorded because it is the mistake a reader is
+    most likely to repeat.
 
-    **The sentence is right and the code is wrong**; narrowing the promise to
-    match the defect was considered and rejected. **The full write-up, the
-    shape of the fix and the one trap in it are in `TODO.md`** — "An exclusion
-    is escaped by re-creating the folder with different capitalisation" —
-    including that `gradedFolders.choices.walk.skippedMatching` already pins
-    the OPPOSITE rule for a different list, so the two want writing down side
-    by side. Whoever takes it owes a contract case, matching changes to
-    `CourseConfiguration` on both platforms, and a run of `verify.sh` from the
-    mac.
+    What a teacher can hit follows from the rule rather than from a bug:
+    `Old Tests` removed in Course Settings, deleted in Obsidian and later
+    remade as `old tests` is discovered, appended and published — so
+    `specialNames.contentStructureTip`'s "even if you make it again in
+    Obsidian" holds for the same name remade, which is the realistic case, and
+    not for that edge.
+
+    **The full write-up is in `TODO.md`** — "`_dropping_excluded_items` matches
+    excluded names case-insensitively…" — including every consumer a fix must
+    cover (the sentinel-note sync at both scopes and
+    `GradedFolderChoices.Excluded` are the two easily missed), and the two ways
+    out: make `_dropping_excluded_items` exact so the file agrees with its own
+    rule, or go case-insensitive everywhere and amend `walk.excludedItems`
+    while answering row 412. Either owes a contract case and a `verify.sh` run
+    from the mac.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 

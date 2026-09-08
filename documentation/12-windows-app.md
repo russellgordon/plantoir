@@ -333,8 +333,9 @@ Automation. It exists for the things a unit test cannot see: that a control can
 be REACHED (invoking a button fires it whether or not it is on screen), that
 clicking it opens something, that the RENDERED text is what the model said in
 the order the contract fixes, that a scrolling list is not cut off at the
-bottom, and that a panel follows the course a teacher selected rather than
-going stale.
+bottom, that a panel follows the course a teacher selected rather than
+going stale, and that a sentence the contract pins is actually RENDERED where
+a teacher can see it rather than merely held in a constant.
 
 **It is opt-in and belongs to no gate.** Every test carries `[UiFact]`, which
 skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and
