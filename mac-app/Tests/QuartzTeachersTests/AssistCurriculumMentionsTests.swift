@@ -70,6 +70,7 @@ final class AssistCurriculumMentionsTests: XCTestCase {
         let added: Set<String> = [
             "list_courses",
             "plan_add_classes", "add_classes",
+            "plan_make_room_for_classes", "make_room_for_classes",
             "list_curriculum_expectations", "plan_curriculum_mentions", "add_curriculum_mentions",
         ]
         for name in added {

@@ -156,6 +156,8 @@ extension AssistToolRunner {
         listCoursesTool,
         planAddClassesTool,
         addClassesTool,
+        planMakeRoomForClassesTool,
+        makeRoomForClassesTool,
         listCurriculumExpectationsTool,
         planCurriculumMentionsTool,
         addCurriculumMentionsTool,
@@ -707,6 +709,69 @@ extension AssistToolRunner {
         required: ["course", "section", "unit", "howMany"],
         readOnly: false,
         needsApproval: false
+    )
+
+    /// Room for a class PART-WAY through a unit, not on the end of it.
+    ///
+    /// **The most dangerous thing on this surface, by its own engine's
+    /// admission**: `ClassInsertionPlanner` renames the later days of a unit
+    /// and rewrites every wikilink that pointed at them. That is why it is
+    /// MCP-only — a person reads every step there — and why the write says
+    /// plainly that "Undo that" cannot take it back once other classes moved.
+    ///
+    /// The engine has taken `unit`, `atDay` and `count` from the start; what
+    /// was missing was any way to say them. Its one route was the fixed
+    /// phrasing "duplicate <page> as my next class", which pins the insertion
+    /// point to the day after a named page and the count to one.
+    private static let planMakeRoomForClassesTool: AssistToolDefinition = AssistToolDefinition(
+        name: "plan_make_room_for_classes",
+        description: "Work out what making room part-way through a unit would do, and change nothing. "
+                   + "Names every page that would be renamed, every class that would move to a later "
+                   + "day, and every link that would be rewritten. Call this first and show the teacher "
+                   + "what it said, in full — this moves more pages than anything else here.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+            "unit": unitHelp,
+            "atDay": atDayHelp,
+            "howMany": howManyRoomHelp,
+        ],
+        required: ["course", "section", "unit", "atDay"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    private static let makeRoomForClassesTool: AssistToolDefinition = AssistToolDefinition(
+        name: "make_room_for_classes",
+        description: "TEACHERS SAY: \"make room for a class at Unit 3, Day 4\". Insert one or more "
+                   + "classes part-way through a unit: the later days of that unit are renumbered, every "
+                   + "link that pointed at them is rewritten, the classes that follow move onto later "
+                   + "class days, and the new pages arrive unpublished.\n\n"
+                   + "Call plan_make_room_for_classes FIRST and show the teacher what it said. The course "
+                   + "is backed up first. Once other classes have moved, \"undo that\" can no longer take "
+                   + "this back and the backup is the way out — so tell the teacher to look the section "
+                   + "over in Plantoir before publishing anything.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+            "unit": unitHelp,
+            "atDay": atDayHelp,
+            "howMany": howManyRoomHelp,
+        ],
+        required: ["course", "section", "unit", "atDay"],
+        readOnly: false,
+        needsApproval: false
+    )
+
+    private static let atDayHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .integer,
+        description: "The day number the new class takes. That day and every later day in the unit are "
+                   + "renumbered to make room."
+    )
+
+    private static let howManyRoomHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .integer,
+        description: "How many classes to make room for. Leave empty for one."
     )
 
     private static let unitHelp: AssistSchemaProperty = AssistSchemaProperty(
