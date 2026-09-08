@@ -565,10 +565,31 @@ extension AssistToolRunner {
                    + "class dates on file, by POSITION — the first class takes the first date — and move "
                    + "the pages each class uses onto that class's day with it. Pages this section's Key "
                    + "Links points at move to the first day of class. Curriculum pages are left alone, "
-                   + "because Plantoir dates those itself on every build.",
+                   + "because Plantoir dates those itself on every build. Set `website` when the "
+                   + "teacher is rolling a section over to a NEW YEAR and has said which website "
+                   + "they want: \"new\" starts a fresh one, so publishing no longer replaces last "
+                   + "year's site, and \"same\" keeps last year's address. Ask them first — never "
+                   + "choose for them, and leave it out for an ordinary re-dating.",
         parameters: [
             "course": courseHelp,
             "section": sectionHelp,
+            // `website` IS on the schema and `rollover` is not, and the split
+            // is deliberate. In the app the rollover is a fixed phrasing, so
+            // the card supplies both keys and no model is involved. Over MCP
+            // there is no card and no sheet, so a client that cannot say which
+            // website the teacher chose cannot roll a section over at all —
+            // which was the hole in the first version of this, and it made the
+            // "answer in words rather than with a sheet" reasoning wrong for
+            // the one surface that reasoning was about.
+            //
+            // It costs no routing accuracy: `re_date_classes` is in
+            // `hiddenFromTheLocalModel`, so the small model never sees this
+            // schema. Only Claude Code does, and a person is reading each step.
+            "website": AssistSchemaProperty(
+                kind: .string,
+                description: "Either \"new\" or \"same\", when a teacher rolling this section over "
+                           + "to a new year has said which website they want. Leave empty otherwise."
+            ),
         ],
         required: ["course", "section"],
         readOnly: false,

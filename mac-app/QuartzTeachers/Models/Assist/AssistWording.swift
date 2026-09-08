@@ -204,6 +204,111 @@ nonisolated enum AssistWording {
         "That change is still on the list, so you can ask me to undo it again once you have "
         + "dealt with the pages I left alone."
 
+    // MARK: - Rolling a section over to a new year
+
+    /// The question a rollover asks, and the only one it asks.
+    ///
+    /// **Neither answer is guessed**, which is the whole decision (Russell,
+    /// 2026-09-08). A teacher who keeps one address across years has every
+    /// link anybody saved still working; a teacher who starts fresh leaves
+    /// last year's site up for last year's students. Both are ordinary things
+    /// to want, and the sentence says nothing about which is better.
+    static let rolloverWebsiteQuestion: String =
+        "Should this be a new website, or the same one students used last year?"
+
+
+    /// Confirming a new website, when the section had one to be cut loose from.
+    ///
+    /// It carries the CONSEQUENCE rather than only the fact, because the next
+    /// thing that happens to this teacher is a publish that asks them
+    /// something new.
+    ///
+    /// **Naming the file is a considered exception to rule 1, not an
+    /// oversight.** A filename is machinery, and plain words are the standing
+    /// rule. But the folder it sits in is HIDDEN, so "kept in your course
+    /// folder" points a teacher at something Finder will not show them — less
+    /// use than a precise string they can search for, and this sentence exists
+    /// for the teacher who wants last year's website back. Windows says the
+    /// same thing in the same shape, so a shared sentence stays shared.
+    static func rolloverStartedANewWebsite(keptAs: String) -> String {
+        return rolloverIsOnANewWebsite + " Last year's details are "
+             + "kept at \(keptAs), so you can go back to it. The next time you publish this "
+             + "section, Plantoir will ask what to call the new website."
+    }
+
+    /// The half of that sentence with no filename in it.
+    ///
+    /// **Named so a contract case can assert it.** The whole sentence carries
+    /// the kept file's name, which has a timestamp in it, so no fixed string
+    /// can ever match the whole thing — and a test that cannot name the
+    /// sentence ends up matching prose it typed itself, which is the copy that
+    /// keeps passing after the product's words change.
+    static let rolloverIsOnANewWebsite: String =
+        "This section is no longer tied to last year's website." 
+
+    /// Confirming a new website for a section that had never been published.
+    static let rolloverHadNoWebsiteYet: String =
+        "This section had not been published anywhere yet, so there was no website to move away "
+        + "from. The first time you publish it, Plantoir will ask what to call it."
+
+    /// Confirming the same website.
+    static let rolloverKeptTheSameWebsite: String =
+        "This section still publishes to the same website as last year, so every link anybody "
+        + "saved keeps working. Nothing goes out until you publish."
+
+    /// What a teacher is told when the question was never answered.
+    ///
+    /// **The honest half of the feature, and the reason it is a sentence
+    /// rather than silence.** The re-dating has already happened by the time
+    /// the question appears, so an offer a teacher ignores — or one that
+    /// cannot appear at all, which is every request arriving over MCP — must
+    /// not leave them believing the website was dealt with. Saying plainly
+    /// that it was NOT is what stops this feature quietly recreating the
+    /// defect it was built to fix.
+    static let rolloverWebsiteNotDecided: String =
+        "I have not changed which website this section publishes to — publishing it will still "
+        + "go to last year's website. Ask me to roll it over again if you would like to choose."
+
+    /// A destination that could not be released, so the section is still
+    /// pinned to it.
+    ///
+    /// **Its own sentence because the alternative said the opposite.** A
+    /// marker that exists and cannot be moved used to produce the same empty
+    /// result as one that was never there, so a teacher was told "this section
+    /// had not been published anywhere yet" about a section that is still
+    /// publishing over last year's site. That is a lie about the one fact this
+    /// whole feature turns on.
+    static func rolloverCouldNotStartANewWebsite(stillPinned: String) -> String {
+        return "I could not move this section off \(stillPinned), so publishing it will still "
+             + "replace last year's website there. Try again, or check whether that file is "
+             + "locked or open somewhere else."
+    }
+
+    /// Added when releasing a website turned off a publish that was set to
+    /// happen on its own.
+    ///
+    /// A section cut loose has nowhere agreed to publish TO, and the scheduled
+    /// run has no one to ask, so it would silently create a website nobody
+    /// named while the address students actually read stopped updating. The
+    /// same shape as renaming a course, which turns the schedule off and says
+    /// so for the same reason.
+    static let rolloverTurnedOffTheScheduledPublish: String =
+        "This section was set to publish on its own. Starting a new website turned that off — "
+        + "set it again from the section's menu once you have published the new website for the "
+        + "first time."
+
+    /// When turning that scheduled publish off did NOT work.
+    ///
+    /// The dangerous state, and so the one that must not be described by the
+    /// sentence above. A publish still set to run has nobody to ask what the
+    /// new website should be called, so it would go ahead and make one — the
+    /// exact outcome turning it off exists to prevent. Renaming a course says
+    /// the same thing for the same reason.
+    static let rolloverCouldNotTurnOffTheScheduledPublish: String =
+        "This section was also set to publish on its own, and Plantoir could not turn that off. "
+        + "It may still try to publish, and it has no way to ask what the new website should be "
+        + "called — turn it off from the section's menu."
+
     /// There is nothing on the list at all.
     ///
     /// "No PAGES", not "nothing", and the distinction is load-bearing. The old

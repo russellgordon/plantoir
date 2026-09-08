@@ -255,9 +255,25 @@
       },
       {
         "arguments" : {
-
+          "rollover" : "yes"
         },
         "phrasing" : "roll this section over to a new year",
+        "tool" : "re_date_classes"
+      },
+      {
+        "arguments" : {
+          "rollover" : "yes",
+          "website" : "new"
+        },
+        "phrasing" : "roll this section over onto a new website",
+        "tool" : "re_date_classes"
+      },
+      {
+        "arguments" : {
+          "rollover" : "yes",
+          "website" : "same"
+        },
+        "phrasing" : "roll this section over, keeping the same website",
         "tool" : "re_date_classes"
       }
     ],
@@ -479,6 +495,37 @@
   },
   "scenarios" : {
     "cases" : [
+      {
+        "expectTranscriptContains" : [
+          "tool(re_date_classes): wording.rolloverWebsiteQuestion",
+          "tool(re_date_classes): wording.rolloverWebsiteNotDecided"
+        ],
+        "given" : {
+          "pending" : "re_date_classes",
+          "saying" : [
+            "roll this section over to a new year"
+          ]
+        },
+        "name" : "a rollover asks about the website and changes none of it",
+        "when" : "approve",
+        "why" : "The question has to reach the line a teacher READS. It was written into the reply's detail for a while, which the mac never surfaces for a write — so the feature was invisible in the app and worked over MCP alone, behind a green suite. Asserting it in the transcript is what makes that impossible to repeat. The second line matters as much: the re-dating has already happened by the time the question appears, so a teacher who does not answer must be told plainly that the website was NOT changed, or the feature quietly recreates the defect it was built to fix."
+      },
+      {
+        "expectTranscriptContains" : [
+          "tool(re_date_classes): wording.rolloverWebsiteQuestion",
+          "tool(re_date_classes): wording.rolloverIsOnANewWebsite"
+        ],
+        "given" : {
+          "pending" : "re_date_classes",
+          "saying" : [
+            "roll this section over to a new year",
+            "roll this section over onto a new website"
+          ]
+        },
+        "name" : "answering the website question on a second turn still cuts the section loose",
+        "when" : "approve",
+        "why" : "The answer is the SECOND turn, and by then the pages are already on their dates — so the re-date plan changes nothing, and an early return on that made the whole answer a no-op: the reply talked about dates, never mentioned the website, and left the section pinned to last year's, behind an offer that looked like it had worked. Nothing exercised two turns in a row, which is why it survived. Both turns go through the plan card here, because asking before changing is ON unless a teacher turns it off."
+      },
       {
         "expectEvents" : [
           "stopPreview.begins",
@@ -1589,7 +1636,7 @@
       },
       {
         "function" : {
-          "description" : "TEACHERS SAY: \"re-date my classes\", \"roll this section over to a new year\", \"put my classes on this year's dates\". Re-date every class in a section onto the class dates on file, by POSITION — the first class takes the first date — and move the pages each class uses onto that class's day with it. Pages this section's Key Links points at move to the first day of class. Curriculum pages are left alone, because Plantoir dates those itself on every build.",
+          "description" : "TEACHERS SAY: \"re-date my classes\", \"roll this section over to a new year\", \"put my classes on this year's dates\". Re-date every class in a section onto the class dates on file, by POSITION — the first class takes the first date — and move the pages each class uses onto that class's day with it. Pages this section's Key Links points at move to the first day of class. Curriculum pages are left alone, because Plantoir dates those itself on every build. Set `website` when the teacher is rolling a section over to a NEW YEAR and has said which website they want: \"new\" starts a fresh one, so publishing no longer replaces last year's site, and \"same\" keeps last year's address. Ask them first — never choose for them, and leave it out for an ordinary re-dating.",
           "name" : "re_date_classes",
           "parameters" : {
             "properties" : {
@@ -1600,6 +1647,10 @@
               "section" : {
                 "description" : "The section number, for example 1.",
                 "type" : "integer"
+              },
+              "website" : {
+                "description" : "Either \"new\" or \"same\", when a teacher rolling this section over to a new year has said which website they want. Leave empty otherwise.",
+                "type" : "string"
               }
             },
             "required" : [
