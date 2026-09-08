@@ -53,7 +53,14 @@ final class AssistCurriculumMentionsTests: XCTestCase {
             mcpNames.insert(tool.name)
         }
 
+        // The MCP-only tools, and WHY each is not on the local list. The
+        // curriculum three are a judgement about meaning; `list_courses` is
+        // simply never needed there, because the window is scoped to one
+        // section and `AssistAgent.systemPrompt` already names the course —
+        // while a Claude Code session is handed a FOLDER and has no other way
+        // to find out what is in it.
         let added: Set<String> = [
+            "list_courses",
             "list_curriculum_expectations", "plan_curriculum_mentions", "add_curriculum_mentions",
         ]
         for name in added {

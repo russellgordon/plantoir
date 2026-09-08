@@ -5,6 +5,20 @@
         "arguments" : {
 
         },
+        "phrasing" : "what courses do i have?",
+        "tool" : "list_courses"
+      },
+      {
+        "arguments" : {
+
+        },
+        "phrasing" : "list my courses",
+        "tool" : "list_courses"
+      },
+      {
+        "arguments" : {
+
+        },
         "phrasing" : "what would students see in this section right now?",
         "tool" : "check_section"
       },
@@ -627,6 +641,7 @@
       "add_next_class"
     ],
     "mcpOnly" : [
+      "list_courses",
       "list_curriculum_expectations",
       "plan_curriculum_mentions",
       "add_curriculum_mentions"
@@ -1606,6 +1621,19 @@
               "course",
               "section"
             ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "TEACHERS SAY: \"what courses do I have?\", \"list my courses\". List the courses in this working folder: the code, the name, which sections each one has, and where each publishes to. Call this first when a teacher mentions a course and you are not certain of its exact code — guessing a code reaches the wrong course silently.",
+          "name" : "list_courses",
+          "parameters" : {
+            "properties" : {
+
+            },
             "type" : "object"
           }
         },

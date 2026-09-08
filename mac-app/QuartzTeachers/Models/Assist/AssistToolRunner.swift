@@ -247,6 +247,8 @@ final class AssistToolRunner {
             return await reDateClasses(arguments)
         case "add_next_class":
             return addNextClass(arguments)
+        case "list_courses":
+            return listCourses()
         case "list_curriculum_expectations":
             return listCurriculumExpectations(arguments)
         case "plan_curriculum_mentions":
@@ -2244,6 +2246,47 @@ final class AssistToolRunner {
                     + "deploy."
             return AssistToolOutcome.wrote(summary, detail: detail)
         }
+    }
+
+    /// Every course in this working folder, with what a caller needs to pick
+    /// one: the code to pass back, the name a teacher would recognise it by,
+    /// the sections it has, and where it publishes.
+    ///
+    /// **Sections and destination are here because leaving them out costs a
+    /// round trip each.** A caller that knows only codes must call
+    /// `check_section` to find out whether section 2 exists, and cannot warn a
+    /// teacher that the course they just asked to publish goes somewhere they
+    /// did not expect. Windows' version answers the same three things, so a
+    /// Claude Code session sees the same shape on either platform.
+    private func listCourses() -> AssistToolOutcome {
+        let courses: [Course] = workspace.courses
+        guard courses.isEmpty == false else {
+            return AssistToolOutcome.read(
+                AssistWording.noCoursesYet, detail: AssistWording.noCoursesYet
+            )
+        }
+
+        var lines: [String] = []
+        for course in courses {
+            var sections: [String] = []
+            for number in course.sectionNumbers {
+                sections.append(String(number))
+            }
+            let sectionList: String = sections.isEmpty
+                ? "none yet"
+                : sections.joined(separator: ", ")
+            lines.append(
+                "\(course.code) — \(course.configuration.courseName)\n"
+                + "  sections: \(sectionList)\n"
+                + "  publishes to: \(DeployCommand.destinationDescription(for: course.configuration))"
+            )
+        }
+
+        let said: String = lines.joined(separator: "\n")
+        let summary: String = courses.count == 1
+            ? "There is 1 course in this working folder."
+            : "There are \(courses.count) courses in this working folder."
+        return AssistToolOutcome.read(summary, detail: said, showingTheTeacher: said)
     }
 
     private struct PlannedReDate {

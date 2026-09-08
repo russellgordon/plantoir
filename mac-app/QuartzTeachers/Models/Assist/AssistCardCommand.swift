@@ -249,6 +249,18 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// simply goes to the model — but it goes to the model on a shape that was
     /// put here precisely because the model gets it wrong.
     private static let fixedShapes: [(String, AssistCardCommand)] = [
+        // The app reaches `list_courses` too, even though the tool is MCP-only.
+        // MCP-only means the local MODEL is not shown it — which is what keeps
+        // routing accuracy intact — and says nothing about whether a teacher
+        // can ask for it. A fixed phrasing is matched in code and never reaches
+        // the model, so this costs the router nothing and still answers a
+        // teacher who is looking at one section and wants to know what else is
+        // in the folder.
+        ("what courses do i have?",
+         AssistCardCommand(toolName: "list_courses", arguments: [:])),
+        ("list my courses",
+         AssistCardCommand(toolName: "list_courses", arguments: [:])),
+
         ("what would students see in this section right now?",
          AssistCardCommand(toolName: "check_section", arguments: [:])),
 
