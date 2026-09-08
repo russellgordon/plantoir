@@ -1461,7 +1461,7 @@ to run in the background.
       real `CredentialRequests`, is the half that would catch a request added
       here and written down nowhere.
     - `app-rules.json` → `publishedFreshness.whenShown` (9) / `whenRecorded`
-      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/30 — the NAMES
+      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/32 — the NAMES
       and ARGUMENTS, not the descriptions, which `Briefly()` rewrites here for
       measured reasons); `course-management.json` → `courseCode.renameEffects`
       (6); `shared-rules.json` → `buildOutputLocation.windowsLocation.buildsRoot`
@@ -2015,7 +2015,7 @@ to run in the background.
     first". Those are the two cases that reach the placeholder, by name. The
     numbers above hold.
 
-41. **Your MCP server serves 37 tools and the mac's serves 30 — and TWO
+41. **Your MCP server serves 37 tools and the mac's serves 32 — and TWO
     things now fall to you: a rollover that publishes over last year's
     website (DECIDED 2026-09-08 — build it, do not re-open it), and seventeen
     measured phrasings you do not have.**
@@ -2224,7 +2224,27 @@ to run in the background.
     it says so in the PLAN as well as afterwards, where a teacher can still say
     no.
 
-    **One number moved:** the mac's MCP surface is 30 (22 shared + 8 MCP-only),
+    **`explain_publishing` and `back_up_course` completed the set**
+    (`GUI-IMPROVEMENTS.md` row 451), and with them **all six tools this sorting
+    judged the mac should have are built**. Two divergences to weigh against
+    your own: your `Briefing.AlreadyExplained` persists per FOLDER, so a teacher
+    is told once ever, while the mac's lasts one conversation — the reasoning is
+    that a session cannot repeat itself after it has ended, and a session a week
+    later is talking to somebody who may have forgotten, so writing a file to
+    suppress a sentence is a bigger promise than the problem needs. Neither is
+    obviously right. And the mac's `back_up_course` has no plan twin, which
+    yours does not need either: it has a side effect, so it is not a read, but
+    "shall I plan to take a copy?" is a card with no decision in it.
+
+    **Three more card phrasings will make your suite red** — "what does
+    publishing mean?", "what is the difference between publishing and
+    deploying?", and "back up this course".
+
+    **What this closes:** the twelve-tool gap is now the three you keep by
+    design (`read_timetable`, `list_recent_changes`, `sync_page_dates`) plus the
+    `plan_` twins that travel with their writes.
+
+    **One number moved:** the mac's MCP surface is 32 (22 shared + 10 MCP-only),
     not 25. A pinned count made that a decision rather than drift — the test
     failed the moment the tool was added, which is exactly what it is for.
 
@@ -3228,11 +3248,11 @@ for behaviour only your side has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 30-tool MCP one. (It said 23; corrected
+the 13-tool local surface and the 32-tool MCP one. (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
 serves 37, and the twelve it has beyond the contract are named in
 `AssistSurfaceContractTests` and in `MAC-HANDOFF.md`.) The mac's own test has
-pinned that sum for longer than the prose said so; it is 22 + 8 MCP-only = 30 since `list_courses`, the `add_classes` pair and the `make_room_for_classes` pair landed. What the two
+pinned that sum for longer than the prose said so; it is 22 + 10 MCP-only = 32 since all six of the tools sorted as the mac's landed on 2026-09-08. What the two
 surfaces do and do not share is item 41 and "The two MCP surfaces are not the
 same product" below.
 

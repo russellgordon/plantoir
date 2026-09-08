@@ -680,9 +680,26 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   nothing was going to tell either side** (found 2026-09-06 by an audit asking
   whether the parity list was COMPLETE, not whether it was correct).
   `plantoir-mcp.exe` declares **37** tools; the mac's `AssistToolSurface`
-  serves **30** (22 plus eight MCP-only, five of them built on 2026-09-08 out
+  serves **32** (22 plus ten MCP-only, seven of them built on 2026-09-08 out
   of this very list). So the same question asked of Claude
   Code gets a different toolbox depending on the machine.
+
+  **✅ ALL SIX BUILT 2026-09-08.** Russell asked for the whole product bucket
+  ("build all six tools"), and each one is done with its own tests and write-up:
+  `list_courses` (row 448), the `add_classes` pair (449), the
+  `make_room_for_classes` pair (450), and `explain_publishing` with
+  `back_up_course` (451). **What is left of the twelve-tool gap is what this
+  sorting said should be left**: `read_timetable` and `list_recent_changes`,
+  which are Windows-shaped by design, `sync_page_dates`, which needs a
+  teacher's problem first, and the `plan_` twins that travel with their writes.
+  The mac's MCP surface is 32 (22 shared plus ten MCP-only).
+
+  **The shape Russell set for all six**, which is the part worth carrying
+  forward: an MCP tool for Claude Code, plus a card phrasing so the app can
+  reach it, with the phrasing offering everything the tool does. MCP-only
+  constrains which client the MODEL is shown a tool on; it says nothing about
+  what a teacher can ask for. A fixed phrasing is matched in code and never
+  reaches a model, so it costs the router nothing.
 
   **✅ Sorted 2026-09-06** on `issue/mcp-tool-surface-divergence` — the twelve
   are gone through one at a time below, with the reasoning. **What is still
@@ -914,7 +931,10 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      it only through a sentence naming one specific page. If it is built,
      **MCP-only** — a person is reading every step there. Never the local list.
 
-  5. **`back_up_course`** — MCP-only, and mechanically the smallest of all: it
+  5. **`back_up_course`** — ✅ **BUILT 2026-09-08** (`GUI-IMPROVEMENTS.md` row
+     451). The original entry follows.
+
+     MCP-only, and mechanically the smallest of all: it
      wraps `CourseArchiver.backUpCourse`, which exists. A LOCAL tool would be
      redundant, because `AssistToolRunner.backUpOnceForThisConversation`
      already saves a copy before the assistant's first write. Windows' own
@@ -926,7 +946,14 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      builds one `AssistToolRunner` for the process, so the automatic copy fires
      once per server session and only ahead of a tool write.
 
-  6. **`explain_publishing`** — MCP-only. The publish-versus-deploy distinction
+  6. **`explain_publishing`** — ✅ **BUILT 2026-09-08** (`GUI-IMPROVEMENTS.md`
+     row 451), as a TOOL rather than the cheaper `instructions` field this entry
+     suggested trying first: a paragraph sent at startup is read once by a
+     session that may not need it, while a tool is there at the moment the
+     question arises and can say "already explained" the second time. The
+     original entry follows.
+
+     MCP-only. The publish-versus-deploy distinction
      reaches the local model through `AssistAgent.systemPrompt`, whose own
      comment says the paragraph "is not padding … saying plainly that they are
      different is what stops 'publish tomorrow's class' turning into a live

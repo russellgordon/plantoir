@@ -247,6 +247,10 @@ final class AssistToolRunner {
             return await reDateClasses(arguments)
         case "add_next_class":
             return addNextClass(arguments)
+        case "explain_publishing":
+            return explainPublishing(arguments)
+        case "back_up_course":
+            return backUpCourse(arguments)
         case "plan_make_room_for_classes":
             return planMakeRoomForClasses(arguments)
         case "make_room_for_classes":
@@ -2253,6 +2257,72 @@ final class AssistToolRunner {
             detail += "\n\nNothing was published or hidden, so students see no change until you "
                     + "deploy."
             return AssistToolOutcome.wrote(summary, detail: detail)
+        }
+    }
+
+    /// Sections this conversation has already had the explanation for.
+    ///
+    /// **Per conversation, not per folder — a deliberate divergence.** Windows
+    /// remembers it on disk (`Briefing.AlreadyExplained`), so a teacher is told
+    /// once ever. Here it lasts as long as the runner: one assistant window, or
+    /// one `--mcp-stdio` session. The thing being prevented is a session that
+    /// re-explains before every action, and a session cannot repeat itself
+    /// after it has ended — while a mac session that DOES repeat it a week
+    /// later is talking to a teacher who may well have forgotten. Writing a
+    /// file to suppress a sentence is a bigger promise than the problem needs.
+    private var sectionsToldWhatPublishingMeans: Set<String> = []
+
+    /// What publishing and deploying mean, said once per section.
+    private func explainPublishing(_ arguments: [String: Any]) -> AssistToolOutcome {
+        let found: Result<Located, AssistToolRefusal> = locate(arguments)
+        guard case .success(let located) = found else {
+            return AssistToolOutcome.couldNotRead(refusal(from: found).message)
+        }
+        let key: String = "\(located.course.code)/\(located.sectionNumber)"
+        if sectionsToldWhatPublishingMeans.contains(key) {
+            let already: String = AssistWording.publishingAlreadyExplained(
+                course: located.course.code, section: String(located.sectionNumber)
+            )
+            return AssistToolOutcome.read(already, detail: already)
+        }
+        sectionsToldWhatPublishingMeans.insert(key)
+        return AssistToolOutcome.read(
+            AssistWording.whatPublishingMeans,
+            detail: AssistWording.whatPublishingMeans,
+            showingTheTeacher: AssistWording.whatPublishingMeans
+        )
+    }
+
+    /// A full copy of one course.
+    private func backUpCourse(_ arguments: [String: Any]) -> AssistToolOutcome {
+        let asked: String = text("course", in: arguments)
+        // Matched the way every other tool here matches a course code, so a
+        // teacher typing "ics3u" reaches the same course either way.
+        var found: Course? = nil
+        for candidate in workspace.courses
+        where candidate.code.lowercased() == asked.lowercased() && found == nil {
+            found = candidate
+        }
+        guard let course = found else {
+            return AssistToolOutcome.couldNotRead(
+                "There is no course called “\(asked)” in this working folder."
+            )
+        }
+        guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
+            return AssistToolOutcome.couldNotRead("No working folder is open.")
+        }
+        do {
+            let backupURL: URL = try CourseArchiver.backUpCourse(
+                course, coursesDirectoryURL: coursesDirectoryURL
+            )
+            let said: String = AssistWording.backedUpCourse(
+                course: course.code, to: backupURL.lastPathComponent
+            )
+            return AssistToolOutcome.wrote(said, detail: said)
+        } catch {
+            return AssistToolOutcome.refused(
+                "\(course.code) could not be backed up: \(error.localizedDescription)"
+            )
         }
     }
 

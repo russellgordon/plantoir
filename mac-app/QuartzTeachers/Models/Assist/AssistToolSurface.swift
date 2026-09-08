@@ -158,6 +158,8 @@ extension AssistToolRunner {
         addClassesTool,
         planMakeRoomForClassesTool,
         makeRoomForClassesTool,
+        explainPublishingTool,
+        backUpCourseTool,
         listCurriculumExpectationsTool,
         planCurriculumMentionsTool,
         addCurriculumMentionsTool,
@@ -759,6 +761,49 @@ extension AssistToolRunner {
             "howMany": howManyRoomHelp,
         ],
         required: ["course", "section", "unit", "atDay"],
+        readOnly: false,
+        needsApproval: false
+    )
+
+    /// The distinction the local model is told and Claude Code was not.
+    private static let explainPublishingTool: AssistToolDefinition = AssistToolDefinition(
+        name: "explain_publishing",
+        description: "Call this FIRST, before doing anything else with a section. It returns a short "
+                   + "explanation of what publishing and deploying mean in Plantoir — say it to the "
+                   + "teacher word for word. It answers once per section: after that it says so, and "
+                   + "you should get straight on with what was asked rather than repeating it.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+        ],
+        required: ["course", "section"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    /// A copy of a whole course, before somebody edits it by hand.
+    ///
+    /// **`readOnly: false` and NO plan twin, like `rebuild_preview`.** It has a
+    /// side effect, so it is not read-only — but there is nothing to plan: a
+    /// backup takes nothing away and changes nothing a teacher would want to
+    /// approve. `AssistAgent` checks whether a twin exists before offering a
+    /// plan and executes directly when there is none, so this is a supported
+    /// shape rather than a gap.
+    ///
+    /// It exists even though `backUpOnceForThisConversation` already saves a
+    /// copy before the assistant's first write, and Windows' own description
+    /// says why: the case it does not cover is "edits you make DIRECTLY rather
+    /// than through these tools" — a Claude Code session about to change
+    /// Markdown with its own file tools, which no automatic backup sees.
+    private static let backUpCourseTool: AssistToolDefinition = AssistToolDefinition(
+        name: "back_up_course",
+        description: "Make a full copy of one course, which the teacher can restore from inside "
+                   + "Plantoir. Do this before any bulk editing of a course's files — INCLUDING "
+                   + "edits you make directly rather than through these tools, which nothing else "
+                   + "backs up. Course folders are not in version control, so a copy is the only "
+                   + "way back.",
+        parameters: ["course": courseHelp],
+        required: ["course"],
         readOnly: false,
         needsApproval: false
     )

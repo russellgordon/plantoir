@@ -75,6 +75,13 @@ enum AssistContract {
             "cancelled": AssistWording.cancelled,
             "deployWasCancelled": AssistWording.deployWasCancelled,
             "noCoursesYet": AssistWording.noCoursesYet,
+            "whatPublishingMeans": AssistWording.whatPublishingMeans,
+            "publishingAlreadyExplained": AssistWording.publishingAlreadyExplained(
+                course: course, section: section
+            ),
+            "backedUpCourse": AssistWording.backedUpCourse(
+                course: course, to: "ICS3U_backup_2026-09-08_1900.zip"
+            ),
             "planWasCancelled": AssistWording.planWasCancelled,
             "deployed": AssistWording.deployed(course: course, section: section),
             "couldNotBuildBeforeDeploying": AssistWording.couldNotBuildBeforeDeploying(
