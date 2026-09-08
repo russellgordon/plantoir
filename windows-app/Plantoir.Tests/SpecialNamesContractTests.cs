@@ -183,7 +183,12 @@ public class SpecialNamesContractTests
     /// (<c>discover_shared_items</c>, and the drop-and-skip pass over
     /// <c>shared_files</c> / <c>per_section_files</c>) -- so a teacher who
     /// removed a file met a permanent, silent rule that no sentence anywhere
-    /// warned them about. An edit that quietly narrows it back fails here.
+    /// warned them about.
+    ///
+    /// <para>Honest about its reach: this guards the PROMISE clause only. An
+    /// edit dropping "and files" from the first sentence fails here; one that
+    /// narrowed the second sentence back to folders would not, and no test
+    /// would catch it.</para>
     /// </summary>
     [Fact]
     public void TheContentStructureTipCoversFilesAsWellAsFolders()

@@ -841,6 +841,51 @@ If this is ever revisited, the thing to find out first is whether BuildKit can
 be given a scoped cache per build context — a filtered prune, not a bigger
 hammer.
 
+## An exclusion is escaped by re-creating the folder with different capitalisation
+
+Noted 2026-09-07 by adversarial review, while pinning the Course Settings tip
+sentence (`GUI-IMPROVEMENTS.md` row 447). Pre-existing on both platforms and
+not introduced by that change — listed here so it is not later mistaken for
+one. It is a defect in the CODE, not in the sentence: the sentence describes
+the intended rule.
+
+`scripts/build_site.py` compares `excluded_items` names two different ways, in
+one file:
+
+- **Raw, case-SENSITIVE**, in the path that actually runs on every build — the
+  `excluded_shared` / `excluded_per_section` sets, the drop pass
+  (`if name in names`) and the discovery filter (`if f in excluded_shared`).
+- **Lowercased on both sides**, in `_dropping_excluded_items`, the give-up path
+  for the same reconciliation.
+
+So a teacher who removes `Old Tests` in Course Settings, deletes it in
+Obsidian, and later makes `old tests` gets it discovered, appended to
+`shared_folders` and published — the exact outcome
+`shared-rules.json` → `specialNames.contentStructureTip` now promises to a
+teacher cannot happen ("it stays off your site, even if you make it again in
+Obsidian"). Both apps agree with the case-sensitive half:
+`CourseConfiguration.cs` uses `StringComparer.Ordinal`, and the mac's
+`exclude`/`reinclude` match exactly too.
+
+**Why it was left.** Changing how exclusion matches is a build-behaviour
+change, not a wording one, and it wants its own piece and its own gate: it
+touches the shared Python that both platforms run, and the two apps' `exclude`
+/ `reinclude` have to agree with it or the app and the build disagree about
+what is excluded. Narrowing the teacher-facing sentence to match the bug was
+considered and rejected — a promise trimmed to fit a defect is how the defect
+becomes permanent.
+
+**What the fix looks like**, so picking it up is cheap: case-fold on BOTH
+sides at every comparison (the three in the live path and the one in
+`_dropping_excluded_items`), with a contract case under `specialNames` saying
+the matching rule is case-insensitive, and matching changes to
+`CourseConfiguration` on both platforms so `reinclude` finds a name whose case
+has drifted. Note that `gradedFolders.choices.walk.skippedMatching` already
+records the opposite decision for a DIFFERENT list ("EXACT, case included"),
+so the two rules want to be written down side by side rather than assumed to
+match.
+
+
 ## ✅ Done — Publish stops an active preview itself
 
 Deferred 2026-08-11 as a design problem (the tricky moment being a
@@ -945,5 +990,4 @@ entry point checked for `--verify` while every doc taught
 `--verify-deploy` — a plausible typo would have fallen through into
 triggering a real deploy instead of a read-only check). No `contracts/` or
 handoff entry — release tooling, not app behavior either platform's
-teacher-facing suite covers.
-
+teacher-facing suite covers.

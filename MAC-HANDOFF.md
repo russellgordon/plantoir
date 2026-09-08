@@ -103,6 +103,30 @@ would demand this be one of the seven flyout sentences; and it must stay OUT of
 any "longest sentence" assertion, since it is a caption that wraps and is far
 longer than the flyout sentence such a test exists to name.
 
+**A fourth test exists and is worth copying in spirit if the mac has anywhere
+to put it.** Opting out of the `reason` sweep meant opting out of the only
+check that a sentence is actually SHOWN — delete the line that adds the caption
+and all 1206 unit tests stay green while it vanishes from the product. So
+`CourseSettingsCaptionUiTests` (opt-in `[UiFact]`, gates nothing) reads the
+Course Settings form through UI Automation and asserts the contract's sentence
+is among the texts a teacher can see. **Measured rather than assumed**: with
+the caption line commented out and the app rebuilt, it fails; restored and
+rebuilt, it passes. The mac has no equivalent harness, so this is offered as
+awareness rather than as a debt.
+
+**One gap between the sentence and the code, found reviewing it and left
+deliberately unfixed** — it is in SHARED Python, so it is the mac's problem
+too. "even if you make it again in Obsidian" holds only when the name is remade
+with the same capitalisation: the live preflight path compares raw strings
+while `_dropping_excluded_items` lowercases both sides, so `Old Tests` removed
+and remade as `old tests` is discovered, appended and published. The sentence
+describes the intended rule and the code has the defect; narrowing the promise
+to fit it was rejected. Written up in `TODO.md` ("An exclusion is escaped by
+re-creating the folder with different capitalisation") and indexed as item 41
+in `WINDOWS-HANDOFF.md`. Whoever takes it owes a contract case, matching
+changes to `CourseConfiguration` on both platforms, and a `verify.sh` run from
+the mac — which is why it was not done inside a wording piece.
+
 **One proposed 2026-09-07, and nothing goes red for it: the New Course
 wizard's affirmative button reads "Create Course" on both platforms** —
 `NewCourseDialog.cs` on Windows, `NewCourseWizardView.swift:520` on the mac —
