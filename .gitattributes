@@ -1,0 +1,65 @@
+# Line endings, so an agent's editor cannot decide them.
+#
+# Added 2026-09-08 after a session committed four files as CRLF with stray
+# lone CRs in them. That combination is the dangerous one: git's automatic
+# text/binary detection treats a lone CR as a sign of a binary file and then
+# skips end-of-line normalisation entirely, so the CRLFs went into the index
+# verbatim. The result was 7,672 insertions for 264 lines of work, `git blame`
+# on WINDOWS-HANDOFF.md attributing all 6,655 lines to one commit, and a diff
+# no reviewer could read. It was caught by review; nothing enforced it.
+#
+# This repository is LF: measured on the day this file was written,
+# `git ls-files --eol` reported 13,091 tracked files as i/lf, 138 detected as
+# binary, and exactly two not LF - both vendored, both excluded below.
+
+# The default. Git decides text from binary and stores text as LF.
+* text=auto
+
+# Explicitly text, which is the part that matters. An explicit `text` skips
+# the content heuristic, so a file that has picked up a stray CR is still
+# normalised instead of being mistaken for binary. `text=auto` alone would NOT
+# have prevented the failure above.
+#
+# What this file does NOT do, measured rather than assumed: git strips only the
+# CR directly before each newline, so a file written as CR CR LF still lands in
+# the index with one CR per line -- which is the exact shape that caused the
+# damage. `.githooks/pre-commit` checks the staged blobs for that and says so.
+# This file closes ordinary CRLF drift; the hook closes the rest, and hooks
+# reach a clone only after `git config core.hooksPath .githooks`.
+#
+# No `eol=` on any of these on purpose: the working tree keeps whatever the
+# platform gives it (CRLF on Windows via core.autocrlf), so adding this file
+# changes nothing anyone has checked out. Only what reaches the index is fixed.
+*.md      text
+*.txt     text
+*.json    text
+*.yml     text
+*.yaml    text
+*.cs      text
+*.csproj  text
+*.sln     text
+*.xaml    text
+*.swift   text
+*.py      text
+*.sh      text
+*.ps1     text
+*.bat     text
+*.cmd     text
+*.js      text
+*.ts      text
+*.css     text
+*.scss    text
+*.html    text
+
+# Vendored, and kept byte-for-byte as upstream ships it: the only two tracked
+# files that are not LF, one CRLF and one mixed. Normalising them would rewrite
+# a third party's file and produce a 2,150-line diff that says nothing.
+#
+# Named one by one, NOT as `.obsidian/**`. The wider pattern was written first
+# and checked before committing: it also caught app.json, appearance.json,
+# core-plugins.json and workspace.json, which ARE LF in the index and merely
+# CRLF in a Windows working tree - and `-text` on those makes git compare the
+# two literally, so `git add --renormalize` staged their CRLF. The exclusion
+# would have committed the exact damage this file exists to prevent.
+support/obsidian_defaults/.obsidian/themes/Minimal/manifest.json -text
+support/obsidian_defaults/.obsidian/themes/Minimal/theme.css     -text
