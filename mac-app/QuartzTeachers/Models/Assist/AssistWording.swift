@@ -252,9 +252,15 @@ nonisolated enum AssistWording {
         + "after a change so the teacher can look it over first, which is the safer order."
 
     /// Said instead when this section has already been told.
+    ///
+    /// **Written for the TEACHER, who is who reads it.** The first draft was
+    /// addressed to a model — "carry on with what the teacher asked rather than
+    /// saying it twice" — and a teacher who typed the phrasing twice read an
+    /// instruction to a robot in their own conversation. A tool result is
+    /// rendered as an ordinary assistant bubble; there is no channel here that
+    /// only a model sees.
     static func publishingAlreadyExplained(course: String, section: String) -> String {
-        return "\(course) Section \(section) has had this explained already — carry on with what "
-             + "the teacher asked rather than saying it twice."
+        return "I explained that for \(course) Section \(section) earlier in this conversation."
     }
 
     // MARK: - Backing a course up

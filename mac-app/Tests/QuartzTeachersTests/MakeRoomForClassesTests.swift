@@ -165,6 +165,64 @@ final class MakeRoomForClassesTests: XCTestCase {
         )
     }
 
+
+    /// A timetable that has run out is REFUSED, not reported as success.
+    ///
+    /// The engine reports this by returning a plan that adds nothing rather
+    /// than by throwing, so the apply path answered "Nothing needed moving."
+    /// under a summary saying room had been made — and threw away the one
+    /// actionable sentence, which names how many more dates are needed.
+    @MainActor
+    func testItRefusesWhenTheTimetableHasRunOut() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try seedAUnit(in: made.course)
+
+        // Far more classes than there are class dates left.
+        let said: String = await run(
+            made.runner, "make_room_for_classes",
+            ["course": "ICS3U", "section": 1, "unit": 1, "atDay": 2, "howMany": 50]
+        )
+
+        XCTAssertFalse(
+            said.lowercased().contains("nothing needed moving"),
+            "That reads as success over a summary saying room was made: \(said)"
+        )
+        XCTAssertTrue(
+            said.lowercased().contains("class dates") || said.lowercased().contains("timetable"),
+            "It must say what is actually wrong, and what to do: \(said)"
+        )
+        XCTAssertEqual(try pageNames(in: made.course).count, 2, "Nothing may have been written.")
+    }
+
+    /// Moving later classes counts as "other classes moved", even when nothing
+    /// inside the unit was renamed.
+    ///
+    /// Making room in a SHORT unit renames nothing in it and re-dates every
+    /// class of every later unit — so a warning keyed on renames alone stayed
+    /// silent in exactly the case that moves a teacher's whole year.
+    @MainActor
+    func testItWarnsWhenLaterUNITSMoveEvenWithNoRenames() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try seedAUnit(in: made.course)
+        // A second unit, so there is something after the one being widened.
+        try AssistFixture.write(
+            page: "Unit 2, Day 1", publish: "false", date: "2026-09-15", body: "three", in: made.course
+        )
+
+        // The day AFTER the last day of unit 1: nothing in unit 1 is renamed.
+        let said: String = await run(
+            made.runner, "make_room_for_classes",
+            ["course": "ICS3U", "section": 1, "unit": 1, "atDay": 3]
+        )
+
+        XCTAssertTrue(
+            said.contains("Undo that"),
+            "Later classes moved, so the teacher must be told the undo will not help: \(said)"
+        )
+    }
+
     // MARK: - Helpers
 
     @MainActor

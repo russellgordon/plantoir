@@ -476,6 +476,17 @@ struct ClassInsertionPlan {
         return added.isEmpty && renames.isEmpty && moves.isEmpty
     }
 
+    /// Whether anything OTHER than the new pages is disturbed.
+    ///
+    /// **Renames and date moves are equally irreversible, and only one of them
+    /// is obvious.** A rename is inside the target unit; a move re-dates every
+    /// class of every LATER unit. Making room in a short unit can therefore
+    /// rename nothing and move a teacher's whole year — so a warning keyed on
+    /// renames alone stays silent in exactly the case that hurts most.
+    var movesAnythingElse: Bool {
+        return renames.isEmpty == false || moves.isEmpty == false
+    }
+
     /// The proposal, as a teacher would hear it.
     var description: String {
         var lines: [String] = []

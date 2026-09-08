@@ -116,7 +116,9 @@ final class AssistToolRunner {
     }
 
     /// The tools the MCP client sees: everything that exists, plus the ones
-    /// that ask for judgement a small local model has no business making.
+    /// it alone is offered — some asking for judgement a small local model has
+    /// no business making, the rest simply never needed by a window scoped to
+    /// one section, or already reachable there through a fixed phrasing.
     var mcpDefinitions: [AssistToolDefinition] {
         return AssistToolRunner.mcpTools
     }
@@ -2311,9 +2313,18 @@ final class AssistToolRunner {
         guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
             return AssistToolOutcome.couldNotRead("No working folder is open.")
         }
+        // **Attributed to the ASSISTANT, which takes a `section`.** Left to
+        // default it is recorded as the teacher's, so the Backups list says
+        // "made by you" about a copy they never made — and, worse, `pruneBackups`
+        // skips anything that is not the assistant's, so a session told to back
+        // up "before any bulk editing" would write a whole-course zip each time
+        // and none of them would ever be cleared. `mostBackupsKept` exists
+        // precisely to stop that.
+        let section: Int = number("section", in: arguments) ?? 1
         do {
             let backupURL: URL = try CourseArchiver.backUpCourse(
-                course, coursesDirectoryURL: coursesDirectoryURL
+                course, coursesDirectoryURL: coursesDirectoryURL,
+                madeBy: .assistant(sectionNumber: section)
             )
             let said: String = AssistWording.backedUpCourse(
                 course: course.code, to: backupURL.lastPathComponent
@@ -2332,24 +2343,20 @@ final class AssistToolRunner {
         case .couldNot(let message):
             return AssistToolOutcome.couldNotRead(message)
         case .planned(let asked):
-            var lines: [String] = []
-            let word: String = asked.located.course.configuration.unitWord
-            lines.append(
-                "\(asked.count) new class \(asked.count == 1 ? "page" : "pages") would be added at "
-                + "\(word) \(asked.unit), Day \(asked.atDay)."
-            )
-            lines.append("They start hidden, so nothing changes on the site until you publish them.")
-            if asked.plan.renames.isEmpty == false {
-                lines.append("")
-                lines.append(
-                    "\(asked.plan.renames.count) later "
-                    + "\(asked.plan.renames.count == 1 ? "class moves" : "classes move") along to "
-                    + "make room, and the links that point at them are rewritten to match."
-                )
+            // The ENGINE's own description, not a summary of it. It names
+            // every rename from → to, the link count, every date move and
+            // every problem — which is exactly what this tool's description
+            // promises a teacher will be shown, and a hand-rolled count of
+            // renames delivered none of it. The more dangerous tool was the
+            // one showing less.
+            var lines: [String] = [asked.plan.description]
+            lines.append("")
+            lines.append("The new pages start hidden, so nothing changes on the site until you publish them.")
+            if asked.plan.movesAnythingElse {
                 lines.append("")
                 lines.append(
                     "Because other classes move, “Undo that” will not take this back afterwards — "
-                    + "the backup made first is the way out."
+                    + "the copy made before any of it is in Plantoir's Backups list."
                 )
             }
             return AssistToolOutcome.planned(
@@ -2373,6 +2380,22 @@ final class AssistToolRunner {
         case .couldNot(let message):
             return AssistToolOutcome.couldNotRead(message)
         case .planned(let asked):
+            // **Said BEFORE anything is written, because the engine reports
+            // both of these by returning a plan rather than by throwing.** A
+            // plan that adds nothing satisfies `changesNothing`, so `apply`
+            // answers "Nothing needed moving." and the `wouldNotFit` throw is
+            // never reached — which produced "Made room for 1 class" over a
+            // detail saying nothing moved, with the one actionable sentence
+            // ("add 3 more class dates and ask again") thrown away.
+            if asked.plan.added.isEmpty {
+                let why: String = asked.plan.problems.joined(separator: " ")
+                return AssistToolOutcome.refused(
+                    why.isEmpty
+                        ? "There is nothing to make room for there."
+                        : why
+                )
+            }
+
             let backedUp: Bool = backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
@@ -2389,7 +2412,12 @@ final class AssistToolRunner {
             detail += "\n\nThe new "
                     + (asked.count == 1 ? "page is" : "pages are")
                     + " hidden, so nothing changed on the site yet."
-            if asked.plan.renames.isEmpty == false {
+            // Keyed on renames OR moves. Gating on renames alone missed the
+            // case that hurts most: making room in a short unit renames
+            // nothing inside it and re-dates every class of every LATER unit,
+            // so a teacher's whole year moved and the reply said nothing about
+            // undo at all — while "undo that" answered "nothing to undo".
+            if asked.plan.movesAnythingElse {
                 detail += "\n\nBecause other classes moved, “Undo that” will not take this back. "
                         + "The copy made before any of it is in Plantoir's Backups list. Look the "
                         + "section over in Plantoir before you publish."

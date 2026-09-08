@@ -53,20 +53,22 @@ final class AssistCurriculumMentionsTests: XCTestCase {
             mcpNames.insert(tool.name)
         }
 
-        // The MCP-only tools, and WHY each is not on the local list. The
-        // curriculum three are a judgement about meaning; `list_courses` is
-        // simply never needed there, because the window is scoped to one
-        // section and `AssistAgent.systemPrompt` already names the course —
-        // while a Claude Code session is handed a FOLDER and has no other way
-        // to find out what is in it.
-        // The MCP-only tools, and WHY each is not on the local list. The
-        // curriculum three are a judgement about meaning; `list_courses` is
-        // never needed there, because the window is scoped to one section and
-        // `AssistAgent.systemPrompt` already names the course; and the
-        // `add_classes` pair is a capability the local model reaches ANYWAY
-        // through the "add five more days to Unit 4" phrasing, matched in code
-        // — so publishing its schema would spend routing accuracy to buy the
-        // model something it already has a deterministic route to.
+        // The ten MCP-only tools, and WHY each is off the local list — three
+        // different reasons, which is why this cannot be one sentence.
+        //
+        // * The curriculum three ask for a judgement about MEANING, which a
+        //   large model does well and a 4B does not.
+        // * `list_courses` and `explain_publishing` are never NEEDED there: the
+        //   window is scoped to one section and `AssistAgent.systemPrompt`
+        //   already names the course and explains publishing. A Claude Code
+        //   session is handed a folder and told nothing.
+        // * The `add_classes` and `make_room_for_classes` pairs, and
+        //   `back_up_course`, are capabilities the local model reaches ANYWAY
+        //   through phrasings matched in code — so publishing their schemas
+        //   would spend routing accuracy to buy it a route it already has.
+        //
+        // What they share is only the test that matters: none costs the
+        // thirteen-tool surface the routing figures were measured against.
         let added: Set<String> = [
             "list_courses",
             "plan_add_classes", "add_classes",

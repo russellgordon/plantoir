@@ -299,6 +299,18 @@
     "note" : "Matched in CODE and never sent to the model. Trimmed, case-folded, trailing . and ! removed, then compared for EQUALITY. Measured: the model misrouted five of the eleven suggested phrasings in every trial while filling arguments perfectly, so the shapes with no ambiguity in them do not reach it.",
     "parsed" : [
       {
+        "becauseNotThis" : "The count and the noun disagree, so it is a sentence somebody typed carelessly rather than one of these shapes — and this tool renames pages the teacher's links point at. Guessing which half they meant is exactly what a fixed shape exists to avoid.",
+        "example" : "make room for two classes at Unit 3, Day 4",
+        "fills" : {
+          "atDay" : "<day>",
+          "howMany" : "<count>, as a number — words up to twelve are understood",
+          "unit" : "<unit>"
+        },
+        "notThis" : "make room for two class at Unit 3, Day 4",
+        "shape" : "make room for <count> class|classes at unit <unit>, day <day>",
+        "tool" : "make_room_for_classes"
+      },
+      {
         "becauseNotThis" : "A comma means one PAGE was named, which has a title in it for the model to read out. Only a bare unit number is a whole unit.",
         "example" : "publish unit 5",
         "fills" : {
@@ -677,7 +689,7 @@
       "deploy_section",
       "schedule_deploy"
     ],
-    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is offered to Claude Code on top of everything — three that ask for judgement about meaning, plus listing the working folder's courses and filling out a unit, which the local model reaches through fixed phrasings instead.",
+    "note" : "Three lists, deliberately. `all` is what the runner can execute; `local` is what the small model is SHOWN (the plan twins and remember_timetable are taken off, because the model never has to name a plan and dates it supplies are dates it may have invented); `mcpOnly` is the ten offered to Claude Code on top of everything — three asking for judgement about meaning, the rest either never needed by a model scoped to one section or already reachable by it through a fixed phrasing.",
     "planTwins" : {
       "add_classes" : "plan_add_classes",
       "add_next_class" : "plan_add_next_class",
@@ -1845,10 +1857,15 @@
               "course" : {
                 "description" : "The course code, for example ICS3U.",
                 "type" : "string"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
               }
             },
             "required" : [
-              "course"
+              "course",
+              "section"
             ],
             "type" : "object"
           }
