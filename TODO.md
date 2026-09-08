@@ -845,7 +845,7 @@ mac has never made one. Three options:
   `contracts/` so both platforms say it identically.
 
 Whichever is chosen it needs the same sentence on both sides. Windows' half is
-item 33 in `WINDOWS-HANDOFF.md`.
+item 41 in `WINDOWS-HANDOFF.md`.
 
 ## A folder rename does not follow an angle-bracket Markdown link
 

@@ -1930,49 +1930,32 @@ to run in the background.
     first". Those are the two cases that reach the placeholder, by name. The
     numbers above hold.
 
-41. **Your MCP server serves 37 tools and the mac's serves 25, nobody was
-    going to notice, and FOUR things fall to you — an enumeration test, a
-    rollover that publishes over last year's website, a signature that differs
-    from the mac's under the same name, and seventeen measured phrasings you
-    do not have.**
+41. **Your MCP server serves 37 tools and the mac's serves 25 — and TWO
+    things now fall to you: a rollover that publishes over last year's
+    website, and seventeen measured phrasings you do not have.**
     Found 2026-09-06 by a mac audit asking whether the parity list was
     COMPLETE rather than whether it was correct. Full write-up: "The two MCP
     surfaces are not the same product" below, and the sorting of all twelve
     (which are product, which are Windows-shaped, and why) is in
     `MAC-HANDOFF.md`.
 
+    **It was four, and you had already done two of them before this was
+    written.** The audit ran on a branch cut before
+    `issue/29-windows-contract-case-lists` reached `dev`, so it could not see
+    `AssistSurfaceContractTests` and said the enumeration test did not exist
+    and that no Windows test read `toolSchemas`. Both were wrong by the time
+    they were merged, and are corrected below rather than deleted, because
+    what you built is better than what was going to be asked for and the
+    reason is worth keeping.
+
     **You inherit free:** the sorting itself, and the decision that nine of
     the twelve are either the mac's to build or deliberately not the mac's.
     Nothing you serve is being taken away.
 
-    **You owe four things.**
+    **You owe two things.**
 
-    **One — an enumeration test over your own 37.** Nobody has told you this,
-    which is why it is first. `AssistCases_Tools_MatchesContract`
-    (`ContractTests.cs:497-510`) is a fine test that pins the wrong class: it
-    compares the contract against `AssistAgent.ForTheLocalModel` and
-    `.DeploysToStudents` — the IN-APP assistant — and its `mcpOnly` third
-    compares the contract against a **hardcoded three-name list written inline
-    in the test**. Nothing anywhere reads
-    `Plantoir.Mcp.PlantoirTools`' `[McpServerTool(Name = "…")]` names, and no
-    Windows test reads `toolSchemas` at all (0 hits). So a tool added on your
-    side and put in neither the contract nor the mac passes both suites
-    silently, which is what happened twelve times. The mac proposes an
-    AUTHORED `assist-cases.json` key — `mcpToolNames` — that each side asserts
-    against: you assert your 37 names equal it, the mac asserts its 25 plus a
-    recorded "not served here, and why" list equals it. **It is not written
-    yet, on purpose** — the "and why" half is the sorting, and committing that
-    before Russell has agreed to it would make an unapproved decision the
-    acceptance list. Propose the key from your side if you get there first;
-    authored keys survive `--write-contracts` (`AssistContract.write`
-    overwrites only `generatedCaseKeys`), which is what makes either direction
-    possible. The mac REJECTED the obvious alternative — a mac test that
-    regexes `[McpServerTool(Name = "…")]` straight out of `PlantoirTools.cs` —
-    because an attribute reformatted across two lines makes the regex find
-    FEWER names, and fewer names all of which are accounted for is a **false
-    green**, the one failure mode a drift detector must not have.
-
-    **Two — a rollover publishes over LAST year's website on YOUR side too.**
+    **One of two, still open — a rollover publishes over LAST year's website
+    on YOUR side too.**
     This is a real defect, not a mac gap. `AssistCardCommand.cs:50` matches
     "roll this section over to a new year" in code and routes it to
     `re_date_classes`; `re_date_classes` never calls `ReleaseSite` — only
@@ -1988,22 +1971,8 @@ to run in the background.
     section publishes over last year's website") puts three options to Russell. Whatever is chosen needs the same sentence on
     both platforms, so the wording belongs in `contracts/`.
 
-    **Three — `re_date_classes` has the same NAME and different PARAMETERS on
-    the two servers.** Yours takes `timetable, block, pages, meetings,
-    firstDay, startYear` (`PlantoirTools.cs:938-951`); the mac's takes
-    `course` and `section` and reads the remembered timetable. `toolSchemas`
-    is generated from the mac, so the contract records the mac's shape and
-    nothing on either side compares yours to it. That is worse than a missing
-    tool — a missing tool is visible as missing, while a shared name with two
-    shapes lets a client written against the contract send arguments one
-    server silently ignores. This is NOT a request to change your signature:
-    yours exists because your MCP server drives a whole rollover from Claude
-    Code and needs the file, while the mac puts spreadsheet reading behind its
-    schedule sheet on purpose. It is a request that the difference be written
-    down where a test can see it — most cheaply as part of the `mcpToolNames`
-    work above, extended to schemas rather than names.
-
-    **Four — seventeen `TEACHERS SAY:` phrasings the mac has and you do not.**
+    **Two of two, still open — seventeen `TEACHERS SAY:` phrasings the mac
+    has and you do not.**
     Checked clause by clause, every list in `toolSchemas.mcp` against every
     `[Description]` in `PlantoirTools.cs`. Five of the 25 shared tools differ,
     and **four of the five are yours**: `add_next_class` (mac has six
@@ -2019,6 +1988,14 @@ to run in the background.
     is the part that was measured, so being in the prose is not the same as
     being in it.
 
+    **Your new surface test cannot catch this one, and says so.**
+    `AssistSurfaceContractTests` deliberately does not assert descriptions —
+    `AssistAgent.NarrowToLocal` rewrites every one through `Briefly()`, so
+    asserting the mac's wording would be red on all thirteen and "fixing" it
+    would change the text the local model routes on. That is the right call,
+    and it is also why the seventeen are invisible to every gate on both
+    sides: what is pinned is WHICH tools and WHAT arguments, never the words.
+
     This is not a documentation difference. `AssistToolSurface`'s own comment
     says the phrasings *"are what took routing from 69% to 91%"* — they are
     measured artifacts, so a missing one is a routing change nobody chose, and
@@ -2033,6 +2010,57 @@ to run in the background.
     this section right now?" — two days after the mac wrote its three, and it
     never came back. Neither side is fixed here, because routing is measured by
     hand and an unattended session cannot do it.
+
+    **The other two are ✅ already done — by you, and better than the
+    mac was going to ask for.**
+
+    **✅ Already done by you — the enumeration test.** This item was going to
+    ask for one, on the evidence that `AssistCases_Tools_MatchesContract`
+    (`ContractTests.cs:497-510`) pins the wrong class — it compares the
+    contract against `AssistAgent.ForTheLocalModel` and `.DeploysToStudents`,
+    the IN-APP assistant, while the 37 live in `Plantoir.Mcp.PlantoirTools`,
+    and its `mcpOnly` third compares against a hardcoded three-name list
+    written inline. That much is still true of that test. What the audit
+    missed is that you had already answered it elsewhere:
+    `AssistSurfaceContractTests.TheExtraToolsThisServerOffersAreTheOnesWeKnowAbout`
+    enumerates `PlantoirTools` and pins the twelve extras BY NAME, failing in
+    both directions — an unrecorded addition, and an extra adopted into the
+    contract and not deleted from the list.
+
+    **Your solution beat the one the mac was going to propose, and this is the
+    part worth keeping.** The mac had designed an authored `assist-cases.json`
+    key (`mcpToolNames`) that both sides would assert against, and had REJECTED
+    the obvious alternative — a mac test regexing `[McpServerTool(Name = "…")]`
+    out of `PlantoirTools.cs` — because an attribute reformatted across two
+    lines makes the regex find FEWER names, and fewer names all of which are
+    accounted for is a **false green**, the one failure mode a drift detector
+    must not have. You avoided both problems by reading the attribute through
+    **reflection on your own side**, where the compiler guarantees the list is
+    complete and no formatting can hide a name. That needs no new contract key
+    and no second home for the list, so `mcpToolNames` is **withdrawn, not
+    deferred**. Your own comment — "Named, not counted", because a count stays
+    at twelve when one tool is added and another adopted — is the reasoning the
+    mac's version did not have.
+
+    **✅ Already done by you — `re_date_classes`' divergent signature.** The
+    audit found that the tool has the same NAME and different PARAMETERS on
+    the two servers: yours takes `course` and `section` and then `timetable,
+    block, pages, meetings, firstDay, startYear` (`PlantoirTools.cs:938-951`),
+    while the mac's takes `course` and `section` alone and reads the
+    remembered timetable. `toolSchemas` is generated from the mac, so the
+    contract records the mac's shape — and the audit's worry was that nothing
+    compared yours to it. That worry is answered:
+    `AssistSurfaceContractTests.AssertOnlyTheDeparturesWeHaveAgreed` lists all
+    six of those arguments as agreed extras, asserted as an EXACT set, so a
+    seventh fails and a resolved one that stays listed fails too.
+
+    Nothing is being asked of you here, and your signature is not in question:
+    yours exists because your MCP server drives a whole rollover from Claude
+    Code and needs the file, while the mac puts spreadsheet reading behind its
+    schedule sheet on purpose. What the mac still owes, and has recorded
+    against itself in `MAC-HANDOFF.md`, is the generator change that would let
+    the departures live beside the schemas instead of in your test — which is
+    your own request, not a new one.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 
@@ -3067,7 +3095,7 @@ it.
 ### The two MCP surfaces are not the same product
 
 Written 2026-09-06 after a mac audit asked whether the parity list was
-COMPLETE rather than whether it was correct. The numbered item is 33; this is
+COMPLETE rather than whether it was correct. The numbered item is 41; this is
 the manual for it.
 
 **The measurement.** `Plantoir.Mcp/PlantoirTools.cs` declares **37** distinct
@@ -3082,53 +3110,61 @@ version of any of them:
 `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,
 `roll_over_section`, `sync_page_dates`.
 
-**Why neither suite noticed, which is the part to fix first.** Not a subset
-check — an earlier write-up said that and was wrong. `Assert.Equal` on
-`HashSet`s is set equality in both directions, and it is a good test; it
-simply pins a **different class**. It compares the contract against
+**Why neither suite noticed — and how it is now caught.** Not a subset check
+— an earlier write-up said that and was wrong. `Assert.Equal` on `HashSet`s is
+set equality in both directions, and it is a good test; it simply pins a
+**different class**. It compares the contract against
 `AssistAgent.ForTheLocalModel` and `.DeploysToStudents`, which is the in-app
 assistant, while the 37 live in `PlantoirTools`. Its `mcpOnly` third compares
-the contract against three names typed inline in the test file. Nothing on
-either platform enumerates `PlantoirTools`' names against anything, and no
-Windows test reads `toolSchemas` at all. Twelve additions went through that
-gap without a single red test.
+the contract against three names typed inline in the test file. Twelve
+additions went through that gap without a single red test.
 
-**The shape proposed for closing it**, and why it is this shape:
+**Windows closed it, on the same day and from the other direction.**
+`AssistSurfaceContractTests` (branch `issue/29-windows-contract-case-lists`,
+merged after the audit's branch was cut) reads `PlantoirTools` by
+**reflection** and pins the twelve extras BY NAME, failing both when an
+unrecorded tool appears and when a listed one is adopted into the contract and
+not deleted. It reads `toolSchemas` for both surfaces and checks arguments and
+types, not just names. The audit said "nothing on either platform enumerates
+`PlantoirTools`' names" and "no Windows test reads `toolSchemas` at all"; both
+were true where it stood and false by the time it merged.
 
-- One AUTHORED key in `assist-cases.json` — `mcpToolNames` — as the single
-  list of what the MCP surface is agreed to carry. Authored keys survive
-  regeneration (`AssistContract.write` reads the file first and overwrites
-  only `generatedCaseKeys`), so either platform can propose an addition, which
-  is the property that makes rule 4 work here at all.
-- Windows asserts its 37 equal that list. The mac asserts its 25 plus a
-  recorded "not served here, and why" list equals the same one.
-- A tool added on either side then fails the OTHER side's suite until somebody
-  writes down what they decided — a request, not damage.
+**What the mac was going to propose, and why it is WITHDRAWN.** An AUTHORED
+`assist-cases.json` key — `mcpToolNames` — that Windows asserted its 37
+against and the mac its 25 plus a "not served here, and why" list. It is not
+needed: reflection on the Windows side gets the complete list from the
+compiler, with no new contract key and no second home for it.
 
-**REJECTED: a mac test that regexes the names straight out of
+**REJECTED even before that: a MAC test that regexes the names straight out of
 `PlantoirTools.cs`.** It is feasible — `AssistContractTests` already locates
 the repository root from `#filePath` — and it was the first design. An
 attribute reformatted across two lines makes the regex find FEWER names, and
 fewer names all of which are accounted for reports **success**. A drift
 detector whose failure mode is a false green is worse than none, because it
-will be believed. It also couples a gate to source rather than to data, which
-is not how anything else here crosses the platform gap.
+will be believed. It also couples a gate to source rather than to data. Both
+problems vanish when the enumeration happens on the side that owns the code,
+which is the general lesson: **enumerate a platform's surface on that
+platform, and cross the gap with the RESULT.**
 
-**Not written yet, and that is deliberate.** The "and why" half of the mac's
-list IS the sorting of the twelve, and Russell had not yet agreed to it when
-this was found; committing it would have made an unapproved decision into the
-acceptance list both suites run. The sorting is in `MAC-HANDOFF.md` under
-"Windows' MCP server has drifted a dozen tools ahead of the mac's".
+**The sorting is still not in any contract, and that is deliberate.** The "and
+why" half of it is an unapproved product decision, and committing it would
+make that decision into the acceptance list both suites run. Windows' test
+carries the twelve names with no verdict attached, which is exactly the right
+amount to pin before Russell has chosen. The sorting is in `MAC-HANDOFF.md`
+under "Windows' MCP server has drifted a dozen tools ahead of the mac's".
 
 **What the sorting concluded, in one paragraph**, so this file is readable on
 its own: six of the twelve are product the mac should have — `list_courses`
 and `back_up_course` and `explain_publishing` as MCP-only tools that cost no
 routing, `add_classes` and `make_room_for_classes` as WIDENINGS of something
 that already ships rather than new features (`add_next_class` already calls
-`PlaceholderClassPlanner.apply`, and its `duplicate` argument already calls
-`ClassInsertionPlanner.plan(count: 1)` — so the mac is missing an argument
-each, not an engine each), and `roll_over_section` because of the defect in
-item 33's second part. Two are
+`PlaceholderClassPlanner.apply`, and a `duplicate` key on the same call
+already reaches `ClassInsertionPlanner.plan(count: 1)` — so the ENGINES are
+both wired up already). Note the limit: `duplicate` is not on
+`add_next_class`' published schema at all, only on the hardcoded card phrasing
+`AssistCardCommand.swift:85`, so no model and no MCP client can reach it — the
+mac needs a schema argument, not just a bigger count. And `roll_over_section`
+because of the defect in item 41's first open part. Two are
 Windows-shaped and stay yours: `read_timetable`, because the mac puts
 spreadsheet reading behind its schedule sheet on purpose and has no file-path
 argument anywhere on its surface; and `list_recent_changes`, because both mac
