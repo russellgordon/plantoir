@@ -14,13 +14,15 @@ final class AssistToolRunnerTests: XCTestCase {
 
     // MARK: - The surface
 
-    /// The exact twenty. Narrowed from the Windows server's full surface, which
-    /// is far larger: a small local model routes worse the more it is shown,
-    /// and these are the ones a teacher actually asks for.
+    /// The exact twenty-two. Narrowed from the Windows server's full surface,
+    /// which is far larger — 37 tools as of 2026-09-06: a small local model
+    /// routes worse the more it is shown, and these are the ones a teacher
+    /// actually asks for.
     ///
     /// **The count is a measurement, and it has moved.** Routing accuracy was
-    /// counted against FIFTEEN tools. Five have been added since — reading and
-    /// recording a section's timetable, and the page for the next class — and
+    /// counted against FIFTEEN tools. Seven have been added since — reading and
+    /// recording a section's timetable, the page for the next class, and
+    /// re-dating a whole section — and
     /// each was a deliberate decision to spend some of that number. Anyone
     /// changing this figure again should say so out loud, and the accuracy is
     /// worth re-measuring rather than assumed to have survived.
@@ -49,15 +51,17 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertEqual(AssistToolRunner.tools.count, expected.count, "A tool is defined twice.")
     }
 
-    /// What the LOCAL model is shown: thirteen of the twenty.
+    /// What the LOCAL model is shown: thirteen of the twenty-two.
     ///
-    /// Seven are left off because the model never has to NAME them, and every
-    /// schema in the prompt costs a small router accuracy. The six `plan_`
+    /// Nine are left off because the model never has to NAME them, and every
+    /// schema in the prompt costs a small router accuracy. The seven `plan_`
     /// twins are called IN CODE by plan mode, which builds the call from the
     /// write the model already chose; `remember_timetable` is off because dates
     /// the model supplies are dates it may have invented, and a wrong one
-    /// silently puts a class on the wrong day. All seven still RUN — they are
-    /// hidden from the list, not removed from the surface.
+    /// silently puts a class on the wrong day; `re_date_classes` is off because
+    /// its phrasings are matched in code and it is far too large a change to
+    /// reach through a router. All nine still RUN — they are hidden from the
+    /// list, not removed from the surface.
     @MainActor
     func testTheLocalModelIsShownExactlyThirteenToolsAndNoPlans() throws {
         let expected: Set<String> = [
@@ -93,7 +97,14 @@ final class AssistToolRunnerTests: XCTestCase {
 
     /// Claude Code, on the other end of the MCP server, has no plan mode: it
     /// needs the twins by name to show a teacher what a write would do. So the
-    /// seven hidden from the local list are still served there.
+    /// nine hidden from the local list are still served there.
+    ///
+    /// **The list below is checked against the code rather than trusted.** It
+    /// stood at seven for as long as it took two more tools to be hidden, and
+    /// nothing noticed: the two newest — `plan_re_date_classes` and
+    /// `re_date_classes` — were absent, so this test promised a coverage it
+    /// did not give. Asserting the list IS the set difference is what stops
+    /// that happening the next time a tool is hidden.
     @MainActor
     func testTheHiddenToolsAreStillServedToClaudeCode() throws {
         let runner: AssistToolRunner = try makeRunner().runner
@@ -105,8 +116,25 @@ final class AssistToolRunnerTests: XCTestCase {
         let hidden: [String] = [
             "plan_publish_class_on", "plan_publish_pages", "plan_unpublish_pages",
             "plan_scheduled_deploy", "plan_remember_timetable", "plan_add_next_class",
-            "remember_timetable",
+            "plan_re_date_classes", "remember_timetable", "re_date_classes",
         ]
+
+        // Named above so a reader can see WHICH nine, and checked here so the
+        // naming cannot fall behind the code.
+        var shownToTheLocalModel: Set<String> = []
+        for definition in AssistToolRunner.localTools {
+            shownToTheLocalModel.insert(definition.name)
+        }
+        var everythingHidden: Set<String> = []
+        for definition in AssistToolRunner.tools where !shownToTheLocalModel.contains(definition.name) {
+            everythingHidden.insert(definition.name)
+        }
+        XCTAssertEqual(
+            Set(hidden), everythingHidden,
+            "The list of tools hidden from the local model has changed. Add the new one here, "
+            + "and check it is still served over MCP."
+        )
+
         for name in hidden {
             XCTAssertTrue(overMCP.contains(name), "\(name) is missing from the MCP surface.")
             XCTAssertNotNil(runner.definition(named: name), "\(name) must still be runnable.")

@@ -683,30 +683,346 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   serves **25** (22 plus three MCP-only). So the same question asked of Claude
   Code gets a different toolbox depending on the machine.
 
-  Roughly what the mac is missing, from the Windows server's own list:
-  `add_classes`, `make_room_for_classes`, `sync_page_dates`,
-  `roll_over_section`, `back_up_course`, `list_courses`,
-  `list_recent_changes`, `explain_publishing`, `read_timetable`, and several
-  `plan_` twins.
+  **✅ Sorted 2026-09-06** on `issue/mcp-tool-surface-divergence` — the twelve
+  are gone through one at a time below, with the reasoning. **What is still
+  owed is Russell's yes, and then the building.** Nothing was implemented:
+  he was asked directly whether he wanted parity attempted and chose the
+  decision document instead, so this entry stays OPEN on purpose rather than
+  being marked done — the sorting is finished, the product is not.
 
-  **Why nothing caught it, which is the part worth fixing first.** Windows'
-  `AssistCases_Tools_MatchesContract` only checks that the CONTRACT's lists are
-  a subset of what it serves — so a tool that exists on Windows and is in
-  neither the contract nor the mac passes both suites silently. A subset check
-  cannot notice an addition; that is what makes it the wrong shape here.
+  **Two of the four things this entry handed Windows were already done when it
+  merged, 2026-09-07.** The sorting ran on a branch cut before
+  `issue/29-windows-contract-case-lists` reached `dev`, so it could not see
+  `AssistSurfaceContractTests` — which enumerates `PlantoirTools` by reflection
+  and records `re_date_classes`' extra arguments as agreed departures. The
+  paragraphs below are corrected in place rather than deleted, because the
+  reasoning that was rejected on the way is still worth having. What is left
+  for Windows is the rollover decision and the seventeen phrasings; what is
+  left for the MAC is Russell's yes on the sorting, the one `check_section`
+  phrasing, and the generator change Windows asked for in this same file.
 
-  **What the mac owes is a decision before any code.** Not all twelve
-  necessarily belong on the mac — some may be Windows-shaped, and `TODO.md`
-  already names a few as the CSV-reschedule surface. What is owed is to look
-  at the list, decide which are product and which are local, and then put the
-  survivors in `assist-cases.json` → `toolSchemas` so the gap becomes a test
-  failure rather than an audit finding. Reference:
-  `windows-app/Plantoir.Mcp/PlantoirTools.cs` (the 37, each an
+  The twelve, verified by set difference rather than read off a list: exactly
+  twelve Windows-only, **zero mac-only**, and **zero hits for any of the twelve
+  names anywhere under `mac-app/QuartzTeachers` or `contracts/`** —
+  `add_classes`, `back_up_course`, `explain_publishing`, `list_courses`,
+  `list_recent_changes`, `make_room_for_classes`, `plan_add_classes`,
+  `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,
+  `roll_over_section`, `sync_page_dates`.
+
+  ### Why nothing caught it — the mechanism above was WRONG, twice
+
+  This entry used to say Windows' `AssistCases_Tools_MatchesContract` "only
+  checks that the CONTRACT's lists are a subset of what it serves". It does
+  not. `Plantoir.Tests/ContractTests.cs:497-510` uses `Assert.Equal` on
+  `HashSet`s, which is **set equality**, in both directions. Two things are
+  actually true, and both are worse than a subset check:
+
+  1. **That test pins a different class.** It compares the contract against
+     `AssistAgent.ForTheLocalModel` and `AssistAgent.DeploysToStudents` — the
+     IN-APP assistant — while the 37 live in `Plantoir.Mcp.PlantoirTools`. The
+     `mcpOnly` third of it compares the contract against a **hardcoded
+     three-name list written inline in the test**, never against
+     `PlantoirTools` at all.
+  2. **Nothing on either platform enumerated the 37 — true when this was
+     written, and Windows fixed it hours later.** The audit ran on a branch cut
+     before `issue/29-windows-contract-case-lists` reached `dev`, and reported
+     `grep toolSchemas windows-app/Plantoir.Tests` → 0 hits. Windows' new
+     `AssistSurfaceContractTests` reads `PlantoirTools` by REFLECTION, pins the
+     twelve extras by name in both directions, and reads `toolSchemas` for both
+     surfaces including argument names and types. What remains true is the
+     first half: `AssistCases_Tools_MatchesContract` still pins `AssistAgent`,
+     and no MAC test knows `PlantoirTools.cs` exists — nor should one, see
+     below.
+
+  **The fix this entry PRESCRIBED was also wrong, and is the reason to read
+  the next paragraph before acting.** It said to "put the survivors in
+  `assist-cases.json` → `toolSchemas` so the gap becomes a test failure".
+  `toolSchemas` is GENERATED — `AssistContract.generatedCaseKeys` is
+  `["cardPhrasings", "tools", "toolSchemas"]`, overwritten wholesale by
+  `Plantoir --write-contracts` — so nothing can be hand-added to it, and
+  nothing on Windows reads it anyway. The real order is decide → write Swift →
+  regenerate.
+
+  ### The drift detector that would make this stick — BUILT, on the other side
+
+  **Windows built it, and their shape is better than the one proposed here.**
+  `AssistSurfaceContractTests.TheExtraToolsThisServerOffersAreTheOnesWeKnowAbout`
+  reflects over `PlantoirTools` and holds the twelve extras as a NAMED list —
+  their own comment says why named rather than counted: "a count stays at
+  twelve when one tool is added and another adopted into the contract, and it
+  cannot tell the reader WHICH". It fails on an unrecorded addition AND on a
+  listed name the contract has since adopted.
+
+  Rejected on the way: **a mac test that reads
+  `windows-app/Plantoir.Mcp/PlantoirTools.cs` and regexes out the
+  `[McpServerTool(Name = "…")]` names.** It is feasible —
+  `AssistContractTests.readContract` already finds the repository root from
+  `#filePath`, so a mac test can read anything in the tree — and it was the
+  first design. Two things killed it. An attribute reformatted across two
+  lines makes the regex find FEWER names, and fewer names all of which are
+  accounted for is a **false green**: the one failure mode a drift detector
+  must not have. And it couples the mac gate to Windows source rather than to
+  data, which is not how anything else here crosses the gap.
+
+  **WITHDRAWN — what this entry was going to propose instead.** An AUTHORED
+  `assist-cases.json` key, `mcpToolNames`, listing every name the MCP surface
+  is agreed to carry; Windows asserting its 37 against it, the mac asserting
+  its 25 plus a recorded "not served here, and why" list against the same one.
+  Authored keys do survive `--write-contracts`, so it would have worked. It is
+  not needed: reflection on the Windows side gets the complete list from the
+  compiler, with no new contract key and no second home for the list to drift
+  in. Recorded because it was reasoned about, and because the general lesson
+  outlived it — **enumerate a platform's surface ON that platform, and cross
+  the gap with the RESULT** — which is also why no mac test should learn to
+  read `PlantoirTools.cs`.
+
+  What is still NOT in any contract is the sorting below, and that stays
+  deliberate: its "and why" half is an unapproved product decision, and
+  committing it would make that decision the acceptance list both suites run.
+  Windows' list carries the twelve names with no verdict attached, which is
+  exactly the right amount to pin before Russell has chosen.
+
+  ### The twelve, sorted
+
+  Four buckets rather than three. The brief asked for product / Windows-shaped
+  / already-covered-under-another-name, and a fourth was needed because
+  `sync_page_dates` turned out to need a teacher's problem before it needs a
+  decision, which is a different answer from either "build it" or "never".
+
+  **"Already covered under another name" is NOT empty, though the first draft
+  of this entry said it was.** `add_next_class` is the one-page case of
+  `add_classes` AND — through a `duplicate` key on the same call — the
+  one-class case of `make_room_for_classes`; both ENGINES are already called
+  from `AssistToolRunner`. So two of the six in the product bucket are
+  widenings of something that ships, not new features, and that is the single
+  most useful correction in this entry.
+
+  **Do not read "widening" as "add a bigger number", which is how this was
+  first written.** `duplicate` is on NO published schema — `AssistToolSurface`
+  declares `course` and `section` for `add_next_class` and nothing else, and
+  `contracts/assist-cases.json` carries `duplicate` only under `cardPhrasings`.
+  The sole supplier is the hardcoded card sentence at
+  `AssistCardCommand.swift:85`, so no local model and no MCP client can reach
+  that path at all. `ClassInsertionPlanner` is wired up; the ROUTE to it is one
+  typed sentence. What the mac needs is a schema argument, and for
+  `make_room_for_classes` an MCP route that does not exist yet — still far less
+  than an engine, but more than a count.
+
+  **PRODUCT — belongs on the mac. In this order.**
+
+  1. **`list_courses`** — MCP-only, and the cheapest real gain of the twelve.
+     `Plantoir --mcp-stdio <working-folder>` is scoped to a WORKING FOLDER,
+     which routinely holds several courses. The server answers only
+     `initialize`, `tools/list` and `tools/call` — no `resources/list`, no
+     `instructions` — and every other tool takes `course` as a required
+     argument. The LOCAL model learns the course from
+     `AssistAgent.systemPrompt(course:section:)`; a Claude Code session has no
+     such thing. It is not that the information is unreachable — that client
+     has file tools and can read `courses/` itself — but that nothing on the
+     tool surface offers it, so the first thing it does is guess or read raw
+     folders. MCP-only means the local list is untouched, so this is **not a
+     routing change** and needs no hand measurement.
+
+     **Consider the cheaper answer first, which Windows already has and the mac
+     does not:** `plantoir-mcp --course <CODE>` (`Plantoir.Mcp/Program.cs:21`)
+     locks a session to one course, and their own comment says why — "a lock is
+     a stronger guarantee than an instruction in a prompt the model might drift
+     from". The mac's `--mcp-stdio` takes a folder and nothing else. A
+     `--course` argument costs no tool slot and no routing at all, and answers
+     the common case (a teacher opening an assistant from one course's menu).
+     The two are complements, not alternatives: the lock answers "which course
+     is this about", `list_courses` answers "which courses are there".
+
+  2. **`roll_over_section`** — ✅ **DECIDED 2026-09-08: ASK.** A rollover asks
+     the teacher whether this should be a new website or the same one as last
+     year; and it does NOT hide pages that were visible last year, because
+     re-dating moves dates and hiding is a separate act. The sentence has to be
+     written in `contracts/` first, the mac has no `ReleaseSite` to call at
+     all, and the card phrasing must move on both platforms or the decision
+     changes nothing a teacher meets. Reasoning in `TODO.md`. The original
+     entry, which is what the decision was taken against, follows.
+
+     The one that is a DEFECT before it is a feature,
+     and it is a defect **on both platforms**: "roll this section over to a new
+     year" is matched in code on each and routed to `re_date_classes`, which
+     cuts the section loose from its published site on neither, so the first
+     publish afterwards overwrites last year's website. Written up in full,
+     with three options, in `TODO.md` → "A rolled-over section publishes over
+     last year's website". It is a product decision rather than a missing
+     tool, which is why it is there and not here.
+
+  3. **`plan_add_classes` / `add_classes`** — smaller than it looks, and the
+     first draft of this entry got it wrong in a way worth recording.
+     `PlaceholderClassPlanner` (340 lines) lays down a unit's worth of class
+     pages on the days the section actually meets, skipping days already taken
+     — and it is **already wired to the assistant**: `add_next_class` calls
+     `PlaceholderClassPlanner.apply` (`AssistToolRunner.swift:2310`) with a
+     count of one. So this is not "build a feature", nor even "wrap an engine";
+     it is **let the existing arm take a count**, plus a unit and a first day,
+     under a name of its own. Today "add seven days to the next unit" has no
+     assistant route on the mac; "add the next class" has had one all along.
+
+     (Neither planner has a GUI sheet. An earlier draft of this entry said both
+     did — checked and false: nothing under `mac-app/QuartzTeachers/Views/`
+     mentions either one. They are reachable only through the assistant, which
+     makes the assistant surface the ONLY way a teacher gets at them and raises
+     the value of (3) and (4) rather than lowering it.)
+
+  4. **`plan_make_room_for_classes` / `make_room_for_classes`** — and this one
+     is **already covered under another name, for the one-class case**.
+     `ClassInsertionPlanner` (574 lines, its own contract in
+     `contracts/class-planning.json`) is what runs when a teacher says
+     "duplicate Unit 3, Day 2 as my next class" and the next day is already
+     taken: `duplicateClassRequested` calls
+     `ClassInsertionPlanner.plan(… count: 1)` and `.apply`
+     (`AssistToolRunner.swift:2139, 1994`), renaming the later days, re-dating
+     them onto real class days and rewriting every wikilink that pointed at a
+     renamed page. All of the dangerous machinery already runs on the mac
+     today. What is missing is a count above one, and the ability to name an
+     arbitrary insertion point rather than "the day after the page I named".
+
+     Ranked below (3) anyway, because widening it is where the danger is: the
+     file's own comment calls this "the most dangerous thing here, because it
+     renames pages the teacher's links point at", and the current route reaches
+     it only through a sentence naming one specific page. If it is built,
+     **MCP-only** — a person is reading every step there. Never the local list.
+
+  5. **`back_up_course`** — MCP-only, and mechanically the smallest of all: it
+     wraps `CourseArchiver.backUpCourse`, which exists. A LOCAL tool would be
+     redundant, because `AssistToolRunner.backUpOnceForThisConversation`
+     already saves a copy before the assistant's first write. Windows' own
+     description says why the tool exists anyway, and the reason survives the
+     redundancy: *"Do this before any bulk editing of a course's files —
+     **including edits you make directly rather than through these tools**"*.
+     That is a Claude Code session about to edit Markdown with its OWN Write
+     tool, which the automatic backup does not cover — `AssistMCPServer.serve`
+     builds one `AssistToolRunner` for the process, so the automatic copy fires
+     once per server session and only ahead of a tool write.
+
+  6. **`explain_publishing`** — MCP-only. The publish-versus-deploy distinction
+     reaches the local model through `AssistAgent.systemPrompt`, whose own
+     comment says the paragraph "is not padding … saying plainly that they are
+     different is what stops 'publish tomorrow's class' turning into a live
+     site". The mac's MCP server sends no `instructions` in its `initialize`
+     result and has no such tool, so a Claude Code session driving it **never
+     learns the two are different acts**. **Try the cheaper answer first:** the
+     MCP `initialize` result carries an `instructions` field. One paragraph,
+     said once, costs no tool slot and no routing. The tool's extra trick —
+     only explaining once per section, then saying so — is worth having only if
+     the `instructions` field turns out not to be read.
+
+  **WINDOWS-SHAPED — deliberately not the mac's, with the reason.**
+
+  7. **`read_timetable`** — it takes a school spreadsheet by PATH or by link.
+     The mac deliberately puts that reading behind the schedule SHEET:
+     `SectionScheduleSource` (902 lines) turns a file, a shared-sheet link or a
+     paste into calendar days, and its own comment states the rule — *"The
+     reading happens here, in Swift, and never in the assistant's model."*
+     `SectionTimetable` then remembers the answer inside the course folder so
+     nothing asks twice, and the assistant reads it back with
+     `read_remembered_timetable`. There is no file-path argument anywhere on
+     the mac's tool surface today, and adding one is a bigger decision than a
+     tool. Windows needs the file because its MCP server drives a whole
+     rollover from Claude Code; the mac's answer is "the teacher fills the
+     schedule sheet once, and everything reads it from there". **Reconsider
+     only if (2) is ever built as an end-to-end rollover over MCP.**
+
+  8. **`list_recent_changes`** — answers a question neither mac client has to
+     ask. Windows' own description says the history "is only kept while this
+     conversation is open"; the mac's `AssistChangeHistory` is the same, and
+     the local assistant SHOWS each change in the conversation it just had,
+     while a Claude Code session has its own transcript of every call it made.
+
+  **NEEDS A TEACHER'S PROBLEM BEFORE IT NEEDS A DECISION.**
+
+  9. **`plan_sync_page_dates` / `sync_page_dates`** — the only pair of the
+     twelve with **no mac engine at all** (zero hits for anything sync-dates
+     shaped). It fixes "the class is in June but the concept page it links to
+     is dated in November", one class at a time. Two things make it a question
+     rather than a task. The mac's answer today is `re_date_classes`, which
+     moves each class's linked pages with it across the whole section — a
+     bigger hammer, but not obviously the wrong one. And **nothing on the mac
+     reports the problem this fixes**: Windows' re-date plan surfaces date
+     drift under "Worth looking at:" because `AssistWorkspace.ProblemsAfter`
+     runs `DateAudit.Run`, and the mac's `SectionReDatePlanner` has no
+     equivalent — `DateAudit` has zero hits under `mac-app/`. So on the mac
+     this would be a fix for a problem nothing surfaces. **If it is wanted,
+     the audit is the half to build first**, and it is useful with or without
+     the fix.
+
+  **BUNDLED, not separate decisions** — `plan_add_classes`,
+  `plan_make_room_for_classes` and `plan_sync_page_dates` travel with their
+  writes. The mac's convention (`AssistPlanMode`, pinned by
+  `AssistPlanModeTests`) is that every write has a plan twin, so a `plan_` name
+  is never its own call.
+
+  ### One more divergence, found on the way and not in the original audit
+
+  **`re_date_classes` exists on both sides with the same NAME and different
+  PARAMETERS.** Windows takes `timetable, block, pages, meetings, firstDay,
+  startYear` on top of `course` and `section` (`PlantoirTools.cs:938-951`); the
+  mac takes `course` and `section` alone and reads the remembered timetable. `toolSchemas` is generated from the mac,
+  so the contract records the mac's shape and nothing on either side compares
+  Windows' actual parameters to it. **This is worse than a missing tool**: a
+  missing tool is at least visible as missing, while a shared name with two
+  shapes lets a client written against the contract send arguments one server
+  silently ignores. **Answered on the Windows side while this was being
+  written:** `AssistSurfaceContractTests.AssertOnlyTheDeparturesWeHaveAgreed`
+  lists all six of the extra arguments as agreed departures, asserted as an
+  exact set, so a seventh fails and a resolved one that stays listed fails too.
+  What the mac still owes is the generator change Windows asked for in this
+  same file — emit the departures beside the schemas, so their test can read
+  them instead of holding a second copy.
+
+  ### The `TEACHERS SAY:` phrasings have drifted five ways, mostly OURS
+
+  Checked clause by clause, every `TEACHERS SAY:` list in `toolSchemas.mcp`
+  against every `[Description]` in `PlantoirTools.cs`. **Five of the 25 shared
+  tools differ, and four of the five are tools where Windows has no
+  `TEACHERS SAY:` clause at all** — seventeen phrasings the mac shows the model
+  and Windows shows it nowhere, in the MCP server or the in-app assistant:
+
+  | Tool | Difference |
+  |---|---|
+  | `check_section` | Windows has four phrasings, the mac three. Windows added "what would students see in this section right now?" on 2026-08-17, two days after the mac wrote its three, and it never came back here. |
+  | `add_next_class` | The mac has six phrasings. Windows has **no `TEACHERS SAY:` clause at all**. |
+  | `plan_add_next_class` | The mac has three. Windows has none. |
+  | `read_remembered_timetable` | The mac has four. Windows has none. |
+  | `remember_timetable` | The mac has four. Windows has none. |
+
+  This matters more than a documentation difference, and the reason is written
+  into `AssistToolSurface` itself: the phrasings *"are what took routing from
+  69% to 91%"*, so they are measured artifacts and a missing one is a routing
+  change nobody chose. The rule for copying a Windows description is to keep
+  the clause WHOLE, and `check_section` is the one place the mac did not.
+
+  **Nothing is fixed here on either side**, because adding a phrasing IS a
+  routing change and routing is measured by hand against a local
+  `llama-server`, which an unattended session cannot do. The mac owes itself
+  one phrasing; Windows owes itself seventeen, and item 41 tells them so.
+  (An earlier draft of this entry claimed the `check_section` case was the only
+  difference of the 25 — that was a script that only looked in one direction,
+  and it is exactly the failure this whole entry is about.)
+
+  Reference: `windows-app/Plantoir.Mcp/PlantoirTools.cs` (the 37, each an
   `[McpServerTool]`), `mac-app/QuartzTeachers/Models/Assist/AssistToolSurface.swift`.
 
-  Two stale counts were corrected on the way past: `CLAUDE.md` and
-  `documentation/10-local-ai-assistant.md` both said 23 tools against 13; the
-  mac's own test has pinned 22/13 since, making the MCP surface 25.
+  Stale counts corrected on the way past, both saying 23 where the surface is
+  25: `documentation/09-mac-app.md` and `WINDOWS-HANDOFF.md`'s "compare against
+  the contract" section. (This entry previously claimed the two stale counts
+  were `CLAUDE.md` and `documentation/10-local-ai-assistant.md`; those two are
+  right, and the two above were missed.) `AssistToolSurface.swift`'s own header
+  said "twenty tools", "seven of the twenty" and "six `plan_` twins" against a
+  measured 22, 9 and 7 — corrected, since stale counts in that file are exactly
+  how the previous miscount happened.
+
+- **A section rolled over to a new year publishes over LAST year's website, on
+  both platforms** — found 2026-09-06 while sorting the entry above. It is a
+  DECISION for Russell rather than a fix, and because it was found on the mac
+  rather than handed over from Windows, the write-up and the three options live
+  in **`TODO.md`** ("A rolled-over section publishes over last year's website").
+  Listed here only so the sorting above does not point at nothing: item (2) of
+  the product bucket is this. Windows' half is item 41 in `WINDOWS-HANDOFF.md`.
 
 - **The folder-problem front end landed on Windows, and it found two defects in
   the mac's own repair** (Windows, 2026-09-06, branch

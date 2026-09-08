@@ -1,15 +1,31 @@
 import Foundation
 
-/// The twenty tools that exist, and the thirteen of them the local model is
-/// shown.
+/// The twenty-two tools that exist, and the thirteen of them the local model
+/// is shown.
 ///
-/// It was fifteen when routing accuracy was measured, and the five that came
-/// after — reading and recording a section's timetable, and adding the next
-/// class page — were added on purpose, knowing the cost. A small local model
-/// routes worse the more it is shown, so the number is worth re-measuring
-/// rather than assuming the old figure still holds. `localTools` is the answer
-/// to that pressure: seven of the twenty are never NAMED by the model, so they
-/// are not put in front of it.
+/// It was fifteen when routing accuracy was measured, and the seven that came
+/// after — reading and recording a section's timetable, adding the next class
+/// page, and re-dating a whole section — were added on purpose, knowing the
+/// cost. A small local model routes worse the more it is shown, so the number
+/// is worth re-measuring rather than assuming the old figure still holds.
+/// `localTools` is the answer to that pressure: nine of the twenty-two are
+/// never NAMED by the model, so they are not put in front of it.
+///
+/// **Keep these three numbers right.** They are 22, 13 and 9 as this is
+/// written, and all three are now pinned — `AssistCurriculumMentionsTests`
+/// asserts 22 and 13, and `testTheHiddenToolsAreStillServedToClaudeCode`
+/// asserts that the nine it names ARE the set difference, so hiding a tenth
+/// tool fails a test rather than quietly making this sentence wrong.
+///
+/// **A pin does not protect the PROSE, and the obvious lesson here is the
+/// wrong one.** It is tempting to read the rot as "9 was the unpinned one, so
+/// pinning fixes it" — but 22 was already pinned, by that same test, all the
+/// while this comment said "twenty" and so did `CLAUDE.md`, two documents and
+/// this file's own neighbour. A test compares the code to a number; nothing
+/// compares a SENTENCE to one. What the set-difference assertion actually buys
+/// is narrower and worth having anyway: hiding a tenth tool now fails rather
+/// than silently widening a gap nobody restates. The prose still has to be
+/// grepped for and corrected by hand, which is how these were found.
 ///
 /// The descriptions are the Windows server's own, put through the same
 /// shortening rule the narrowed surface uses there: keep the `TEACHERS SAY:`
@@ -73,9 +89,11 @@ extension AssistToolRunner {
     ///
     /// Everything above still RUNS; this is only what the model is asked to
     /// choose between, and every schema in the list costs it context and
-    /// accuracy. Two kinds are left out, and neither loses a teacher anything:
+    /// accuracy. Nine are left out — the seven `plan_` twins, plus the two
+    /// named in `hiddenFromTheLocalModel` below — and none of them loses a
+    /// teacher anything:
     ///
-    /// * **The six `plan_` twins.** Plan mode calls them IN CODE —
+    /// * **The seven `plan_` twins.** Plan mode calls them IN CODE —
     ///   `AssistAgent.showPlan` builds the call itself from the write the model
     ///   already chose — so the model never has to name one. They were about a
     ///   third of the prompt and bought nothing.
