@@ -239,7 +239,13 @@ Neither app contains toolchain logic of its own: they write the same
    ```
 
    Do that on any machine that has not, and check `git config --get
-   core.hooksPath` before assuming you are covered. The seven bad commits are
+   core.hooksPath` before assuming you are covered. `.githooks/pre-commit`
+   rides on the same opt-in and does two things, neither of which blocks: it
+   says when a commit touches the publishing path, and — since 2026-09-08 — it
+   says when a staged file carries carriage returns, this repository being LF.
+   `.gitattributes` handles ordinary CRLF drift on its own; the hook exists for
+   the shape it cannot, an editor writing CR CR LF, which git normalises only
+   halfway and which once produced 7,672 insertions for 264 lines of work. The seven bad commits are
    left as they are: removing them from GitHub's contributor list would mean
    rewriting `main` and `dev` and breaking every existing clone, which costs
    more than it buys. The failure
