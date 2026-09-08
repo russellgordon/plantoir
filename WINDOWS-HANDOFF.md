@@ -2036,8 +2036,27 @@ to run in the background.
     six levers that look like they should fix it", below. Read it only if you
     ever hit something of this shape; it is written for that moment.
 
-40. **Your `TheRowsAreTheContractsRowsInTheContractsOrder` builds ONE course,
-    so it cannot catch the retired placeholder sentence coming back.** The
+40. ~~**Your `TheRowsAreTheContractsRowsInTheContractsOrder` builds ONE course,
+    so it cannot catch the retired placeholder sentence coming back.**~~
+    ✅ Done 2026-09-08 (branch `issue/folders-help-row-check-cases`;
+    `GUI-IMPROVEMENTS.md` row 450, full entry in `MAC-HANDOFF.md`). The check
+    loops `specialFoldersHelp.cases` through the existing `CourseFrom(figure)`
+    helper — count, `what`, `why` and the `namedFrom: "fixed"` names per
+    case, the case's own name in every message — and asserts at the end
+    that both branches were reached. **Both traps honoured**, and the
+    reversion was reproduced here rather than the mac's numbers being
+    inherited: introducing a placeholder-only variant of the curriculum `why`
+    leaves the OLD test at 5 tests / 0 failures and fails the NEW one with 2
+    mismatches, naming "asked and cleared: an empty pool is a real answer" and
+    "more than one class folder is listed, not just the first" — the same
+    two cases the mac's reversion named. **One deviation, and it is a fact
+    about the harnesses rather than a shortcut: xUnit's `Assert` THROWS where
+    XCTest records and carries on**, so a literal port would have left the
+    `continue` guard below unreachable and named ONE case where the mac names
+    two. Mismatches are collected and asserted together at the end instead,
+    which is what makes the guard real. Worth a sentence in any future item
+    that tells Windows to keep going after a recorded failure. No product code
+    and no teacher-facing sentence changed. The original item follows. The
     other half of the same test file as item 32 — which is now done, and this
     is not: item 32 fixed the jargon SWEEP, and a sweep cannot stand in for
     this. Raised on the mac 2026-09-06 (`GUI-IMPROVEMENTS.md` row 446).
