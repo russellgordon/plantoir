@@ -122,10 +122,20 @@ separate piece.
 earlier draft of this entry said "last", which would have told you the audit
 was finished. One control above this one, the coverage-notes toggle says
 "Explain the map on the page" on the mac and "Include explanations on
-Curriculum Coverage page" on Windows, and Windows draws two caption sentences
-there that the mac has no counterpart for. None of the four is in any
-contract. Nothing is owed on it yet; it is `WINDOWS-HANDOFF.md` item 43 so it
-is not lost.
+Curriculum Coverage page" on Windows — in Course Settings AND in the wizard,
+so that is the same divergence twice. Nothing pins any of it.
+
+**The captions beside it are two different problems, and a first draft of this
+entry got it wrong in the direction that would have cost you work.** It said
+Windows draws two sentences "the mac has no counterpart for". That is true in
+Course Settings, where the mac shows no caption at all — and false in the
+wizard, where the mac has had its own since it was built
+(`NewCourseWizardView.swift:756` and `:766`) and they are markedly better than
+this side's, because they say what a teacher will SEE rather than what the
+switch does. So the wizard is an ordinary pick-one-of-two and the mac's
+probably win; only Course Settings asks whether the mac gains a sentence or
+Windows drops two. Eight strings, not four. Nothing is owed today; it is
+`WINDOWS-HANDOFF.md` item 43, quoted in full there, so it is not lost.
 
 **One proposed 2026-09-07, and nothing goes red for it: the Course Settings
 tip sentence, which item 37 had been waiting on this side to choose** —
