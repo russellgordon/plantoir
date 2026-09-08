@@ -250,7 +250,18 @@ enum DeployCommand {
         // publish over last year's site on the next deploy — the whole defect,
         // in exactly the folders old enough to have taught somebody something.
         // Netlify only: there has never been a Cloudflare equivalent.
+        //
+        // **It lives in the BUILT OUTPUT, not beside the teacher's pages**, and
+        // getting that wrong is the easy mistake: `deploy.py` computes it from
+        // `section_dir`, which is `merged_output_root(...)/section<N>`
+        // (`scripts/deploy.py:1001-1004`), never the content folder. An earlier
+        // version of this released `courses/<CODE>/section<N>/.netlify_site.json`
+        // — a path that has never held a marker in any version of the layout —
+        // so it did nothing at all. `.merged_output` is a symlink out to
+        // Application Support, and it may not exist yet; that is ordinary and
+        // not a failure.
         let legacyURL: URL = course.directoryURL
+            .appendingPathComponent(".merged_output")
             .appendingPathComponent("section\(sectionNumber)")
             .appendingPathComponent(".netlify_site.json")
         if FileManager.default.fileExists(atPath: legacyURL.path) {

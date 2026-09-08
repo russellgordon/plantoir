@@ -2183,10 +2183,39 @@ final class AssistToolRunner {
             askForTheTimetableIfReDatingNeedsIt(problem, arguments)
             return AssistToolOutcome.couldNotRead(problem.localizedDescription)
         case .success(let asked):
+            // A ROLLOVER carrying an answer is still a plan even when the
+            // dates are already right, and this is what makes the answer turn
+            // work at all under plan mode — which is ON unless a teacher has
+            // turned it off. `showPlan` returns early whenever the twin hands
+            // back something that is not a plan, so returning "already on the
+            // day it should be" here meant the real call never ran and the
+            // website was never settled. In the default configuration that
+            // made the release unreachable.
+            let websiteAnswer: String = text("website", in: arguments).lowercased()
+            let isRollover: Bool = text("rollover", in: arguments).lowercased() == "yes"
             if asked.plan.changesNothing {
                 let already: String = "Every page in \(asked.located.course.code) Section "
                                     + "\(asked.located.sectionNumber) is already on the day it should be."
-                return AssistToolOutcome.wrote(already, detail: already)
+                guard isRollover, websiteAnswer == "new" || websiteAnswer == "same" else {
+                    return AssistToolOutcome.wrote(already, detail: already)
+                }
+                return AssistToolOutcome.planned(
+                    already,
+                    plan: websiteAnswer == "new"
+                        ? "Start a new website for this section, so publishing it no longer replaces "
+                        + "last year's. Last year's details are kept, and any publish set to happen "
+                        + "on its own is turned off."
+                        : "Keep publishing this section to the same website as last year."
+                )
+            }
+            if isRollover, websiteAnswer == "new" {
+                return AssistToolOutcome.planned(
+                    "Worked out what rolling that section over would do.",
+                    plan: asked.plan.describe()
+                        + "\n\nIt would also start a new website for this section, so publishing it "
+                        + "no longer replaces last year's. Last year's details are kept, and any "
+                        + "publish set to happen on its own is turned off."
+                )
             }
             return AssistToolOutcome.planned(
                 "Worked out what re-dating that section would do.",
@@ -2214,16 +2243,21 @@ final class AssistToolRunner {
                 // never mentioned the website, and left the section pinned to
                 // last year's. An offer that looks like it worked is worse than
                 // no offer at all.
-                var detail: String = already
+                var said: String = already
                 let aboutTheWebsite: String = settleTheWebsiteAfterARollover(
                     arguments,
                     course: asked.located.course,
                     sectionNumber: asked.located.sectionNumber
                 )
+                // Into the SUMMARY, which is what a teacher reads. `detail` is
+                // shown only behind a "Show me" disclosure, and only when the
+                // outcome carries a `teacherDetail` — which `wrote` does not.
+                // Putting the question there made the whole feature invisible
+                // in the app and left it working over MCP alone.
                 if aboutTheWebsite.isEmpty == false {
-                    detail += "\n\n" + aboutTheWebsite
+                    said += "\n\n" + aboutTheWebsite
                 }
-                return AssistToolOutcome.wrote(already, detail: detail)
+                return AssistToolOutcome.wrote(said, detail: said)
             }
 
             let backedUp: Bool = backUpOnceForThisConversation(
@@ -2263,10 +2297,15 @@ final class AssistToolRunner {
             let aboutTheWebsite: String = settleTheWebsiteAfterARollover(
                 arguments, course: asked.located.course, sectionNumber: asked.located.sectionNumber
             )
+            // The website goes in the SUMMARY beside the count of what moved:
+            // it is the part a teacher has to answer, and `detail` is not shown
+            // to them at all for a write.
+            var said: String = summary
             if aboutTheWebsite.isEmpty == false {
+                said += "\n\n" + aboutTheWebsite
                 detail += "\n\n" + aboutTheWebsite
             }
-            return AssistToolOutcome.wrote(summary, detail: detail)
+            return AssistToolOutcome.wrote(said, detail: detail)
         }
     }
 
@@ -2291,11 +2330,17 @@ final class AssistToolRunner {
         course: Course,
         sectionNumber: Int
     ) -> String {
-        guard text("rollover", in: arguments).lowercased() == "yes" else {
+        let answer: String = text("website", in: arguments).lowercased()
+        // Either the app's card phrasing said so, or a caller answered the
+        // question outright. Over MCP there is no card, so `website` alone has
+        // to be enough — otherwise the one surface that cannot show a sheet
+        // also cannot roll a section over, which is the hole this design was
+        // supposed to close. An ordinary re-date sets neither and is untouched.
+        let isRollover: Bool = text("rollover", in: arguments).lowercased() == "yes"
+                            || answer == "new" || answer == "same"
+        guard isRollover else {
             return ""
         }
-
-        let answer: String = text("website", in: arguments).lowercased()
         if answer == "same" {
             ActivityTrail.note(
                 .sectionKeptItsWebsiteOnRollover,

@@ -2127,13 +2127,46 @@ to run in the background.
       course can carry additional targets. The mac releases every type; the
       rule is now `contracts/file-formats.json` →
       `firstDeployMarkers.releasedWhenASectionRollsOver`.
-    - **The LEGACY marker is not released either.** `deploy.py` still reads
-      `courses/<CODE>/section<N>/.netlify_site.json` and migrates it back into
-      the stable path (`load_netlify_marker`, `scripts/deploy.py:454`). A
-      folder old enough to hold one is told "never published" and then
-      publishes over last year's site. Netlify only — there has never been a
-      Cloudflare equivalent. The mac releases it under
-      `.netlify_site.previous-<stamp>.json`.
+    - **The LEGACY marker is not released either, and it is NOT where you would
+      guess.** `deploy.py` still reads it and migrates it back into the stable
+      path (`load_netlify_marker`, `scripts/deploy.py:454`), and it lives at
+      `<CODE>/.merged_output/section<N>/.netlify_site.json` — in the BUILT
+      OUTPUT, never beside the teacher's pages. The mac got this wrong first
+      time and released a content-folder path that has never held a marker in
+      any version of the layout, so the fix did nothing at all; `section_dir`
+      in `deploy.py` is `merged_output_root(...)/section<N>`
+      (`scripts/deploy.py:1001-1004`). A folder old enough to hold one is told
+      "never published" and then publishes over last year's site. Netlify only
+      — there has never been a Cloudflare equivalent. The mac releases it as
+      `.netlify_site.previous-<stamp>.json`, and tolerates the output folder
+      being absent, which is ordinary.
+
+    **Three traps found only at the third review, all of them "the feature is
+    invisible or unreachable" rather than "the feature is wrong".** Read these
+    before you build, because each passed a green suite.
+
+    - **The question has to be in the SUMMARY, not the detail.** On the mac
+      `AssistToolOutcome.wrote` leaves `teacherDetail` nil and the window
+      renders that, so text put in `detail` never reaches a teacher: the
+      feature worked over MCP alone and showed "Re-dated 3 classes…" and no
+      question in the app. Check whatever the equivalent is on your side before
+      assuming your reply is seen.
+    - **Plan mode is ON by default, and a plan twin that returns a WRITE
+      dead-ends the answer.** The mac's `showPlan` returns early whenever the
+      twin hands back something that is not a plan — and the twin's "already on
+      the day it should be" is a write, which is exactly what the answer turn
+      produces, since the dates are right by then. In the default configuration
+      the release was unreachable. The twin now still offers a plan when only
+      the website would change.
+    - **`website` is on the PUBLISHED schema; `rollover` is not.** In the app
+      the card supplies both and no model is involved. Over MCP there is no
+      card, so a client with no declared argument could not roll a section over
+      at all — which made the "answer in words rather than with a sheet"
+      reasoning wrong for the one surface that reasoning was about. It costs no
+      routing: `re_date_classes` is hidden from the local model, so only Claude
+      Code ever sees the schema. **This changes `toolSchemas` on your side of
+      the contract**, so expect `AssistSurfaceContractTests` to ask for
+      `website` — that is the request arriving, not damage.
 
     **What you inherit unchanged:** the kept filename
     `section<N>.previous-yyyy-MM-dd_HHmmss.json` is yours already and the mac
