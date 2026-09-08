@@ -3655,9 +3655,18 @@ def _dropping_excluded_items(cfg: dict) -> dict:
 
 def preflight_update_course_config(course_dir: Path, section_dir: Path, config_path: Path,
                                    _attempt: int = 0) -> dict:
-    """Discover new items and append them to course_config.json (add-only). Return updated config dict.
+    """Discover new items and append them to course_config.json. Return updated config dict.
     Also: any newly discovered folders are marked not hidden and added to the expandable list.
     Excludes any items listed in excluded_items (skips discovery, does not un-hide, and manages index.md note).
+
+    NOT add-only, and this docstring said it was until 2026-09-07. Since
+    2026-08-24 (GUI-IMPROVEMENTS row 377) excluded_items is AUTHORITATIVE:
+    a name listed there is also DROPPED from shared_folders / shared_files /
+    per_section_folders / per_section_files if it is found back in one, with a
+    console line saying so and the config written back. Without that, a hand
+    edit or an app that wrote the key without removing the name produced a site
+    that published a folder while the console and the index.md note both said
+    it was excluded.
     """
     # Read the BYTES, not just the parsed object: the write at the end of this
     # function is a compare-and-swap against exactly what was read here.
@@ -3670,7 +3679,9 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     # the rename's keys simply vanished, leaving the folders moved and the
     # configuration naming the old name. Redoing the discovery against the new
     # contents is safe, because it is a pure function of (what is on disk,
-    # what the config says) and is add-only.
+    # what the config says). It is not add-only — an excluded name is dropped
+    # from the copy lists — but that is a function of the same two inputs, so
+    # redoing it against newer contents still cannot lose anything.
     try:
         with open(config_path, "rb") as f:
             config_bytes_when_read = f.read()
@@ -3747,7 +3758,7 @@ def preflight_update_course_config(course_dir: Path, section_dir: Path, config_p
     new_shared_folders = [x for x in allowed_disc_shared_folders if x not in shared_folders]
     new_sec_folders = [x for x in allowed_disc_sec_folders if x not in per_section_folders]
 
-    # Append-only updates for copy lists
+    # Appends only — the excluded names were already dropped, above
     added_sf = _safe_unique_append(shared_folders, allowed_disc_shared_folders)
     added_sfi = _safe_unique_append(shared_files, allowed_disc_shared_files)
     added_psf = _safe_unique_append(per_section_folders, allowed_disc_sec_folders)
