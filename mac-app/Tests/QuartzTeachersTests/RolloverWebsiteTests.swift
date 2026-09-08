@@ -388,6 +388,88 @@ final class RolloverWebsiteTests: XCTestCase {
         XCTAssertEqual(release.stillPinned, [".netlify_sites/section1.json"])
     }
 
+
+    // MARK: - The teacher has to be able to SEE it
+
+    /// The question must be in the SUMMARY, not the detail.
+    ///
+    /// `AssistToolOutcome.wrote` leaves `teacherDetail` nil, and the window
+    /// renders `entry.detail` from that — so anything put only in `detail` is
+    /// invisible in the app and the feature works over MCP alone. The first
+    /// version of this did exactly that: a teacher saw "Re-dated 3 classes…"
+    /// and no question at all.
+    @MainActor
+    func testTheQuestionIsInWhatTheTeacherActuallyReads() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let outcome: AssistToolOutcome = await runTool(
+            runner, course: course, arguments: ["rollover": "yes"]
+        )
+        XCTAssertTrue(
+            outcome.summary.contains(AssistWording.rolloverWebsiteQuestion),
+            "The question must be in the summary, which is what a teacher reads: \(outcome.summary)"
+        )
+    }
+
+    /// An MCP client has no card, so `website` alone must be enough.
+    ///
+    /// It is the one surface that cannot show a sheet — which is the whole
+    /// stated reason this is answered in words — so a caller that could not
+    /// say which website the teacher chose could not roll a section over at
+    /// all. `website` is on the published schema for exactly this.
+    @MainActor
+    func testAnMCPCallerCanRollOverWithWebsiteAlone() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // No `rollover` key, as an MCP client would call it.
+        let said: String = await reDate(runner, course: course, arguments: ["website": "new"])
+        XCTAssertTrue(said.contains("no longer tied to last year"), said)
+        let live: URL = course.directoryURL.appendingPathComponent(".netlify_sites/section1.json")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: live.path))
+    }
+
+    /// `website` is on the schema so a Claude Code session can set it.
+    @MainActor
+    func testWebsiteIsOnThePublishedSchemaButRolloverIsNot() throws {
+        let tool: AssistToolDefinition = try XCTUnwrap(
+            AssistToolRunner.tools.first(where: { $0.name == "re_date_classes" })
+        )
+        XCTAssertNotNil(tool.parameters["website"], "An MCP client must be able to answer.")
+        XCTAssertNil(
+            tool.parameters["rollover"],
+            "`rollover` stays off the schema: the app's card supplies it and no model needs it."
+        )
+    }
+
+    /// Under plan mode — which is ON by default — the answer turn must still
+    /// reach the real call.
+    ///
+    /// `showPlan` returns early whenever the twin hands back something that is
+    /// not a plan. The twin's "already on the day it should be" is a write, so
+    /// the answer turn dead-ended and the website was never settled: in the
+    /// DEFAULT configuration the release was unreachable.
+    @MainActor
+    func testThePlanTwinStillPlansWhenOnlyTheWebsiteWouldChange() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // First turn re-dates, so the pages are already right by the second.
+        _ = await reDate(runner, course: course, arguments: ["rollover": "yes"])
+
+        let outcome: AssistToolOutcome = await runTool(
+            runner, course: course,
+            arguments: ["rollover": "yes", "website": "new"],
+            tool: "plan_re_date_classes"
+        )
+        XCTAssertTrue(
+            outcome.isPlan,
+            "The twin must still offer a PLAN, or plan mode swallows the answer and the "
+            + "website is never settled: \(outcome.summary)"
+        )
+    }
+
     // MARK: - Helpers
 
 
@@ -434,6 +516,27 @@ final class RolloverWebsiteTests: XCTestCase {
             atomically: true, encoding: .utf8
         )
         return (made.root, made.course, made.runner)
+    }
+
+    /// Run a tool and hand back the whole outcome.
+    @MainActor
+    private func runTool(
+        _ runner: AssistToolRunner, course: Course, arguments: [String: Any],
+        tool: String = "re_date_classes"
+    ) async -> AssistToolOutcome {
+        var full: [String: Any] = arguments
+        full["course"] = course.code
+        full["section"] = 1
+        let encoded: Data = (try? JSONSerialization.data(withJSONObject: full)) ?? Data("{}".utf8)
+        return await runner.run(
+            call: AssistToolCall(
+                id: UUID().uuidString,
+                type: "function",
+                function: AssistToolCall.Function(
+                    name: tool, arguments: String(decoding: encoded, as: UTF8.self)
+                )
+            )
+        )
     }
 
     /// Run `re_date_classes` and hand back what the teacher would read.

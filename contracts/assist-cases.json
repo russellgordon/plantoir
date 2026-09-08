@@ -1605,7 +1605,7 @@
       },
       {
         "function" : {
-          "description" : "TEACHERS SAY: \"re-date my classes\", \"roll this section over to a new year\", \"put my classes on this year's dates\". Re-date every class in a section onto the class dates on file, by POSITION — the first class takes the first date — and move the pages each class uses onto that class's day with it. Pages this section's Key Links points at move to the first day of class. Curriculum pages are left alone, because Plantoir dates those itself on every build.",
+          "description" : "TEACHERS SAY: \"re-date my classes\", \"roll this section over to a new year\", \"put my classes on this year's dates\". Re-date every class in a section onto the class dates on file, by POSITION — the first class takes the first date — and move the pages each class uses onto that class's day with it. Pages this section's Key Links points at move to the first day of class. Curriculum pages are left alone, because Plantoir dates those itself on every build. Set `website` when the teacher is rolling a section over to a NEW YEAR and has said which website they want: \"new\" starts a fresh one, so publishing no longer replaces last year's site, and \"same\" keeps last year's address. Ask them first — never choose for them, and leave it out for an ordinary re-dating.",
           "name" : "re_date_classes",
           "parameters" : {
             "properties" : {
@@ -1616,6 +1616,10 @@
               "section" : {
                 "description" : "The section number, for example 1.",
                 "type" : "integer"
+              },
+              "website" : {
+                "description" : "Either \"new\" or \"same\", when a teacher rolling this section over to a new year has said which website they want. Leave empty otherwise.",
+                "type" : "string"
               }
             },
             "required" : [

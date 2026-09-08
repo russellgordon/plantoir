@@ -199,7 +199,7 @@
     ],
   "releasedWhenASectionRollsOver": {
     "name": "section<N>.previous-yyyy-MM-dd_HHmmss.json, beside the marker it replaces",
-    "legacyName": ".netlify_site.previous-yyyy-MM-dd_HHmmss.json, for the older marker inside section<N>/ that deploy.py still reads and migrates",
+    "legacyName": ".netlify_site.previous-yyyy-MM-dd_HHmmss.json, for the older marker at <CODE>/.merged_output/section<N>/.netlify_site.json \u2014 in the BUILT OUTPUT, never beside the teacher's pages \u2014 which deploy.py still reads and migrates back into the stable path",
     "rule": "Cutting a section loose from last year's website RENAMES its marker aside, never deletes it, and does so for EVERY destination type rather than only the one the course is configured for now.",
     "why": "Renamed rather than deleted because the file holds the site's id and its admin address, and a teacher who decides they wanted last year's website after all has no other way back to it. Every destination rather than the primary one because markers are keyed purely by destination TYPE and a course can carry additional targets, so releasing only the primary leaves an additional destination still overwriting last year's site. The name is frozen and shared so a teacher is told the same filename whichever app they are sitting at.",
     "windowsOwes": "Windows' AssistWorkspace.ReleaseSite returns inside the first folder that holds a marker, so a section pinned to both Netlify and Cloudflare has only its Netlify marker released and still publishes over last year's Cloudflare site. It also does not know the legacy path.",
