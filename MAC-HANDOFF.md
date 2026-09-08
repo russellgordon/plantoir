@@ -2618,7 +2618,11 @@ rather than being deleted.
   a behaviour XCTest has and xUnit does not, so a literal port makes the guard
   dead code and reports one failure where the mac reports several. Worth a
   sentence when writing the next such item, rather than being rediscovered.
-  Full entry, with the numbers measured on this PC, in the ledger below.
+  **This is an INDEX, not a second home for the entry** — the first in
+  this file to sit in two sections, and deliberately so: the numbers, the
+  rejected options and what landed are all in the ledger below, and only the
+  generalisable lesson is here, where a mac reader who never scrolls that far
+  will still meet it.
 
 - **Item 39 answered: `Plantoir.UiTests` cannot crash its host the way the
   mac's suite did — measured — and the strengthened `oneAlertAtATime` reason
@@ -4281,15 +4285,27 @@ is what happened to the test-race item, sitting here for three days with
   behaviour XCTest has natively and makes the `continue` guard real. **It is
   also the established pattern in this test project rather than something
   invented for this branch** — `AssistSurfaceContractTests`,
-  `SharedRuleContractTests`, `PublishAndLauncherContractTests`,
-  `MilestoneContractTests`, `GradedFolderContractTests` and `ContractTests` all
-  gather offenders into a `List<string>` and report them joined, for the same
-  reason. Confirmed by review rather than assumed. **Rejected:
+  `SharedRuleContractTests`, `PublishAndLauncherContractTests` and
+  `MilestoneContractTests` gather offenders into a `List<string>` and report
+  them joined, for the same reason. **Four, and the first draft of this entry
+  said SIX**, adding `GradedFolderContractTests` and `ContractTests` —
+  neither of which does it: the first has no `string.Join` at all and its only
+  `List<string>` is a product-model assignment, and the second's `allStrings`
+  is a list of INPUTS to scan whose loop `Assert.False`s per term, so it throws
+  on the first offender — the pattern this branch moved AWAY from. The
+  draft also called itself "confirmed by review rather than assumed", which is
+  the worse half of the mistake: it claimed the very check that would have
+  caught it. Corrected after the counts were actually run. **Rejected:
   leaving the Asserts to throw** (simpler, and the trap item 40 spelled out
   would then be decoration), **and splitting the cases into an xUnit `[Theory]`
   with a `MemberData` source** — tempting, since it would name each failing
   case as its own test, but the both-branches-reached check has to see every
-  case in one run, and a Theory cannot assert across its own rows. That check is
+  case in one run, and a Theory cannot assert across its own rows: xUnit builds
+  a fresh test-class instance per row and offers no "after all rows" hook. The
+  one workaround — static counters asserted from a collection fixture's
+  `Dispose` — is worse in a way worth naming, because it would FALSE-FAIL
+  on any filtered run (`--filter`, or one row from Test Explorer), a single
+  row being able to reach only one branch. That check is
   the half that stops the case list quietly drifting back to all-have-a-folder,
   so it decided it.
 
@@ -4859,7 +4875,7 @@ where.
   placeholder branch's explanation is pinned to the contract character for
   character — the same reversion now fails 2 assertions. See
   `GUI-IMPROVEMENTS.md` row 446; Windows owes the same change, which is item
-  40. Nothing in the retirement itself was wrong: the sentence was gone, and
+  40 — ✅ done 2026-09-08, see the ledger. Nothing in the retirement itself was wrong: the sentence was gone, and
   it stays gone.
 
 - ✅ DONE (mac, 2026-09-06, branch `issue/folder-rename-space-links`, commit

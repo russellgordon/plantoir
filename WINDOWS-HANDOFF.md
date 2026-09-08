@@ -2046,8 +2046,11 @@ to run in the background.
     that both branches were reached. **Both traps honoured**, and the
     reversion was reproduced here rather than the mac's numbers being
     inherited: introducing a placeholder-only variant of the curriculum `why`
-    leaves the OLD test at 5 tests / 0 failures and fails the NEW one with 2
-    mismatches, naming "asked and cleared: an empty pool is a real answer" and
+    leaves the OLD test at 5 tests / 0 failures and the NEW one at 5 tests /
+    **1 failed**, whose message lists **2 mismatches** — not "2 failures",
+    which is the mac's number for the same reversion fifty lines below, and the
+    difference is the whole point of the deviation named next: naming
+    "asked and cleared: an empty pool is a real answer" and
     "more than one class folder is listed, not just the first" — the same
     two cases the mac's reversion named. **One deviation, and it is a fact
     about the harnesses rather than a shortcut: xUnit's `Assert` THROWS where
@@ -2058,8 +2061,8 @@ to run in the background.
     that tells Windows to keep going after a recorded failure. No product code
     and no teacher-facing sentence changed. The original item follows. The
     other half of the same test file as item 32 — which is now done, and this
-    is not: item 32 fixed the jargon SWEEP, and a sweep cannot stand in for
-    this. Raised on the mac 2026-09-06 (`GUI-IMPROVEMENTS.md` row 446).
+    is not (as of the day this was written; both are done now): item 32 fixed
+    the jargon SWEEP, and a sweep cannot stand in for this. Raised on the mac 2026-09-06 (`GUI-IMPROVEMENTS.md` row 446).
 
     **The hole: it builds ONE course and that course has a curriculum
     folder** (`SpecialFoldersHelpContractTests.cs:96-98`, shared
