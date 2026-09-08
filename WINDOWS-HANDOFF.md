@@ -1894,10 +1894,42 @@ to run in the background.
     WHICH sentence becomes the contract is the mac's call, and says why no case
     was proposed: proposing one would redden the mac suite over wording the mac
     already ships. That has been sitting there unactioned, which is the actual
-    state and is why it is now indexed here too. **What Windows owes: taking
+    state and is why it is now indexed here too. ~~**What Windows owes: taking
     the mac's wording verbatim once the mac picks it**, and nothing before
     that. **Not for tonight** — it is a decision about what a teacher reads,
-    not a defect.
+    not a defect.~~
+
+    **✅ Done 2026-09-07** (branch `issue/course-settings-tip-contract`) — and
+    the last two sentences above are struck because the decision went the other
+    way. Russell made the call in a Windows session and chose WINDOWS'
+    substance: the mac's six-word bracket named no remedy, and row 377 had made
+    the rule it glosses permanent the same day it was written. The case is
+    `contracts/shared-rules.json` → `specialNames.contentStructureTip`:
+
+    > Tip: you can also simply create new folders and files in Obsidian —
+    > they’re added to your site automatically the next time you preview. The
+    > exception is anything you remove here: it stays off your site, even if
+    > you make it again in Obsidian, until you add it back here.
+
+    Two edits to what this app already shipped, and one that matters more than
+    either. "on this page" became "here", matching the sibling sentence
+    `removeLeavesTheFolderOnDisk` shown in the same view; the straight
+    apostrophe became the typographic one, which every other string in
+    `SpecialNames.cs` already used. **And "folders" became "folders and
+    files"** — the caption sits under FOUR list editors, two of them file
+    lists, and `build_site.py` discovers and excludes files identically, so
+    BOTH apps had been promising only half of what the code does. That gap was
+    invisible while the argument was framed as "which of these two sentences
+    wins", which is worth remembering the next time an item is written that
+    way.
+
+    **Windows' side is finished**: the literal is gone from
+    `CourseSettingsView.xaml.cs`, `SpecialNames.ContentStructureTip` is the
+    single source, and three facts in `SpecialNamesContractTests` pin it (1206
+    tests green). **The mac now owes the adoption** and is not red meanwhile —
+    no mac test pins the key. It is listed at the top of `MAC-HANDOFF.md`'s
+    "Open — what the mac still owes", with the reasoning and the two traps in
+    "Contract cases waiting on the mac".
 
 38. ~~**The two apps wrote a teacher's visibility flag differently, and the
     contract described the mac's way.**~~ ✅ Done 2026-09-07 (branch

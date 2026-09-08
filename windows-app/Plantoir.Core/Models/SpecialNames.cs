@@ -3,8 +3,10 @@ using System;
 namespace Plantoir.Core.Models;
 
 /// <summary>
-/// What a teacher is told when a folder or file a feature depends on cannot
-/// simply be removed.
+/// What a teacher is told about the folders and files a course is built from:
+/// which ones a feature depends on and so cannot simply be removed, what
+/// adding or removing one actually does, and how the lists in Course Settings
+/// relate to what they do in Obsidian.
 ///
 /// <para><b>Every sentence here is pinned to
 /// <c>contracts/shared-rules.json</c> -> <c>specialNames</c> by
@@ -217,6 +219,27 @@ public static class SpecialNames
     /// <summary>Removal excludes; it has never deleted anything, and teachers could not tell.</summary>
     public const string RemoveLeavesTheFolderOnDisk =
         "“{name}” and everything in it stays on this PC — this only takes it off your website. Add it back here to include it again.";
+
+    /// <summary>
+    /// The caption under the four Content Structure lists in Course Settings.
+    ///
+    /// <para>The two apps had worded this rule differently since the day it was
+    /// written and neither pinned it; this wording was proposed from Windows
+    /// 2026-09-07 and is now <c>specialNames.contentStructureTip</c>. It says
+    /// "folders and files" because the caption sits under four lists of which
+    /// two are file lists, and exclusion works identically for both — the
+    /// earlier sentences on BOTH platforms promised only the folder half.</para>
+    ///
+    /// <para>Unlike its neighbours this is not a removal-blocked sentence, so
+    /// it carries no <c>reason</c> key in the contract and
+    /// <c>NoBlockedSentenceInTheContractIsUnusedHere</c> steps over it. It is
+    /// also deliberately absent from
+    /// <c>TheLongestSentenceIsStillTheOneTheFlyoutWasSizedFor</c>: it is a
+    /// caption that wraps, not a flyout sentence, and it is far longer than the
+    /// one that test exists to name.</para>
+    /// </summary>
+    public const string ContentStructureTip =
+        "Tip: you can also simply create new folders and files in Obsidian — they’re added to your site automatically the next time you preview. The exception is anything you remove here: it stays off your site, even if you make it again in Obsidian, until you add it back here.";
 
     /// <summary>
     /// Shown inside the rename sheet when it opens on a rename that stopped
