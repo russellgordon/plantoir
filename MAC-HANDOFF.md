@@ -730,12 +730,22 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
   **"Already covered under another name" is NOT empty, though the first draft
   of this entry said it was.** `add_next_class` is the one-page case of
-  `add_classes` AND — through its `duplicate` argument — the one-class case of
-  `make_room_for_classes`; both engines are already called from
-  `AssistToolRunner`. So two of the six in the product bucket are widenings of
-  something that ships, not new features, and that is the single most useful
-  correction in this entry: it moves them from "a feature each" to "an argument
-  each".
+  `add_classes` AND — through a `duplicate` key on the same call — the
+  one-class case of `make_room_for_classes`; both ENGINES are already called
+  from `AssistToolRunner`. So two of the six in the product bucket are
+  widenings of something that ships, not new features, and that is the single
+  most useful correction in this entry.
+
+  **Do not read "widening" as "add a bigger number", which is how this was
+  first written.** `duplicate` is on NO published schema — `AssistToolSurface`
+  declares `course` and `section` for `add_next_class` and nothing else, and
+  `contracts/assist-cases.json` carries `duplicate` only under `cardPhrasings`.
+  The sole supplier is the hardcoded card sentence at
+  `AssistCardCommand.swift:85`, so no local model and no MCP client can reach
+  that path at all. `ClassInsertionPlanner` is wired up; the ROUTE to it is one
+  typed sentence. What the mac needs is a schema argument, and for
+  `make_room_for_classes` an MCP route that does not exist yet — still far less
+  than an engine, but more than a count.
 
   **PRODUCT — belongs on the mac. In this order.**
 
