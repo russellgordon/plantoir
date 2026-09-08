@@ -237,7 +237,18 @@ Tests touching **preview leases or the publish registry** belong in the
 xUnit parallelises test classes. Skipping that produces an intermittent failure
 that looks exactly like a production bug and is not one.
 
-`verify.sh` does **not** run here (bash, and it expects `docker` on PATH).
-Toolchain changes made on this side have no automated gate — verify them by
-driving a real publish through the app, and say so in `MAC-HANDOFF.md` so the
-mac re-runs `verify.sh` after the next sync.
+`verify.sh` does **not** run here (bash, and it expects `docker` on PATH), but
+"no automated gate" — what this said until 2026-09-07 — is no longer true.
+Split it in two:
+
+- **The shared Python IS gated here.** `dotnet test` runs every
+  `scripts/test_*.py` through `PythonToolchainTests` — all fifteen, the same
+  files `verify.sh` runs on the mac, in about eight seconds with no Docker,
+  network or credentials. Until then this side ran none of them, so a shared
+  file could be broken from this machine with every gate on it green.
+- **The IMAGE is not.** Nothing here builds the Docker image or checks the
+  baked files. Verify those by driving a real publish through the app, and say
+  so in `MAC-HANDOFF.md` so the mac re-runs `verify.sh` after the next sync.
+  For publishing specifically that means `verify-deploy.ps1`, which
+  `RELEASING.md` requires — with nothing skipped — for a release that changes
+  the publishing path.
