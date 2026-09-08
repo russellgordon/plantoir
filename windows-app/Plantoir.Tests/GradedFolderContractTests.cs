@@ -267,4 +267,66 @@ public class GradedFolderContractTests
 
         Assert.Equal("Ontario Curriculum", config.ResolvedCurriculumFolder);
     }
+
+    // ---- What a teacher reads on the Marks control ------------------------
+
+    /// <summary>
+    /// The list title and its caption are the contract's, word for word.
+    /// Pinned because they are sentences a teacher reads, and because the two
+    /// apps had worded them differently since the control was built with
+    /// nothing to catch it.
+    /// </summary>
+    [Fact]
+    public void TheMarksWordingIsTheContractsOwn()
+    {
+        var wording = SharedRules["gradedFolders"]!["wording"]!;
+        Assert.Equal(wording["listTitle"]!.ToString(), GradedFolderRule.ListTitle);
+        Assert.Equal(wording["caption"]!.ToString(), GradedFolderRule.Caption);
+    }
+
+    /// <summary>
+    /// The caption says "tick" and never "add" or "remove".
+    ///
+    /// <para>This list is a tick list: <c>MembershipToggleList</c> renders
+    /// checkboxes and offers no Add button, so a teacher told to "add Tests"
+    /// is being pointed at a control that cannot do it. And "remove what you
+    /// don't" invites the one action the product refuses outright — unticking
+    /// the last graded folder while the coverage map is on
+    /// (<see cref="SpecialNames.LastGradedFolderBlocked"/>). Both verbs were
+    /// in the mac's wording, which is why this is asserted rather than left
+    /// to review.</para>
+    /// </summary>
+    [Fact]
+    public void TheMarksCaptionNamesOnlyActionsThisControlOffers()
+    {
+        string caption = SharedRules["gradedFolders"]!["wording"]!["caption"]!.ToString();
+
+        Assert.Contains("tick", caption, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("add ", caption, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("remove", caption, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The map is called what the rest of THIS screen calls it.
+    ///
+    /// <para>Russell's choice, 2026-09-08. Two spellings are pinned: the
+    /// folders-help sheet says "the curriculum map", while the flyout raised
+    /// from this very list and the switch beside it both say "curriculum
+    /// coverage map". The caption follows the control it captions. Capital-C
+    /// "Curriculum Coverage map" is what this app used to say and is wrong:
+    /// that is the built page's TITLE, not a common noun.</para>
+    /// </summary>
+    [Fact]
+    public void TheMarksCaptionCallsTheMapWhatThisScreenCallsIt()
+    {
+        string caption = SharedRules["gradedFolders"]!["wording"]!["caption"]!.ToString();
+
+        // Case-insensitively: the phrase opens a sentence here, so it is
+        // "The curriculum coverage map". What must NOT appear is the
+        // capitalised PAGE title, which is what this app used to say.
+        Assert.Contains("curriculum coverage map", caption, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Curriculum Coverage map", caption, StringComparison.Ordinal);
+        Assert.Contains("curriculum coverage map", SpecialNames.LastGradedFolderBlocked,
+                        StringComparison.OrdinalIgnoreCase);
+    }
 }

@@ -51,6 +51,72 @@ product, not of one platform.
 
 ## Contract cases waiting on the mac
 
+**One proposed 2026-09-08, and nothing goes red for it: the Marks list's title
+and caption** — `shared-rules.json` → `gradedFolders.wording`, branch
+`issue/marks-wording-contract`. The second and last Course Settings divergence,
+found in the same audit as the tip above. Four strings pinned by nothing; the
+mac's title WINS unchanged, so the mac's only real change is the caption.
+
+> **Title:** Folders whose work counts for marks
+>
+> **Caption:** Tick the folders holding work that counts for marks. The
+> curriculum coverage map shows an expectation as evaluated when a page in one
+> of these addresses it. Most courses keep “Tasks”; tick “Tests” or anything
+> else you mark.
+
+Russell chose the title (it is also the closer match to `specialFoldersHelp`'s
+already-pinned "Work that counts for marks", so it cost this side nothing) and
+chose what the map is called. **Three things in the caption are worth the mac
+reading before adopting it, because each was argued the other way first.**
+
+**The verbs.** The mac's caption says "**add** “Tests” … and **remove** what
+you don't". This control is a tick list — `MembershipToggleListView` on the
+mac, `MembershipToggleList` here — with no Add button at all, so it has been
+naming two actions the control does not offer, and "remove what you don't"
+invites the one thing `lastGradedFolderBlocked` refuses outright. It says
+"tick" now. This is the part of the change that is a correction rather than a
+preference.
+
+**The map's name.** Both spellings are pinned already: `specialFoldersHelp`
+says "the curriculum map", while `specialNames.lastGradedFolderBlocked` — the
+flyout raised from THIS list — says "the curriculum coverage map", and the
+switch beside it is labelled "Publish the curriculum coverage map". Russell's
+call, 2026-09-08: follow the control, so the caption makes three matching names
+on one screen. `specialFoldersHelp`'s wording is knowingly left alone; **that
+is a recorded mixed state, not drift to tidy up**, and it is written into the
+contract's `why` so the next reviewer does not "harmonise" it back. Windows'
+capital-C "the Curriculum Coverage map" WAS drift and is gone — that is the
+built page's title, not a common noun.
+
+**Where the caption goes.** Below its list, on all four surfaces. The mac
+already draws it there; Windows drew it ABOVE, where "a page in one of these"
+followed the section header "Marks" and referred to nothing. Windows moved.
+**So the mac has no layout change** — but the contract now says the position
+out loud (`gradedFolders.wording.rule`), because it is what lets one string
+serve all four places instead of a per-surface variant.
+
+**What the mac does:** take the caption into `NewCourseWizardView.swift:937`
+and `CourseSettingsView.swift:190` — the title at `:932` / `:185` already
+matches — ideally via a constant rather than two literals, and assert both
+against `gradedFolders.wording`. **Nothing on the mac is red meanwhile**: no
+mac test names this key (`contracts/README.md` — "the mac reads the key but
+runs no case list yet"). Reference: `GradedFolderRule.ListTitle` / `.Caption`,
+three facts in `GradedFolderContractTests`, and
+`CourseSettingsCaptionUiTests` for whether a teacher can see it.
+
+**One trap, met here.** A Windows UI test hard-coded the old title inside an
+automation id — `member:{list title}:{name}`, built by
+`FormBuilders.MembershipToggleList` — so changing the title moved every marks
+checkbox's id, in a suite that gates nothing and would have said nothing. It
+now reads the title out of the contract. If the mac keys anything on that
+string, look before changing it.
+
+**One imprecision inherited rather than introduced, flagged not fixed:** the
+coverage map's own word is "**assessed**", and this sentence says "evaluated".
+It says it because `specialFoldersHelp` has said it since that sheet was
+written; changing it means changing that row, on both platforms, which is a
+separate piece.
+
 **One proposed 2026-09-07, and nothing goes red for it: the Course Settings
 tip sentence, which item 37 had been waiting on this side to choose** —
 `shared-rules.json` → `specialNames.contentStructureTip`, branch
@@ -365,6 +431,17 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   `windows-app/Plantoir.Tests/GradedFolderChoicesTests.cs`.
 
 ## Open — what the mac still owes
+
+- **One caption to adopt: the Marks wording is now a contract case, and the
+  mac's TITLE won.** (Windows, 2026-09-08, branch
+  `issue/marks-wording-contract`.) The title at `CourseSettingsView.swift:185`
+  and `NewCourseWizardView.swift:932` already matches, so the change is the
+  caption at `:190` / `:937`. **Nothing on the mac is red** — no mac test names
+  `gradedFolders.wording` — so this can wait for a convenient session. Read the
+  entry in **"Contract cases waiting on the mac"** above first: one of the three
+  changes is a correction rather than a preference (the mac's caption says
+  "add" and "remove" of a control that only ticks), and one is a deliberate
+  mixed state that must not be tidied up.
 
 - **One sentence to adopt: the Course Settings tip is now a contract case, and
   the mac's copy of it is the one that changes.** (Windows, 2026-09-07, branch

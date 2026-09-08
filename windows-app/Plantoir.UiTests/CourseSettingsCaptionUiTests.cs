@@ -30,6 +30,12 @@ public class CourseSettingsCaptionUiTests
             Path.Combine(AppContext.BaseDirectory, "contracts", "shared-rules.json")))!
             ["specialNames"]!["contentStructureTip"]!["message"]!.ToString();
 
+    private static string MarksCaption() =>
+        JsonNode.Parse(File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "contracts", "shared-rules.json")))!
+            ["gradedFolders"]!["wording"]!["caption"]!.ToString();
+
+
     /// <summary>
     /// The tip is rendered in Course Settings, it is the CONTRACT's sentence
     /// rather than one the view invented, and it can actually be brought into
@@ -56,9 +62,23 @@ public class CourseSettingsCaptionUiTests
         app.SelectCourse(CourseFixtures.Renamed);
 
         var form = app.Find("courseSettingsForm", "the Course Settings form");
-        string tip = ContentStructureTip();
+        ScrollUntilVisible(form, ContentStructureTip(), "the Content Structure tip");
+    }
 
-        Assert.Contains(tip, DrivenApp.TextsUnder(form));
+    /// <summary>
+    /// Assert a sentence is both PRESENT in the form and can be brought into
+    /// its viewport.
+    ///
+    /// <para>The two are different claims and the second is the one that
+    /// matters: being in the UIA tree passes for a control scrolled off the
+    /// bottom of this long form. The form is walked with its OWN Scroll
+    /// pattern — a TextBlock in a StackPanel offers no ScrollItem pattern, so
+    /// asking the caption to bring itself into view would scroll nothing while
+    /// appearing to.</para>
+    /// </summary>
+    private static void ScrollUntilVisible(AutomationElement form, string sentence, string describedAs)
+    {
+        Assert.Contains(sentence, DrivenApp.TextsUnder(form));
 
         var scroll = form.Patterns.Scroll.PatternOrDefault;
         Assert.True(scroll is not null, "the Course Settings form offers no scroll pattern");
@@ -70,7 +90,7 @@ public class CourseSettingsCaptionUiTests
             visible = Retry.WhileFalse(() =>
             {
                 var caption = form.FindAllDescendants(cf => cf.ByControlType(ControlType.Text))
-                                  .FirstOrDefault(t => SafeName(t) == tip);
+                                  .FirstOrDefault(t => SafeName(t) == sentence);
                 return caption is not null
                        && !caption.IsOffscreen
                        && !caption.BoundingRectangle.IsEmpty
@@ -79,12 +99,35 @@ public class CourseSettingsCaptionUiTests
         }
 
         Assert.True(visible,
-            "the Content Structure tip never came into view anywhere in the Course Settings form");
+            $"{describedAs} never came into view anywhere in the Course Settings form");
     }
 
     /// <summary>A name that cannot throw when the element has gone.</summary>
     private static string SafeName(AutomationElement element)
     {
         try { return element.Name ?? ""; } catch { return ""; }
+    }
+
+    /// <summary>
+    /// The Marks caption is on screen too, and it is the contract's.
+    ///
+    /// <para>Its own test rather than a second assertion in the one above,
+    /// because it sits FURTHER down the form — Marks comes after Sidebar
+    /// Visibility on this platform — and a shared scroll walk would leave
+    /// whichever failed ambiguous about which caption was missing.</para>
+    ///
+    /// <para>This is also the guard on the change that moved the caption
+    /// BELOW its list. Above it, "a page in one of these" followed the section
+    /// header and referred to nothing; a unit test comparing constants cannot
+    /// see where a control was drawn, only what it says.</para>
+    /// </summary>
+    [UiFact]
+    public void TheMarksCaptionIsOnScreenInCourseSettings()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+        app.SelectCourse(CourseFixtures.Renamed);
+
+        var form = app.Find("courseSettingsForm", "the Course Settings form");
+        ScrollUntilVisible(form, MarksCaption(), "the Marks caption");
     }
 }
