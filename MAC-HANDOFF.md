@@ -4125,6 +4125,19 @@ where.
   so the branch that carried the retired sentence — the one that had never
   run in a test on either platform — is the branch being read.
 
+  **Corrected 2026-09-06, the same day, by the session that came to verify
+  this entry: running that branch is not the same as GUARDING it, and the
+  sentence above reads as though it were.** The jargon sweep reads the
+  placeholder branch and cannot see the retired sentence in it, because
+  "mentions" is not a banned word. Measured by putting the sentence back:
+  all five folders-help tests stayed green. The gate is now the row check,
+  which runs every contract case rather than one hand-typed fixture, so the
+  placeholder branch's explanation is pinned to the contract character for
+  character — the same reversion now fails 2 assertions. See
+  `GUI-IMPROVEMENTS.md` row 446; Windows owes the same change, which is item
+  40. Nothing in the retirement itself was wrong: the sentence was gone, and
+  it stays gone.
+
 - ✅ DONE (mac, 2026-09-06, branch `issue/folder-rename-space-links`, commit
   `cd333f6f`). **A folder rename to a name with a space broke every Markdown
   link into it — and the fix for it is NOT the one Windows shipped.**
