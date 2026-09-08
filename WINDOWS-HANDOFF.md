@@ -1862,11 +1862,24 @@ to run in the background.
     (`scripts/test_baked_modules.py` read the Dockerfile and product sources
     with the locale encoding, which fails on any Windows machine).
 
-37. **The Course Settings tip sentence is pinned by no contract on either
+37. ~~**The Course Settings tip sentence is pinned by no contract on either
     platform, and the two apps word the same rule differently (audited onto
-    this list 2026-09-06).** A sentence a teacher READS belongs in `contracts/`
+    this list 2026-09-06).**~~ ✅ Done 2026-09-07 (branch
+    `issue/course-settings-tip-contract`). Russell chose WINDOWS' wording, not
+    the mac's, and widened it to cover files; it is now
+    `shared-rules.json` → `specialNames.contentStructureTip`, Windows ships it
+    from `SpecialNames.ContentStructureTip`, and the mac owes only the
+    adoption. **The detail, and the reasoning worth keeping, is in the block at
+    the end of this item.** What follows first is the item as it was audited,
+    left as written because it is the honest record of what was true until
+    today — so read its present tense as speaking of **2026-09-06**: "nobody
+    has picked it up" and "sitting there unactioned" were the state that day
+    and are not the state now.
+
+    A sentence a teacher READS belongs in `contracts/`
     by CLAUDE.md rule 2, and this one is in neither app's contract:
-    `grep -rn "added to your site automatically" contracts/` returns nothing.
+    ~~`grep -rn "added to your site automatically" contracts/` returns
+    nothing.~~ (It returns the new case as of 2026-09-07.)
     So Windows wrote its own, in
     `windows-app/Plantoir/Views/CourseSettingsView.xaml.cs`:
 
@@ -1894,10 +1907,42 @@ to run in the background.
     WHICH sentence becomes the contract is the mac's call, and says why no case
     was proposed: proposing one would redden the mac suite over wording the mac
     already ships. That has been sitting there unactioned, which is the actual
-    state and is why it is now indexed here too. **What Windows owes: taking
+    state and is why it is now indexed here too. ~~**What Windows owes: taking
     the mac's wording verbatim once the mac picks it**, and nothing before
     that. **Not for tonight** — it is a decision about what a teacher reads,
-    not a defect.
+    not a defect.~~
+
+    **✅ Done 2026-09-07** (branch `issue/course-settings-tip-contract`) — and
+    the last two sentences above are struck because the decision went the other
+    way. Russell made the call in a Windows session and chose WINDOWS'
+    substance: the mac's six-word bracket named no remedy, and row 377 had made
+    the rule it glosses permanent the same day it was written. The case is
+    `contracts/shared-rules.json` → `specialNames.contentStructureTip`:
+
+    > Tip: you can also simply create new folders and files in Obsidian —
+    > they’re added to your site automatically the next time you preview. The
+    > exception is anything you remove here: it stays off your site, even if
+    > you make it again in Obsidian, until you add it back here.
+
+    Two edits to what this app already shipped, and one that matters more than
+    either. "on this page" became "here", matching the sibling sentence
+    `removeLeavesTheFolderOnDisk` shown in the same view; the straight
+    apostrophe became the typographic one, which every other string in
+    `SpecialNames.cs` already used. **And "folders" became "folders and
+    files"** — the caption sits under FOUR list editors, two of them file
+    lists, and `build_site.py` discovers and excludes files identically, so
+    BOTH apps had been promising only half of what the code does. That gap was
+    invisible while the argument was framed as "which of these two sentences
+    wins", which is worth remembering the next time an item is written that
+    way.
+
+    **Windows' side is finished**: the literal is gone from
+    `CourseSettingsView.xaml.cs`, `SpecialNames.ContentStructureTip` is the
+    single source, and three facts in `SpecialNamesContractTests` pin it (1206
+    tests green). **The mac now owes the adoption** and is not red meanwhile —
+    no mac test pins the key. It is listed at the top of `MAC-HANDOFF.md`'s
+    "Open — what the mac still owes", with the reasoning and the two traps in
+    "Contract cases waiting on the mac".
 
 38. ~~**The two apps wrote a teacher's visibility flag differently, and the
     contract described the mac's way.**~~ ✅ Done 2026-09-07 (branch
@@ -2169,6 +2214,41 @@ to run in the background.
     against itself in `MAC-HANDOFF.md`, is the generator change that would let
     the departures live beside the schemas instead of in your test — which is
     your own request, not a new one.
+42. **`_dropping_excluded_items` matches excluded names case-insensitively
+    while every other consumer matches exactly, so `build_site.py` gives two
+    answers in one file.** Found 2026-09-07 by adversarial review while pinning
+    the Course Settings tip (item 37, `GUI-IMPROVEMENTS.md` row 448).
+    Pre-existing on both platforms, in SHARED Python, so it is neither side's
+    in particular — it is listed here because this side now runs
+    `scripts/test_*.py` inside `dotnet test` (item 36) and can therefore gate a
+    fix, which it could not before.
+
+    **Do not resolve it by case-folding the live path.** Exact, case-included
+    matching is the RULE, not an oversight: the contract says so at
+    `gradedFolders.choices.walk.excludedItems` — "the same way preflight
+    matches" — and row 412 gives the reason, that a case-insensitive answer
+    would have the app believe a folder is excluded while the build published
+    it. Case-folding breaks that live case, fails `GradedFolderChoicesTests`,
+    and re-introduces precisely the app/build disagreement row 412 rejected.
+    **This item was first written the wrong way round**, calling the exact
+    match a defect, and that is recorded because it is the mistake a reader is
+    most likely to repeat.
+
+    What a teacher can hit follows from the rule rather than from a bug:
+    `Old Tests` removed in Course Settings, deleted in Obsidian and later
+    remade as `old tests` is discovered, appended and published — so
+    `specialNames.contentStructureTip`'s "even if you make it again in
+    Obsidian" holds for the same name remade, which is the realistic case, and
+    not for that edge.
+
+    **The full write-up is in `TODO.md`** — "`_dropping_excluded_items` matches
+    excluded names case-insensitively…" — including every consumer a fix must
+    cover (the sentinel-note sync at both scopes and
+    `GradedFolderChoices.Excluded` are the two easily missed), and the two ways
+    out: make `_dropping_excluded_items` exact so the file agrees with its own
+    rule, or go case-insensitive everywhere and amend `walk.excludedItems`
+    while answering row 412. Either owes a contract case and a `verify.sh` run
+    from the mac.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 
@@ -5396,7 +5476,10 @@ name.
   immediately before writing and, if it changed, redoes the whole discovery
   against the new contents — bounded at three tries, then it carries on with
   what is there rather than spinning. Redoing is safe because discovery is a
-  pure function of (what is on disk, what the config says) and is add-only.
+  pure function of (what is on disk, what the config says). It is not add-only
+  — an `excluded_items` name is dropped from the copy lists (row 377) — but
+  that is a function of the same two inputs, so the argument is unaffected.
+  Corrected 2026-09-07; it said "and is add-only" until then.
 - **The other writer is yours.** Whatever writes `course_config.json` from the
   Windows app must do the same read-compare-write, or the race is only half
   closed on your side. The mac's is `CourseConfiguration.recordOnDisk`. One

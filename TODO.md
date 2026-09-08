@@ -845,7 +845,7 @@ mac has never made one. Three options:
   `contracts/` so both platforms say it identically.
 
 Whichever is chosen it needs the same sentence on both sides. Windows' half is
-item 41 in `WINDOWS-HANDOFF.md`.
+item 42 in `WINDOWS-HANDOFF.md`.
 
 ### ✅ DECIDED 2026-09-08 by Russell — **ASK**, and leave visibility alone
 
@@ -941,6 +941,57 @@ days of toolchain edits, where a teacher builds on install and then not again.
 If this is ever revisited, the thing to find out first is whether BuildKit can
 be given a scoped cache per build context — a filtered prune, not a bigger
 hammer.
+
+## `_dropping_excluded_items` matches excluded names case-insensitively, and every other consumer matches exactly
+
+Noted 2026-09-07 by adversarial review, while pinning the Course Settings tip
+(`GUI-IMPROVEMENTS.md` row 448). Pre-existing on both platforms.
+
+**Read this paragraph before touching anything.** Exact, case-included matching
+is the RULE here, not an oversight, and it is written down twice: the contract
+says so at `shared-rules.json` → `gradedFolders.choices.walk.excludedItems`
+— "Matched EXACTLY, case included, **the same way preflight matches**" — and
+the reason is `GUI-IMPROVEMENTS.md` row 412 (2026-08-25): *"a case-insensitive
+answer here would have the app believe a folder is excluded while the build
+published it."* So **do not resolve this by case-folding the live path.** That
+breaks a live contract case, fails `GradedFolderChoicesTests`, and
+re-introduces exactly the app/build disagreement row 412 rejected. This entry
+was first written the wrong way round, calling the exact match a defect, and
+the review caught it; the mistake is left recorded here because it is the one a
+future reader is most likely to repeat.
+
+**The actual inconsistency** is that `scripts/build_site.py` gives two answers
+in one file. `_dropping_excluded_items` lowercases both sides (`:3639-3651`),
+so the give-up path for reconciliation drops names the documented rule would
+keep. Every other consumer matches exactly:
+
+- the `excluded_shared` / `excluded_per_section` sets, the drop pass
+  (`if name in names`) and the four discovery filters;
+- the `index.md` sentinel-note sync, at both scopes — easy to miss, and
+  missing it means a folder correctly excluded that never gains or never loses
+  its "removed in Course Settings" note;
+- `CourseConfiguration` on both platforms — `StringComparer.Ordinal` in C#,
+  `==` in Swift;
+- `GradedFolderChoices.Excluded` on Windows (`Ordinal`), whose own doc comment
+  already claims it matches "the same way `CourseConfiguration.IsExcluded` and
+  the build's preflight scan" do.
+
+**What a teacher can actually hit.** Because the rule is exact, an exclusion is
+escaped by re-creating the folder with DIFFERENT capitalisation: remove
+`Old Tests` in Course Settings, delete it in Obsidian, later make `old tests`,
+and it is discovered, appended and published. `shared-rules.json` →
+`specialNames.contentStructureTip` promises "it stays off your site, even if
+you make it again in Obsidian", which is true for the realistic case — the
+same name, remade — and not for that edge.
+
+**Two ways out, and the smaller one is probably right.** (a) Make
+`_dropping_excluded_items` exact too, so the file agrees with its own
+documented rule, and record the capitalisation edge as accepted. (b) Go
+case-insensitive everywhere, which means amending `walk.excludedItems`,
+answering row 412's objection, and changing both apps so the app and the build
+still agree. Either way it wants a contract case saying which, and a
+`verify.sh` run from the mac — which is why it was not done inside a wording
+piece.
 
 ## ✅ Done — Publish stops an active preview itself
 
@@ -1047,4 +1098,3 @@ entry point checked for `--verify` while every doc taught
 triggering a real deploy instead of a read-only check). No `contracts/` or
 handoff entry — release tooling, not app behavior either platform's
 teacher-facing suite covers.
-

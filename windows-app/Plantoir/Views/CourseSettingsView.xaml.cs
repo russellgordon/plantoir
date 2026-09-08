@@ -611,8 +611,7 @@ public sealed partial class CourseSettingsView : UserControl
             name => RecordReInclusion(CourseConfiguration.PerSectionScope, "file", name),
             name => ItemProtectionRule.For(name, ItemList.PerSectionFiles, Protection()),
             (name, reason) => RecordRemovalBlocked("the per-section files", name, reason)));
-        Form.Children.Add(FormBuilders.ExampleCaption(
-            "Tip: you can also simply create new folders in Obsidian — they're added to your site automatically the next time you preview. The exception is anything you remove here: it stays off your site, even if you make it again in Obsidian, until you add it back on this page."));
+        Form.Children.Add(FormBuilders.ExampleCaption(SpecialNames.ContentStructureTip));
 
         // -------- Sidebar Visibility --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Sidebar Visibility", null));

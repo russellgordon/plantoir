@@ -249,10 +249,13 @@ as WINDOWS-HANDOFF item 31), through these classes in
 | `gradedFolders.cases` | `GradedFolderContractTests` |
 | `gradedFolders.choices` (cases, the depth cap and the skip list) | `GradedFolderChoicesTests` |
 | `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution` | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
+| `specialNames.contentStructureTip` (proposed from Windows 2026-09-07; the mac runs nothing for it yet, and is not red — no mac test names the key) | `SpecialNamesContractTests`. Whether a teacher can actually SEE it is `CourseSettingsCaptionUiTests`, which is in `Plantoir.UiTests/` rather than this project, carries `[UiFact]`, and runs only under `PLANTOIR_UI_TESTS=1` — so it is part of no gate |
 | `specialNames.renameFolder.materialisesOnRename`, `addCreatesTheFolder`, `removeLeavesTheFolderOnDisk`, `renameFolder.interruptedRename` (proposed from Windows 2026-09-07) | `FolderRenameApplyTests` |
 | `specialNames.renameFolder.linkRewriting` — every case, plus `escapingSet.leaveUnescaped` character by character | `FolderPathRewriterTests` |
 | `siteHealth.repair.reportedOncePerFinding` (both cases, built as `howToRunACase` says) and `siteHealth.repair.refusedWhenSomethingIsInTheWay` (the sentence, word for word) | `SiteHealthRepairTests`, `SiteHealthContractTests` |
-**Two notes on the two `specialNames` rows**, because they are not part of the audit's
+**Two notes on the `specialNames` rows** — there are four of them now, and the
+two this note is about are the first and the `linkRewriting` one — because they
+are not part of the audit's
 count and reading them as though they were would mislead. The `specialNames`
 lists in the first were already being run — those test classes predate item 29
 — and were simply never written down here. `linkRewriting` is newer than the audit — it was added to
