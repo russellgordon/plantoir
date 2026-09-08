@@ -1961,11 +1961,35 @@ to run in the background.
     rule that migrated only on a genuine change would leave the pages nobody
     flips old forever.
 
-39. **The mac's unit suite was segfaulting its own test host a third of the
+39. ~~**The mac's unit suite was segfaulting its own test host a third of the
     time, and you owe almost nothing for it — but check one thing and re-read
-    one rule** (2026-09-07, mac). Fixed on the mac; listed here because rule 3
+    one rule**~~ — ✅ Done 2026-09-08, branch `issue/ui-test-host-crash-signal`.
+    (2026-09-07, mac.) Fixed on the mac; listed here because rule 3
     says a write-up nothing points at is, from your side, a write-up nobody
     made, and because two halves of it do travel.
+
+    **Both halves answered, and the answer to the first is no — measured, not
+    reasoned.** `Plantoir.UiTests` drives the app OUT of process, so killing
+    the driven `Plantoir.exe` mid-test gave an `InvalidOperationException`
+    after `DrivenApp`'s 30 s patience: an ordinary test failure, host
+    untouched. The full suite ran 11 of 11 green in 5 m 17 s with no host
+    death. **Re-running a flaky UI test here is therefore the right response**,
+    which is the opposite of what a mac host crash deserves.
+
+    **But the LESSON travelled, and nothing on this side was applying it.**
+    A test host that dies and a test that fails are both exit 1 here too, and
+    differ only in the output — a dead host prints no totals line at all.
+    `batch/run-batch.ps1` decided from the exit code alone and would have
+    reported a dead host as "TESTS FAILED (0 failed)", the exact shape of the
+    mac's `exit 65` with `0 failures`. `windows-app/TestRunOutcome.ps1` now
+    reads the totals, is shared by `run-ui-tests.ps1`, `run-tests.ps1` and the
+    batch driver, and its own checks run inside `dotnet test`
+    (`TheTestRunReaderTellsACrashFromAFailure`). Numbers, and the nuance found
+    in the `oneAlertAtATime` re-read — Windows obeys the ordering rule AND
+    needs a retry, because WinUI's `ShowAsync` returns when a dialog begins
+    closing; and the lost-alert clause this item glosses as "understated" is
+    exactly the Windows failure mode — are in `MAC-HANDOFF.md`.
+
 
     **What it was.** The mac unit suite runs against the app's real window, so
     a test that sets alert state raises a real `NSAlert` sheet, and clearing it
@@ -1986,7 +2010,9 @@ to run in the background.
     produces this does not exist on your side. Do not go looking for it, and
     do not port the fix.
 
-    **What you owe — two small things.**
+    **What you owed — two small things, both now DONE. Kept as the original
+    text rather than deleted, so the list keeps its own history; nothing
+    under this number is outstanding.**
 
     - **Check whether `Plantoir.UiTests` can CRASH its host rather than fail an
       assertion.** The one intermittent you have recorded,
