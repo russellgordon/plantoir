@@ -802,8 +802,11 @@ extension AssistToolRunner {
                    + "edits you make directly rather than through these tools, which nothing else "
                    + "backs up. Course folders are not in version control, so a copy is the only "
                    + "way back.",
-        parameters: ["course": courseHelp],
-        required: ["course"],
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+        ],
+        required: ["course", "section"],
         readOnly: false,
         needsApproval: false
     )

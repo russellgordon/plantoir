@@ -80,7 +80,7 @@ enum AssistContract {
                 course: course, section: section
             ),
             "backedUpCourse": AssistWording.backedUpCourse(
-                course: course, to: "ICS3U_backup_2026-09-08_1900.zip"
+                course: course, to: "{course}_backup_2026-09-08_190000.zip"
             ),
             "planWasCancelled": AssistWording.planWasCancelled,
             "deployed": AssistWording.deployed(course: course, section: section),
@@ -251,9 +251,9 @@ enum AssistContract {
             "note": "Three lists, deliberately. `all` is what the runner can execute; `local` is what the "
                   + "small model is SHOWN (the plan twins and remember_timetable are taken off, because "
                   + "the model never has to name a plan and dates it supplies are dates it may have "
-                  + "invented); `mcpOnly` is offered to Claude Code on top of everything — three that "
-                  + "ask for judgement about meaning, plus listing the working folder's courses and "
-                  + "filling out a unit, which the local model reaches through fixed phrasings instead.",
+                  + "invented); `mcpOnly` is the ten offered to Claude Code on top of everything — three "
+                  + "asking for judgement about meaning, the rest either never needed by a model "
+                  + "scoped to one section or already reachable by it through a fixed phrasing.",
             "all": all,
             "local": local,
             "mcpOnly": mcpOnly,

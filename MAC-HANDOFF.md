@@ -722,9 +722,9 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   The twelve, verified by set difference rather than read off a list: exactly
   twelve Windows-only, **zero mac-only**, and **zero hits for any of the twelve
   names anywhere under `mac-app/QuartzTeachers` or `contracts/`** — true when
-  it was measured on 2026-09-06, and three of them have since been built here
-  (`list_courses`, `plan_add_classes`, `add_classes`, 2026-09-08), so the
-  difference is nine today —
+  it was measured on 2026-09-06, and SEVEN of them have since been built here —
+  all six tools this entry sorted as the mac's, on 2026-09-08 — so the
+  difference is five today —
   `add_classes`, `back_up_course`, `explain_publishing`, `list_courses`,
   `list_recent_changes`, `make_room_for_classes`, `plan_add_classes`,
   `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,

@@ -8,7 +8,7 @@
   },
   "wording" : {
     "aCreatedPageCanBeTakenBack" : "“Undo that” takes the page away again, as long as you have not written anything in it yet. Once you have, it is yours and I will leave it alone.",
-    "backedUpCourse" : "Backed up {course} to ICS3U_backup_2026-09-08_1900.zip. It is in Plantoir's Backups list, and restoring from it puts the whole course back as it is right now.",
+    "backedUpCourse" : "Backed up {course} to {course}_backup_2026-09-08_190000.zip. It is in Plantoir's Backups list, and restoring from it puts the whole course back as it is right now.",
     "builtWithNoWindowOpen" : "Rebuilt the site for {course} Section {section}. Open that section in Plantoir and press Preview to look it over — no window is showing it at the moment.",
     "cancelled" : "Cancel",
     "couldNotBuildBeforeDeploying" : "{course} Section {section} could not be built, so nothing was sent to students. The output is in that section's window in Plantoir.",
@@ -28,7 +28,7 @@
     "planWasCancelled" : "Left as it was — nothing was changed.",
     "previewDidNotBuild" : "The preview for {course} Section {section} did not finish building. The output is in that section's window in Plantoir.",
     "previewIsRebuilding" : "The preview for {course} Section {section} is rebuilding now, and will appear in that section's window when it is ready.",
-    "publishingAlreadyExplained" : "{course} Section {section} has had this explained already — carry on with what the teacher asked rather than saying it twice.",
+    "publishingAlreadyExplained" : "I explained that for {course} Section {section} earlier in this conversation.",
     "rebuiltForACallerWithNoWindow" : "Rebuilt the preview for {course} Section {section}. Open that section in Plantoir to look it over.",
     "sectionIsBusy" : "{course}-S{section} is already busy in Plantoir. Wait for that to finish, then deploy.",
     "undid" : "Earlier, you {change}. Then you asked me to undo that, and I have done so.",

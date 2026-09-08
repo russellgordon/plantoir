@@ -111,7 +111,7 @@ final class ExplainAndBackUpTests: XCTestCase {
         let made = try AssistFixture.makeRunner()
         defer { try? FileManager.default.removeItem(at: made.root) }
 
-        let said: String = await run(made.runner, "back_up_course", ["course": "ICS3U"])
+        let said: String = await run(made.runner, "back_up_course", ["course": "ICS3U", "section": 1])
 
         XCTAssertTrue(said.contains("ICS3U"), said)
         XCTAssertTrue(said.contains(".zip"), "It must name the copy: \(said)")
@@ -133,7 +133,7 @@ final class ExplainAndBackUpTests: XCTestCase {
         let made = try AssistFixture.makeRunner()
         defer { try? FileManager.default.removeItem(at: made.root) }
 
-        let said: String = await run(made.runner, "back_up_course", ["course": "NOPE1"])
+        let said: String = await run(made.runner, "back_up_course", ["course": "NOPE1", "section": 1])
         XCTAssertTrue(said.contains("NOPE1"), said)
         XCTAssertTrue(said.lowercased().contains("no course"), said)
     }
@@ -144,8 +144,64 @@ final class ExplainAndBackUpTests: XCTestCase {
         let made = try AssistFixture.makeRunner()
         defer { try? FileManager.default.removeItem(at: made.root) }
 
-        let said: String = await run(made.runner, "back_up_course", ["course": "ics3u"])
+        let said: String = await run(made.runner, "back_up_course", ["course": "ics3u", "section": 1])
         XCTAssertTrue(said.contains("ICS3U"), "Lower case should reach the same course: \(said)")
+    }
+
+
+    /// The copy is recorded as the ASSISTANT'S, not the teacher's.
+    ///
+    /// **Two things go wrong if it defaults.** The Backups list tells a teacher
+    /// "made by you" about a copy they never made — and `pruneBackups` skips
+    /// anything that is not the assistant's, so a session told to back up
+    /// "before any bulk editing" writes a whole-course zip each time and none
+    /// of them is ever cleared. `mostBackupsKept` exists to stop exactly that.
+    @MainActor
+    func testTheCopyIsRecordedAsTheAssistantsSoItAlsoPrunes() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        _ = await run(made.runner, "back_up_course", ["course": "ICS3U", "section": 1])
+
+        let backups: URL = made.root.appendingPathComponent("courses/_backups/ICS3U")
+        let files: [String] = (try? FileManager.default.contentsOfDirectory(atPath: backups.path)) ?? []
+        let zip: String = try XCTUnwrap(files.first(where: { $0.hasSuffix(".zip") }))
+        XCTAssertTrue(
+            zip.contains("_assistant-section1"),
+            "Left to default this is filed as the teacher's, which is untrue and never prunes: \(zip)"
+        )
+
+        let item: BackupItem = try XCTUnwrap(
+            BackupItem.from(fileURL: backups.appendingPathComponent(zip), courseCode: "ICS3U")
+        )
+        XCTAssertEqual(item.maker, .assistant(sectionNumber: 1))
+    }
+
+    /// The memory is keyed per SECTION, and a section that is not there is
+    /// refused rather than quietly remembered.
+    ///
+    /// A single flag would silence a section that had never been told. The
+    /// fixture course has one section, so what can be pinned here is the other
+    /// half of the same property: an unknown section never reaches the memory
+    /// at all, and is answered honestly.
+    @MainActor
+    func testAnUnknownSectionIsRefusedRatherThanRemembered() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+
+        let missing: String = await run(
+            made.runner, "explain_publishing", ["course": "ICS3U", "section": 2]
+        )
+        XCTAssertTrue(missing.contains("Section 2"), missing)
+
+        // Section 1 has still never been told, so it gets the explanation.
+        let first: String = await run(
+            made.runner, "explain_publishing", ["course": "ICS3U", "section": 1]
+        )
+        XCTAssertEqual(
+            first, AssistWording.whatPublishingMeans,
+            "A refused section must not have been recorded as explained."
+        )
     }
 
     // MARK: - Helpers

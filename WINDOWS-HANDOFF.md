@@ -3296,16 +3296,17 @@ half-built mac version of any of them:
 `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,
 `roll_over_section`, `sync_page_dates`.
 
-**Three of those twelve are the mac's now**, and the surface is **28** (22 plus
-six MCP-only): `list_courses`, `plan_add_classes` and `add_classes` were built
-2026-09-08 (`GUI-IMPROVEMENTS.md` rows 448 and 449, and item 42 below). So the
-set difference is **9**, and the sentence above about none of them existing on
-the mac describes the day it was measured rather than today. The remaining nine
-are `back_up_course`, `explain_publishing`, `list_recent_changes`,
-`make_room_for_classes`, `plan_make_room_for_classes`, `plan_sync_page_dates`,
-`read_timetable`, `roll_over_section` and `sync_page_dates` — of which
-`make_room_for_classes` and its twin are next, and three were sorted as
-deliberately yours or as needing a teacher's problem first.
+**Seven of those twelve are the mac's now**, and the surface is **32** (22 plus
+ten MCP-only). All six tools this sorting judged the mac should have were built
+on 2026-09-08 — `list_courses`, the `add_classes` pair, the
+`make_room_for_classes` pair, `explain_publishing` and `back_up_course`
+(`GUI-IMPROVEMENTS.md` rows 448–451, and item 42 below). So the set difference
+is **5**, and the sentence above about none of them existing on the mac
+describes the day it was measured rather than today. What is left is what the
+sorting said to leave: `read_timetable` and `list_recent_changes`, which are
+Windows-shaped by design; `sync_page_dates`, which needs a teacher's problem
+first; and `plan_sync_page_dates` and `roll_over_section`, whose writes are
+covered by decisions recorded elsewhere.
 
 **Why neither suite noticed — and how it is now caught.** Not a subset check
 — an earlier write-up said that and was wrong. `Assert.Equal` on `HashSet`s is

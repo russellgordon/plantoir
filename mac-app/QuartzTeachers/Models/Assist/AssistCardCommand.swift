@@ -212,7 +212,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// The literal shapes can be listed; these cannot, because the number in
     /// them is unbounded — any unit, any count of days, any page title. A
     /// contract that carried only the literals would say the assistant
-    /// understands eleven sentences when it understands those plus three
+    /// understands eleven sentences when it understands those plus five
     /// families, and Windows would build eleven.
     struct ParsedShape: Sendable, Equatable {
 
@@ -240,6 +240,20 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// Every parsed family, for the contract.
     static var everyParsedShape: [ParsedShape] {
         return [
+            ParsedShape(
+                shape: "make room for <count> class|classes at unit <unit>, day <day>",
+                tool: "make_room_for_classes",
+                fills: [
+                    "unit": "<unit>", "atDay": "<day>",
+                    "howMany": "<count>, as a number — words up to twelve are understood",
+                ],
+                example: "make room for two classes at Unit 3, Day 4",
+                notThis: "make room for two class at Unit 3, Day 4",
+                becauseNotThis: "The count and the noun disagree, so it is a sentence somebody typed "
+                              + "carelessly rather than one of these shapes — and this tool renames "
+                              + "pages the teacher's links point at. Guessing which half they meant is "
+                              + "exactly what a fixed shape exists to avoid."
+            ),
             ParsedShape(
                 shape: "publish unit <number>",
                 tool: "publish_pages",
