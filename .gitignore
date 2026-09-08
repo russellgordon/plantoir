@@ -32,7 +32,8 @@ windows-app/Vendor/llama/
 windows-app/Vendor/runtime/
 
 # What `dotnet test --blame` / `--blame-crash` writes when diagnosing a test
-# host that died: a small Sequence_<guid>.xml naming the test that was running,
+# host that died: a small TestResults/<guid>/<guid>_Sequence.xml naming the
+# test that was running,
 # and - for --blame-crash - a FULL process dump, which is tens to hundreds of
 # megabytes. Added 2026-09-08 alongside windows-app/TestRunOutcome.ps1, which
 # tells people to reach for --blame; recommending a flag that stages a dump
