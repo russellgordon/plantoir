@@ -587,9 +587,10 @@ final class AssistSession {
     /// gone back when it had not.
     func restoreSection() {
         let saidSoFar: Int = agent?.entries.count ?? 0
+        let backupURL: URL? = toolRunner?.conversationBackupURL
         do {
             try AssistSectionRestore.restore(
-                backupURL: toolRunner?.conversationBackupURL,
+                backupURL: backupURL,
                 courseCode: courseCode,
                 sectionNumber: sectionNumber,
                 coursesDirectoryURL: coursesDirectoryURL
@@ -602,6 +603,21 @@ final class AssistSession {
             ))
             return
         }
+        // On the trail as well as in the transcript, and only once the restore
+        // has actually happened. The transcript lives inside a conversation the
+        // teacher will close; the trail is what is still there next week, when
+        // they ask why the section's pages are older than the changes above
+        // them. The file NAME says which copy it came from without saying a
+        // word about what is written on any page.
+        ActivityTrail.note(
+            .sectionRestored,
+            AssistSectionRestore.trailLine(
+                backupFileName: backupURL?.lastPathComponent
+                    ?? AssistSectionRestore.unnamedBackup
+            ),
+            course: courseCode,
+            section: sectionNumber
+        )
         restoreNotes.append(RestoreNote(
             text: AssistSectionRestore.doneMessage(
                 courseCode: courseCode, sectionNumber: sectionNumber

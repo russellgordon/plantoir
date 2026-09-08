@@ -502,10 +502,14 @@ final class SharedRulesContractTests: XCTestCase {
 
         var wanted: [String] = []
         for entry in required {
-            wanted.append(try XCTUnwrap(entry["event"] as? String))
+            let event: String = try XCTUnwrap(entry["event"] as? String)
             // An event nobody explained is an event nobody can implement.
             XCTAssertNotNil(entry["carries"] as? String, "\(entry) has no 'carries'")
             XCTAssertNotNil(entry["why"] as? String, "\(entry) has no 'why'")
+
+            if SharedRulesContractTests.macMustRecord(entry) {
+                wanted.append(event)
+            }
         }
         wanted.sort()
 
@@ -517,6 +521,36 @@ final class SharedRulesContractTests: XCTestCase {
             "The trail and the contract disagree. Add the event to ActivityTrail.Event, "
             + "or to contracts/shared-rules.json, whichever is behind."
         )
+    }
+
+    /// Whether a `mustRecord` entry is one the MAC has to record.
+    ///
+    /// `appliesOn` names the platforms an event belongs to; an entry without
+    /// it belongs to both.
+    ///
+    /// **Honouring it is not a loosening**, and that is the part worth
+    /// keeping. The assertion in the test above is still EQUALITY, so an event
+    /// this app records and the contract does not still fails, and so does a
+    /// both-platform event the app has forgotten. All this does is stop one
+    /// platform's event reddening the other's suite forever.
+    ///
+    /// Windows added the same filter to its twin first, and its reason is the
+    /// one that matters: the mac's own `built site moved out of the working
+    /// folder` is `appliesOn: ["mac"]`, and until Windows filtered it, it held
+    /// the WINDOWS suite red no matter what was implemented there — and a test
+    /// that cannot go green stops being read. The mac met the mirror image on
+    /// 2026-09-07, the day Windows proposed its first windows-only event.
+    ///
+    /// There is no windows-only entry in the contract as this is written —
+    /// `section restored` dropped its `appliesOn` when the mac adopted it —
+    /// so `SharedRulesPlatformFilterTests` exercises this with entries of its
+    /// own rather than leaving it to be discovered wrong by whoever adds the
+    /// next one.
+    static func macMustRecord(_ entry: [String: Any]) -> Bool {
+        guard let platforms = entry["appliesOn"] as? [String] else {
+            return true
+        }
+        return platforms.contains("mac")
     }
 
     /// The teacher's own words are behind a fixed prefix so a report can drop
