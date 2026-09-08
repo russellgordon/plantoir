@@ -293,6 +293,67 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ## Open — what the mac still owes
 
+- **Two small things, and a decision you may want to copy: the shared Python
+  tests now run on Windows too, and one of them was broken there.** (Windows +
+  shared, 2026-09-07, branch `issue/36-publishing-gate`, handoff item 36.)
+
+  **What the mac owes is two lines of housekeeping, not a feature.**
+
+  1. **Run `git config core.hooksPath .githooks` on the mac clone** if it has
+     not been run there. A new `.githooks/pre-commit` warns — never blocks —
+     when a commit touches the publishing path, naming `./verify-deploy.sh` as
+     the only automated check that really publishes. Hooks are not installed by
+     cloning, so it reaches this side only by that opt-in; check with
+     `git config --get core.hooksPath`.
+  2. **Nothing else.** `verify.sh` already runs all fifteen shared
+     `scripts/test_*.py` files, so the mac's coverage is unchanged.
+
+  **What changed in shared code**, so the mac is not surprised by the diff:
+  `scripts/test_baked_modules.py` read the Dockerfile and the product `.py`
+  sources with `read_text()` — no encoding — which takes the LOCALE encoding.
+  On macOS that is UTF-8 and it has always passed; on Windows it is cp1252 and
+  it dies with `UnicodeDecodeError: 'charmap' codec can't decode byte 0x9d`.
+  Now `read_text(encoding="utf-8")` in both places. No behaviour change on the
+  mac; it simply stops being luck.
+
+  **The measurement worth having**, because it is about shared files and the
+  mac cannot take it: all fifteen `scripts/test_*.py` pass on Windows (156
+  tests, ~8 s through `dotnet test`; Lenovo 20QES70500, Intel Core i5-8365U @
+  1.60 GHz, 16 GB). Windows had been running **none** of them — `verify.sh` is
+  bash and does not run there — so a shared file could be broken from that
+  machine with every gate on it green. `PythonToolchainTests` now runs them
+  there, discovering `scripts/test_*.py` rather than listing the files, so a
+  test file ADDED ON THE MAC starts running on Windows with no Windows change.
+  Worth knowing when adding one: if it needs Docker or POSIX it will fail
+  there, and the fix is an entry in that class's `NotRunHere` map with a
+  reason, not deletion.
+
+  **The two environment variables are load-bearing and cost an hour to learn.**
+  The runner sets `PYTHONUTF8=1` and `PYTHONIOENCODING=utf-8`, which is exactly
+  what `deploy.ps1:117-118`, `preview.ps1:185-186` and `setup.ps1:158-159`
+  already set. Without them, `build_site.py`'s emoji `print` ("📝 Added
+  exclusion note to …", `build_site.py:1932`) raises `UnicodeEncodeError` on a
+  cp1252 console — and the handler prints an emoji too, raises again, and the
+  exception escapes into `preflight_update_course_config`. It reads exactly
+  like a real fault in the build and is not one: a teacher never meets it,
+  because the launchers set the variables first. **This was nearly written up
+  as a product bug**; it is recorded here so the mac does not "fix"
+  `build_site.py` for a fault that does not exist.
+
+  **A decision the mac may want to copy, or may reasonably not.** Item 36 asked
+  what should run `verify-deploy.ps1`, and the same question is open here for
+  `verify-deploy.sh`, which is wired into nothing on this side either. Windows'
+  answer: leave it opt-in (it makes real, globally unique sites that nothing
+  deletes), warn at commit time, and require a run with **nothing skipped** at
+  a release cut — `RELEASING.md` step 2 now names both scripts, so that part
+  already binds the mac. A stamp-file design that would have reddened the unit
+  suite until the verifier was re-run was rejected on measurements; they are in
+  `WINDOWS-HANDOFF.md` item 36, and the headline is that the publishing files
+  changed on 16 of 22 active days over 60 days, so the suite would have been
+  red three days in four. **The mac is not asked to build anything here** —
+  only to know that `RELEASING.md` now expects `./verify-deploy.sh` with
+  nothing skipped for a release that changes publishing.
+
 - **One check, five minutes: does `deploy.sh` validate the Netlify token
   before running `deploy.py`?** (Windows, 2026-09-07, branch
   `issue/35-first-run-ui-checks`, handoff item 35.) Windows' `deploy.ps1`

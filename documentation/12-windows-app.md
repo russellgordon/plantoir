@@ -68,8 +68,25 @@ Three consequences that catch people out:
 - **`verify.sh` and `verify-deploy.sh` do not run here.** They are bash and
   expect `docker` on PATH. The Windows counterpart is `verify-deploy.ps1`,
   which publishes to every destination and every pairing against real sites
-  and fetches each one back. It needs credentials and the network, so it is
-  opt-in and wired into nothing.
+  and fetches each one back. It needs three credentials, the network and about
+  twenty minutes, and it creates real sites — so it stays opt-in, and no suite
+  runs it. What changed on 2026-09-07 is that this is now SAID rather than
+  merely true: `.githooks/pre-commit` names it when a commit touches the
+  publishing path (a warning; it never blocks), and `RELEASING.md` requires a
+  run with nothing skipped for a release that changes that path.
+
+  **The Python half of `verify.sh` does run here now.** All fifteen shared
+  `scripts/test_*.py` files execute inside `dotnet test` via
+  `PythonToolchainTests` — 156 tests in about eight seconds, no Docker, no
+  network, no credentials. `verify.sh` has always run them on the mac and
+  nothing ran them here, so a shared file could be broken from this machine
+  with every gate on it green. The runner sets `PYTHONUTF8=1` and
+  `PYTHONIOENCODING=utf-8`, which is what the launchers set
+  (`deploy.ps1:117-118`); without them `build_site.py`'s emoji `print` raises
+  `UnicodeEncodeError` on a cp1252 console and it reads exactly like a broken
+  build rather than a console encoding. What still does NOT run here is
+  everything of `verify.sh` that needs Docker — the image build and the baked
+  file checks.
 - **The local model runs natively too**, with Vulkan GPU offload, falling back
   to multi-threaded CPU. Neither platform runs the model in a container, and
   the reason is measured: a 3,411-token prompt took ~175 s in one and a few
@@ -467,9 +484,17 @@ stops checking anything.** Three pieces of state make a second run silent:
 And delete the site on Netlify, since it is a real one and the address is
 globally unique.
 
-Whether this joins the release cut is the same open question as handoff item
-36 (`verify-deploy.ps1` is wired into nothing and that is a decision nobody has
-made), so it is deliberately not written into `RELEASING.md` here.
+**Whether this joins the release cut — answered 2026-09-07, and the answer is
+no.** It was left open as the same question as handoff item 36; item 36 is now
+settled, so this one is too, and separately from it. `RELEASING.md` requires
+`verify-deploy.ps1` with nothing skipped for a release that changes the
+publishing path, and that script deliberately cannot reach this dialog: it
+redirects stdin from a file precisely so `deploy.py` asks nothing. Adding the
+hand-check to the cut would mean a release step that creates a real, globally
+unique Netlify site that nothing deletes, on top of the ones the verifier
+already makes, to check five things that change about once a year. Do it when
+the new-site path itself changes — the five checks above say what to look at —
+and not on a schedule.
 
 ## What this page does not cover
 
