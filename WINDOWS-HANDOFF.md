@@ -1461,7 +1461,7 @@ to run in the background.
       real `CredentialRequests`, is the half that would catch a request added
       here and written down nowhere.
     - `app-rules.json` → `publishedFreshness.whenShown` (9) / `whenRecorded`
-      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/26 — the NAMES
+      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/28 — the NAMES
       and ARGUMENTS, not the descriptions, which `Briefly()` rewrites here for
       measured reasons); `course-management.json` → `courseCode.renameEffects`
       (6); `shared-rules.json` → `buildOutputLocation.windowsLocation.buildsRoot`
@@ -2015,7 +2015,7 @@ to run in the background.
     first". Those are the two cases that reach the placeholder, by name. The
     numbers above hold.
 
-41. **Your MCP server serves 37 tools and the mac's serves 26 — and TWO
+41. **Your MCP server serves 37 tools and the mac's serves 28 — and TWO
     things now fall to you: a rollover that publishes over last year's
     website (DECIDED 2026-09-08 — build it, do not re-open it), and seventeen
     measured phrasings you do not have.**
@@ -2191,7 +2191,21 @@ to run in the background.
     was otherwise Claude-Code-only. Anything of yours that is MCP-only today is
     a candidate for the same treatment.
 
-    **One number moved:** the mac's MCP surface is 26 (22 shared + 4 MCP-only),
+    **`add_classes` and `plan_add_classes` followed the same day**
+    (`GUI-IMPROVEMENTS.md` row 449), and they carry one divergence worth
+    knowing: **the mac takes no `firstDay`.** Yours defaults it to 1 and
+    describes it as "1 unless the earlier days already exist", which is a
+    question the caller has to answer by looking at the section. The mac's
+    planner continues from the last day that EXISTS in that unit, published or
+    not — a page a teacher has written and not yet shown anybody is still a day
+    of the course, and numbering over it would collide with a real file. An
+    argument nobody can get wrong is better than one with a sensible default;
+    if your planner can work the same thing out, dropping the argument removes
+    a way to be wrong. Nothing is owed here — your suite will not go red for
+    this pair, because the phrasing it corresponds to already existed on both
+    sides.
+
+    **One number moved:** the mac's MCP surface is 28 (22 shared + 6 MCP-only),
     not 25. A pinned count made that a decision rather than drift — the test
     failed the moment the tool was added, which is exactly what it is for.
 
@@ -3195,11 +3209,11 @@ for behaviour only your side has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 26-tool MCP one. (It said 23; corrected
+the 13-tool local surface and the 28-tool MCP one. (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
 serves 37, and the twelve it has beyond the contract are named in
 `AssistSurfaceContractTests` and in `MAC-HANDOFF.md`.) The mac's own test has
-pinned that sum for longer than the prose said so; it is 22 + 4 MCP-only = 26 since `list_courses` landed. What the two
+pinned that sum for longer than the prose said so; it is 22 + 6 MCP-only = 28 since `list_courses` and the `add_classes` pair landed. What the two
 surfaces do and do not share is item 41 and "The two MCP surfaces are not the
 same product" below.
 
@@ -3232,16 +3246,27 @@ COMPLETE rather than whether it was correct. The numbered item is 41; this is
 the manual for it.
 
 **The measurement.** `Plantoir.Mcp/PlantoirTools.cs` declares **37** distinct
-`[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` served **25** when this was measured, and 26 since `list_courses`
-(22 tools plus three MCP-only). The set difference is exactly **12, all
-yours, none the mac's**, and **not one of the twelve appears anywhere under
-`mac-app/QuartzTeachers` or in `contracts/`** — there is no half-built mac
-version of any of them:
+`[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` served **25**
+when this was measured (22 tools plus three MCP-only). The set difference was
+exactly **12, all yours, none the mac's**, and not one of the twelve appeared
+anywhere under `mac-app/QuartzTeachers` or in `contracts/` — there was no
+half-built mac version of any of them:
 
 `add_classes`, `back_up_course`, `explain_publishing`, `list_courses`,
 `list_recent_changes`, `make_room_for_classes`, `plan_add_classes`,
 `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,
 `roll_over_section`, `sync_page_dates`.
+
+**Three of those twelve are the mac's now**, and the surface is **28** (22 plus
+six MCP-only): `list_courses`, `plan_add_classes` and `add_classes` were built
+2026-09-08 (`GUI-IMPROVEMENTS.md` rows 448 and 449, and item 42 below). So the
+set difference is **9**, and the sentence above about none of them existing on
+the mac describes the day it was measured rather than today. The remaining nine
+are `back_up_course`, `explain_publishing`, `list_recent_changes`,
+`make_room_for_classes`, `plan_make_room_for_classes`, `plan_sync_page_dates`,
+`read_timetable`, `roll_over_section` and `sync_page_dates` — of which
+`make_room_for_classes` and its twin are next, and three were sorted as
+deliberately yours or as needing a teacher's problem first.
 
 **Why neither suite noticed — and how it is now caught.** Not a subset check
 — an earlier write-up said that and was wrong. `Assert.Equal` on `HashSet`s is

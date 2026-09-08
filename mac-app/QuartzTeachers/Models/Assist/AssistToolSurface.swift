@@ -140,8 +140,22 @@ extension AssistToolRunner {
     /// and it can do the one thing these tools need doing, which is deciding
     /// what a curriculum expectation MEANS. So the fuller surface is served
     /// there and nowhere else.
+    /// **Not all "judgement about meaning" any more, and the list says why per
+    /// tool.** It began as the three curriculum tools, which a large model does
+    /// well and a 4B does not. `list_courses` joined for a different reason —
+    /// the local model is scoped to one section and told its course, so it can
+    /// never need it, while a Claude Code session is handed a folder and has no
+    /// other way to look. The `add_classes` pair joined for a third: the local
+    /// model already reaches that capability through a phrasing matched in
+    /// CODE, so publishing its schema would spend routing accuracy to buy
+    /// something it already has.
+    ///
+    /// What they share is only the test that matters: none of them costs the
+    /// thirteen-tool surface the routing figures were measured against.
     static let mcpOnlyTools: [AssistToolDefinition] = [
         listCoursesTool,
+        planAddClassesTool,
+        addClassesTool,
         listCurriculumExpectationsTool,
         planCurriculumMentionsTool,
         addCurriculumMentionsTool,
@@ -641,6 +655,68 @@ extension AssistToolRunner {
         required: [],
         readOnly: true,
         needsApproval: false
+    )
+
+    /// How many days a unit needs, said once instead of five times.
+    ///
+    /// **The engine already shipped; only the door was missing.** "Add five
+    /// more days to Unit 4" has reached `NextClassPlanner.plan(addingDays:
+    /// toUnit:)` through a card phrasing since that phrasing was written — but
+    /// `unit` and `days` are card-only keys, absent from `add_next_class`'
+    /// schema, so no MCP client could ask for it. This publishes the same
+    /// capability under a name of its own, which is how Windows has it.
+    ///
+    /// **No `firstDay`, and that is a deliberate divergence.** Windows takes
+    /// one, defaulting to 1, described as "1 unless the earlier days already
+    /// exist" — which is a question the caller has to answer by looking. The
+    /// mac's planner works it out: it continues from the last day that EXISTS
+    /// in that unit, published or not, because a page a teacher has written
+    /// and not yet shown anybody is still a day of the course and numbering
+    /// over it would collide with a real file. An argument nobody can get
+    /// wrong is better than one with a sensible default.
+    private static let planAddClassesTool: AssistToolDefinition = AssistToolDefinition(
+        name: "plan_add_classes",
+        description: "Work out what adding several class pages to a unit would do, and change nothing. "
+                   + "Shows what each page would be called and the day it would land on. Call this first "
+                   + "and show the teacher what it said.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+            "unit": unitHelp,
+            "howMany": howManyClassesHelp,
+        ],
+        required: ["course", "section", "unit", "howMany"],
+        readOnly: true,
+        needsApproval: false
+    )
+
+    private static let addClassesTool: AssistToolDefinition = AssistToolDefinition(
+        name: "add_classes",
+        description: "TEACHERS SAY: \"add five more days to Unit 4\". Add several class pages to a unit, "
+                   + "dated to the days this section actually meets, continuing from the last day that unit "
+                   + "already has. Call plan_add_classes first and show the teacher what it said.\n\n"
+                   + "The pages arrive UNPUBLISHED — empty skeletons for the teacher to write, which stay "
+                   + "out of the site until they publish them. An existing page is never written over, the "
+                   + "course is backed up first, and undo_last_change takes back what this created.",
+        parameters: [
+            "course": courseHelp,
+            "section": sectionHelp,
+            "unit": unitHelp,
+            "howMany": howManyClassesHelp,
+        ],
+        required: ["course", "section", "unit", "howMany"],
+        readOnly: false,
+        needsApproval: false
+    )
+
+    private static let unitHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .integer,
+        description: "The unit number to add days to, for example 4."
+    )
+
+    private static let howManyClassesHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .integer,
+        description: "How many class pages to add to that unit."
     )
 
     private static let listCurriculumExpectationsTool: AssistToolDefinition = AssistToolDefinition(

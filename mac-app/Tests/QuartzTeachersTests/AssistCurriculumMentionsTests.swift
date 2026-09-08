@@ -59,8 +59,17 @@ final class AssistCurriculumMentionsTests: XCTestCase {
         // section and `AssistAgent.systemPrompt` already names the course —
         // while a Claude Code session is handed a FOLDER and has no other way
         // to find out what is in it.
+        // The MCP-only tools, and WHY each is not on the local list. The
+        // curriculum three are a judgement about meaning; `list_courses` is
+        // never needed there, because the window is scoped to one section and
+        // `AssistAgent.systemPrompt` already names the course; and the
+        // `add_classes` pair is a capability the local model reaches ANYWAY
+        // through the "add five more days to Unit 4" phrasing, matched in code
+        // — so publishing its schema would spend routing accuracy to buy the
+        // model something it already has a deterministic route to.
         let added: Set<String> = [
             "list_courses",
+            "plan_add_classes", "add_classes",
             "list_curriculum_expectations", "plan_curriculum_mentions", "add_curriculum_mentions",
         ]
         for name in added {

@@ -680,7 +680,8 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   nothing was going to tell either side** (found 2026-09-06 by an audit asking
   whether the parity list was COMPLETE, not whether it was correct).
   `plantoir-mcp.exe` declares **37** tools; the mac's `AssistToolSurface`
-  serves **25** (22 plus three MCP-only). So the same question asked of Claude
+  serves **28** (22 plus six MCP-only, three of them built on 2026-09-08 out
+  of this very list). So the same question asked of Claude
   Code gets a different toolbox depending on the machine.
 
   **✅ Sorted 2026-09-06** on `issue/mcp-tool-surface-divergence` — the twelve
@@ -703,7 +704,10 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
   The twelve, verified by set difference rather than read off a list: exactly
   twelve Windows-only, **zero mac-only**, and **zero hits for any of the twelve
-  names anywhere under `mac-app/QuartzTeachers` or `contracts/`** —
+  names anywhere under `mac-app/QuartzTeachers` or `contracts/`** — true when
+  it was measured on 2026-09-06, and three of them have since been built here
+  (`list_courses`, `plan_add_classes`, `add_classes`, 2026-09-08), so the
+  difference is nine today —
   `add_classes`, `back_up_course`, `explain_publishing`, `list_courses`,
   `list_recent_changes`, `make_room_for_classes`, `plan_add_classes`,
   `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,
@@ -810,7 +814,15 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
   **PRODUCT — belongs on the mac. In this order.**
 
-  1. **`list_courses`** — MCP-only, and the cheapest real gain of the twelve.
+  1. **`list_courses`** — ✅ **BUILT 2026-09-08** (`GUI-IMPROVEMENTS.md` row
+     448). MCP-only as judged here, plus two phrasings matched in code — "what
+     courses do I have?" and "list my courses" — so a teacher can ask without
+     the model being shown a tool. The reasoning that came out of building it,
+     and which applies to the rest of this list: MCP-only constrains which
+     client the MODEL sees a tool on, and says nothing about what the app can
+     do. The original entry follows.
+
+     MCP-only, and the cheapest real gain of the twelve.
      `Plantoir --mcp-stdio <working-folder>` is scoped to a WORKING FOLDER,
      which routinely holds several courses. The server answers only
      `initialize`, `tools/list` and `tools/call` — no `resources/list`, no

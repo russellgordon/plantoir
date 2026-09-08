@@ -244,8 +244,9 @@ enum AssistContract {
             "note": "Three lists, deliberately. `all` is what the runner can execute; `local` is what the "
                   + "small model is SHOWN (the plan twins and remember_timetable are taken off, because "
                   + "the model never has to name a plan and dates it supplies are dates it may have "
-                  + "invented); `mcpOnly` is offered to Claude Code on top of everything, being the three "
-                  + "that ask for judgement about meaning.",
+                  + "invented); `mcpOnly` is offered to Claude Code on top of everything — three that "
+                  + "ask for judgement about meaning, plus listing the working folder's courses and "
+                  + "filling out a unit, which the local model reaches through fixed phrasings instead.",
             "all": all,
             "local": local,
             "mcpOnly": mcpOnly,
