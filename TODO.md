@@ -4,6 +4,51 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **The assistant's features are tested at the tool and nowhere above it, and
+  that is exactly where the bugs have been** (mac, 2026-09-08; Russell:
+  *"you MUST drive the real app to test these features. They should be part of
+  the full UI suite that is run"*).
+
+  **The evidence, and it is not a hunch.** Building the rollover
+  (`GUI-IMPROVEMENTS.md` row 448) took three adversarial reviews, and every
+  serious finding was at a SEAM above the tool rather than in its logic — each
+  one behind a fully green suite:
+
+  | What was wrong | Which seam |
+  |---|---|
+  | The question never reached the teacher: it was written into `detail`, and `AssistToolOutcome.wrote` leaves `teacherDetail` nil | tool → window |
+  | Plan mode is ON by default and `showPlan` returns early on a non-plan outcome, so the answer turn never ran the real call — the release was unreachable in the default configuration | tool → plan card |
+  | A Claude Code session had no declared argument to answer with | tool → MCP schema |
+  | Answering was a no-op, because by the second turn the dates are already right and the plan changes nothing | tool → its own early return |
+
+  A unit suite that calls `AssistToolRunner` directly cannot see any of those.
+  Three of the four were caught by reading rather than by testing, which is not
+  a process anyone should rely on twice.
+
+  **What to build.** `mac-app/Tests/QuartzTeachersUITests/` already exists and
+  is a real target (15 tests, wizard and settings), and
+  `AssistantTreeDump.testDumpAssistantTree` already prints the assistant
+  window's element tree — so addressing the conversation by what it actually is
+  is groundwork that is done. What is missing is any test that opens the
+  assistant, types a phrasing, and reads what comes back. Start with the
+  rollover, because it is the one whose seams are known to be load-bearing:
+  type "roll this section over to a new year", assert the QUESTION is on
+  screen; say one of the two answers back, assert the confirmation is on screen
+  and the marker actually moved; and do it once with plan mode ON, since that
+  is the default and the configuration nothing exercises.
+
+  **Two things to decide when picking this up.** Whether it is opt-in and part
+  of no gate, as Windows' `run-ui-tests.ps1` deliberately is (`[UiFact]`,
+  `PLANTOIR_UI_TESTS=1`) — the same reasoning applies here, since it needs the
+  foreground and takes minutes; and whether the assistant is driven with a
+  stubbed model, which the card phrasings make possible because they are
+  matched in code and never reach a model at all. That second point is what
+  makes this tractable: the deterministic phrasings are exactly the ones worth
+  covering, and they need no `llama-server` running.
+
+  **Rule 9 applies while writing it**: driving the real app is encouraged, and
+  the terminal comes back to the front afterwards.
+
 - **Start the Windows app with its output redirected and every launcher fails,
   silently and unrecognisably** (Windows, 2026-09-07, met while writing the
   wizard's UI test - the research below is done, so picking this up is cheap).
