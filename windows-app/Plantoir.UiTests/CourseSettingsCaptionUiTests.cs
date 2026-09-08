@@ -35,7 +35,6 @@ public class CourseSettingsCaptionUiTests
             Path.Combine(AppContext.BaseDirectory, "contracts", "shared-rules.json")))!
             ["gradedFolders"]!["wording"]!["caption"]!.ToString();
 
-
     /// <summary>
     /// The tip is rendered in Course Settings, it is the CONTRACT's sentence
     /// rather than one the view invented, and it can actually be brought into

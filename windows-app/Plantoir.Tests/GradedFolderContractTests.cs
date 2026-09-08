@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 using Plantoir.Core.Models;
 
@@ -309,8 +310,13 @@ public class GradedFolderContractTests
         // obvious tightening -- a \badd\w*\b pattern -- matches "ADDRESSES
         // it", which this caption legitimately contains and which would fail
         // the test for a word that is not a verb at all.
+        // IgnoreCase EXPLICITLY. The assertion this replaced was an
+        // OrdinalIgnoreCase string compare; xUnit's string overload builds a
+        // Regex with no options and .NET regex is case-SENSITIVE, so the
+        // tightening quietly stopped catching a sentence-initial "Add".
+        // The caption is three sentences: any of them can start with a verb.
         foreach (string verb in new[] { "add", "adds", "adding", "remove", "removes", "removing" })
-            Assert.DoesNotMatch(@"\b" + verb + @"\b", caption);
+            Assert.DoesNotMatch(new Regex(@"\b" + verb + @"\b", RegexOptions.IgnoreCase), caption);
     }
 
     /// <summary>
