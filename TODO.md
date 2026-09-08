@@ -96,9 +96,9 @@ an item when it ships (finished behaviour is recorded in
   Measured on this Mac (Apple M4 Pro, macOS 26.6 25G72), same command, same
   session: **10 crashes in 30 runs before, 0 in 30 after** for that class
   alone, and the FULL suite 0 host deaths in 13 runs afterwards (1,062 cases
-  each, and the one red case throughout is the `section restored` contract
-  event Windows proposed, which the mac has not implemented — `MAC-HANDOFF.md`,
-  and rule 4 says that failure is the feature working). Those are two
+  each; the one red case throughout was the `section restored` contract event
+  Windows proposed, unrelated to this work and adopted the same day — see
+  `GUI-IMPROVEMENTS.md` row 445). Those are two
   separate measurements on purpose — the class-alone figure was clean while
   the full suite was still aborting 8 times out of 8 on an unrelated crash
   this work had just introduced, which is the whole reason to measure at the
