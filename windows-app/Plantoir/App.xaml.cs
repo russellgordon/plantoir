@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.UI.Xaml;
@@ -81,6 +83,21 @@ public partial class App : Application
             LogDiagnostic($"Error loading settings: {ex}");
             Settings = new AppSettings();
         }
+
+        // Name every builds folder this app can name, then sweep the ones
+        // whose working folder is gone. Once per process, here, never per
+        // window. Both are best-effort and silent: a teacher cannot see
+        // either, so neither leaves a trail line.
+        try
+        {
+            var known = new List<string>();
+            if (Settings.WorkspacePath is { } open) known.Add(open);
+            foreach (var rememberedWindow in Settings.RememberedWindows) known.Add(rememberedWindow.Path);
+            BuildOutputLocation.AdoptWorkingFolderMarkers(known);
+            var swept = BuildOutputLocation.DiscardBuildsForMissingWorkingFolders();
+            if (swept.Count > 0) LogDiagnostic($"Swept {swept.Count} builds folder(s) whose working folder is gone");
+        }
+        catch (Exception ex) { LogDiagnostic($"builds sweep: {ex.Message}"); }
 
         string rawArgs = args.Arguments ?? "";
         string[] cmdArgs = Environment.GetCommandLineArgs();
@@ -185,11 +202,40 @@ public partial class App : Application
     }
 
 
+    /// <summary>
+    /// An open main window showing this working folder, or null. For the
+    /// assistant, whose own main window may have been closed under it: the
+    /// build then goes to another window on the same folder rather than to
+    /// a second one opened beside it.
+    /// </summary>
+    public static MainWindow? WindowFor(string folderPath)
+    {
+        foreach (var window in _windows)
+        {
+            if (window.IsClosed || window.Workspace.WorkspacePath is not { } open) continue;
+            try
+            {
+                if (string.Equals(Path.GetFullPath(open), Path.GetFullPath(folderPath), StringComparison.OrdinalIgnoreCase))
+                    return window;
+            }
+            catch (Exception) { /* a malformed stored path is "no window", not a crash in the tool loop */ }
+        }
+        return null;
+    }
+
+    /// <summary>A synced-folder note answered in one window leaves every other window showing that folder.</summary>
+    public static void HideSyncNoticesFor(string path, MainWindow? except)
+    {
+        foreach (var window in _windows)
+            if (!ReferenceEquals(window, except) && !window.IsClosed) window.HideSyncNoticeFor(path);
+    }
+
     /// <summary>Ctrl+N: inherit the key window's folder; alone → the picker.</summary>
     public static MainWindow OpenNewWindow()
     {
         var window = OpenWindow(null, null);
         window.Workspace.AdoptFolderForNewWindow();
+        window.ShowSyncNoticeIfNeeded();
         return window;
     }
 

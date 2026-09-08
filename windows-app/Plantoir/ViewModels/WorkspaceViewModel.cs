@@ -137,6 +137,7 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
             Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderOpened,
             $"working folder opened — {path}");
         Reload();
+        MarkBuildsFolder();
         if (previous is not null && previous != path) ReleaseFolderIfUnused(previous);
         NoteBecameKey();
         Notify(nameof(WorkspacePath));
@@ -156,9 +157,24 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
             $"working folder opened — {path}");
         App.LogDiagnostic("AdoptRestoredPath calling Reload()");
         Reload();
+        MarkBuildsFolder();
         App.LogDiagnostic("AdoptRestoredPath Reload() finished, calling Notify(WorkspacePath)");
         Notify(nameof(WorkspacePath));
         App.LogDiagnostic("AdoptRestoredPath Notify(WorkspacePath) finished");
+    }
+
+    /// <summary>
+    /// Names this folder's builds folder — only once the folder is known to
+    /// be a WORKING folder. Marking on every open would create a builds
+    /// folder for a Downloads picked by mistake, one the sweep could never
+    /// remove because the folder still exists: litter from the anti-litter
+    /// change. The mac writes its marker when a build folder is made; this is
+    /// the nearest moment the app has.
+    /// </summary>
+    private void MarkBuildsFolder()
+    {
+        if (_workspacePath is { } path && State == WorkspaceState.Ready)
+            BuildOutputLocation.WriteWorkingFolderMarker(path);
     }
 
     /// <summary>New window inherits the key window's folder; first window shows the picker.</summary>

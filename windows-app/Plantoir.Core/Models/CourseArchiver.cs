@@ -22,7 +22,11 @@ public static class CourseArchiver
     ///
     /// A course full of images makes a large zip, and the assistant saves one
     /// per conversation whether or not anybody asked for it, so without a
-    /// limit a term of chats fills a disk with copies of copies.
+    /// limit a term of chats fills a disk with copies of copies. (Until
+    /// 2026-09-07 this comment described the mac and not this code, which
+    /// saved one per CHANGE — so after six changes the copy from before the
+    /// conversation had already been pruned. See
+    /// <c>AssistWorkspace.BackUpOnceForThisConversation</c>.)
     ///
     /// A teacher's OWN backups are never counted here and never pruned. They
     /// made those on purpose; deciding on their behalf that a backup from

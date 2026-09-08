@@ -85,13 +85,13 @@ computing its own path (see "The flags the app answers"):
 
 | Folder | What |
 |---|---|
-| `builds\<folder id>\` | Built websites, OUTSIDE the working folder. `<CODE>\section<N>\public` is the built site; `work\<CODE>\section<N>` is the Quartz project a preview serves from. |
+| `builds\<folder id>\` | Built websites, OUTSIDE the working folder. `<CODE>\section<N>\public` is the built site; `work\<CODE>\section<N>` is the Quartz project a preview serves from. Each `builds\<id>\` also holds `working-folder.txt`, naming the working folder it belongs to; at launch the app deletes any builds folder whose named working folder is under the home folder and the system says is NOT THERE (error 2 or 3) — never one that is merely unreachable. |
 | `Logs\` | The activity trail — the breadcrumb file a problem report gathers. |
 | `scheduled\` | The wrapper script each scheduled deploy runs. |
 | `scheduled\pending\` | Sentinels a finished scheduled deploy leaves for the app to pick up next time it runs. |
 | `assist\`, `models\` | The assistant's MCP configuration (`mcp-<CODE>.json`) and the model weights it downloads. |
 | `WebView2\` | The embedded preview's user-data folder. |
-| `settings.json` | The app's own settings — and, since Windows has no system window restoration, the remembered-windows list IS the restoration mechanism. |
+| `settings.json` | The app's own settings — and, since Windows has no system window restoration, the remembered-windows list IS the restoration mechanism. (`AssistWindowPlacements`, beside it, is deliberately NOT replayed: restoring an assistant window would load a multi-gigabyte model unasked, so it remembers placement only and is a separate type.) |
 
 **The folder id is a hash, and it must never be derived twice.** The launcher
 computes it as `$WORKDIR_ID` and the app as
@@ -136,11 +136,25 @@ watches the output for progress markers and advances the stage bar as each one
 appears.
 
 **Read your own `.ps1` files rather than copying the mac's marker list**, and
-note that `markerOrigins` in the contract is the MAC's set — it still lists
-markers about containers starting, which nothing here prints. The list this app
-actually matches is `TaskMilestones.cs`, and `TaskMilestoneLauncherMarkerTests`
-reads the real `.ps1` files so a launcher rewrite that drops a line fails the
-suite instead of silently stalling a teacher's progress bar.
+note that `markerOrigins` in the contract classifies markers from BOTH sides —
+it still lists ones about containers starting, which nothing here prints. The
+list this app actually matches is `TaskMilestones.cs`, and two test classes
+hold it to the contract:
+
+- `TaskMilestoneLauncherMarkerTests` reads the real `.ps1` files, so a launcher
+  rewrite that drops a line fails the suite instead of silently stalling a
+  teacher's progress bar.
+- `MilestoneContractTests` runs `markerOrigins` itself. Every marker here that
+  the contract calls **shared Python** must still be printed by something under
+  `scripts/`; every marker the contract does NOT name must not be printed there
+  either, which is what caught the two example-course markers nobody had
+  classified; and the shared-Python steps of each mac milestone list must
+  appear in this app's list for the same task, in the same order, so a step the
+  mac gains is not one this side quietly stops showing. The mac's own launcher
+  phrasings — the five in `markerOrigins.knownDivergence.macOnlyLauncherMarkers`
+  — are read from the contract rather than copied here, because a hand-kept
+  list of the other platform's words goes stale the day that platform changes
+  them.
 
 That test exists because this failed silently once: four markers had been
 copied verbatim from the mac's `.sh` scripts, describing events — a one-time
@@ -255,10 +269,29 @@ builds root from `$env:LOCALAPPDATA` themselves, and `TaskScheduling` bakes the
 same into the wrapper script it registers. So a redirected run that PREVIEWED
 would look for its build where the launcher did not put it, and one that
 SCHEDULED a deploy would register a REAL Task Scheduler task whose sentinels
-land in the teacher's real pending folder. Nothing in the UI suite goes near
-either today — but a test that drives Preview is the obvious next thing
-somebody writes, and this is the paragraph they will have read first.
-`plantoir-mcp.exe` resolves its own paths too.
+land in the teacher's real pending folder. Neither is done by any test, and a
+test that drives Preview is the obvious next thing somebody writes — this is
+the paragraph they will have read first. `plantoir-mcp.exe` resolves its own
+paths too.
+
+**One launcher IS run from a test now**, and the reasons that is safe are
+narrower than they look. `NewCourseWizardUiTests` presses the wizard's Create
+button, which runs `setup.ps1`. **Two guards, neither enforced by anything:**
+
+1. `setup.ps1` sets `PLANTOIR_BUILD_ROOT` to the real
+   `%LOCALAPPDATA%\Plantoir\builds\<id>` like every other launcher — but
+   `setup_course.py` never resolves `toolchain_paths.merged_output_root`, so
+   the variable is set and the folder it names is never made.
+2. `setup_course.py` patches `quartz.layout.ts` and `OverflowList.tsx`, which
+   in a native run live inside the **bundled runtime every working folder
+   shares**. It is stopped only by `_scaffold_is_bundled_runtime()`, which
+   returns true only while `PLANTOIR_RUNTIME` is set — and it is set, by
+   `ScriptRunner`. If that ever stopped being true, a UI test would rewrite
+   the shared runtime.
+
+Checked rather than assumed, 2026-09-07: after a create there was no new folder
+under the real builds root and the real breadcrumb trail was untouched. Check
+both again before a test runs a different launcher.
 
 Two things about it are worth more than the flag itself.
 
@@ -287,7 +320,7 @@ bottom, and that a panel follows the course a teacher selected rather than
 going stale.
 
 **It is opt-in and belongs to no gate.** Every test carries `[UiFact]`, which
-skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds six and
+skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and
 runs none. The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
@@ -299,6 +332,144 @@ and not reopening it — that part is the teacher's).
 
 It does **not** judge anything visual: colour, contrast, dark-mode legibility,
 how a long name wraps. That is a screenshot pass, not this.
+
+**Two switches worth knowing.** `PLANTOIR_UI_KEEP=1` stops the run deleting
+its temporary folders — EVERY test's, not just a failed one's, since the
+teardown does not know the outcome — and `run-ui-tests.ps1` prints each path.
+A test that fails INSIDE the app has almost nothing to say from outside it,
+and the evidence that matters (that run's own `startup.log`, its breadcrumb
+trail, its per-run launcher log under `Logs\runs`, and its working folder) is
+all in what is normally thrown away.
+
+And `run-ui-tests.ps1` sweeps orphaned launcher children afterwards: killing
+`Plantoir.exe` kills only `Plantoir.exe`, because the whole-tree kill lives in
+`ConPty.Kill()`, which runs when the APP ends a task rather than when the app
+is ended from outside. A test that fails while `setup.ps1` is mid-run
+therefore leaves `powershell.exe` and `python.exe` holding the temporary
+working folder open, and the folder then survives with nothing to say where it
+came from. **The sweep matches THIS RUN's token** — `run-ui-tests.ps1` mints
+one and `DrivenApp` folds it into every folder it makes
+(`plantoir-ui-<run>-<8 hex>`). Matching the folder PREFIX instead was the
+first version and is too wide: two runs at once would kill each other's live
+launchers, and a developer tailing a kept folder's log has the prefix in their
+own command line. Both match the prefix; neither matches the token. Python is
+caught by the same match because `setup.ps1` runs it as `python.exe -u
+<workspace>\.toolchain\scripts\setup_course.py` — the script path is inside
+the temporary folder, so it is on the command line even though the folder is
+otherwise only python's working directory.
+
+### Never start the app with its output redirected
+
+`ConPtyProcess.Start` already carries this as a CAUTION, and it is repeated
+here because the way you MEET it is nothing like the way it is written there.
+The rule: the launcher binds to the pseudo console only when the process that
+started **Plantoir** has clean std handles — console handles, or none, as a
+GUI app started from a shortcut has. A parent whose stdio is redirected to
+pipes leaks those handles into the launcher instead.
+
+When that happens the app captures nothing, and what the app sends the
+launcher never reaches it. Under `dotnet test` that shows as a task that
+"failed (exit code 1) after 1s" with an EMPTY transcript in Show details —
+the pipe gives the child EOF, and `input()` in `setup_course.py` dies. With
+output redirected to a file it instead HANGS on the first prompt, with the
+launcher's output sitting in the redirect target. Both read like a broken
+toolchain, and neither is one.
+
+Measured 2026-09-07 (Lenovo 20QES70500, Intel Core i5-8365U @ 1.60 GHz,
+16 GB) — three launches of one build, one variable:
+
+| How the app was started | What happened |
+|---|---|
+| `cmd.exe` in its own window, handles inherited (what `.\Plantoir.exe` at a prompt really gives you) | course made, `setup.ps1` succeeded after 21 s |
+| ShellExecute (`Start-Process`, a shortcut, the Start menu) | course made, 21 s |
+| the same, with `> out.txt 2>&1` | nothing captured, run hung on the first prompt, no course |
+
+**So an ordinary terminal is fine; redirecting is not.** An earlier version of
+this section said the opposite — that any console broke it — which is why the
+experiment above is written down rather than the conclusion alone.
+`Plantoir.UiTests` is the case that meets it in practice, and `DrivenApp`
+launches with `UseShellExecute = true` for exactly this reason. Whether
+`ConPtyProcess.Start` should defend itself is in [`TODO.md`](../TODO.md).
+
+### The new-site dialog: a hand-driven check
+
+One first-run path cannot be a `[UiFact]`, and it is the other half of what
+handoff item 35 asked for: the dialog a BRAND-NEW section's first publish
+raises, where a teacher chooses their website address. Everything verified
+until now has been a REPEAT publish to a site that already existed, so this
+dialog has never been seen by anybody checking that it works.
+
+**Why it is not automated** — five reasons, checked rather than assumed:
+
+1. **A test would READ a real credential, and this is the one that settles
+   it.** `deploy.ps1`'s `$KEY_TARGET` is the hardcoded
+   `containerized-quartz-netlify`, with no override, and `--state-dir` does not
+   redirect Credential Manager. So whether a test reached the token dialog or
+   **published a real website** would depend on whether the machine happened to
+   have a token saved. A test whose behaviour forks on developer machine state,
+   one fork of which creates a live site, is not a test.
+2. **A fake token never reaches the prompt.** `deploy.ps1` validates the token
+   against `https://api.netlify.com/api/v1/user` before `deploy.py` starts, and
+   clears it and asks again on failure — so a bogus one raises "Connect to
+   Netlify", not "Choose a Website Address".
+3. **A real token creates a real, globally unique Netlify site**, and the suite
+   has no way to delete it afterwards.
+4. **A stub `deploy.ps1` does not survive.** `ToolchainMirror.RefreshLaunchers`
+   rewrites any launcher that differs byte-for-byte from the bundled copy, and
+   it runs on every `WorkspaceViewModel.Reload()` with no once-per-folder
+   guard. (`RefreshToolchain` DOES have that guard, so a stub written into
+   `.toolchain\scripts` after the first reload would survive — worth knowing
+   before anyone reaches for it, but it rescues nothing, because reason 2 stops
+   the run before `deploy.py` is reached.)
+5. **`verify-deploy.ps1` cannot cover it, by design.** It redirects stdin from
+   a file precisely so `sys.stdin.isatty()` is false and `deploy.py` asks
+   nothing at all (`verify-deploy.ps1:166-185`).
+
+**What to check, and what NOT to.** Do not eyeball the dialog's title,
+explanation or its three steps: those are contract data
+(the `siteName` entry in `contracts/app-rules.json`'s `credentialRequests.requests`
+array) and are asserted by equality in `ContractTests`, so reading them by hand
+adds nothing. **The explanation was the exception until 2026-09-07** — the
+sweep checked title, field label, secrecy, link and steps, and skipped the
+longest thing a teacher reads. Writing this paragraph is what found it; it is
+asserted now.
+Check the five things nothing pins:
+
+1. The **surname** dialog comes first, and only once. On a second new section
+   it must not appear again.
+2. "Choose a Website Address" then appears, with the address field
+   **PRE-FILLED** as `<course>-s<section>-<year>-<surname>` — the bracketed
+   default `deploy.py` prints, lifted out of the wording by
+   `QuestionParser.SeparateDefaultAnswer`.
+3. **Cancel cancels**, and does not hang. The run should end as cancelled
+   rather than sit waiting on a question nobody can answer.
+4. "Save and continue" sends what you typed: the site Netlify creates carries
+   **that** address, not the pre-filled one.
+5. The breadcrumb trail records the ask — `asked for a publishing credential`,
+   with the field named.
+
+**How to run it.** Publish a section that has never published, to Netlify,
+with a real token already saved. `--auto-deploy CODE N` presses Publish for
+you; the button does the same thing.
+
+**Do it in a working folder made for it, and clean up afterwards, or the check
+stops checking anything.** Three pieces of state make a second run silent:
+
+- `courses/<CODE>/.netlify_sites/section<N>.json` — the site marker. With it
+  in place the next publish reuses the site and never asks.
+- `courses/<CODE>/section<N>/.netlify_site.json` — the LEGACY marker, which
+  `deploy.py` migrates back into the stable path if it finds one, so an older
+  folder needs both removed.
+- `courses/.internal/profile.json` — the saved surname. Nothing removes it,
+  which is why **step 1 can only be checked once per working folder**: use a
+  fresh one, or accept that you are checking steps 2–5 only and say so.
+
+And delete the site on Netlify, since it is a real one and the address is
+globally unique.
+
+Whether this joins the release cut is the same open question as handoff item
+36 (`verify-deploy.ps1` is wired into nothing and that is a decision nobody has
+made), so it is deliberately not written into `RELEASING.md` here.
 
 ## What this page does not cover
 
