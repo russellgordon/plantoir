@@ -441,8 +441,12 @@ and re-asks every time. On a machine without that team's certificate, point
 `DEVELOPMENT_TEAM` at your own or set `CODE_SIGN_IDENTITY: "-"` and live with
 the prompts.
 
-**Windows app.** Nothing is generated, the solution is committed, and the only
-prerequisite is the **.NET 9 SDK**. It targets `net9.0-windows10.0.19041.0` /
+**Windows app.** Nothing is generated, the solution is committed, and the
+prerequisites are the **.NET 9 SDK** and a **`python` on PATH** — the latter
+since 2026-09-07, when `dotnet test` began running the shared
+`scripts/test_*.py` files; the suite FAILS rather than skips without an
+interpreter, deliberately, because a suite that is green having run nothing is
+the failure mode that change was made to close. It targets `net9.0-windows10.0.19041.0` /
 `win-x64` and ships self-contained, Windows App SDK included, so a teacher
 installs no runtime.
 
@@ -719,15 +723,30 @@ mistake there is a mistake in nineteen hundred courses.
 |---|---|
 | Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
 | macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests` |
-| Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` |
+| Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` — which since 2026-09-07 also runs every shared `scripts/test_*.py` through `PythonToolchainTests`, so a change to the shared Python is gated on Windows too. Needs a `python` on PATH and FAILS rather than skips without one. |
 | Windows app, **through the real interface** | `.\run-ui-tests.ps1`, **run from the repository root** (every other command in this table starts `cd windows-app`; this one does not), — launches the x64 Debug `Plantoir.exe` with `--state-dir` and drives it with UI Automation, for what a unit test cannot see: that a control can be REACHED, that clicking it opens something, that the RENDERED text is what the model said in the order the contract fixes, that a scrolling list is not cut off at the bottom, and that a panel follows the course a teacher selected rather than going stale. **Opt-in and part of no gate**: every test carries `[UiFact]` and skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and runs none. It is in the solution, so a SOLUTION build compiles it — the per-project commands this table names do not, which is the honest limit of the compile-rot protection. Needs a desktop session and the foreground, takes minutes, and CLOSES a running Plantoir (saying so, and not reopening it). Nothing of the teacher's is touched: `--state-dir` moves the whole state folder for the run — but that redirects only what the APP resolves, and one test now presses the wizard's Create button and so runs `setup.ps1`, which computes the builds root from the real environment itself. That one is safe because `setup_course.py` never resolves `merged_output_root`; **a test that drove Preview or a scheduled deploy would NOT be**, and `documentation/12-windows-app.md` is where to read why before writing one. |
 | Assistant routing | **Nothing.** Measured by hand — see below. |
 | Publishing (any destination, `deploy.sh`/`deploy.py`, the preview→publish path) | `./verify-deploy.sh` — publishes to a folder, Netlify and Cloudflare, and every primary+secondary pairing, then FETCHES EACH SITE BACK and reads it. Deliberately NOT part of `verify.sh`: it needs three credentials, the network, and it creates real sites. Run it when the publishing path changes. |
 
 `verify.sh` **does not run on Windows** (bash, and it expects `docker` on PATH;
-in the normal Windows setup Docker Engine lives inside WSL2). Toolchain changes
-made on Windows have no automated gate: verify them by driving a real publish
-through the app, and re-run `verify.sh` from the mac after the next sync.
+in the normal Windows setup Docker Engine lives inside WSL2). What Windows does
+and does not get from that, corrected 2026-09-07 — this used to say toolchain
+changes made there have "no automated gate" at all, which is no longer true:
+
+- **The shared Python IS gated there now.** `PythonToolchainTests` runs every
+  `scripts/test_*.py` — all fifteen, the same files `verify.sh` runs — inside
+  `dotnet test`, in about eight seconds. They need no Docker, no network and no
+  credentials, and until 2026-09-07 Windows ran none of them, so a shared file
+  could be broken from that machine with every gate on it staying green.
+- **The IMAGE is still ungated there**, and that part stands: nothing on
+  Windows builds the Docker image or checks the baked files. Verify those by
+  driving a real publish through the app, and re-run `verify.sh` from the mac
+  after the next sync.
+- **Publishing for real is `verify-deploy.ps1`**, the Windows counterpart of
+  `verify-deploy.sh` in the row above and opt-in for the same reasons. No suite
+  runs either of them; `.githooks/pre-commit` says so when a commit touches the
+  publishing path, and `RELEASING.md` requires a run — with nothing skipped —
+  for any release that changes it.
 
 **The mac suite runs its test classes one at a time, and that is load-bearing.**
 The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`,

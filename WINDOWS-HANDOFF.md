@@ -1761,21 +1761,106 @@ to run in the background.
     procedure instead; say which it became. **Not for tonight**, and not a
     defect report: it is an untested path, listed so it is a choice.
 
-36. **`verify-deploy.ps1` is wired into nothing, and that is a standing
-    exposure rather than a task (audited onto this list 2026-09-06).** It is
-    the ONLY automated check of the PowerShell half of publishing — it
-    publishes to every destination and every pairing against real sites and
-    fetches each one back, 36 passed / 0 failed on 2026-09-06 — and no gate
-    runs it. `verify.sh` and `verify-deploy.sh` are bash and do not run here,
-    so if this one is not run by hand, the publishing path on Windows has no
-    coverage at all beyond unit tests of its parts. It needs three credentials
-    and the network, which is WHY it is opt-in, and that reasoning is sound;
-    what was missing is anybody being told. Evidence:
-    `windows-app/PROGRESS.md` (the "the deploy gate exists now" bullet below
-    its parity table) and [`documentation/12-windows-app.md`](documentation/12-windows-app.md).
-    **Windows owes nothing here except a decision** — run it on a schedule, run
-    it as a release-cut step, or leave it hand-run and say so in `RELEASING.md`.
-    **Not for tonight.**
+36. ~~**`verify-deploy.ps1` is wired into nothing, and that is a standing
+    exposure rather than a task.**~~ ✅ Done 2026-09-07 (branch
+    `issue/36-publishing-gate`). Audited onto this list 2026-09-06; Russell's
+    steer was "this should be part of the standard test suite that is run after
+    major changes [to] publishing mechanics."
+
+    **What was decided.** `verify-deploy.ps1` STAYS opt-in and no suite runs
+    it — that posture was always right (three credentials, the network, ~20
+    minutes, and it creates real globally unique sites nothing deletes); what
+    was missing was anybody being told. So the telling was built in three
+    places, and a fourth thing was found underneath that mattered more:
+
+    - **`PythonToolchainTests` runs every shared `scripts/test_*.py` inside
+      `dotnet test`** — all fifteen files, 156 tests, ~8 seconds, no Docker, no
+      network, no credentials. **`verify.sh` runs those same fifteen on the
+      mac and Windows ran NONE of them**, so a shared file — including
+      `deploy.py` and `build_site.py`, which a publish executes — could be
+      broken from this machine with every gate on this machine staying green.
+      That hole was not what item 36 was about; it was found while answering
+      it, and it is the part that buys real coverage.
+    - **`.githooks/pre-commit`** prints, when a commit stages anything in the
+      publishing closure, that `verify-deploy.ps1` (or `verify-deploy.sh`) is
+      the only automated check that really publishes. It **warns and never
+      blocks**, and exits 0 always.
+    - **`RELEASING.md` step 2** now names the verifier instead of asking for a
+      hand smoke in prose, and requires a run with **nothing skipped** —
+      because a destination with no credentials is skipped while the run still
+      exits 0, which is right for everyday use and wrong for a release.
+
+    **The design that was rejected, and the measurements that killed it — this
+    is the part worth reading before proposing it again.** The first plan was a
+    stamp: a committed file recording the SHA-256 of the publishing files as
+    they stood when `verify-deploy.ps1` last passed, plus a unit test going red
+    whenever they changed afterwards, with a written-reason waiver as the
+    escape hatch. It is a genuinely stronger forcing function — it makes
+    ignoring the verifier impossible rather than merely noticed — and it was
+    dropped anyway, on four findings from an adversarial review, each checked
+    against the files rather than taken on trust:
+
+    1. **It excluded the file a publish actually runs.** The watched set was
+       five files; `build_site.py` was left out for churning. But `deploy.py`
+       EXECUTES it — `rebuild_for_production` (`scripts/deploy.py:147-155`),
+       the live-reload rebuild, and `ensure_base_url_and_rebuild`
+       (`:161-192`) reached from both the Cloudflare and Netlify legs — and
+       `deploy.ps1:341`'s `--to-folder` branch shells `preview.bat
+       --build-only` into it. A gate that stays green while the code a publish
+       runs changes underneath it is theatre.
+    2. **The churn argument condemned the set it kept.** Measured over the 60
+       days to 2026-09-07, on `dev`: the rejected design's five watched files
+       — `deploy.ps1`, `deploy.bat`, `scripts/deploy.py`,
+       `scripts/toolchain_paths.py`, `scripts/netlify_badge.py` — changed on
+       **16 distinct days**; `scripts/build_site.py` on **16 distinct days**;
+       out of **22 active days**. Not "less churn" — identical. The gate would
+       have been red three days in four, and a gate red most days gets waived
+       by reflex, which was the stated reason for the exclusion in the first
+       place.
+
+       **The command, because the number is only useful if it can be
+       re-taken** — a review of this write-up got 17–19 from differently
+       chosen sets and read that as a contradiction, which it is not: the
+       figure is about the REJECTED set, and a wider set naturally churns more:
+
+           git log --since=60.days --format=%ad --date=short -- <paths> | sort -u | wc -l
+
+       Run it with the five paths above, then with `scripts/build_site.py`,
+       then with no paths at all for the 22. (The hook's broader eleven-file
+       publishing closure gives 19 over the same window — a different question
+       with a different answer, and not a correction of this one.)
+    3. **Its preflight could not pass.** The plan had the script refuse unless
+       the working folder's launchers matched the repo byte-for-byte. The
+       Debug bin's bundled toolchain is already stale by several files;
+       `Plantoir.csproj` globs `scripts/**` so gitignored `__pycache__/*.pyc`
+       ships into it; and with `core.autocrlf=true` and no `.gitattributes`
+       the working tree is CRLF. Byte equality was never going to hold.
+    4. **A credential-less run would have CLEARED it.** The stamp was to be
+       written on `Fail -eq 0`, and a run with no credentials skips Netlify and
+       Cloudflare and still exits 0 — so a folder-only run that published
+       almost nothing would have certified the whole path. That contradicts
+       `verify-deploy.ps1`'s own header: "a script that quietly passes because
+       it ran nothing is the failure mode this whole file exists to prevent."
+
+    **What that trade costs, stated plainly** so nobody thinks it was free: the
+    stamp would have told you "you changed publishing and have not run the real
+    thing" every time you ran the suite, forever. The hook says it once, at
+    commit time, and can be ignored. That is a real loss. It was accepted
+    because the alternative was a suite red on three days in four, which stops
+    being read — and because the fifteen Python files buy coverage that runs,
+    where the stamp only ever checked whether somebody had run something else.
+
+    **Also settled by this, deliberately:** whether the new-site dialog's
+    hand-check (item 35) joins the release cut. It does not — the reasoning is
+    in [`documentation/12-windows-app.md`](documentation/12-windows-app.md),
+    which had explicitly deferred that question to this item.
+
+    **What the mac owes** is at the top of `MAC-HANDOFF.md`: `verify.sh` already
+    runs the fifteen files, so nothing is owed there — but `.githooks/pre-commit`
+    reaches the mac only once that clone runs `git config core.hooksPath
+    .githooks`, and one shared test file was fixed
+    (`scripts/test_baked_modules.py` read the Dockerfile and product sources
+    with the locale encoding, which fails on any Windows machine).
 
 37. **The Course Settings tip sentence is pinned by no contract on either
     platform, and the two apps word the same rule differently (audited onto

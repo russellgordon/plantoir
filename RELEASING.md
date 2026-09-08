@@ -159,10 +159,32 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > a green test run says nothing about the thing teachers actually run.
    > `verify.sh`, the real toolchain gate, is bash and expects `docker` on
    > `PATH`, which does not hold on Windows where Docker Engine lives in WSL2.
-   > **On Windows the hand smoke is the only toolchain verification there is.**
-   > If the release changes anything under `scripts/`, the Dockerfile or a
-   > launcher, smoke the publishing destination(s) it touches — there are three
-   > (Netlify, Cloudflare Pages, a folder) and they take different code paths.
+   > **On Windows the hand smoke is the only DOCKER verification there is.**
+   > (It is no longer the only toolchain verification: since 2026-09-07
+   > `PythonToolchainTests` runs all fifteen shared `scripts/test_*.py` files
+   > inside `dotnet test` — the same files `verify.sh` runs on the mac, which
+   > nothing ran here before. They need no Docker, so they cover the shared
+   > Python and say nothing about the image.)
+
+   **If the release changes anything under `scripts/`, the Dockerfile or a
+   launcher, run the publishing verifier rather than smoking it by hand** —
+   `verify-deploy.ps1` on Windows, `./verify-deploy.sh` on the mac. It is the
+   automation this step used to ask for in prose: it publishes to all three
+   destinations (Netlify, Cloudflare Pages, a folder — different code paths
+   each) and every pairing, then FETCHES EACH SITE BACK and reads it, which is
+   the only way to catch the two failures that have actually shipped here — a
+   preview build reaching a published site, and a publish that reported success
+   having copied the wrong thing or nothing.
+
+   > **Require a run with nothing skipped.** A destination with no credentials
+   > on the machine is skipped and the run still exits 0 — correct for everyday
+   > use, wrong for a release. Read the summary line: `passed, failed, skipped`.
+   > A cut is the moment "Cloudflare was skipped on that laptop" stops being
+   > acceptable, so get the credentials on the machine and run it again.
+   >
+   > It needs three credentials, the network and about twenty minutes, and it
+   > **creates real, globally unique sites that nothing deletes** — so no suite
+   > runs it and none should. Delete the sites it made when you are done.
 3. **Build the signed Windows bundle**:
 
        powershell -File publish.ps1 -Sign
