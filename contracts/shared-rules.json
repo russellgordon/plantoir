@@ -958,7 +958,7 @@
       },
       "oneAlertAtATime": {
         "rule": "The outcome is shown AFTER the dialog it was requested from has gone, never raised from inside that dialog's own button action.",
-        "why": "A view presents one alert at a time; asking for a second while the first is dismissing loses one of them, and the one lost would be the report the teacher just asked for."
+        "why": "A view presents one alert at a time; asking for a second while the first is dismissing loses one of them, and the one lost would be the report the teacher just asked for. It is worse than a lost alert: on 2026-09-05 doing exactly this CRASHED the shipping app (GUI-IMPROVEMENTS.md row 391) — EXC_BAD_ACCESS in AppKitDialogBridge.updateExistingAlert, because AppKit tears the sheet down inside a layout pass and spins a nested runloop from inside a display-cycle callback already running."
       }
     },
     "checks": [

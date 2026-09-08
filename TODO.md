@@ -54,9 +54,56 @@ an item when it ships (finished behaviour is recorded in
   [`documentation/12-windows-app.md`](documentation/12-windows-app.md),
   "Never start the app with its output redirected".
 
-- **The mac suite crashes intermittently inside AppKit, and it reads as a
-  failing test rather than as a crash** (mac, 2026-09-06, measured while
-  working on something else — NOT caused by that work, see below).
+- ~~**The mac suite crashes intermittently inside AppKit, and it reads as a
+  failing test rather than as a crash**~~ — ✅ **Done 2026-09-07** (mac,
+  raised 2026-09-06, measured while working on something else — NOT caused by
+  that work, see below).
+
+  **What it turned out to be, and what fixed it.** The diagnosis below is
+  right as far as it goes and one guess in it is wrong. `NSMoveHelper
+  _doAnimation` spins a NESTED runloop, and SwiftUI's `AppKitDialogBridge`
+  ends the modal session from inside `NSHostingView.layout()` — so the nested
+  runloop is spun from inside a display-cycle callback that is already
+  running, and the cycle is re-entered. One call stack on one thread, not a
+  race, which is why no amount of settling would have helped.
+
+  **The "two-line experiment" at the bottom of this entry does not work, and
+  that is the useful part to keep.** `-NSAutomaticWindowAnimationsEnabled NO`
+  reaches the process and is ignored for the sheet move: 0.268 s animating
+  without it, 0.268 s with it, measured by timing `_doAnimation` directly.
+  AppKit reads the key on this very path — hooking `-[NSUserDefaults
+  objectForKey:]` during a close shows it consulted, beside
+  `NSOrderOutSheetWhenEnded` — and does not act on it. Nor does
+  `NSWindow.animationBehavior = .none` on the sheet or its parent, nor
+  `endSheet` inside a zero-duration `NSAnimationContext` group, nor
+  `-NSOrderOutSheetWhenEnded NO`, nor an off-screen parent window. All six
+  landed between 0.264 s and 0.270 s. Reduce Motion was not tried and is
+  almost certainly a dead end too: no accessibility key is among the four
+  read on that path.
+
+  What DOES work is AppKit's own switch. `NSSheetMoveHelper` declares its own
+  `-shouldSkipAnimation`, overriding `NSMoveHelper`'s, and forcing it true is
+  how AppKit itself takes a sheet out of the animation — the same branch it
+  takes for `inhibitWindowAnimations`. One `method_setImplementation` on the
+  subclass leaves ordinary window moves animating. (An empty `_doAnimation`
+  override also works and was tried first; the switch was preferred because
+  AppKit's own skip path leaves the state AppKit intends to leave, and because
+  it needs no `class_addMethod` and no fallback branch.) It lives in the test
+  bundle (`mac-app/Tests/QuartzTeachersTests/SheetAnimationSuppressor.swift`)
+  and is installed from the bundle's `NSPrincipalClass`, so nothing in the
+  shipped app changes.
+
+  Measured on this Mac (Apple M4 Pro, macOS 26.6 25G72), same command, same
+  session: **10 crashes in 30 runs before, 0 in 30 after** for that class
+  alone, and the FULL suite 0 host deaths in 13 runs afterwards (1,062 cases
+  each, and the one red case throughout is the `section restored` contract
+  event Windows proposed, which the mac has not implemented — `MAC-HANDOFF.md`,
+  and rule 4 says that failure is the feature working). Those are two
+  separate measurements on purpose — the class-alone figure was clean while
+  the full suite was still aborting 8 times out of 8 on an unrelated crash
+  this work had just introduced, which is the whole reason to measure at the
+  scope a gate runs. See `GUI-IMPROVEMENTS.md` row 444 and
+  `WINDOWS-HANDOFF.md`.
 
   **What it looks like.** `xcodebuild ... test` exits 65 and prints
   `** TEST FAILED **` with a "Failing tests:" line naming one
@@ -88,13 +135,15 @@ an item when it ships (finished behaviour is recorded in
   `testACourseThatIsPreviewingIsNotRenamed` before noticing the totals say
   zero failures.
 
-  Not fixed here because it is not this piece's, and because the fix is a real
+  ~~Not fixed here because it is not this piece's, and because the fix is a real
   question rather than a tweak: whether these tests should drive a live
   `NSAlert` sheet at all (`beginSheetModalForWindow:` under a test host, with
   animations on), or assert the same thing without one. Worth checking
   `NSAnimationContext`/`reduce motion` in the test environment first — a
   disabled sheet animation would take the faulting frame out of the picture
-  entirely, and would be a two-line experiment.
+  entirely, and would be a two-line experiment.~~ — the instinct was right and
+  the route was not; see the correction at the top of this entry. The tests
+  still drive a live `NSAlert` sheet, and still assert exactly what they did.
 
 - **Two courses whose curriculum folder BOTH apps name is not the one the
   build uses — decide whether they should read the vault to break the tie**
@@ -408,8 +457,18 @@ an item when it ships (finished behaviour is recorded in
   Rejected: a `.nosync` suffix (iCloud-only — Dropbox and OneDrive ignore it —
   and it moves the path just as much).
 
-- **`CourseRenameInterfaceTests` crashes the whole unit run, intermittently —
-  and it is PRE-EXISTING, not caused by the special-folders work.** Measured
+- ~~**`CourseRenameInterfaceTests` crashes the whole unit run, intermittently —
+  and it is PRE-EXISTING, not caused by the special-folders work.**~~ —
+  ✅ **Done 2026-09-07.** The SAME defect as the "crashes intermittently inside
+  AppKit" entry near the top of this file,
+  written up twice a fortnight apart before anybody noticed they were one
+  thing; both are fixed by the same change. Everything below stands as
+  measured, and the closing paragraph's lead — "the cheapest lead is now
+  inside `CourseRenameInterfaceTests` itself" — was correct: the class's own
+  `renameProblem = nil` at line 175 is what lights the fuse. The full-suite
+  rate recorded here (about half of runs, 9 of 17 across two trees) is the
+  number that mattered most in the end, because it is the scope a merge gate
+  actually runs. Measured
   2026-08-23 on a clean `origin/dev` worktree with none of that branch's
   changes: **one crash in four full runs**, aborting the run partway
   (`Executed 419 tests` and an exit code of 65 with ZERO failed test CASES).
