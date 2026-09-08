@@ -50,7 +50,67 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         if let more = AssistCardCommand.moreDays(tidied) {
             return more
         }
+        if let room = AssistCardCommand.makeRoom(tidied) {
+            return room
+        }
         return AssistCardCommand.duplicateClass(tidied, original: message)
+    }
+
+    /// "Make room for a class at Unit 3, Day 4", and the same with a count.
+    ///
+    /// **Parity with the MCP tool, which is the rule for these** — a teacher
+    /// should be able to ask for whatever a Claude Code session can. Course
+    /// and section come from the window, so the three things left to say are
+    /// the unit, the day, and how many. Everything in the sentence is a number
+    /// in a fixed frame; none of it is a judgement, so none of it needs a
+    /// model.
+    ///
+    /// Deliberately strict, like the rest of this table. The shape is fixed
+    /// and the parts are read out of it — it does not try to understand a
+    /// sentence that merely resembles this one, because answering the wrong
+    /// question with total confidence is worse than routing it.
+    private static func makeRoom(_ tidied: String) -> AssistCardCommand? {
+        let spelled: [String: Int] = [
+            "a": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+            "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+        ]
+        let opening: String = "make room for "
+        guard tidied.hasPrefix(opening) else {
+            return nil
+        }
+        // The comma in "Unit 3, Day 4" is punctuation in the frame rather than
+        // part of any value, so it is dropped before the words are counted.
+        let body: String = String(tidied.dropFirst(opening.count))
+            .replacingOccurrences(of: ",", with: " ")
+        var words: [String] = []
+        for piece in body.split(separator: " ") {
+            words.append(String(piece))
+        }
+
+        // <count> class|classes at unit <unit> day <day>
+        guard words.count == 7,
+              words[2] == "at", words[3] == "unit", words[5] == "day" else {
+            return nil
+        }
+        guard words[1] == "class" || words[1] == "classes" else {
+            return nil
+        }
+        guard let howMany = spelled[words[0]] ?? Int(words[0]), howMany > 0,
+              let unit = Int(words[4]), unit > 0,
+              let day = Int(words[6]), day > 0 else {
+            return nil
+        }
+        // A plural count with a singular noun, or the reverse, is a sentence
+        // somebody typed carelessly rather than one of these shapes — and
+        // guessing which half they meant is exactly what this table exists to
+        // avoid.
+        guard (howMany == 1) == (words[1] == "class") else {
+            return nil
+        }
+        return AssistCardCommand(
+            toolName: "make_room_for_classes",
+            arguments: ["unit": "\(unit)", "atDay": "\(day)", "howMany": "\(howMany)"]
+        )
     }
 
     /// "Duplicate Unit 3, Day 2 as my next class."

@@ -1461,7 +1461,7 @@ to run in the background.
       real `CredentialRequests`, is the half that would catch a request added
       here and written down nowhere.
     - `app-rules.json` → `publishedFreshness.whenShown` (9) / `whenRecorded`
-      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/28 — the NAMES
+      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/30 — the NAMES
       and ARGUMENTS, not the descriptions, which `Briefly()` rewrites here for
       measured reasons); `course-management.json` → `courseCode.renameEffects`
       (6); `shared-rules.json` → `buildOutputLocation.windowsLocation.buildsRoot`
@@ -2015,7 +2015,7 @@ to run in the background.
     first". Those are the two cases that reach the placeholder, by name. The
     numbers above hold.
 
-41. **Your MCP server serves 37 tools and the mac's serves 28 — and TWO
+41. **Your MCP server serves 37 tools and the mac's serves 30 — and TWO
     things now fall to you: a rollover that publishes over last year's
     website (DECIDED 2026-09-08 — build it, do not re-open it), and seventeen
     measured phrasings you do not have.**
@@ -2205,7 +2205,26 @@ to run in the background.
     this pair, because the phrasing it corresponds to already existed on both
     sides.
 
-    **One number moved:** the mac's MCP surface is 28 (22 shared + 6 MCP-only),
+    **`make_room_for_classes` and its twin landed the same day too**
+    (`GUI-IMPROVEMENTS.md` row 450), and this is the one where the card
+    phrasing needs care rather than copying. It is PARSED, not listed — "make
+    room for a class at Unit 3, Day 4", or "two classes" for more — because
+    the sentence is a fixed frame with numbers in it and no judgement anywhere.
+    **Take the near-miss list with it**, not just the happy path: "make room
+    for two class at Unit 3, Day 4" must NOT match, and a parser that shrugs at
+    a count and noun disagreeing is one that renames a teacher's pages on a
+    typo. Your `AssistCardCommandTests` will go red until the phrasing exists
+    on your side.
+
+    Two other things worth checking against your own implementation, because
+    the mac had to think about them and the engine is the same shape: whether
+    your reply says that "undo that" will NOT take it back once other classes
+    have moved — a half-undone renumbering is worse than no undo, so the mac
+    records nothing on the undo list and names the backup instead — and whether
+    it says so in the PLAN as well as afterwards, where a teacher can still say
+    no.
+
+    **One number moved:** the mac's MCP surface is 30 (22 shared + 8 MCP-only),
     not 25. A pinned count made that a decision rather than drift — the test
     failed the moment the tool was added, which is exactly what it is for.
 
@@ -3209,11 +3228,11 @@ for behaviour only your side has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 28-tool MCP one. (It said 23; corrected
+the 13-tool local surface and the 30-tool MCP one. (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
 serves 37, and the twelve it has beyond the contract are named in
 `AssistSurfaceContractTests` and in `MAC-HANDOFF.md`.) The mac's own test has
-pinned that sum for longer than the prose said so; it is 22 + 6 MCP-only = 28 since `list_courses` and the `add_classes` pair landed. What the two
+pinned that sum for longer than the prose said so; it is 22 + 8 MCP-only = 30 since `list_courses`, the `add_classes` pair and the `make_room_for_classes` pair landed. What the two
 surfaces do and do not share is item 41 and "The two MCP surfaces are not the
 same product" below.
 

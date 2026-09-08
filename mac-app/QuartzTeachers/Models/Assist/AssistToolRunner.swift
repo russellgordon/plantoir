@@ -247,6 +247,10 @@ final class AssistToolRunner {
             return await reDateClasses(arguments)
         case "add_next_class":
             return addNextClass(arguments)
+        case "plan_make_room_for_classes":
+            return planMakeRoomForClasses(arguments)
+        case "make_room_for_classes":
+            return makeRoomForClasses(arguments)
         case "plan_add_classes":
             return planAddNextClass(addClassesArguments(from: arguments))
         case "add_classes":
@@ -2249,6 +2253,132 @@ final class AssistToolRunner {
             detail += "\n\nNothing was published or hidden, so students see no change until you "
                     + "deploy."
             return AssistToolOutcome.wrote(summary, detail: detail)
+        }
+    }
+
+    /// What making room part-way through a unit would do.
+    private func planMakeRoomForClasses(_ arguments: [String: Any]) -> AssistToolOutcome {
+        switch roomPlan(arguments) {
+        case .couldNot(let message):
+            return AssistToolOutcome.couldNotRead(message)
+        case .planned(let asked):
+            var lines: [String] = []
+            let word: String = asked.located.course.configuration.unitWord
+            lines.append(
+                "\(asked.count) new class \(asked.count == 1 ? "page" : "pages") would be added at "
+                + "\(word) \(asked.unit), Day \(asked.atDay)."
+            )
+            lines.append("They start hidden, so nothing changes on the site until you publish them.")
+            if asked.plan.renames.isEmpty == false {
+                lines.append("")
+                lines.append(
+                    "\(asked.plan.renames.count) later "
+                    + "\(asked.plan.renames.count == 1 ? "class moves" : "classes move") along to "
+                    + "make room, and the links that point at them are rewritten to match."
+                )
+                lines.append("")
+                lines.append(
+                    "Because other classes move, “Undo that” will not take this back afterwards — "
+                    + "the backup made first is the way out."
+                )
+            }
+            return AssistToolOutcome.planned(
+                "Worked out what making room in that unit would do.",
+                plan: lines.joined(separator: "\n")
+            )
+        }
+    }
+
+    /// Make the room.
+    ///
+    /// **The undo caveat is the important half of the reply.** Once other
+    /// classes have been renamed, taking this back page by page would leave a
+    /// section half-renumbered — worse than not offering an undo at all — so
+    /// nothing is recorded on the undo list and the teacher is told the backup
+    /// is the way out. That is the same rule the duplicate path already lives
+    /// by, said out loud here because this tool moves more pages than anything
+    /// else on the surface.
+    private func makeRoomForClasses(_ arguments: [String: Any]) -> AssistToolOutcome {
+        switch roomPlan(arguments) {
+        case .couldNot(let message):
+            return AssistToolOutcome.couldNotRead(message)
+        case .planned(let asked):
+            let backedUp: Bool = backUpOnceForThisConversation(
+                asked.located.course, forSection: asked.located.sectionNumber
+            )
+            let outcome: ClassChangeOutcome
+            do {
+                outcome = try ClassInsertionPlanner.apply(asked.plan, in: asked.located.course)
+            } catch {
+                return AssistToolOutcome.refused(
+                    "Nothing was changed: \(error.localizedDescription)"
+                )
+            }
+
+            var detail: String = outcome.message
+            detail += "\n\nThe new "
+                    + (asked.count == 1 ? "page is" : "pages are")
+                    + " hidden, so nothing changed on the site yet."
+            if asked.plan.renames.isEmpty == false {
+                detail += "\n\nBecause other classes moved, “Undo that” will not take this back. "
+                        + "The copy made before any of it is in Plantoir's Backups list. Look the "
+                        + "section over in Plantoir before you publish."
+            }
+            if backedUp {
+                detail += "\n\n" + AssistToolRunner.backedUpNote
+            }
+            return AssistToolOutcome.wrote(
+                "Made room for \(asked.count) "
+                + (asked.count == 1 ? "class" : "classes")
+                + " at \(asked.located.course.configuration.unitWord) \(asked.unit), Day \(asked.atDay).",
+                detail: detail
+            )
+        }
+    }
+
+    /// A plan, or the sentence saying why there is not one.
+    private enum PlannedRoomOutcome {
+        case planned(PlannedRoom)
+        case couldNot(String)
+    }
+
+    private struct PlannedRoom {
+        let located: Located
+        let plan: ClassInsertionPlan
+        let unit: Int
+        let atDay: Int
+        let count: Int
+    }
+
+    /// Read the arguments and plan, or say why not.
+    private func roomPlan(_ arguments: [String: Any]) -> PlannedRoomOutcome {
+        let found: Result<Located, AssistToolRefusal> = locate(arguments)
+        guard case .success(let located) = found else {
+            return .couldNot(refusal(from: found).message)
+        }
+        guard let unit = number("unit", in: arguments) else {
+            return .couldNot(
+                "Which \(located.course.configuration.unitWord.lowercased()) should I make room in?"
+            )
+        }
+        guard let atDay = number("atDay", in: arguments) else {
+            return .couldNot("Which day should the new class take?")
+        }
+        // One unless asked for more, matching what the teacher means by "make
+        // room for a class".
+        let count: Int = number("howMany", in: arguments) ?? 1
+
+        do {
+            let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+                unit: unit, atDay: atDay, count: count,
+                forSection: located.sectionNumber, in: located.course
+            )
+            return .planned(
+                PlannedRoom(located: located, plan: plan, unit: unit, atDay: atDay, count: count)
+            )
+        } catch {
+            askForTheTimetableIfDuplicatingNeedsIt(error, located: located)
+            return .couldNot(error.localizedDescription)
         }
     }
 

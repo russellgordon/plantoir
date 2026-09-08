@@ -680,7 +680,7 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   nothing was going to tell either side** (found 2026-09-06 by an audit asking
   whether the parity list was COMPLETE, not whether it was correct).
   `plantoir-mcp.exe` declares **37** tools; the mac's `AssistToolSurface`
-  serves **28** (22 plus six MCP-only, three of them built on 2026-09-08 out
+  serves **30** (22 plus eight MCP-only, five of them built on 2026-09-08 out
   of this very list). So the same question asked of Claude
   Code gets a different toolbox depending on the machine.
 
@@ -863,7 +863,13 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      last year's website". It is a product decision rather than a missing
      tool, which is why it is there and not here.
 
-  3. **`plan_add_classes` / `add_classes`** — smaller than it looks, and the
+  3. **`plan_add_classes` / `add_classes`** — ✅ **BUILT 2026-09-08**
+     (`GUI-IMPROVEMENTS.md` row 449). Smaller even than this entry says: the
+     capability already shipped behind the "add five more days to Unit 4"
+     phrasing, so only the published door was missing. The original entry
+     follows.
+
+     Smaller than it looks, and the
      first draft of this entry got it wrong in a way worth recording.
      `PlaceholderClassPlanner` (340 lines) lays down a unit's worth of class
      pages on the days the section actually meets, skipping days already taken
@@ -880,7 +886,16 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
      makes the assistant surface the ONLY way a teacher gets at them and raises
      the value of (3) and (4) rather than lowering it.)
 
-  4. **`plan_make_room_for_classes` / `make_room_for_classes`** — and this one
+  4. **`plan_make_room_for_classes` / `make_room_for_classes`** — ✅ **BUILT
+     2026-09-08** (`GUI-IMPROVEMENTS.md` row 450), MCP-only as this entry asked,
+     plus a parsed card phrasing. **One thing this entry got wrong, worth
+     correcting rather than deleting:** it said what was missing is "a count
+     above one, and the ability to name an arbitrary insertion point".
+     `ClassInsertionPlanner.plan` has taken `unit`, `atDay` and `count` from the
+     start — nothing was missing but a way to SAY them. The original entry
+     follows.
+
+     And this one
      is **already covered under another name, for the one-class case**.
      `ClassInsertionPlanner` (574 lines, its own contract in
      `contracts/class-planning.json`) is what runs when a teacher says

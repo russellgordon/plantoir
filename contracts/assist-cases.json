@@ -644,6 +644,8 @@
       "list_courses",
       "plan_add_classes",
       "add_classes",
+      "plan_make_room_for_classes",
+      "make_room_for_classes",
       "list_curriculum_expectations",
       "plan_curriculum_mentions",
       "add_curriculum_mentions"
@@ -656,6 +658,7 @@
     "planTwins" : {
       "add_classes" : "plan_add_classes",
       "add_next_class" : "plan_add_next_class",
+      "make_room_for_classes" : "plan_make_room_for_classes",
       "publish_class_on" : "plan_publish_class_on",
       "publish_pages" : "plan_publish_pages",
       "re_date_classes" : "plan_re_date_classes",
@@ -1704,6 +1707,82 @@
               "section",
               "unit",
               "howMany"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "Work out what making room part-way through a unit would do, and change nothing. Names every page that would be renamed, every class that would move to a later day, and every link that would be rewritten. Call this first and show the teacher what it said, in full — this moves more pages than anything else here.",
+          "name" : "plan_make_room_for_classes",
+          "parameters" : {
+            "properties" : {
+              "atDay" : {
+                "description" : "The day number the new class takes. That day and every later day in the unit are renumbered to make room.",
+                "type" : "integer"
+              },
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "howMany" : {
+                "description" : "How many classes to make room for. Leave empty for one.",
+                "type" : "integer"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              },
+              "unit" : {
+                "description" : "The unit number to add days to, for example 4.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section",
+              "unit",
+              "atDay"
+            ],
+            "type" : "object"
+          }
+        },
+        "type" : "function"
+      },
+      {
+        "function" : {
+          "description" : "TEACHERS SAY: \"make room for a class at Unit 3, Day 4\". Insert one or more classes part-way through a unit: the later days of that unit are renumbered, every link that pointed at them is rewritten, the classes that follow move onto later class days, and the new pages arrive unpublished.\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course is backed up first. Once other classes have moved, \"undo that\" can no longer take this back and the backup is the way out — so tell the teacher to look the section over in Plantoir before publishing anything.",
+          "name" : "make_room_for_classes",
+          "parameters" : {
+            "properties" : {
+              "atDay" : {
+                "description" : "The day number the new class takes. That day and every later day in the unit are renumbered to make room.",
+                "type" : "integer"
+              },
+              "course" : {
+                "description" : "The course code, for example ICS3U.",
+                "type" : "string"
+              },
+              "howMany" : {
+                "description" : "How many classes to make room for. Leave empty for one.",
+                "type" : "integer"
+              },
+              "section" : {
+                "description" : "The section number, for example 1.",
+                "type" : "integer"
+              },
+              "unit" : {
+                "description" : "The unit number to add days to, for example 4.",
+                "type" : "integer"
+              }
+            },
+            "required" : [
+              "course",
+              "section",
+              "unit",
+              "atDay"
             ],
             "type" : "object"
           }
