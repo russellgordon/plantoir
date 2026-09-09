@@ -712,7 +712,7 @@ public sealed class CourseConfiguration
     /// publishing to more than one destination for redundancy may want a
     /// domain on one and not another — mirrors
     /// `CourseConfiguration.customDomain(forSection:destinationType:)` on the
-    /// mac side; see WINDOWS-HANDOFF.md entry 307.
+    /// mac side; see documentation/08-course-config-reference.md.
     ///
     /// Reads an OLDER shape too: `custom_domains.sections.sectionN` used to
     /// be a bare string, written before a course could have more than one
@@ -744,7 +744,7 @@ public sealed class CourseConfiguration
     /// (set before this course had more than one destination) is carried
     /// forward into the new per-destination map, attributed to the PRIMARY
     /// destination, rather than silently discarded the first time any
-    /// destination's domain is set here — see WINDOWS-HANDOFF.md entry 307,
+    /// destination's domain is set here — see documentation/08-course-config-reference.md,
     /// which found the mac side losing exactly this data before the map
     /// shape existed. Setting an empty domain removes that destination's own
     /// entry rather than storing an empty string.
@@ -867,7 +867,7 @@ public sealed class CourseConfiguration
     /// teacher the map could not be built, whereas a deadlock tells them
     /// nothing and offers no way forward. Changing what the config CARRIES is
     /// a product decision rather than a port detail, and is raised in
-    /// `MAC-HANDOFF.md` instead of being taken here.</para>
+    /// documentation/08-course-config-reference.md instead of being taken here.</para>
     /// </summary>
     public static bool CurriculumCoverageEnabled(bool hasExampleContent, bool prepopulating,
                                                  bool contentIncludesCurriculum,

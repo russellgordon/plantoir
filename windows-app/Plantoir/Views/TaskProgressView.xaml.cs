@@ -62,7 +62,7 @@ public sealed partial class TaskProgressView : UserControl
     /// <paramref name="multiRunner"/>, when set and carrying more than one
     /// leg, adds the destination checklist, the combined console (every leg
     /// that has produced output, not just whichever is current — see
-    /// WINDOWS-HANDOFF.md entry 308), and every succeeded leg's own link
+    /// documentation/03-launcher-scripts.md), and every succeeded leg's own link
     /// once the whole run is finished (entry 306). Left null — the default —
     /// for every caller with a single runner: the wizard's preview, and a
     /// single-destination deploy behave byte-for-byte as before.
@@ -91,7 +91,7 @@ public sealed partial class TaskProgressView : UserControl
     /// <c>MultiDestinationDeployRunner.ActiveRunner</c> until <c>RunAsync</c>
     /// replaces <c>Legs</c> with fresh ones) — neither is what is actually
     /// happening right now. Mirrors the mac's
-    /// `preparingToDeployPlaceholder` (WINDOWS-HANDOFF.md item 8, row 318a).
+    /// `preparingToDeployPlaceholder` (documentation/03-launcher-scripts.md, row 318a).
     /// Sets the currently-shown runner to null (not unregistered — a
     /// runner, once <see cref="Register"/>ed, stays registered for its own
     /// question dialog for the life of this view) so a stray notification
@@ -261,7 +261,7 @@ public sealed partial class TaskProgressView : UserControl
     /// output so far, each under its own heading, joined in deploy order.
     /// Without this, the moment a second destination started, the FIRST
     /// destination's own console output was simply gone — not scrolled
-    /// past, gone (WINDOWS-HANDOFF.md entry 308). A leg the run never
+    /// past, gone (documentation/03-launcher-scripts.md). A leg the run never
     /// reached (stopped by a cancel, or an earlier failed shared build) is
     /// filtered out rather than shown as an empty, confusing section.
     /// </summary>

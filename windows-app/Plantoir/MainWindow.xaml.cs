@@ -78,7 +78,7 @@ public sealed partial class MainWindow : Window
                 // activation — a scheduled deploy that finished overnight is
                 // reflected in the " — Edited" marker the first time the
                 // teacher looks, not one activation later. See
-                // ScheduledDeployCompletion and WINDOWS-HANDOFF.md, "A
+                // ScheduledDeployCompletion and documentation/12-windows-app.md, "A
                 // scheduled deploy needs its own path to the same record".
                 _ = System.Threading.Tasks.Task.Run(ScheduledDeployCompletion.ConsumePending);
                 // The sidebar's own clock badge (SidebarRow.ScheduledDeploy)
@@ -232,7 +232,7 @@ public sealed partial class MainWindow : Window
     /// <c>AppWindow.IsVisible</c> being false. A window fully covered by
     /// another window is NOT detected: there is no cheap answer to occlusion
     /// on WinUI, and guessing wrong would steal focus. Recorded in
-    /// MAC-HANDOFF.md as a chosen divergence rather than an oversight.</para>
+    /// documentation/12-windows-app.md as a chosen divergence rather than an oversight.</para>
     /// </summary>
     private void ComeForwardIfHidden()
     {

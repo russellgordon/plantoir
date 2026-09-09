@@ -12,12 +12,12 @@ namespace Plantoir.Tests;
 /// for every marker, which of those two it is — and that classification is the
 /// thing that decides whether Windows must match a string to the character or
 /// write its own. Getting it wrong crashes nothing: the bar simply stops
-/// moving, which reads as a slow build (WINDOWS-HANDOFF.md item 5, where
+/// moving, which reads as a slow build (documentation/03-launcher-scripts.md, where
 /// exactly that shipped).</para>
 ///
 /// <para>The mac runs this classification against its own files
 /// (<c>AppRulesContractTests.testEveryMarkerIsClassified</c>). Nothing ran it
-/// here, which is WINDOWS-HANDOFF.md item 29. What follows is the same check
+/// here, which is documentation/03-launcher-scripts.md. What follows is the same check
 /// pointed the other way, plus the parity half the mac cannot do: that a step
 /// the mac's list gains is a step this side's list gains too.</para>
 ///
@@ -254,7 +254,7 @@ public class MilestoneContractTests
             // AppRulesContract.milestones() omits it from the readout, so it is
             // not in `milestones` yet — which is why its two markers were
             // classified by nobody until 2026-09-06. Listing it here means the
-            // mac's fix (MAC-HANDOFF.md, "Open") regenerates the contract and
+            // mac's fix (documentation/03-launcher-scripts.md, "Open") regenerates the contract and
             // lands GREEN, instead of failing this suite by name for a change
             // that is entirely correct.
             ["exampleCourse"] = TaskMilestones.ExampleCourse,
@@ -314,7 +314,7 @@ public class MilestoneContractTests
     /// parity test above never visits it and the mac's own classification test
     /// never saw its markers. That is how they came to be printed by
     /// <c>setup_course.py</c> and classified by nobody. Until the mac's readout
-    /// is fixed (MAC-HANDOFF.md), this is the only thing checking them.</para>
+    /// is fixed (documentation/03-launcher-scripts.md), this is the only thing checking them.</para>
     /// </summary>
     [Fact]
     public void TheExampleCourseMarkersAreClassifiedThoughTheReadoutOmitsTheTask()

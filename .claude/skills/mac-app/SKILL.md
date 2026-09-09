@@ -381,7 +381,8 @@ So a macOS change is not finished until BOTH of these are true:
    differently, what it can inherit unchanged, and — most valuable — the trap
    that would look correct in review. "Shared Python, nothing to mirror" is a
    fine note when true; an empty cell never is.
-2. **Anything architectural also gets a section in `WINDOWS-HANDOFF.md`.** A
+2. **Anything architectural also gets a section in the `documentation/` page
+   that owns its subject.** A
    log row records a decision; the handoff explains it well enough to
    implement. Rule of thumb: if you needed more than a sentence of reasoning
    to get it right, they will too.
@@ -413,7 +414,7 @@ would look like clutter to somebody who did not know why:
 - why there is no delete tool at all.
 
 So: when a decision has a reason that is not obvious from reading the code,
-the reason goes in `WINDOWS-HANDOFF.md` in the same change that makes the
+the reason goes in the `documentation/` page that owns it, in the same change that makes the
 decision. Not afterwards, not in a batch, and **not only when Russell asks —
 he has said plainly that he will forget to, and it is not his job to
 remember.** Record the roads NOT taken too, and why: an option rejected for

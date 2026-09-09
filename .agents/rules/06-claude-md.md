@@ -157,7 +157,7 @@ Four things that cost a day each if you do not know them:
   is shown 32 (`.mcpTools`, the 22 plus ten: three that ask for judgement about
   meaning). More choices is the classic way a router degrades. **Windows'
   `plantoir-mcp.exe` serves 37**, so the two MCP surfaces are no longer the
-  same product — see `MAC-HANDOFF.md`.
+  same product — see [issue #66](https://github.com/russellgordon/plantoir/issues/66).
 
 On the mac the MCP server IS the app: `Plantoir --mcp-stdio <working-folder>`
 serves the same tools to Claude Code, so there is no second binary to sign or

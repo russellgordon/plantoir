@@ -15,7 +15,7 @@ namespace Plantoir.Tests;
 /// way a router degrades, so the shape of this surface is a product decision
 /// rather than an implementation detail. `assist-cases.json` →
 /// <c>toolSchemas</c> carries the definitions as each client really sends
-/// them, and nothing on this side read them (WINDOWS-HANDOFF item 29).</para>
+/// them, and nothing on this side read them (documentation/10-local-ai-assistant.md).</para>
 ///
 /// <para><b>The descriptions are deliberately NOT asserted, and that is the
 /// interesting part.</b> This app has no local tool definitions of its own:
@@ -134,7 +134,7 @@ public class AssistSurfaceContractTests
     /// <c>toolSchemas</c> is a GENERATED key, so the departure cannot be
     /// recorded beside the schemas it applies to, and this list is now its
     /// second home — the very thing `contracts/` exists to prevent. Asked for
-    /// in MAC-HANDOFF.md: have the generator emit the departures alongside the
+    /// in documentation/10-local-ai-assistant.md: have the generator emit the departures alongside the
     /// schemas, and this reads them instead of restating them.</para>
     ///
     /// <para>Asserted as an exact set rather than an allow-list, so a NEW
@@ -297,7 +297,7 @@ public class AssistSurfaceContractTests
     ///
     /// <para>The contract carries the mac's 25; <c>plantoir-mcp.exe</c> serves
     /// 37. So the same question asked of Claude Code gets a different toolbox
-    /// depending on the machine, which is written up in `MAC-HANDOFF.md` and is
+    /// depending on the machine, which is written up in documentation/10-local-ai-assistant.md and is
     /// the mac's to decide. What must hold either way is that every tool the
     /// contract DOES describe behaves the same here.</para>
     ///
@@ -389,7 +389,7 @@ public class AssistSurfaceContractTests
         Assert.True(unrecorded.Count == 0,
             "This server offers tools the contract does not describe and nobody has recorded: " +
             string.Join(", ", unrecorded) + ". Add each to assist-cases.json → toolSchemas.mcp " +
-            "so both apps serve it, or list it here and say in MAC-HANDOFF.md why it is this " +
+            "so both apps serve it, or list it here and say in documentation/10-local-ai-assistant.md why it is this " +
             "platform's alone. A subset check cannot notice an addition, which is how twelve of " +
             "these accumulated without either suite saying so.");
 

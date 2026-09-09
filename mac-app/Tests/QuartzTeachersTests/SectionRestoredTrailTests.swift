@@ -5,7 +5,7 @@ import XCTest
 /// lets either platform propose an event without reddening the other.
 ///
 /// **Why these are together.** They arrived together, as one request from
-/// Windows on 2026-09-07 (`MAC-HANDOFF.md`), and separating them would hide
+/// Windows on 2026-09-07 (documentation/10-local-ai-assistant.md), and separating them would hide
 /// what the piece is: the mac adopting `section restored`, and the mac's
 /// contract test learning the `appliesOn` key it had never needed while the
 /// only platform-scoped event was its own.

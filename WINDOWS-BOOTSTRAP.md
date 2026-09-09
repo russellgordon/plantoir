@@ -49,11 +49,12 @@ go, without stopping to ask permission for each step.
 
    Pass `--limit`: `gh` shows 30 by default and silently hides the rest, which
    is the failure this whole arrangement was made to stop.
-3. **`WINDOWS-HANDOFF.md`** — reference, not a work list. Architecture, the
-   config contract, the WSL2 background and the reasoning behind past
-   decisions; each issue points at the section that explains it. Long, and the
-   section headings are enough to navigate. Write-ups of work that has already
-   shipped are in `WINDOWS-HANDOFF-COMPLETED.md`.
+3. **[`documentation/`](documentation/README.md)** — reference, not a work
+   list. Architecture, the config contract, the WSL2 background and the
+   reasoning behind past decisions, numbered 01–13; each issue points at the
+   page that explains it. Read the page an issue names rather than all of them.
+   Write-ups for work that already shipped on this port are in
+   `documentation/13-windows-port-archive.md` — history, not a specification.
 4. **`contracts/README.md`**, then the ten JSON files. The coverage table
    there says what is shared and what deliberately is not. Three of the ten are
    GENERATED from the mac and must never be hand-edited; the other seven are
@@ -132,7 +133,7 @@ reasons rather than tasks:
   are the mac's to-do list from you, exactly as the `windows` ones are yours
   from them — an obligation that lives only in prose inside a long file is one
   nobody picks up. Something the mac need only KNOW is not an issue; that goes
-  in `MAC-HANDOFF.md`'s "For awareness" section.
+  in the `documentation/` page that owns its subject.
 
   ```powershell
   gh issue create --repo russellgordon/plantoir --label mac --milestone v1.2.0 `
@@ -149,7 +150,7 @@ reasons rather than tasks:
   account; with one account, `--user russellgordon` naming nothing configured
   fails confusingly.
 - **Write every change up before moving on**, to the template in
-  `MAC-HANDOFF.md` → "How to write an issue for the mac": what changed, why,
+  `CLAUDE.md` rule 4: what changed, why,
   what you rejected, and — for anything measured — the numbers **with the
   hardware they came from**. "The Vulkan
   build was faster" cannot be acted on; "43 tok/s against 11 on CPU, Intel Iris
@@ -270,7 +271,7 @@ Split it in two:
   file could be broken from this machine with every gate on it green.
 - **The IMAGE is not.** Nothing here builds the Docker image or checks the
   baked files. Verify those by driving a real publish through the app, and say
-  so in `MAC-HANDOFF.md` so the mac re-runs `verify.sh` after the next sync.
+  so in a `mac` issue, so the mac re-runs `verify.sh` after the next sync.
   For publishing specifically that means `verify-deploy.ps1`, which
   `RELEASING.md` requires — with nothing skipped — for a release that changes
   the publishing path.

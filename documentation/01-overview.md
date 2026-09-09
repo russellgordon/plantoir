@@ -68,6 +68,33 @@ This toolchain lets a teacher:
 | `./preview.sh ICS3U 1` / `.\preview.bat ICS3U 1` | [`build_site.py`](05-build-pipeline.md) | Merges shared + section-1 content into `.merged_output/section1/` (a shortcut to a builds folder outside the working folder), patches the Quartz scaffold, draws the section's social sharing card, and serves the site — the launcher prints the address (each working folder has its own probed host port block) |
 | `./deploy.sh ICS3U 1` / `.\deploy.bat ICS3U 1` | [`deploy.py`](07-deployment.md) | Publishes an EXISTING static build — it never builds one: if `public/` is missing or empty the launcher stops and tells the teacher to run preview with `--build-only` first. Then publishes `public/` to the course's chosen destination: delta-upload to a Netlify site (the default), `--target cloudflare` for a Cloudflare Pages project, or `--to-folder` to copy it into a folder on the teacher's own machine |
 
+## Two words that mean different things: PUBLISH and DEPLOY
+
+Both are visible to a teacher, and keeping them apart is a product rule rather
+than a naming preference (reversing an earlier decision to use one word for
+both, which is why older log rows use them interchangeably):
+
+- A **page** is *published*. That is the `publish:` frontmatter flag deciding
+  whether students can see it at all.
+- A **site** is *deployed* — to Netlify, Cloudflare, or a folder.
+
+One word for both makes "I published tomorrow's class" mean a frontmatter flag
+to one person and a live website to another, and the two are hours apart in
+practice. Internal names, script file names and configuration keys keep
+"deploy" throughout; the distinction is about what a teacher reads.
+
+Two related rules the whole product follows, and which shape every surface in
+this documentation:
+
+- **The GUI never mentions the machinery** (`CLAUDE.md` rule 1) — no
+  "toolchain", "script", "Docker", "container" or "WSL" in anything a teacher
+  reads. "Building your website builder…", "Getting this Mac ready…" ("this PC"
+  on Windows).
+- **Use the script logic itself wherever possible.** Both apps run the real
+  launchers and answer their real prompts rather than reimplementing them;
+  progress comes from parsing their output — milestone markers, `#N [k/n]`
+  build steps, "N of M" upload counts, the announced preview address.
+
 ## Key design decisions worth understanding
 
 **Per-section output directories.** Each section gets a complete, independent

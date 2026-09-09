@@ -12,7 +12,7 @@ namespace Plantoir.Tests;
 /// a course made on one machine is opened on the other, and a key one app does
 /// not write is a question the Python answers with its own default while the
 /// teacher is never asked. Three of these lists were read by nobody on this
-/// side (WINDOWS-HANDOFF item 29) and one of them, <c>wizardAnswerKeys</c>,
+/// side (contracts/README.md) and one of them, <c>wizardAnswerKeys</c>,
 /// describes item 25 exactly.</para>
 /// </summary>
 public sealed class FileFormatContractTests : IDisposable
@@ -78,7 +78,7 @@ public sealed class FileFormatContractTests : IDisposable
     public void TheWizardWritesEveryAnswerTheContractSaysItAsksFor()
     {
         // Empty since 2026-09-07, when the wizard began asking the skeleton
-        // question (WINDOWS-HANDOFF item 25). It held "use_skeleton" for three
+        // question (contracts/README.md). It held "use_skeleton" for three
         // weeks — named HERE rather than read from the contract's
         // knownDivergence note, because a note cannot fail a test run and a
         // name beside a skipped test shows in every run's skip count. Kept so
@@ -108,7 +108,7 @@ public sealed class FileFormatContractTests : IDisposable
     }
 
     /// <summary>
-    /// WINDOWS-HANDOFF item 25's acceptance test, skipped from 2026-09-06
+    /// contracts/README.md's acceptance test, skipped from 2026-09-06
     /// until the wizard asked the skeleton question on 2026-09-07.
     ///
     /// <para>Around 1,900 course codes have a skeleton and no ready-made
@@ -267,7 +267,7 @@ public sealed class FileFormatContractTests : IDisposable
     ///
     /// <para>Keyed by the contract's own rule sentences and checked for
     /// completeness at the end, so a rule the mac ADDS fails here by name
-    /// rather than sitting unread — which is the failure WINDOWS-HANDOFF item
+    /// rather than sitting unread — which is the failure contracts/README.md item
     /// 29 exists to end.</para>
     /// </summary>
     [Fact]

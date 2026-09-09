@@ -1,16 +1,23 @@
-# Windows App — Completed Handoff Items
+# 13. Archive — the Windows port's shipped design decisions
 
-This file holds handoff sections moved out of
-[`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) for length, once code-level
-verification (2026-08-22) confirmed the work they describe has actually
-shipped on the Windows side (or, where noted, is shared code with nothing
-left to port). They are kept rather than deleted because the reasoning in
-them — why a design was chosen, what was rejected and why, what was measured
-— remains the reference for anyone touching that area again. Content is
-relocated verbatim; nothing here has been rewritten. If a section below turns
-out to describe something that has since regressed or been superseded, that
-is itself worth a note in `WINDOWS-HANDOFF.md` or `MAC-HANDOFF.md`, not a
-silent edit here.
+**This is history, not a specification.** It holds write-ups for work verified
+shipped in `windows-app/` as of 2026-08-22 (or shared code with nothing left to
+port), kept because the reasoning in them — why a design was chosen, what was
+rejected and why, what was measured — remains the reference for anyone touching
+that area again.
+
+Two things follow from it being an archive. **Read it as a record of what was
+true on its day**: where it and a contract disagree, the contract is what is
+true now, exactly as with `GUI-IMPROVEMENTS.md`. And **nothing new is written
+here** — it is append-only in the sense that it is closed. Current reference
+lives in the numbered pages 01-12; work still to do is a [GitHub
+issue](https://github.com/russellgordon/plantoir/issues).
+
+It arrived here on 2026-09-08, when the two handoff documents it was split out
+of were themselves absorbed into `documentation/` and deleted. Content is
+relocated verbatim; nothing has been rewritten. If a section turns out to
+describe something since regressed or superseded, that is worth an issue rather
+than a silent edit here.
 
 ---
 
@@ -3339,3 +3346,7 @@ Plantoir now supports course codes and curriculum registries beyond Ontario, sta
 > your BC payload against was wrong.
 
 
+
+---
+
+[◀ Previous: The Windows App](12-windows-app.md) · [Back to index](README.md)
