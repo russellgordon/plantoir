@@ -89,7 +89,7 @@ reason. The two changes the mac owed that contract — naming the RESOLVED
 curriculum folder rather than the raw key, and retiring a second placeholder
 sentence that published the matching rule in words — landed 2026-09-06; the
 reasoning, including two things the handoff had wrong, is in the ledger in
-[`MAC-HANDOFF.md`](../MAC-HANDOFF.md).
+the Windows-side write-ups elsewhere in this folder.
 
 The row check runs every case the contract lists rather than one fixture of its
 own, and that is deliberate: two of those cases leave the course with no
@@ -135,7 +135,7 @@ Four things about it are deliberate:
   is recorded in [`contracts/README.md`](../contracts/README.md) rather than
   here, because that is the kind of fact this page cannot keep true; the
   reasoning is in
-  [`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md) → "Spelling a folder's new name
+  [`06-quartz-customizations.md`](06-quartz-customizations.md) → "Spelling a folder's new name
   inside a link".
 
 Two neighbouring behaviours changed with it: adding a folder name now CREATES
@@ -325,6 +325,262 @@ the reasoning and a Windows-porting note per entry — is
 [`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md). Architecture, build
 instructions (XcodeGen + Xcode), and the test suite are documented in
 [`mac-app/README.md`](../mac-app/README.md).
+
+## A test host that segfaults, and the six levers that look like they should fix it
+
+Written 2026-09-07, for whoever meets a modal that kills a test process rather
+than failing an assertion. It is macOS mechanics — none of the code transfers —
+but the SHAPE of the fault and the way it was cornered do, and the dead ends are
+the expensive part. Windows checked the same question on its own suite and
+answered it — `Plantoir.UiTests` drives the app out of process, so killing the
+driven `Plantoir.exe` mid-test is an ordinary test failure rather than a host
+death — so nothing is owed there. This is the manual for the mac's half.
+
+### The fault
+
+The mac unit suite hosts the real app, so its tests act on the real window. A
+test setting `renameProblem` puts a genuine `NSAlert` sheet on screen; clearing
+it takes the sheet down. All 38 crash reports from 2026-09-01 to 09-07 share one
+stack, and every one carries `libXCTestBundleInject.dylib` — they are all test
+hosts. Innermost last:
+
+    XCTest pumps the runloop
+      CA::Transaction::commit()
+        -[NSWindow _layoutViewTree]                  <- a layout pass starts
+          NSHostingView.layout()
+            +[NSAnimationContext runAnimationGroup:]
+              ViewGraph.updateOutputs -> preferencesDidChange()
+                AppKitDialogBridge.updateExistingAlert(allAlerts:id:)
+                  NSWindowEndWindowModalSession
+                    -[NSWindow(NSSheets) _orderOutRelativeToWindow:]
+                      -[NSSheetMoveHelper closeSheet]
+                        -[NSMoveHelper _doAnimation] <- spins a NESTED runloop
+                          the display cycle is re-entered -> null deref
+
+Two independent things have to be true at once, and naming both is what made it
+tractable. SwiftUI ends the modal session from **inside a layout pass**; and
+AppKit's sheet animation **spins a nested runloop** — in its own private
+`_NSMoveTimerRunLoopMode` — to drive itself. A nested runloop entered from inside
+a display-cycle callback re-enters the display cycle. It is one call stack on one
+thread. **It is not a race**, which is the single most useful thing to know: no
+delay, no extra settling and no ordering tweak could ever have made it safe, and
+an afternoon spent adding sleeps would have been an afternoon wasted.
+
+### The six levers that do not work, with numbers
+
+Every one of these is the obvious answer, and all five are dead. Measured on
+macOS 26.6 (25G72) by swizzling `-[NSMoveHelper _doAnimation]` and timing it, in
+a standalone AppKit probe rather than in the suite:
+
+| lever | close animation |
+|---|---|
+| nothing (baseline) | 0.268 s |
+| `-NSAutomaticWindowAnimationsEnabled NO` | 0.268 s |
+| `NSWindow.animationBehavior = .none` on the sheet | 0.264 s |
+| the same on the sheet's PARENT window | 0.270 s |
+| `endSheet` inside a zero-duration `NSAnimationContext` group | 0.267 s |
+| `-NSOrderOutSheetWhenEnded NO` | 0.266 s |
+| parent window never ordered on screen | 0.264 s |
+
+The first is the cruel one. `NSAutomaticWindowAnimationsEnabled` is the key
+everybody reaches for, it is real, and AppKit **reads it on this very path** —
+hooking `-[NSUserDefaults objectForKey:]` during a sheet close shows it consulted
+alongside `NSOrderOutSheetWhenEnded` — and then ignores it for the sheet move. A
+reviewer checking "is this key real?" gets yes; only measuring gets the truth.
+Reduce Motion was not tried and is near-certainly dead too: no accessibility key
+appears among the four read on that path.
+
+### What does work: the class's own switch
+
+`NSSheetMoveHelper` declares its own `-shouldSkipAnimation`, overriding
+`NSMoveHelper`'s. Forcing it to answer true is how AppKit itself takes a sheet
+out of the animation. One `method_setImplementation` on the SUBCLASS's own
+method, in the test bundle only.
+
+**It is AppKit's own branch, not a hole punched in AppKit.** Disassembling
+`-[NSMoveHelper _doAnimation]` on macOS 26.6: the flag is read at +192, and true
+branches to +216 → `_stopAnimation` → return at +252 — before the
+`CFRunLoopRunInMode` at +488. That is the identical branch AppKit takes when its
+own `inhibitWindowAnimations` is set. A logging implementation over the live
+selector shows `shouldSkipAnimation` is consulted from exactly one place,
+`_doAnimation`, reached from `openSheet`/`closeSheet`/`animateResizeToFrame:`
+and nowhere else — so a sheet RESIZE is covered by the same switch, and nothing
+but the animation is gated by it.
+
+| | `_doAnimation` runs | nested mode entered | open / close blocked |
+|---|---|---|---|
+| unchanged | 2 | **yes** | 0.281 s / 0.267 s |
+| force `shouldSkipAnimation` | 2 | no | 0.020 s / 0.008 s |
+| empty `_doAnimation` override | 0 | no | 0.020 s / 0.005 s |
+
+Sheet frame identical in all three, completion handler run, window takes another
+sheet afterwards.
+
+**The empty override was tried first and rejected, and the reason generalises.**
+Both work. The switch is better because AppKit's own skip path leaves the state
+AppKit intends to leave, BY CONSTRUCTION, rather than by our having probed that
+dropping `setUpAnimation`/`cleanUpAnimation` happens to be symmetric; because the
+switch is declared on the sheet subclass, so scoping needs no `class_addMethod`
+and no fallback branch to reason about, where `_doAnimation` is declared only on
+`NSMoveHelper`, which animates ordinary window moves too; and because it puts the
+test host in a configuration the framework already ships to real people instead
+of one nobody runs. **Where a framework has its own switch for the behaviour you
+want off, use the switch rather than removing the behaviour** — that is the part
+worth carrying to WinUI.
+
+### Two things about testing it that cost time
+
+**A test that cannot fail is not a test.** The first version raised a sheet,
+closed it, and asserted the sheet had gone — which passes identically with the
+fix removed, because the assertions come after a sleep that outlasts the 0.268 s
+animation. It looked like a regression test for a day. The version that works
+registers a `CFRunLoopObserver` for `_NSMoveTimerRunLoopMode` and asserts it
+never fires: it watches for **the exact frame in the crash stack**, has no timing
+threshold to go flaky on a busy machine, and was checked by putting the fault
+back and watching it fail. If you pin an intermittent, pin the mechanism, not a
+symptom you can outlast.
+
+**Measure with enough runs to mean something.** The rate here was about one run
+in three, so a fix "confirmed" by two green runs would be confirmed 44% of the
+time by doing nothing at all. Baseline and fix were each run 30 times, same
+command, same machine, same session.
+
+**And measure at the scope the GATE runs, not the scope that reproduces
+fastest.** This is the one that nearly shipped a defect. The single class was
+clean 30 times out of 30, which is where an honest-looking session would have
+stopped. The full suite then aborted 8 times out of 8 — a DIFFERENT crash, an
+over-released `_NSWindowTransformAnimation`, in the class that happens to run
+next alphabetically. It was caused by the tidy-up a review had asked for
+(closing the window the new test borrowed), and a single-class loop can never
+see it, because the damage only lands on whatever runs afterwards. Isolating it
+took four runs, and the fourth is the one that mattered — reproducing it with
+the fix TURNED OFF, which is what proved the crash had nothing to do with the
+fix and everything to do with the tidy-up. **When two things changed and
+something broke, turn one of them off rather than reasoning about which is more
+suspicious.**
+
+### And the half of it that is a product rule, not a test rule
+
+This mechanism is reachable in the SHIPPING app, and has fired once:
+`GUI-IMPROVEMENTS.md` row 391, 2026-09-05, when a rename dismissed a sheet and
+raised an alert in the same breath. `contracts/shared-rules.json` →
+`siteHealth.repair.oneAlertAtATime` is the rule against it, and its stated reason
+used to say only that one of the two alerts is lost. It now says what actually
+happened. **A rule whose reason understates the consequence is a rule somebody
+will trade away**, and that is the reason to keep the sentence accurate rather
+than tidy.
+
+## What the engine says reaches a problem report — without a pipe
+
+Answering the gap Windows reported the same day. Until now
+`AssistServerHost` sent `llama-server`'s stdout and stderr to
+`FileHandle.nullDevice`, so a report from a teacher whose assistant was
+misbehaving could carry **nothing the engine had said** — no load error, no
+slot warning, no timing. Windows already had `NoteServerLine` for this. The
+mac now samples too, and the interesting part is what it does INSTEAD of a
+pipe, and how narrow the filter is.
+
+**A file, not a pipe, and the pipe is the trap.** `nullDevice` was never
+laziness: a redirected pipe nobody drains fills up, and the engine then blocks
+on its next log write, mid-request, looking exactly like a hung model. That is
+the wedge Windows had to fix by draining both streams, and discarding the
+output is precisely why the mac never had it. Swapping in a `Pipe` would have
+traded a diagnostics gap for that bug. So both streams now go to ONE FILE in
+the temporary directory, and a bounded tail is read **when somebody asks** —
+never on the engine's timetable. A write to a file has no reader to wait for.
+`AssistEngineLogTests.testTheEnginesOutputIsNeverReadThroughAPipe` pins it by
+reading the source for `Pipe(` and `readabilityHandler`, because every other
+test in the file would pass with the wedge back in.
+
+`AssistServerHost.lines(in:since:atMost:)` is a free function taking the mark
+by reference, so each look reports what arrived SINCE the last one; it reads at
+most the recent 64 KB however long the engine has run, drops the part-line that
+skipping ahead lands on, and resets a mark left past the end of a file that has
+shrunk. `stop()` closes the handle but deliberately LEAVES the file — the
+engine-never-became-ready path calls `stop()` before anybody has looked, and
+the reason it never became ready is the last thing in there. `discardEngineLog()`
+is the separate step, and a sweep on start removes anything older than a day
+that a force-kill left behind.
+
+**The filter is narrow, and the narrowness is measured, not guessed.** Driven
+against the bundled engine on this Mac (llama.cpp b10435, Qwen2.5-1.5B, 2026-08-20):
+
+- Lines carry a severity letter as their **second field** —
+  `0.46.018.667 E srv send_error: …` — so `E` is the signal.
+- **Warnings are deliberately NOT recorded.** A perfectly healthy start prints
+  **six** of them: five are a CORS block warning that all origins are allowed
+  and no API key is set (which cannot matter on a server bound to 127.0.0.1),
+  and one is `control-looking token: 128247 '</s>' was not control-type`, a
+  quirk of the weights. Recording warnings would have spent the entire budget
+  on noise before the teacher asked anything.
+- A word test sits beside the severity test as a fallback, matching `error`,
+  `exception`, `failed`, `failure`. The severity field is this build's format
+  and a future build could drop it; and it is what catches
+  `W srv operator(): got exception: …`, the one warning worth having. Verified
+  that none of the six healthy-start lines contain any of those words.
+
+Two lines were provoked deliberately and both are caught: a malformed request
+body (`got exception: … parse error`) and an over-long prompt
+(`E srv send_error: … request (20030 tokens) exceeds the available context size
+(8192 tokens), try increasing it`).
+
+**When it samples.** Three moments, all in `AssistSession`:
+
+1. **The engine never became ready** — the tail is taken with the filter OFF,
+   because then every line is the diagnosis, ordinary ones included.
+2. **Every fifteen seconds while the window is open**, filtered. Sampling only
+   at teardown would have been simpler and would have missed the case this is
+   FOR: a teacher whose assistant is misbehaving right now, filing a report
+   without closing anything. The loop ends itself once the cap is reached, so a
+   badly behaved engine costs a fixed amount of work rather than a permanent one.
+3. **On `finish()`**, before the log is discarded.
+
+**Capped at twelve lines per conversation.** The trail is deliberately coarse —
+it is a record of what the TEACHER did, and its failure mode is that the one
+line that mattered ends up on page forty. Twelve is enough for a model that
+will not load and nowhere near enough to bury a morning's work. Lines are cut
+to 200 characters, and go through `LogRedactor` on the way in like everything
+else — which matters here, because the engine prints the model's full path.
+
+**Verified end to end on the real app**, because none of the unit tests can
+prove the wiring holds. A healthy conversation left the trail untouched, which
+is the result that matters most — the filter is doing its job. An over-long
+prompt then produced, about six seconds later:
+
+```
+23:23:36 · MCV4U/1 · the local AI assistant could not answer — The assistant's engine answered with an error (400).
+23:23:42 · MCV4U/1 · the assistant's engine said: 0.56.869.873 E srv    send_error: task id = 114, error: request (11965 tokens) exceeds the available context size (8192 tokens), try increasing it
+```
+
+The first line is what a report carried BEFORE this change, on its own: an HTTP
+status and nothing else. The second is the sentence that explains it. That pair
+is the whole argument for the feature. The temporary log folder was empty after
+quitting, so `discardEngineLog()` does clean up.
+
+### This adds a contract event, and the Windows suite will go red
+
+`contracts/shared-rules.json` → `activityTrail.mustRecord` gained
+**`assistant engine said`**, and `ActivityTrail.Event` gained the matching
+case. The test that compares the two lists runs on both platforms, so
+**`Plantoir.Tests` will fail until `Plantoir.Core`'s event list gains the same
+entry.** That is the mechanism working, not damage: it is a request, and it is
+written up as a chosen divergence rather than an oversight.
+
+The work on the other platform is small, because the hard half is already there.
+`LocalModel.NoteServerLine` and `RecentServerLog` already keep a 60-line ring
+buffer of exactly this output. What is missing is that nothing puts any of it
+on the trail. Add the event, sample `RecentServerLog` at the three moments
+above, and reuse the filter — **but re-measure the healthy-start noise on your
+own engine build before trusting the warning rule.** Vulkan and CPU builds
+print different startup lines from the Metal one, and the whole reason
+warnings are excluded here is a specific set of six lines that may not be your
+six. Say what you measured.
+
+One difference worth keeping rather than closing: Windows drains into memory
+because it must (a redirected pipe has to be read), while the mac writes to a
+file because it can. Do not "bring the mac into line" by switching it to a
+pipe — the file is what makes the no-blocking-read property structural rather
+than a promise about always having a reader attached.
 
 ---
 

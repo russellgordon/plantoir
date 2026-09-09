@@ -353,7 +353,7 @@ enum SiteHealthRepair {
     /// written down nowhere: the next caller — the assistant, a second window,
     /// a whole-course fix — would have met it as a wrong report rather than as
     /// a compile error. Windows found it by porting this file line by line
-    /// (`MAC-HANDOFF.md`, 2026-09-06) and shipped this shape first; the mac is
+    /// (documentation/04-course-setup.md, 2026-09-06) and shipped this shape first; the mac is
     /// catching up to it rather than inventing it.
     ///
     /// One thing it does NOT fix, deliberately. Section 1 restored and section
@@ -365,7 +365,7 @@ enum SiteHealthRepair {
     /// weighed is harder to take back than a paragraph of explanation. The
     /// blocked case does not have the problem HERE — its own sentence names
     /// the section folder — but Windows has no blocked case yet, so over there
-    /// it reads namelessly too until `WINDOWS-HANDOFF.md` item 33 lands.
+    /// it reads namelessly too until Windows adopts the named refusal.
     struct Attempt: Equatable {
 
         // MARK: - Stored properties

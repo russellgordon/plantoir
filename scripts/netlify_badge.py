@@ -43,7 +43,7 @@ it — the violation was a *capability* (eval), not a script identity.
 Extracted from scripts/deploy.py so both it and website/netlify_deploy.py
 (the plantoir.app marketing site's own Netlify deploy, which is exposed to
 the identical badge) can share one implementation instead of two copies
-drifting apart. See WINDOWS-HANDOFF.md, "Suppressing Netlify's own ad badge
+drifting apart. See documentation/07-deployment.md, "Suppressing Netlify's own ad badge
 (entry 300)", for the full design writeup and the two rejected alternatives.
 """
 import base64

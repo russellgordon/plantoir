@@ -328,6 +328,545 @@ The rows, the sentences and the cases are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `specialFoldersHelp`, so both apps say the same thing about the same course.
 
+## Example content, as the installer sees it
+
+Ready-made course payloads ship in `support/example_content/<CODE>/` — 37 of
+them as of 2026-08-15 and growing, so read the directory rather than any list
+written here; detection is by the presence of `manifest.json`, which is what
+the code does anyway. (SNC1W is the example course's content converted to
+payload form, so a teacher actually teaching Grade 9 science gets it as
+starting content; SNC2D is its Grade 10 sequel, and SCH3U/SCH4U carry
+chemistry through Grades 11 and 12.) All
+the installing, date logic, and curriculum handling is shared Python —
+Windows needs exactly three UI behaviours:
+
+- **Detection**: example content exists for a code when the bundled
+  `support/example_content/<CODE>/manifest.json` exists; the curriculum
+  toggle additionally needs the manifest's `curriculum_folder` to be
+  non-empty (reference logic: `ExampleContentCatalog.swift`).
+- **Starting Content section** in the new-course wizard: "Pre-populate
+  course with example content" (default ON) with "Include Ontario
+  curriculum pages" beneath it (default ON, disabled when the first is
+  off). When no content exists for the code, this is where the SKELETON
+  toggle goes instead (entry 123) — "Start from a <subject> skeleton" —
+  and the quiet "empty folders" caption is now the last resort, for a code
+  with neither.
+- **Structure lock**: when pre-populating, HIDE the folders/files
+  editor behind a caption — the payload's manifest is the entire
+  structure authority and the Python wizard skips all structure
+  prompts.
+
+Authoring new payloads is content work, governed by the repo-local
+skill `.claude/skills/example-content/` and checked by its
+`lint_payload.py` — no app code changes on either platform. The same skill
+holds the skeleton generator and `lint_skeletons.py`; the skeletons are
+generated output, so never hand-edit `support/skeletons/`.
+
+Two payload conventions have changed since these entries, both handled by
+shared Python: course-level pages now arrive with
+`createdSectionN`/`publishForSectionN` (one pair per section — entry 122), and
+`Key Links` ends with the site tour (entry 121).
+
+## Which folders count for marks: absent is not empty
+
+The Curriculum Coverage map shows an expectation as ASSESSED — the ring on a
+cell, and Ontario's ask that every overall expectation be evaluated at least
+once — when a page addressing it lives in a folder that counts for marks. That
+used to be hardcoded in `build_site.py` as *any folder whose name contains
+"task"*, and a teacher who called theirs "Tests", or renamed "Tasks", silently
+lost every assessed mark on the map with nothing said.
+
+It is now `graded_folders` in `course_config.json`, matched by EXACT
+folder-segment name at any depth (so `Tasks/Unit 1/Quiz.md` still counts, and a
+page is never assessed because of what it is CALLED).
+
+### The one mistake that matters when porting this
+
+**`GradedFolders` must distinguish ABSENT from EMPTY.** A plain
+`List<string>` that defaults to empty when the key is missing would tell the
+build "this teacher has no graded folders", and every course made before this
+key existed would lose every assessed mark on its map — silently, because a map
+with no rings still renders and still looks finished.
+
+- ABSENT means the teacher has never been asked. The build applies the
+  historical substring rule, and the course keeps exactly the marks it had.
+- EMPTY (`[]`) means they were asked and cleared it. That is a real answer and
+  is honoured.
+
+The mac models it as `[String]?` and REMOVES the key when set to nil
+(`CourseConfiguration.swift`). Whatever you use, make the round trip preserve
+"no key at all" — and check your serialiser, because both apps write this file
+wholesale from an in-memory copy.
+
+### Do not seed existing courses
+
+The obvious migration — write `["Tasks"]` into every course — is wrong, and the
+repository proves it rather than the reasoning alone. All 38 payloads use
+"Tasks", but the mathematics skeleton family ships **"Thinking Tasks"**: the
+substring rule counted it, an exact pool of `["Tasks"]` does not. Seeding would
+have quietly stripped that course's assessed marks.
+
+Nothing is written back from a BUILD either. Be precise about why, because the
+first version of this paragraph overstated it: both apps DO preserve keys they
+do not recognise, so a build's write is not dropped in general. The real risk is
+narrower and quite sufficient — an app holding a copy of the file it loaded
+BEFORE the build wrote the key overwrites it at the next save, and a teacher
+with Settings open while a preview runs is ordinary, not a corner case.
+
+**One thing you will notice immediately: `FileFormats_CourseConfigKeys_MatchesContract`
+is RED on Windows, deliberately.** `contracts/file-formats.json` now documents
+`graded_folders` and `CourseConfiguration.cs` does not read it yet. That is the
+contract working as designed (CLAUDE.md rule 4) — a request, not damage. It goes
+green when you add the property, and the absent-vs-empty note above is the whole
+of what it has to get right.
+
+### What the Settings control does, and why
+
+The mac's is a checklist of the course's folders, under a "Marks" heading. When
+the course has never been asked, it shows the folders the build CURRENTLY counts
+already ticked, so a teacher sees what is actually happening rather than a blank
+list. Nothing is written until they change something — and the moment they do,
+the answer is explicit and the historical rule stops applying to that course.
+
+### Content declares its own pool
+
+All 38 payload manifests and all 50 skeleton families now carry
+`graded_folders`, and both linters refuse a manifest without one or one naming a
+folder the course does not have. `setup_course.py` writes it at creation from
+the manifest — shared Python, so both platforms get that unchanged.
+
+Declared rather than inferred deliberately: inference is a substring while the
+build matches exactly, and those two agree for 88 of the 89 courses here and
+disagree for the one that would have been broken by it.
+
+### Where the rules live
+
+`contracts/shared-rules.json` → `gradedFolders` (9 cases, run by
+`scripts/test_graded_folders.py` in the image) and `contracts/file-formats.json`
+for the key itself.
+
+## “Where do the class pages live?” had four answers
+
+*(The Windows half of this is [issue
+#115](https://github.com/russellgordon/plantoir/issues/115): the C# below was
+written on the mac, which has no `dotnet`, so it has compiled nowhere.)*
+
+A teacher whose class folder is not called "All Classes" — "Class Pages", say —
+used to get a different answer from each of four places:
+
+| Where | What it asked |
+|---|---|
+| mac `ClassPages.folderURL` | the course's CONFIGURED per-section folders, first containing "class" |
+| mac `AssistSectionGraph.isClassPage` | the page's IMMEDIATE parent contains "class" |
+| `build_site.py` | any segment of the ABSOLUTE path EQUALS "all classes" or "classes" |
+| Windows `AssistWorkspace.Plan` | the whole ABSOLUTE directory string contains "class" |
+
+Three of those are wrong in ways worth knowing:
+
+- **The build's.** Exact strings, so "Class Pages" matched nothing. When no
+  class pages are found, `_pages_the_course_teaches` returns `None` and the
+  Curriculum Coverage map falls back from "pages the course teaches" to "every
+  published page". The map still renders, still looks healthy, and is wrong —
+  the failure this whole piece exists to close.
+- **The build's, again — and this is a CORRECTION to what this section said
+  first.** An earlier draft claimed the build had been counting pages by their
+  file NAME, and named "How This Class Works.md" and ADA1O's "B3. Connections
+  Beyond the Classroom.md" as pages it had miscounted. That was wrong. The old
+  rule was `part.lower() in ("all classes", "classes")` — membership in a
+  tuple, i.e. EQUALITY — so no page was ever counted for its name. The real
+  defect in the same line was different and worse: `content_root.rglob` yields
+  ABSOLUTE paths, so it walked every segment above the content root too. A
+  teacher whose working folder was `~/Documents/All Classes` made every page in
+  every course a lesson — the same bug Windows had, on the other platform. The
+  file-name exclusion is kept as defence in depth for a future change to
+  substring matching, and is labelled as such rather than as a fix.
+- **Windows.** `Path.GetDirectoryName(pagePath)` is the absolute directory, so a
+  teacher whose working folder is `C:\Users\x\Classroom\` makes **every page
+  in every course** a class page. Where somebody keeps their files is not a fact
+  about their lessons. This is the one that needed fixing most and could not
+  have been found from the mac.
+
+**The one rule**, in `contracts/class-planning.json` → `classFolder`:
+
+- *naming* (where a NEW page is written): the first configured per-section
+  folder whose name CONTAINS "class" (case-insensitive), else the first entry,
+  else the literal "All Classes". Substring is safe here — it is a short list
+  the teacher chose.
+- *membership* (which folders COUNT): EVERY configured per-section folder whose
+  name contains "class", falling back to the single name naming chose. Added
+  after review: naming and membership are the same question only when a course
+  has one such folder, and a course configured
+  `["Class Resources", "All Classes"]` would otherwise resolve to the first for
+  both, match zero pages, and drop the coverage map back to "every published
+  page" — reintroducing the exact silent failure the rule closes.
+- *isClassPage*: not an `index.md`, and one FOLDER segment — never the file
+  name — EQUALS that folder's name, case-insensitively, with the path taken
+  RELATIVE to the content root.
+
+The asymmetry is deliberate and is the part worth not "simplifying" later:
+naming may use a substring because its input is curated; page matching may not,
+because its input is arbitrary paths. A classics course's "Classical Studies"
+folder must not be mistaken for where its lessons live.
+
+**What changed on Windows:**
+
+- new `Plantoir.Core/Models/ClassFolderRule.cs` — `Name(...)` and
+  `IsClassPage(relativePath, classFolder)`. It is called `ClassFolderRule`, not
+  `ClassFolder`, because `AssistWorkspace` already has a private `ClassFolder`
+  method that returns a PATH, and two things with one name returning different
+  kinds of answer is how the next bug gets written;
+- `AssistWorkspace.Plan` now calls
+  `ClassFolderRule.IsClassPage(Relative(pagePath), ClassFolderRule.Names(...))`
+  — note `Relative(...)`, which is the fix for the `Classroom` bug. **The rule
+  is a pure segment matcher and cannot tell an absolute path from a relative
+  one**, so `Relative(...)` is the whole protection: if you ever call
+  `IsClassPage` from somewhere else, pass a relative path or you reintroduce
+  the bug. The mac learned this the same way — its own `AssistSectionPage` had
+  to gain a `pathWithinSection` because `relativePath` is the FULL ABSOLUTE
+  PATH whenever `workspaceURL` is nil;
+- `ClassFolderRule.Name`/`Names` skip null and empty entries: these lists come
+  from JSON, including the contract's own case data, and unguarded LINQ threw
+  where Swift and Python coerce;
+- `AssistWorkspace.ClassFolder(course, section)` delegates its naming half;
+- new `Plantoir.Tests/ClassFolderContractTests.cs`, deserialising the same 5 + 9
+  cases the mac suite and `scripts/test_class_folder.py` run.
+
+**Rejected:** unifying on "contains class" everywhere. It reads well and it
+reclassifies real shipped pages — see the payload examples above. Segment
+EQUALITY for pages, substring only for the configured list, is the distinction
+that makes the rule safe.
+
+## A cloud-synced working folder: explain it, never refuse it
+
+**The decision, and who made it.** Russell, 2026-09-05, on the question
+`TODO.md` had carried since a reliability review found that renaming a
+folder reads every page in the course — which on an iCloud-backed vault means
+downloading every offloaded page, one blocking read at a time. The question
+was whether Plantoir should refuse a working folder that a cloud service
+keeps in sync. The answer is **no**: recognise it, say once and in plain
+words what it costs, give the teacher the choice, and leave their notes
+exactly where they put them. `GUI-IMPROVEMENTS.md` row 399 is the log entry;
+`shared-rules.json` → `cloudSyncedFolders` is the specification; this
+section is the reasoning.
+
+**Why not refuse.** Three reasons, and each alone would have been enough:
+
+- Teachers keep their vaults in iCloud or OneDrive *on purpose* — it is how
+  the notes reach an iPad and a second machine. A refusal tells them to give
+  up cross-device access to their own teaching material, and a hard block is
+  the one answer they cannot opt out of.
+- Detection is unreliable in both directions. A teacher can have a folder
+  literally called "Dropbox" that is not one; a folder can be synced by a
+  service neither app knows. A false refusal on a hard block is
+  unrecoverable for them, whereas a synced folder Plantoir fails to notice
+  still works — more slowly.
+- **You already rejected refusal, by building something better.** When
+  OneDrive locked build output mid-build, the Windows answer was
+  `PLANTOIR_BUILD_ROOT` — move the churn out, leave the content in. That
+  precedent settled the argument here: the same problem, met once, answered
+  by relocating rather than refusing.
+
+**The two moments, and why they are different things.** This was Russell's
+own question — shown when a synced folder is suspected, when the working
+folder is created, or both? — and the answer is both, as two forms:
+
+- **A folder the teacher just CHOSE, or an empty one about to be set up,
+  stops at the folder picker.** This is the one moment the choice is free:
+  nothing has been written into the folder yet. The picker shows the
+  headline, the five-sentence explanation, and two buttons — "Use This
+  Folder Anyway" and "Choose a Different Folder…". Setting up the empty
+  folder IS going ahead (the note was beside the button; pressing it is the
+  answer). **Neither button is the Return-key default**: a Return pressed
+  out of habit must not decide this.
+- **A folder the window RESTORED gets a quiet notice inside the window**,
+  above the working-folder bar: headline, one-line summary, a way to open
+  the full explanation in place, and "Got It". Never a dialog and never a
+  sheet, because a folder can become synced *after* it was set up (moved
+  into iCloud; Desktop & Documents turned on) and a folder that opens on
+  every launch must not interrupt every launch. On the mac this is a strip
+  above the path bar with a `.quaternary` background; a port builds its own as an
+  InfoBar or the nearest WinUI equivalent — the placement and the
+  dismissability are the contract; the control itself is each app's own.
+- **Going ahead is remembered PER FOLDER**, and neither form is shown for
+  that folder again. A second synced folder gets its own note. The mac
+  keeps the list in preferences under `acknowledgedSyncedFolders`; keep
+  Windows stores its own wherever it keeps per-app preferences, keyed by the folder's path.
+- **The check runs on EVERY adoption of a folder**, not only the first —
+  folders move into cloud services after they are made, and the check costs
+  nothing.
+
+**Detection: markers, never names.** The mac reads three things, and all
+three are in `detection.macMarkers`: `~/Library/Mobile Documents` (iCloud
+Drive's real location), `~/Library/CloudStorage/<Service>-<Account>/` (where
+macOS 12.3+ keeps every File Provider service — OneDrive, Google Drive,
+Dropbox, Box — with the service named by the part of the folder name before
+the first hyphen), and the item's own `isUbiquitousItem` flag, trusted ONLY
+under `~/Desktop` and `~/Documents` — the two folders iCloud syncs in place.
+**That flag is not iCloud-specific**: the adversarial review (row 401)
+probed a real `~/Library/CloudStorage/Dropbox` and found it set there too,
+so trusted anywhere else it would call a Dropbox folder "iCloud Drive".
+Whatever Windows exposes for "this item is cloud-managed", assume the same
+until proven otherwise. **Symlinks are resolved before any rule runs** —
+Dropbox and OneDrive both leave a link at the old place (`~/Dropbox` →
+`~/Library/CloudStorage/Dropbox`), and a path arriving through it matched
+nothing while the folder behind it matched Dropbox; on Windows, resolve
+junctions and reparse points the same way, since Known Folder Move leaves
+exactly that indirection. The resolved path is also the acknowledgement's
+key, so one folder is one key whichever spelling it arrives by. Your
+markers are listed in `detection.windowsMarkers`: the OneDrive roots the
+client publishes as `%OneDrive%`, `%OneDriveConsumer%` and
+`%OneDriveCommercial%` (a Desktop moved by Known Folder Move physically lives
+under one of them, so a prefix rule catches it), Dropbox's `info.json`
+(`%APPDATA%\Dropbox\info.json`, `path` entries), and iCloud for Windows
+(`%USERPROFILE%\iCloudDrive` by default). A service you cannot see is
+allowed — see "why not refuse". **Run the eleven `detection.cases` against
+your path function** with `{home}` as `%USERPROFILE%` and the mac's reserved
+paths translated per platform; the cases that matter most are the negative ones:
+a folder CALLED Dropbox on the Desktop, and the reserved root itself. When
+the service is recognisably syncing but not one you name, the contract's
+`unknownServiceName` ("your cloud service") is the honest word.
+
+**The sentences, and the one that is platform-specific.** All in `wording`, word for
+word, `{service}` filled in. They name EFFECTS a teacher can recognise —
+"building can be slower", "renaming a folder can take a while" — and never
+machinery: no "sync client", no "file provider", no "dataless", no "build
+root". A mac test forbids those words; write the same test. The ORDER is
+part of it (`explanationOrder`): reassurance first, because "kept in sync"
+beside a warning reads as "your notes are at risk" and they are not; the
+choice last, after the reasons. **`buildFilesAreCopied` applies on the mac
+only** (`buildFilesAreCopiedAppliesOn`): it says the built site's thousands
+of files are written inside the folder and copied to the cloud, which is
+true on the mac today — `.merged_output` still lands in the working folder —
+and false on Windows, where row 290 already builds into
+`%LOCALAPPDATA%\Plantoir\builds\<id>`. Show the other four. When the mac
+moves its output out too (a separate piece; the research is in `TODO.md`
+under "Move the mac's build output OUT of a synced working folder", and it
+is bigger on the mac because the build runs in a container that mounts only
+`courses/`), that field will change and the contract diff is how you will
+hear.
+
+**The trail.** Two events, both in `activityTrail.mustRecord` and so already
+failing your `ContractTests` until you add them: `synced folder noticed`
+(the service and the redacted path — recorded because the effects of a
+synced folder arrive weeks later as unrelated reports, and this line is what
+connects them) and `synced folder accepted` (which of the two forms, and the
+service — because "nobody warned me" is answered by this one, not the
+first). The mac's lines read "noticed the working folder is kept in sync
+with iCloud Drive — ~/…" and "chose to use the working folder anyway, kept
+in sync with iCloud Drive"; say the same things in the same words.
+
+**Rejected, so it is not proposed again:** refusing (above); detecting by
+folder name (the case that would catch a real Dropbox folder is the case
+that mislabels a teacher's folder called Dropbox); a dialog or sheet on
+launch (interrupts every launch of a folder that cannot be un-synced from
+inside the app); a single app-wide "don't show again" (a teacher with two
+synced folders was told about one). Not measured: nothing here was timed.
+The iCloud read-on-download slowness that started the question is real but
+was observed, not clocked; if you time a rename on an offloaded OneDrive
+folder, write the number here with the hardware.
+
+**What driving it against a real iCloud Drive folder found** (row 400), in
+the order you are likely to meet the same things:
+
+- **The notice pushed the whole bottom band of the window off screen**, at
+  every window height. The mechanism is SwiftUI's (a text pinned to its
+  vertical size answers a minimum-size probe with a word per line — 1,548
+  points, measured, whether 700 points or no height at all is proposed;
+  the modifier ignores the height either way), but the SHAPE is WinUI's too: a
+  wrapping `TextBlock` in a horizontal `StackPanel` gets unbounded width and
+  never wraps, or bounded width and grows tall. Measure your InfoBar's
+  height with the real sentences at a narrow width before shipping it, and
+  measure with a width PROPOSED — the mac's first test asked for the ideal
+  size with no width and passed the faulty layout.
+- **The path bar cut off the folder's own name.** An iCloud path always runs
+  through `~/Library/Mobile Documents/com~apple~CloudDocs/…`, so the last
+  crumb — the only one that differs between a teacher's folders — was the
+  one lost. Now a contract rule, `workingFolderPathBar.tooLongForTheSpace`:
+  a path too long for the space shows its END. Your bar needs the same.
+- **The folder must be NAMED before it is explained.** The picker showed the
+  five sentences and then the path bar; a teacher reads "this folder" and
+  looks for which folder. Path bar first, in both the empty-folder and the
+  existing-folder states.
+- **Enter still set up the empty folder while the note was showing**, which
+  the contract's own `whenShown.chosen` forbids. The set-up button loses its
+  default-action status while a decision is pending; check that a port's does too.
+- **A folder the picker will not take anyway** — neither a working folder
+  nor empty — is not asked about. The rule is in the contract's `whenShown`;
+  the teacher is about to choose again, and the guidance saying what to
+  choose is the message.
+
+**What the adversarial review then found** (row 401), beyond the detection
+points folded in above:
+
+- **Finishing a set-up must acknowledge the folder that was SET UP**, not
+  whichever folder is current when the copy ends. The copy runs off the
+  main thread and the Open Working Folder command stays enabled meanwhile;
+  a second synced folder chosen during it has its own decision pending, and
+  the first folder's completion must not answer it. Guard on the path.
+- **"Synced folder noticed" is recorded by a window only.** The assistant
+  and the MCP server adopt folders on models nothing shows; a "noticed" from
+  those says the teacher was told something they were not, and on the mac it
+  produced six lines for one folder in ten minutes. Your `plantoir-mcp.exe`
+  adopts folders too — same rule.
+- **One folder, every window.** Got It in one window clears the same
+  folder's notice in any other window showing it. Rarer on Windows, where
+  one `MainWindow` shows one folder; verify and say so if it cannot happen.
+- **Re-choosing the open folder is a restore**, not a new choice
+  (`whenShown.reChoosingTheOpenFolder`), or the courses vanish behind the
+  picker for a folder the teacher did not change.
+- **The acknowledgement list is keyed by resolved path and never pruned.** A
+  renamed or moved folder is a new key and is asked again — on purpose,
+  since it may have moved INTO a synced location. A deleted folder's key
+  stays, harmlessly.
+- **Three labels are now in the contract** — `chooseDifferentFolderButton`,
+  `showDetailsButton`, `hideDetailsButton` — so nothing on the picker or the
+  notice is left for you to word.
+
+## A folder named `index.md`, and why both apps refuse rather than clear the way
+
+Windows found this bug, porting `SiteHealthRepair` line by line, and reported
+it on 2026-09-06; this is what the mac did about it. What follows is the part
+that does not travel in a diff: what the mac chose, what it rejected, and why
+the two are not interchangeable.
+
+### The bug, stated once
+
+`FileManager.fileExists(atPath:)` — and `File.Exists`, and every other bare
+existence test — is answering a question about a NAME, not about a file. On the
+mac it returns `true` for a directory. So this:
+
+```swift
+if FileManager.default.fileExists(atPath: index.path) { return .alreadyFine }
+```
+
+reported `.alreadyFine` for a section whose `index.md` was a FOLDER, and
+`outcome(ofRepairing:)` sorts `.alreadyFine` into neither "restored" nor
+"failed", so the dialog said **"That is already put right. Nothing needed
+changing."** The section still had no front page: `build_site.py` produces no
+root `index.html`, so there is no site to publish and the deploy refuses. The
+one dialog written to end silence was the thing telling them it was dealt with.
+
+`restoreMedia`, the function DIRECTLY above it, has used the `isDirectory:`
+form since it was written, with a comment saying why. And the two were written
+in the same sitting — `git log -S` puts both in commit `04dfd0cd`, 2026-08-23 —
+so this is not a case of an old habit and a new one. The careful form and the
+bare one were typed one function apart, on the same afternoon, by somebody who
+had just explained in a comment why the careful one was needed. That is the
+useful lesson in it: knowing the rule does not make the next call site obey it,
+and a grep for `fileExists` / `File.Exists` with no `isDirectory:` is worth more
+than remembering.
+
+### What it does now, and the decision behind it
+
+**Refuse, explain, and touch nothing.** Russell decided this before the work
+started, and the alternative was live: move the folder aside and write a proper
+front page in its place, so the teacher's next publish just works.
+
+**That was rejected because the folder may hold their pages.** Neither app can
+see inside it — this is a teacher's Obsidian vault, and a folder called
+`index.md` is most often a sync conflict or a mis-drag, but it can perfectly
+well be a folder somebody made on purpose with a term's work in it. A repair
+that relocates a teacher's writing to make a warning go away is a worse outcome
+than the warning, and it is the kind of thing that gets discovered in May.
+Refusing costs one step by hand, in Finder or Explorer, and nothing else.
+
+It also fits the rule the whole health feature is built on
+(`siteHealth.checksTheFeatureNotTheFolder`): a fix must restore the FEATURE.
+Moving a folder out of the way and writing an empty page satisfies the check
+while possibly hiding the teacher's own pages, which is the same failure mode
+as recreating an empty curriculum folder, one step further along.
+
+### The sentence, and why it names the course
+
+`contracts/shared-rules.json` → `siteHealth.repair.refusedWhenSomethingIsInTheWay`
+carries it. On the mac it is `SiteHealthRepair.folderWhereTheFrontPageBelongs(course:section:)`.
+
+It names the course as well as the section folder, and that was a review
+finding rather than a first draft: the outcome dialog shows a headline and one
+sentence and NOTHING else — not the course, not the section — so "in your
+section1 folder" sends a teacher with two courses to a folder that exists twice.
+This is the first teacher-facing sentence on either platform to name a
+`section<N>` folder. It is safe to do: that is the on-disk name, it is what
+Obsidian's file tree shows, and both apps already offer "Reveal in Finder" on
+exactly that folder.
+
+**And the generic explanation is REPLACED, not appended to.** That is
+`SiteHealthRepair.couldNotExplanation` on the mac — the one that sends a teacher
+to check whether a folder is locked or read-only. It is the right thing to say
+about a read-only volume and the wrong thing to say here: permissions are not
+what is wrong, and a teacher gets one prompt to act on. When BOTH kinds of failure happen at once — a file where
+`Media` belongs and a folder where the front page belongs — both sentences are
+said, generic first and specific last. Both orders were read aloud. The other
+way round ends the paragraph on the generic explanation's opening clause —
+"You can make it yourself in Obsidian" —
+immediately after "…and Plantoir can put the front page back", so "it" lands on
+the front page — the one thing that cannot be made until the folder in the way
+has moved. There is a test on the order
+(`testWhenBothKindsOfFailureHappenTheGenericExplanationComesFirst`), because a
+comment claiming a paragraph reads well is worth nothing.
+
+### The shape of the answer, which is what you have to copy
+
+`Result` gained a fourth case:
+
+```swift
+case blockedByAFolderWhereTheFrontPageBelongs(section: Int)
+```
+
+Two things about it are deliberate.
+
+It carries the **section number, not the sentence**. `Result` says how a repair
+went — a fact — and `outcome(ofRepairing:in:occasion:)` chooses every word in
+that file. Putting the prose in the Result would have split the wording across
+two places, and the first adversarial review of the plan caught exactly that.
+
+It is counted as a **failure**: the check's name goes into the failed list, so
+"Could not put the front page back." still appears beside anything that did
+come back, and `canRebuild` stays false, so the "Preview Again" button is not
+offered. There is nothing to look at.
+
+### The trail line
+
+`ActivityTrail.Event.folderProblemNotRepaired` = `"folder problem not
+repaired"`, written from the refusal branch with the course and section:
+
+```
+ICS3U/1 · found a folder called index.md where the front page belongs, and left it alone
+```
+
+Without it the trail shows the problem being FOUND and then nothing at all,
+which reads exactly like a teacher who never pressed the button — and the
+folder in the way is something they will very likely have moved or deleted by
+the time they report anything, so it cannot be looked for afterwards.
+
+**Named for the OUTCOME, not for its one cause, and this is the part worth
+copying rather than re-deciding.** Only the directory refusal writes it today.
+A repair that simply FAILED — a read-only volume, a permissions problem — still
+records nothing, which is a real gap and is left open on purpose: closing it is
+a different piece of work, and it belongs to whoever also decides what
+`restoreMedia` should say when a FILE is sitting where the `Media` folder
+belongs (the same class of problem, still answering `.failed` with the generic
+sentence). Naming the event `folder problem repair blocked` would have forced a
+rename on both platforms and in the contract the day that gap closes. So: wire
+it to the directory branch, not to every failure, and leave the name alone.
+
+### What is still not right in the repair code, on both platforms
+
+Named here so it is not rediscovered as a puzzle, and NOT fixed by this piece:
+
+- `restoreMedia` answers plain `.failed` when a FILE sits where the `Media`
+  folder belongs. Same class of problem, same wrong explanation, no sentence of
+  its own. The machinery to give it one is now in place — a second `Result`
+  case and a second contract sentence — and nobody has decided the wording.
+- `SectionAdder` has the identical bare `fileExists` guard on `index.md` when a
+  section is added, so a folder by that name is skipped silently there too.
+- ~~`repair(_:in:)` returns `[String: Result]` keyed by check NAME, so two
+  findings with the same name collapse — your second finding of 2026-09-06,
+  owned by its own piece of work.~~ — ✅ Done 2026-09-07, branch
+  `issue/repair-results-keyed-by-name`. It returns `[Attempt]` now, one entry
+  per finding, and the rule is contract data both suites can run
+  (`siteHealth.repair.reportedOncePerFinding`).
+
 ---
 
 [◀ Previous: Launcher Scripts](03-launcher-scripts.md) · [Back to index](README.md) · [Next: The Build Pipeline ▶](05-build-pipeline.md)

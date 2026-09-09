@@ -22,7 +22,7 @@ below** (in B it applies from the moment you start implementing, at B.3). Implem
 Have each logical chunk reviewed by something that is not the thing that wrote
 it (Fable in Claude Code) — the PLAN first, then the implementation, then the
 fixes, because a review of the finished thing arrives too late to change its
-shape. Write the Windows handoff AS YOU GO rather than from memory at the end.
+shape. Write it up for Windows AS YOU GO rather than from memory at the end.
 And **finish with a documentation pass before you say it is ready**, which is
 step 7 below.
 
@@ -39,10 +39,14 @@ places, and which one is a judgement about portability rather than effort:
   a rule with inputs and expected outputs, or a sequence that must happen in
   order. Add the case, run it here, commit the diff — the Windows suite then
   runs the identical case.
-- **[`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md)** if it cannot be expressed as
-  data: anything visual, anything with platform mechanics (Colima, port leases,
-  WebKit), anything measured rather than asserted. Write the INTENT and the
-  reasoning, not just that it exists.
+- **A [GitHub issue](https://github.com/russellgordon/plantoir/issues)
+  labelled `windows`** if it cannot be expressed as data: anything visual,
+  anything with platform mechanics (Colima, port leases, WebKit), anything
+  measured rather than asserted. Write the INTENT and the reasoning, not just
+  that it exists — and put the reasoning that an implementer will need to READ
+  in the [`documentation/`](documentation/README.md) page that owns its subject,
+  which the issue points at.
+  The issue is the index; the section is the manual.
 
 **Never neither.** The failure this prevents is the quiet one: a behaviour that
 exists in one app, is described nowhere the other app's tests can reach, and is
@@ -118,21 +122,32 @@ bundle from the Dock. Test, then build, then stop.
 - `GUI-IMPROVEMENTS.md` gets a row, with a **"Notes for Windows port"** cell
   that says something usable. Say what you measured, not only what you decided.
   Record the options REJECTED, or they get proposed again.
-- Anything architectural also gets a section in `WINDOWS-HANDOFF.md`, and any
+- Anything architectural also gets a section in the `documentation/` page that
+  owns its subject, and any
   guidance the change made WRONG is corrected there in the same breath. Stale
   advice is worse than none, because it gets followed.
-- **Anything WINDOWS must now do gets a numbered item in that file's "What is
-  still genuinely outstanding", in the same session.** Standing instruction,
-  `CLAUDE.md` rule 3. The list is not a duplicate of the section: a Windows
-  session is told to read the list FIRST, so it is how they find out there is
-  work at all, while the section is the manual for doing it. Mark items done
-  where they stand — struck through, `✅ Done <date>` — rather than deleting
-  them. A change written up beautifully in a section nothing points at is, from
-  their side, a change nobody wrote up.
+- **Anything WINDOWS must now do gets a GitHub issue labelled `windows`, in
+  the same session.** Standing instruction, `CLAUDE.md` rule 3. The issue is
+  not a duplicate of the section: a Windows session is told to read its open
+  issues FIRST, so the issue is how they find out there is work at all, while
+  the `documentation/` page it points at is the manual for doing it. Give it a
+  milestone if it is
+  pinned to a release, and `decision` as well if it needs Russell to choose.
+  A change written up beautifully in a section nothing points at is, from their
+  side, a change nobody wrote up.
+
+  ```bash
+  GH_TOKEN=$(gh auth token --user russellgordon) gh issue create \
+    --repo russellgordon/plantoir --label windows --milestone v1.2.0 \
+    --title "..." --body-file issue-body.md
+  ```
+
+  **Per-command auth, never `gh auth switch`** — this machine has more than one
+  `gh` account and switching globally affects every other session on it.
 - **An affordance that lives only in a context menu is invisible to everyone
   else.** A right-click menu, a double-click, a hover, a keyboard shortcut —
-  each needs a handoff line even though nothing on screen changed. That is how
-  the path bar's menu went unnoticed for months.
+  each needs a write-up even though nothing on screen changed. That is how the
+  path bar's menu went unnoticed for months.
 - Commit code changes as they are made, not in one lump at the end.
 
 ### 7. Then update the documentation — the LAST thing before "it is ready"
@@ -145,7 +160,7 @@ they are the ones that rot.
   is described. A behaviour is nearly always written down in more places than
   the one you edited.
 - **`documentation/` is the folder that gets forgotten**, because nothing in
-  the daily rhythm points at it. The deep dives 01–11 describe how the
+  the daily rhythm points at it. The deep dives 01–13 describe how the
   toolchain, the launchers, the build pipeline and the assistant actually
   work, and a change to any of those has almost certainly made a sentence
   there wrong. On the session rule 11 came from, four places in
@@ -166,33 +181,41 @@ Russell's call every time (`CLAUDE.md` rule 6).
 
 ## B. Bringing the mac up to speed with Windows work
 
-### 1. Read [`MAC-HANDOFF.md`](MAC-HANDOFF.md) top-down
+### 1. Read the open `mac` issues
 
-It is ordered by status, so you can stop when you like:
+```bash
+GH_TOKEN=$(gh auth token --user russellgordon) \
+  gh issue list --repo russellgordon/plantoir --label mac --limit 100
+```
 
-1. **Contract cases waiting on the mac** — read this FIRST. If the suite is
-   red, the explanation is probably here.
-2. **Open — what the mac still owes.**
-3. **For awareness** — things to know, not to do.
-4. **Done — the ledger**, kept in full because the reasoning is the point.
+Pass `--limit`: `gh` shows 30 by default and silently hides the rest, which is
+the failure this whole arrangement was made to stop.
+
+That is what the mac still owes, and it is the whole of it. Things the mac
+must merely KNOW are not issues — an issue nobody can close is one everybody
+learns to scroll past — so those live in the [`documentation/`](documentation/README.md)
+page that owns their subject, and
+[`13-windows-port-archive.md`](documentation/13-windows-port-archive.md) holds
+the reasoning behind Windows-port work that already shipped.
 
 ### 2. A red suite may be a REQUEST
 
 The Windows side can propose a case in the authored half of a contract. When
 they do, the mac suite fails until this side implements it — that is the
-mechanism working, not a break. The failing case names itself, and
-`MAC-HANDOFF.md` should carry a line saying it is waiting.
+mechanism working, not a break. The failing case names itself, and there
+should be an open `mac` issue saying it is waiting.
 
-### 3. Implement, then mark it DONE in place
+### 3. Implement, then CLOSE the issue
 
-Entries are never deleted: a `✅ DONE` line names what landed here and where.
-Add what the mac found that Windows had not — the ledger's most useful entries
-are the ones where implementing their fix turned up a second instance of the
-same bug on this side.
+Close it with a comment naming what landed here and where — never by editing
+its title. Say what the mac found that Windows had not: the most useful
+closing comments are the ones where implementing their fix turned up a second
+instance of the same bug on this side.
 
 ### 4. Answer back
 
 If the mac's implementation makes their guidance wrong, correct
-`WINDOWS-HANDOFF.md` in the same change. If it settles a question they asked,
+the `documentation/` page that owns it, in the same change. If it settles a
+question they asked,
 say so where they will look. A handoff that only travels one way is a report,
 not a conversation.
