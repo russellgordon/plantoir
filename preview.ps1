@@ -55,6 +55,7 @@ if ($args.Count -lt 2 -or ($args[0] -eq '--help') -or ($args[0] -eq '-h')) {
     Write-Host "  --force-npm-install               Force npm install even if deps present"
     Write-Host "  --full-rebuild                    Clear entire output folder and re-copy scaffold"
     Write-Host "  --build-only                      Build static site only (no local preview server)"
+    Write-Host "  --non-interactive                 Refuse rather than ask, for a build nobody is watching"
     Write-Host "  --stop                            Stop this section's preview processes (build or server) and exit"
     Write-Host "  --port N                          Serve the preview on port N (default 8081; 8081-8084 available)"
     Write-Host "  --help, -h                        Show this help and exit"
@@ -80,6 +81,42 @@ $BUILD_ONLY        = $false
 $STOP_MODE         = $false
 $PREVIEW_PORT      = 8081
 $OVERRIDE_IMAGE    = $null
+# Nobody is at the computer. Every question this script asks becomes a refusal
+# that names the question and exits 3, matching deploy.ps1 and deploy.py's
+# NEEDS_AN_ANSWER.
+#
+# This script publishes nothing, so it is easy to think it does not need the
+# flag. It does: a SCHEDULED publish builds before it publishes, and the
+# wrapper Task Scheduler runs calls `preview.ps1 <course> <section>
+# --build-only` first, so both questions below are put to nobody at half six in
+# the morning.
+#
+# WHAT ACTUALLY HAPPENS THEN, measured on this machine (PowerShell 5.1.26100,
+# script stdin at end of input) rather than assumed — and it is NOT what
+# preview.sh does, so do not copy that file's reasoning across:
+#
+#   powershell -File x.ps1 < NUL          Read-Host returns $null, not "".
+#   (what preview.bat starts)             ($ans -eq '') is FALSE, so the [Y/n]
+#                                         default is NOT taken and the code is
+#                                         kept as typed. The script carries on.
+#
+#   powershell -NonInteractive -File      Read-Host THROWS
+#   (the scheduled wrapper's build leg)   PSInvalidOperationException, and
+#                                         $ErrorActionPreference = 'Stop' at the
+#                                         top of this file kills the script.
+#                                         Exit 1, no build, nothing said.
+#
+# The second is the one that matters, and it is the whole justification: a
+# scheduled publish dies at a question, mid-sentence, and the teacher's site is
+# simply not updated in the morning with nothing anywhere saying why. The flag
+# turns that into exit 3 and a sentence naming the question, which the wrapper
+# records and the app shows.
+#
+# (The "takes the DEFAULT and builds a DIFFERENT course" failure is real, but
+# it belongs to preview.sh: that script has no `set -e` and `${_ans:-Y}` really
+# does default. It is written down in app-rules.json under nonInteractive,
+# where it is true of the launcher it describes.)
+$NON_INTERACTIVE   = $false
 
 if ($Flags) {
     $i = 0
@@ -89,6 +126,7 @@ if ($Flags) {
             '--force-npm-install'             { $FORCE_NPM_INSTALL = $true; $i++; continue }
             '--full-rebuild'                  { $FULL_REBUILD = $true; $i++; continue }
             '--build-only'                    { $BUILD_ONLY = $true; $i++; continue }
+            '--non-interactive'               { $NON_INTERACTIVE = $true; $i++; continue }
             '--stop'                          { $STOP_MODE = $true; $i++; continue }
             '--port'                          {
                 if ($i + 1 -ge $Flags.Count) { Write-Host "--port requires a value"; exit 1 }
@@ -109,6 +147,24 @@ if ($Flags) {
     }
 }
 
+# Called immediately before every question this script asks, and only ever on
+# the line directly above the Read-Host — a guard further away is one somebody
+# moves code past, and a test pins the placement.
+#
+# NO PRE-SCAN HERE, and that is the one difference from preview.sh worth
+# knowing. That script asks its course-code question BEFORE its flag parser
+# runs, so it has to look for --non-interactive twice; this one parses every
+# flag above, before asking anything, exactly as deploy.ps1 does.
+function Assert-CanAsk([string]$question, [string]$whatToDo) {
+    if (-not $NON_INTERACTIVE) { return }
+    Write-Host ""
+    Write-Host "This build was set to happen on its own, so nobody is here to answer:"
+    Write-Host ("   {0}" -f $question)
+    Write-Host (" {0}" -f $whatToDo)
+    Write-Host " Nothing was built."
+    exit 3
+}
+
 # ---- Guardrail: course codes ending with zero vs letter O ----
 if ($COURSE -match '^[A-Z]{3}[0-9]0$') {
     $SUGGESTED = $COURSE.Substring(0, $COURSE.Length - 1) + 'O'
@@ -118,6 +174,7 @@ if ($COURSE -match '^[A-Z]{3}[0-9]0$') {
     if ((Test-Path -LiteralPath ("courses/{0}/course_config.json" -f $SUGGESTED)) -and -not (Test-Path -LiteralPath ("courses/{0}/course_config.json" -f $COURSE))) {
         Write-Host "I see setup data for '$SUGGESTED' on disk."
     }
+    Assert-CanAsk ("Fix course code to '{0}'? [Y/n]" -f $SUGGESTED) "Preview this section once from Plantoir, where you can answer it."
     $ans = Read-Host ("Fix course code to '{0}'? [Y/n]" -f $SUGGESTED)
     if (($ans -eq '') -or ($ans -match '^(?i:y)$')) {
         $COURSE = $SUGGESTED
@@ -456,6 +513,13 @@ if ($allowed) {
     $list = $allowed.Split(',') | ForEach-Object { $_.Trim() }
     if ($list -notcontains ($SECTION.ToString())) {
         Write-Host "WARNING: Section $SECTION is not listed in course_config.json for $COURSE."
+        # A question preview.sh does not have, so it is not in the shared
+        # contract's refusal list — see the `mac` issue opened alongside this
+        # change. It matters here for the same reason the guard above does: a
+        # scheduled publish builds first, and this one's default is "no", so an
+        # unattended build of a section that is not listed would simply exit 1
+        # saying "Cancelled." with nobody to read it.
+        Assert-CanAsk "Continue anyway? [y/N]" "Add this section to the course in Plantoir, or preview it once yourself to answer this."
         $c = Read-Host "Continue anyway? [y/N]"
         if ($c -notmatch '^(?i:y)$') { Write-Host "Cancelled."; exit 1 }
     }

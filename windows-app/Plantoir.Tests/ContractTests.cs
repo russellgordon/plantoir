@@ -605,7 +605,17 @@ public class ContractTests
             var configJson = c["configuration"]!.ToJsonString();
             var config = CourseConfiguration.FromBytes(System.Text.Encoding.UTF8.GetBytes(configJson));
 
-            var actual = DeployCommand.Arguments(course, section, config, cloudflareAccountID);
+            // A case carrying `unattended` is the SCHEDULED deploy's shape, and
+            // nothing else passes it — the Deploy button, the assistant and an
+            // MCP client all leave it off, because a question they raise
+            // becomes a dialog somebody is there to answer. Read rather than
+            // assumed: a case added on the mac with this key set arrives here
+            // as a real assertion instead of being silently ignored, which is
+            // what happened while this app appended the flag in its own
+            // scheduled wrapper instead.
+            bool unattended = c["unattended"]?.GetValue<bool>() ?? false;
+
+            var actual = DeployCommand.Arguments(course, section, config, cloudflareAccountID, unattended);
             var expected = c["expectArguments"]!.AsArray().Select(x => x!.ToString()).ToList();
 
             Assert.Equal(expected, actual);
