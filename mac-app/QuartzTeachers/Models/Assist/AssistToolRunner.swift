@@ -2206,7 +2206,10 @@ final class AssistToolRunner {
             // back something that is not a plan, so returning "already on the
             // day it should be" here meant the real call never ran and the
             // website was never settled. In the default configuration that
-            // made the release unreachable.
+            // made the release unreachable. A rollover with NO answer is the
+            // exception below, and it is not a contradiction: it hands back
+            // "already on the day it should be" WITH the question attached,
+            // because there is nothing there to press Go on.
             let websiteAnswer: String = text("website", in: arguments).lowercased()
             let isRollover: Bool = isARollover(arguments)
             if asked.plan.changesNothing {
@@ -2389,6 +2392,18 @@ final class AssistToolRunner {
         guard let answer = arguments["website"] as? String else {
             return false
         }
+        // **What this costs, kept rather than fixed.** The schema tells a
+        // caller to "leave empty otherwise", and a model told that will
+        // sometimes send a PLACEHOLDER instead — "none", "n/a" — which counts
+        // here, so an ordinary re-date picks up a website question it should
+        // never have been asked. That is the price of the rule above, and the
+        // rule is worth more: a real answer nobody recognised, silently read
+        // as an ordinary re-date, is the failure that has actually happened.
+        // The question changes nothing on its own and says so in as many
+        // words, and only Claude Code can put free text here, where a person
+        // reads every step. Windows has the identical property from the
+        // identical rule; a narrower list of words nobody means would drift
+        // apart on the two platforms within a release.
         return answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
 

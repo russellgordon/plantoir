@@ -1780,6 +1780,36 @@ address their students are reading right now. Only a `String` counts on the mac
 now. **Windows cannot reach it and should not copy the guard**: the MCP SDK's
 binder never lets a bool reach a `string` parameter.
 
+**A second consequence is shared, and is kept rather than fixed.** The schema
+sentence — word for word the same on both platforms — tells a caller to "leave
+empty otherwise", and a model told that will sometimes send a PLACEHOLDER
+instead: `"none"`, `"n/a"`, `"unchanged"`. Each of those counts as a rollover,
+so an ordinary re-date picks up a website question nobody asked for, and the
+teacher is then one sentence away from cutting a MID-SEMESTER section loose
+from the address students are reading. It is the exact inversion of the
+non-text guard above, and it was weighed rather than missed:
+
+- **Kept, because the alternative failure is the one that has happened.** A
+  real answer nobody recognised, read silently as an ordinary re-date — no
+  question, no error, nothing said about the website at all — is what issue
+  #120 was partly about. The question, by contrast, changes nothing on its own
+  and says so in as many words.
+- **Rejected: a list of words that mean "no".** It would drift apart on the two
+  platforms inside a release, and the day it disagreed the two apps would
+  answer the same call differently, which is the thing `contracts/` exists to
+  stop.
+- **Rejected: changing the schema sentence to "leave the key OUT otherwise",**
+  which is better instruction and would steer most models away from the
+  placeholder. `re_date_classes` is hidden from every local model, so it costs
+  no routing accuracy — but the sentence is identical on both platforms today,
+  and a one-sided edit trades a small, contained oddity for a real divergence
+  in what the two apps advertise. Worth doing when both sides change it
+  together; not worth doing alone.
+
+Only Claude Code can put free text in `website` — the card sends one of two
+fixed words and no local model sees the tool — so the whole surface for this is
+one where a person reads every step.
+
 **A known limit, recorded in `nearMisses` rather than fixed.** The reply offers
 two sentences word for word, and those exact strings are the only way back in.
 `re_date_classes` is shown to no local model, so a teacher who paraphrases —
