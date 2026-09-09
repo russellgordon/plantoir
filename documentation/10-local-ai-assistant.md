@@ -1792,23 +1792,48 @@ non-text guard above, and it was weighed rather than missed:
 - **Kept, because the alternative failure is the one that has happened.** A
   real answer nobody recognised, read silently as an ordinary re-date — no
   question, no error, nothing said about the website at all — is what issue
-  #120 was partly about. The question, by contrast, changes nothing on its own
-  and says so in as many words.
+  #120 was partly about. Weigh the two: the unrecognised answer changes the
+  wrong thing silently, the placeholder says something unnecessary loudly.
 - **Rejected: a list of words that mean "no".** It would drift apart on the two
   platforms inside a release, and the day it disagreed the two apps would
   answer the same call differently, which is the thing `contracts/` exists to
   stop.
-- **Rejected: changing the schema sentence to "leave the key OUT otherwise",**
-  which is better instruction and would steer most models away from the
-  placeholder. `re_date_classes` is hidden from every local model, so it costs
-  no routing accuracy — but the sentence is identical on both platforms today,
-  and a one-sided edit trades a small, contained oddity for a real divergence
-  in what the two apps advertise. Worth doing when both sides change it
-  together; not worth doing alone.
+- **DONE, and it was first rejected for a reason that turned out to be
+  false.** The `website` parameter said "Leave empty otherwise" while the tool's
+  own description, on BOTH platforms, ends "leave it out for an ordinary
+  re-dating" — so the parameter contradicted its own tool, and the mac's now
+  says `LEAVE THE KEY OUT otherwise`, naming the consequence. This was first
+  written up as "rejected: the sentence is identical on both platforms, so a
+  one-sided edit creates a divergence". That is wrong, and a Windows session
+  would have seen it was wrong: description BODIES are deliberately not
+  asserted across the two apps and are expected to differ —
+  `AssistSurfaceContractTests` says so in as many words, pinning the
+  `TEACHERS SAY:` clause and the argument names and types and nothing else,
+  because `NarrowToLocal` rewrites every description through `Briefly()`. The
+  real limit is smaller and is the honest one: better instruction NARROWS the
+  placeholder case and cannot close it, because a model can send whatever it
+  likes. **Windows may copy the sentence and owes nothing if it does not.**
+
+**Say what the placeholder case actually looks like, rather than calling it
+harmless.** Nothing on disk changes, which is the part that matters. But a
+mid-semester section that gets the question reads two sentences that are simply
+untrue of it — "the same one students used last year", and "publishing it will
+still go to last year's website" — about a site students are reading this term.
+That is the cost, stated plainly, so the next person weighing this has the real
+number rather than a reassuring one.
 
 Only Claude Code can put free text in `website` — the card sends one of two
 fixed words and no local model sees the tool — so the whole surface for this is
 one where a person reads every step.
+
+**A related edge that predates all of this, so nobody fixes it by reflex.**
+`website: "same"` with no `rollover` is a RECOGNISED answer, so it has always
+been treated as a rollover, and it writes `sectionKeptItsWebsiteOnRollover`
+— "kept last year's website when rolling the section over" — onto the trail. A
+caller that sent it on an ordinary re-date would put a line on the trail about
+a rollover that never happened. Unchanged by issue #120 in either direction,
+and left alone deliberately: the fix is a way to tell a placeholder from an
+answer, which is the thing that does not exist.
 
 **A known limit, recorded in `nearMisses` rather than fixed.** The reply offers
 two sentences word for word, and those exact strings are the only way back in.
