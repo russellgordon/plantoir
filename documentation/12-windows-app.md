@@ -105,6 +105,8 @@ computing its own path (see "The flags the app answers"):
 | `Logs\` | The activity trail — the breadcrumb file a problem report gathers. |
 | `scheduled\` | The wrapper script each scheduled deploy runs. |
 | `scheduled\pending\` | Sentinels a finished scheduled deploy leaves for the app to pick up next time it runs. |
+| `scheduled\unanswered\` | One note per section, left when a scheduled publish stopped because it needed an answer nobody was there to give. Its own folder, not `pending\`, because `ScheduledDeployCompletion.ConsumePendingFrom` deletes every file it touches, parsed or not. |
+| `scheduled\folder-problems\` | What last night's build found wrong with a course's folders, for the next time there is somebody to tell. |
 | `assist\`, `models\` | The assistant's MCP configuration (`mcp-<CODE>.json`) and the model weights it downloads. |
 | `WebView2\` | The embedded preview's user-data folder. |
 | `settings.json` | The app's own settings — and, since Windows has no system window restoration, the remembered-windows list IS the restoration mechanism. (`AssistWindowPlacements`, beside it, is deliberately NOT replayed: restoring an assistant window would load a multi-gigabyte model unasked, so it remembers placement only and is a separate type.) |
@@ -197,21 +199,62 @@ belongs to macOS Background Items and has no counterpart here. It is recorded
 as something to weigh, not as something this code
 does; do not go looking for app-registration code.)
 
-One rule learned the hard way:
+Two rules learned the hard way, and they cover different halves of the same
+problem — **nobody answers a question at 6 a.m.**
 
-- **Run it `-NonInteractive`.** Nobody answers a question at 6 a.m. Without
-  it, a `Read-Host` anywhere in the chain blocks until Task Scheduler's own
-  limit and the site is simply never updated, with nothing to say why. Note
-  the flag reaches PowerShell's own prompts only: it does nothing for a
-  Python `input()` in `deploy.py`, which runs in a child process. That half is
-  answered by `--non-interactive` instead (added on the mac 2026-09-06):
-  `deploy.py` refuses a question rather than taking a default, and it does so
-  before it looks at `sys.stdin.isatty()`, so a console makes no difference.
-  **Windows does not pass the flag yet** — `TaskScheduling.WriteWrapperScript`
-  and `deploy.ps1` are what is owed, and until they land the old behaviour
-  stands here: the default is taken silently. Tracked as
-  [issue #92](https://github.com/russellgordon/plantoir/issues/92);
-  `WINDOWS-HANDOFF.md` was deleted on 2026-09-08 and its content moved here.
+- **Run it `-NonInteractive`.** Without it, a `Read-Host` anywhere in the chain
+  blocks until Task Scheduler's own limit and the site is simply never updated,
+  with nothing to say why. **This reaches PowerShell's own prompts only.**
+
+- **Pass the deploy legs `--non-interactive`.** PowerShell's flag does not
+  reach a Python child, and `deploy.py` is where the question that matters
+  lives: what the website should be called. Both ways that ended have been
+  seen. With a terminal, `input()` BLOCKS — measured at 45 minutes, the
+  launcher and its Python child still waiting at the prompt when they were
+  swept up. Without one, `prompt()` returns its DEFAULT silently and a Netlify
+  name conflict auto-suffixes, so the site is published to an address nobody
+  chose, and on a machine with no saved surname the address has no surname in
+  it either.
+
+  Under the flag every question REFUSES instead: it says which question it
+  could not ask, says what to do about it, and exits **3** — a code that
+  means "a question went unanswered" and nothing else, so a caller can tell it
+  from an ordinary failure. Every other exit in `deploy.py` and in both
+  launchers is 0 or 1. The wrapper reads it, writes a per-section note under
+  `scheduled\unanswered\`, and `SectionDetailView` tells the teacher the next
+  time that section is on screen — the same consume-on-read, clear-on-clean-run
+  shape the folder problems already use. Nothing changes when the flag is
+  absent: a teacher at a keyboard gets every prompt they got before.
+
+  Two things about the note that look like tidiness and are not. It is written
+  only by the FIRST destination that stops, because there is one note per
+  section and a course can publish to several — overwriting would report the
+  last thing that went wrong rather than the first. And it is cleared only
+  AFTER every destination has run: clearing inside the loop looked right and
+  was wrong, because a course whose Netlify leg stopped for a question and
+  whose folder leg then succeeded would have had the note deleted by the second
+  leg, and the teacher would never have been told why the first did not go out.
+
+  The refusal is gated at the one place the situation is KNOWN rather than at
+  three scattered prompts: `deploy.py`'s `main()` refuses as soon as it sees
+  that a Netlify site is about to be named, and tells the two cases apart —
+  a section never published, and one whose saved site no longer exists at the
+  other end. `prompt()` and the surname helper refuse too, as a backstop for
+  any path nobody has walked.
+
+  **It stops at the deploy launcher.** `deploy` shells out to `preview.bat
+  --build-only` when the built site is stale, and neither `preview.ps1` nor
+  `preview.sh` takes the flag — so `preview.ps1`'s "Continue anyway?" can
+  still be asked of nobody, in the narrow case where a section has been
+  archived out of `course_config.json` while its scheduled deploy still exists.
+  `-NonInteractive` does not reach it either, because `preview.bat` starts a
+  new `powershell.exe`. GitHub issue #124.
+
+  `ScheduledDeploy.Problem` already refuses to SCHEDULE a section that has
+  never been deployed, so the commonest way into this is closed at the other
+  end. What it cannot see is a site DELETED on Netlify after the schedule was
+  set, or a token revoked in between — which is how a real harness run hit
+  it.
 
 ---
 

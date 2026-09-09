@@ -127,6 +127,13 @@ else
   cat /tmp/verify_build_output_link_test.log
 fi
 
+if (cd scripts && python3 test_deploy_non_interactive.py) >/tmp/verify_deploy_non_interactive_test.log 2>&1; then
+  pass "deploy.py: a publish set to happen on its own refuses rather than asking (scripts/test_deploy_non_interactive.py)"
+else
+  fail "deploy.py: a publish set to happen on its own refuses rather than asking (scripts/test_deploy_non_interactive.py)"
+  cat /tmp/verify_deploy_non_interactive_test.log
+fi
+
 if (cd scripts && python3 test_deploy_course_dir_resolution.py) >/tmp/verify_deploy_course_dir_test.log 2>&1; then
   pass "deploy.py: course directory resolution under a native build root (scripts/test_deploy_course_dir_resolution.py)"
 else
