@@ -222,7 +222,7 @@ PREVIEW_CMD="./preview.sh"
 usage() {
   cat <<USAGE
 🧰 Usage:
-  ${SELF_CMD} <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--account <ACCOUNT_ID>] [--diagnose] [--team <TEAM_SLUG>] [--reset-token|--logout] [--image REF]
+  ${SELF_CMD} <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--account <ACCOUNT_ID>] [--diagnose] [--team <TEAM_SLUG>] [--reset-token|--logout] [--image REF] [--non-interactive]
 
 Examples:
   ${SELF_CMD} ICS3U 1
@@ -278,6 +278,34 @@ SECTION_NUM="$1"; shift
 # Normalize course code to uppercase
 COURSE_CODE="$(printf '%s' "$COURSE_CODE" | tr '[:lower:]' '[:upper:]')"
 
+# --non-interactive is looked for HERE, before the flag loop below, because the
+# first question this script asks — the 'Open' course-code guard — comes before
+# that loop. deploy.ps1 needs no such pre-scan: it parses its flags first and
+# asks afterwards. The loop below also accepts the flag, so it is not reported
+# as an unknown option; this pre-scan only makes it visible early.
+NON_INTERACTIVE="false"
+for _early_arg in "$@"; do
+  if [[ "$_early_arg" == "--non-interactive" ]]; then NON_INTERACTIVE="true"; fi
+done
+
+# Called immediately before every question this script asks. Under
+# --non-interactive there is nobody to answer it — the publish was set to
+# happen on its own, at half six, with the app closed — so it REFUSES and says
+# which question it could not ask, rather than waiting for an answer that will
+# never come or quietly taking a default.
+#
+# Exit code 3 means that and nothing else, matching deploy.py's
+# NEEDS_AN_ANSWER. Every other exit in this script is 0 or 1.
+assert_can_ask() {
+  [[ "$NON_INTERACTIVE" == "true" ]] || return 0
+  echo ""
+  echo "This publish was set to happen on its own, so nobody is here to answer:"
+  echo "   $1"
+  echo " $2"
+  echo " Nothing was published."
+  exit 3
+}
+
 # Friendly guard: 'Open' course code ended with zero
 if [[ "$COURSE_CODE" =~ ^[A-Z]{3}[0-9]0$ ]]; then
   SUGGESTED="${COURSE_CODE%0}O"
@@ -287,6 +315,7 @@ if [[ "$COURSE_CODE" =~ ^[A-Z]{3}[0-9]0$ ]]; then
   if [[ -f "courses/$SUGGESTED/course_config.json" && ! -f "courses/$COURSE_CODE/course_config.json" ]]; then
     echo " I see setup data for '$SUGGESTED' on disk."
   fi
+  assert_can_ask "Fix course code to '$SUGGESTED'? [Y/n]" "Publish this section once from Plantoir, where you can answer it."
   read -rp " Fix course code to '$SUGGESTED'? [Y/n]: " _ans
   _ans="${_ans:-Y}"
   if [[ "$_ans" =~ ^[Yy]$ ]]; then
@@ -323,6 +352,7 @@ while [[ $# -gt 0 ]]; do
     --to-folder=*)
       TO_FOLDER="${1#*=}" ;;
     --diagnose) DIAGNOSE="--diagnose" ;;
+    --non-interactive) NON_INTERACTIVE="true" ;;
     --team|--team-slug)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
       TEAM_SLUG="$2"; shift ;;
@@ -639,6 +669,7 @@ This is the only time you will be asked for it.
      dash.cloudflare.com/.)
 
 MSG
+  assert_can_ask "Paste Cloudflare Account ID" "Add the Account ID in this course's settings in Plantoir, under Deploying."
   read -rp "Paste Cloudflare Account ID: " entered
   entered="$(printf '%s' "$entered" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
   if [[ ! "$entered" =~ ^[0-9a-f]{32}$ ]]; then
@@ -763,6 +794,7 @@ this computer.
      paste it below. Nothing appears as you paste; that is normal.
 
 MSG
+    assert_can_ask "Paste Cloudflare token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
     read -rsp "Paste Cloudflare token: " cf_pasted; echo
     if ! validate_cf_token "$cf_pasted"; then
       echo "❌ Cloudflare did not accept that token."
@@ -862,6 +894,7 @@ this computer.
 
 MSG
   echo ""
+  assert_can_ask "Paste Netlify token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
   read -rsp "Paste Netlify token: " pasted; echo
   if ! validate_token "$pasted"; then
     echo "❌ Token invalid (Netlify rejected it). Please try again."
@@ -1329,6 +1362,7 @@ if [[ -t 0 ]]; then _EXEC_TTY="-it"; else _EXEC_TTY="-i"; fi
 docker exec $_EXEC_TTY \
   -e HOST_TZ_OFFSET="${HOST_TZ_OFFSET}" \
   -e DIAGNOSE="${DIAGNOSE}" \
+  -e NON_INTERACTIVE="${NON_INTERACTIVE}" \
   -e TEAM_SLUG="${TEAM_SLUG}" \
   -e TARGET="${TARGET}" \
   -e CF_ACCOUNT="${CF_ACCOUNT}" \
@@ -1337,6 +1371,10 @@ docker exec $_EXEC_TTY \
     tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat;
     opts="";
     [ -n "$DIAGNOSE" ]  && opts="$opts $DIAGNOSE";
+    # PARSING the flag is not enough — it has to reach the Python, which is
+    # where the site-name question lives. A launcher that took the flag and
+    # never forwarded it would leave a green test suite and an unchanged hang.
+    [ "$NON_INTERACTIVE" = "true" ] && opts="$opts --non-interactive";
     [ -n "$TEAM_SLUG" ] && opts="$opts --team $TEAM_SLUG";
     if [ "$TARGET" = "cloudflare" ]; then
       CLOUDFLARE_API_TOKEN="$tok" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \

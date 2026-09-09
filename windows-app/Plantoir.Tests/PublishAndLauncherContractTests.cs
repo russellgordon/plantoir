@@ -365,6 +365,77 @@ public class PublishAndLauncherContractTests
         }
     }
 
+    /// <summary>
+    /// <c>--non-interactive</c> is FORWARDED to the Python, not merely parsed.
+    /// </summary>
+    /// <remarks>
+    /// <para>The test above checks the parser, which is not the property that
+    /// matters here. <c>deploy.ps1</c> builds <c>$deployArgs</c> by hand and
+    /// then invokes <c>deploy.py</c> with it, and the site-name question — the
+    /// one that blocked a harness for 45 minutes — lives in the PYTHON. A
+    /// launcher that took the flag, never added it to <c>$deployArgs</c> and
+    /// exited <c>$nativeExit</c> would leave a green suite and an unchanged
+    /// hang, which is exactly the shape of failure this whole piece of work is
+    /// about.</para>
+    ///
+    /// <para>Coupled to the <c>$deployArgs +=</c> idiom the launcher uses for
+    /// every other flag; a rewrite that changes the idiom should change this
+    /// line with it.</para>
+    /// </remarks>
+    [Fact]
+    public void TheDeployLauncherForwardsNonInteractiveToThePython()
+    {
+        string launcher = File.ReadAllText(Path.Combine(RepoRoot, "deploy.ps1"));
+
+        Assert.Contains("$deployArgs += '--non-interactive'", launcher, StringComparison.Ordinal);
+
+        // And the guard is the flag itself, not something that always fires: a
+        // launcher that passed it unconditionally would refuse every question a
+        // teacher standing at the keyboard is entitled to answer.
+        Assert.Contains("if ($NON_INTERACTIVE) { $deployArgs += '--non-interactive' }",
+                        launcher, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Every question <c>deploy.ps1</c> asks is guarded, and the guard comes
+    /// BEFORE the question.
+    /// </summary>
+    /// <remarks>
+    /// One unguarded <c>Read-Host</c> is one way for a scheduled publish to sit
+    /// waiting at half six with nobody there, which is the whole failure. The
+    /// launcher asks four things — the 'Open' course-code correction, the
+    /// Cloudflare Account ID, and the two token prompts — and this fails if a
+    /// fifth is added without a guard.
+    /// </remarks>
+    [Fact]
+    public void EveryQuestionTheDeployLauncherAsksIsGuarded()
+    {
+        var lines = File.ReadAllLines(Path.Combine(RepoRoot, "deploy.ps1"));
+        var unguarded = new List<int>();
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (!lines[i].Contains("Read-Host", StringComparison.Ordinal)) continue;
+            // The guard sits on the line immediately above the question, which
+            // is the only placement that reads correctly: a guard further away
+            // is one somebody moves code past.
+            // TrimStart before the "#" test, and the "#" test at all, because
+            // the first version of this counted a COMMENTED-OUT guard as a
+            // guard — proved by commenting one out and watching the test still
+            // pass, which is the only way that kind of hole is ever found.
+            string above = i == 0 ? "" : lines[i - 1].TrimStart();
+            if (above.StartsWith("#", StringComparison.Ordinal)
+                || !above.Contains("Assert-CanAsk", StringComparison.Ordinal))
+                unguarded.Add(i + 1);
+        }
+
+        Assert.True(unguarded.Count == 0,
+            "deploy.ps1 asks a question with no Assert-CanAsk above it, at line(s) " +
+            string.Join(", ", unguarded) + ". Under --non-interactive that question is put to " +
+            "nobody: the publish either waits for ever or takes a default and publishes the " +
+            "teacher's site to an address they never chose.");
+    }
+
     // ---- The address handed to the teacher's browser ----------------------
 
     /// <summary>

@@ -410,6 +410,56 @@ public sealed partial class SectionDetailView : UserControl
         {
             App.LogDiagnostic($"TakeAnythingTheScheduledDeployFound exception: {ex}");
         }
+        TakeAnyQuestionTheScheduledPublishCouldNotAsk();
+    }
+
+    /// <summary>
+    /// Tell the teacher their overnight publish stopped for a question nobody
+    /// was there to answer.
+    ///
+    /// <para>Read here for the same reason the folder problems are: the run
+    /// happened with the app closed, so this is the first moment there is
+    /// anybody to say it to. The record is CONSUMED as it is read, so it is
+    /// said once rather than every time the app opens, and a later run that
+    /// gets through clears it, so a question the teacher has since answered
+    /// stops being reported.</para>
+    ///
+    /// <para>The TRAIL line is written here too, dated to when the RUN wrote
+    /// the record rather than to this morning — a trail that dated an overnight
+    /// problem to whenever somebody happened to open the app would file it
+    /// under the wrong night. Nothing else records it at all: the run happened
+    /// with the app closed.</para>
+    /// </summary>
+    private void TakeAnyQuestionTheScheduledPublishCouldNotAsk()
+    {
+        ScheduledPublishQuestion.Unanswered? stopped;
+        try { stopped = ScheduledPublishQuestion.Take(_course.Code, _sectionNumber); }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"TakeAnyQuestionTheScheduledPublishCouldNotAsk exception: {ex}");
+            return;
+        }
+        if (stopped is null) return;
+
+        ActivityTrail.Note(
+            ActivityTrail.Event.ScheduledPublishNeededAnAnswer,
+            $"the publish set to happen on its own stopped — {stopped.Destination} needed an answer",
+            _course.Code, _sectionNumber, stopped.When);
+
+        string said = ScheduledPublishQuestion.Sentence(_course.Code, _sectionNumber, stopped.Destination);
+        bool queued = DispatcherQueue.TryEnqueue(async () =>
+        {
+            await ShowDialogSafelyAsync(new ContentDialog
+            {
+                Title = "Your scheduled publish did not go out",
+                Content = said,
+                CloseButtonText = "OK",
+            });
+        });
+        // A refused enqueue means the dispatcher is shutting down, and the
+        // record has already been consumed. The trail line above is then the
+        // only surviving account of it, which is exactly what the trail is for.
+        if (!queued) App.LogDiagnostic("Could not show the scheduled-publish question: " + said);
     }
 
     private void NoteHealthFindings(ScriptRunner? runner, bool cameFromPublishing = false)

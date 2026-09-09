@@ -337,15 +337,71 @@ public static class TaskScheduling
                 "",
                 "# ---- Deploy to every destination — un-chained, on purpose ---------------",
                 "$allSucceeded = $true",
+                // Whether any destination stopped for a question nobody could
+                // answer. Kept across the whole loop so the note survives a
+                // later destination succeeding.
+                "$neededAnAnswer = $false",
             };
+
+            // Where a stopped publish leaves its note, and where a publish that
+            // got through clears one. Computed once, outside the loop.
+            string unansweredDir = ScheduledPublishQuestion.Directory();
+            string unansweredRecord =
+                $"(Join-Path {PsQuote(unansweredDir)} {PsQuote(HealthRecordName(courseCode, section))})";
 
             foreach (var destination in destinations)
             {
                 var arguments = DeployCommand.Arguments(courseCode, section, destination, cloudflareAccountID);
                 string quotedArgs = string.Join(" ", arguments.Select(PsQuote));
-                lines.Add($"& {PsQuote(launcherPath)} {quotedArgs}");
-                lines.Add("if ($LASTEXITCODE -ne 0) { $allSucceeded = $false }");
+
+                // --non-interactive is appended HERE rather than inside
+                // DeployCommand.Arguments, whose output is pinned by
+                // app-rules.json -> deployArguments: whether anybody is there to
+                // answer a question is a fact about who is RUNNING, not about
+                // the course's configuration, and the same arguments serve the
+                // Deploy button, where somebody plainly is.
+                //
+                // Without it this line is the whole defect: deploy.py's
+                // site-name prompt either blocks for ever (measured at 45
+                // minutes) or takes its default silently and publishes the
+                // teacher's site to an address nobody chose.
+                lines.Add($"& {PsQuote(launcherPath)} {quotedArgs} --non-interactive");
+
+                // Exit 3 is deploy.py's NEEDS_AN_ANSWER and means that alone.
+                // Tested BEFORE the general non-zero branch, because it is also
+                // non-zero: a run that needed an answer did not succeed either.
+                //
+                // The FIRST destination that stopped is the one recorded. A
+                // course can publish to several, and there is one record per
+                // section, so overwriting would tell the teacher about the last
+                // thing that went wrong rather than the first.
+                string name = PsQuote(DeployCommand.DestinationDescription(destination));
+                lines.Add("if ($LASTEXITCODE -eq 3) {");
+                lines.Add("  $allSucceeded = $false");
+                lines.Add("  if (-not $neededAnAnswer) {");
+                lines.Add("    $neededAnAnswer = $true");
+                lines.Add("    try {");
+                lines.Add($"      New-Item -ItemType Directory -Force -Path {PsQuote(unansweredDir)} | Out-Null");
+                lines.Add($"      Set-Content -LiteralPath {unansweredRecord} -Value {name} -Encoding utf8");
+                lines.Add("    } catch { }");
+                lines.Add("  }");
+                lines.Add("} elseif ($LASTEXITCODE -ne 0) {");
+                lines.Add("  $allSucceeded = $false");
+                lines.Add("}");
             }
+
+            // Cleared only when NOTHING needed an answer, and only AFTER every
+            // destination has run. Clearing inside the loop looked right and was
+            // wrong: a course publishing to two places whose Netlify leg stopped
+            // for a question and whose Cloudflare leg then succeeded would have
+            // had the note deleted by the second leg, and the teacher would
+            // never have been told why the first one did not go out.
+            lines.Add("");
+            lines.Add("if (-not $neededAnAnswer) {");
+            lines.Add("  try {");
+            lines.Add($"    Remove-Item -LiteralPath {unansweredRecord} -Force -ErrorAction SilentlyContinue");
+            lines.Add("  } catch { }");
+            lines.Add("}");
 
             lines.AddRange(new[]
             {
