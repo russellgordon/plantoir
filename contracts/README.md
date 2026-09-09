@@ -315,7 +315,7 @@ oversight:
 
 | Area | Tests | Why it stays local |
 |---|---|---|
-| Windows, sheets, layout, hit areas, fonts, chat bubbles | ~71 | Platform look and feel. The mac's numbers were measured against Messages; matching them on WinUI would produce something that looks foreign. What must be TRUE of the assistant's window is in this documentation. |
+| Windows, sheets, layout, hit areas, fonts, chat bubbles | ~71 | Platform look and feel. The mac's numbers were measured against Messages; matching them on WinUI would produce something that looks foreign. What must be TRUE of the assistant's window is in [`documentation/10-local-ai-assistant.md`](../documentation/10-local-ai-assistant.md) → "What the conversation looks like, and why". |
 | Script runner and preview stopper mechanics | 34 + 2 | ConPTY against a pseudo-terminal, WSL2 against Colima. The OUTPUT they parse is shared (see `markerOrigins`); the machinery is not. **Narrowed 2026-09-05**: WHICH processes belong to a section's preview is now shared (`shared-rules.json` → `stopPreview`) — how they are found (`/proc` against `Win32_Process`) and how they are ended (SIGTERM-then-SIGKILL against `Stop-Process -Force`) remain platform mechanics. |
 | Scheduled deploys: the MECHANISM | ~14 | launchd against Task Scheduler — nothing about writing a plist or a task ports. The **refusals** are now shared (`shared-rules.json`), which is the half that matters. |
 | Model tiers, plan mode, activity | 30 | Measured on this hardware. See `research/`; a tier ladder measured on an M4 Pro says nothing about a teacher's laptop with integrated graphics. |
@@ -337,12 +337,11 @@ function ran it. Now it is written once in `AssistWording`, and everything else
 is generated from it or tested against it.
 ## Sentences the contract does not carry — each app writes its own, knowingly
 
-`contracts/` holds every sentence it can, and the handoff sections above say so
-about the ones it does. These are the exceptions as of 2026-09-01, found by
+`contracts/` holds every sentence it can, and says so about the ones it does. These are the exceptions as of 2026-09-01, found by
 adversarial review after an earlier draft claimed "sentences …
 are all in `shared-rules.json`", which was not true. Each is teacher-facing,
-each lives only in the mac's Swift, and each is one a port has to word
-yourself — so word it deliberately rather than discovering the gap:
+each lives only in the mac's Swift, and each is one a port has to word for
+itself — so word it deliberately rather than discovering the gap:
 
 - **`ClassPageTerm.problem(with:)`** — the two wizard refusals for a unit word
   containing a digit or a comma.
@@ -356,8 +355,8 @@ yourself — so word it deliberately rather than discovering the gap:
   as "the rename failed": it did not, and saying so sends the teacher looking
   for a folder under its old name.
 - **The wizard's unit-word caption** — "Class pages will be named '… 1, Day 1'".
-- **The assistant's unit sentences**, which item 13 wrongly said were "listed
-  below with the others" until this line was added: "{word} N was published",
+- **The assistant's unit sentences**, which an earlier draft wrongly said were
+  "listed below with the others" until this line was added: "{word} N was published",
   "{word} N has already been published", "{word} N is already hidden", "{word} N
   was only partly published", and "I can't find any class pages in {word} N of
   …". They are hardcoded in `AssistToolRunner` and are in NO contract — not

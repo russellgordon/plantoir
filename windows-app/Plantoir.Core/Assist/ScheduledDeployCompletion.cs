@@ -17,7 +17,7 @@ namespace Plantoir.Core.Assist;
 /// deploy that failed to record cleanly cannot be mistaken, tomorrow, for
 /// one that succeeded.
 ///
-/// See documentation/07-deployment.md, "A scheduled deploy needs its own path to the
+/// See documentation/05-build-pipeline.md, "A scheduled deploy needs its own path to the
 /// same record".
 /// </summary>
 public static class ScheduledDeployCompletion

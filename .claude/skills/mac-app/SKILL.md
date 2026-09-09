@@ -383,13 +383,13 @@ So a macOS change is not finished until BOTH of these are true:
    fine note when true; an empty cell never is.
 2. **Anything architectural also gets a section in the `documentation/` page
    that owns its subject.** A
-   log row records a decision; the handoff explains it well enough to
+   log row records a decision; the deep dive explains it well enough to
    implement. Rule of thumb: if you needed more than a sentence of reasoning
    to get it right, they will too.
 
 **Corrections count as improvements.** When a change makes existing Windows
 guidance WRONG, fixing that guidance is part of the change. This has already
-bitten twice in one night: the handoff still told Windows "the visible verb
+bitten twice in one night: the write-up still told Windows "the visible verb
 is Publish, never Deploy" long after rows 140 and 143 reversed it, and the
 per-conversation backup rule silently invalidated the pruning advice above
 it. Stale guidance is worse than none — they will follow it.
@@ -445,7 +445,7 @@ windows, quantisation, Metal, GPU layers, inference. If a sentence would only
 make sense to somebody who has read the source, it is not ready to show.
 
 Two exceptions, both non-teacher-facing: `GUI-IMPROVEMENTS.md` and the
-handoffs record what was measured and must name models precisely, and code
+write-ups record what was measured and must name models precisely, and code
 comments should too. The rule is about what appears on screen.
 
 ## Open investigations — read these before touching the area

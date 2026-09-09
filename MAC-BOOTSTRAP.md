@@ -22,7 +22,7 @@ below** (in B it applies from the moment you start implementing, at B.3). Implem
 Have each logical chunk reviewed by something that is not the thing that wrote
 it (Fable in Claude Code) — the PLAN first, then the implementation, then the
 fixes, because a review of the finished thing arrives too late to change its
-shape. Write the Windows handoff AS YOU GO rather than from memory at the end.
+shape. Write it up for Windows AS YOU GO rather than from memory at the end.
 And **finish with a documentation pass before you say it is ready**, which is
 step 7 below.
 
@@ -130,7 +130,8 @@ bundle from the Dock. Test, then build, then stop.
   the same session.** Standing instruction, `CLAUDE.md` rule 3. The issue is
   not a duplicate of the section: a Windows session is told to read its open
   issues FIRST, so the issue is how they find out there is work at all, while
-  the handoff section is the manual for doing it. Give it a milestone if it is
+  the `documentation/` page it points at is the manual for doing it. Give it a
+  milestone if it is
   pinned to a release, and `decision` as well if it needs Russell to choose.
   A change written up beautifully in a section nothing points at is, from their
   side, a change nobody wrote up.
@@ -159,7 +160,7 @@ they are the ones that rot.
   is described. A behaviour is nearly always written down in more places than
   the one you edited.
 - **`documentation/` is the folder that gets forgotten**, because nothing in
-  the daily rhythm points at it. The deep dives 01–11 describe how the
+  the daily rhythm points at it. The deep dives 01–13 describe how the
   toolchain, the launchers, the build pipeline and the assistant actually
   work, and a change to any of those has almost certainly made a sentence
   there wrong. On the session rule 11 came from, four places in

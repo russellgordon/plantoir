@@ -414,7 +414,7 @@ final class SiteHealthRepairTests: XCTestCase {
     /// still has none, so the build still produces no site and the publish
     /// still refuses, and the teacher stops looking.
     ///
-    /// Found by Windows porting this file line by line (documentation/05-build-pipeline.md,
+    /// Found by Windows porting this file line by line (documentation/04-course-setup.md,
     /// 2026-09-06). `restoreMedia`, the function directly above it, has always
     /// used the
     /// `isDirectory:` form; this one did not.

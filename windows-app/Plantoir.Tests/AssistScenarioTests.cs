@@ -178,7 +178,7 @@ public class AssistScenarioTests
 
     // ---- StartDeployInAppAsync: the assistant must say the REAL outcome ---
     //
-    // documentation/10-local-ai-assistant.md / TODO.md item: DeployForAsync used to resolve the
+    // documentation/12-windows-app.md: DeployForAsync used to resolve the
     // instant the click was dispatched, so RunTool always answered with the
     // unconditional AssistWording.Deployed — success or not. These wire the
     // production seam itself (StartDeployInAppAsync), not a stand-in for it,

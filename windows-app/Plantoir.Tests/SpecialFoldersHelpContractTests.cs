@@ -107,8 +107,8 @@ public class SpecialFoldersHelpContractTests
     /// cannot see it, because "mentions" is not a banned word. Banning it is
     /// not the fix either: a banned word catches only that word, and "named
     /// after the curriculum" says the same thing in different ones. Pinning
-    /// the sentence catches any wording. See item 40 in
-    /// <c>documentation/04-course-setup.md</c>.</para>
+    /// the sentence catches any wording. The mac's counterpart is
+    /// <c>documentation/09-mac-app.md</c> → "Which folders Plantoir uses".</para>
     ///
     /// <para>Running the contract's own cases closes it without inventing a
     /// second fixture to drift: two of them end up with no curriculum folder

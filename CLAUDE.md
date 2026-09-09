@@ -53,8 +53,8 @@ Neither app contains toolchain logic of its own: they write the same
      **An issue is an OBLIGATION**, so this fork is for things the other side
      must DO. Something they only need to KNOW — a shared decision, a frozen
      name, a trap — is not a third case slipping between the two: it goes in
-     the handoff's awareness section (rules 3 and 4), and an issue nobody can
-     close is the thing that arrangement avoids.
+     the `documentation/` page that owns its subject (rules 3 and 4), and an
+     issue nobody can close is the thing that arrangement avoids.
 
    The failure this prevents is the quiet one: a behaviour that exists in one
    app, is described nowhere the other app's tests can reach, and is discovered
@@ -88,8 +88,8 @@ Neither app contains toolchain logic of its own: they write the same
    **The issue is not a duplicate of the section, and this is the part that
    gets skipped.** A Windows session is told to read the open `windows` issues
    first ([`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md)), so the issue is the
-   INDEX — how they learn there is work at all — and the handoff section is the
-   manual for doing it. Prose buried three hundred lines down that nothing
+   INDEX — how they learn there is work at all — and the `documentation/` page
+   it points at is the manual for doing it. Prose buried three hundred lines down that nothing
    points at is work they will not find, and a change written up beautifully
    and never opened as an issue is indistinguishable, from their side, from a
    change nobody wrote up. (This replaced a numbered list inside
@@ -417,16 +417,16 @@ Neither app contains toolchain logic of its own: they write the same
     - **Write it up for the other platform AS YOU GO, not at the end.** This
       is rule 3 (and rule 4 pointing the other way); it is named here because
       it belongs to the rhythm of the work rather than to its ending. A
-      handoff written at the end is written from memory, and the reasons —
-      which is the part that travels — are what memory loses first.
+      write-up made at the end is made from memory, and the reasons — which is
+      the part that travels — are what memory loses first.
     - **ALWAYS end with a documentation update, BEFORE asking to merge** —
       after the rebuild rule 10 asks for, since a documentation pass needs no
       further build. The last act before "this is ready" is to go looking for
       every place that describes what you changed, and fix the ones the change
       made wrong. Start with `documentation/`, which is the one most easily forgotten
-      because nothing in the daily rhythm points at it: the handoffs and
-      `GUI-IMPROVEMENTS.md` get written because rules 3 to 5 demand them, and
-      the deep dives get written because somebody remembers. On the session
+      because nothing in the daily rhythm points at it: an issue and a
+      `GUI-IMPROVEMENTS.md` row get written because rules 3 to 5 demand them,
+      and the deep dive gets written because somebody remembers. On the session
       this rule came from, four places in `documentation/` described the rule
       that had just been replaced, three of them wrongly, and one of them did
       not document a launcher flag the app has been calling for weeks.
@@ -908,14 +908,13 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 
 | Read this | When |
 |---|---|
-| [`documentation/`](documentation/README.md) | How the toolchain works, numbered 01–11: overview, image, launchers, course setup, build pipeline, Quartz customizations, deployment, config reference, mac app, local AI assistant, release strategy. |
+| [`documentation/`](documentation/README.md) | How the toolchain works AND why, numbered 01–13: overview, image, launchers, course setup, build pipeline, Quartz customizations, deployment, config reference, mac app, local AI assistant, release strategy, Windows app, and the Windows-port archive. Since 2026-09-08 this is also where the reasoning behind a decision lives — what was chosen, what was rejected, what was measured. |
 | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change, with a required "Notes for Windows port" column. Append here for any GUI change — and read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
 | [GitHub issues](https://github.com/russellgordon/plantoir/issues) | **Everything still to do**, on either platform. Labelled `mac`, `windows`, `toolchain`, `assistant`, `decision`; milestones pin an issue to a release. |
 | [`documentation/13-windows-port-archive.md`](documentation/13-windows-port-archive.md) | Write-ups for Windows-port work verified shipped as of 2026-08-22, kept for the reasoning. **History, not a specification** — where it and a contract disagree, the contract is true. Closed to new entries. |
 | [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Three of the ten files are generated from the macOS app by `Plantoir --write-contracts` and must never be hand-edited; the other seven — `shared-rules.json` among them — are AUTHORED, and can be proposed or corrected from either platform. `contracts/README.md` says which is which, and this line used to say "never hand-edited" of all ten, which sent a Windows session on 2026-09-08 to ask the mac for an edit it could make itself. Its coverage table says what is deliberately NOT shared, and why. |
-
 | [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, and the frozen asset names both platforms depend on. |
 | [`website/`](website/README.md) | **plantoir.app.** The marketing site's SOURCES — a layout, a stylesheet, one file per page, and the screenshot harness. `python3 website/build.py` writes `site/`, and `--deploy` publishes it to Netlify — the site is not Git-connected, so nothing deploys on push. `site/` is a build output and hand-edits to it are overwritten. The release version line lives in `website/site.json`. Screenshots are captured from the real app and the real class sites by `website/shots/capture.py`, in both colour schemes. |
 | [`TODO.md`](TODO.md) | **Closed to new entries** since 2026-09-08 — deferred work is a GitHub issue now. What is left is append-only history like a `GUI-IMPROVEMENTS.md` row: an entry records what was true on its day and what the entry itself got wrong, and is not rewritten when the behaviour changes again. |

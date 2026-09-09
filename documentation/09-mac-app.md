@@ -331,8 +331,10 @@ instructions (XcodeGen + Xcode), and the test suite are documented in
 Written 2026-09-07, for whoever meets a modal that kills a test process rather
 than failing an assertion. It is macOS mechanics — none of the code transfers —
 but the SHAPE of the fault and the way it was cornered do, and the dead ends are
-the expensive part. Item 39 in the outstanding list says what, if anything, you
-owe. This is the manual.
+the expensive part. Windows checked the same question on its own suite and
+answered it — `Plantoir.UiTests` drives the app out of process, so killing the
+driven `Plantoir.exe` mid-test is an ordinary test failure rather than a host
+death — so nothing is owed there. This is the manual for the mac's half.
 
 ### The fault
 

@@ -38,8 +38,8 @@ description: "Plantoir project rules, part 2 of 9 - Rules that override default 
      **An issue is an OBLIGATION**, so this fork is for things the other side
      must DO. Something they only need to KNOW — a shared decision, a frozen
      name, a trap — is not a third case slipping between the two: it goes in
-     the handoff's awareness section (rules 3 and 4), and an issue nobody can
-     close is the thing that arrangement avoids.
+     the `documentation/` page that owns its subject (rules 3 and 4), and an
+     issue nobody can close is the thing that arrangement avoids.
 
    The failure this prevents is the quiet one: a behaviour that exists in one
    app, is described nowhere the other app's tests can reach, and is discovered
@@ -73,8 +73,8 @@ description: "Plantoir project rules, part 2 of 9 - Rules that override default 
    **The issue is not a duplicate of the section, and this is the part that
    gets skipped.** A Windows session is told to read the open `windows` issues
    first ([`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md)), so the issue is the
-   INDEX — how they learn there is work at all — and the handoff section is the
-   manual for doing it. Prose buried three hundred lines down that nothing
+   INDEX — how they learn there is work at all — and the `documentation/` page
+   it points at is the manual for doing it. Prose buried three hundred lines down that nothing
    points at is work they will not find, and a change written up beautifully
    and never opened as an issue is indistinguishable, from their side, from a
    change nobody wrote up. (This replaced a numbered list inside

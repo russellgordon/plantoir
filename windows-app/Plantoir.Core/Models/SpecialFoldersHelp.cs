@@ -103,7 +103,7 @@ public static class SpecialFoldersHelp
             // lists. So a course that has never been asked can see fewer names
             // here than it sees ticked one section above — true on both
             // platforms, and gone the moment the teacher saves. Widening it is
-            // a shared decision, written up in documentation/04-course-setup.md rather than
+            // a shared decision, written up in documentation/09-mac-app.md rather than
             // taken on one platform.
             new(Listed(config.MaterializedGradedFolders(
                     config.SharedFolders.Concat(config.PerSectionFolders))),

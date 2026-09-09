@@ -138,7 +138,7 @@ the field is open.
    Finder's own Rename item carries no key equivalent for exactly this
    reason. Handle the key in the list instead, and ignore it when a field is
    already open so the field's own Return commits. If your framework has the
-   same precedence, do the same; if it does not, say so in `MAC-HANDOFF.md`.
+   same precedence, do the same; if it does not, say so in a `mac` issue.
 
 2. **Switching apps is not clicking away.** Clicking elsewhere should commit
    the rename, as Finder does. But a focused field cannot hold focus while
@@ -161,7 +161,7 @@ the field is open.
    hosts the ROW VIEW on its own and asserts a text field appears in it —
    deterministic, and no accessibility tree involved
    (`CourseRenameInterfaceTests`). If your framework's tree exposes list rows
-   honestly, that is worth a line in `MAC-HANDOFF.md`.
+   honestly, that is worth a `mac` issue.
 
 ### Obsidian: close it, rename, and open the vaults again
 
@@ -473,7 +473,7 @@ days to find:
 - **The teacher never learns the model's name.** A faster backend does not buy
   a licence to say "CUDA" or "Qwen" in the interface.
 
-When you have measured, write the numbers into `MAC-HANDOFF.md` — tokens per
+When you have measured, write the numbers into a `mac` issue — tokens per
 second per backend, on named hardware. The mac side has no way to find out what
 a Windows teacher's machine does, and those numbers are the only thing that
 makes the next decision on either side a measurement rather than a guess.
@@ -2257,7 +2257,7 @@ adds another such guard, it goes in the Dockerfile and it fails closed.
 
 ## The three one-time-setup explainer cases are retired (2026-08-20)
 
-Answering the request in `MAC-HANDOFF.md` rather than leaving it half-done:
+Answering the mac's request rather than leaving it half-done:
 the mac implemented ONE of the two failure-explanation cases proposed from
 that side and **retired the other three**.
 

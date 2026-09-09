@@ -6,7 +6,7 @@ using Plantoir.Core.Scripting;
 namespace Plantoir.Tests;
 
 /// <summary>
-/// The last of the case lists contracts/README.md found this suite was not
+/// The last of the case lists the 2026-09-06 contract audit found this suite was not
 /// running — renaming a course, the problem report's question about the
 /// assistant, the working folder's path bar, what a page is CALLED, where a
 /// built site is kept, what a payload may contain, and which folders make up
@@ -618,7 +618,7 @@ public sealed class SharedRuleContractTests : IDisposable
     /// <para>A deploy that runs perfectly at half six and puts up a site
     /// missing tomorrow's class is the failure worth catching while somebody is
     /// awake. The rule was in the contract and read by nobody on this side;
-    /// contracts/README.md records separately that the interface does not
+    /// `documentation/12-windows-app.md` records separately that the interface does not
     /// yet CALL this — which this suite cannot see, since it cannot reference
     /// the interface project.</para>
     /// </summary>

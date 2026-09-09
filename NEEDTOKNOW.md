@@ -68,7 +68,7 @@ so a publish stops at the build with the reason in front of it. And the skipped
 sync used to leave the PREVIOUS build's `public/` on the host, which `deploy`
 uploads — so a publish after deleting a front page reported success and shipped
 last week's pages. That mirror is now cleared. See `GUI-IMPROVEMENTS.md` row
-384 and `WINDOWS-HANDOFF.md`.
+384 and `documentation/`.
 
 ## The repair dialog asked the wrong "is it busy" question (2026-08-23)
 

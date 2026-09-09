@@ -842,8 +842,8 @@ right answer is a refusal that SAYS so, not a task that fails at 06:30 in
 silence. Check it, and record what you find here; the contract
 case says which of the two you are looking at.
 
-Two more that stay yours: the plan's own words (the mac's says what has to be
-true of the Mac — awake, plugged in, lid open — and yours will say something
+Two more that stay per-platform: the plan's own words (the mac's says what has
+to be true of the Mac — awake, plugged in, lid open — and Windows says something
 different about sleep and Modern Standby), and cancelling, which on the mac is
 `launchctl bootout` plus deleting the plist.
 
@@ -855,7 +855,7 @@ answer. Say something; the words are the app's own.
 
 **The transcript — everything except the stripping.** What is stripped is
 shared (a colour code is a colour code). How much scrollback is kept, when the
-view follows the tail, whether it scrolls on focus — all yours, and all
+view follows the tail, whether it scrolls on focus — all per-platform, and all
 different in WinUI.
 
 **Curriculum — the plan, not the recognition.** What COUNTS as an expectation
@@ -1157,7 +1157,7 @@ manual for it.
 **The measurement.** `Plantoir.Mcp/PlantoirTools.cs` declares **37** distinct
 `[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` served **25**
 when this was measured (22 tools plus three MCP-only). The set difference was
-exactly **12, all yours, none the mac's**, and not one of the twelve appeared
+exactly **12, all Windows', none the mac's**, and not one of the twelve appeared
 anywhere under `mac-app/QuartzTeachers` or in `contracts/` — there was no
 half-built mac version of any of them:
 
@@ -1233,7 +1233,7 @@ both wired up already). Note the limit: `duplicate` is not on
 `AssistCardCommand.swift:85`, so no model and no MCP client can reach it — the
 mac needs a schema argument, not just a bigger count. And `roll_over_section`
 because of the defect in item 41's first open part. Two are
-Windows-shaped and stay yours: `read_timetable`, because the mac puts
+Windows-shaped and stay there: `read_timetable`, because the mac puts
 spreadsheet reading behind its schedule sheet on purpose and has no file-path
 argument anywhere on its surface; and `list_recent_changes`, because both mac
 clients already show or hold that history. `sync_page_dates` needs a teacher's
@@ -1373,7 +1373,7 @@ in BOTH appearances, with the selected glyphs painted in the bubble's own
 fill. The system's dark-mode selection colour is a grey-slate that reads as
 broken beside it. Two porting notes: our UI toolkit's built-in text selection
 drew an unstylable grey and we had to drop to the native text control to
-style it at all — check yours early; and the hook that styles selection must
+style it at all — check the platform's early; and the hook that styles selection must
 be one that runs when selection machinery actually attaches (ours had a
 first attempt that configured a text editor that did not exist yet, and it
 failed silently).

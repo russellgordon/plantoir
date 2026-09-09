@@ -134,7 +134,7 @@ public class AssistSurfaceContractTests
     /// <c>toolSchemas</c> is a GENERATED key, so the departure cannot be
     /// recorded beside the schemas it applies to, and this list is now its
     /// second home — the very thing `contracts/` exists to prevent. Asked for
-    /// in documentation/10-local-ai-assistant.md: have the generator emit the departures alongside the
+    /// in issue #83: have the generator emit the departures alongside the
     /// schemas, and this reads them instead of restating them.</para>
     ///
     /// <para>Asserted as an exact set rather than an allow-list, so a NEW
