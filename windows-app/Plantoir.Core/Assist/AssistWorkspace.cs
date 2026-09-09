@@ -1924,33 +1924,180 @@ public sealed class AssistWorkspace
     ///
     /// The marker is renamed rather than deleted: it holds the site id and
     /// admin URL, and a teacher who decides they wanted the old site after all
-    /// has no other way back to it.
+    /// has no other way back to it. <c>deploy.py</c> and <c>build_site.py</c>
+    /// build exact marker paths and never glob the folder, so a
+    /// <c>.previous-*.json</c> sitting beside them is inert.
     /// </summary>
-    public string? ReleaseSite(Course course, int sectionNumber)
+    /// <remarks>
+    /// <para><b>EVERY destination type, not just the course's primary — this
+    /// used to <c>return</c> inside the first folder that held a marker.</b>
+    /// Markers are keyed purely by destination TYPE and a course can carry
+    /// additional targets, so a section pinned to both Netlify and Cloudflare
+    /// had only its Netlify marker released and went on publishing over last
+    /// year's Cloudflare site. Pinned by
+    /// <c>contracts/file-formats.json</c> -&gt;
+    /// <c>firstDeployMarkers.releasedWhenASectionRollsOver</c>.</para>
+    ///
+    /// <para><b>"Still pinned" is kept apart from "there was nothing to
+    /// release"</b>, because both used to produce the same empty answer — so a
+    /// marker that existed and could not be moved was reported as "this
+    /// section had not been published anywhere yet", the opposite of the truth
+    /// about the one fact this whole feature turns on.</para>
+    /// </remarks>
+    public SiteRelease ReleaseSite(Course course, int sectionNumber)
     {
+        var kept = new List<string>();
+        var stillPinned = new List<string>();
+        string stamp = DateTime.Now.ToString("yyyy-MM-dd_HHmmss");
+
+        // ONE undo entry for the whole release, not one per destination. A
+        // rollover is a single act to the teacher, and a partial undo would
+        // put a section back on last year's Netlify site while leaving it cut
+        // loose from Cloudflare — a state nobody chose and nothing describes.
+        _undo?.Begin($"cut section {sectionNumber} loose from its website");
+
         foreach (string folder in new[] { ".netlify_sites", ".cloudflare_sites" })
         {
             string marker = Path.Combine(course.DirectoryPath, folder, $"section{sectionNumber}.json");
-            if (!File.Exists(marker)) continue;
-            string kept = Path.Combine(course.DirectoryPath, folder,
-                $"section{sectionNumber}.previous-{DateTime.Now:yyyy-MM-dd_HHmmss}.json");
+            string keptPath = Path.Combine(course.DirectoryPath, folder,
+                ReleasedMarkerName(sectionNumber, stamp));
+            Release(marker, keptPath, kept, stillPinned);
+        }
+
+        // The LEGACY marker, which `deploy.py` still reads and migrates back
+        // into the stable path (`load_netlify_marker`). Leaving it would make
+        // a rollover report "never published" and then publish over last
+        // year's site on the next deploy — in exactly the folders old enough
+        // to have taught somebody something. Netlify only: there has never
+        // been a Cloudflare equivalent.
+        //
+        // **It lives in the BUILT OUTPUT, and on THIS platform that is not
+        // `.merged_output`.** `deploy.py` computes it from `section_dir`,
+        // which is `toolchain_paths.merged_output_root(...)/section<N>` — and
+        // `merged_output_root` returns `PLANTOIR_BUILD_ROOT/<COURSE>` when
+        // that is set, with no `.merged_output` level at all, which is the
+        // Windows layout the launchers always set up. Releasing the mac's
+        // literal `<CODE>/.merged_output/section<N>/…` here would repeat the
+        // mac's own first-cut mistake in the other direction: a path that has
+        // never held a marker on this platform, so the release would do
+        // nothing and the section would keep publishing over last year's site.
+        //
+        // Both are attempted, guarded by existence. The build-root one is the
+        // path `deploy.py` reads HERE; the `.merged_output` one is what a
+        // folder carried here from a mac would have, and releasing a file that
+        // is not there costs nothing.
+        foreach (string sectionOutput in LegacyMarkerHomes(course, sectionNumber))
+        {
+            string marker = Path.Combine(sectionOutput, ".netlify_site.json");
+            string keptPath = Path.Combine(sectionOutput, $".netlify_site.previous-{stamp}.json");
+            Release(marker, keptPath, kept, stillPinned);
+        }
+
+        _undo?.End();
+        return new SiteRelease(kept, stillPinned);
+    }
+
+    /// <summary>
+    /// Move one marker aside, recording it for undo, and file it under kept or
+    /// still-pinned.
+    /// </summary>
+    private void Release(string marker, string keptPath, List<string> kept, List<string> stillPinned)
+    {
+        if (!File.Exists(marker)) return;   // nothing pinning this destination
+        string contents;
+        try { contents = File.ReadAllText(marker); }
+        catch { stillPinned.Add(NameForTeacher(marker)); return; }
+
+        try
+        {
             // Recorded as a move so an undo puts the section back on last
             // year's site rather than leaving it orphaned.
-            try
-            {
-                string? contents = File.ReadAllText(marker);
-                _undo?.Begin($"cut section {sectionNumber} loose from its website");
-                _undo?.Touch(marker, contents);
-                _undo?.Touch(kept, null);
-                File.Move(marker, kept);
-                _undo?.Wrote(marker, null);
-                _undo?.Wrote(kept, contents);
-                _undo?.End();
-                return Relative(kept);
-            }
-            catch { return null; }
+            _undo?.Touch(marker, contents);
+            _undo?.Touch(keptPath, null);
+            File.Move(marker, keptPath);
+            _undo?.Wrote(marker, null);
+            _undo?.Wrote(keptPath, contents);
+            kept.Add(NameForTeacher(keptPath));
         }
-        return null;
+        catch
+        {
+            // A marker that could not be moved is one this section is STILL
+            // pinned to, and the reply has to say so rather than reporting the
+            // same empty result as "never published".
+            stillPinned.Add(NameForTeacher(marker));
+        }
+    }
+
+    /// <summary>
+    /// The folders a legacy <c>.netlify_site.json</c> could be sitting in, in
+    /// the order they are tried.
+    /// </summary>
+    /// <remarks>
+    /// One known divergence, inherited rather than introduced:
+    /// <c>BuildOutputLocation.BuildsRootFor</c> falls back to
+    /// <c>AppDataRoot</c>, which <c>--state-dir</c> redirects, while the
+    /// launchers compute the same root from the real <c>%LOCALAPPDATA%</c>. So
+    /// a run started with <c>--state-dir</c> looks for the legacy marker
+    /// somewhere the launcher would never have put one and finds nothing —
+    /// the same hazard <c>run-ui-tests.ps1</c> already warns about, and
+    /// harmless here because it can only cause a release to be skipped, never
+    /// a wrong file to be moved.
+    /// </remarks>
+    private IEnumerable<string> LegacyMarkerHomes(Course course, int sectionNumber)
+    {
+        string fromBuildRoot;
+        try
+        {
+            fromBuildRoot = BuildOutputLocation.ForSection(
+                BuildOutputLocation.BuildsRootFor(_folder), course.Code, sectionNumber);
+        }
+        catch { fromBuildRoot = ""; }
+        if (fromBuildRoot.Length > 0) yield return fromBuildRoot;
+
+        yield return Path.Combine(course.DirectoryPath, ".merged_output", $"section{sectionNumber}");
+    }
+
+    /// <summary>
+    /// The name a released marker is kept under.
+    ///
+    /// <para><b>Frozen, and shared with the mac</b> (<c>DeployCommand.releasedMarkerName</c>),
+    /// so a teacher who wants back onto last year's website is told the same
+    /// filename whichever app they are sitting at. Pinned in
+    /// <c>contracts/file-formats.json</c> -&gt; <c>firstDeployMarkers</c>.</para>
+    /// </summary>
+    public static string ReleasedMarkerName(int sectionNumber, string stamp) =>
+        $"section{sectionNumber}.previous-{stamp}.json";
+
+    /// <summary>
+    /// A marker named the way a teacher would find it — the folder it sits in
+    /// and the file, without the rest of the path.
+    /// </summary>
+    /// <remarks>
+    /// Not <see cref="Relative"/>, which is relative to the WORKING FOLDER: on
+    /// this platform the built output lives outside it, so a legacy marker
+    /// would be named with a run of <c>..\..\</c> nobody could use. The mac
+    /// says it this way too, and the sentence carrying it is shared.
+    /// </remarks>
+    private static string NameForTeacher(string path) =>
+        (Path.GetFileName(Path.GetDirectoryName(path)) ?? "") + "/" + Path.GetFileName(path);
+
+    /// <summary>What cutting a section loose actually managed.</summary>
+    /// <param name="KeptFiles">Where last year's details were put, for each destination released.</param>
+    /// <param name="StillPinned">
+    /// Destinations this section is STILL pinned to, because releasing them
+    /// failed — kept apart from "there was nothing to release", which is the
+    /// distinction that matters.
+    /// </param>
+    public sealed record SiteRelease(IReadOnlyList<string> KeptFiles, IReadOnlyList<string> StillPinned)
+    {
+        /// <summary>Whether this section was pinned to any website at all.</summary>
+        public bool ReleasedAnything => KeptFiles.Count > 0;
+
+        /// <summary>
+        /// Whether anything was left pinned — either because a release failed
+        /// or because only some of several destinations came loose.
+        /// </summary>
+        public bool SomethingIsStillPinned => StillPinned.Count > 0;
     }
 
     /// <summary>Carry out a re-date the teacher has agreed to, after backing the course up.</summary>

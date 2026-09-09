@@ -476,7 +476,16 @@ public static class TaskScheduling
     /// </summary>
     public static string? Cancel(string taskName)
     {
-        try { File.Delete(WrapperScriptPath(taskName)); } catch { /* best effort — litter, not a failure */ }
+        // The stand-in stands in for the WHOLE operation, not only for schtasks.
+        // This path resolves through AppDataRoot, which nothing redirects in a
+        // test process, so without the guard a test driving Cancel would delete
+        // a real teacher's wrapper script — and that damage is quieter than the
+        // one the seam already prevents: the scheduled task survives with
+        // nothing to run, so the overnight publish fails instead of being
+        // cleanly removed. Found by review, on a machine that had a real
+        // ICD2O wrapper sitting in that folder while the suite ran.
+        if (SchtasksForTests is null)
+            try { File.Delete(WrapperScriptPath(taskName)); } catch { /* best effort — litter, not a failure */ }
         var (exitCode, output) = Run(["/Delete", "/F", "/TN", taskName]);
         return exitCode == 0 ? null : output.Trim();
     }
@@ -517,8 +526,29 @@ public static class TaskScheduling
         return null;
     }
 
+    /// <summary>
+    /// Stands in for <c>schtasks.exe</c>, so a test can drive scheduling
+    /// without a real scheduled task.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Not convenience — the alternative deletes a teacher's real
+    /// publish.</b> <see cref="Cancel"/> runs <c>schtasks /Delete /F</c>
+    /// against the real Task Scheduler, and the fixture course in this suite
+    /// is ICS3U, which is a course a teacher plausibly has. A test that
+    /// exercised the rollover's "turn off the scheduled publish" branch with
+    /// no seam would silently remove whoever is running the suite's own
+    /// overnight publish. The mac reached the same conclusion about
+    /// <c>launchctl</c> and injects a runner for it.</para>
+    ///
+    /// <para>Process-wide, so anything setting it belongs in the
+    /// <c>SharedActivityState</c> serialized collection and must put it back.</para>
+    /// </remarks>
+    internal static Func<IReadOnlyList<string>, (int ExitCode, string Output)>? SchtasksForTests;
+
     private static (int ExitCode, string Output) Run(IEnumerable<string> arguments)
     {
+        if (SchtasksForTests is { } stand_in) return stand_in(arguments.ToList());
+
         var info = new ProcessStartInfo
         {
             FileName = "schtasks.exe",

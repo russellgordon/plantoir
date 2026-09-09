@@ -130,6 +130,24 @@ public static class ActivityTrail
         /// </summary>
         RemovalBlocked,
         /// <summary>
+        /// A rollover cut a section loose from last year's website. Carries
+        /// the course, the section and — when there was a website to move away
+        /// from — where last year's details were kept.
+        /// </summary>
+        /// <remarks>
+        /// The same act turns off any publish that was set to happen on its
+        /// own, so a teacher whose overnight publish stops happening has one
+        /// line explaining both.
+        /// </remarks>
+        SectionStartedANewWebsite,
+        /// <summary>
+        /// A rollover kept last year's website. The OTHER answer, and the one
+        /// a problem report is more likely to be about: a teacher writing in
+        /// weeks later to say last year's class site was replaced is
+        /// describing this branch.
+        /// </summary>
+        SectionKeptItsWebsite,
+        /// <summary>
         /// A publish set to happen on its own stopped because it needed an
         /// answer. Carries the course, the section and which destination
         /// stopped — never the question's own text.
@@ -185,6 +203,8 @@ public static class ActivityTrail
         Event.ItemExcluded => "item excluded",
         Event.ItemReIncluded => "item re-included",
         Event.RemovalBlocked => "removal blocked",
+        Event.SectionStartedANewWebsite => "section started a new website",
+        Event.SectionKeptItsWebsite => "section kept its website",
         Event.ScheduledPublishNeededAnAnswer => "scheduled publish needed an answer",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
