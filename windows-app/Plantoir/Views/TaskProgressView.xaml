@@ -47,8 +47,8 @@
                  multi-destination run has finished — occupies the exact
                  slot LiveLink/FolderResult would for a single destination,
                  rather than being appended after the whole panel, so it
-                 never floats below "Show details" (see WINDOWS-HANDOFF.md
-                 entries 306, 309). -->
+                 never floats below "Show details" (see
+                 documentation/13-windows-port-archive.md, the multi-leg console). -->
             <StackPanel x:Name="DestinationLinks" Visibility="Collapsed" Spacing="10"
                         AutomationProperties.AutomationId="destinationLinks" />
             <!-- Folder publishing's completion: the folder, not a live link

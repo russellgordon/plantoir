@@ -79,6 +79,60 @@ public sealed class CourseConfiguration
         _lastSavedData = data;
     }
 
+    /// <summary>
+    /// Writes ONE change to the file on disk from a fresh read, leaving every
+    /// other unsaved edit in this object unsaved — the recorder a folder
+    /// rename uses, because the folder has really moved and a Cancel that
+    /// appeared to undo it would be a lie. <see cref="Write"/> is left exactly
+    /// as it is: making it read-compare-write would change what
+    /// <see cref="HasUnsavedChanges"/> and <see cref="DiscardChanges"/> mean,
+    /// and Cancel in Course Settings would stop doing what it says.
+    ///
+    /// <para>Read, change, and write only if nothing else wrote in between. A
+    /// build's own <c>preflight_update_course_config</c> writes this same
+    /// file, and the loser of that race used to be silent; the Python side
+    /// does the same compare-and-swap, so a rename and a build can no longer
+    /// quietly undo each other. Three tries, then write anyway — a folder
+    /// that has MOVED with a configuration that does not say so is the worse
+    /// state, so this ends by recording the truth — but from the FRESHEST
+    /// bytes, never the computation the compare just proved stale.</para>
+    ///
+    /// <para>Afterwards the change is applied to this object too, and the
+    /// bytes written become its last-saved state, so Revert keeps the rename
+    /// (it is on disk) and drops only what was never saved.</para>
+    /// </summary>
+    public void RecordOnDisk(Func<JObject, JObject> change, string path)
+    {
+        byte[] before;
+        byte[] written;
+        int attempts = 0;
+        while (true)
+        {
+            before = File.ReadAllBytes(path);
+            written = Serialize(change(ParseObject(before)));
+            byte[] nowOnDisk;
+            try { nowOnDisk = File.ReadAllBytes(path); } catch (IOException) { nowOnDisk = before; }
+            if (nowOnDisk.AsSpan().SequenceEqual(before)) break;
+            attempts++;
+            if (attempts < 3) continue;
+            written = Serialize(change(ParseObject(nowOnDisk)));
+            break;
+        }
+        string temp = path + ".tmp";
+        File.WriteAllBytes(temp, written);
+        File.Move(temp, path, overwrite: true);
+
+        _values = change(_values);
+        _lastSavedData = written;
+    }
+
+    private static JObject ParseObject(byte[] data) =>
+        JToken.Parse(Encoding.UTF8.GetString(data)) as JObject
+        ?? throw new InvalidDataException("course_config.json does not hold a JSON object.");
+
+    private static byte[] Serialize(JObject values) =>
+        new CourseConfiguration(values, Array.Empty<byte>()).SerializedBytes();
+
     /// <summary>The Revert button: put the values back the way the last save left them.</summary>
     public void DiscardChanges()
     {
@@ -469,10 +523,26 @@ public sealed class CourseConfiguration
     /// they touched, taking the assessed marks off every other one. Called on
     /// the way in to any edit of the pool — a tick, an untick, or a folder
     /// leaving the list.</para>
+    ///
+    /// <param name="choices">
+    /// Every folder that could hold work counting for marks — normally
+    /// <see cref="GradedFolderChoices.For(CourseConfiguration, string)"/>,
+    /// which walks the course folder.
+    ///
+    /// <para><b>Required rather than defaulted, on purpose.</b> This used to
+    /// infer from <c>shared_folders</c> + <c>per_section_folders</c> alone,
+    /// which is narrower than what the build counts — the build matches a
+    /// folder at ANY depth — so a teacher with <c>Portfolios/Tasks</c> had it
+    /// silently dropped by their first tick. A parameter with a default would
+    /// read as "the pool" and be picked by the next caller without thought,
+    /// which is the same silent narrowing arriving a second time. Passing the
+    /// top-level lists is still a legitimate answer where there is no course
+    /// folder to walk; it just has to be a visible choice at the call
+    /// site.</para>
+    /// </param>
     /// </summary>
-    public List<string> MaterializedGradedFolders() =>
-        GradedFolders ?? GradedFolderRule.InferredPool(
-            SharedFolders.Concat(PerSectionFolders));
+    public List<string> MaterializedGradedFolders(IEnumerable<string> choices) =>
+        GradedFolders ?? GradedFolderRule.InferredPool(choices);
 
     /// <summary>Whether a page counts for marks in this course.</summary>
     public bool CountsForMarks(string relativePath) =>
@@ -642,7 +712,7 @@ public sealed class CourseConfiguration
     /// publishing to more than one destination for redundancy may want a
     /// domain on one and not another — mirrors
     /// `CourseConfiguration.customDomain(forSection:destinationType:)` on the
-    /// mac side; see WINDOWS-HANDOFF.md entry 307.
+    /// mac side; see documentation/08-course-config-reference.md.
     ///
     /// Reads an OLDER shape too: `custom_domains.sections.sectionN` used to
     /// be a bare string, written before a course could have more than one
@@ -674,8 +744,8 @@ public sealed class CourseConfiguration
     /// (set before this course had more than one destination) is carried
     /// forward into the new per-destination map, attributed to the PRIMARY
     /// destination, rather than silently discarded the first time any
-    /// destination's domain is set here — see WINDOWS-HANDOFF.md entry 307,
-    /// which found the mac side losing exactly this data before the map
+    /// destination's domain is set here — found by the 2026-09-06 audit,
+    /// which caught the mac side losing exactly this data before the map
     /// shape existed. Setting an empty domain removes that destination's own
     /// entry rather than storing an empty string.
     /// </summary>
@@ -796,8 +866,8 @@ public sealed class CourseConfiguration
     /// the build's `curriculumCoverageFoundNothing` health check tells the
     /// teacher the map could not be built, whereas a deadlock tells them
     /// nothing and offers no way forward. Changing what the config CARRIES is
-    /// a product decision rather than a port detail, and is raised in
-    /// `MAC-HANDOFF.md` instead of being taken here.</para>
+    /// a product decision rather than a port detail, and is raised as an issue
+    /// instead of being taken here.</para>
     /// </summary>
     public static bool CurriculumCoverageEnabled(bool hasExampleContent, bool prepopulating,
                                                  bool contentIncludesCurriculum,

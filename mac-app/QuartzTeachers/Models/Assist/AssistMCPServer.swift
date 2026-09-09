@@ -13,7 +13,8 @@ import Foundation
 /// local model's list is kept as short as the job allows, because a small model
 /// routes worse the more it is shown; Claude Code is not that model, so it also
 /// gets the
-/// tools that ask for a judgement about meaning — reading a course's curriculum
+/// tools it alone is offered: three that ask for a judgement about meaning —
+/// reading a course's curriculum
 /// expectations and pointing a page at the ones that fit. Same definitions,
 /// same runner, same rules; `runner.mcpDefinitions` is simply the longer list.
 ///

@@ -665,7 +665,8 @@ accuracy.
 *Written 2026-08-14. All three levers below have since been pulled: the routing
 mitigation was re-measured the same day (§10.3, 91% then 94%) and again across
 ten models on macOS; the surface was trimmed further still (the mac shows the
-local model 13 of the 20 tools that exist); and a different model was measured
+local model 13 of the 20 tools that exist — 22 as of 2026-09-06; the local 13
+has not moved, the surface it is drawn from grew); and a different model was measured
 in llama.cpp with `--jinja` rather than on a leaderboard — which is what changed
 the shipping model. The advice held; it is the "unverified" and "not measured"
 framing below that is now historical.*

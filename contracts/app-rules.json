@@ -913,6 +913,28 @@
         "marker" : "PUBLISHED_FOLDER="
       }
     ],
+    "exampleCourse" : [
+      {
+        "label" : "Getting this Mac ready…",
+        "marker" : "Setting up this Mac"
+      },
+      {
+        "label" : "Building your website builder…",
+        "marker" : "Building your website builder"
+      },
+      {
+        "label" : "Getting things ready…",
+        "marker" : "Starting container if needed"
+      },
+      {
+        "label" : "Copying the example course…",
+        "marker" : "Example Course installed to"
+      },
+      {
+        "label" : "Finishing up…",
+        "marker" : "EXAMPLE_COURSE_CODE="
+      }
+    ],
     "note" : "label is what a teacher reads; marker is the text in the shared scripts' output that means the step has been reached. The marker is the load-bearing half — it is matched against output produced by shared Python, so both apps must match these strings exactly. A drifted marker does not crash anything: the progress bar simply stops moving, and neither app can tell.",
     "preview" : [
       {
@@ -994,7 +1016,7 @@
       {
         "detail" : "Never inside the container that builds the site.",
         "rule" : "The model runs on the HOST, with hardware acceleration",
-        "why" : "Measured on an M4 Pro, same model and same 3,411-token prompt: 175 seconds inside Colima against 2.1 seconds natively on Metal, and 5.5 tokens/second against 158. That is the largest single number in the feature. See WINDOWS-HANDOFF.md for what to use on Windows."
+        "why" : "Measured on an M4 Pro, same model and same 3,411-token prompt: 175 seconds inside Colima against 2.1 seconds natively on Metal, and 5.5 tokens/second against 158. That is the largest single number in the feature. See documentation/12-windows-app.md for what to use on Windows."
       },
       {
         "detail" : "Re-run the routing suite when the model, quant or context size changes.",

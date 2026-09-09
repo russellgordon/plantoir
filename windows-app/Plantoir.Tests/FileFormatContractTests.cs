@@ -12,7 +12,7 @@ namespace Plantoir.Tests;
 /// a course made on one machine is opened on the other, and a key one app does
 /// not write is a question the Python answers with its own default while the
 /// teacher is never asked. Three of these lists were read by nobody on this
-/// side (WINDOWS-HANDOFF item 29) and one of them, <c>wizardAnswerKeys</c>,
+/// side (contracts/README.md) and one of them, <c>wizardAnswerKeys</c>,
 /// describes item 25 exactly.</para>
 /// </summary>
 public sealed class FileFormatContractTests : IDisposable
@@ -77,15 +77,13 @@ public sealed class FileFormatContractTests : IDisposable
     [Fact]
     public void TheWizardWritesEveryAnswerTheContractSaysItAsksFor()
     {
-        // use_skeleton is knowingly absent — WINDOWS-HANDOFF item 25 — and has
-        // its own skipped test below, which is that item's acceptance test.
-        //
-        // Named HERE rather than read from the contract's own knownDivergence
-        // note on purpose. The note has existed since 2026-08-16 and the gap
-        // stood for three weeks anyway, because a note cannot fail a test run.
-        // A name in this file, beside a skipped test, appears in every run's
-        // skip count and cannot be satisfied by writing more prose.
-        var knowinglyAbsent = new HashSet<string>(StringComparer.Ordinal) { "use_skeleton" };
+        // Empty since 2026-09-07, when the wizard began asking the skeleton
+        // question (contracts/README.md). It held "use_skeleton" for three
+        // weeks — named HERE rather than read from the contract's
+        // knownDivergence note, because a note cannot fail a test run and a
+        // name beside a skipped test shows in every run's skip count. Kept so
+        // the next knowingly absent key has somewhere to be named.
+        var knowinglyAbsent = new HashSet<string>(StringComparer.Ordinal);
 
         var doc = ContractLoader.LoadJson("file-formats.json");
         var keys = doc["courseConfigKeys"]!["wizardAnswerKeys"]!["keys"]!.AsArray();
@@ -110,18 +108,17 @@ public sealed class FileFormatContractTests : IDisposable
     }
 
     /// <summary>
-    /// WINDOWS-HANDOFF item 25's acceptance test. Un-skip it when the wizard
-    /// asks the skeleton question, and delete the name from
-    /// <see cref="TheWizardWritesEveryAnswerTheContractSaysItAsksFor"/>.
+    /// the wizard skeleton question's acceptance test, skipped from 2026-09-06
+    /// until the wizard asked the skeleton question on 2026-09-07.
     ///
     /// <para>Around 1,900 course codes have a skeleton and no ready-made
-    /// payload, so this is the question most teachers actually meet. The mac
-    /// asks it and writes <c>hasSkeleton(code) &amp;&amp; teacherSaidYes</c>;
-    /// this side writes nothing, so <c>setup_course.py</c>'s own default of
-    /// TRUE decides — the right answer, arrived at without asking, which is
-    /// still not the same product.</para>
+    /// payload, so this is the question most teachers actually meet. Both
+    /// apps ask it and write <c>hasSkeleton(code) &amp;&amp; teacherSaidYes</c>.
+    /// For three weeks this side wrote nothing, so <c>setup_course.py</c>'s
+    /// own default of TRUE decided — the right answer, arrived at without
+    /// asking, which was still not the same product.</para>
     /// </summary>
-    [Fact(Skip = "WINDOWS-HANDOFF item 25 — the wizard never asks the skeleton question")]
+    [Fact]
     public void TheWizardWritesUseSkeleton()
     {
         Assert.Contains("[\"use_skeleton\"]", InterfaceSource(), StringComparison.Ordinal);
@@ -270,7 +267,7 @@ public sealed class FileFormatContractTests : IDisposable
     ///
     /// <para>Keyed by the contract's own rule sentences and checked for
     /// completeness at the end, so a rule the mac ADDS fails here by name
-    /// rather than sitting unread — which is the failure WINDOWS-HANDOFF item
+    /// rather than sitting unread — which is the failure the 2026-09-06 contract audit
     /// 29 exists to end.</para>
     /// </summary>
     [Fact]
@@ -289,21 +286,24 @@ public sealed class FileFormatContractTests : IDisposable
                 "removed on the mac and this test is answering a question nobody asked.");
         }
 
-        // This app does the OPPOSITE of the first rule, deliberately, and
-        // saying so is not the same as answering it. Marking a rule "answered"
-        // without asserting it would make the completeness check below report
-        // four of four when the truth is three of four and one open question —
-        // the same shape of comfort as a `knownDivergence` note, which is the
-        // thing that let item 25 stand for three weeks.
-        //
-        // So it is removed by NAME and the set is asserted to hold exactly
-        // that: un-skipping TheOldSpellingIsKeptRatherThanMigrated without
-        // deleting this line fails too, which is what stops a resolved
-        // divergence being recorded as a live one for ever.
-        var knowinglyNotFollowed = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "A page written in the old spelling KEEPS it, inverted",
-        };
+        // The first rule was this app's own behaviour before it was the
+        // contract's: until 2026-09-07 the contract said the opposite (keep
+        // the old key, inverted), this test held that rule in a
+        // "knowinglyNotFollowed" set removed by NAME, and the migration test
+        // sat skipped as a named divergence. The set is kept, EMPTY, so the
+        // next knowing divergence has somewhere to be named rather than a
+        // comment — and so that a contract rule this app does not follow
+        // fails here by name instead of being quietly marked answered.
+        var knowinglyNotFollowed = new HashSet<string>(StringComparer.Ordinal);
+
+        // A page in the old spelling is migrated: the new key on the old
+        // key's line, the legacy key gone. The full set of cases, including
+        // the deliberate exception to rule 4, is TheOldSpellingIsMigratedToTheNewKey.
+        var (migrated, migration) = PageFrontmatter.SetDraft(
+            "---\ntitle: Day one\ndraftSection1: true\n---\nBody.\n", "publishForSection1", draft: false);
+        Assert.True(migration.Changed);
+        Assert.Equal("---\ntitle: Day one\npublishForSection1: true\n---\nBody.\n", migrated);
+        Answered("A page written in the old spelling is MIGRATED to the new key, and the legacy key removed, the first time something edits its visibility");
 
         // Edit the LINE, never round-trip the YAML.
         string withComment =
@@ -340,8 +340,8 @@ public sealed class FileFormatContractTests : IDisposable
             Assert.True(unanswered.Remove(rule),
                 $"\"{rule}\" is recorded here as a rule this app knowingly does not follow, and the " +
                 "contract no longer contains it — or a test above has just answered it. Either way " +
-                "the divergence is over: delete it from knowinglyNotFollowed and un-skip " +
-                nameof(TheOldSpellingIsKeptRatherThanMigrated) + ".");
+                "the divergence is over: delete it from knowinglyNotFollowed and assert the " +
+                "rule above.");
         }
 
         Assert.True(unanswered.Count == 0,
@@ -351,54 +351,49 @@ public sealed class FileFormatContractTests : IDisposable
     }
 
     /// <summary>
-    /// The contract's first writing rule, which this app does NOT follow —
-    /// and the divergence is a decision somebody has to make rather than a
-    /// bug to fix quietly.
+    /// <c>pageVisibility.writingRules[0]</c>, as decided 2026-09-07: a page
+    /// in the old spelling is MIGRATED — the new key on the old key's line,
+    /// the legacy key gone — and a page carrying both loses the legacy one.
+    /// Until that day this test asserted the opposite and was skipped as a
+    /// named divergence (the contract and the mac kept the old key inverted;
+    /// this app migrated). The contract moved to this app's behaviour, so
+    /// the mac's suite fails on it until the mac adopts it — a request, not
+    /// damage (issue #107).
     ///
-    /// <para>The contract says a page written in the old spelling keeps it,
-    /// inverted: publishing a <c>draft:</c> page writes <c>draft: false</c>,
-    /// because rewriting the key changes a page the teacher did not ask to
-    /// have changed. The mac does exactly that
-    /// (<c>AssistPageVisibility.setting</c>). This app migrates instead —
-    /// <c>SetDraft</c> puts <c>publishForSection1</c> where
-    /// <c>draftSection1</c> sat — which GUI-IMPROVEMENTS row 140 describes as
-    /// intended: "writes the new key in the old key's position so a migrated
-    /// page shows a one-line diff rather than reordered frontmatter", with no
-    /// flag day because the build reads both spellings.</para>
-    ///
-    /// <para>Both are defensible and they cannot both be true of a course a
-    /// teacher opens on one machine and then the other, so the answer is not
-    /// this branch's to pick. Raised in MAC-HANDOFF.md; un-skip this test if
-    /// the contract wins, or change the contract and delete it if migration
-    /// does.</para>
+    /// <para>The last assertion is the one genuine design question: a legacy
+    /// page whose value is already right IS rewritten, once, to migrate the
+    /// key, as the contract's own exception to rule 4 says. The case is
+    /// reachable only inside a batch that is changing other pages, so the
+    /// build that follows was happening anyway.</para>
     /// </summary>
-    [Fact(Skip = "Divergence, not a defect — the mac keeps the old key, this app migrates it. See MAC-HANDOFF.md")]
-    public void TheOldSpellingIsKeptRatherThanMigrated()
+    [Fact]
+    public void TheOldSpellingIsMigratedToTheNewKey()
     {
-        // The per-section spelling, on a course-level page.
+        // The per-section spelling, on a course-level page: same line, new key.
         string shared = "---\ntitle: Day one\ndraftSection1: true\n---\nBody.\n";
-        var (writtenShared, _) = PageFrontmatter.SetDraft(shared, "publishForSection1", draft: false);
-        Assert.Contains("draftSection1: false", writtenShared, StringComparison.Ordinal);
-        Assert.DoesNotContain("publishForSection1", writtenShared, StringComparison.Ordinal);
+        var (writtenShared, sharedEdit) = PageFrontmatter.SetDraft(shared, "publishForSection1", draft: false);
+        Assert.Equal("---\ntitle: Day one\npublishForSection1: true\n---\nBody.\n", writtenShared);
+        Assert.True(sharedEdit.Changed);
 
         // And the plain one, on a page inside a section's own folder.
         string local = "---\ntitle: Day one\ndraft: true\n---\nBody.\n";
         var (writtenLocal, _) = PageFrontmatter.SetDraft(local, "publish", draft: false);
-        Assert.Contains("draft: false", writtenLocal, StringComparison.Ordinal);
-        Assert.DoesNotContain("publish:", writtenLocal, StringComparison.Ordinal);
+        Assert.Equal("---\ntitle: Day one\npublish: true\n---\nBody.\n", writtenLocal);
 
-        // Rule 4 has to hold for the OLD spelling too. This app currently
-        // rewrites a legacy page whose value is already right, purely to
-        // migrate the key — so a page nobody changed gets a new modification
-        // time, and the next build believes its content changed.
+        // Both spellings on one page: the legacy line goes.
+        string both = "---\npublishForSection1: false\ndraftSection1: true\n---\nBody.\n";
+        var (writtenBoth, _) = PageFrontmatter.SetDraft(both, "publishForSection1", draft: false);
+        Assert.Equal("---\npublishForSection1: true\n---\nBody.\n", writtenBoth);
+
+        // Already right, still legacy: migrated once, on purpose (rule 4's one exception).
         string alreadyRight = "---\ndraftSection1: false\n---\nBody.\n";
-        var (untouched, edit) = PageFrontmatter.SetDraft(alreadyRight, "publishForSection1", draft: false);
-        Assert.False(edit.Changed);
-        Assert.Equal(alreadyRight, untouched);
+        var (migrated, edit) = PageFrontmatter.SetDraft(alreadyRight, "publishForSection1", draft: false);
+        Assert.True(edit.Changed);
+        Assert.Equal("---\npublishForSection1: true\n---\nBody.\n", migrated);
 
-        // The mac leaves a leftover legacy key alone; this app removes it.
-        string both = "---\npublishForSection1: true\ndraftSection1: false\n---\nBody.\n";
-        var (kept, _) = PageFrontmatter.SetDraft(both, "publishForSection1", draft: true);
-        Assert.Contains("draftSection1: false", kept, StringComparison.Ordinal);
+        // And once migrated, rule 4 holds: the same value again touches nothing.
+        var (untouched, again) = PageFrontmatter.SetDraft(migrated, "publishForSection1", draft: false);
+        Assert.False(again.Changed);
+        Assert.Equal(migrated, untouched);
     }
 }

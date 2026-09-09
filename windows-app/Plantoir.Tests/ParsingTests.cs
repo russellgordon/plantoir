@@ -376,7 +376,7 @@ public class TaskMilestoneTests
 /// but TaskMilestones.cs — last touched the day before — kept matching
 /// against them, so those progress stages could never be reached: the bar
 /// sat at 0% until a later, still-real marker jumped it forward several
-/// steps at once (see WINDOWS-HANDOFF.md item 5). This reads the ACTUAL
+/// steps at once (see documentation/12-windows-app.md). This reads the ACTUAL
 /// .ps1 files rather than a hand-typed transcript, so a future launcher
 /// rewrite that drops a line these markers depend on fails here instead of
 /// silently stalling a teacher's progress bar again.
@@ -428,5 +428,5 @@ public class TaskMilestoneLauncherMarkerTests
     // a hand-kept copy of the other platform's words is exactly what goes
     // stale the day that platform changes them, which is how the four strings
     // above came to be matched against launchers that had stopped printing
-    // them (WINDOWS-HANDOFF.md item 5).
+    // them (documentation/12-windows-app.md).
 }

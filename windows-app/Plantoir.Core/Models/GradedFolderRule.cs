@@ -123,4 +123,32 @@ public static class GradedFolderRule
         }
         return reconciled;
     }
+
+    // ---- What a teacher reads on the Marks control ------------------------
+
+    /// <summary>
+    /// The title of the tick list, and the caption below it. Pinned by
+    /// <c>contracts/shared-rules.json</c> -> <c>gradedFolders.wording</c>,
+    /// proposed from Windows 2026-09-08.
+    ///
+    /// <para>The same two strings serve Course Settings AND the New Course
+    /// Wizard, on both platforms. Before this they were four different
+    /// strings pinned by nothing: this app said "Folders that count for
+    /// marks" and named the map "the Curriculum Coverage map", which is the
+    /// built PAGE's title used where a common noun belongs.</para>
+    ///
+    /// <para><b>The caption belongs BELOW its list.</b> It says "a page in one
+    /// of these", and this app used to draw it ABOVE, where "these" followed
+    /// the section header "Marks" and referred to nothing. Moving it is what
+    /// lets one string serve all four surfaces.</para>
+    /// </summary>
+    public const string ListTitle = "Folders whose work counts for marks";
+
+    /// <summary>
+    /// Says "tick", not "add" or "remove": this is a tick list with no Add
+    /// button, and unticking the last graded folder while the coverage map is
+    /// on is refused outright (<see cref="SpecialNames.LastGradedFolderBlocked"/>).
+    /// </summary>
+    public const string Caption =
+        "Tick the folders holding work that counts for marks. The curriculum coverage map shows an expectation as evaluated when a page in one of these addresses it. Most courses keep “Tasks”; tick “Tests” or anything else you mark.";
 }

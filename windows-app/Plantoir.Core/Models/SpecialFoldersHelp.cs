@@ -96,7 +96,17 @@ public static class SpecialFoldersHelp
                 + "without them there is nothing to measure your lessons against, and "
                 + "the map is left out."),
 
-            new(Listed(config.MaterializedGradedFolders()),
+            // Deliberately the TOP-LEVEL lists, not the walked pool the Marks
+            // checklist offers: this sheet is handed a configuration and has no
+            // course folder to walk, and the mac's own row
+            // (`SpecialFoldersHelpView.gradedFolderNames`) reads the same two
+            // lists. So a course that has never been asked can see fewer names
+            // here than it sees ticked one section above — true on both
+            // platforms, and gone the moment the teacher saves. Widening it is
+            // a shared decision, written up in documentation/09-mac-app.md rather than
+            // taken on one platform.
+            new(Listed(config.MaterializedGradedFolders(
+                    config.SharedFolders.Concat(config.PerSectionFolders))),
                 "Work that counts for marks",
                 "The curriculum map shows an expectation as evaluated when a page in "
                 + "one of these addresses it. You choose these above."),

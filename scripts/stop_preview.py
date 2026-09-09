@@ -46,7 +46,7 @@ for the platform it is on. That was not true until 2026-09-05: `/proc` was the
 only reader, so on native Windows the list came back empty and
 `build_site.py`'s own `stop_preview_serving()` stopped nothing — leaving the
 overwrite race it exists to close wide open on that platform. See
-WINDOWS-HANDOFF.md item 20.
+documentation/03-launcher-scripts.md.
 """
 
 import argparse

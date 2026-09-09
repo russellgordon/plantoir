@@ -99,7 +99,7 @@ than a code each platform re-words.
 - **Payloads and skeletons declare `graded_folders`** so the configurable pool has
   a sensible default per course.
 - Windows kept in step: `ClassFolderRule.cs`, `ClassFolderContractTests.cs`, the
-  mirrored `contracts` folder, and write-ups in `WINDOWS-HANDOFF.md`.
+  mirrored `contracts` folder, and write-ups in `documentation/`.
 
 ## The honesty rule this branch was worked under
 

@@ -6,6 +6,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -28,12 +29,18 @@
             </Button>
         </Grid>
 
-        <ScrollViewer x:Name="FormScroll" Grid.Row="1" Padding="16,0,16,16"
+        <!-- What a folder change did — Add made the folder, Remove left it on
+             disk, a rename finished — said once, here, where the list is. -->
+        <InfoBar x:Name="FolderNotice" Grid.Row="1" Margin="16,8,16,0"
+                 IsOpen="False" Severity="Informational" IsClosable="True"
+                 AutomationProperties.AutomationId="folderNotice" />
+
+        <ScrollViewer x:Name="FormScroll" Grid.Row="2" Padding="16,0,16,16"
                       AutomationProperties.AutomationId="courseSettingsForm">
             <StackPanel x:Name="Form" Spacing="8" MaxWidth="720" HorizontalAlignment="Left" />
         </ScrollViewer>
 
-        <Grid Grid.Row="2" Padding="12" ColumnSpacing="10"
+        <Grid Grid.Row="3" Padding="12" ColumnSpacing="10"
               BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />

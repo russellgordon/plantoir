@@ -289,7 +289,7 @@ public static class MarketingShotCapturer
     /// load_netlify_marker actually read.
     ///
     /// This replaces a "deploy_site_name" key these fixtures used to write.
-    /// WINDOWS-HANDOFF.md asked this side to decide what that key should hold
+    /// website/README.md asked this side to decide what that key should hold
     /// under the per-section naming adopted on 2026-08-19
     /// (<c>&lt;code&gt;-s&lt;n&gt;-2026-gordon</c>), on the grounds that the new
     /// scheme names a section while the key sits in course-level config. The

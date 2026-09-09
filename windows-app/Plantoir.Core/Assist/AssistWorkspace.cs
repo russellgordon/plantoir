@@ -49,6 +49,57 @@ public sealed class AssistWorkspace
     private static string CurrentCloudflareAccountId() =>
         CloudflareAccountIdOverrideForTests?.Invoke() ?? AppSettings.Load().CloudflareAccountId;
 
+
+    // ---- One backup per conversation ---------------------------------------
+
+    /// <summary>
+    /// The copy saved for each course this conversation has changed, keyed by
+    /// course code — the mac's <c>conversationBackups</c>. This object lives
+    /// for the life of the serving process, which is the life of the
+    /// teacher's conversation, so "once" means once per chat.
+    /// </summary>
+    private readonly Dictionary<string, string> _conversationBackups = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The copy saved before this conversation's FIRST change, or null while
+    /// it has only read. What "Restore Section N…" puts back. The most recent
+    /// one when a session unlocked to a course has changed several.
+    /// </summary>
+    public string? ConversationBackupPath { get; private set; }
+
+    /// <summary>
+    /// Saves a copy of the course before the first change of a conversation,
+    /// and reuses it for every later change in the same conversation.
+    ///
+    /// <para>Until 2026-09-07 every changing tool saved its own copy, and
+    /// <see cref="CourseArchiver.MostBackupsKept"/> is five — so after six
+    /// changes the copy from before the conversation started had already
+    /// been pruned, and a "put it all back" button could not have kept its
+    /// promise. One copy per conversation is what the mac has always done,
+    /// and it is what the Backups list a teacher reads describes ("before an
+    /// assistant chat about Section N"). Per-change undo is
+    /// <see cref="UndoHistory"/>'s promise and is unchanged.</para>
+    /// </summary>
+    private string BackUpOnceForThisConversation(Course course, int sectionNumber)
+    {
+        // The recorded copy is reused even if it has since gone — deleted from
+        // the Backups list, or pruned by five later conversations. Taking a
+        // fresh copy of the already-changed course and calling it "from before
+        // this conversation started" would make the restore dialog's promise
+        // false; the mac checks only its dictionary too, and a vanished copy
+        // then fails honestly with "could not be read".
+        if (_conversationBackups.TryGetValue(course.Code, out var existing))
+        {
+            ConversationBackupPath = existing;
+            return existing;
+        }
+        string made = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
+                                                  new BackupMaker.Assistant(sectionNumber));
+        _conversationBackups[course.Code] = made;
+        ConversationBackupPath = made;
+        return made;
+    }
+
     /// <param name="lockedCourse">
     /// When given, the session can see and touch this course and nothing else.
     /// Plantoir uses it when a teacher starts an assistant from a particular
@@ -1233,7 +1284,7 @@ public sealed class AssistWorkspace
         if (plan.Publishes) RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             // No backup, no edits. This is the one step that has no fallback.
@@ -1444,7 +1495,7 @@ public sealed class AssistWorkspace
         if (publishing) RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(section)); }
+        try { backup = BackUpOnceForThisConversation(course, section); }
         catch (Exception error)
         {
             throw new AssistRefusal($"{course.Code} couldn’t be backed up, so nothing was changed: {error.Message}");
@@ -1910,7 +1961,7 @@ public sealed class AssistWorkspace
         if (plan.ChangesNothing) return new AssistResult(true, "Every class already carries that date.", null);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             throw new AssistRefusal(
@@ -2079,7 +2130,7 @@ public sealed class AssistWorkspace
         if (plan.ChangesNothing) return new AssistResult(true, "Every page already matches its class.", null);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             throw new AssistRefusal(
@@ -2297,7 +2348,7 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             throw new AssistRefusal($"{course.Code} couldn’t be backed up, so the page was not changed: {error.Message}");
@@ -2517,7 +2568,7 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             throw new AssistRefusal(
@@ -2762,7 +2813,7 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), new BackupMaker.Assistant(plan.SectionNumber)); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
         catch (Exception error)
         {
             throw new AssistRefusal(

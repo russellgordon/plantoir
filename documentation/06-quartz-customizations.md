@@ -338,6 +338,211 @@ what makes tracking upstream Quartz plausible (the cost of an upgrade is
 re-validating each patch's regex against the new source text — and replacing
 the three layer-A components).
 
+## Spelling a folder's new name inside a link
+
+Renaming a course folder repoints the qualified links that name it, and the
+question this section answers is a narrow one: how is the new name SPELLED
+once it is inside a link? Getting it wrong does not fail — it writes a broken
+link into a teacher's own page and says nothing.
+
+**The defect, which was on both platforms.** `FolderPathRewriter` decided
+whether to percent-encode the new name from whether the OLD path segment was
+encoded. That is the obvious rule and it is wrong, because a Markdown link's
+destination ends at the first SPACE. Renaming `Tasks` to `All Tasks` turned
+
+    [q](Tasks/Quiz%201.md)   into   [q](All Tasks/Quiz%201.md)
+
+which neither Obsidian nor Quartz can follow. The `%20` there belongs to the
+FILE name; the folder segment `Tasks` carries no `%` at all, which is what made
+it easy to miss by eye. Windows found this by adversarial review on 2026-09-06,
+fixed it, and reported it to the mac as a shared defect rather than a port
+error — which was the right call, and is why the mac took the rule unchanged:
+
+> In a MARKDOWN link, escape when the NEW name needs it, whatever the old
+> segment looked like. In a WIKILINK, keep the plain spelling.
+
+The wikilink half is not an oversight. `[[All Tasks/Quiz 1]]` is exactly how
+Obsidian writes a wikilink whose folder has a space in it, so escaping there
+would be the mirror-image mistake. Both sides also kept the OLD rule as a
+second reason to escape rather than replacing it: a segment that ARRIVED
+percent-encoded goes back percent-encoded, in either style, so a link a teacher
+already had keeps the shape it had.
+
+### The escaping SET is measured, and `Uri.EscapeDataString` is the wrong tool
+
+This is the part that is new to Windows, and the mac's first plan was to copy
+`Uri.EscapeDataString` precisely so the two apps could not drift. An
+adversarial review checked that against the real Quartz instead of reasoning
+about it, and it would have REGRESSED the mac. The chain, read out of
+`quartz/util/path.ts` in the running image on 2026-09-06:
+
+1. `transformInternalLink` calls JavaScript's `decodeURI` on the link.
+2. `decodeURI` **deliberately leaves the reserved set `; / ? : @ & = + $ , #`
+   still encoded** — that is what distinguishes it from `decodeURIComponent`.
+3. `sluggify`, in the same file, then maps `&` to `-and-` and `%` to
+   `-percent` when it builds the address.
+
+So a folder called “Tasks & Quizzes”:
+
+| written as | after `decodeURI` | slug | matches the folder? |
+|---|---|---|---|
+| `Tasks%20&%20Quizzes` | `Tasks & Quizzes` | `Tasks--and--Quizzes` | ✅ |
+| `Tasks%20%26%20Quizzes` | `Tasks %26 Quizzes` | `Tasks--percent26-Quizzes` | ❌ 404 |
+
+`Uri.EscapeDataString` keeps only `A-Za-z0-9-._~`, so it produces the second
+row. And the failure is the worst kind: Obsidian decodes `%26` perfectly well,
+so the teacher's vault looks healthy and only students see the break. “Tests &
+Quizzes” and “Q&A” are ordinary folder names, so this is not a corner case.
+
+Measured in the container, not inferred:
+
+    decodeURI("Tasks%20%26%20Quizzes/Quiz.md")  ->  "Tasks %26 Quizzes/Quiz.md"
+    decodeURI("Tasks%20&%20Quizzes/Quiz.md")    ->  "Tasks & Quizzes/Quiz.md"
+    decodeURI("Work%28new%29/Quiz.md")          ->  "Work(new)/Quiz.md"
+    decodeURI("Top%2010%25/Quiz.md")            ->  "Top 10%/Quiz.md"
+    decodeURI("Caf%C3%A9%20Notes/Quiz.md")      ->  "Café Notes/Quiz.md"
+    decodeURI("C%2B%2B/Quiz.md")                ->  unchanged
+
+The set that survives untouched is therefore what JavaScript's `encodeURI`
+leaves alone, minus three — `(` and `)` close a destination, `#` starts a
+heading — and minus `/` and `:`, which the rename sheet refuses anyway. It is written into the contract as a literal string rather than
+described, so either side can test a character against it:
+
+    contracts/shared-rules.json
+      -> specialNames.renameFolder.linkRewriting.escapingSet.leaveUnescaped
+      =  ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;,@&=+$-_.!~*'?
+
+(This line lost its trailing `?` when the correction two paragraphs down
+was written, and said the wrong thing for a day. Copy the string from the
+contract, never from here — or better, assert against it: Windows'
+`TheEscapingSetIsTheContractsCharacterForCharacter` pins the code's copy
+against the contract's, which is the only check that catches a character
+quietly added to or dropped from either.)
+
+Everything else — the space, `%`, the quotes and brackets, and every non-ASCII
+letter — is percent-encoded as UTF-8 **once escaping runs at all**, and
+`decodeURI` gives all of it back. That last clause matters more than it looks:
+nothing is encoded unless the name needs it, so `Café` goes into a link as
+`Café` and only `Café Notes` becomes `Caf%C3%A9%20Notes`. Reading
+`leaveUnescaped` as "always encode everything else" is the way the two apps
+would write different text for the same rename, so there is a case pinning it.
+
+### Two things this section said first and got wrong
+
+Both were caught by an adversarial review that measured the pipeline instead
+of reasoning about `decodeURI` in isolation, and both are kept here because
+the correction is the useful part.
+
+- **A lone `%` does NOT need escaping, and `%` is not in the trigger set.**
+  The argument for it was `decodeURI("10%/Quiz.md")` throwing. Quartz never
+  sees a bare `%`: it parses with `remarkRehype`, and the Markdown parser
+  normalises `%` to `%25` on the way to HTML long before the link transformer
+  runs. Measured in the container — `[b](Top10%/Quiz.md)` arrives as
+  `Top10%25/Quiz.md`, `[a](Top%2010%/Quiz.md)` as `Top%2010%25/Quiz.md`.
+  `WouldBreakAMarkdownTarget` on Windows is already right; do not add `%`.
+- **`?` belongs in `leaveUnescaped`, and this section twice said otherwise.**
+  It first claimed a folder named with `#` or `?` loses whichever spelling is
+  used — true for `#`, false for `?`, because `sluggify` STRIPS a `?` from the
+  real folder's name. It then claimed both apps "escape `?` anyway", which the
+  mac's code did not do: `?` is not a trigger, so `Why?` always went in
+  unescaped. What that left was a rule where the folder resolved when it was
+  called `Why?` and not when it was called `Why Not?` — the escaped
+  `Why%20Not%3F` slugs to `Why-Not-percent3F` and 404s, while the real folder
+  and the unescaped link both slug to `Why-Not`. `?` is now in the set. It
+  cannot arise on Windows, where a folder name may not contain one, but the
+  encoder is a pure string transform so the case still runs there.
+
+### What Windows owed — ✅ done 2026-09-07
+
+Kept as it was written, because the reasoning is the point of the section and a
+deleted obligation takes its reason with it. Landed on branch
+`issue/31-rename-link-escaping`, commit `2bed7c83`: `Spelled` calls a
+`PercentEncoded` driven by `leaveUnescaped` in BOTH branches, and
+`FolderPathRewriterTests` deserialises every case. 1125 passed, 2 skipped, 0
+failed (1031 before).
+
+**A TWELFTH case went in with the fix**, and it is the part worth reading even
+now the work is done. `Spelled` has two reasons to escape — the new name would
+break a Markdown destination, or the OLD segment arrived percent-encoded — and
+NONE of the original eleven reaches the second. Eight take the first (a space or
+a bracket in the new name); the other three reach no encoder at all, because
+`Assignments` and `Café` need no escaping and the wikilink case is not a
+Markdown link. A `Uri.EscapeDataString` left behind in the second branch alone
+would have passed all eleven. The new case
+(`[q](All%20Tasks/Quiz.md)`, "All Tasks" → `Q&A`, expecting
+`[q](Q&A/Quiz.md)`) is the only one that reaches it. It is named in
+Windows proposed it, and it should be green on the mac already.
+
+**What was originally owed, and why:**
+
+**Three** of the eleven cases failed on Windows, and they were a request
+rather than damage:
+
+- **“an ampersand is left as it stands”** — `Tasks` → `Tasks & Quizzes`,
+  expecting `[q](Tasks%20&%20Quizzes/Quiz.md)`.
+- **“a comma is left as it stands”** — `Tasks` → `Unit 1, Day 2`, expecting
+  `[q](Unit%201,%20Day%202/Quiz.md)`. **This is the one that will actually
+  happen.** `Unit%201%2C%20Day%202` slugs to `Unit-1-percent2C-Day-2` while
+  the folder slugs to `Unit-1,-Day-2`, and “Unit 1, Day 2” is this project's
+  own naming pattern.
+- **“a question mark is left as it stands”** — unreachable on Windows, where a
+  folder name may not contain `?`, but the encoder is a pure string transform
+  so the case still runs.
+
+All three were ONE change in
+`windows-app/Plantoir.Core/Models/FolderPathRewriter.cs`: replace
+`Uri.EscapeDataString` in `Spelled` with an encoder driven by `leaveUnescaped`
+above — in BOTH of its branches, which is the half that reads as optional and
+is not. It keeps only `A-Za-z0-9-._~`, so it over-encodes `&`, `,`, `+`, `'`,
+`!` and `*` alike. **Not all eleven break, and this line said they did.** The
+ones that 404 are the eight characters `decodeURI` leaves encoded and
+`sluggify` then turns into `-percent…`: `; , @ & = + $ ?`. `?` is an ordinary
+member of that set and not a special case — `Why%20Not%3F` slugs to
+`Why-Not-percent3F` by the same mechanism as the rest. (What IS peculiar to `?`
+is why the UNESCAPED spelling works: `sluggify` strips it from the real
+folder's name too, so both sides land on `Why-Not`.) `%27`, `%21` and `%2A` decode back to `'`, `!` and
+`*` and resolve fine, so over-encoding those three is noise rather than damage.
+Corrected 2026-09-07 by an adversarial review of the fix; the encoder is
+unchanged by the correction, because the eight that DO break include both of
+the ones a teacher will actually type. Nothing else in the rule changes, and the
+mac's version of it is `spelled(_:likeThe:in:)` in
+`mac-app/QuartzTeachers/Models/FolderPathRewriter.swift`.
+
+**And a second obligation that is easy to miss** — done in the same commit;
+the file deserialises `linkRewriting.cases` now, keeps its five as named
+anchors, and pins the code's copy of `leaveUnescaped` against the contract's
+string directly. That last check is the one worth copying to the mac: a
+behavioural walk over the set can only test the characters the CODE has, so a
+character quietly ADDED to either app's constant is invisible to it.
+`windows-app/Plantoir.Tests/FolderPathRewriterTests.cs` used to retype five
+cases of its own rather than deserialising `linkRewriting.cases`, so **nothing
+on the Windows side went red on its own** — the three failures above are invisible
+there until the cases are wired in. `contracts/README.md`'s own rule is to
+deserialise and never retype, and this file was one of the places that did not
+— until 2026-09-07.
+
+The per-cent case, “a per-cent sign is escaped” (`Top 10%` →
+`[q](Top%2010%25/Quiz.md)`), **passes on Windows already** and is not work:
+`Top 10%` triggers escaping on its SPACE, and `EscapeDataString` encodes the
+`%` with everything else. It is in the contract to pin what encoding COVERS,
+not what triggers it.
+
+### What was rejected, so it is not proposed again
+
+- **Copying `Uri.EscapeDataString` for parity's sake.** Parity with a rule
+  that produces a 404 is not worth having; the measurement above is what
+  settled it.
+- **Escaping wikilinks the same way.** The mirror-image mistake — Obsidian
+  writes `[[All Tasks/Quiz 1]]`, plain.
+- **Widening the rename sheet's refusals to cover `#` and `?`.** Refusing
+  more names is a product decision nobody has made. For `#` neither spelling
+  resolves in Quartz anyway (`%23` survives `decodeURI` and slugs through
+  `-percent`); for `?` see the correction above.
+- **Angle-bracket destinations, `[q](<Tasks/Quiz 1.md>)`.** Neither app matches
+  them — the segment reads as `<Tasks` — and neither app has ever matched them.
+  Pre-existing on both sides and out of this piece's scope; noted here so it is
+  not mistaken for a regression.
+
 ---
 
 [◀ Previous: The Build Pipeline](05-build-pipeline.md) · [Back to index](README.md) · [Next: Deployment ▶](07-deployment.md)

@@ -17,6 +17,21 @@ import Foundation
 /// of the model is reliability bought back.
 nonisolated struct AssistCardCommand: Sendable, Equatable {
 
+    // MARK: - The rollover answers
+
+    /// The sentence that means "roll over, and start a new website".
+    ///
+    /// Named rather than typed, because the assistant's own reply offers it
+    /// back to the teacher word for word — a phrasing a teacher is TOLD to say
+    /// and a phrasing the matcher accepts must be the same string, or the
+    /// feature invites a sentence it then does not understand.
+    static let rollOverOntoANewWebsite: String =
+        "roll this section over onto a new website"
+
+    /// The sentence that means "roll over, and keep last year's website".
+    static let rollOverKeepingTheSameWebsite: String =
+        "roll this section over, keeping the same website"
+
     // MARK: - Stored properties
 
     /// The tool this phrasing always means.
@@ -50,7 +65,67 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         if let more = AssistCardCommand.moreDays(tidied) {
             return more
         }
+        if let room = AssistCardCommand.makeRoom(tidied) {
+            return room
+        }
         return AssistCardCommand.duplicateClass(tidied, original: message)
+    }
+
+    /// "Make room for a class at Unit 3, Day 4", and the same with a count.
+    ///
+    /// **Parity with the MCP tool, which is the rule for these** — a teacher
+    /// should be able to ask for whatever a Claude Code session can. Course
+    /// and section come from the window, so the three things left to say are
+    /// the unit, the day, and how many. Everything in the sentence is a number
+    /// in a fixed frame; none of it is a judgement, so none of it needs a
+    /// model.
+    ///
+    /// Deliberately strict, like the rest of this table. The shape is fixed
+    /// and the parts are read out of it — it does not try to understand a
+    /// sentence that merely resembles this one, because answering the wrong
+    /// question with total confidence is worse than routing it.
+    private static func makeRoom(_ tidied: String) -> AssistCardCommand? {
+        let spelled: [String: Int] = [
+            "a": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+            "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+        ]
+        let opening: String = "make room for "
+        guard tidied.hasPrefix(opening) else {
+            return nil
+        }
+        // The comma in "Unit 3, Day 4" is punctuation in the frame rather than
+        // part of any value, so it is dropped before the words are counted.
+        let body: String = String(tidied.dropFirst(opening.count))
+            .replacingOccurrences(of: ",", with: " ")
+        var words: [String] = []
+        for piece in body.split(separator: " ") {
+            words.append(String(piece))
+        }
+
+        // <count> class|classes at unit <unit> day <day>
+        guard words.count == 7,
+              words[2] == "at", words[3] == "unit", words[5] == "day" else {
+            return nil
+        }
+        guard words[1] == "class" || words[1] == "classes" else {
+            return nil
+        }
+        guard let howMany = spelled[words[0]] ?? Int(words[0]), howMany > 0,
+              let unit = Int(words[4]), unit > 0,
+              let day = Int(words[6]), day > 0 else {
+            return nil
+        }
+        // A plural count with a singular noun, or the reverse, is a sentence
+        // somebody typed carelessly rather than one of these shapes — and
+        // guessing which half they meant is exactly what this table exists to
+        // avoid.
+        guard (howMany == 1) == (words[1] == "class") else {
+            return nil
+        }
+        return AssistCardCommand(
+            toolName: "make_room_for_classes",
+            arguments: ["unit": "\(unit)", "atDay": "\(day)", "howMany": "\(howMany)"]
+        )
     }
 
     /// "Duplicate Unit 3, Day 2 as my next class."
@@ -152,7 +227,7 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// The literal shapes can be listed; these cannot, because the number in
     /// them is unbounded — any unit, any count of days, any page title. A
     /// contract that carried only the literals would say the assistant
-    /// understands eleven sentences when it understands those plus three
+    /// understands eleven sentences when it understands those plus five
     /// families, and Windows would build eleven.
     struct ParsedShape: Sendable, Equatable {
 
@@ -180,6 +255,20 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// Every parsed family, for the contract.
     static var everyParsedShape: [ParsedShape] {
         return [
+            ParsedShape(
+                shape: "make room for <count> class|classes at unit <unit>, day <day>",
+                tool: "make_room_for_classes",
+                fills: [
+                    "unit": "<unit>", "atDay": "<day>",
+                    "howMany": "<count>, as a number — words up to twelve are understood",
+                ],
+                example: "make room for two classes at Unit 3, Day 4",
+                notThis: "make room for two class at Unit 3, Day 4",
+                becauseNotThis: "The count and the noun disagree, so it is a sentence somebody typed "
+                              + "carelessly rather than one of these shapes — and this tool renames "
+                              + "pages the teacher's links point at. Guessing which half they meant is "
+                              + "exactly what a fixed shape exists to avoid."
+            ),
             ParsedShape(
                 shape: "publish unit <number>",
                 tool: "publish_pages",
@@ -249,6 +338,31 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// simply goes to the model — but it goes to the model on a shape that was
     /// put here precisely because the model gets it wrong.
     private static let fixedShapes: [(String, AssistCardCommand)] = [
+        // The app reaches `list_courses` too, even though the tool is MCP-only.
+        // MCP-only means the local MODEL is not shown it — which is what keeps
+        // routing accuracy intact — and says nothing about whether a teacher
+        // can ask for it. A fixed phrasing is matched in code and never reaches
+        // the model, so this costs the router nothing and still answers a
+        // teacher who is looking at one section and wants to know what else is
+        // in the folder.
+        // The publish/deploy distinction, on demand. The local model is told
+        // it in its system prompt and a teacher never was — the shelf explains
+        // what the assistant can DO, not what its words mean.
+        ("what does publishing mean?",
+         AssistCardCommand(toolName: "explain_publishing", arguments: [:])),
+        ("what is the difference between publishing and deploying?",
+         AssistCardCommand(toolName: "explain_publishing", arguments: [:])),
+
+        // A copy before a big edit. No arguments: the window is scoped to one
+        // course, so the only course it could mean is that one.
+        ("back up this course",
+         AssistCardCommand(toolName: "back_up_course", arguments: [:])),
+
+        ("what courses do i have?",
+         AssistCardCommand(toolName: "list_courses", arguments: [:])),
+        ("list my courses",
+         AssistCardCommand(toolName: "list_courses", arguments: [:])),
+
         ("what would students see in this section right now?",
          AssistCardCommand(toolName: "check_section", arguments: [:])),
 
@@ -392,7 +506,30 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
          AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
         ("re-date this section",
          AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
+        // A ROLLOVER, and the only one of these four that is. The other three
+        // are ordinary re-dating — a snow day, a timetable that shifted — and
+        // must never be asked about websites: answering "a new website" to a
+        // mid-semester re-date abandons the address students are reading right
+        // now. So the rollover carries the fact that it is one.
+        //
+        // `rollover` is deliberately absent from the tool's schema, the same
+        // way `unit`, `scope` and `revise` are above: the model never needs to
+        // know it exists, so this adds a whole answer without touching the
+        // surface routing was measured against, and without changing the
+        // argument set Windows pins as an exact departure list.
         ("roll this section over to a new year",
-         AssistCardCommand(toolName: "re_date_classes", arguments: [:])),
+         AssistCardCommand(toolName: "re_date_classes", arguments: ["rollover": "yes"])),
+
+        // The two answers to the website question, as whole sentences rather
+        // than "a new website" — which is an exact match a teacher could type
+        // meaning something else entirely. Each also works as a FIRST thing to
+        // say, for a teacher who already knows which they want, because
+        // re-dating a section that is already on its dates changes nothing.
+        (AssistCardCommand.rollOverOntoANewWebsite,
+         AssistCardCommand(toolName: "re_date_classes",
+                           arguments: ["rollover": "yes", "website": "new"])),
+        (AssistCardCommand.rollOverKeepingTheSameWebsite,
+         AssistCardCommand(toolName: "re_date_classes",
+                           arguments: ["rollover": "yes", "website": "same"])),
     ]
 }

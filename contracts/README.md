@@ -23,7 +23,7 @@ mechanics, a measurement taken on one machine: not.
 | [`toolchain.json`](toolchain.json) | The image both platforms build from the same recipe: the four pins with the REASON each sits where it does, and what each of the seven Quartz patches changes and why it cannot be dropped. |
 | [`example-content.json`](example-content.json) | The ready-made courses: how a payload is discovered, the manifest's keys, and the allow-list rule that decides what actually installs. |
 | [`file-formats.json`](file-formats.json) | **The two files both apps WRITE and the Python then reads**: every `course_config.json` key with its type and default, and the frontmatter that decides whether students see a page — including the legacy `draft:` spelling, which means the opposite. |
-| [`shared-rules.json`](shared-rules.json) | Nineteen rule sets on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**, and **which processes belong to a section's preview, and must therefore be stopped**, and **which of a course's own folders the build treats specially, and what a teacher is told about each**. |
+| [`shared-rules.json`](shared-rules.json) | Twenty rule sets on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks, and which a teacher is OFFERED when they are asked**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**, and **which processes belong to a section's preview, and must therefore be stopped**, and **which of a course's own folders the build treats specially, and what a teacher is told about each**, and **what the New Course wizard's affirmative button says**. |
 | [`course-management.json`](course-management.json) | The names the three kinds of zip carry and how they are told apart, what section number is offered next and which entries are refused in whose words, and the grade a course code names. |
 | [`class-planning.json`](class-planning.json) | Which page titles carry numbers, what "the next class" would be called, and — the highest-stakes data here — the ORDER renames must run in when room is made for a class. |
 | [`schedule-rules.json`](schedule-rules.json) | How a teacher's own list of class dates is read: every accepted date form, how an ambiguous `08/09/2026` column is settled or asked about, and what a pasted Google Sheet address becomes. |
@@ -93,12 +93,24 @@ classified because the line is still printed and a future list may want it.
 Two more — `"Example Course installed to"` and `"EXAMPLE_COURSE_CODE="` — went
 unclassified until 2026-09-06, and how is worth knowing, because the mechanism
 can hide any marker. Both apps have an example-course task and always did
-(`TaskMilestones.exampleCourse`), but `AppRulesContract.milestones()` does not
-list it, so the generated `milestones` readout has eight tasks where the mac
-has nine. The mac's classification test walks the READOUT, so a marker missing
-from it is invisible to the test however loudly the shared script prints it —
-and the classification is only as complete as the readout it is checked
-against.
+(`TaskMilestones.exampleCourse`), but `AppRulesContract.milestones()` kept its
+OWN array naming eight of the nine and did not list it — so the generated
+`milestones` readout had eight tasks where the mac had nine. The mac's
+classification test walks the READOUT, so a marker missing from it is invisible
+to the test however loudly the shared script prints it, and the classification
+is only as complete as the readout it is checked against.
+
+**Closed on 2026-09-08** (issue #82). The readout is now built from
+`TaskMilestones.allLists`, a single list of every task, rather than from a
+second hand-kept copy of what to read — so it cannot omit a task that exists,
+and `AppRulesContractTests.testEveryMilestoneListReachesTheReadout` pins the
+readout to that list in case a future change reintroduces a private copy.
+
+One hole is deliberately left open and is worth knowing about: a new
+`static let` added to `TaskMilestones` and NOT added to `allLists` is still
+invisible, because Swift cannot enumerate an enum's static properties at
+runtime. Windows' `AllLists` has the identical gap. Adding a task means adding
+it in both places, on both platforms.
 
 ## Proposing a case from the Windows side
 
@@ -116,9 +128,12 @@ event, rather than passing quietly.
 
 Two things make that failure read as a request instead of as damage:
 
-- **Name the case so it is obviously a proposal** and say in
-  [`MAC-HANDOFF.md`](../MAC-HANDOFF.md) that it is waiting — the ledger is
-  where the mac side looks for work that arrived from Windows.
+- **Name the case so it is obviously a proposal, and open a GitHub issue
+  labelled `mac`** saying which case you added and what the mac has to
+  implement to make it pass. That issue is where the mac side looks for work
+  that arrived from Windows, and it is what turns a red suite over there into a
+  request. (Until 2026-09-08 this said to write it into `MAC-HANDOFF.md` under
+  "Contract cases waiting on the mac"; that section no longer exists.)
 - **Do not touch the generated keys** (`cardPhrasings`, `tools`, `milestones`).
   Those are readouts of mac code; an edit there is overwritten on the next
   regeneration and the diff looks like vandalism.
@@ -150,7 +165,7 @@ the sentences are the product's, and the sequences are the toolchain's.
 
 The full list of what the contract cannot cover — and therefore what each side
 still tests for itself — is in
-[`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md), under "Do not re-derive the
+[`documentation/10-local-ai-assistant.md`](../documentation/10-local-ai-assistant.md), under "Do not re-derive the
 assistant's tests". Two of them matter enough to repeat:
 
 - **How the preview is stopped and started.** WSL2, ConPTY and the preview
@@ -168,7 +183,8 @@ assistant's tests". Two of them matter enough to repeat:
 ## Coverage: every mac test file, and where it stands
 
 No stone unturned — this table is the audit, and a file missing from it is a
-gap nobody has looked at. Counts are test functions, taken 2026-08-16.
+gap nobody has looked at. Counts are test functions, taken 2026-08-16; the `siteHealth` row was
+recounted 2026-09-07.
 
 **Shared through a contract** (the Windows suite can run the same cases):
 
@@ -215,27 +231,29 @@ gap nobody has looked at. Counts are test functions, taken 2026-08-16.
 | What publishing and unpublishing do to linked pages, and what is never swept | `shared-rules.json` → `followingLinks` | SharedRulesContract (2), AssistToolRunner (3) |
 | Whether the assistant asks before changing anything, and when it says so | `shared-rules.json` → `assistantConfirmation` | SharedRulesContract (1), AssistPlanMode (6), AssistantSettings (6) |
 | Phrasings matched in code, including the four PARSED families | `assist-cases.json` → `cardPhrasings` | AssistContract (1), AssistPromptShelf (2), AssistToolRunner (4) |
+| The New Course wizard's affirmative button | `shared-rules.json` → `wizard` | SharedRulesContract (1). On Windows the label is asserted only in `Plantoir.UiTests/NewCourseWizardUiTests`, which carries `[UiFact]` and runs only under `PLANTOIR_UI_TESTS=1` — so it is part of no gate there ([issue #119](https://github.com/russellgordon/plantoir/issues/119)) |
 | Backup, archive and wizard zip names | `course-management.json` → `zipNames` | BackupItem, ArchivedItem (18) |
 | Adding a section: suggestion, refusals, wording | `course-management.json` → `sectionNumbers` | SectionAdder, SectionNumbersValidation (21) |
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
 | Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
-| What a teacher is told when a folder a feature needs has gone | `shared-rules.json` → `siteHealth` | SiteHealthContract (5), SiteHealthFinding (11), and `scripts/test_site_health.py` |
+| Which folders the marks checklist OFFERS | `shared-rules.json` → `gradedFolders.choices` | Proposed from Windows 2026-09-06 and run there by `GradedFolderChoicesTests` (10 cases). **The mac has the behaviour and runs no case list**, so its suite does not go red for this one — [issue #112](https://github.com/russellgordon/plantoir/issues/112). |
+| What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (15), SiteHealthRepair (25), and `scripts/test_site_health.py` |
 
 ### Which of these the WINDOWS suite runs
 
 The table above says what the MAC draws on, and for a long time nothing said
 the same about Windows. That turned out to matter: an audit on 2026-09-06
-(WINDOWS-HANDOFF item 29) found **23 case lists the mac ran and the Windows
-gate did not read at all** — none of them unreachable, each simply a test
+found **23 case lists the mac ran and the Windows gate did not read at all** — none of them unreachable, each simply a test
 nobody had written. Wiring them found a divergence in how the two apps write
 teachers' frontmatter, four tool arguments that differ by design and were
 recorded only in a Swift comment, two shared markers classified by nobody, and
 a launcher flag listed as shared that only one platform has.
 
 So the state is worth writing down rather than re-derived. Windows now runs
-every list that audit counted, plus two it missed (`linkRules.browserSafe` and
-`example-content.sentinels`), through these classes in
+every list that audit counted, plus three it missed (`linkRules.browserSafe`,
+`example-content.sentinels` and `linkRewriting`, the last wired on 2026-09-07),
+through these classes in
 `windows-app/Plantoir.Tests/`:
 
 | What it runs | Class |
@@ -245,6 +263,34 @@ every list that audit counted, plus two it missed (`linkRules.browserSafe` and
 | `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts`, `linkRules.browserSafe` | `PublishAndLauncherContractTests` |
 | `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |
+| `gradedFolders.cases`, and `gradedFolders.wording` — the Marks list's title and caption (proposed from Windows 2026-09-08; the mac runs nothing for it yet and is not red) | `GradedFolderContractTests`. Whether a teacher can SEE the caption is `CourseSettingsCaptionUiTests` in `Plantoir.UiTests/`, opt-in and part of no gate |
+| `gradedFolders.choices` (cases, the depth cap and the skip list) | `GradedFolderChoicesTests` |
+| `specialNames` — the blocked and confirmed names, `renameFolder.carriesAcross`, `renameFolder.problems`, `curriculumFolderResolution` | `SpecialNamesContractTests`, `SpecialFolderRenamerTests`, `GradedFolderContractTests` |
+| `specialNames.contentStructureTip` (proposed from Windows 2026-09-07; the mac runs nothing for it yet, and is not red — no mac test names the key) | `SpecialNamesContractTests`. Whether a teacher can actually SEE it is `CourseSettingsCaptionUiTests`, which is in `Plantoir.UiTests/` rather than this project, carries `[UiFact]`, and runs only under `PLANTOIR_UI_TESTS=1` — so it is part of no gate |
+| `specialNames.renameFolder.materialisesOnRename`, `addCreatesTheFolder`, `removeLeavesTheFolderOnDisk`, `renameFolder.interruptedRename` (proposed from Windows 2026-09-07) | `FolderRenameApplyTests` |
+| `specialNames.renameFolder.linkRewriting` — every case, plus `escapingSet.leaveUnescaped` character by character | `FolderPathRewriterTests` |
+| `siteHealth.repair.reportedOncePerFinding` (both cases, built as `howToRunACase` says) and `siteHealth.repair.refusedWhenSomethingIsInTheWay` (the sentence, word for word) | `SiteHealthRepairTests`, `SiteHealthContractTests` |
+**Two notes on the `specialNames` rows** — there are four of them now, and the
+two this note is about are the first and the `linkRewriting` one — because they
+are not part of the audit's
+count and reading them as though they were would mislead. The `specialNames`
+lists in the first were already being run — those test classes predate that
+audit — and were simply never written down here. `linkRewriting` is newer than the audit — it was added to
+`shared-rules.json` on 2026-09-06, the same day, and fell outside the sweep; the
+row is here so it is not missed a second time. `FolderPathRewriterTests` has
+deserialised every case since 2026-09-07; before that it retyped five of its
+own.
+
+**One list was added after that audit and wired the same day it reached
+Windows.** `siteHealth.repair.reportedOncePerFinding` (mac, 2026-09-07) says a
+repair reports one result per FINDING rather than one per check name, and
+names each thing once in the sentence however many findings produced it.
+Windows shipped that shape first and proved it with a hand-written test; on
+2026-09-07 the test was replaced by the contract's cases, so the rule has one
+home. [`documentation/04-course-setup.md`](../documentation/04-course-setup.md) → "A folder named `index.md`, and why both apps
+refuse rather than clear the way" has the detail for the refusal; for the
+repair's own shape, the contract key and
+`windows-app/Plantoir.Tests` are now the record.
 
 **Three habits came out of that work and are worth copying on either side.**
 
@@ -284,7 +330,7 @@ oversight:
 
 | Area | Tests | Why it stays local |
 |---|---|---|
-| Windows, sheets, layout, hit areas, fonts, chat bubbles | ~71 | Platform look and feel. The mac's numbers were measured against Messages; matching them on WinUI would produce something that looks foreign. What must be TRUE of the assistant's window is in `WINDOWS-HANDOFF.md`. |
+| Windows, sheets, layout, hit areas, fonts, chat bubbles | ~71 | Platform look and feel. The mac's numbers were measured against Messages; matching them on WinUI would produce something that looks foreign. What must be TRUE of the assistant's window is in [`documentation/10-local-ai-assistant.md`](../documentation/10-local-ai-assistant.md) → "What the conversation looks like, and why". |
 | Script runner and preview stopper mechanics | 34 + 2 | ConPTY against a pseudo-terminal, WSL2 against Colima. The OUTPUT they parse is shared (see `markerOrigins`); the machinery is not. **Narrowed 2026-09-05**: WHICH processes belong to a section's preview is now shared (`shared-rules.json` → `stopPreview`) — how they are found (`/proc` against `Win32_Process`) and how they are ended (SIGTERM-then-SIGKILL against `Stop-Process -Force`) remain platform mechanics. |
 | Scheduled deploys: the MECHANISM | ~14 | launchd against Task Scheduler — nothing about writing a plist or a task ports. The **refusals** are now shared (`shared-rules.json`), which is the half that matters. |
 | Model tiers, plan mode, activity | 30 | Measured on this hardware. See `research/`; a tier ladder measured on an M4 Pro says nothing about a teacher's laptop with integrated graphics. |
@@ -299,8 +345,118 @@ oversight:
 
 A sentence a teacher reads is a specification. Kept in the Swift that says it,
 the Swift test that pins it, `GUI-IMPROVEMENTS.md` where it is specified and
-`WINDOWS-HANDOFF.md` where Windows is told to copy it, it is four copies and
+the documentation page telling Windows to copy it, it is four copies and
 three of them were already drifting — the same deploy failure was told two ways
 ("that section's console" / "that section's window") depending only on which
 function ran it. Now it is written once in `AssistWording`, and everything else
 is generated from it or tested against it.
+## Sentences the contract does not carry — each app writes its own, knowingly
+
+`contracts/` holds every sentence it can, and says so about the ones it does. These are the exceptions as of 2026-09-01, found by
+adversarial review after an earlier draft claimed "sentences …
+are all in `shared-rules.json`", which was not true. Each is teacher-facing,
+each lives only in the mac's Swift, and each is one a port has to word for
+itself — so word it deliberately rather than discovering the gap:
+
+- **`ClassPageTerm.problem(with:)`** — the two wizard refusals for a unit word
+  containing a digit or a comma.
+- **`SpecialFolderRenamer.rename`'s half-failure sentence** — "Plantoir renamed
+  N of M copies of 'X' and then could not rename the one in section3: …". The
+  SHAPE is what matters and is worth copying: the count moved, and the section
+  that stopped it. A bare exception here leaves a teacher with a course renamed
+  in two sections out of four and no idea which.
+- **`CourseSettingsView.renameFolder`'s bookkeeping-failure sentence** — the
+  folder moved but the configuration could not be written. Do not report this
+  as "the rename failed": it did not, and saying so sends the teacher looking
+  for a folder under its old name.
+- **The wizard's unit-word caption** — "Class pages will be named '… 1, Day 1'".
+- **The assistant's unit sentences**, which an earlier draft wrongly said were
+  "listed below with the others" until this line was added: "{word} N was published",
+  "{word} N has already been published", "{word} N is already hidden", "{word} N
+  was only partly published", and "I can't find any class pages in {word} N of
+  …". They are hardcoded in `AssistToolRunner` and are in NO contract — not
+  even `assist-wording.json`, which carries the rest of the assistant's words.
+  That is a pre-existing gap this work inherited rather than made, and it is
+  named here so nobody goes looking for them.
+
+**Three things the contract DOES carry that must not be copied verbatim.**
+`specialNames.renameFolder.explanation`,
+`specialNames.renameFolder.doneNothingWasThere` and
+`specialNames.removeLeavesTheFolderOnDisk.message` all say "on your Mac".
+Windows substitutes "on this PC", the same way it already does for `app-rules.json`'s
+"this Mac" — `contracts/README.md` documents that substitution. Your contract
+test must compare on the substituted form or it will fail on a difference that
+is correct.
+## The scripts can read the contract — and it travels differently on Windows
+
+`contracts/` used to be readable only by the two test suites. It is now readable
+from `scripts/*.py` as well, through `scripts/contracts.py`. This is the spine of
+a larger piece (hardening the folder and file names that carry hidden meaning —
+`Tasks`, the curriculum folder, `All Classes`, `Media`, `index.md`,
+`Key Links.md`), and it matters to you because the rules being hardened live in
+`build_site.py`, which is the thing that actually decides what ships. A rule that
+lives there and nowhere a test can reach is a third implementation with no gate
+on it — the drift the contract exists to prevent, arriving by the back door.
+
+**Why it had to be baked into the image, and what that costs.** The container's
+ONLY bind mount is `courses` (see `preview.sh`, `deploy.sh`). The working
+folder's `.toolchain/` sits beside `courses/` and is NOT mounted; the app bundle
+is on the host. So neither of the two obvious routes can be read from inside the
+container, and the contract has to be `COPY`d in by the Dockerfile. The
+consequence is deliberate: `contracts/` is not in `toolchain_hash`'s prune list,
+so every contract edit mints a new `teaching-quartz:src-<hash>` tag and forces an
+image rebuild and container recreate. That is development-time cost on the mac,
+paid on every case added, and it was accepted because the alternative was a
+shared rule the build cannot see.
+
+**None of that applies to you, and that is the point of this section.** Windows
+runs these scripts NATIVELY — no container, no image, no hash. The contract
+reaches Python through `PLANTOIR_CONTRACTS_DIR`, exactly the way
+`PLANTOIR_SUPPORT_DIR` already reaches `support/`. Five things carry it:
+
+- `ToolchainMirror.RecipeFolders` gained `contracts`, so a working folder's
+  `.toolchain/` gets it;
+- `Plantoir.csproj` ships `Toolchain\contracts\`;
+- `setup.ps1`, `preview.ps1` and `deploy.ps1` set `PLANTOIR_CONTRACTS_DIR`;
+- `Vendor/fetch-runtime.ps1` sets it too — a SIXTH env-setting site the first
+  pass missed, and the kind that is latent until it is not: it runs
+  `setup_course.py` while provisioning the runtime, so the first time a script
+  reads a required contract there, it throws `ContractMissing` naming
+  `/opt/contracts` on a Windows host. That error names a container path on a
+  machine that has no container, which is about as confusing as a message gets.
+
+**If you add another place that runs a `scripts/*.py`, it needs the variable.**
+There is no way to make this fail loudly at build time; it fails at run time, in
+whatever feature happened to read a contract first.
+
+**A trap that cost real time here, and travels to you unchanged.** The recipe's
+folder list existed as FOUR hand-maintained copies: the mac's
+`WorkspaceModel.refreshToolchain`, your `ToolchainMirror.RecipeFolders`, the
+marketing screenshot harness (`website/shots/capture.py`), and the Dockerfile's
+own `COPY` lines. They drifted the moment a fifth folder was added, and the one
+that drifted was the harness — whose docstring said, in so many words, "keep them
+in step".
+
+The failure mode is worth understanding because it is not the one you would
+guess. `capture.py` copies the *Dockerfile* too. So the demo workspace got a
+Dockerfile containing `COPY contracts/ /opt/contracts/` with no `contracts/`
+beside it. That workspace is not STALE, it is **unbuildable**: `docker buildx
+build` fails on the missing `COPY`, and `preview.sh`'s friendly "this folder is
+missing the toolchain's build recipe" message cannot fire, because
+`resolve_build_context` only checks that the Dockerfile EXISTS — and it does.
+A folder list that is merely incomplete produces a hard build failure with a
+misleading diagnosis.
+
+The fix, and the pattern worth copying: the list became DATA
+(`contracts/toolchain.json` → `recipeFolders`), and `scripts/test_recipe_folders.py`
+pins every carrier against it — including your `ToolchainMirror.cs` and
+`Plantoir.csproj`, which it reads as TEXT. That is deliberate: one Python test
+can pin a Swift list and a C# list, where a C#-only test could only ever check
+its own half. The test was verified to actually fail when a copy drifts, which
+is the check people skip. **If a recipe folder is added on either platform, add it to
+`recipeFolders` and let the test tell the mac.**
+
+**Rejected:** leaving the list in code and adding a comment (that is exactly what
+was there, and it is what failed); and having each platform's own suite check
+only its own copy (two green suites, still drifted).
+

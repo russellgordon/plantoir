@@ -15,7 +15,7 @@ namespace Plantoir.Tests;
 /// way a router degrades, so the shape of this surface is a product decision
 /// rather than an implementation detail. `assist-cases.json` →
 /// <c>toolSchemas</c> carries the definitions as each client really sends
-/// them, and nothing on this side read them (WINDOWS-HANDOFF item 29).</para>
+/// them, and nothing on this side read them (documentation/10-local-ai-assistant.md).</para>
 ///
 /// <para><b>The descriptions are deliberately NOT asserted, and that is the
 /// interesting part.</b> This app has no local tool definitions of its own:
@@ -134,7 +134,7 @@ public class AssistSurfaceContractTests
     /// <c>toolSchemas</c> is a GENERATED key, so the departure cannot be
     /// recorded beside the schemas it applies to, and this list is now its
     /// second home — the very thing `contracts/` exists to prevent. Asked for
-    /// in MAC-HANDOFF.md: have the generator emit the departures alongside the
+    /// in issue #83: have the generator emit the departures alongside the
     /// schemas, and this reads them instead of restating them.</para>
     ///
     /// <para>Asserted as an exact set rather than an allow-list, so a NEW
@@ -297,7 +297,7 @@ public class AssistSurfaceContractTests
     ///
     /// <para>The contract carries the mac's 25; <c>plantoir-mcp.exe</c> serves
     /// 37. So the same question asked of Claude Code gets a different toolbox
-    /// depending on the machine, which is written up in `MAC-HANDOFF.md` and is
+    /// depending on the machine, which is written up in documentation/10-local-ai-assistant.md and is
     /// the mac's to decide. What must hold either way is that every tool the
     /// contract DOES describe behaves the same here.</para>
     ///
@@ -374,12 +374,18 @@ public class AssistSurfaceContractTests
         // Named, not counted. A count stays at twelve when one tool is added
         // and another adopted into the contract, and it cannot tell the reader
         // WHICH — so the two things that should happen next would get the same
-        // message. These are the twelve as of 2026-09-06.
+        // message.
+        //
+        // Twelve as of 2026-09-06; FIVE since 2026-09-08, when the mac built
+        // seven of them (`add_classes`, `back_up_course`, `explain_publishing`,
+        // `list_courses`, `make_room_for_classes`, `plan_add_classes`,
+        // `plan_make_room_for_classes`) and the contract began describing them.
+        // Deleting an adopted name from this list is the whole of what the
+        // "adopted" assertion below asks for, and the list shrinking is the gap
+        // closing rather than anything being lost.
         var knownExtras = new[]
         {
-            "add_classes", "back_up_course", "explain_publishing", "list_courses",
-            "list_recent_changes", "make_room_for_classes", "plan_add_classes",
-            "plan_make_room_for_classes", "plan_sync_page_dates", "read_timetable",
+            "list_recent_changes", "plan_sync_page_dates", "read_timetable",
             "roll_over_section", "sync_page_dates",
         };
 
@@ -389,7 +395,7 @@ public class AssistSurfaceContractTests
         Assert.True(unrecorded.Count == 0,
             "This server offers tools the contract does not describe and nobody has recorded: " +
             string.Join(", ", unrecorded) + ". Add each to assist-cases.json → toolSchemas.mcp " +
-            "so both apps serve it, or list it here and say in MAC-HANDOFF.md why it is this " +
+            "so both apps serve it, or list it here and open a `mac` issue saying why it is this " +
             "platform's alone. A subset check cannot notice an addition, which is how twelve of " +
             "these accumulated without either suite saying so.");
 
@@ -398,6 +404,109 @@ public class AssistSurfaceContractTests
             "The contract now describes tools this list still records as this platform's alone: " +
             string.Join(", ", adopted) + ". That is the gap closing — delete them from the " +
             "list, which is the whole of what is owed here.");
+    }
+
+    /// <summary>
+    /// The <c>TEACHERS SAY:</c> clause of every shared tool matches the
+    /// contract's, character for character.
+    ///
+    /// <para><b>Why this exists.</b> The phrasings are measured artifacts —
+    /// <c>AssistToolSurface</c>'s own comment says they "are what took routing
+    /// from 69% to 91%" — and <c>AssistAgent.Briefly()</c> puts the clause
+    /// FIRST in what the local model reads, so a missing or edited one is a
+    /// routing change nobody chose. Until 2026-09-08 this side was missing the
+    /// clause ENTIRELY on seven tools and no test could see it: the rest of
+    /// this class deliberately asserts names and argument types and never
+    /// descriptions, because <c>NarrowToLocal</c> rewrites every description
+    /// through <c>Briefly()</c> and asserting the mac's full wording would be
+    /// red on all thirteen.</para>
+    ///
+    /// <para>The clause is the part that can be pinned, and pinning only the
+    /// clause is deliberate: the descriptions' BODIES differ between the two
+    /// servers on purpose — this one writes for Claude Code — so asserting
+    /// those would be asserting a difference both sides chose.</para>
+    ///
+    /// <para>Added because the branch that closed the gap wrote up "a hand
+    /// copy of a shipping list needs something that runs on every commit" as
+    /// its own lesson, and had applied it to a research script and not to the
+    /// twenty phrasings that were the point of the work.</para>
+    /// </summary>
+    [Fact]
+    public void TheTriggerPhrasingsAreTheContractsOwn()
+    {
+        var served = ServedTools();
+        var doc = ContractLoader.LoadJson("assist-cases.json");
+
+        // check_section: this server offers a fourth phrasing, "what would
+        // students see in this section right now?", written here 2026-08-17
+        // and never adopted on the mac. It is the mac's to take up, and is a
+        // GitHub issue on the `mac` label rather than a difference to erase.
+        var agreedDepartures = new HashSet<string>(StringComparer.Ordinal) { "check_section" };
+
+        var missing = new List<string>();
+        var differing = new List<string>();
+        var resolved = new List<string>();
+        int compared = 0;
+
+        foreach (var tool in doc["toolSchemas"]!["mcp"]!.AsArray())
+        {
+            string name = tool!["function"]!["name"]!.ToString();
+            if (!served.TryGetValue(name, out var method)) continue;
+
+            string? wanted = TriggerClause(tool["function"]!["description"]?.ToString());
+            if (wanted is null) continue;
+
+            string? here = TriggerClause(
+                method.GetCustomAttribute<System.ComponentModel.DescriptionAttribute>()?.Description);
+
+            if (agreedDepartures.Contains(name))
+            {
+                if (here == wanted) resolved.Add(name);
+                continue;
+            }
+
+            compared++;
+            if (here is null) missing.Add(name);
+            else if (here != wanted)
+                differing.Add($"{name} — contract has [{wanted}] and this server has [{here}]");
+        }
+
+        Assert.True(compared > 0,
+            "No shared tool carried a TEACHERS SAY: clause, so this test compared nothing. "
+            + "Either the contract stopped writing them or the surface stopped overlapping.");
+
+        Assert.True(missing.Count == 0,
+            "These shared tools carry a TEACHERS SAY: clause in the contract and none here: "
+            + string.Join(", ", missing.Order(StringComparer.Ordinal))
+            + ". The phrasings are measured, not decorative — Briefly() puts them FIRST in what "
+            + "the local model reads, so a missing clause is a routing change nobody chose. "
+            + "Copy the contract's clause WHOLE; see research/ai-assist/teachers-say-results.txt "
+            + "for what the last set was worth.");
+
+        Assert.True(differing.Count == 0,
+            "These shared tools' TEACHERS SAY: clauses differ from the contract's: "
+            + string.Join("; ", differing.Order(StringComparer.Ordinal))
+            + ". Copy the contract's, or — if this side is deliberately ahead — add the tool to "
+            + "agreedDepartures above and open a `mac` issue so the mac adopts it.");
+
+        Assert.True(resolved.Count == 0,
+            "These tools are listed as agreed departures and no longer differ: "
+            + string.Join(", ", resolved.Order(StringComparer.Ordinal))
+            + ". That is the gap closing — remove them from agreedDepartures, which is the whole "
+            + "of what is owed here.");
+    }
+
+    /// <summary>
+    /// The leading <c>TEACHERS SAY: "…", "…".</c> of a description, or null.
+    /// MIRRORS the first half of <c>AssistAgent.Briefly()</c>, which splits on
+    /// the first occurrence of quote-full-stop-space.
+    /// </summary>
+    private static string? TriggerClause(string? description)
+    {
+        if (description is null) return null;
+        if (!description.StartsWith("TEACHERS SAY:", StringComparison.Ordinal)) return null;
+        int end = description.IndexOf("\". ", StringComparison.Ordinal);
+        return end > 0 ? description[..(end + 2)] : null;
     }
 
     // ---- Which assistant a teacher is offered ----------------------------
