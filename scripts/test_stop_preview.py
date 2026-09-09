@@ -235,7 +235,7 @@ class TheEntryPointAPlatformWithoutProcCanUse(unittest.TestCase):
 
     It exists so a platform that cannot read `/proc` can still use the ONE
     rule — enumerate with its own tools, ask here WHICH, kill with its own
-    tools. Windows has not adopted it (see WINDOWS-HANDOFF item 20), and an
+    tools. Windows has not adopted it (see documentation/03-launcher-scripts.md), and an
     entry point that is offered but never executed is how a docstring becomes
     fiction. So it is exercised here as a real subprocess, against the same
     contract cases.

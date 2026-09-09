@@ -304,6 +304,146 @@ receive launchers via the app's `.toolchain/` mirror rather than
 `export-scripts`, but the exported copies remain a supported escape hatch
 and differ from the repo versions in line endings only.
 
+## One rule for stopping a section's preview
+
+New on 2026-09-05, and the closing of a `TODO.md` item. Read
+`contracts/shared-rules.json` → `stopPreview` first; this explains why it is
+shaped the way it is, and what was rejected.
+
+**What was wrong.** One question — *which processes belong to this section's
+preview?* — was answered in three places: `preview.sh --stop` (a `/proc` sweep
+by working directory, run inside the container), `preview.ps1 --stop`
+(`Win32_Process` by command line, plus a descendant walk, run natively), and
+`build_site.py` (command line plus `--serve`, inside the container, written
+because both of the others are HOST scripts and it is not). The reason for the
+third is sound and has not gone away; the problem was never that it existed,
+it was that nothing held the three to the same answer.
+
+**The finding that changed the design, and the reason a straight refactor
+would have been wrong.** They were not three copies of one rule. They were
+three PARTIAL rules, and each saw something the others could not:
+
+- A **working directory** catches a child launched by a RELATIVE path, which
+  carries no directory to match on. `npm install` runs exactly that way, and
+  so do the esbuild workers under it.
+- A **command line** catches the Python driver. `build_site.py` never calls
+  `os.chdir` — it passes `cwd=` to its CHILDREN — so the driver sits in the
+  container's `/teaching` for the whole build. Through every in-process phase
+  (copying the scaffold, copying content, social cards, the rsync mirror) it
+  is the only process there is to find, and the mac's sweep found nothing and
+  printed "Stopped 0 process(es)".
+- Only **`preview.ps1`** walked descendants — Windows', and it was right.
+
+So picking any one of the three as "the" implementation would have shipped
+that one's blind spot to both platforms. The rule is a **disjunction of three
+evidences, plus a walk down the process tree**, and it stops strictly more
+than any of the three did alone.
+
+**Why the cases are process SNAPSHOTS rather than single processes.** The
+first design had each case describe one process — name, command line, working
+directory — with an expected verdict. That cannot be run on both platforms,
+for two independent reasons. `Win32_Process` exposes no working directory at
+all, so every cwd case would be unanswerable there. And the descendant
+walk is not a property of any single process: it is a rule over parent links
+across the whole list. A case is therefore a small process TABLE with `pid`,
+`ppid`, `name`, `commandLine` and `cwd`, and the expected answer is the list
+of pids to stop. A platform that cannot see one kind of evidence must still
+reach the same verdict — through the walk — and that is exactly the property
+worth testing rather than assuming.
+
+**Two modes, because there are genuinely two questions.** `everything` is the
+launcher's `--stop`: reclaim the server, the build, the driver, and everything
+under them. `servingOnly` is `build_site.py --build-only`: remove ONLY the
+preview server that would otherwise overwrite the publish build a second later
+through its own host mirror. A build must never be stopped in that mode,
+because the build being protected is itself a build of this section — and the
+process asking is the driver the rule would otherwise recognise.
+
+**The version-independence trap, which is the one to carry if anyone ever adopts
+`--match-stdin`.** `preview.sh` pipes the recipe's copy of the rule into the
+container over stdin rather than running the copy baked into the image. Stop
+mode must never build anything, so it runs against whatever container is
+ALREADY there — right after an upgrade, one built from the previous image,
+with no such file. Naming a baked path would make `docker exec` fail with a
+message nobody sees (both callers send the launcher's output to the null
+device and neither checks its exit code) while the build it was asked to stop
+carried on burning CPU. This is exactly once per teacher per upgrade, and only
+when something was running, which is the only time the mode matters at all.
+`verify.sh` section 6d proves it by deleting the file from a running container
+and stopping a preview anyway.
+
+**Rejected: making `preview.ps1` call the shared Python.** It would leave one
+implementation and two ports, which is better, and the `--match-stdin` entry
+point exists so it can be. It was not done from the mac because `--stop` must never
+start anything and whether Python is reliably resolvable on that path at that
+moment is a question only a Windows machine can answer. Measure it there; say
+what you find.
+
+**Rejected: extracting `preview.ps1`'s matcher into a new `.ps1` file beside
+the launchers.** A test could then dot-source it without running the script.
+But a new file there has to be added to `ToolchainMirror.Launchers` and
+`RecipeRootFiles`, the Dockerfile's `COPY … /opt/export/` and its `unix2dos`
+line, `project.yml`, and the mac's own refresh lists — five hand-maintained
+lists, which is the precise failure `contracts/toolchain.json` →
+`recipeFolders` exists to record. The functions are defined inside
+`preview.ps1`'s stop block instead. Making them dot-sourceable is a
+real cost to weigh, not a free tidy-up.
+
+**A case a platform may skip, and why that is not a loophole.** One case —
+"a process is caught by its working directory alone" — can be decided ONLY
+with a working directory, which `Win32_Process` does not expose. Rather than
+delete it (it pins the evidence that catches `npm install`) or let it fail on
+Windows, cases carry `needsEvidence`, and a runner without that evidence skips
+it naming what was missing. The loophole this could obviously become is closed
+by a test rather than by discipline: the mac's suite BLINDS every case — takes
+the working directories away — and asserts that a marked case's verdict
+changes and an unmarked case's does not. It caught a case wearing the marker
+that did not need it on the first run, which is exactly the drift the marker
+would otherwise invite.
+
+**Three holes the second review found, all in the rule itself, all the same
+family as the bug being fixed.** A blank or root build directory was evidence
+for EVERY process, because an empty string is a prefix of everything — a
+caller that lost track of which section it was asking about would have swept
+the whole container rather than failed. A target that is a SUFFIX of a longer
+absolute path matched as well, so `/x/tmp/quartz-builds/ADA1O/section1` was
+evidence for `/tmp/quartz-builds/ADA1O/section1`. Both are the section1 /
+section10 mistake pointed in different directions: one about where a path
+ends, one about where it begins, one about whether it is a path at all. The
+lesson worth keeping is that fixing a boundary bug in one direction is not
+finishing it — check every edge of the match, and check that the thing being
+matched is a real value.
+
+**One harness lesson, learned twice in one afternoon.** A process that scans
+other processes for a marker string finds ITSELF — the marker is on its own
+command line. In `verify.sh` 6d this first inflated a count so that every
+check in the section failed while the code under test was correct, and then,
+in the cleanup, made the script SIGKILL itself part-way through: it printed
+nothing, exited quietly, and left behind the very processes it was written to
+collect. The second one was found only by checking the container afterwards
+rather than trusting a green run. Exclude the harness's own process id, and treat
+"scanning for a string I am myself carrying" as a shape worth recognising —
+the same trap that `stop_preview.py` already guards against for the real rule.
+
+**What was measured, not decided.** The two `preview.ps1` prefix bugs were
+found by reading, and both are real: `$lower.Contains($sectionNeedle)` with a
+needle ending `\section1` matches `\section10`, and
+`$lower.Contains('--section=1')` matches `--section=10`. Each was reproduced
+as a contract case, and each case was checked by putting the fault back into
+the shared Python and watching that case — and only that case — fail. The same
+was done for the descendant walk. A green suite proves nothing about a case
+that cannot fail.
+
+## `--image` is the mac's flag alone
+
+Found 2026-09-06 while wiring the contract's case lists into the Windows suite.
+`contracts/app-rules.json` → `launcherFlags.deployExtras` named `--diagnose` and `--image <tag>` as flags
+the launchers must both accept. `deploy.sh` parses `--image`; `deploy.ps1`
+does not, and cannot — Windows has had no image to name since it dropped
+Docker on 2026-08-19. Recorded as `macOnly` rather than closed by adding a
+dead flag to `deploy.ps1` so a test would go green, which is the shape of fix
+`WINDOWS-BOOTSTRAP.md` §0 exists to forbid.
+
 ---
 
 [◀ Previous: The Docker Image](02-docker-image.md) · [Back to index](README.md) · [Next: Course Setup ▶](04-course-setup.md)

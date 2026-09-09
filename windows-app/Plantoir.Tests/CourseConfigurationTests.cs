@@ -204,7 +204,7 @@ public class CourseConfigurationTests
     public void CustomDomainsAreNormalized(string raw, string expected) =>
         Assert.Equal(expected, CourseConfiguration.NormalizedCustomDomain(raw));
 
-    // WINDOWS-HANDOFF.md entry 307: custom_domains.sections.sectionN moved
+    // documentation/08-course-config-reference.md: custom_domains.sections.sectionN moved
     // from a bare string to a map keyed by destination TYPE, since the mac
     // side can now deploy one section to more than one destination. Windows
     // has no multi-destination deploy UI yet, but must never read this map

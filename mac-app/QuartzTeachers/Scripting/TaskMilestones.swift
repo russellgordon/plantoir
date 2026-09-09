@@ -53,12 +53,12 @@ enum TaskMilestones {
         // "Launching Quartz preview" — build_site.py's own print — fires BEFORE
         // `quartz build --serve` even starts, so it used to complete every
         // milestone at once and pin the bar on this step for the whole real
-        // build (TODO.md item 1, found 2026-08-19). "Done processing" is
-        // patches/build.ts's own line, printed once the fresh site is actually
-        // written to disk — verified against a real `preview.ps1 --build-only`
-        // transcript on Windows 2026-08-23 ("Quartz v4.5.0" then "Done
-        // processing N files in Ns"). **This edit was authored on Windows and
-        // has NOT been built or tested on a mac — see MAC-HANDOFF.md.**
+        // build (found 2026-08-19). "Done processing" is patches/build.ts's own
+        // line, printed once the fresh site is actually written to disk —
+        // verified against a real `preview.ps1 --build-only` transcript on
+        // Windows 2026-08-23 ("Quartz v4.5.0" then "Done processing N files in
+        // Ns"). Authored on Windows; built, tested and regenerated into
+        // app-rules.json on the mac 2026-09-01 (13da5319).
         TaskMilestone(label: "Opening the preview…", marker: "Done processing"),
     ]
 
@@ -131,6 +131,35 @@ enum TaskMilestones {
         TaskMilestone(label: "Building your site…", marker: "Quartz v4"),
         TaskMilestone(label: "Copying your files…", marker: "to a folder"),
         TaskMilestone(label: "Finishing up…", marker: "PUBLISHED_FOLDER="),
+    ]
+
+    /// Every list above, under the name the contract writes it as.
+    ///
+    /// `AppRulesContract` builds its readout from THIS, rather than from a
+    /// second copy of the list of lists, and that is the whole point of it
+    /// existing. Until 2026-09-08 that contract kept a private array naming
+    /// eight while this enum had nine: `exampleCourse` reached no readout, so
+    /// the two shared-python markers only it carries — "Example Course
+    /// installed to" and "EXAMPLE_COURSE_CODE=" — were classified by nobody,
+    /// and the test that walks the readout could not see that they were
+    /// missing. A readout assembled from a hand-kept list of what to read is a
+    /// readout that can silently omit things.
+    ///
+    /// **The hole this does not close**, said plainly rather than left to be
+    /// discovered: a new `static let` added above and not added here is still
+    /// invisible. Swift cannot enumerate an enum's static properties at
+    /// runtime, so nothing can catch that automatically — Windows' `AllLists`
+    /// has the identical gap. Adding a list means adding it in both places.
+    static let allLists: [(name: String, milestones: [TaskMilestone])] = [
+        ("courseCreation", courseCreation),
+        ("exampleCourse", exampleCourse),
+        ("preview", preview),
+        ("deploy", deploy),
+        ("buildAndDeploy", buildAndDeploy),
+        ("deployToCloudflare", deployToCloudflare),
+        ("buildAndDeployToCloudflare", buildAndDeployToCloudflare),
+        ("deployToFolder", deployToFolder),
+        ("buildAndDeployToFolder", buildAndDeployToFolder),
     ]
 
 }

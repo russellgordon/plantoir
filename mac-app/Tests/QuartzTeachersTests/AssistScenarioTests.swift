@@ -6,7 +6,7 @@ import XCTest
 ///
 /// **Why the cases live in JSON and not here.** They were here, in Swift, and
 /// the Windows app was built from a prose description of them written by hand
-/// in `WINDOWS-HANDOFF.md`. That is a translation, once per change, by somebody
+/// in documentation/10-local-ai-assistant.md. That is a translation, once per change, by somebody
 /// who cannot run this suite — and a translation of an ORDER ("stop the
 /// preview, wait, then deploy") is exactly the kind of thing that survives
 /// review while being wrong. Now both platforms read the same list, and a case

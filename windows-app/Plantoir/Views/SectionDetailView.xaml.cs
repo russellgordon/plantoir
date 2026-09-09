@@ -55,7 +55,7 @@ public sealed partial class SectionDetailView : UserControl
     /// left the Deploy button clickable again the instant the phase
     /// started and let a second click race the first's own
     /// stop-preview-then-deploy sequence. Mirrors the mac's
-    /// `SectionDetailView.isPreparingDeploy` (WINDOWS-HANDOFF.md item 8,
+    /// `SectionDetailView.isPreparingDeploy` (documentation/05-build-pipeline.md,
     /// row 318a).
     /// </summary>
     private bool _isPreparingDeploy;
@@ -65,7 +65,7 @@ public sealed partial class SectionDetailView : UserControl
     /// result: several triggers (window activation, a run finishing) can
     /// fire in quick succession, and a walk started before a publish must
     /// not overwrite one started after it. Mirrors the mac's generation
-    /// counter — see "The refresh triggers" in WINDOWS-HANDOFF.md.
+    /// counter — see "The refresh triggers" in documentation/05-build-pipeline.md.
     /// </summary>
     private int _publishMarkerGeneration;
 

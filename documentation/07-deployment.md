@@ -338,6 +338,154 @@ panel with a reveal-in-file-manager button instead of a link — plus a note
 that pages opened straight from disk won't look right, since the site expects
 to be served over HTTP.
 
+## Publishing while a preview is running — the race, and the harness that found it
+
+Two defects on 2026-09-05, both in the publish path, both invisible to every
+test that does not publish and then LOOK at what came out.
+
+**The race, which is the one that matters.** Killing the preview LAUNCHER does
+not stop the preview. On the mac the Python and the node server both live
+inside the container, and `_start_public_sync_watcher` keeps mirroring the
+SERVE build to the host every second — so a build for publishing lands and the
+preview overwrites it within a second, and what gets published is the preview,
+live-reload client and all. `kill_existing_quartz` was only ever called from
+the SERVE branch, so `--build-only` never stopped anything.
+
+`build_site.py`'s `--build-only` now stops the preview serving THIS SECTION
+before building, matched by the section's own build directory.
+**That is shared Python and both platforms inherit it.**
+
+**It was written by PORT first, and that was wrong — do not go back to it.**
+`kill_existing_quartz(port)` looked like the obvious tool and is the right one
+for the SERVE path, where the port is known and leased. A build-only run is
+never given a port: `preview.sh` defaults it to 8081 and the app's deploy
+passes no `--port` at all. So the first version killed whatever was serving on
+8081 — the first section to have previewed in that working folder, which is
+usually a DIFFERENT section from the one being published. Measured 2026-09-05
+by doing it: previewing section 1 and publishing section 2 printed "Killed
+existing process on port 8081" and section 1 stopped answering. A scheduled
+overnight deploy would have done the same to any preview left running.
+
+What works instead is the section's BUILD DIRECTORY, which is on the serve
+process's command line because the launcher runs the Quartz CLI by absolute
+path. It identifies exactly one preview and cannot collide with another. One
+detail that is easy to miss: match on the directory plus a trailing separator,
+or `section1` also matches `section10`.
+
+Two things worth checking per platform rather than assuming:
+
+- **A Windows preview is not in a container**, so an orphaned server is a plain
+  Windows process. Check that killing the launcher actually stops the node
+  server — on the mac it demonstrably does not, and that is exactly the kind of
+  difference that is assumed rather than measured.
+- **The matching algorithm exists on both sides — do not write a third copy.**
+  `preview.ps1`'s `--stop` block finds this section's processes by COMMAND
+  LINE (this paragraph said WORKING DIRECTORY until 2026-09-05, and that was
+  simply wrong — `Win32_Process` exposes no working directory) and walks their
+  descendants; the descendant walk is the half Windows had and the mac did not.
+
+  The mac could not simply call `preview.sh --stop`, because `build_site.py`
+  runs INSIDE the container and `--stop` is a host script — which is why a
+  third copy of this rule once existed. **Resolved 2026-09-05: the rule lives
+  once**, in `contracts/shared-rules.json` → `stopPreview` and
+  `scripts/stop_preview.py`, whose `read_snapshot()` dispatches on the platform
+  — `/proc` on Linux and in the container, `Get-CimInstance Win32_Process`
+  natively on Windows. See
+  [`03-launcher-scripts.md`](03-launcher-scripts.md) → "One rule for stopping
+  a section's preview" for the full design and what was rejected.
+
+- **What is and is not exposed.** The Windows APP already stops a
+  running preview before deploying (`SectionDetailView.xaml.cs`), exactly as
+  the mac's does — so the app is safe on both platforms and always was. The
+  hole was the COMMAND LINE, on both.
+
+  **On Windows that hole was open until 2026-09-05, and this page described it
+  as open for longer.** `read_proc_snapshot()` reads `/proc` and native Windows
+  has none, so it returned an empty list and `stop_preview_serving()` stopped
+  nothing. The fix went one level DEEPER than "call `preview.ps1`'s matcher
+  from the build-only path" — that route was considered and rejected, because
+  `deploy.py` reaches `build_site.py --build-only` directly and never passes
+  through the launcher, so a fix living in `preview.ps1` would leave the
+  Netlify and Cloudflare route still racing. `read_snapshot()` is a dispatcher
+  instead. The watcher that causes the race runs everywhere regardless:
+  `_start_public_sync_watcher` is started unconditionally in the SERVE branch,
+  so a Windows preview mirrors over a Windows publish exactly as a mac one
+  does.
+
+- **The wait is bounded at 30 seconds** (150 × 0.2 s), not the 15 that
+  `GUI-IMPROVEMENTS.md` row 392 says — that row predates the change and the log
+  is append-only, so this is the current number.
+
+**The other one was a partial fix of mine, and is worth knowing as a shape.**
+The first version of the preview guard in `deploy.sh` waited for `index.html`
+to lose the live-reload client. Serve mode bakes that client into EVERY page
+and the mirror is replaced file by file, so a clean front page can sit in front
+of two hundred stale preview pages. Publishing that MIXTURE is worse than
+publishing the preview wholesale, because the front page looks fine and nobody
+looks further. Wait on the whole tree; `deploy.ps1` already does.
+
+## `verify-deploy.sh` — the publishing harness, and why it is not in the gate
+
+New on 2026-09-05, at the repository root. It publishes to a folder, to Netlify
+and to Cloudflare, and runs all three primary+secondary pairings, then **fetches
+every published site back and reads it** — the launcher's own output only
+proves the launcher is happy with itself. 42 checks.
+
+**It is deliberately NOT part of `verify.sh`.** The gate must be runnable at any
+moment, on any machine, without credentials and without touching anything
+outside the repository. This needs a Netlify token, a Cloudflare token and an
+account ID, it needs the network, and it CREATES REAL SITES. Build the Windows
+equivalent the same way — opt-in, run when the publishing path changes — rather
+than folding it into whatever else gates a commit.
+
+One thing it does NOT cover, stated so nobody assumes otherwise:
+`additional_deploy_targets` is not handled by `deploy.sh` at all — the APP loops
+and calls the launcher once per destination. The harness exercises the pairings
+by running that same sequence, which tests the launcher half; that the app
+produces exactly those argument lists is pinned separately by
+`app-rules.json` → `deployArguments`, which both suites run. Between the
+two the pairing is covered; neither half covers it alone.
+
+## The scheduled task NEVER refuses
+
+Russell's call, and the reasoning travels: *"a slightly inaccurate curriculum map
+is a paper cut, an unpublished site update a teacher was counting on is a broken
+nose."* Pinned as `siteHealth.scheduledDeployPublishesAnyway` and asserted by a
+mac test so it cannot be quietly softened later.
+
+So: publish, then stash what was found for the next time somebody is there. You
+already have the shape — `ScheduledDeployCompletion.cs` stashes a completion
+sentinel exactly this way. Two properties the mac's version has that any port should
+too: the record is CONSUMED when read, so a problem is reported once rather than
+every time the app opens; and a CLEAN run clears it, so a problem the teacher has
+put right stops being reported.
+
+**That second property is harder than it looks, and this section claimed it
+before it was true.** launchd opens the scheduled log with O_APPEND and nothing
+rotates or truncates it, so reading the whole file re-finds LAST week's marker
+lines every night: the sentinel is rewritten with stale findings forever, and the
+"nothing wrong this time" branch becomes unreachable the moment a single problem
+has ever been logged. A teacher who fixed the folder would have been told about
+it every morning until somebody deleted the log.
+
+The mac now records the log's SIZE before the run and reads only from that offset
+afterwards. A task runner that captures output per run may not have this
+problem at all — but check rather than assume. And note how it got through: the
+test that was supposed to cover it faked the append by rewriting the file, so it
+passed against broken code.
+
+One platform difference worth knowing: the mac reads the findings back out of the
+scheduled run's LOG FILE rather than from a pipe, because `runScheduled`
+deliberately does not capture the child's output — launchd points stdout at that
+log and the process inherits it, and an unread pipe is what wedged the
+assistant server once. Where a task runner already captures output, use that;
+the log-scrape is a workaround for a constraint not every platform shares.
+
+## Deploys with several destinations
+
+Take the findings from the FIRST leg only. Every destination publishes the same
+built site, so a second leg repeats them.
+
 ---
 
 [◀ Previous: Quartz Customizations](06-quartz-customizations.md) · [Back to index](README.md) · [Next: course_config.json Reference ▶](08-course-config-reference.md)

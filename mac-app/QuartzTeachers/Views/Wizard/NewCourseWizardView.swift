@@ -517,7 +517,7 @@ struct NewCourseWizardView: View {
                 }
 
                 if !hasStarted {
-                    Button("Create Course") {
+                    Button(WizardWording.createCourseButton) {
                         startCreation()
                     }
                     .buttonStyle(.borderedProminent)
