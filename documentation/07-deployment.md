@@ -74,18 +74,32 @@ site name encodes everything a teacher needs to recognize it later:
   (Netlify site names are global) trigger a retry prompt with an
   auto-suggested `-02`, `-03`, … suffix.
 
-**None of this can happen unattended.** A scheduled publish passes
-`--non-interactive`, and naming a site is the one question with no safe
-default — the address is what students type, it is global to all of Netlify,
-and changing it later breaks every existing link. So with that flag the
-script REFUSES here rather than asking or quietly taking the suggestion. It
-is reached in two states and both stop: a section that has never been
-published (which the app already refuses to SCHEDULE, for the same reason),
-and — the one that cannot be foreseen — a site that existed when the alarm
-was set and has since been deleted at Netlify, so the lookup below comes back
-404 and falls through to creating a fresh one. See
-[launcher scripts](03-launcher-scripts.md#deploysh) and
-`contracts/app-rules.json` → `launcherFlags.nonInteractive`.
+**None of those questions may be asked of a publish that runs on its own**, and
+`--non-interactive` is how that is enforced. A scheduled publish runs at half
+six with the app closed, so a question it puts to a teacher is put to nobody,
+and both ways that ended have been seen: with a terminal `input()` BLOCKS —
+measured at 45 minutes, the site simply not updated in the morning with nothing
+to say why — and without one `prompt()` returns its DEFAULT silently, so the
+site is created at an address nobody chose, and on a machine with no saved
+surname an address with no surname in it.
+
+Under the flag every question refuses instead, saying which one it could not
+ask and exiting **3**, a code that means that and nothing else. Naming a site
+is the question with no safe default: the address is what students type, it is
+global to all of Netlify, and changing it later breaks every existing link. It
+is reached in two states and both stop — a section that has never been
+published (which the app already refuses to SCHEDULE, for the same reason), and
+the one that cannot be foreseen: a site that existed when the alarm was set and
+has since been deleted at Netlify, so the lookup comes back 404 and falls
+through to creating a fresh one. That second state is what this whole feature
+was opened on.
+
+Both launchers take the flag and FORWARD it, since the site-name question lives
+in the Python; both also guard their own prompts with it. Nothing changes
+without the flag: a teacher at a keyboard gets every prompt they got before.
+See [launcher scripts](03-launcher-scripts.md#deploysh),
+`contracts/app-rules.json` → `launcherFlags.nonInteractive` for what is
+refused, and `launcherFlags.deployExtras` for the flag itself.
 
 The created site's identity is saved as a **marker file** at
 `courses/<CODE>/.netlify_sites/section<N>.json` so subsequent deploys go to

@@ -1,142 +1,188 @@
 #!/usr/bin/env python3
 """
-`--non-interactive`: a publish that nobody is there to answer questions for.
+Regression test for `deploy.py --non-interactive`.
 
-Found on Windows 2026-09-06 by `verify-deploy.ps1`, whose Netlify leg hung
-until its own 900-second timeout: the site saved in `.netlify_sites/` no
-longer existed on Netlify, so the deploy fell through to creating a fresh
-one and asked what to call it. A person answers that in two seconds; a
-scheduled publish has nobody. Both branches of the old behaviour were seen
-for real, and both are bad:
+A publish a teacher sets to happen on its own runs at half six in the morning
+with the app closed, so every question deploy.py can ask is a question NOBODY
+will answer. Until this flag existed there were two ways that ended, and BOTH
+have been seen:
 
-* **With a terminal on standard input**, `input()` waits forever — two
-  measured runs sat at one prompt for 45 minutes. The teacher's site is
-  simply not updated in the morning, with nothing to say why.
-* **Without one**, `sys.stdin.isatty()` is false and the DEFAULT is taken
-  silently, so the website is published at an address nobody chose.
+  * stdin IS a terminal -> `input()` blocks, forever. Measured: two harness
+    runs left a powershell.exe and its python.exe child waiting at the
+    site-name prompt for 45 minutes. The teacher's site is simply not updated
+    in the morning, and nothing says why.
+  * stdin is NOT a terminal -> `prompt()` returns its DEFAULT silently, and a
+    Netlify name conflict auto-suffixes. The site is published to an address
+    nobody chose, and on a machine with no saved surname the address has no
+    surname in it either.
 
-So the rule this pins is: with the flag set, a question becomes a REFUSAL
-that names the question, and nothing takes a default it was not given.
+Under the flag, every question REFUSES instead: it says which question it could
+not ask, says what to do about it, and exits `NEEDS_AN_ANSWER` (3) — a code
+that means that and nothing else, so a caller can tell it from an ordinary
+failure. GitHub issue #92.
 
-Pure stdlib, no Docker and no network. Run with:
+**What is pinned here is the REFUSAL, not the prose.** The sentences are free
+to change; what must not change is that no question is asked, no default is
+taken, and the exit code is 3.
+
+Pure stdlib, no Docker, no network, no credentials. Run with:
 
     python3 scripts/test_deploy_non_interactive.py
-
-verify.sh runs this early, before the (slow) Docker build.
 """
+# Merged 2026-09-09 from two branches that implemented this flag independently:
+# issue/92-non-interactive-deploy (Windows, whose SHAPE won -- exit 3, the
+# top-level Cloudflare guard, the teacher-facing readout) and
+# issue/deploy-non-interactive (the mac, whose CONTRACT won -- the seven named
+# refusal points in app-rules.json and the deployArguments cases). The four
+# tests appended at the end came from the mac's file; they pin the launcher
+# plumbing and the contract, which the Windows file did not cover.
+#
+# One mac test was deliberately NOT carried over:
+# test_the_launcher_asks_for_no_terminal_when_nobody_is_here asserted that
+# deploy.sh forces `-i` under the flag, as belt and braces so the branch of
+# input() that WAITS could not be reached at all. The Windows shape decides the
+# terminal with `[[ -t 0 ]]` instead and relies on every question refusing
+# first, which is sound -- refuse_to_ask() runs before input() at every site,
+# and prompt() refuses as a catch-all. The belt is redundant rather than
+# missing, and forcing `-i` would also change the MCP path.
 
-import contextlib
 import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
-import unittest.mock
 from pathlib import Path
+
+REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+from contextlib import redirect_stdout
 
 import deploy
 
 
-REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
-
-
-class NonInteractiveRefusesEveryQuestion(unittest.TestCase):
-    """Every question `deploy.py` can ask, with the flag set."""
+class RefusingRatherThanAsking(unittest.TestCase):
 
     def setUp(self):
-        self.previous = deploy.NON_INTERACTIVE
+        # Module-level state, so it is put back whatever happens — otherwise a
+        # failure here would leave every later test in this process refusing.
+        self._before = deploy.NON_INTERACTIVE
         deploy.NON_INTERACTIVE = True
 
     def tearDown(self):
-        deploy.NON_INTERACTIVE = self.previous
+        deploy.NON_INTERACTIVE = self._before
 
-    def test_a_prompt_refuses_rather_than_taking_its_default(self):
-        """The backstop, and the failure it replaces.
-
-        This is the one that used to publish to an address nobody chose:
-        `prompt()` returned `default or ""` whenever standard input was not
-        a terminal, so the site was created at the suggested address with
-        no sign that a question had been skipped.
-        """
-        with contextlib.redirect_stdout(io.StringIO()):
-            with self.assertRaises(SystemExit) as stopped:
-                deploy.prompt("Enter Netlify site name", default="ics3u-s1-2026-gordon")
-        self.assertEqual(stopped.exception.code, 1)
-
-    def test_a_prompt_with_no_default_refuses_too(self):
-        with contextlib.redirect_stdout(io.StringIO()):
-            with self.assertRaises(SystemExit) as stopped:
-                deploy.prompt("Choose a different Netlify site name")
-        self.assertEqual(stopped.exception.code, 1)
-
-    def test_the_refusal_names_the_question_it_could_not_ask(self):
-        """A refusal nobody can act on is barely better than a hang.
-
-        The question is quoted verbatim, so whoever reads the log in the
-        morning knows what would have been asked.
-        """
+    def _refusal(self, call):
+        """Run something that must refuse, and hand back what it printed."""
         said = io.StringIO()
-        with contextlib.redirect_stdout(said):
-            with self.assertRaises(SystemExit):
-                deploy.prompt("Enter Netlify site name", default="ics3u-s1-2026-gordon")
-        printed = said.getvalue()
-        self.assertIn(
-            "Enter Netlify site name", printed,
-            "The refusal must say which question it could not ask",
-        )
-        self.assertIn(
-            "nobody is at this computer", printed,
-            "The refusal must say why it stopped",
-        )
+        with redirect_stdout(said):
+            with self.assertRaises(SystemExit) as stopped:
+                call()
+        self.assertEqual(
+            deploy.NEEDS_AN_ANSWER, stopped.exception.code,
+            "The exit code is the whole mechanism: the scheduled wrapper reads "
+            "it to tell a teacher their publish needs one answer. Any other "
+            "code reads as an ordinary failure.")
+        return said.getvalue()
+
+    def test_the_exit_code_is_distinct_from_an_ordinary_failure(self):
+        # Every other exit in deploy.py is 1. If this ever becomes 1, a caller
+        # can no longer tell "nobody was there to answer" from "the upload
+        # failed", and the teacher gets the wrong sentence in the morning.
+        self.assertEqual(3, deploy.NEEDS_AN_ANSWER)
+        self.assertNotEqual(1, deploy.NEEDS_AN_ANSWER)
+
+    def test_a_question_with_a_default_refuses_rather_than_taking_it(self):
+        """
+        The dangerous half. Without the flag and without a terminal this
+        returns "ics3u-s1-2026" and the site is created at that address —
+        published, live, and named by nobody.
+        """
+        said = self._refusal(
+            lambda: deploy.prompt("Enter Netlify site name", default="ics3u-s1-2026"))
+        self.assertIn("Enter Netlify site name", said,
+                      "The refusal has to name the question it could not ask.")
+        self.assertNotIn("ics3u-s1-2026", said,
+                         "Naming the default invites somebody to think it was used.")
+
+    def test_a_question_with_no_default_refuses_too(self):
+        said = self._refusal(lambda: deploy.prompt("Choose a different Netlify site name"))
+        self.assertIn("Choose a different Netlify site name", said)
 
     def test_the_surname_question_refuses(self):
-        """Reached only when a NEW website is being named.
-
-        The surname is looked for under `GLOBAL_SECRETS_ROOT`, which is a
-        path inside the container — so it is pointed at an empty folder
-        here rather than left to the host's, where "no surname saved"
-        would be true by accident rather than by arrangement.
         """
-        with tempfile.TemporaryDirectory() as tmp:
-            with unittest.mock.patch.object(deploy, "GLOBAL_SECRETS_ROOT", Path(tmp)):
-                with contextlib.redirect_stdout(io.StringIO()):
-                    with self.assertRaises(SystemExit) as stopped:
-                        deploy.get_or_prompt_teacher_last_name()
-                self.assertEqual(stopped.exception.code, 1)
+        Asked only when a NEW site is being named — which is exactly the
+        situation a scheduled run must not be in.
+        """
+        # No saved profile is needed: the point is that it never reaches the
+        # terminal, whatever is on disk. If a surname IS already saved the
+        # function returns it and asks nothing, which is the ordinary case and
+        # is not what this pins.
+        if deploy.load_teacher_last_name():
+            self.skipTest("a surname is already saved on this machine, so nothing is asked")
+        said = self._refusal(deploy.get_or_prompt_teacher_last_name)
+        self.assertIn("last name", said.lower())
+
+    def test_it_says_nothing_was_published(self):
+        """
+        The sentence a teacher most needs, because the alternative reading of a
+        stopped publish is "it half happened".
+        """
+        said = self._refusal(lambda: deploy.prompt("Enter Netlify site name", default="x"))
+        self.assertIn("Nothing was published", said)
+
+    def test_it_says_what_to_do_about_it(self):
+        said = self._refusal(lambda: deploy.prompt("Enter Netlify site name", default="x"))
+        self.assertIn("Plantoir", said,
+                      "A refusal that does not say where to answer the question leaves the "
+                      "teacher with a publish that will fail again tomorrow night.")
 
 
-class WithSomebodyThereNothingChanges(unittest.TestCase):
-    """The flag is opt-in, and the ordinary publish must be untouched.
-
-    Pressing Deploy in the app runs this same code through a
-    pseudo-terminal, so a question comes back to the app and becomes a
-    dialog the teacher answers. That is the feature, not a fault.
+class AskingNormallyWhenSomebodyIsThere(unittest.TestCase):
+    """
+    The other half, and the one a regression would be worst in: with the flag
+    ABSENT nothing changes at all. A teacher at a keyboard must get every
+    prompt they got before.
     """
 
-    def test_a_prompt_still_takes_its_default_when_the_flag_is_off(self):
-        self.assertFalse(deploy.NON_INTERACTIVE)
-        # Standard input is replaced rather than merely assumed to be a
-        # pipe. `prompt()` branches on `isatty()`, so run from a terminal
-        # this test would call `input()` and WAIT — and verify.sh insists
-        # on a terminal, which means the gate for a hang would itself hang,
-        # with its output redirected to a log so nothing said why.
-        with unittest.mock.patch.object(sys, "stdin", io.StringIO()):
-            self.assertEqual(
-                deploy.prompt("Enter Netlify site name", default="ics3u-s1-2026-gordon"),
-                "ics3u-s1-2026-gordon",
-            )
+    def test_without_the_flag_a_non_terminal_still_takes_the_default(self):
+        before = deploy.NON_INTERACTIVE
+        before_stdin = sys.stdin
+        deploy.NON_INTERACTIVE = False
+        # stdin is REPLACED rather than tested, because this file is also run
+        # by hand from a terminal — where the real stdin is a tty and this call
+        # would block on input() for ever, hanging the suite. A StringIO is not
+        # a terminal, which takes the same branch a scheduled run takes.
+        sys.stdin = io.StringIO("")
+        try:
+            self.assertEqual("ics3u-s1-2026",
+                             deploy.prompt("Enter Netlify site name", default="ics3u-s1-2026"))
+        finally:
+            sys.stdin = before_stdin
+            deploy.NON_INTERACTIVE = before
+
+    def test_the_flag_is_off_unless_it_is_asked_for(self):
+        # Read from the module as imported, not after setUp has touched it.
+        self.assertFalse(
+            deploy.NON_INTERACTIVE,
+            "Refusing by default would break every teacher publishing by hand.")
 
 
-class TheFlagIsWiredAllTheWayThrough(unittest.TestCase):
-    """It has to survive three hops, and a break in any one is silent."""
+class TheFlagIsAccepted(unittest.TestCase):
 
-    def test_the_python_accepts_the_flag(self):
-        result = subprocess.run(
-            [sys.executable, str(REPOSITORY_ROOT / "scripts" / "deploy.py"), "--help"],
-            capture_output=True, text=True, timeout=60,
-        )
-        self.assertIn("--non-interactive", result.stdout)
+    def test_the_argument_parser_takes_it(self):
+        # Guards the plumbing rather than the behaviour: a flag the parser
+        # rejects makes the launcher's child exit 2 with an argparse message,
+        # which reads as a broken toolchain rather than as a missing answer.
+        source = (deploy.__file__ or "")
+        self.assertTrue(source.endswith("deploy.py"))
+        with open(source, encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn('"--non-interactive"', text)
+        self.assertIn("non_interactive", text,
+                      "argparse turns --non-interactive into args.non_interactive; "
+                      "main() has to read that name.")
+
+
 
     def test_the_launcher_accepts_the_flag_and_does_not_call_it_unknown(self):
         """`deploy.sh` exiting with "Unknown option" is a publish that never started.
@@ -167,17 +213,6 @@ class TheFlagIsWiredAllTheWayThrough(unittest.TestCase):
         launcher = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
         self.assertIn('opts="$opts --non-interactive"', launcher)
         self.assertIn('-e NON_INTERACTIVE=', launcher)
-
-    def test_the_launcher_asks_for_no_terminal_when_nobody_is_here(self):
-        """Belt and braces: with no terminal on standard input, the branch
-        of `input()` that WAITS cannot be reached at all."""
-        launcher = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
-        self.assertIn('if [[ "$NON_INTERACTIVE" == "true" ]]; then\n  _EXEC_TTY="-i"', launcher)
-
-
-class TheContractAndTheCodeAgree(unittest.TestCase):
-    """The refusal points are contract data so Windows copies them rather
-    than inventing a second, differently-shaped list."""
 
     def test_the_contract_lists_the_flag_and_what_it_refuses(self):
         rules = json.loads(

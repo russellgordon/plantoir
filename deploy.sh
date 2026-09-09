@@ -247,10 +247,6 @@ Notes:
 - --image REF publishes using a particular already-built image; normally the
   image is built locally from this folder's recipe when missing.
 - If your course code ends with '0' (zero), you'll be prompted to correct it to 'O' for Open-level courses.
-- --non-interactive says nobody is at the computer, which is what a scheduled
-  publish is. Anything that would stop and ask — a Netlify or Cloudflare
-  credential, a name for a website that does not exist yet — stops the publish
-  instead, saying which question it could not ask.
 USAGE
 }
 
@@ -282,6 +278,34 @@ SECTION_NUM="$1"; shift
 # Normalize course code to uppercase
 COURSE_CODE="$(printf '%s' "$COURSE_CODE" | tr '[:lower:]' '[:upper:]')"
 
+# --non-interactive is looked for HERE, before the flag loop below, because the
+# first question this script asks — the 'Open' course-code guard — comes before
+# that loop. deploy.ps1 needs no such pre-scan: it parses its flags first and
+# asks afterwards. The loop below also accepts the flag, so it is not reported
+# as an unknown option; this pre-scan only makes it visible early.
+NON_INTERACTIVE="false"
+for _early_arg in "$@"; do
+  if [[ "$_early_arg" == "--non-interactive" ]]; then NON_INTERACTIVE="true"; fi
+done
+
+# Called immediately before every question this script asks. Under
+# --non-interactive there is nobody to answer it — the publish was set to
+# happen on its own, at half six, with the app closed — so it REFUSES and says
+# which question it could not ask, rather than waiting for an answer that will
+# never come or quietly taking a default.
+#
+# Exit code 3 means that and nothing else, matching deploy.py's
+# NEEDS_AN_ANSWER. Every other exit in this script is 0 or 1.
+assert_can_ask() {
+  [[ "$NON_INTERACTIVE" == "true" ]] || return 0
+  echo ""
+  echo "This publish was set to happen on its own, so nobody is here to answer:"
+  echo "   $1"
+  echo " $2"
+  echo " Nothing was published."
+  exit 3
+}
+
 # Friendly guard: 'Open' course code ended with zero
 if [[ "$COURSE_CODE" =~ ^[A-Z]{3}[0-9]0$ ]]; then
   SUGGESTED="${COURSE_CODE%0}O"
@@ -291,6 +315,7 @@ if [[ "$COURSE_CODE" =~ ^[A-Z]{3}[0-9]0$ ]]; then
   if [[ -f "courses/$SUGGESTED/course_config.json" && ! -f "courses/$COURSE_CODE/course_config.json" ]]; then
     echo " I see setup data for '$SUGGESTED' on disk."
   fi
+  assert_can_ask "Fix course code to '$SUGGESTED'? [Y/n]" "Publish this section once from Plantoir, where you can answer it."
   read -rp " Fix course code to '$SUGGESTED'? [Y/n]: " _ans
   _ans="${_ans:-Y}"
   if [[ "$_ans" =~ ^[Yy]$ ]]; then
@@ -307,14 +332,6 @@ DIAGNOSE=""
 TEAM_SLUG=""
 RESET_TOKEN="false"
 TO_FOLDER=""
-# Nobody is at the computer — a scheduled publish, run by launchd at a time
-# the teacher chose and then went to bed for. Every prompt below becomes a
-# refusal that names the question, because both of the alternatives were
-# seen for real (TODO.md, 2026-09-06): with a terminal on standard input the
-# read waits forever and the site is simply not updated in the morning;
-# without one the read returns empty and something is chosen on the
-# teacher's behalf. See the same flag in scripts/deploy.py.
-NON_INTERACTIVE="false"
 TARGET="netlify"
 ACCOUNT_ARG=""
 while [[ $# -gt 0 ]]; do
@@ -335,6 +352,7 @@ while [[ $# -gt 0 ]]; do
     --to-folder=*)
       TO_FOLDER="${1#*=}" ;;
     --diagnose) DIAGNOSE="--diagnose" ;;
+    --non-interactive) NON_INTERACTIVE="true" ;;
     --team|--team-slug)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
       TEAM_SLUG="$2"; shift ;;
@@ -342,8 +360,6 @@ while [[ $# -gt 0 ]]; do
       TEAM_SLUG="${1#*=}" ;;
     --reset-token|--logout)
       RESET_TOKEN="true" ;;
-    --non-interactive)
-      NON_INTERACTIVE="true" ;;
     --image)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
       OVERRIDE_IMAGE="$2"; shift ;;
@@ -744,31 +760,12 @@ CF_ACCOUNT=""
 if [[ "$TARGET" == "cloudflare" ]]; then
   CF_TOKEN="$(get_cf_token_keychain)"
   if [[ -n "$CF_TOKEN" ]] && ! validate_cf_token "$CF_TOKEN"; then
-    # Unattended, the saved token is KEPT even though the check failed.
-    # The check is a network call, so "this Mac was offline at 6am" and
-    # "the token was revoked" look identical from here — and throwing away
-    # a working credential that only a person can replace is the more
-    # expensive of the two mistakes by a wide margin. An ordinary publish
-    # clears it as before, with somebody there to paste a new one.
-    if [[ "$NON_INTERACTIVE" == "true" ]]; then
-      echo "❌ The saved Cloudflare connection could not be checked, so ${COURSE_CODE} Section ${SECTION_NUM}"
-      echo "   was not published. It may have expired, or this computer may have been offline."
-      echo "   It has been left in place, because nobody is here to enter a new one."
-      echo "   Open Plantoir and publish this section once to sort it out."
-      exit 1
-    fi
     echo "⚠️ The saved Cloudflare token no longer works, so it has been cleared."
     delete_cf_token_keychain
     delete_cf_account_keychain
     CF_TOKEN=""
   fi
   if [[ -z "$CF_TOKEN" ]]; then
-    if [[ "$NON_INTERACTIVE" == "true" ]]; then
-      echo "❌ Cloudflare is not connected on this computer, so ${COURSE_CODE} Section ${SECTION_NUM} was not published."
-      echo "   Connecting asks you to paste a token from Cloudflare, and nobody is here to do that."
-      echo "   Open Plantoir and publish this section once, then it can publish on its own."
-      exit 1
-    fi
     cat <<'MSG'
 
 Connect to Cloudflare.
@@ -796,6 +793,7 @@ this computer.
      paste it below. Nothing appears as you paste; that is normal.
 
 MSG
+    assert_can_ask "Paste Cloudflare token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
     read -rsp "Paste Cloudflare token: " cf_pasted; echo
     if ! validate_cf_token "$cf_pasted"; then
       echo "❌ Cloudflare did not accept that token."
@@ -818,13 +816,15 @@ MSG
   if [[ -z "$CF_ACCOUNT" ]]; then CF_ACCOUNT="$(discover_cf_account "$CF_TOKEN")"; fi
   if [[ -z "$CF_ACCOUNT" ]]; then CF_ACCOUNT="$(get_cf_account_keychain)"; fi
   if [[ -z "$CF_ACCOUNT" ]]; then
-    if [[ "$NON_INTERACTIVE" == "true" ]]; then
-      echo "❌ Cloudflare needs your Account ID, and it is not saved on this computer, so"
-      echo "   ${COURSE_CODE} Section ${SECTION_NUM} was not published."
-      echo "   Nobody is here to be asked for it. Add it in this course’s settings, under"
-      echo "   Deploying, then schedule this again."
-      exit 1
-    fi
+    # GUARDED HERE, not inside prompt_for_cf_account, and that is the whole
+    # point. The function's output is CAPTURED — `$( )` is a subshell — so a
+    # refusal printed in there goes into $CF_ACCOUNT instead of onto the
+    # screen, and its `exit 3` exits the subshell, leaving `|| exit 1` to
+    # report an ordinary failure. Nothing printed, wrong exit code, and the
+    # launchd wrapper the mac is being asked to build would read it as an
+    # ordinary failure and leave no note. Found by review; the other three
+    # guards in this file are at the top level and are unaffected.
+    assert_can_ask "Paste Cloudflare Account ID" "Add the Account ID in this course's settings in Plantoir, under Deploying."
     CF_ACCOUNT="$(prompt_for_cf_account)" || exit 1
     set_cf_account_keychain "$CF_ACCOUNT"
   fi
@@ -837,15 +837,6 @@ TOKEN=""
 if [[ "$TARGET" == "netlify" ]]; then
 TOKEN="$(get_token_keychain || true)"
 if [[ -n "$TOKEN" ]] && ! validate_token "$TOKEN"; then
-  # Kept rather than cleared when nobody is here — see the same reasoning
-  # on the Cloudflare token above.
-  if [[ "$NON_INTERACTIVE" == "true" ]]; then
-    echo "❌ The saved Netlify connection could not be checked, so ${COURSE_CODE} Section ${SECTION_NUM}"
-    echo "   was not published. It may have expired, or this computer may have been offline."
-    echo "   It has been left in place, because nobody is here to enter a new one."
-    echo "   Open Plantoir and publish this section once to sort it out."
-    exit 1
-  fi
   echo "⚠️ The saved Netlify token no longer works, so it has been cleared."
   delete_token_keychain
   TOKEN=""
@@ -885,12 +876,6 @@ fi
 
 # If still no token, prompt user to create one (quote-safe via here-doc)
 if [[ -z "$TOKEN" ]]; then
-  if [[ "$NON_INTERACTIVE" == "true" ]]; then
-    echo "❌ Netlify is not connected on this computer, so ${COURSE_CODE} Section ${SECTION_NUM} was not published."
-    echo "   Connecting asks you to paste an access token from Netlify, and nobody is here to do that."
-    echo "   Open Plantoir and publish this section once, then it can publish on its own."
-    exit 1
-  fi
   cat <<'MSG'
 
 Connect to Netlify.
@@ -917,6 +902,7 @@ this computer.
 
 MSG
   echo ""
+  assert_can_ask "Paste Netlify token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
   read -rsp "Paste Netlify token: " pasted; echo
   if ! validate_token "$pasted"; then
     echo "❌ Token invalid (Netlify rejected it). Please try again."
@@ -1378,15 +1364,7 @@ fi
 # Ask for a terminal only when there is one: `docker exec -t` refuses to start
 # without a terminal on stdin, which is how this runs from a script or from
 # Plantoir's MCP server. See the same note in preview.sh.
-#
-# Unattended, never ask for one even if the host happens to have a console.
-# That removes the branch that hangs: with a terminal on standard input
-# `deploy.py`'s own prompts would WAIT rather than return, and a scheduled
-# publish has nobody to type into it. The Python refuses on its own now, but
-# the two together mean neither half has to be right for the other to hold.
-if [[ "$NON_INTERACTIVE" == "true" ]]; then
-  _EXEC_TTY="-i"
-elif [[ -t 0 ]]; then _EXEC_TTY="-it"; else _EXEC_TTY="-i"; fi
+if [[ -t 0 ]]; then _EXEC_TTY="-it"; else _EXEC_TTY="-i"; fi
 
 # Pass options via env to avoid fragile mixed quoting in sh -lc
 docker exec $_EXEC_TTY \
@@ -1401,8 +1379,11 @@ docker exec $_EXEC_TTY \
     tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat;
     opts="";
     [ -n "$DIAGNOSE" ]  && opts="$opts $DIAGNOSE";
-    [ -n "$TEAM_SLUG" ] && opts="$opts --team $TEAM_SLUG";
+    # PARSING the flag is not enough — it has to reach the Python, which is
+    # where the site-name question lives. A launcher that took the flag and
+    # never forwarded it would leave a green test suite and an unchanged hang.
     [ "$NON_INTERACTIVE" = "true" ] && opts="$opts --non-interactive";
+    [ -n "$TEAM_SLUG" ] && opts="$opts --team $TEAM_SLUG";
     if [ "$TARGET" = "cloudflare" ]; then
       CLOUDFLARE_API_TOKEN="$tok" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \
         python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course '"$COURSE_CODE"' --section '"$SECTION_NUM"' $opts
