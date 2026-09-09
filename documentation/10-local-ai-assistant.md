@@ -1032,8 +1032,8 @@ assistant's contract and is now the whole product's:
 
 | File | What it holds |
 |---|---|
-| `contracts/assist-wording.json` | Every sentence the assistant says to a teacher — nineteen, with `{course}` and `{section}` where values go. |
-| `contracts/assist-cases.json` | The nine phrasings matched in code, the four near misses that must NOT match, the three tool lists with approvals and plan twins, **the full tool SCHEMAS as a client sends them**, eight scenarios as `given` / `when` / `expectEvents` / `expectReply`, and the arrow-key prompt history. |
+| `contracts/assist-wording.json` | Every sentence the assistant says to a teacher, with `{course}` and `{section}` where values go. **Count the keys rather than trusting a number here** — it was written as "nineteen" and there are forty-one. |
+| `contracts/assist-cases.json` | The phrasings matched in code, the near misses that must NOT match, the three tool lists with approvals and plan twins, **the full tool SCHEMAS as a client sends them**, the scenarios, and the arrow-key prompt history. A scenario is `given` / `when` / an expectation: `given.saying` makes it a CONVERSATION rather than one turn, `when` is `approve`, `decline`, `say` (the last turn is ANSWERED, and a card there fails the case) or a tool name, and the expectation is `expectEvents`, `expectReply`, `expectTranscript` or `expectTranscriptContains`. The file's own `scenarios.note` is the authority; counts here rot. |
 | `contracts/app-rules.json` | Launcher arguments per configuration, the validation a teacher reads, failure output turned into a sentence, whether a deploy must build first, the progress markers and where each one's text comes from, the preview's ports. |
 | `contracts/schedule-rules.json` | Every accepted date form, how an ambiguous `08/09/2026` column is settled or asked about, what a pasted Google Sheet address becomes. |
 | `contracts/class-planning.json` | Which titles carry numbers, what the next class is called, and the ORDER renames must run in. |
@@ -1737,10 +1737,48 @@ answer turn arrives once the dates are already right, so an early return there
 makes the answer a no-op; `ShowPlan` returns early whenever the plan twin hands
 back something that is not a plan, which can make the release unreachable in
 the default configuration; and the question has to go in the teacher's SUMMARY
-rather than the detail. A fourth was found on Windows and is the mac's too
-(issue #120): a bare rollover on a section whose dates are already right never
-asks the question at all under plan mode, so the question exists or not
-depending on a setting.
+rather than the detail. A fourth was found on Windows and was the mac's too
+(issue #120, fixed on the mac 2026-09-09): a bare rollover on a section whose
+dates are already right never asked the question at all under plan mode, so
+the question existed or not depending on a setting.
+
+### Why the twin ANSWERS rather than proposing, on the turn that changes nothing
+
+All four traps are the same shape — a branch that returns early because the
+DATES need no change, on a feature whose whole subject is the WEBSITE — and the
+fourth is the one that keeps coming back, because the natural repair is the
+wrong one. A rollover with no answer, on a section already on its dates, could
+be made to return a PLAN: that is what the branch beside it does for a rollover
+that HAS an answer, and it would reach the real call, which asks properly.
+
+It would also put a Go button under a question. There is nothing there to agree
+to: the dates need no change, and the website is settled by SAYING one of the
+two sentences, not by pressing Go — which is the design's own rule, since an
+MCP client has no card to press. A teacher pressing Go would watch a plan they
+accepted change nothing, and the one surface the "answer in words" reasoning
+was written for would see a proposal it cannot act on. So the twin ANSWERS:
+the question, the two sentences that answer it, and `rolloverWebsiteNotDecided`,
+handed back as a reply that the plan surface puts in the transcript verbatim.
+The contract pins it as `when: "say"` — a card appearing on that turn fails the
+case rather than merely looking odd.
+
+**The two definitions of "is this a rollover" must be ONE.** The twin and the
+write each had their own, and they disagreed: the write counted `website:
+"new"` or `"same"` with no `rollover` key, and the twin counted only
+`rollover`. `isARollover(_:)` is now the single answer to the question, and
+**any non-empty `website` counts** — so an MCP caller sending `website: "a new
+one"`, which is an ordinary thing for a model to do, gets the question back
+instead of an ordinary re-date with no question, no error and no mention of the
+website at all. Windows reached the same rule independently
+(`!string.IsNullOrWhiteSpace`).
+
+**One consequence of that widening is the mac's alone.** Arguments arrive as
+JSON and `text(_:in:)` renders a number, so `website: false` — an ordinary way
+for a caller to spell "no answer here" — read as `"0"`, which is not empty, and
+would have asked a teacher re-dating after a SNOW DAY whether to abandon the
+address their students are reading right now. Only a `String` counts on the mac
+now. **Windows cannot reach it and should not copy the guard**: the MCP SDK's
+binder never lets a bool reach a `string` parameter.
 
 **A known limit, recorded in `nearMisses` rather than fixed.** The reply offers
 two sentences word for word, and those exact strings are the only way back in.
