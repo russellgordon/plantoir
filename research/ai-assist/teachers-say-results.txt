@@ -1,8 +1,9 @@
 What the missing TEACHERS SAY: phrasings were worth — Windows, 2026-09-08
 ========================================================================
 
-Run on WINDOWS, for `WINDOWS-HANDOFF.md` item 41, which asked for exactly this
-and said only this side could do it. The mac cannot run this hardware.
+Run on WINDOWS, for GitHub issue #66 (the retired numbered list's item 41),
+which asked for exactly this and said only this side could do it. The mac
+cannot run this hardware.
 
 WHAT WAS MEASURED
 -----------------
@@ -73,6 +74,20 @@ explained: "That was wrong, revert it" went from declined 5/5 to
 undo_last_change 5/5. Nothing in the change touches undo_last_change's
 description, so this is the surface shifting under it, not a designed gain.
 
+**So the honest headline is 40/50 -> 50/50 with no control regressing, NOT
+76% -> 88%.** Five of the fifteen gained calls are that one control, and by
+the paragraph above they are not attributable to the phrasings. Quote the
+under-test figure.
+
+It also qualifies the determinism claim above, and the qualification is worth
+more than the tidy sentence it spoils. Within a run this model is perfectly
+deterministic — every probe 5/5 or 0/5, twice over. ACROSS a 347-character
+change to a surface that does not mention undo_last_change, an unrelated probe
+flipped completely. That is what a null perturbation looks like here, so a
+one-probe difference between two runs is not evidence of anything on its own.
+The two under-test fixes survive that caution because the probes are literally
+two of the phrasings added; a control moving is not.
+
 THE CORRECTION THAT MATTERS MOST — the first pair was thrown away
 ----------------------------------------------------------------
 A first BEFORE/AFTER pair was run and DISCARDED. It sent the bare prompt with
@@ -88,8 +103,15 @@ identical in both BEFORE runs and only the dateline changed:
 
 Thirty points, from the line the app appends to every message anyway. And the
 three probes it fixed on its own were "what dates do you have for us?", "do you
-know our timetable?" and "how many class days are left?" — so the discarded run
-would have credited the phrasings with FIVE probes when they fix two.
+know our timetable?" and "how many class days are left?" — three probes that
+pass with no phrasing change at all, and that a before/after run without the
+dateline would have handed to the phrasings.
+
+(Said exactly: the discarded AFTER run was stopped before it finished, so
+"five instead of two" is inference from the two BEFORE runs rather than a
+measured pair. What IS measured is that those three fail without the dateline
+and pass with it, on the unchanged surface. That is enough to make the point
+and not enough to state a five.)
 
 That is the whole reason this file records its request shape in such detail. A
 routing score is a score for one exact request, and a harness that sends
@@ -127,6 +149,25 @@ HOW TO RE-RUN
 Start llama-server with the arguments above, by hand. Do NOT start from
 `tools-from-contract.py` on Windows: the contract is generated from the mac,
 so its descriptions are the mac's.
+
+WHAT CHANGED UNDER THIS FILE, HOURS AFTER IT WAS WRITTEN
+--------------------------------------------------------
+The measurement above is of the seventeen phrasings across four tools, and
+stands exactly as run. It was taken against a 25-tool shared surface.
+
+The same day, the mac shipped six new MCP tools, and three of them —
+add_classes, list_courses, make_room_for_classes — arrived carrying
+TEACHERS SAY: clauses their Windows equivalents did not have. Those three
+were added in the same Windows branch, taking it to twenty phrasings across
+seven tools, and were NOT re-measured: none of the three is in
+AssistAgent.ForTheLocalModel, so the local router never reads them and there
+is nothing a routing probe could show. The comparison was re-run across all
+32 shared tools afterwards; exactly one clause still differs and it is the
+mac's check_section.
+
+The point worth keeping is not about those three tools. A parity claim about
+tool wording is true only of the surface it was checked against, and both
+surfaces move. Re-run the comparison rather than quoting a count from here.
 
 A NOTE ON THE INSTRUMENT
 ------------------------

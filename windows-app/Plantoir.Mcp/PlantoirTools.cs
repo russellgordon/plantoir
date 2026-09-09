@@ -43,7 +43,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     // ---- Looking around --------------------------------------------------
 
     [McpServerTool(Name = "list_courses", Title = "List courses", ReadOnly = true, Destructive = false)]
-    [Description("List the teacher's courses in this working folder: code, name, sections, and where each one publishes to. " +
+    [Description("TEACHERS SAY: \"what courses do I have?\", \"list my courses\". " +
+                 "List the teacher's courses in this working folder: code, name, sections, and where each one publishes to. " +
                  "Call this first when the teacher mentions a course but you are not certain of its exact code.")]
     public string ListCourses()
     {
@@ -477,7 +478,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "make_room_for_classes", Title = "Make room for classes",
                    Destructive = false, Idempotent = false)]
-    [Description("Insert one or more classes part-way through a unit: rename the later days of that unit, " +
+    [Description("TEACHERS SAY: \"make room for a class at Unit 3, Day 4\". " +
+                 "Insert one or more classes part-way through a unit: rename the later days of that unit, " +
                  "update every link that pointed at them, move the classes that follow onto later class days, " +
                  "and create the new pages unpublished. " +
                  "\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course is " +
@@ -512,7 +514,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         => Guarded(() => workspace.PlanAddClasses(course, section, unit, firstDay, howMany).Describe());
 
     [McpServerTool(Name = "add_classes", Title = "Add class pages", Destructive = false, Idempotent = false)]
-    [Description("Create the class pages for a unit, dated to the days the section actually meets. " +
+    [Description("TEACHERS SAY: \"add five more days to Unit 4\". " +
+                 "Create the class pages for a unit, dated to the days the section actually meets. " +
                  "Call plan_add_classes FIRST and show the teacher what it said. " +
                  "\n\nThe pages are created UNPUBLISHED — empty skeletons for the teacher to write, which stay out " +
                  "of the site until they publish them. An existing page is never written over. The course is " +

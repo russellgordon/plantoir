@@ -79,6 +79,17 @@ which gets wiped by `--full-rebuild`; markers found there are silently
 migrated to the stable location. This is also why marker storage lives under
 the *course* folder, not the *output* folder.)
 
+**One thing removes that marker, and only on purpose.** Rolling a section over
+to a new year asks the teacher whether this should be a new website or last
+year's, and on "a new website" the marker is **renamed aside**, never deleted —
+it holds the site id and admin address, and is the only way back. The next
+deploy then finds no marker and asks what to call the new site, exactly as a
+first deploy does. Every destination type is released, not just the one the
+course is configured for now, because a section pinned to a destination it no
+longer uses would otherwise keep publishing there. Rolling over also turns off
+any publish scheduled to run on its own: a released section has no agreed site
+to publish to, and an unattended run has nobody to ask what to call one.
+
 The `*.netlify.app` address need not be the address anyone shares: a
 teacher can attach a **custom domain** to the site in Netlify and record
 it per section in `course_config.json`

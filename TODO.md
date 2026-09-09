@@ -4,6 +4,77 @@ Ideas and deferred work, in no particular order. Add items freely; remove
 an item when it ships (finished behaviour is recorded in
 [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), not here).
 
+- **The assistant's features are tested at the tool and nowhere above it, and
+  that is exactly where the bugs have been** (mac, 2026-09-08; Russell:
+  *"you MUST drive the real app to test these features. They should be part of
+  the full UI suite that is run"*).
+
+  **The evidence, and it is not a hunch.** Building the rollover
+  (`GUI-IMPROVEMENTS.md` row 448) took three adversarial reviews, and every
+  serious finding was at a SEAM above the tool rather than in its logic — each
+  one behind a fully green suite:
+
+  | What was wrong | Which seam |
+  |---|---|
+  | The question never reached the teacher: it was written into `detail`, and `AssistToolOutcome.wrote` leaves `teacherDetail` nil | tool → window |
+  | Plan mode is ON by default and `showPlan` returns early on a non-plan outcome, so the answer turn never ran the real call — the release was unreachable in the default configuration | tool → plan card |
+  | A Claude Code session had no declared argument to answer with | tool → MCP schema |
+  | Answering was a no-op, because by the second turn the dates are already right and the plan changes nothing | tool → its own early return |
+
+  A unit suite that calls `AssistToolRunner` directly cannot see any of those.
+  Three of the four were caught by reading rather than by testing, which is not
+  a process anyone should rely on twice.
+
+  **The test now EXISTS; what is left is the thing stopping it going green.**
+  `AssistantRolloverUITests` was written the same day (2026-09-08) and does
+  what this entry asked: types "roll this section over to a new year", asserts
+  the question is on screen by contract NAME rather than by retyped prose, says
+  an answer back, asserts the confirmation and that the site marker moved on
+  disk — four steps, with plan mode ON, against a real `llama-server` and no
+  stubbed model. Both questions this entry left open are decided: opt-in via
+  `PLANTOIR_UI_TESTS=1`, and nothing bypassed.
+
+  **It is not green.** The card phrasing matches, the plan card appears,
+  approval runs the tool — and then the app's main thread is busy for ~30
+  seconds and XCUITest cannot take a snapshot through it. `AssistToolRunner` is
+  `@MainActor` and the rollover awaits `bringThePreviewUpToDate`, which drives
+  the toolchain; a fixture workspace has no container for it to talk to.
+  **Whether that is a product problem worth fixing — the window freezing after
+  a rollover — or an artefact of testing without Docker is the open question**,
+  and it is not one to answer by guessing. Russell offered the cheap way to
+  find out: run a rollover by hand and see whether the window freezes.
+
+  **The state redirect is still owed and is the other half.** A UI-driven app
+  does not know it is under test — `isRunningTests` asks whether `XCTestCase`
+  is loaded, and it is loaded in the RUNNER — so it writes to the real
+  preferences domain, the real breadcrumb trail and the real
+  `~/Library/LaunchAgents`. Windows bought this property with `--state-dir`;
+  the mac has no equivalent. Russell chose to run without it for now ("I'd
+  rather know that it works"), which is a decision about today rather than a
+  reason not to build it.
+
+  The original "what to build" follows, kept because its reasoning about WHICH
+  seams matter is what made the test worth writing.
+
+  `mac-app/Tests/QuartzTeachersUITests/` already exists and is a real target,
+  and `AssistantTreeDump.testDumpAssistantTree` already prints the assistant
+  window's element tree — so addressing the conversation by what it actually is
+  is groundwork that is done. What is missing is any test that opens the
+  assistant, types a phrasing, and reads what comes back. Start with the
+  rollover, because it is the one whose seams are known to be load-bearing.
+
+  **Two things to decide when picking this up.** Whether it is opt-in and part
+  of no gate, as Windows' `run-ui-tests.ps1` deliberately is (`[UiFact]`,
+  `PLANTOIR_UI_TESTS=1`) — the same reasoning applies here, since it needs the
+  foreground and takes minutes; and whether the assistant is driven with a
+  stubbed model, which the card phrasings make possible because they are
+  matched in code and never reach a model at all. That second point is what
+  makes this tractable: the deterministic phrasings are exactly the ones worth
+  covering, and they need no `llama-server` running.
+
+  **Rule 9 applies while writing it**: driving the real app is encouraged, and
+  the terminal comes back to the front afterwards.
+
 - **Start the Windows app with its output redirected and every launcher fails,
   silently and unrecognisably** (Windows, 2026-09-07, met while writing the
   wizard's UI test - the research below is done, so picking this up is cheap).
@@ -604,7 +675,13 @@ an item when it ships (finished behaviour is recorded in
   the teacher's editor and they would see the old word every time they opened
   the vault — which is the place the rename was supposed to help.
 
-- **The assistant's first turn does not wait for its warm-up** — measured
+- **~~The assistant's first turn does not wait for its warm-up~~** — ✅ **Done
+  2026-08-20**, the same week it was written. `AssistSession.canSend` now reads
+  `guard readiness == .ready, hasFinishedWarmUp, let agent`, with a separate
+  `canAcceptTyping` so the composer explains itself while the model warms, and
+  `AssistWarmUpTests` pins it. The original entry follows.
+
+  The assistant's first turn does not wait for its warm-up — measured
   2026-08-20, while qualifying the mac for v1.1.0. `AssistSession` sets
   `readiness = .ready` (which is all `canSend` checks) and only THEN awaits
   `warmUp`, so a teacher who types straight away queues behind the
@@ -625,7 +702,14 @@ an item when it ships (finished behaviour is recorded in
   measurement above is the evidence it is worth doing, not a substitute
   for one.
 
-- **A mac problem report can carry nothing the engine said** — found the
+- **~~A mac problem report can carry nothing the engine said~~** — ✅ **Done
+  2026-08-20.** `AssistServerHost` writes to `logHandle ?? FileHandle.nullDevice`
+  — a FILE, never a pipe, which keeps exactly the no-blocking-read property this
+  entry insisted on — and a bounded tail (`engineLinesSinceLastLook(atMost: 200)`)
+  reaches the trail as `assistantEngineSaid`, a registered contract event. The
+  original entry follows.
+
+  A mac problem report can carry nothing the engine said — found the
   same day. `AssistServerHost` sends `llama-server`'s stdout and stderr to
   `FileHandle.nullDevice`. That is load-bearing (an unread pipe is what
   wedged the Windows server mid-request, and this is why the mac never
@@ -636,8 +720,24 @@ an item when it ships (finished behaviour is recorded in
   than piping the firehose, and keep the no-blocking-read property that
   makes the current arrangement safe.
 
-- **A preview's progress bar sits at 100% saying "Opening the preview…"
-  for the entire build** — found 2026-08-19, while re-shooting the
+- **~~A preview's progress bar sits at 100% saying "Opening the preview…"
+  for the entire build~~** — ✅ **Done.** `TaskMilestones` watches for
+  `"Done processing"`, `patches/build.ts` prints it and the Dockerfile bakes
+  that file into the image.
+
+  **This entry survived only because of its own closing instruction**, which
+  said to leave it until a mac had regenerated `app-rules.json`. A mac did, on
+  2026-09-01 (`13da5319`), and the contract has carried the right marker ever
+  since — so the sentence telling a reader the contract is stale had itself
+  gone stale, and acting on it would have meant redoing done work or
+  hand-editing a generated file. **Two things ARE still un-refreshed** and are
+  the only live part: `TaskMilestones.swift`'s comment still says the edit was
+  "authored on Windows and has NOT been built or tested on a mac", and
+  `MAC-HANDOFF.md` still lists it under "NEEDS A MAC BUILD/TEST/REGEN". Neither
+  is a code change. The original entry follows.
+
+  A preview's progress bar sits at 100% saying "Opening the preview…"
+  for the entire build — found 2026-08-19, while re-shooting the
   marketing screenshots; the "Building your site…" step is unreachable.
 
   **✅ Fixed on Windows, 2026-08-23** (`TaskMilestones.cs`, built and tested,
@@ -697,6 +797,17 @@ an item when it ships (finished behaviour is recorded in
   decline (or warn) when the container hosts running previews. Low
   priority — rare, and the next preview self-heals.
 
+  **Checked 2026-09-08, and "rare" is doing more work than it used to.**
+  `preview.sh` now has **five** paths that `docker rm` the container, not the
+  one or two this entry was written against: a missing `/teaching/courses`
+  mount, a different working folder, a **missing builds mount**, an image-id
+  mismatch, and a missing `9084/tcp` port binding. None of them consults
+  preview state. The third arrived with the 2026-09-05 builds-mount work, and
+  it guarantees exactly one forced recreation for every folder created before
+  that — so the "in steady state this never triggers" framing is weaker than it
+  reads. The priority judgement may still be right; the reasoning behind it
+  should be re-made rather than inherited.
+
 - **AI Assist — the rest of it**, updated 2026-08-14 after a full
   live-tested day on the `ai-assist` branch, since folded into `main`
   (not yet in any tagged release). The
@@ -708,7 +819,16 @@ an item when it ships (finished behaviour is recorded in
   [`research/ai-assist/HISTORY.md`](research/ai-assist/HISTORY.md) part 2 §10 is the record, and
   `MAC-HANDOFF.md` carries the mac side's pickup entry. What remains:
 
-  **(a) The CSV reschedule — built; what is left is around the edges.**
+  **(a) The CSV reschedule — ✅ SHIPPED ON BOTH PLATFORMS; nothing here is
+  open.** The mac now has the whole chain — `plan_re_date_classes` /
+  `re_date_classes`, `SectionReDatePlanner`, `SectionTimetable` — and the one
+  leftover named below is a decision this entry already closed ("not worth
+  fixing"), not work waiting. Reading a timetable FILE is a different question
+  and belongs to the MCP-surface divergence in `MAC-HANDOFF.md`, where
+  `read_timetable` is recorded as deliberately Windows-only. The original entry
+  follows.
+
+  Built; what is left is around the edges.
   It shipped in the plan-then-write shape this item asked for.
   `Plantoir.Core/Assist/Timetable.cs` reads a school's sheet without
   assuming its layout — which row is the header, which column holds dates,
@@ -728,7 +848,13 @@ an item when it ships (finished behaviour is recorded in
     worth fixing — teachers export to CSV without friction, and reading
     `.xlsx` off disk buys little.
 
-  **(b) The shared activity lease, finished.** `WorkLease` files under the
+  **(b) The shared activity lease — THE ONLY GENUINELY OPEN HALF of this
+  entry.** Verified 2026-09-08: the mac still does not read Windows' on-disk
+  lease files. `PreviewLeases` is an in-memory store and nothing under
+  `mac-app/` refers to `courses/.internal/activity` or a `.lease` file at all.
+  Everything else in this item has shipped. The original entry follows.
+
+  The shared activity lease, finished. `WorkLease` files under the
   working folder now let the GUI decline a preview while the assistant
   builds, but the full both-directions story (server honouring the GUI's
   claims across every operation, and the mac app reading the same files)
@@ -744,9 +870,12 @@ an item when it ships (finished behaviour is recorded in
   original TODO wording — a hide request declined outright — is fixed as
   a side effect; conversational-only accuracy went from 85% to 91-94%
   across two runs, with no new failures elsewhere. Shipped in
-  `AssistAgent.cs` and `AssistAgent.swift` — **the Swift side is written
-  but, per the usual constraint of a Windows session, not yet built or
-  tested on a mac**; see `MAC-HANDOFF.md`.
+  `AssistAgent.cs` and `AssistAgent.swift`. **That caveat is spent**: it said
+  the Swift was "written but not yet built or tested on a mac", which was true
+  the day a Windows session wrote it and has not been since — the two sentences
+  are in `AssistAgent.systemPrompt` and have been through every mac build and
+  suite run since 2026-08-24. Left in place rather than deleted, because a
+  caveat that expires quietly is how the next one gets believed too long.
 
   **Still open: the deletion probe's decline never came back.** "Delete
   the Unit 1 folder" still routes to `cancel_scheduled_deploy` instead of
@@ -757,6 +886,16 @@ an item when it ships (finished behaviour is recorded in
   Left for a future pass.
 
 - **A "prepare for start of year" operation, and the audit behind it** —
+  **Read the rollover decision first (2026-09-08, above): Russell chose that a
+  rollover leaves visibility ALONE.** A bulk "put everything past Day 1 into
+  draft" is the same territory and was just deliberately kept out of the
+  rollover, so this entry's shape is now a question he has partly answered.
+  Both gaps it names are still real, verified 2026-09-08: `check_section`
+  reports only two groups (links into hidden pages, visible pages nothing links
+  to) with no third "linked but missed" group, and there is no bulk operation
+  anywhere. The original entry follows.
+
+  A "prepare for start of year" operation, and the audit behind it —
   deferred 2026-08-13, from a real session on the `ai-assist` branch.
 
   A teacher asked for "every class past Unit 1, Day 1, and everything those
@@ -791,7 +930,7 @@ an item when it ships (finished behaviour is recorded in
   course-level pages, but for a "sample course" it does not name — a
   different measurement from the 32 above, not a contradiction of it.)
 
-## A rolled-over section publishes over last year's website
+## ✅ Done — A rolled-over section publishes over last year's website
 
 Noted 2026-09-06 on `issue/mcp-tool-surface-divergence`, while sorting the
 twelve MCP tools Windows serves and the mac does not (`MAC-HANDOFF.md`). Found
@@ -845,7 +984,7 @@ mac has never made one. Three options:
   `contracts/` so both platforms say it identically.
 
 Whichever is chosen it needs the same sentence on both sides. Windows' half is
-item 42 in `WINDOWS-HANDOFF.md`.
+item 45 in `WINDOWS-HANDOFF.md`.
 
 ### ✅ DECIDED 2026-09-08 by Russell — **ASK**, and leave visibility alone
 
@@ -874,7 +1013,28 @@ behaviour rather than an accident — the question at rollover is what makes it 
 choice — and the teacher who wants the year revealed class by class hides the
 pages themselves, which is an act they already have.
 
-**What is still to BUILD — a separate piece, not done here.**
+**✅ BUILT 2026-09-08** on `issue/rollover-asks-about-the-website`,
+`GUI-IMPROVEMENTS.md` row 451. All three parts below are done on the MAC; the
+Windows half is `WINDOWS-HANDOFF.md` item 45. Three things were found by
+adversarial review while building and are worth keeping, because each was a
+way of shipping something worse than the defect:
+
+- **Cutting a section loose had to turn off any publish set to happen on its
+  own.** `runScheduled` re-validates nothing and `deploy.py`'s name prompt
+  returns its DEFAULT with no terminal rather than failing, so the overnight
+  run would have created a website nobody named while the address students read
+  stopped updating.
+- **Answering the question is the SECOND turn**, by which time the pages are
+  already on their dates — so the re-date plan changes nothing, and returning
+  early on that made the answer a no-op with an offer that looked like it had
+  worked.
+- **"Still pinned" and "never published" cannot share a sentence.** A marker
+  that could not be moved was reported as "had not been published anywhere
+  yet", which is the opposite of the truth about the one fact this turns on.
+
+The original list of what had to be built follows.
+
+**What was to BUILD — a separate piece, not done in the deciding session.**
 
 1. **The sentence, in `contracts/`**, so both platforms ask identically. It is
    the only part of this that is teacher-facing, and it is the reason this
@@ -924,6 +1084,20 @@ case both suites run is how the two apps drift.
 `docker system df` on the dev mac, 2026-08-23: 1301 build-cache entries,
 14.30 GB, 14.25 GB reclaimable — a bigger number than the images that were
 leaking beside it (fixed 2026-08-23, `GUI-IMPROVEMENTS.md` 352).
+
+**Re-measured 2026-09-08, and the comparison has INVERTED.** Build cache is now
+632 entries, 4.81 GB, 2.56 GB reclaimable — a third of what it was — while
+images are 37 / 31.22 GB with **12.39 GB reclaimable**. So the sentence above,
+that the cache is the bigger number, is no longer true and should not be quoted
+as a reason to act. The decision below is unaffected and still right.
+
+Something else showed up in the same measurement, and it is not this item's
+bug: nine `teaching-quartz:src-*` images are on disk (2.42 GB each) against
+**two** containers, so eight are unreferenced. `prune_superseded_images` exists
+and works — it just only runs after a SUCCESSFUL build inside
+`build_image_if_missing`, so superseded images sit there until the next recipe
+change. Worth its own entry if it keeps growing, rather than being folded in
+here.
 
 **Not fixed on purpose, and this is the record of why so it does not get
 re-proposed:** `docker builder prune` is GLOBAL. There is no per-project or
