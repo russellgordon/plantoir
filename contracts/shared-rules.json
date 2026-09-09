@@ -458,7 +458,7 @@
       "why": "The exclusions are checked BEFORE the referrer test, so narrowing what counts as a referrer cannot reach them. Narrowing a sweep rule makes every exclusion above it matter more than it did the day before, which is why the exclusions are the thing to re-test after any change to what gets swept."
     }
   },
-  "note": "Eight rule sets that both apps need and neither platform owns. The MECHANISMS behind several of them differ completely - launchd against Task Scheduler, AppKit against WinUI, ~/Library/Logs against %LOCALAPPDATA% - which is exactly why the rules are written here instead: what must be refused, matched, stripped, or taken out of a problem report does not change with the machinery that does it.",
+  "note": "The rule sets both apps need and neither platform owns. The MECHANISMS behind several of them differ completely - launchd against Task Scheduler, AppKit against WinUI, ~/Library/Logs against %LOCALAPPDATA% - which is exactly why the rules are written here instead: what must be refused, matched, stripped, or taken out of a problem report does not change with the machinery that does it.",
   "pageNaming": {
     "note": "What a page is CALLED when the assistant talks about it, which is not what its file is called. Shared because it is a rule with inputs and outputs and because both apps read the same folders: a teacher told that 'index' still links to a page has been told nothing, since every folder in a course has an index.md. Reported from a real course (ADA1O Section 1).",
     "theRule": [
@@ -1053,11 +1053,9 @@
   "wizard": {
     "note": "What the New Course wizard says. AUTHORED rather than generated, and that is the whole point of the entry: a generated readout cannot fail when the code it reads changes, so a button label written by the generator would simply be rewritten to match whatever the button now says. Written by hand, each platform asserts its own constant against it and a drift goes red. Same reasoning as app-rules.json's split between milestones (a readout) and deployArguments (an expectation).",
     "createCourseButton": "Create Course",
+    "whereItIsRendered": "The mac reads it from WizardWording.createCourseButton and renders it in NewCourseWizardView; Windows renders it in NewCourseDialog. Named in prose rather than as a structured key, the way buildOutputLocation names its sources, because nothing reads such a key and a rename would rot it silently.",
     "whyThisOneString": "It is the first thing a teacher presses in this app. Both platforms have said Create Course since the wizard existed and nothing pinned it until 2026-09-08 — Windows asserted it only in NewCourseWizardUiTests, which is opt-in behind PLANTOIR_UI_TESTS=1 and part of no gate, and the mac asserted it nowhere. Two apps agreeing by habit is not two apps agreeing on purpose; the first notice of a drift would have been a teacher reading a different button from the one in the other platform's screenshots.",
-    "sources": {
-      "mac": "WizardWording.createCourseButton, rendered at NewCourseWizardView.swift",
-      "windows": "NewCourseDialog.cs"
-    }
+    "gatedTests": "Each platform's GATED test compares its constant to this key, which pins the constant rather than the rendered button. Only the UI suites see the button itself, and both are opt-in and part of no gate — QuartzTeachersUITests on the mac, [UiFact] under PLANTOIR_UI_TESTS=1 on Windows. Said plainly because the first version of this entry called Windows' arrangement the weakest place a shared sentence can live while the mac had the same arrangement and one fewer test."
   },
   "workingFolderPathBar": {
     "actions": [
