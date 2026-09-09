@@ -1050,6 +1050,15 @@
     ],
     "note": "The launchers' output is written for a terminal: colour codes, cursor moves, window-title sequences. Both apps show that output to a teacher, so both must strip the same things - and KEEP the same things. Newlines, carriage returns and tabs survive; every other control character does not. Inputs below use \\u001b for ESC and \\u0007 for BEL."
   },
+  "wizard": {
+    "note": "What the New Course wizard says. AUTHORED rather than generated, and that is the whole point of the entry: a generated readout cannot fail when the code it reads changes, so a button label written by the generator would simply be rewritten to match whatever the button now says. Written by hand, each platform asserts its own constant against it and a drift goes red. Same reasoning as app-rules.json's split between milestones (a readout) and deployArguments (an expectation).",
+    "createCourseButton": "Create Course",
+    "whyThisOneString": "It is the first thing a teacher presses in this app. Both platforms have said Create Course since the wizard existed and nothing pinned it until 2026-09-08 — Windows asserted it only in NewCourseWizardUiTests, which is opt-in behind PLANTOIR_UI_TESTS=1 and part of no gate, and the mac asserted it nowhere. Two apps agreeing by habit is not two apps agreeing on purpose; the first notice of a drift would have been a teacher reading a different button from the one in the other platform's screenshots.",
+    "sources": {
+      "mac": "WizardWording.createCourseButton, rendered at NewCourseWizardView.swift",
+      "windows": "NewCourseDialog.cs"
+    }
+  },
   "workingFolderPathBar": {
     "actions": [
       {
