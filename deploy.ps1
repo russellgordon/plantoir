@@ -360,7 +360,25 @@ if ($TO_FOLDER) {
   if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
     Write-Host "This site was built by a preview, which bakes in a live-reload script"
     Write-Host "  that students' browsers would ask about. Rebuilding it for publishing..."
-    & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only"
+    # Forward the flag. Without it this rebuild is a SECOND way a scheduled
+    # publish can meet a question nobody is there to answer: preview.ps1 has
+    # its own course-code guard and its own section warning, and an unanswered
+    # Read-Host returns empty — so the [Y/n] guard takes its default and
+    # rebuilds a DIFFERENT course, which this script then publishes,
+    # successfully, against the wrong one. Mirrors deploy.sh, which has
+    # forwarded it since 2026-09-09; this side had not, and GitHub issue #124
+    # is where that gap was named.
+    $previewExtra = @()
+    if ($NON_INTERACTIVE) { $previewExtra += '--non-interactive' }
+    & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only" @previewExtra
+    if ($LASTEXITCODE -eq 3) {
+      # Passed straight through, because 3 means one thing: a question went
+      # unanswered. A caller that saw 1 here would tell the teacher their
+      # publish failed, when what it needs to say is which question nobody
+      # was there to answer.
+      Write-Host "Could not rebuild this site for publishing: it needed an answer."
+      exit 3
+    }
     if ($LASTEXITCODE -ne 0) {
       Write-Host "Could not rebuild this site for publishing."
       exit 1
