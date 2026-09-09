@@ -363,9 +363,12 @@ enum SiteHealthRepair {
     /// Windows reads the same way. Inventing wording for it was rejected: it
     /// is as unreachable as the collapse was, and a sentence nobody has
     /// weighed is harder to take back than a paragraph of explanation. The
-    /// blocked case does not have the problem HERE — its own sentence names
-    /// the section folder — but Windows has no blocked case yet, so over there
-    /// it reads namelessly too until Windows adopts the named refusal.
+    /// blocked case does not have the problem on EITHER platform — its own
+    /// sentence names the section folder. Windows adopted the named refusal on
+    /// 2026-09-07; until then a blocked section there fell into `failed` and
+    /// read namelessly too, which is what this comment used to describe. Pinned
+    /// over there by SiteHealthRepairTests
+    /// .TwoRefusedSectionsAreTwoSentencesBecauseEachNamesItsOwnFolder.
     struct Attempt: Equatable {
 
         // MARK: - Stored properties

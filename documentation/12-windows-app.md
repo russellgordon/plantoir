@@ -699,11 +699,17 @@ What replaces the old container concepts:
   runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
   entry below), not a container's forwarded port.
 - **`preview.ps1 CODE N --stop` reclaims native processes, not a
-  container.** It matches `node.exe` / `python.exe` by command line
+  container.** It matches processes by command line
   (`build_site.py --course=/--section=` for the build, the section's own
   build-root path for the server) and walks parent/child links to catch
   descendants, then kills them with `Stop-Process`. No container, no `docker
-  exec`, no engine to stop.
+  exec`, no engine to stop. It narrowed those matches to `node.exe` /
+  `python.exe` until 2026-09-05; **that filter is gone**, because it refused
+  most of the contract's own fixtures (`python3`, `npm`, `esbuild`, `sh`) and
+  a `cmd.exe` running `npm.cmd` with the section's folder on its command
+  line. `preview.ps1` now applies no filter on process NAME at all, because
+  the shared rule has none — see the comment above
+  `Get-SectionProcessesToStop`.
 
 `GUI-IMPROVEMENTS.md` entries 290 and 292 are the log rows for this change;
 Its origin and reasoning are written up in full above.
@@ -761,12 +767,16 @@ as history, not as what Windows does today.
 - **Stopping a preview reclaims native processes** (entry 105): killing
   the host-side launcher orphans the build or server process it started
   (an orphaned build burns real CPU). `preview.ps1 CODE N --stop` matches
-  that section's `node.exe` / `python.exe` processes by COMMAND LINE —
-  never the working directory, which `Win32_Process` does not expose at
-  all — walks their descendants, and `Stop-Process`es them, and never
-  starts anything itself. (Corrected 2026-09-05: this said "command line
-  and working directory" for months, which is the mac's mechanism, not
-  this one. The rule both platforms must agree on is now written down
+  that section's processes by COMMAND LINE — never the working
+  directory, which `Win32_Process` does not expose at all — walks their
+  descendants, and `Stop-Process`es them, and never starts anything
+  itself. (Corrected 2026-09-05, and this passage needed correcting
+  TWICE over: it said "command line and working directory" for months,
+  which is the mac's mechanism rather than this one, and it went on
+  naming a `node.exe` / `python.exe` filter that was removed the same
+  day — for refusing most of the contract's own fixtures. Fixing half a
+  stale sentence and leaving the other half is how a passage keeps
+  being believed. The rule both platforms must agree on is written down
   once, in `contracts/shared-rules.json` → `stopPreview`.) Call it
   fire-and-forget — output discarded — wherever a preview ends: stop
   button, navigating away, window close. (History: this used to reclaim

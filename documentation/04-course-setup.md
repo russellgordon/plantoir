@@ -807,6 +807,11 @@ comment claiming a paragraph reads well is worth nothing.
 
 ### The shape of the answer, which is what you have to copy
 
+> **Windows adopted this on 2026-09-07** (branch `issue/33-repair-refused-folder-in-the-way`,
+> `GUI-IMPROVEMENTS.md` row 428). What follows is the REASONING behind the shape,
+> kept because it is worth understanding — not an outstanding port. A Windows
+> session reading this section does not owe it.
+
 `Result` gained a fourth case:
 
 ```swift
