@@ -255,6 +255,11 @@ if [ -z "$(find scripts -name '__pycache__' -print -quit 2>/dev/null)" ]; then
 else
   fail "scripts/__pycache__ exists — it would be copied into the app bundle, mirrored into every working folder's .toolchain/, and change the image tag"
   find scripts -name '__pycache__' -print
+  echo "   Remove it and run again:  rm -rf scripts/__pycache__"
+  echo "   It gets there from running a test file BY HAND — this script exports"
+  echo "   PYTHONDONTWRITEBYTECODE, a bare 'python3 scripts/test_x.py' does not,"
+  echo "   and importing the module under test is what writes the .pyc."
+
 fi
 
 # -------------------- 1. Container runtime (shared Colima) --------------------
