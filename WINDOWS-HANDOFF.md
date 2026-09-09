@@ -1461,7 +1461,7 @@ to run in the background.
       real `CredentialRequests`, is the half that would catch a request added
       here and written down nowhere.
     - `app-rules.json` → `publishedFreshness.whenShown` (9) / `whenRecorded`
-      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/25 — the NAMES
+      (7); `assist-cases.json` → `toolSchemas.local`/`.mcp` (13/32 — the NAMES
       and ARGUMENTS, not the descriptions, which `Briefly()` rewrites here for
       measured reasons); `course-management.json` → `courseCode.renameEffects`
       (6); `shared-rules.json` → `buildOutputLocation.windowsLocation.buildsRoot`
@@ -2108,13 +2108,10 @@ to run in the background.
     first". Those are the two cases that reach the placeholder, by name. The
     numbers above hold.
 
-41. **Your MCP server serves 37 tools and the mac's serves 25 — and ONE thing
-    is still open: a rollover that publishes over last year's website
-    (DECIDED 2026-09-08 — build it, do not re-open it).** ~~And seventeen
-    measured phrasings you do not have.~~ ✅ The phrasings were done
-    2026-09-08 (branch `issue/41-teachers-say-phrasings`); see "Two of two"
-    below, which is kept because what it cost to do properly is the part
-    worth reading.
+41. **Your MCP server serves 37 tools and the mac's serves 32 — and TWO
+    things now fall to you: a rollover that publishes over last year's
+    website (DECIDED 2026-09-08 — build it, do not re-open it), and seventeen
+    measured phrasings you do not have.**
     Found 2026-09-06 by a mac audit asking whether the parity list was
     COMPLETE rather than whether it was correct. Full write-up: "The two MCP
     surfaces are not the same product" below, and the sorting of all twelve
@@ -2134,15 +2131,14 @@ to run in the background.
     the twelve are either the mac's to build or deliberately not the mac's.
     Nothing you serve is being taken away.
 
-    **You owed two things; one is left.**
+    **You owe two things.**
 
     **One of two, still open — a rollover publishes over LAST year's website
     on YOUR side too.**
     This is a real defect, not a mac gap. `AssistCardCommand.cs:50` matches
     "roll this section over to a new year" in code and routes it to
     `re_date_classes`; `re_date_classes` never calls `ReleaseSite` — only
-    `roll_over_section` does (`PlantoirTools.cs:920` — it was `:911` until the
-    phrasings below added nine lines above it). So the exact sentence a
+    `roll_over_section` does (`PlantoirTools.cs:911`). So the exact sentence a
     teacher says reaches the tool that does NOT cut the section loose from
     `.netlify_sites/section<N>.json`, and the first publish afterwards lands
     on last year's URL, which last year's students may still be reading. Your
@@ -2159,42 +2155,128 @@ to run in the background.
     teacher who then deploys, in `TODO.md` → "A rolled-over section publishes
     over last year's website".
 
-    **So this is no longer a question, and three things fall out of it. Still
-    do not fix it unilaterally — the WORDING has to be shared.**
+    **✅ BUILT ON THE MAC 2026-09-08** (`GUI-IMPROVEMENTS.md` row 451). The
+    sentences are in `contracts/assist-wording.json` and the marker rules in
+    `contracts/file-formats.json`, so your half is a port rather than a design.
+    What follows is what to copy, what to copy DIFFERENTLY, and the three traps
+    that cost real time here.
 
-    1. **The sentence belongs in `contracts/`** before either side builds it,
-       so both apps ask identically. Nobody has written it yet.
-    2. **You already have the machinery and the mac does not.** `ReleaseSite`
-       (`AssistWorkspace.cs:1929`) renames the marker aside rather than
-       deleting it, because it holds the site id and admin URL. Keep that.
-       What changes on your side is only WHO calls it: today only
-       `roll_over_section` does.
-    3. **The card phrasing has to move on both platforms.**
-       `AssistCardCommand.cs:50` sends "roll this section over to a new year"
-       straight to `re_date_classes`. Until that sentence reaches something
-       that can ask the question, the decision changes nothing a teacher meets.
-       It is the step easiest to leave out and the one that makes the other two
-       matter.
+    **The shape: the question hangs off the CARD PHRASING, never the tool.**
+    Four phrasings reach `re_date_classes` and only one is a rollover; the
+    other three are ordinary re-dating — a snow day, a timetable that shifted.
+    Asking those about websites lets a teacher answer "a new website"
+    mid-semester and abandon the address their students are reading right now.
+    So the mac's rollover phrasing carries `rollover: yes` and the others do
+    not, and the key is deliberately ABSENT from the tool's published schema —
+    exactly as `unit`, `scope` and `revise` already are. That costs no routing
+    accuracy and does not touch the argument set your
+    `AssistSurfaceContractTests` pins as an exact departure list, so copying
+    this shape keeps your suite green. `contracts/assist-cases.json` →
+    `cardPhrasings` carries all three phrasings and their arguments, and your
+    `AssistCardCommandTests` already asserts every key and value, so **your
+    suite will go red until you add them** — that is the mechanism working.
 
-    ~~**Two of two, still open — seventeen `TEACHERS SAY:` phrasings the mac
-    has and you do not.**~~ **✅ Done 2026-09-08** (branch
-    `issue/41-teachers-say-phrasings`; `GUI-IMPROVEMENTS.md` row 451, numbers
-    in `research/ai-assist/teachers-say-results.txt`, full entry in
-    `MAC-HANDOFF.md`). All seventeen are in, copied verbatim from the contract
-    and re-verified afterwards: of the 25 shared tools, exactly ONE clause now
-    differs, `check_section`, and that one is the mac's debt. **What it cost to
-    do properly is below and is the part worth reading** — three of the four
-    traps were found by review, not by writing the code.
+    **Answered in WORDS, not with a dialog.** The reply asks the question and
+    names two sentences; saying either one comes back through the same tool
+    with `website: new` or `website: same`. A dialog cannot appear for a
+    request arriving over MCP, and your `PlantoirTools` advertises this
+    phrasing to Claude Code exactly as the mac's surface does — so a dialog
+    would leave that path silently pinned with the write already done. Both
+    answer sentences are in the wording contract
+    (`rolloverSayToStartANewWebsite`, `rolloverSayToKeepTheSameWebsite`).
 
-    The description of the gap, as it stood:
-    checked clause by clause, every list in `toolSchemas.mcp` against every
+    **Three traps, all met here, all costly.**
+
+    1. **Answering is the SECOND turn, and by then the pages are already on
+       their dates.** The re-date plan then changes nothing, and an early
+       return on "already on the right day" made the whole answer a no-op —
+       the reply talked about dates, never mentioned the website, and left the
+       section pinned, with an offer that looked like it had worked. Settle the
+       website on BOTH paths. Found by review, not by testing.
+    2. **Cutting a section loose must turn off a publish set to happen on its
+       own, and say so.** A released section has no agreed website, and a
+       scheduled run has nobody to ask — and `deploy.py`'s name prompt returns
+       its DEFAULT when there is no terminal rather than failing, so the
+       overnight run creates `<code>-s<n>-<year>-<name>` and publishes there
+       while the address students read stops updating. That is a WORSE failure
+       than the defect being fixed. Renaming a course already turns scheduled
+       publishes off for the same reason. Report it honestly when turning it
+       off FAILS (`rolloverCouldNotTurnOffTheScheduledPublish`): a plist left
+       behind is loaded again at next login.
+    3. **"Still pinned" and "never published" must not share a sentence.** A
+       marker that exists and cannot be moved used to produce the same empty
+       result as one that was never there, so a teacher was told "this section
+       had not been published anywhere yet" about a section still publishing
+       over last year's site — the opposite of the truth about the one fact the
+       feature turns on. `rolloverCouldNotStartANewWebsite` is its own sentence.
+
+    **What you must copy DIFFERENTLY — two real defects on your side.**
+
+    - **`ReleaseSite` releases only the FIRST destination it finds.** The loop
+      at `AssistWorkspace.cs:1931-1952` `return`s inside the first folder
+      holding a marker, so a section pinned to both Netlify and Cloudflare has
+      only its Netlify marker released and still publishes over last year's
+      Cloudflare site. Markers are keyed purely by destination TYPE and a
+      course can carry additional targets. The mac releases every type; the
+      rule is now `contracts/file-formats.json` →
+      `firstDeployMarkers.releasedWhenASectionRollsOver`.
+    - **The LEGACY marker is not released either, and it is NOT where you would
+      guess.** `deploy.py` still reads it and migrates it back into the stable
+      path (`load_netlify_marker`, `scripts/deploy.py:454`), and it lives at
+      `<CODE>/.merged_output/section<N>/.netlify_site.json` — in the BUILT
+      OUTPUT, never beside the teacher's pages. The mac got this wrong first
+      time and released a content-folder path that has never held a marker in
+      any version of the layout, so the fix did nothing at all; `section_dir`
+      in `deploy.py` is `merged_output_root(...)/section<N>`
+      (`scripts/deploy.py:1001-1004`). A folder old enough to hold one is told
+      "never published" and then publishes over last year's site. Netlify only
+      — there has never been a Cloudflare equivalent. The mac releases it as
+      `.netlify_site.previous-<stamp>.json`, and tolerates the output folder
+      being absent, which is ordinary.
+
+    **Three traps found only at the third review, all of them "the feature is
+    invisible or unreachable" rather than "the feature is wrong".** Read these
+    before you build, because each passed a green suite.
+
+    - **The question has to be in the SUMMARY, not the detail.** On the mac
+      `AssistToolOutcome.wrote` leaves `teacherDetail` nil and the window
+      renders that, so text put in `detail` never reaches a teacher: the
+      feature worked over MCP alone and showed "Re-dated 3 classes…" and no
+      question in the app. Check whatever the equivalent is on your side before
+      assuming your reply is seen.
+    - **Plan mode is ON by default, and a plan twin that returns a WRITE
+      dead-ends the answer.** The mac's `showPlan` returns early whenever the
+      twin hands back something that is not a plan — and the twin's "already on
+      the day it should be" is a write, which is exactly what the answer turn
+      produces, since the dates are right by then. In the default configuration
+      the release was unreachable. The twin now still offers a plan when only
+      the website would change.
+    - **`website` is on the PUBLISHED schema; `rollover` is not.** In the app
+      the card supplies both and no model is involved. Over MCP there is no
+      card, so a client with no declared argument could not roll a section over
+      at all — which made the "answer in words rather than with a sheet"
+      reasoning wrong for the one surface that reasoning was about. It costs no
+      routing: `re_date_classes` is hidden from the local model, so only Claude
+      Code ever sees the schema. **This changes `toolSchemas` on your side of
+      the contract**, so expect `AssistSurfaceContractTests` to ask for
+      `website` — that is the request arriving, not damage.
+
+    **What you inherit unchanged:** the kept filename
+    `section<N>.previous-yyyy-MM-dd_HHmmss.json` is yours already and the mac
+    copied it; renaming aside rather than deleting is yours and the mac copied
+    the reason with it; and recording the move for undo is yours — the mac had
+    to widen its own history type to express a move at all before it could.
+
+    **Two of two, still open — seventeen `TEACHERS SAY:` phrasings the mac
+    has and you do not.**
+    Checked clause by clause, every list in `toolSchemas.mcp` against every
     `[Description]` in `PlantoirTools.cs`. Five of the 25 shared tools differ,
     and **four of the five are yours**: `add_next_class` (mac has six
-    phrasings, you have no `TEACHERS SAY:` clause at all — `PlantoirTools.cs:553`,
-    now `:556`), `plan_add_next_class` (mac three, you none — `:533`, now
-    `:535`), `read_remembered_timetable` (mac four, you none — `:620`, now
-    `:627`) and `remember_timetable` (mac four, you none — `:767`, now `:776`).
-    Not in your in-app assistant either. Two of the seventeen DO appear in your code outside a
+    phrasings, you have no `TEACHERS SAY:` clause at all — `PlantoirTools.cs:553`),
+    `plan_add_next_class` (mac three, you none — `:533`),
+    `read_remembered_timetable` (mac four, you none — `:620`) and
+    `remember_timetable` (mac four, you none — `:767`). Not in your in-app
+    assistant either. Two of the seventeen DO appear in your code outside a
     `TEACHERS SAY:` clause, which is where `Briefly` cannot reach them: "add
     the next class" is an example inside `plan_add_next_class`' own description
     (`PlantoirTools.cs:536`) and in `AssistCardCommand.cs:31`, and "when does
@@ -2216,46 +2298,8 @@ to run in the background.
     on your side that is seventeen of them. Worth a measurement on your own
     backend before you copy them in: you have a Vulkan-accelerated
     `llama-server` and the mac cannot run your hardware, so this is one of the
-    things only you can settle. ~~`research/ai-assist/tools-from-contract.py`
-    writes the surface the suites take as input.~~ **That pointer was wrong for
-    this side and is corrected in the file itself:** the contract is generated
-    from the MAC, so starting a Windows measurement there scores the mac's
-    descriptions on Windows hardware. Dump the live surface with
-    `dump-tools.ps1` and narrow it with `narrow-tools.py` instead.
-
-    **What it measured, and the four traps.** The numbers are in
-    `research/ai-assist/teachers-say-results.txt` with the hardware they came
-    from; the short version is that the ten phrasings the local model can see
-    took the probes under test from **40/50 to 50/50**, with no control
-    regressing, and the two they fixed were both confident MISROUTES rather
-    than declines — "Set up next day's lesson" was reaching the deploy
-    scheduler five times out of five. The traps, because each one produces a
-    number that looks fine:
-
-    1. **The instrument was stale.** `narrow-tools.py` was right when committed
-       on 2026-08-14 and wrong from 2026-08-17 (4089c752), when
-       `ForTheLocalModel` went from fifteen names to thirteen. It was keeping
-       four `plan_` tools the app no longer shows and MISSING both tools under
-       test. A research script is run by hand months apart, so nothing could
-       catch it; `NarrowToolsMirrorTests` in your suite now does, and that is
-       the general lesson — a hand copy of a shipping list needs something that
-       runs on every commit.
-    2. **The dateline decides the answer.** `AssistAgent.Say` appends
-       `" (Today is YYYY-MM-DD, a Weekday.)"` to every message the model sees.
-       Measured without it, the same ten probes score 25/50 instead of 40/50 —
-       and the three the dateline fixes on its own would have been credited to
-       the phrasings, reporting five fixes where there are two.
-    3. **`AssistCardCommand` is not the only interception layer — there are
-       three.** `PreviewAskedForPlainly` (thirteen sentences), then
-       `AssistCardCommand.Matching`, then four inline regexes in `CardCommand`
-       itself. A probe suite that checks only the middle one measures the
-       router on sentences the app never routes; three controls were lost that
-       way in the first draft.
-    4. **Making a research script "stricter" can delete a control.** Requiring
-       the course code in `narrow-tools.py` looked like a tightening and would
-       have silently turned `trimmed-surface-suite.py --real-course` into a
-       no-op, destroying the A/B its own docstring rests on. It is optional,
-       un-substituted by default, and says why.
+    things only you can settle. `research/ai-assist/tools-from-contract.py`
+    writes the surface the suites take as input.
 
     The fifth difference is the mac's own and the mac owes it: you added a
     fourth `check_section` phrasing on 2026-08-17 — "what would students see in
@@ -2445,6 +2489,105 @@ to run in the background.
     not — `SpecialNames.CoverageSwitchLabelInSettings` is quoted by the blocked
     sentences and `EveryBlockedSentenceNamesASwitchTheAppActuallyHas` asserts
     it, so that one cannot be changed alone.
+
+45. **A rollover now ASKS whether the section should publish to a new website
+    or last year's, and your side has the same defect plus two of its own.**
+    Built on the mac 2026-09-08 to Russell's decision; `GUI-IMPROVEMENTS.md`
+    row 451. Your half is a PORT — the sentences are already in
+    `contracts/assist-wording.json` and the marker rules in
+    `contracts/file-formats.json` → `firstDeployMarkers.releasedWhenASectionRollsOver`.
+
+    **You inherit free:** the whole design, and the reasoning for the three
+    near-misses that shaped it. **You owe:** the three card phrasings (your
+    `AssistCardCommandTests` pins phrasing arguments against the contract, so
+    your suite goes red until you add them — a request, not damage), plus TWO
+    defects that are yours alone. `AssistWorkspace.ReleaseSite` returns inside
+    the first folder holding a marker, so a section pinned to both Netlify and
+    Cloudflare still publishes over last year's Cloudflare site; and it does
+    not know the legacy `section<N>/.netlify_site.json` path that `deploy.py`
+    still reads and migrates.
+
+    The detail, including why the question hangs off the card phrasing rather
+    than the tool and why cutting a section loose MUST turn off a scheduled
+    publish, is in item 41's rollover section above.
+
+46. **The mac now serves `list_courses` too, and the CARD PHRASING half is the
+    part worth copying.**
+    Built 2026-09-08, `GUI-IMPROVEMENTS.md` row 452 — the first of the six
+    tools from item 41's sorting that Russell asked for. You have had
+    `PlantoirTools.ListCourses` since before the mac's server existed; the mac
+    copied its shape, so a Claude Code session now gets the same three facts —
+    sections and destination alongside the code — on either platform.
+
+    **You owe two card phrasings**, and your suite will say so:
+    `AssistCardCommandTests` pins phrasing arguments against the contract, so
+    it goes red until "what courses do i have?" and "list my courses" are
+    added. That is the mechanism working, not damage.
+
+    **The idea to take, beyond this one tool.** MCP-only means the local MODEL
+    is not shown a tool — which is what protects routing accuracy, since that
+    is measured against the thirteen it sees. It does NOT mean the app cannot
+    do it. A fixed phrasing is matched in CODE and never reaches a model, so
+    adding one costs the router nothing and hands a teacher a capability that
+    was otherwise Claude-Code-only. Anything of yours that is MCP-only today is
+    a candidate for the same treatment.
+
+    **`add_classes` and `plan_add_classes` followed the same day**
+    (`GUI-IMPROVEMENTS.md` row 453), and they carry one divergence worth
+    knowing: **the mac takes no `firstDay`.** Yours defaults it to 1 and
+    describes it as "1 unless the earlier days already exist", which is a
+    question the caller has to answer by looking at the section. The mac's
+    planner continues from the last day that EXISTS in that unit, published or
+    not — a page a teacher has written and not yet shown anybody is still a day
+    of the course, and numbering over it would collide with a real file. An
+    argument nobody can get wrong is better than one with a sensible default;
+    if your planner can work the same thing out, dropping the argument removes
+    a way to be wrong. Nothing is owed here — your suite will not go red for
+    this pair, because the phrasing it corresponds to already existed on both
+    sides.
+
+    **`make_room_for_classes` and its twin landed the same day too**
+    (`GUI-IMPROVEMENTS.md` row 454), and this is the one where the card
+    phrasing needs care rather than copying. It is PARSED, not listed — "make
+    room for a class at Unit 3, Day 4", or "two classes" for more — because
+    the sentence is a fixed frame with numbers in it and no judgement anywhere.
+    **Take the near-miss list with it**, not just the happy path: "make room
+    for two class at Unit 3, Day 4" must NOT match, and a parser that shrugs at
+    a count and noun disagreeing is one that renames a teacher's pages on a
+    typo. Your `AssistCardCommandTests` will go red until the phrasing exists
+    on your side.
+
+    Two other things worth checking against your own implementation, because
+    the mac had to think about them and the engine is the same shape: whether
+    your reply says that "undo that" will NOT take it back once other classes
+    have moved — a half-undone renumbering is worse than no undo, so the mac
+    records nothing on the undo list and names the backup instead — and whether
+    it says so in the PLAN as well as afterwards, where a teacher can still say
+    no.
+
+    **`explain_publishing` and `back_up_course` completed the set**
+    (`GUI-IMPROVEMENTS.md` row 455), and with them **all six tools this sorting
+    judged the mac should have are built**. Two divergences to weigh against
+    your own: your `Briefing.AlreadyExplained` persists per FOLDER, so a teacher
+    is told once ever, while the mac's lasts one conversation — the reasoning is
+    that a session cannot repeat itself after it has ended, and a session a week
+    later is talking to somebody who may have forgotten, so writing a file to
+    suppress a sentence is a bigger promise than the problem needs. Neither is
+    obviously right. And the mac's `back_up_course` has no plan twin, which
+    yours does not need either: it has a side effect, so it is not a read, but
+    "shall I plan to take a copy?" is a card with no decision in it.
+
+    **Three more card phrasings will make your suite red** — "what does
+    publishing mean?", "what is the difference between publishing and
+    deploying?", and "back up this course".
+
+    **What this closes:** the twelve-tool gap is now the three you keep by
+    design (`read_timetable`, `list_recent_changes`, `sync_page_dates`) plus the
+    `plan_` twins that travel with their writes.
+
+    **One number moved:** the mac's MCP surface is 32 (22 shared + 10 MCP-only),
+    not 25. A pinned count made that a decision rather than drift — the test
+    failed the moment the tool was added, which is exactly what it is for.
 
 ## A test host that segfaults, and the six levers that look like they should fix it
 
@@ -3446,11 +3589,11 @@ for behaviour only your side has.
 
 `assist-cases.json` → `toolSchemas` now carries the tool definitions **exactly
 as each client sends them** — name, description and parameter schema, for both
-the 13-tool local surface and the 25-tool MCP one. (It said 23; corrected
+the 13-tool local surface and the 32-tool MCP one. (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
 serves 37, and the twelve it has beyond the contract are named in
 `AssistSurfaceContractTests` and in `MAC-HANDOFF.md`.) The mac's own test has
-pinned 22 + 3 MCP-only = 25 for longer than the prose said so. What the two
+pinned that sum for longer than the prose said so; it is 22 + 10 MCP-only = 32 since all six of the tools sorted as the mac's landed on 2026-09-08. What the two
 surfaces do and do not share is item 41 and "The two MCP surfaces are not the
 same product" below.
 
@@ -3479,20 +3622,32 @@ it.
 ### The two MCP surfaces are not the same product
 
 Written 2026-09-06 after a mac audit asked whether the parity list was
-COMPLETE rather than whether it was correct. The numbered item is 41; this is
-the manual for it.
+COMPLETE rather than whether it was correct. The numbered item was 41, now
+**GitHub issue #66**; this is the manual for it.
 
 **The measurement.** `Plantoir.Mcp/PlantoirTools.cs` declares **37** distinct
-`[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` serves **25**
-(22 tools plus three MCP-only). The set difference is exactly **12, all
-yours, none the mac's**, and **not one of the twelve appears anywhere under
-`mac-app/QuartzTeachers` or in `contracts/`** — there is no half-built mac
-version of any of them:
+`[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` served **25**
+when this was measured (22 tools plus three MCP-only). The set difference was
+exactly **12, all yours, none the mac's**, and not one of the twelve appeared
+anywhere under `mac-app/QuartzTeachers` or in `contracts/` — there was no
+half-built mac version of any of them:
 
 `add_classes`, `back_up_course`, `explain_publishing`, `list_courses`,
 `list_recent_changes`, `make_room_for_classes`, `plan_add_classes`,
 `plan_make_room_for_classes`, `plan_sync_page_dates`, `read_timetable`,
 `roll_over_section`, `sync_page_dates`.
+
+**Seven of those twelve are the mac's now**, and the surface is **32** (22 plus
+ten MCP-only). All six tools this sorting judged the mac should have were built
+on 2026-09-08 — `list_courses`, the `add_classes` pair, the
+`make_room_for_classes` pair, `explain_publishing` and `back_up_course`
+(`GUI-IMPROVEMENTS.md` rows 452–456, and item 46 below). So the set difference
+is **5**, and the sentence above about none of them existing on the mac
+describes the day it was measured rather than today. What is left is what the
+sorting said to leave: `read_timetable` and `list_recent_changes`, which are
+Windows-shaped by design; `sync_page_dates`, which needs a teacher's problem
+first; and `plan_sync_page_dates` and `roll_over_section`, whose writes are
+covered by decisions recorded elsewhere.
 
 **Why neither suite noticed — and how it is now caught.** Not a subset check
 — an earlier write-up said that and was wrong. `Assert.Equal` on `HashSet`s is
@@ -3557,6 +3712,93 @@ problem first — the mac has no engine for it AND nothing on the mac reports
 the date drift it fixes, because the mac has no equivalent of your `DateAudit`.
 The three `plan_` twins travel with their writes and are not separate
 decisions.
+
+### What the phrasings were worth, and the four traps in measuring it
+
+Written 2026-09-08, after closing the phrasings half of issue #66. The numbers
+and their conditions are in `research/ai-assist/teachers-say-results.txt`; this
+is the reasoning, which is the half that does not fit in a results header.
+
+**Only some of a clause gap is a routing change, and the split decides the
+work.** `AssistAgent.ForTheLocalModel` holds thirteen names. Of the seven tools
+whose `TEACHERS SAY:` clause Windows was missing, only `add_next_class` and
+`read_remembered_timetable` are in it — the rest are read by Claude Code over
+MCP and by nothing else. `Briefly()` puts the clause FIRST in what the local
+model reads, so those two are a change to the router's prompt and the others
+are not. Ten phrasings needed measuring; ten did not.
+
+**What it bought.** 25 probes × 5 trials at temperature 0, on the shipped
+surface dumped live from `plantoir-mcp`: the probes under test went **40/50 to
+50/50, with no control regressing**. Overall went 76% to 88%, but a third of
+that gain is one unrelated control flipping 0/5 to 5/5 for no reason anything
+in the change explains, so the under-test figure is the one to quote — and that
+flip is also the honest limit on the determinism claim, since it is what a null
+perturbation of this surface looks like.
+The two probes it fixed were confident MISROUTES rather than declines —
+"Set up next day's lesson" was reaching `schedule_deploy` five times out of
+five, which is a sentence about writing a page answered by the tool that puts
+work in front of students.
+
+**Four traps. Each one produces a number that looks fine, which is what makes
+them expensive.** Three were found by adversarial review rather than by writing
+the code, and any future routing measurement on this side meets them again.
+
+1. **A hand copy of a shipping list goes stale silently.**
+   `research/ai-assist/narrow-tools.py` copies `ForTheLocalModel` by hand. It
+   was right when committed on 2026-08-14 and wrong from 2026-08-17
+   (4089c752), when the set went from fifteen names to thirteen: it was still
+   keeping four `plan_` tools the app no longer shows and MISSING both tools
+   about to be measured. Nothing could catch it, because a research script is
+   run by hand months apart, so `NarrowToolsMirrorTests` now fails on drift.
+   REJECTED: adjusting the list by hand at measurement time, which is exactly
+   the arrangement that had just failed. The results files measured inside
+   that three-day window are sound and are named in the script, so nobody
+   throws them away on the strength of this.
+2. **The dateline decides the answer.** `AssistAgent.Say` appends
+   `" (Today is YYYY-MM-DD, a Weekday.)"` to every message the model sees. A
+   first pair of runs omitted it and was discarded — but the ten probes under
+   test were identical in both, leaving one clean comparison: **25/50 without
+   the dateline against 40/50 with it.** The three probes the dateline fixes on
+   its own would otherwise have been credited to the phrasings, reporting five
+   fixes where the truth is two. `trimmed-surface-results.txt` had already
+   recorded the same line being worth fifteen points when PREPENDED instead;
+   this is the second time it has decided a measurement here.
+3. **There are THREE interception layers before the model, not one.**
+   `PreviewAskedForPlainly` (thirteen exact sentences), then
+   `AssistCardCommand.Matching` (`FixedShapes` plus its `WholeUnit`,
+   `MoreDays` and `DuplicateClass` parsers), then four inline regexes in
+   `AssistAgent.CardCommand` itself. A suite that checks only the middle one
+   measures the router on sentences the app never routes; three controls were
+   lost that way, and were being answered without a model at all.
+4. **Making a research script stricter can delete a control.** Requiring the
+   course code in `narrow-tools.py` read as a tightening, and would have
+   silently turned `trimmed-surface-suite.py --real-course` into a no-op,
+   destroying the A/B its own docstring rests on. It is optional now,
+   un-substituted by default, with the reason written down.
+
+**And a fifth, learned the same day: a parity claim is only true of the surface
+it was checked against, and of the PART of it that was checked.** The gap was
+closed against a 25-tool shared surface and reopened hours later, when the mac
+shipped six new MCP tools and three of them arrived with clauses their Windows
+equivalents lacked (`add_classes`, `list_courses`, `make_room_for_classes` —
+closed in the same branch, and none of them local-facing). And "the wording
+matches now" would be false in a way that is easy to write by accident: what
+matches is the `TEACHERS SAY:` CLAUSE. Of the 32 shared tools **29 full
+descriptions differ**, and of the thirteen the local model is shown **five
+differ in the text `Briefly()` actually produces** — `add_next_class`,
+`check_section`, `publish_pages`, `read_remembered_timetable` and
+`unpublish_pages`. Most of that is deliberate (this server writes for Claude
+Code), but not obviously all of it: the mac's `unpublish_pages` tells the model
+it takes down "any page ONLY they link to; a page another class still links to
+stays put", where this one says "optionally along with every page they link
+to". Whether that is two descriptions of one behaviour or two behaviours is a
+`mac`/`decision` issue, not something to quietly align. Re-run the comparison;
+never quote a count out of a write-up.
+
+**Do not start a Windows measurement from `tools-from-contract.py`.** The
+contract is generated on the mac, so its descriptions are the mac's. Dump the
+live surface with `dump-tools.ps1` and narrow it with `narrow-tools.py`. That
+file and `routing-suite.py` now say so; they used to say the opposite.
 
 ### The model's list is SHORTER than the server's
 

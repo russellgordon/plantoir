@@ -74,6 +74,30 @@ enum AssistContract {
             "planAccepted": AssistWording.planAccepted,
             "cancelled": AssistWording.cancelled,
             "deployWasCancelled": AssistWording.deployWasCancelled,
+            "rolloverWebsiteQuestion": AssistWording.rolloverWebsiteQuestion,
+            "rolloverSayToStartANewWebsite": AssistCardCommand.rollOverOntoANewWebsite,
+            "rolloverSayToKeepTheSameWebsite": AssistCardCommand.rollOverKeepingTheSameWebsite,
+            "rolloverCouldNotStartANewWebsite": AssistWording.rolloverCouldNotStartANewWebsite(
+                stillPinned: ".netlify_sites/section1.json"
+            ),
+            "rolloverCouldNotTurnOffTheScheduledPublish":
+                AssistWording.rolloverCouldNotTurnOffTheScheduledPublish,
+            "rolloverStartedANewWebsite": AssistWording.rolloverStartedANewWebsite(
+                keptAs: ".netlify_sites/section1.previous-2026-09-08_071500.json"
+            ),
+            "rolloverIsOnANewWebsite": AssistWording.rolloverIsOnANewWebsite,
+            "rolloverHadNoWebsiteYet": AssistWording.rolloverHadNoWebsiteYet,
+            "rolloverKeptTheSameWebsite": AssistWording.rolloverKeptTheSameWebsite,
+            "rolloverWebsiteNotDecided": AssistWording.rolloverWebsiteNotDecided,
+            "rolloverTurnedOffTheScheduledPublish": AssistWording.rolloverTurnedOffTheScheduledPublish,
+            "noCoursesYet": AssistWording.noCoursesYet,
+            "whatPublishingMeans": AssistWording.whatPublishingMeans,
+            "publishingAlreadyExplained": AssistWording.publishingAlreadyExplained(
+                course: course, section: section
+            ),
+            "backedUpCourse": AssistWording.backedUpCourse(
+                course: course, to: "{course}_backup_2026-09-08_190000.zip"
+            ),
             "planWasCancelled": AssistWording.planWasCancelled,
             "deployed": AssistWording.deployed(course: course, section: section),
             "couldNotBuildBeforeDeploying": AssistWording.couldNotBuildBeforeDeploying(
@@ -243,8 +267,9 @@ enum AssistContract {
             "note": "Three lists, deliberately. `all` is what the runner can execute; `local` is what the "
                   + "small model is SHOWN (the plan twins and remember_timetable are taken off, because "
                   + "the model never has to name a plan and dates it supplies are dates it may have "
-                  + "invented); `mcpOnly` is offered to Claude Code on top of everything, being the three "
-                  + "that ask for judgement about meaning.",
+                  + "invented); `mcpOnly` is the ten offered to Claude Code on top of everything — three "
+                  + "asking for judgement about meaning, the rest either never needed by a model "
+                  + "scoped to one section or already reachable by it through a fixed phrasing.",
             "all": all,
             "local": local,
             "mcpOnly": mcpOnly,

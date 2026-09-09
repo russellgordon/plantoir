@@ -20,8 +20,9 @@ shipping surface if the descriptions are the shipping ones too.
 
 **On WINDOWS this file is the wrong starting point, and that is not obvious.**
 The contract is generated from the MAC, so what it holds is the mac's
-descriptions. The two servers' wording is close but not identical — five of the
-25 shared tools differed on 2026-09-08 and one still does — so a Windows
+descriptions, and they are NOT this server's. Measured 2026-09-08: of the 32
+shared tools, 29 full descriptions differ, and of the thirteen the local model
+is shown, FIVE differ in the text `Briefly()` actually produces. So a Windows
 measurement taken from here scores the mac's surface on Windows hardware and
 reads as evidence about neither. On Windows, dump the live surface instead:
 
@@ -32,7 +33,7 @@ reads as evidence about neither. On Windows, dump the live surface instead:
     python3 research/ai-assist/shipped-surface-suite.py 8099 10 /tmp/real-tools.json
 
 `local` (the default) is what the on-device model is shown — 13 tools, and the
-list the routing figures were measured against. `mcp` is the 25 Claude Code
+list the routing figures were measured against. `mcp` is the 32 Claude Code
 sees.
 """
 import json

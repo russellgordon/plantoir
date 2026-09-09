@@ -43,7 +43,7 @@ the router on them measures nothing. Their replacements below are the same
 intent said a way the app really does route.
 
     python research/ai-assist/narrow-tools.py tools.json narrowed.json EXC2O
-    python research/ai-assist/teachers-say-suite.py 8099 10 narrowed.json
+    python research/ai-assist/teachers-say-suite.py 8099 5 narrowed.json
 
 The system prompt is `AssistAgent.SystemPrompt("EXC2O", 1)` verbatim, the
 request is shaped like `LocalModel`'s (temperature 0, max_tokens 512), and the
@@ -70,8 +70,14 @@ SECTION = 1
 
 # MIRROR of AssistAgent.Say: `_dateline = $" (Today is {today:yyyy-MM-dd}, a
 # {today.DayOfWeek}.)"`, appended to every user message the model sees.
+# The weekday is spelled out rather than taken from strftime("%A"), which
+# follows LC_TIME; C#'s DayOfWeek.ToString() is invariant English, and a
+# harness that stops mirroring the app under a different locale is the exact
+# fault this suite exists to avoid.
+WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+            "Saturday", "Sunday")
 TODAY = datetime.date.today()
-DATELINE = " (Today is %s, a %s.)" % (TODAY.isoformat(), TODAY.strftime("%A"))
+DATELINE = " (Today is %s, a %s.)" % (TODAY.isoformat(), WEEKDAYS[TODAY.weekday()])
 
 with open(TOOLS_PATH, encoding="utf-8-sig") as handle:
     TOOLS = json.load(handle)

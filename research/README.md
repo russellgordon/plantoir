@@ -32,7 +32,7 @@ vetoed and for what, and what the flags cost.
 | `HISTORY.md` | The narrative: the feasibility investigation, the build handoff, and the original MCP proposal, merged with a status block saying what has since been overturned. |
 | `macos-native-10-trial-comparison.txt` | **The model decision.** Ten models × 29 probes × 10 trials on one identical tool surface. The source of the 3B veto (two unrelated families inverting on the same sentence), and of Qwen3-4B replacing the 7B. Cited from `AssistModelTier.swift`. |
 | `reasoning-flag-measurement.txt` | Why thinking must be turned off with **two** flags, and why the fault hid for days: llama.cpp parses the thinking out of the reply, so only the token count and the clock show it. |
-| `tools-from-contract.py` | **Start here for a new measurement.** Writes the tool surface the suites take as input, read from `contracts/assist-cases.json` — which is generated from the app, so a run cannot be against a surface that does not ship. `local` (13 tools) is what the on-device model sees; `mcp` (25) is Claude Code's. |
+| `tools-from-contract.py` | **Start here for a new measurement.** Writes the tool surface the suites take as input, read from `contracts/assist-cases.json` — which is generated from the app, so a run cannot be against a surface that does not ship. `local` (13 tools) is what the on-device model sees; `mcp` (32) is Claude Code's. |
 | `thirteen-tool-surface-results.txt` | The **current** shipping surface, 42 probes × 10 trials on both tiers. Also records the description-steer regression: fixing one probe in a tool description broke three others. |
 | `shelf-phrasings-results.txt` | **Every phrasing the assistant window offers**, word for word, 14 × 10 trials — the evidence the shelf is allowed to promise them. Also records a harness fault worth more than the result: measured without `AssistAgent.dateline()`, "Publish the class on Monday" resolved to a date a month away 10/10 and nearly cost a good card. |
 
@@ -62,8 +62,8 @@ the app no longer shows and missing the two it had gained. Nothing could
 catch that: a research script is run by hand, months apart. Since 2026-09-08
 `NarrowToolsMirrorTests` in the Windows suite fails when the two lists differ,
 which is the only way a file like this stays honest. The three results files
-measured in that three-day window are sound; anything else taken through it
-between those dates is not. **The general lesson, for any harness here:** a
+measured inside that 2026-08-14 to 17 window are sound; anything taken through
+it AFTER 2026-08-17 is not. **The general lesson, for any harness here:** a
 number is only as good as the surface it was taken against, and a hand copy of
 a shipping list needs something that runs on every commit to hold it in place.
 

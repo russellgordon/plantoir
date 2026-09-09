@@ -18,7 +18,18 @@ struct AssistSavedFile: Equatable {
 
     /// The whole file, after — kept so an undo can tell "nobody has touched
     /// this since" from "the teacher has been editing it in Obsidian".
-    let after: String
+    ///
+    /// Optional for the same reason `before` is, and it is what lets a MOVE be
+    /// recorded: a move is two entries, the source with `after: nil` and the
+    /// destination with `before: nil`. Until 2026-09-08 this was a plain
+    /// `String`, so the source half of a move could not be expressed at all —
+    /// the file is gone from there, it reads back as nil, and nil matches no
+    /// `String`, so `undo()` skipped it every time. Cutting a section loose
+    /// from its website is a move, and Windows' undo has always put the
+    /// section back on last year's site; this is what lets the mac do the
+    /// same. No logic below changed: `undo()` already compared an optional
+    /// `current` against this, and already deletes when `before` is nil.
+    let after: String?
 }
 
 /// One thing the assistant did, in a form that can be taken straight back.
