@@ -120,6 +120,42 @@ nonisolated enum ActivityTrail {
         /// deliberate rather than forgotten, and this event is the line it
         /// joins when it is closed, without a rename on either platform.
         case folderProblemNotRepaired = "folder problem not repaired"
+
+        /// A publish set to happen on its own stopped because it needed an
+        /// answer.
+        ///
+        /// The one thing that can happen to a scheduled publish that a teacher
+        /// would otherwise never find out about: it runs at half six with the
+        /// app closed, so a question it could not ask is asked of nobody and
+        /// seen by nobody. Before `--non-interactive` it either waited for
+        /// ever — measured at 45 minutes — or took a default and published the
+        /// site to an address nobody chose. Without this line the run is
+        /// indistinguishable from one that was never scheduled, which is
+        /// exactly the shape of "my site did not update on Tuesday and I do
+        /// not know why".
+        ///
+        /// Carries the course, the section and which DESTINATION stopped: a
+        /// course can publish to several and only one may have needed
+        /// anything, so "it published to the folder and not to Netlify" is the
+        /// report a teacher makes. Dated to when the RUN wrote its record,
+        /// never to when the app read it, or an overnight problem is filed
+        /// under the wrong night.
+        ///
+        /// NEVER the question's own text. That comes from a launcher's
+        /// console, and a line naming a credential prompt would put a
+        /// teacher's own words on the trail.
+        case scheduledPublishNeededAnAnswer = "scheduled publish needed an answer"
+
+        /// A publish set to happen on its own did not finish, for a reason
+        /// that was not a question — a revoked token, a network that was
+        /// down, a build that failed.
+        ///
+        /// Separate from `scheduledPublishNeededAnAnswer` because that event's
+        /// own wording says a question went unasked, and filing a revoked
+        /// token under it would make the trail say something untrue about the
+        /// one run a teacher is trying to understand. Both are the same
+        /// silence from the teacher's side; only one of them is a question.
+        case scheduledPublishDidNotFinish = "scheduled publish did not finish"
         /// A folder or file was removed in Course Settings, excluding it
         /// from previews and deploys.
         case itemExcluded = "item excluded"

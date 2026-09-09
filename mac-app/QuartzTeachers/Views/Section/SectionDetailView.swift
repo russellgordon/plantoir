@@ -39,6 +39,14 @@ struct SectionDetailView: View {
     /// Why a preview could not start, shown as an alert.
     @State var previewRefusal: String?
 
+    /// A publish that was set to happen on its own and did not get through.
+    ///
+    /// Read from disk rather than held in memory, because the run that wrote
+    /// it happened at half six with this app closed. Nil when the last
+    /// scheduled run got through, when there has never been one, or when the
+    /// teacher has dismissed it.
+    @State var stoppedScheduledPublish: ScheduledPublishOutcome.Stopped?
+
     /// Folder problems the last build reported, shown once when it finishes.
     ///
     /// Held here rather than read from the runner at render time so that the
@@ -139,6 +147,9 @@ struct SectionDetailView: View {
             // which is what dragged the progress header under the
             // window's toolbar when a preview was restarted.
             VStack(spacing: 0) {
+                if let stoppedScheduledPublish {
+                    stoppedPublishNotice(stoppedScheduledPublish)
+                }
                 if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
                     consoleArea
                 } else {
@@ -279,6 +290,12 @@ struct SectionDetailView: View {
         // These are the same functions the toolbar buttons call, so the
         // assistant and the buttons can never drift apart.
         .onAppear {
+            // Looked for on every appearance rather than once at launch: a
+            // scheduled run can finish while the app is open, and a teacher
+            // coming back to this section should see it without relaunching.
+            // noteOnTrailIfNeeded is what keeps the trail from gaining a line
+            // each time.
+            loadStoppedScheduledPublish()
             guard let folder = workspace.workspaceURL else {
                 return
             }
@@ -754,6 +771,72 @@ struct SectionDetailView: View {
             deployIsRunning: deployRunner.isRunning,
             previewStartedAt: previewRunner.startedAt,
             deployStartedAt: deployRunner.startedAt
+        )
+    }
+
+    // MARK: - A scheduled publish that stopped
+
+    /// What a teacher sees when an overnight publish did not get through.
+    ///
+    /// At the TOP of the section, above the console, because a teacher opening
+    /// a section after a failed overnight publish is looking for why their site
+    /// is out of date — and the console below is about what they are doing now,
+    /// not about what happened while they were asleep.
+    @ViewBuilder
+    func stoppedPublishNotice(_ stopped: ScheduledPublishOutcome.Stopped) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(ScheduledPublishOutcome.sentence(
+                    for: stopped, course: course.code, section: sectionNumber
+                ))
+                .fixedSize(horizontal: false, vertical: true)
+                // The DATE as well as the day: a record can sit for a week
+                // if nobody dismisses it and no later run gets through, and
+                // "Tuesday 6:30 AM" with no date is a teacher wondering
+                // WHICH Tuesday.
+                Text(stopped.when, format: .dateTime.weekday(.wide).day().month().hour().minute())
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            // Dismissing is the mac's own addition. Windows clears this only
+            // when a later scheduled run gets through, which leaves the message
+            // standing after a teacher has already fixed the problem by hand —
+            // and the next run that would clear it could be a week away.
+            Button("Dismiss") {
+                ScheduledPublishOutcome.clear(
+                    inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+                    course: course.code,
+                    section: sectionNumber
+                )
+                stoppedScheduledPublish = nil
+                // The sidebar's badge is read during a row's render, so it
+                // needs telling that the answer changed — Dismiss happens
+                // here, in a different view with its own state.
+                workspace.stoppedPublishGeneration += 1
+            }
+            .accessibilityIdentifier("dismissStoppedPublish")
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.12))
+        .accessibilityIdentifier("stoppedPublishNotice")
+    }
+
+    /// Look for a stopped run. READ ONLY — the trail line is written by the
+    /// run itself (`ScheduledDeploy.runScheduled`), not here.
+    ///
+    /// Nothing is written back to the record either, which matters: an earlier
+    /// draft appended a "noted" marker, and rewriting the file changed its
+    /// modification date, so the notice showed the morning the teacher opened
+    /// it instead of the half six the run stopped at.
+    func loadStoppedScheduledPublish() {
+        stoppedScheduledPublish = ScheduledPublishOutcome.stopped(
+            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+            course: course.code,
+            section: sectionNumber
         )
     }
 

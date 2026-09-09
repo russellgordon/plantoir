@@ -42,6 +42,37 @@ OVERRIDE_IMAGE="${OVERRIDE_IMAGE:-}"
 # down. Scan the WHOLE argument list — flags follow the course and
 # section, so stopping at the first non-flag word would never see them
 # (that is exactly how verify.sh's --image went unrecognized).
+# --non-interactive is looked for HERE, before the main parser below, for the
+# same reason deploy.sh pre-scans for it: the first question this script asks —
+# the 'Open' course-code guard — comes before that parser. The parser also
+# accepts the flag, so it is not reported as an unknown option; this only makes
+# it visible early.
+#
+# preview.sh needs this even though it publishes nothing, because a SCHEDULED
+# publish builds before it publishes and the mac's launchd agent runs
+# `preview.sh --build-only` directly (ScheduledDeploy.oneShotCommand). Without
+# it this script has no `set -e`: the read fails at end of input, `_ans` stays
+# empty, `${_ans:-Y}` takes the DEFAULT, and the build quietly retargets a
+# DIFFERENT course code — announcing it to nobody. That is a worse failure than
+# the refusal, because the publish then succeeds against the wrong course.
+NON_INTERACTIVE="false"
+for _early_arg in "$@"; do
+  if [[ "$_early_arg" == "--non-interactive" ]]; then NON_INTERACTIVE="true"; fi
+done
+
+# Called immediately before every question this script asks. Exit code 3 means
+# "a question went unanswered" and nothing else, matching deploy.sh and
+# deploy.py's NEEDS_AN_ANSWER.
+assert_can_ask() {
+  [[ "$NON_INTERACTIVE" == "true" ]] || return 0
+  echo ""
+  echo "This build was set to happen on its own, so nobody is here to answer:"
+  echo "   $1"
+  echo " $2"
+  echo " Nothing was built."
+  exit 3
+}
+
 _SAVED_ARGS=("$@")
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -122,6 +153,7 @@ if [[ "$COURSE" =~ ^[A-Z]{3}[0-9]0$ ]]; then
   if [[ -f "courses/$SUGGESTED/course_config.json" && ! -f "courses/$COURSE/course_config.json" ]]; then
     echo "   I see setup data for '$SUGGESTED' on disk."
   fi
+  assert_can_ask "Fix course code to '$SUGGESTED'? [Y/n]" "Preview this section once from Plantoir, where you can answer it."
   read -rp "   Fix course code to '$SUGGESTED'? [Y/n]: " _ans
   _ans="${_ans:-Y}"
   if [[ "$_ans" =~ ^[Yy]$ ]]; then
@@ -148,6 +180,7 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
   echo "  --force-npm-install                Force npm install even if dependencies are present"
   echo "  --full-rebuild                     Clear entire output folder and re-copy Quartz scaffold"
   echo "  --build-only                       Build the static site only (no local preview server)"
+  echo "  --non-interactive                  Refuse rather than ask, for a build nobody is watching"
   echo "  --stop                             Stop this section's preview processes (build or server) and exit"
   echo "  --port N                           Serve the preview on port N (default 8081; 8081-8084 available)"
   echo "  --help, -h                         Show this help message"
@@ -188,6 +221,13 @@ while [[ "$#" -gt 0 ]]; do
     --full-rebuild)
       FULL_REBUILD="--full-rebuild"
       ;;
+    --non-interactive)
+      # No `shift` here: the loop shifts once at the bottom for every case.
+      # Shifting twice ate the NEXT argument, so `--non-interactive
+      # --build-only` lost --build-only and a scheduled run would have
+      # started a SERVER instead of building. Latent only because the
+      # wrapper happens to put the flag last.
+      NON_INTERACTIVE="true" ;;
     --build-only)
       BUILD_ONLY="--build-only"
       ;;
