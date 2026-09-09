@@ -161,6 +161,40 @@ public static class ActivityTrail
         /// words on the trail.
         /// </remarks>
         ScheduledPublishNeededAnAnswer,
+        /// <summary>
+        /// A publish set to happen on its own did not finish, for any reason
+        /// other than a question — a revoked token, a network that was down, a
+        /// build that failed. Carries the course, the section and which
+        /// destination stopped.
+        /// </summary>
+        /// <remarks>
+        /// <para>The same silence as <see cref="ScheduledPublishNeededAnAnswer"/>
+        /// from a different cause, and a SEPARATE event on purpose. That one's
+        /// own wording says a question went unasked, so filing a revoked token
+        /// under it would make the trail say something untrue about the one run
+        /// a teacher is trying to understand.</para>
+        ///
+        /// <para>Added 2026-09-09 when Russell widened the readout to ANY
+        /// failed scheduled publish: a teacher should learn their overnight
+        /// publish did not happen whatever the reason, because the SILENCE is
+        /// the complaint rather than the cause. Recording only the question
+        /// case leaves an ordinary overnight failure exactly as silent as it
+        /// was before.</para>
+        /// </remarks>
+        ScheduledPublishDidNotFinish,
+        /// <summary>
+        /// A publish set to happen on its own went out. Carries the course, the
+        /// section, and where it published.
+        /// </summary>
+        /// <remarks>
+        /// The positive case, here for the same reason as the two failures read
+        /// the other way round: a scheduled publish that leaves NO trace cannot
+        /// be told from one that never happened. Without this line the trail
+        /// can answer "why did my site not update?" and cannot answer "did
+        /// it?", and a teacher wondering whether last night's publish went out
+        /// has nowhere to look.
+        /// </remarks>
+        ScheduledPublishFinished,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -206,6 +240,8 @@ public static class ActivityTrail
         Event.SectionStartedANewWebsite => "section started a new website",
         Event.SectionKeptItsWebsite => "section kept its website",
         Event.ScheduledPublishNeededAnAnswer => "scheduled publish needed an answer",
+        Event.ScheduledPublishDidNotFinish => "scheduled publish did not finish",
+        Event.ScheduledPublishFinished => "scheduled publish finished",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

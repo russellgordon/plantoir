@@ -549,6 +549,16 @@
           "whoItReaches" : "MEASURED 2026-09-06, and it is narrower than the first draft of this entry claimed. The guard matches three letters, a digit and a zero — and NO code in either catalogue the wizard offers matches it: 0 of 1930 Ontario codes and 0 of 117 British Columbia codes (BC codes are MFMP-10 / MPREC11 shaped). A course code is free text up to twelve characters (CourseCodeRule), so it is still reachable — but only by a code a teacher typed freehand, which is exactly the case the guard was written for. That cuts BOTH ways in the decision below: refusing breaks far fewer real courses than feared, and the whole prompt is rarer than it looks."
         },
         {
+          "appliesOn" : [
+            "windows"
+          ],
+          "question" : "Continue anyway? [y/N] — the warning when a section is not listed in course_config.json",
+          "reachedWhen" : "preview.ps1 is asked to build a section the course's configuration does not list. WINDOWS ONLY, and not drift: preview.sh has exactly one read prompt (its course-code guard) and simply does not ask this. Added from Windows 2026-09-09; launcherFlags is authored rather than generated, so that side could record it without asking the mac.",
+          "refuse" : "Say which question could not be asked, and that adding this section to the course in Plantoir — or previewing it once by hand — answers it.",
+          "whatHappenedBefore" : "Its default is NO, so an unattended build of an unlisted section printed \"Cancelled.\" and exited 1 to a console nobody was watching. Measured on PowerShell 5.1.26100: under the scheduled wrapper's `powershell -NonInteractive` an unanswered Read-Host does not return an empty string at all — it THROWS PSInvalidOperationException, and preview.ps1's own $ErrorActionPreference = 'Stop' kills the script before the default is ever consulted. Either way the publish does not happen and nothing says why.",
+          "where" : "launcher"
+        },
+        {
           "question" : "Paste Netlify token",
           "reachedWhen" : "Netlify is not connected on this computer.",
           "refuse" : "Say Netlify is not connected, that connecting asks for a token nobody is here to paste, and that publishing this section once from Plantoir sorts it out.",

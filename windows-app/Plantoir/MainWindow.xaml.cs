@@ -94,7 +94,34 @@ public sealed partial class MainWindow : Window
         // fires before this runs (or does not fire at all on some launch
         // paths) — cheap and idempotent when there is nothing pending.
         _ = System.Threading.Tasks.Task.Run(ScheduledDeployCompletion.ConsumePending);
-        Closed += (_, _) => { IsClosed = true; Workspace.UnregisterWindow(); };
+        // A teacher who dismisses a stopped publish's notice inside a section
+        // has finished with it, and the warning beside that section in the tree
+        // has to go at the same moment. Without this the badge stayed up until
+        // the next Refresh() — which is the Activated handler above, so it
+        // cleared when they alt-tabbed away and back, and not before: the
+        // section open, the notice gone, and the sidebar still saying it needs
+        // attention.
+        //
+        // UNSUBSCRIBED on close, and that is not tidiness: the event is static,
+        // so a subscription left behind roots this window and its whole visual
+        // tree for the life of the process, and every window ever opened would
+        // answer.
+        void OutcomeDismissed(string course, int section)
+        {
+            if (IsClosed) return;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!IsClosed && Workspace.State == WorkspaceState.Ready) Sidebar.Refresh();
+            });
+        }
+        Views.SectionDetailView.SectionOutcomeDismissed += OutcomeDismissed;
+
+        Closed += (_, _) =>
+        {
+            IsClosed = true;
+            Views.SectionDetailView.SectionOutcomeDismissed -= OutcomeDismissed;
+            Workspace.UnregisterWindow();
+        };
 
         // The Preview menu tracks whichever section is currently shown —
         // one callback registered once, rather than a refresh call threaded

@@ -662,6 +662,12 @@ does its own post-run work.
   which is how the Windows side came to design a `.noted` sidecar against a
   mark this side does not keep.
 
+  **Windows marks it differently, and the difference is instructive.** That side
+  keeps the mark in a `.noted` SIDECAR file rather than in the record, because
+  its record's own modification time is what the notice is dated from — writing
+  a mark into it would change that date and file last night's problem under this
+  morning, which is the mistake an earlier draft here made and undid.
+
 **Where a teacher meets it.** The sentence sits at the top of the section, above
 the console — a teacher opening a section after a failed overnight publish is
 looking for why their site is out of date, and the console is about what they
@@ -717,23 +723,41 @@ reads the old sentence once, for that run. Records already on disk stay
 readable — the old kind is still a kind — which is why the fix could be made
 without a migration.
 
-### Two deliberate differences from Windows, both decided rather than drifted
+### The two widenings, and what still differs between the platforms
 
 Recorded in `contracts/shared-rules.json` → `scheduledPublishStopped`
-→ `platformDifferences`, which is where the two are compared.
+→ `platformDifferences`, which is where the two apps are compared.
 
-1. **The mac records ANY failed scheduled publish; Windows records only
-   "needed an answer".** Russell's decision, 2026-09-09: a teacher should learn
-   their overnight publish did not happen whatever the reason — a revoked
-   token, a network that was down — because **the silence is the complaint, not
-   the cause**. Recording only exit 3 leaves an ordinary overnight failure just
-   as silent as before, which is the same complaint in a different coat.
-2. **The mac lets the teacher dismiss it; Windows clears only on a successful
-   run.** Clearing only on success leaves the message standing after somebody
-   has already fixed the problem by hand, and the next scheduled run that would
-   clear it could be a week away.
+Russell decided both on 2026-09-09, and both are now on **both** platforms
+(Windows landed them the same day, GitHub issue #130):
 
-Both are owed to Windows. They are divergences until that side catches up.
+1. **ANY failed scheduled publish is recorded, not only "needed an answer".**
+   A teacher should learn their overnight publish did not happen whatever the
+   reason — a revoked token, a network that was down — because **the silence is
+   the complaint, not the cause**. Recording only exit 3 leaves an ordinary
+   overnight failure just as silent as before, which is the same complaint in a
+   different coat.
+2. **The teacher can dismiss it.** Clearing only on a successful run leaves the
+   message standing after somebody has already fixed the problem by hand, and
+   the next scheduled run that would clear it could be a week away.
+
+**The fourth outcome is on both sides too**, as of the same day —
+`buildNeededAnAnswer`, proposed to the contract from Windows and adopted here
+in issue #132's work, described in full in the section above. That sentence
+used to end "this suite is red on `kinds`/`sentences` until the mac adopts it",
+which was true when it was written on the Windows branch and stopped being true
+the moment these two merged.
+
+**One difference remains, and it is deliberate: who writes the trail line,
+which cannot be the same on both.** Here the
+launchd agent runs Plantoir, so the RUN writes it, as the `trail` key describes.
+On Windows Task Scheduler runs plain PowerShell with no app process alive, so
+that side sweeps every record when the app next opens, dating each line from the
+record rather than from the reading. Writing it from the wrapper's own shell was
+rejected there for the same reason it was rejected here — see below. The
+property the contract is actually asking for survives either way: **a teacher
+who never opens the failed section still gets the line**, and that teacher is
+precisely the one who writes in to say their site did not update.
 
 ### What was rejected
 
