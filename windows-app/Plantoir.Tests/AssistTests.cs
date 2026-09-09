@@ -717,11 +717,14 @@ public class AssistWorkspaceTests : IDisposable
         var workspace = Open();
         var course = workspace.Course("ICS3U");
 
-        string? kept = workspace.ReleaseSite(course, 1);
+        var release = workspace.ReleaseSite(course, 1);
 
-        Assert.NotNull(kept);
+        Assert.True(release.ReleasedAnything);
+        Assert.False(release.SomethingIsStillPinned);
         Assert.False(File.Exists(Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section1.json")));
-        string keptFull = Path.Combine(_folder, kept!.Replace('/', Path.DirectorySeparatorChar));
+        string keptFull = Path.Combine(
+            _folder, "courses", "ICS3U", ".netlify_sites",
+            Path.GetFileName(Assert.Single(release.KeptFiles)));
         Assert.True(File.Exists(keptFull));
         Assert.Contains("ics3u-s1-2026-gordon", File.ReadAllText(keptFull));
     }
@@ -731,7 +734,12 @@ public class AssistWorkspaceTests : IDisposable
     {
         File.Delete(Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section2.json"));
         var workspace = Open();
-        Assert.Null(workspace.ReleaseSite(workspace.Course("ICS3U"), 2));
+        var release = workspace.ReleaseSite(workspace.Course("ICS3U"), 2);
+        Assert.False(release.ReleasedAnything);
+        // And NOT "still pinned" — a section that was never published is a
+        // different answer from one that could not be released, and the two
+        // get opposite sentences.
+        Assert.False(release.SomethingIsStillPinned);
     }
 
     // ---- A session locked to one course ----------------------------------
