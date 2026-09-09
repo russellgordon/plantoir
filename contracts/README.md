@@ -199,7 +199,7 @@ recounted 2026-09-07.
 | Tool lists, approvals, plan twins | `assist-cases.json` → `tools` | AssistToolRunner |
 | Arrow-key history | `assist-cases.json` → `promptHistory` | AssistPromptHistory (15) |
 | Launcher arguments | `app-rules.json` → `deployArguments` | CloudflareDeploy (13) |
-| What a publish with nobody at the computer must REFUSE | `app-rules.json` → `launcherFlags.nonInteractive` | `scripts/test_deploy_non_interactive.py` (13); the flag itself is asserted by AppRulesContractTests via `deployExtras` |
+| What a publish with nobody at the computer must REFUSE | `app-rules.json` → `launcherFlags.nonInteractive` | `scripts/test_deploy_non_interactive.py` (13), which READS the launcher; `scripts/test_deploy_sh_questions.py` (15), which RUNS it to every question the key names and fails if the two lists come apart; the flag itself is asserted by AppRulesContractTests via `deployExtras` |
 | What a teacher is told when a publish set to happen on its own did not get through | `shared-rules.json` → `scheduledPublishStopped` | ScheduledPublishOutcome (12), SharedRulesContract (2) |
 | Validation messages | `app-rules.json` → `configurationRules` | CourseConfiguration (10), CustomDomain (4) |
 | Progress milestones and marker origins | `app-rules.json` → `milestones`, `markerOrigins` | TaskMilestone (12) |

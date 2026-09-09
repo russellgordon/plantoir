@@ -334,7 +334,8 @@ pseudo-terminal rather than reasoning about it:
   instructions were invisible — and when they mistyped it they saw **nothing
   at all** before the script exited 1.
 - On the SUCCESS path the captured value was the instructions **and** the id:
-  **519 bytes where 32 were meant** (the here-doc body is 486 of them). That blob went to `set_cf_account_keychain`,
+  **519 characters — 521 bytes — where 32 were meant** (the instruction block
+  is 489 bytes of it; the two-byte gap between the counts is one em dash). That blob went to `set_cf_account_keychain`,
   so it was remembered and every later run skipped the question and reused
   it, and to wrangler as `CLOUDFLARE_ACCOUNT_ID`. First-time Cloudflare
   publishing from the command line did not work, and stayed broken until the
@@ -363,6 +364,33 @@ mac with no `dotnet` cannot check that suite, so the change would have turned
 it red for a reason it has no way to verify. The invariant that matters — a
 question inside a function whose output is captured — is already gated by
 that test, which is what makes stderr sufficient here.
+
+**Fixing the printing does nothing for a teacher the bug already reached, and
+that is a separate repair.** The blob was written to the Keychain by
+`set_cf_account_keychain`, and the line that reads it back —
+`CF_ACCOUNT="$(get_cf_account_keychain)"` — trusted it without looking. So a
+teacher who answered the question correctly *once*, on a released build, would
+have had the question never asked again and wrangler handed nonsense on every
+run for ever. **Both released versions can have done this** (v1.0.0,
+2026-08-19; v1.1.0, 2026-08-20). The remembered value is therefore CHECKED
+before it is used: anything that is not 32 hex characters is discarded, the
+Keychain entry removed, and the question asked again — which is the state the
+teacher would have been in had the bug never happened.
+
+The repair is deliberately silent. "Your saved Account ID was wrong" invites a
+support question about something already put right, and the very next line asks
+for the ID anyway. If somebody needs to do it by hand, the entry is
+`containerized-quartz-cloudflare-account`:
+
+```bash
+security delete-generic-password -s containerized-quartz-cloudflare-account
+```
+
+`ATeacherAlreadyBittenGetsOutOfIt` in `scripts/test_deploy_sh_questions.py`
+pins both halves, and pins them against the REAL blob — it lifts the pre-fix
+function out of `07952399^`, runs it, and feeds what it actually produced back
+in as the remembered value, rather than a tidy short string that would not
+have caught this.
 
 **This is the same trap issue #92 fixed**, one function along. That issue
 moved the `--non-interactive` REFUSAL out to the call site for exactly this

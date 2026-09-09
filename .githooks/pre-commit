@@ -24,7 +24,7 @@
 # which would be worse than saying nothing. It always exits 0.
 #
 # The real coverage lives elsewhere and is not what this reminds you about:
-# `PythonToolchainTests` runs all fifteen shared Python test files inside
+# `PythonToolchainTests` DISCOVERS and runs every shared Python test file inside
 # `dotnet test` (156 tests, ~8 seconds, no credentials and no network), which
 # `verify.sh` has always done on the mac and nothing did here.
 #
