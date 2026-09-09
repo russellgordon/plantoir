@@ -1214,9 +1214,11 @@ final class SharedRulesContractTests: XCTestCase {
 
     /// The sentences a teacher reads are the contract's, filled in.
     ///
-    /// The `neededAnAnswer` wording is Windows' own, adopted verbatim so both
-    /// apps say one thing about one problem; `didNotFinish` is new on this
-    /// side, because Windows does not record that case yet.
+    /// Both apps show these to a teacher, so both retype them and both pin
+    /// them here. `neededAnAnswer` and `buildNeededAnAnswer` are Windows'
+    /// wording, adopted verbatim; `didNotFinish` and `succeeded` were written
+    /// on this side. Which platform a sentence came from stops mattering the
+    /// moment it is in the contract, which is the point of the contract.
     func testTheStoppedPublishSentencesAreTheContractsOwn() throws {
         let section: [String: Any] = try SharedRulesContractTests
             .section("scheduledPublishStopped")
@@ -1224,6 +1226,7 @@ final class SharedRulesContractTests: XCTestCase {
 
         let cases: [(ScheduledPublishOutcome.Kind, String)] = [
             (.neededAnAnswer, "neededAnAnswer"),
+            (.buildNeededAnAnswer, "buildNeededAnAnswer"),
             (.didNotFinish, "didNotFinish"),
             (.succeeded, "succeeded"),
         ]
@@ -1266,6 +1269,7 @@ final class SharedRulesContractTests: XCTestCase {
         for kind in ScheduledPublishOutcome.Kind.allCases {
             switch kind {
             case .neededAnAnswer: built.append("neededAnAnswer")
+            case .buildNeededAnAnswer: built.append("buildNeededAnAnswer")
             case .didNotFinish: built.append("didNotFinish")
             case .succeeded: built.append("succeeded")
             }
