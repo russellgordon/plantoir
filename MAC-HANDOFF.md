@@ -15,8 +15,10 @@ issues](https://github.com/russellgordon/plantoir/issues) on 2026-09-08: a
 Windows session that creates work for the mac opens an issue labelled `mac`
 rather than adding a numbered item here, and a contract case proposed from
 Windows — the thing that turns the mac suite red on purpose — is an issue too,
-so the red reads as a request rather than as damage. Issues #71–#87 are the
-eighteen items this file was carrying when it was cut over.
+so the red reads as a request rather than as damage. Issues #71–#87, #107–#112
+carry what this file was tracking when it was cut over — the eighteen entries
+under "Open", and the proposals under "Contract cases waiting on the mac",
+which a first pass missed and which were filed the same day.
 
 What is left below is the part that was never a task list: things to KNOW, and
 the reasoning behind work already done.
@@ -24,7 +26,7 @@ the reasoning behind work already done.
 | Section | What is in it |
 |---|---|
 | [For awareness — no mac code needed](#for-awareness--no-mac-code-needed) | Things to KNOW, not to do: shared decisions, frozen names, coordination points. |
-| [Done — the ledger](#done--the-ledger) | Finished, marked in place with what landed and where. History, and the reasoning behind decisions the code no longer explains. |
+| [Done — the ledger](#done--the-ledger) | **Append-only history**, closed to new entries since 2026-09-08 — what landed is now the closing comment on an issue. It holds the reasoning behind decisions the code no longer explains, and is not rewritten when the behaviour changes again. |
 
 Cross-side rebases rewrite commit hashes, so treat hashes as hints from the
 moment of writing — file and test names are the durable pointers.
@@ -57,6 +59,78 @@ If a teacher can see the change, it also wants a row in
 product, not of one platform.
 
 ## For awareness — no mac code needed
+
+> **"item N" in this file means the retired numbered list.** Until 2026-09-08
+> outstanding work lived in a numbered list inside `WINDOWS-HANDOFF.md`, and
+> prose written before then cites it by number. Those numbers no longer resolve
+> to anything: what was still open became [GitHub
+> issues](https://github.com/russellgordon/plantoir/issues), and what was done
+> is recorded in `GUI-IMPROVEMENTS.md`. The numbers are left in historical
+> sentences rather than rewritten, because the sentence around one usually says
+> what it was; `git log` has the list itself if a number ever needs chasing.
+
+- **DO NOT TELL ANYONE TO FIX A CREDENTIAL WITH `cmdkey` — Plantoir cannot
+  read what it writes** (Windows, 2026-09-06). Awareness rather than work, but
+  it cost an hour here and it would cost a support conversation the same.
+  `deploy.ps1`'s `CredApi` stores and reads the credential blob as **UTF-8**;
+  `cmdkey` writes **UTF-16**. A credential written with `cmdkey` therefore
+  shows up perfectly in `cmdkey /list` and is INVISIBLE to the app, which
+  falls through to asking the teacher for the token again — with no hint that
+  a credential is already sitting there.
+
+  Met twice in one evening: a Cloudflare token stored with `cmdkey` was
+  ignored by the launcher, and the machine's stored Cloudflare ACCOUNT ID had
+  evidently been written the same way long ago. Precisely: `ReadSecret`
+  returns null only when `CredRead` fails or the blob is empty — a UTF-16 blob
+  decodes instead into a NUL-riddled string, which is not the token and does
+  not authenticate. Either way the teacher is asked for a credential that is
+  already stored, with nothing to say so. The fix is to write through the
+  launcher's own `CredApi`. If the mac ever documents credential recovery for
+  Windows — or a support note does — this is the trap.
+
+
+- **`GUI-IMPROVEMENTS.md` row 407 (the old `WINDOWS-HANDOFF.md` item 20)'s first owed bullet was answered a
+  different way than it asked, deliberately** (Windows, 2026-09-05). It said
+  to call `preview.ps1`'s own `--stop` matcher from the `--build-only` path.
+  That was not done, and should not be: `deploy.py` reaches
+  `build_site.py --build-only` directly (`rebuild_for_production`), never
+  through the launcher, so a fix living in `preview.ps1` leaves the Netlify
+  and Cloudflare route racing — which that item itself pointed out two
+  paragraphs later. Fixing it one level down in `stop_preview.read_snapshot()`
+  covers `preview.ps1 --build-only`, `deploy.ps1`'s folder branch,
+  `deploy.py`, scheduled deploys and `plantoir-mcp.exe` in one edit, and
+  every future caller for free. Item 20 can be marked done on that bullet.
+
+
+- **The assistant said "deployed" before the deploy finished, on Windows — for awareness, no mac action required.** The old `TODO.md` entry read: *"Assistant
+  replies 'deployed' before the deploy finishes (Windows)."* Windows'
+  `MainWindow.DeployForAsync` used to resolve the instant the click was
+  dispatched to the UI thread, not when the deploy actually finished, so the
+  in-app assistant said "is deployed. Students can reach it now." after
+  every `deploy_section` call regardless of outcome. Fixed by having
+  `SectionDetailView.Deploy_Click`'s body (now `DeployAsync()`, an
+  `async Task<string?>`) RETURN the true outcome sentence on every exit path
+  — success/partial/all-failed via the existing
+  `MultiDestinationDeployRunner.Result(...)`, `AssistWording.DeployDidNotFinish`
+  on every early return and the catch block — threaded back through
+  `MainWindow.DeployForAsync` → `AssistWindow.StartDeployInAppAsync` →
+  `AssistAgent.RunTool`. Full write-up: `GUI-IMPROVEMENTS.md` row 383.
+
+  The mac's `deployAndWait()` already awaits the real result and words it
+  correctly — this only brought Windows to parity, so there is nothing to
+  port. Two things worth a mac session's attention, not required, not
+  blocking anything: (1) whether an equivalent "second deploy request
+  arrives while one is already running" path exists in
+  `SectionDetailView.swift`, and if so whether it shares mutable state across
+  the two in-flight calls the way the first (rejected) fix here did before an
+  adversarial review caught it — see the "rejected" note in
+  `GUI-IMPROVEMENTS.md` row 383 for the exact shape of that bug, since it is
+  a general trap (a single-slot completion field shared across concurrent
+  callers) worth checking for rather than re-discovering; (2) the Windows
+  scenario test fixture (`AssistScenarioTests.cs`) never wired
+  `StartDeployInAppAsync` at all before this — worth checking whether the
+  mac's own scenario tests exercise the equivalent async production seam or
+  only a sync stand-in.
 
 - **Item 40 is closed. Two things to know: xUnit's `Assert` throws where
   XCTest records and carries on, and Windows edited one sentence of authored
@@ -211,7 +285,7 @@ product, not of one platform.
   not platform-specific, and a mac session that ever drives the app from a
   test HOST rather than from Finder should know the failure mode exists,
   because nothing about the symptom points at the cause. Deferred rather than
-  fixed, in `TODO.md`: whether `ConPtyProcess.Start` should zero the creating
+  fixed, as issue #89: whether `ConPtyProcess.Start` should zero the creating
   process's std handles across `CreateProcessW`.
 
   **And the half Windows did NOT automate, with the reasoning, so nobody

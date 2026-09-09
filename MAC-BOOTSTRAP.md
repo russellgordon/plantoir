@@ -39,10 +39,13 @@ places, and which one is a judgement about portability rather than effort:
   a rule with inputs and expected outputs, or a sequence that must happen in
   order. Add the case, run it here, commit the diff — the Windows suite then
   runs the identical case.
-- **[`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md)** if it cannot be expressed as
-  data: anything visual, anything with platform mechanics (Colima, port leases,
-  WebKit), anything measured rather than asserted. Write the INTENT and the
-  reasoning, not just that it exists.
+- **A [GitHub issue](https://github.com/russellgordon/plantoir/issues)
+  labelled `windows`** if it cannot be expressed as data: anything visual,
+  anything with platform mechanics (Colima, port leases, WebKit), anything
+  measured rather than asserted. Write the INTENT and the reasoning, not just
+  that it exists — and put the reasoning that an implementer will need to READ
+  in a [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) section the issue points at.
+  The issue is the index; the section is the manual.
 
 **Never neither.** The failure this prevents is the quiet one: a behaviour that
 exists in one app, is described nowhere the other app's tests can reach, and is
@@ -133,7 +136,7 @@ bundle from the Dock. Test, then build, then stop.
   ```bash
   GH_TOKEN=$(gh auth token --user russellgordon) gh issue create \
     --repo russellgordon/plantoir --label windows --milestone v1.2.0 \
-    --title "…" --body-file <file>
+    --title "..." --body-file issue-body.md
   ```
 
   **Per-command auth, never `gh auth switch`** — this machine has more than one
@@ -179,8 +182,11 @@ Russell's call every time (`CLAUDE.md` rule 6).
 
 ```bash
 GH_TOKEN=$(gh auth token --user russellgordon) \
-  gh issue list --repo russellgordon/plantoir --label mac
+  gh issue list --repo russellgordon/plantoir --label mac --limit 100
 ```
+
+Pass `--limit`: `gh` shows 30 by default and silently hides the rest, which is
+the failure this whole arrangement was made to stop.
 
 That is what the mac still owes. `MAC-HANDOFF.md` is what it must KNOW: two
 sections, both readable top-down and abandonable at any point —
@@ -196,12 +202,12 @@ they do, the mac suite fails until this side implements it — that is the
 mechanism working, not a break. The failing case names itself, and there
 should be an open `mac` issue saying it is waiting.
 
-### 3. Implement, then mark it DONE in place
+### 3. Implement, then CLOSE the issue
 
-Entries are never deleted: a `✅ DONE` line names what landed here and where.
-Add what the mac found that Windows had not — the ledger's most useful entries
-are the ones where implementing their fix turned up a second instance of the
-same bug on this side.
+Close it with a comment naming what landed here and where — never by editing
+its title. Say what the mac found that Windows had not: the most useful
+closing comments are the ones where implementing their fix turned up a second
+instance of the same bug on this side.
 
 ### 4. Answer back
 

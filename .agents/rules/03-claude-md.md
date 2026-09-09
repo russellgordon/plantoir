@@ -9,6 +9,13 @@ description: "Plantoir project rules, part 3 of 9 - Rules that override default 
 
 ## Rules that override default behaviour (continued)
 
+6. **Branch model: `main` + `dev` + issue branches.** Adopted 2026-08-19, the
+   day v1.0.0 shipped, superseding the old "commit straight to `main`" rule —
+   which said a later instruction to branch would supersede rather than
+   contradict it, and this is that instruction. Before the first release,
+   every commit was equally unshipped and a branch only added a merge; now
+   `main` is what teachers have, and it needs protecting from work in flight.
+
    - **`main` is what shipped.** It stays releasable at all times: release
      tags point at `main`, and plantoir.app's download links resolve against
      its releases. Nothing lands there except a merge from `dev`, plus the
@@ -160,14 +167,3 @@ description: "Plantoir project rules, part 3 of 9 - Rules that override default 
     (`~/Library/Developer/Xcode/DerivedData/Plantoir-*/Build/Products/Debug/Plantoir.app`,
     the same bundle `xcodebuild` writes), so "rebuild it" and "make it ready to
     test" are the same act:
-
-    ```bash
-    cd mac-app
-    xcodegen generate     # if files were added or removed, or project.yml changed
-    xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug build
-    ```
-
-    Then say plainly that it is ready. The cost of forgetting is not a wasted
-    rebuild: he launches from the Dock, tests the OLD binary, and reports
-    behaviour that was fixed an hour ago — which then gets investigated as a new
-    fault. A report of "done" that leaves a stale binary behind is not done.

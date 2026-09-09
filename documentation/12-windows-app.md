@@ -205,7 +205,8 @@ One rule learned the hard way:
   limit and the site is simply never updated, with nothing to say why. Note
   the flag reaches PowerShell's own prompts only: a Python `input()` in
   `deploy.py` is guarded separately, by `sys.stdin.isatty()`, which takes the
-  default silently rather than refusing — see [`TODO.md`](../TODO.md).
+  default silently rather than refusing — see
+  [issue #92](https://github.com/russellgordon/plantoir/issues/92).
 
 ---
 
@@ -334,8 +335,8 @@ events, three different responses, one exit code — and the middle one is the
 expensive one, because it does not look like an infrastructure problem. A test
 is NAMED, so the name gets investigated; re-running it passes, so it gets filed
 as flaky. On the mac that mistake rejected 3 of 7 pieces of correct work in a
-single overnight batch and was raised in `TODO.md` twice, a fortnight apart,
-before anybody noticed the two entries were one defect.
+single overnight batch and was raised twice, a fortnight apart, before
+anybody noticed the two reports were one defect.
 
 **The honest signal is the TOTALS line, never the exit code.** Measured
 2026-09-08 on this machine (Lenovo 20QES70500, Intel Core i5-8365U @ 1.60 GHz,
@@ -491,12 +492,13 @@ this section said the opposite — that any console broke it — which is why th
 experiment above is written down rather than the conclusion alone.
 `Plantoir.UiTests` is the case that meets it in practice, and `DrivenApp`
 launches with `UseShellExecute = true` for exactly this reason. Whether
-`ConPtyProcess.Start` should defend itself is in [`TODO.md`](../TODO.md).
+`ConPtyProcess.Start` should defend itself is
+[issue #89](https://github.com/russellgordon/plantoir/issues/89).
 
 ### The new-site dialog: a hand-driven check
 
 One first-run path cannot be a `[UiFact]`, and it is the other half of what
-handoff item 35 asked for: the dialog a BRAND-NEW section's first publish
+the first-run UI checks asked for: the dialog a BRAND-NEW section's first publish
 raises, where a teacher chooses their website address. Everything verified
 until now has been a REPEAT publish to a site that already existed, so this
 dialog has never been seen by anybody checking that it works.
@@ -570,7 +572,7 @@ And delete the site on Netlify, since it is a real one and the address is
 globally unique.
 
 **Whether this joins the release cut — answered 2026-09-07, and the answer is
-no.** It was left open as the same question as handoff item 36; item 36 is now
+no.** It was left open as the same question as the publishing-gate work, which is now
 settled, so this one is too, and separately from it. `RELEASING.md` requires
 `verify-deploy.ps1` with nothing skipped for a release that changes the
 publishing path, and that script deliberately cannot reach this dialog: it
@@ -580,6 +582,48 @@ unique Netlify site that nothing deletes, on top of the ones the verifier
 already makes, to check five things that change about once a year. Do it when
 the new-site path itself changes — the five checks above say what to look at —
 and not on a schedule.
+
+## `x:Bind` freezes a row that is reconciled rather than recreated
+
+Worth knowing before any WinUI work here, not only the case it was found in.
+The sidebar's scheduled-deploy badge never appeared when a deploy was scheduled
+in an already-open window, and the right-click menu never offered Cancel or
+Change either (2026-08-23, `GUI-IMPROVEMENTS.md` row 326). **Two compounding
+bugs, and fixing the obvious one alone would have changed nothing on screen.**
+
+1. `ReconcileSections` read the current schedule into `SidebarRow` only when
+   CREATING a row. An existing row — the normal case, the window being already
+   open — kept whatever had been true the moment it was first shown, forever.
+2. Even with that fixed, nothing would have appeared. **`x:Bind` defaults to
+   `Mode=OneTime`**, unlike classic `Binding`: it evaluates once when the
+   container is created and never again. `SidebarRow` raised no change
+   notification and none of the affected bindings asked for `Mode=OneWay`, so
+   `Visibility` and `ContextFlyout` were frozen at container-creation time.
+
+**The general rule.** A row or item object that is RECONCILED rather than
+recreated needs both halves, every time:
+
+- `Mode=OneWay` in the XAML on every binding whose value can change after the
+  container is built, and
+- `INotifyPropertyChanged` raised for **the exact property name the binding
+  names** — including any DERIVED property XAML binds to directly. `x:Bind`
+  subscribes to the literal property path in the binding, not to whatever that
+  property is computed from, so here `ScheduledDeploy` changing had to raise
+  `BadgeVisibility` and `BadgeTooltip` as well.
+
+`MainWindow`'s `Activated` handler also calls `Sidebar.Refresh()`, so a deploy
+scheduled by the assistant or from another window is picked up when this window
+next comes to the front — the same refresh-on-activation shape the " — Edited"
+marker uses.
+
+**There is no equivalent trap on the mac.** SwiftUI's `@Observable` re-renders
+any view that read a changed property, so the "silently stale until the
+container happens to be recreated" failure mode does not exist there. Do not go
+looking for it in the Swift.
+
+Reference: `Plantoir/Views/SidebarPane.xaml.cs` (`SidebarRow`,
+`ReconcileSections`), `Plantoir/Views/SidebarPane.xaml` (the three `Mode=OneWay`
+bindings), `Plantoir/MainWindow.xaml.cs`.
 
 ## What this page does not cover
 
@@ -598,9 +642,9 @@ as work happens:
 - **Window and state restoration**, archived courses, problem reporting, and
   the `WorkLease` protocol that keeps two windows from building the same
   section at once.
-- **What is built and what is missing.** `PROGRESS.md` carries the parity
-  table; `WINDOWS-HANDOFF.md` carries the numbered list of outstanding work
-  and the reasoning behind past decisions.
+- **What is built and what is missing.** Outstanding work is in [GitHub
+  issues](https://github.com/russellgordon/plantoir/issues) labelled `windows`;
+  `WINDOWS-HANDOFF.md` carries the reasoning behind past decisions.
 
 ---
 

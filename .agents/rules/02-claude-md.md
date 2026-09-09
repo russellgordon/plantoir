@@ -35,6 +35,12 @@ description: "Plantoir project rules, part 2 of 9 - Rules that override default 
      coverage table says what the contract deliberately cannot carry; if your
      change is on that list, an issue is where it goes.
 
+     **An issue is an OBLIGATION**, so this fork is for things the other side
+     must DO. Something they only need to KNOW — a shared decision, a frozen
+     name, a trap — is not a third case slipping between the two: it goes in
+     the handoff's awareness section (rules 3 and 4), and an issue nobody can
+     close is the thing that arrangement avoids.
+
    The failure this prevents is the quiet one: a behaviour that exists in one
    app, is described nowhere the other app's tests can reach, and is discovered
    months later as a difference nobody chose. **It binds both ways** — see
@@ -98,6 +104,14 @@ description: "Plantoir project rules, part 2 of 9 - Rules that override default 
      must DO is an issue, opened in the same session. A change that creates an
      obligation for the other platform and opens no issue has, from their side,
      not been handed over at all.
+   - **The record of what LANDED is the closing comment on the issue**, not a
+     new entry in `MAC-HANDOFF.md`. That file's "Done — the ledger" is now
+     append-only history like `TODO.md`: it holds the reasoning behind work
+     finished while it was the ledger, and nothing new is written into it.
+     Said explicitly because the rule this replaced ended "entries are marked
+     `✅ DONE` in place rather than deleted", and dropping that sentence
+     without saying what took its place would have left the ledger being fed
+     by nothing while two other places still called it live.
    - **`GUI-IMPROVEMENTS.md` gets a row for anything a teacher can see**, so
      the log stays the record of the product rather than of one platform.
    - **anything measured is written with its NUMBERS and the hardware they
@@ -136,10 +150,3 @@ description: "Plantoir project rules, part 2 of 9 - Rules that override default 
    preview, opened the assistant, asked for a report and was told there was
    nothing to report, because neither of the two things they had just done was
    among the things anybody had thought to record.
-
-6. **Branch model: `main` + `dev` + issue branches.** Adopted 2026-08-19, the
-   day v1.0.0 shipped, superseding the old "commit straight to `main`" rule —
-   which said a later instruction to branch would supersede rather than
-   contradict it, and this is that instruction. Before the first release,
-   every commit was equally unshipped and a branch only added a merge; now
-   `main` is what teachers have, and it needs protecting from work in flight.

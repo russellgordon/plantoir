@@ -358,7 +358,7 @@ public sealed class FileFormatContractTests : IDisposable
     /// named divergence (the contract and the mac kept the old key inverted;
     /// this app migrated). The contract moved to this app's behaviour, so
     /// the mac's suite fails on it until the mac adopts it — a request, not
-    /// damage (MAC-HANDOFF.md, "Contract cases waiting on the mac").
+    /// damage (issue #107).
     ///
     /// <para>The last assertion is the one genuine design question: a legacy
     /// page whose value is already right IS rewritten, once, to migrate the

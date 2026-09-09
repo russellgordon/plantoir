@@ -11,7 +11,8 @@ decided while this file was the to-do list. An entry records what was true on
 its day, and — as often as not — what the entry itself got wrong before the
 work was done; that is the part worth keeping, so nothing here is edited when
 the behaviour changes again. The twelve entries that were still open on
-2026-09-08 were moved to issues #88–#99 and removed from this file.
+2026-09-08 were moved to issues #88–#99 and removed from this file, and one
+half-finished entry left its unbuilt half behind as #100.
 
 - ~~**The mac suite crashes intermittently inside AppKit, and it reads as a
   failing test rather than as a crash**~~ — ✅ **Done 2026-09-07** (mac,
@@ -364,7 +365,9 @@ the behaviour changes again. The twelve entries that were still open on
 - ✅ **Half done 2026-09-01 — a course chooses its word for “Unit” when it is
   made.** Deferred 2026-08-23; built once Russell chose the scope on
   2026-09-01: **new courses plus configurable parsing, NOT renaming a course
-  already in use.**
+  already in use.** The unbuilt half is now
+  [issue #100](https://github.com/russellgordon/plantoir/issues/100); the
+  reasoning below is reproduced there.
 
   **What shipped.** `unit_word` in `course_config.json`, absent meaning “Unit”.
   The wizard asks every course, the ready-made payload is written in that word

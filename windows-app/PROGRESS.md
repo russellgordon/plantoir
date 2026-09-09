@@ -20,6 +20,15 @@ Docker Desktop) unless marked otherwise.
 
 ## Where parity stands
 
+> **"item N" in this file means the retired numbered list.** Until 2026-09-08
+> outstanding work lived in a numbered list inside `WINDOWS-HANDOFF.md`, and
+> prose written before then cites it by number. Those numbers no longer resolve
+> to anything: what was still open became [GitHub
+> issues](https://github.com/russellgordon/plantoir/issues), and what was done
+> is recorded in `GUI-IMPROVEMENTS.md`. The numbers are left in historical
+> sentences rather than rewritten, because the sentence around one usually says
+> what it was; `git log` has the list itself if a number ever needs chasing.
+
 **The open work is in [GitHub
 issues](https://github.com/russellgordon/plantoir/issues?q=is%3Aopen+label%3Awindows),
 and this file no longer keeps a second copy of it.** Until 2026-09-08 it did —
