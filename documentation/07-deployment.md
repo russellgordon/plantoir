@@ -509,7 +509,20 @@ looks further. Wait on the whole tree; `deploy.ps1` already does.
 New on 2026-09-05, at the repository root. It publishes to a folder, to Netlify
 and to Cloudflare, and runs all three primary+secondary pairings, then **fetches
 every published site back and reads it** — the launcher's own output only
-proves the launcher is happy with itself. 42 checks.
+proves the launcher is happy with itself.
+
+**First run on the mac: 2026-09-09, 44 passed, 0 failed, 0 skipped** — the run
+`RELEASING.md` requires with nothing skipped, and the one issue #129 was really
+asking for, since `deploy.sh` had gained `--non-interactive` on a machine that
+could not execute it. All three destinations published for real and fetched
+back (folder 244 files, `ada1o-s1-2026-testing.netlify.app`,
+`ada1o-s1-2026-testing.pages.dev`), all three pairings, no live-reload client
+on any of them, and the no-front-page case refused and shipped nothing stale.
+Nothing about a teacher at a keyboard changed. The Windows counterpart
+`verify-deploy.ps1` was run before the merge: 36 passed, 0 failed, 0 skipped.
+The two counts differ because the suites are not identical, not because
+anything was skipped — count the cases in each script rather than comparing
+the numbers.
 
 **It is deliberately NOT part of `verify.sh`.** The gate must be runnable at any
 moment, on any machine, without credentials and without touching anything
