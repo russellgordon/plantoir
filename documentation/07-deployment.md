@@ -314,6 +314,61 @@ Two things are needed, and only one comes from the teacher directly:
   last "asking once" is a refusal instead, naming the Account ID and pointing
   at the course's own settings.
 
+### Asking once, and the subshell that ate the question (2026-09-09)
+
+That "asking once" is `prompt_for_cf_account`, and until issue #129 it did
+not work from the command line. It is called as
+
+```bash
+CF_ACCOUNT="$(prompt_for_cf_account)" || exit 1
+```
+
+and a command substitution is a **subshell that captures stdout**, so the
+function's stdout is its RETURN VALUE — nothing else may go there. Its
+six-step "where to find your Account ID" instructions and its "that doesn't
+look like an Account ID" error both went to stdout anyway. Two consequences,
+both measured on 2026-09-09 by driving the real `deploy.sh` through a
+pseudo-terminal rather than reasoning about it:
+
+- A teacher was asked to paste a code **with no hint where it lives** — the
+  instructions were invisible — and when they mistyped it they saw **nothing
+  at all** before the script exited 1.
+- On the SUCCESS path the captured value was the instructions **and** the id:
+  115 bytes where 32 were meant. That blob went to `set_cf_account_keychain`,
+  so it was remembered and every later run skipped the question and reused
+  it, and to wrangler as `CLOUDFLARE_ACCOUNT_ID`. First-time Cloudflare
+  publishing from the command line did not work, and stayed broken until the
+  Keychain entry was cleared by hand.
+
+**Only the command line was exposed.** The GUI passes `--account` (see
+`DeployCommand`), and a scheduled publish carries it in the plist, so neither
+reaches this question; and the common case never reaches it either, because
+discovery usually answers first. `deploy.ps1` never had it: its twin says
+both of these at top level rather than inside a function whose output is
+captured.
+
+Fixed by sending both to **stderr**, which is where `read -rp` already writes
+its own prompt, so the instructions now sit with the question they belong to.
+
+**Rejected: making the function set `CF_ACCOUNT` directly** and dropping the
+command substitution. It is the more structural fix — it removes the trap
+rather than documenting it — but the call site is parsed as TEXT by Windows'
+`PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`,
+which finds the single caller by searching for `prompt_for_cf_account)`. A
+mac with no `dotnet` cannot check that suite, so the change would have turned
+it red for a reason it has no way to verify. The invariant that matters — a
+question inside a function whose output is captured — is already gated by
+that test, which is what makes stderr sufficient here.
+
+**This is the same trap issue #92 fixed**, one function along. That issue
+moved the `--non-interactive` REFUSAL out to the call site for exactly this
+reason; the instructions and the error were left behind, because nobody had
+started the script and watched it. Which is the real lesson: `deploy.sh`
+changed on a machine with no bash, was syntax-checked and reviewed carefully,
+and reading it found neither of these. `scripts/test_deploy_sh_questions.py`
+now RUNS the launcher to every question it can ask — no Docker, no network,
+no credentials — and `verify.sh` runs it at step 0.
+
 Naming a NEW project asks the teacher nothing, and that is the one place this
 path differs from Netlify's: the project name is derived (course, section,
 year, surname) rather than offered for editing. So under `--non-interactive`
@@ -594,8 +649,11 @@ is what we meant to write and nothing about what bash does with it.
 
 The limit worth stating: those runs use **stub launchers** that exit with a
 chosen code. That the real `deploy.sh` exits 3 in the states we think it does is
-proved separately, by `scripts/test_deploy_non_interactive.py`, and end to end
-only by `verify-deploy.sh`, which publishes to real Netlify.
+proved separately — by `scripts/test_deploy_non_interactive.py`, which reads the
+launcher, and since 2026-09-09 by `scripts/test_deploy_sh_questions.py`, which
+RUNS it to each of the four questions it can ask and checks the refusal is
+visible as well as the code being 3 — and end to end only by
+`verify-deploy.sh`, which publishes to real Netlify.
 
 ---
 
