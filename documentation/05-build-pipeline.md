@@ -924,9 +924,9 @@ succeeded at EVERY destination rather than merely at one.
 
 ## Built websites live outside the working folder
 
-**You did this first, in row 290, and the mac has now caught up.** This section
-exists because the mac's answer looks nothing like yours, and somebody reading
-the two side by side will wonder which is right. Both are: the difference is
+**Windows did this first, in row 290, and the mac caught up on 2026-09-05.**
+This section exists because the mac's answer looks nothing like Windows', and
+somebody reading the two side by side will wonder which is right. Both are: the difference is
 the machinery, and copying either one onto the other platform would be a
 mistake.
 
@@ -945,14 +945,14 @@ rather than once, because Quartz emits its whole output fresh each time and the
 mirror copies every file that has a new timestamp. A real course with media is
 many times that.
 
-**Your side is unchanged and should stay unchanged.** `PLANTOIR_BUILD_ROOT` →
+**Windows is unchanged and should stay unchanged.** `PLANTOIR_BUILD_ROOT` →
 `%LOCALAPPDATA%\Plantoir\builds\<folder id>`, honoured by
 `scripts/toolchain_paths.py` → `merged_output_root()`, which does not nest a
 `.merged_output` level when the variable is set. That flat layout is already
 pinned by `scripts/test_deploy_course_dir_resolution.py` and is the reason
 `deploy.py` derives the course directory from `COURSES_ROOT / <code>` rather
-than by climbing from the built section — the fix that was YOURS, and the shape
-this piece reused.
+than by climbing from the built section — Windows' fix, and the shape this
+piece reused.
 
 ### Why the mac could not just set the variable
 
@@ -1037,13 +1037,12 @@ safety net rather than the only defence. Renaming a course is the exception:
 its build is carried across, because a rename used to cost nothing and should
 still cost nothing.
 
-**Your layout has the same hole in a different shape.** You have no link, so
-the "no link means clear it" rule cannot be copied — but
+**The Windows layout has the same hole in a different shape.** There is no link
+there, so the "no link means clear it" rule cannot be copied — but
 `%LOCALAPPDATA%\Plantoir\builds\<id>\<CODE>` outlives an archived course
 exactly the way the mac's did, and a restore into that code will find it. Worth
 checking; worth writing down either way if it turns out a platform is already safe,
-because "we checked and it cannot happen here" is as useful to this side as a
-fix.
+because "we checked and it cannot happen here" is as useful as a fix.
 
 **And a builds folder for a working folder that no longer exists is litter
 nobody can name**, because the id is a hash and cannot be read backwards. The

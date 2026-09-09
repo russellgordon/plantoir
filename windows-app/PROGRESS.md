@@ -1,8 +1,9 @@
 # Plantoir for Windows — Progress
 
 What each project in the solution is, and what state the app is in. First take
-built overnight 2026-08-11 by Claude Code, per
-[`documentation/`](../documentation/README.md); the assist subsystems folded
+built overnight 2026-08-11 by Claude Code, per `WINDOWS-HANDOFF.md` — a file
+since absorbed into [`documentation/`](../documentation/README.md) and deleted;
+the assist subsystems folded
 into `main` on 2026-08-14. Everything below was **verified live on the
 maintainer's Windows 11 machine** (WSL2 + Ubuntu-24.04 + Docker Engine 29, no
 Docker Desktop) unless marked otherwise.
@@ -69,7 +70,8 @@ Two more things worth knowing here:
   credentials. A rejected first design (a stamp file recording when
   `verify-deploy.ps1` last passed, with a unit test reddening when the
   publishing files changed afterwards) is written up in `documentation/07-deployment.md`
-  item 36 with the measurements that killed it.
+  `git log -- WINDOWS-HANDOFF.md`, with the measurements that killed it — that
+  write-up went with the retired list rather than into `documentation/`.
 - **The unit suite is green**: 911 passed, 0 failed at the time this section
   was written; 945 after the folder-problems front end, and 979 once
   parity-tail was merged into it and the overnight capture was added. `dev` stood
@@ -87,7 +89,8 @@ Two more things worth knowing here:
 
 ## Every contract case list is now RUN here (2026-09-06)
 
-the 2026-09-06 contract audit. Twenty-three lists the mac suite ran and this one did
+Closing the gap the 2026-09-06 contract audit found. Twenty-three lists the mac
+suite ran and this one did
 not read — none unreachable, each simply a test nobody had written.
 `contracts/README.md` now names which class runs which, so the audit does not
 have to be repeated.
@@ -285,11 +288,12 @@ entries 1–264 assessed). Nothing here duplicates it, because a second copy is
 a copy that goes stale — that count itself had been reading "179 rows" for
 days after the log passed 250.
 
-**What to do with that assessment** is the ordered list in
-[`documentation/12-windows-app.md`](../documentation/12-windows-app.md) → "Where Windows actually
-stands", written 2026-08-17 by reading this app's source from the mac. It was
-read rather than run — `dotnet` is not installed there — so treat it as a
-plan to start from, and report anything it gets wrong in a `mac` issue.
+**What to do with that assessment** is the open `windows` issues, plus
+[`documentation/12-windows-app.md`](../documentation/12-windows-app.md) →
+"What is built and what is missing". Much of that page was written by reading
+this app's source from the mac, read rather than run — `dotnet` is not
+installed there — so treat it as a starting point, and report anything it gets
+wrong in a `mac` issue.
 
 ## Known rough edges for the next session
 

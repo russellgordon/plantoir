@@ -744,8 +744,8 @@ public sealed class CourseConfiguration
     /// (set before this course had more than one destination) is carried
     /// forward into the new per-destination map, attributed to the PRIMARY
     /// destination, rather than silently discarded the first time any
-    /// destination's domain is set here — see documentation/08-course-config-reference.md,
-    /// which found the mac side losing exactly this data before the map
+    /// destination's domain is set here — found by the 2026-09-06 audit,
+    /// which caught the mac side losing exactly this data before the map
     /// shape existed. Setting an empty domain removes that destination's own
     /// entry rather than storing an empty string.
     /// </summary>
@@ -866,8 +866,8 @@ public sealed class CourseConfiguration
     /// the build's `curriculumCoverageFoundNothing` health check tells the
     /// teacher the map could not be built, whereas a deadlock tells them
     /// nothing and offers no way forward. Changing what the config CARRIES is
-    /// a product decision rather than a port detail, and is raised in
-    /// documentation/08-course-config-reference.md instead of being taken here.</para>
+    /// a product decision rather than a port detail, and is raised as an issue
+    /// instead of being taken here.</para>
     /// </summary>
     public static bool CurriculumCoverageEnabled(bool hasExampleContent, bool prepopulating,
                                                  bool contentIncludesCurriculum,

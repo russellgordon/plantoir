@@ -108,7 +108,7 @@ public sealed class FileFormatContractTests : IDisposable
     }
 
     /// <summary>
-    /// contracts/README.md's acceptance test, skipped from 2026-09-06
+    /// the wizard skeleton question's acceptance test, skipped from 2026-09-06
     /// until the wizard asked the skeleton question on 2026-09-07.
     ///
     /// <para>Around 1,900 course codes have a skeleton and no ready-made
@@ -267,7 +267,7 @@ public sealed class FileFormatContractTests : IDisposable
     ///
     /// <para>Keyed by the contract's own rule sentences and checked for
     /// completeness at the end, so a rule the mac ADDS fails here by name
-    /// rather than sitting unread — which is the failure contracts/README.md item
+    /// rather than sitting unread — which is the failure the 2026-09-06 contract audit
     /// 29 exists to end.</para>
     /// </summary>
     [Fact]

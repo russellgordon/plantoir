@@ -19,7 +19,7 @@ namespace Plantoir.Services;
 /// in contracts/shared-rules.json → stopPreview. On this platform they are
 /// matched by COMMAND LINE, never by working directory: Win32_Process does
 /// not expose a working directory at all. (Both this comment and two places
-/// in documentation/03-launcher-scripts.md said "by working directory" until 2026-09-05. That
+/// in the shared write-up said "by working directory" until 2026-09-05. That
 /// is the mac's mechanism, where the rule reads /proc; it has never been
 /// true here, and a wrong sentence about how a kill chooses its targets is
 /// exactly the kind that gets believed.)

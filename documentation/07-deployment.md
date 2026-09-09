@@ -360,44 +360,43 @@ or `section1` also matches `section10`.
 
 Two things worth checking per platform rather than assuming:
 
-- **Your preview is not in a container**, so an orphaned server is a plain
+- **A Windows preview is not in a container**, so an orphaned server is a plain
   Windows process. Check that killing the launcher actually stops the node
   server — on the mac it demonstrably does not, and that is exactly the kind of
   difference that is assumed rather than measured.
-- **You have already written most of the algorithm — do not write it again.**
+- **The matching algorithm exists on both sides — do not write a third copy.**
   `preview.ps1`'s `--stop` block finds this section's processes by COMMAND
   LINE (this paragraph said WORKING DIRECTORY until 2026-09-05, and that was
-  simply wrong — `Win32_Process` exposes no working directory), walks their
-  descendants, and its own comment says "not port, … parity: preview.sh". The
-  descendant walk is the half Windows had and the mac did not. What was missing
-  there is not the algorithm, it is **calling it from the build-only path
-  before the build**.
+  simply wrong — `Win32_Process` exposes no working directory) and walks their
+  descendants; the descendant walk is the half Windows had and the mac did not.
 
-  (The mac could not simply call `preview.sh --stop`, because `build_site.py`
+  The mac could not simply call `preview.sh --stop`, because `build_site.py`
   runs INSIDE the container and `--stop` is a host script — which is why a
-  third copy of this rule existed. **Resolved 2026-09-05**: the rule now lives
-  once, in `contracts/shared-rules.json` → `stopPreview` and
-  `scripts/stop_preview.py`, and item 20 in the outstanding list says what
-  this side owes.)
+  third copy of this rule once existed. **Resolved 2026-09-05: the rule lives
+  once**, in `contracts/shared-rules.json` → `stopPreview` and
+  `scripts/stop_preview.py`, whose `read_snapshot()` dispatches on the platform
+  — `/proc` on Linux and in the container, `Get-CimInstance Win32_Process`
+  natively on Windows. See
+  [`03-launcher-scripts.md`](03-launcher-scripts.md) → "One rule for stopping
+  a section's preview" for the full design and what was rejected.
 
 - **What is and is not exposed.** The Windows APP already stops a
   running preview before deploying (`SectionDetailView.xaml.cs`), exactly as
   the mac's does — so the app is safe on both platforms and always was. The
-  hole is the COMMAND LINE, on both.
+  hole was the COMMAND LINE, on both.
 
-  **And on Windows the command line is still open, because the shared fix
-  cannot reach it** (corrected 2026-09-05; this said "in the CONTAINER
-  runtime `/proc` exists, so the mac's new code works there unchanged", which
-  described a container path Windows no longer has). `preview.ps1` refuses to
-  run at all without the bundled native runtime, `read_proc_snapshot()` in `stop_preview.py`
-  reads `/proc`, and native Windows has none — so it returns an empty list
-  and `stop_preview_serving()` stops nothing. The watcher that
-  causes the race, though, runs everywhere: `_start_public_sync_watcher` is
-  started unconditionally in the SERVE branch, so a Windows preview mirrors
-  over a Windows publish exactly as a mac one does. **The fix is to call
-  `preview.ps1`'s own matcher from the build-only path before the build** —
-  see item 20 in the outstanding list, which carries the three details worth
-  copying rather than re-deciding.
+  **On Windows that hole was open until 2026-09-05, and this page described it
+  as open for longer.** `read_proc_snapshot()` reads `/proc` and native Windows
+  has none, so it returned an empty list and `stop_preview_serving()` stopped
+  nothing. The fix went one level DEEPER than "call `preview.ps1`'s matcher
+  from the build-only path" — that route was considered and rejected, because
+  `deploy.py` reaches `build_site.py --build-only` directly and never passes
+  through the launcher, so a fix living in `preview.ps1` would leave the
+  Netlify and Cloudflare route still racing. `read_snapshot()` is a dispatcher
+  instead. The watcher that causes the race runs everywhere regardless:
+  `_start_public_sync_watcher` is started unconditionally in the SERVE branch,
+  so a Windows preview mirrors over a Windows publish exactly as a mac one
+  does.
 
 - **The wait is bounded at 30 seconds** (150 × 0.2 s), not the 15 that
   `GUI-IMPROVEMENTS.md` row 392 says — that row predates the change and the log

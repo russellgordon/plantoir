@@ -1178,6 +1178,67 @@ longer be treated as an open question. No mac change; nothing to port.
 (Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 328, closing
 reported from Windows). No mac change — the mac's own path bar is
 
+## The assistant said "deployed" before the deploy finished
+
+Fixed on Windows 2026-08-19; the mac was already correct, so there was
+nothing to port. Kept because the REJECTED first fix is a general trap.
+
+The old `TODO.md` entry read: *"Assistant
+replies 'deployed' before the deploy finishes (Windows)."* Windows'
+`MainWindow.DeployForAsync` used to resolve the instant the click was
+dispatched to the UI thread, not when the deploy actually finished, so the
+in-app assistant said "is deployed. Students can reach it now." after
+every `deploy_section` call regardless of outcome. Fixed by having
+`SectionDetailView.Deploy_Click`'s body (now `DeployAsync()`, an
+`async Task<string?>`) RETURN the true outcome sentence on every exit path
+— success/partial/all-failed via the existing
+`MultiDestinationDeployRunner.Result(...)`, `AssistWording.DeployDidNotFinish`
+on every early return and the catch block — threaded back through
+`MainWindow.DeployForAsync` → `AssistWindow.StartDeployInAppAsync` →
+`AssistAgent.RunTool`. Full write-up: `GUI-IMPROVEMENTS.md` row 383.
+
+The mac's `deployAndWait()` already awaits the real result and words it
+correctly — this only brought Windows to parity, so there is nothing to
+port. Two things worth a mac session's attention, not required, not
+blocking anything: (1) whether an equivalent "second deploy request
+arrives while one is already running" path exists in
+`SectionDetailView.swift`, and if so whether it shares mutable state across
+the two in-flight calls the way the first (rejected) fix here did before an
+adversarial review caught it — see the "rejected" note in
+`GUI-IMPROVEMENTS.md` row 383 for the exact shape of that bug, since it is
+a general trap (a single-slot completion field shared across concurrent
+callers) worth checking for rather than re-discovering; (2) the Windows
+scenario test fixture (`AssistScenarioTests.cs`) never wired
+`StartDeployInAppAsync` at all before this — worth checking whether the
+mac's own scenario tests exercise the equivalent async production seam or
+only a sync stand-in.
+
+## Two testing lessons that recur, and both cost a red branch
+
+**A test proving a date was FRESHENED must compare against a date in the PAST.**
+`windows-app/Plantoir.Tests/ModelTests.cs` asserts
+`Assert.DoesNotContain("2025-01-01", index)`, and the date being safely in the
+past is what makes that a real assertion. The mac's twin used a date that was
+"today" when it was written, and on **2026-09-08 the clock reached it**: the
+correctly-freshened value became the very string the test checked for the
+absence of, so a passing behaviour failed its own test. `dev` was red that
+morning for every branch, on a test nobody had touched in three weeks. Fixed on
+the mac by moving the fixture to 2020-01-15 (`SectionAdderTests.swift`).
+**Do not "modernise" a fixture date to something recent** — the whole point of
+that literal is that the clock can never catch up with it, and `2025-01-01` is
+already inside the range somebody would be tempted to refresh.
+
+**Cleanup that fails must not fail a test that passed.** An intermittent failure
+that never reproduced (Windows, 2026-08-14, `0479d44`) turned out to be 23 tests
+ending with a bare `finally { Directory.Delete(root, recursive: true); }`. On
+Windows that throws whenever anything still holds a handle in the folder —
+Defender scanning the files the test just wrote, or the Search Indexer. Every
+assertion had passed; the test failed on housekeeping. Deleting a temp folder is
+housekeeping: when it does not work, the operating system will get to it. **The
+same shape is available on the mac** with Spotlight indexing, and whether the
+mac's suites have it has never been checked.
+
+
 ---
 
 [◀ Previous: Release Strategy](11-release-strategy.md) · [Back to index](README.md)

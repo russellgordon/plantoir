@@ -10,7 +10,7 @@ namespace Plantoir.Tests;
 /// launcher's extra flags — plus the preview's ports.
 ///
 /// <para><b>Mirroring by hand is not the same as running the list, and the
-/// difference is the whole of contracts/README.md.</b> A hand-written test
+/// difference is the whole point of the 2026-09-06 contract audit.</b> A hand-written test
 /// answers the cases that existed on the day somebody read the contract. It
 /// cannot notice a case the mac ADDS, because nothing compares the two
 /// collections — so the gap is invisible from both sides until a teacher finds

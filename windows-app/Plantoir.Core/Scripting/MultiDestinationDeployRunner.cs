@@ -209,7 +209,7 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         // upload. A publish takes minutes; a page edited while it uploads
         // did not go out, and stamping the finishing state would wrongly
         // mark that edit as published. See "When the stamp is written" in
-        // documentation/07-deployment.md. Excludes any destination that publishes into
+        // documentation/05-build-pipeline.md. Excludes any destination that publishes into
         // the course's own folder, so a course cannot fingerprint its own
         // output and stay "Edited" forever.
         string? publishedFingerprint = null;

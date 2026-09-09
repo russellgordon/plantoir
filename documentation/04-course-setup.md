@@ -447,8 +447,9 @@ for the key itself.
 
 ## “Where do the class pages live?” had four answers
 
-**Action required on Windows: build and test. The C# below was written on the
-mac, which has no dotnet, so it has compiled nowhere.**
+*(The Windows half of this is [issue
+#115](https://github.com/russellgordon/plantoir/issues/115): the C# below was
+written on the mac, which has no `dotnet`, so it has compiled nowhere.)*
 
 A teacher whose class folder is not called "All Classes" — "Class Pages", say —
 used to get a different answer from each of four places:
@@ -458,7 +459,7 @@ used to get a different answer from each of four places:
 | mac `ClassPages.folderURL` | the course's CONFIGURED per-section folders, first containing "class" |
 | mac `AssistSectionGraph.isClassPage` | the page's IMMEDIATE parent contains "class" |
 | `build_site.py` | any segment of the ABSOLUTE path EQUALS "all classes" or "classes" |
-| your `AssistWorkspace.Plan` | the whole ABSOLUTE directory string contains "class" |
+| Windows `AssistWorkspace.Plan` | the whole ABSOLUTE directory string contains "class" |
 
 Three of those are wrong in ways worth knowing:
 
@@ -476,10 +477,10 @@ Three of those are wrong in ways worth knowing:
   defect in the same line was different and worse: `content_root.rglob` yields
   ABSOLUTE paths, so it walked every segment above the content root too. A
   teacher whose working folder was `~/Documents/All Classes` made every page in
-  every course a lesson — the same bug as yours, on the other platform. The
+  every course a lesson — the same bug Windows had, on the other platform. The
   file-name exclusion is kept as defence in depth for a future change to
   substring matching, and is labelled as such rather than as a fix.
-- **Yours.** `Path.GetDirectoryName(pagePath)` is the absolute directory, so a
+- **Windows.** `Path.GetDirectoryName(pagePath)` is the absolute directory, so a
   teacher whose working folder is `C:\Users\x\Classroom\` makes **every page
   in every course** a class page. Where somebody keeps their files is not a fact
   about their lessons. This is the one that needed fixing most and could not
@@ -583,13 +584,13 @@ folder is created, or both? — and the answer is both, as two forms:
   sheet, because a folder can become synced *after* it was set up (moved
   into iCloud; Desktop & Documents turned on) and a folder that opens on
   every launch must not interrupt every launch. On the mac this is a strip
-  above the path bar with a `.quaternary` background; build yours as an
+  above the path bar with a `.quaternary` background; a port builds its own as an
   InfoBar or the nearest WinUI equivalent — the placement and the
   dismissability are the contract; the control itself is each app's own.
 - **Going ahead is remembered PER FOLDER**, and neither form is shown for
   that folder again. A second synced folder gets its own note. The mac
   keeps the list in preferences under `acknowledgedSyncedFolders`; keep
-  yours wherever you keep per-app preferences, keyed by the folder's path.
+  Windows stores its own wherever it keeps per-app preferences, keyed by the folder's path.
 - **The check runs on EVERY adoption of a folder**, not only the first —
   folders move into cloud services after they are made, and the check costs
   nothing.
@@ -620,12 +621,12 @@ under one of them, so a prefix rule catches it), Dropbox's `info.json`
 (`%USERPROFILE%\iCloudDrive` by default). A service you cannot see is
 allowed — see "why not refuse". **Run the eleven `detection.cases` against
 your path function** with `{home}` as `%USERPROFILE%` and the mac's reserved
-paths translated to yours; the cases that matter most are the negative ones:
+paths translated per platform; the cases that matter most are the negative ones:
 a folder CALLED Dropbox on the Desktop, and the reserved root itself. When
 the service is recognisably syncing but not one you name, the contract's
 `unknownServiceName` ("your cloud service") is the honest word.
 
-**The sentences, and the one that is not yours.** All in `wording`, word for
+**The sentences, and the one that is platform-specific.** All in `wording`, word for
 word, `{service}` filled in. They name EFFECTS a teacher can recognise —
 "building can be slower", "renaming a folder can take a while" — and never
 machinery: no "sync client", no "file provider", no "dataless", no "build
@@ -688,7 +689,7 @@ the order you are likely to meet the same things:
   existing-folder states.
 - **Enter still set up the empty folder while the note was showing**, which
   the contract's own `whenShown.chosen` forbids. The set-up button loses its
-  default-action status while a decision is pending; make sure yours does.
+  default-action status while a decision is pending; check that a port's does too.
 - **A folder the picker will not take anyway** — neither a working folder
   nor empty — is not asked about. The rule is in the contract's `whenShown`;
   the teacher is about to choose again, and the guidance saying what to
@@ -723,10 +724,10 @@ points folded in above:
 
 ## A folder named `index.md`, and why both apps refuse rather than clear the way
 
-The bug was Windows' — found porting `SiteHealthRepair` line by line, and
-The Windows report of 2026-09-06 is what this fixes. What follows is the
-part that does not travel in a diff: what the mac chose, what it rejected, and
-why the two are not interchangeable.
+Windows found this bug, porting `SiteHealthRepair` line by line, and reported
+it on 2026-09-06; this is what the mac did about it. What follows is the part
+that does not travel in a diff: what the mac chose, what it rejected, and why
+the two are not interchangeable.
 
 ### The bug, stated once
 
@@ -849,7 +850,7 @@ sentence). Naming the event `folder problem repair blocked` would have forced a
 rename on both platforms and in the contract the day that gap closes. So: wire
 it to the directory branch, not to every failure, and leave the name alone.
 
-### What is still not right in this file, on both platforms
+### What is still not right in the repair code, on both platforms
 
 Named here so it is not rediscovered as a puzzle, and NOT fixed by this piece:
 
