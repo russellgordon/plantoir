@@ -1085,8 +1085,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     // Answered rather than proposed, because there is nothing
                     // to say yes to: the dates need no change, and the website
                     // is settled by saying one of the two sentences rather than
-                    // by pressing Go. The mac has this hole too - written up
-                    // for them rather than reached into from here.
+                    // by pressing Go. The mac had this hole too and closed it
+                    // on 2026-09-09 (issue #120); its shape matches this one.
                     if (!AnAnswerWasGiven(website))
                         return Answering(already + "\n\n" + AskingWhichWebsite(),
                                          already + "\n\n" + AskingWhichWebsite());
