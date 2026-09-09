@@ -34,13 +34,37 @@ public static class DeployCommand
     /// Netlify passes no target flag at all: it is deploy's default, and every
     /// course written before Cloudflare existed relies on that.
     /// </summary>
+    /// <param name="unattended">
+    /// Nobody is at the computer, so any question the publish would ask must
+    /// become a refusal rather than a prompt.
+    /// </param>
+    /// <remarks>
+    /// <para><b>Only a SCHEDULED deploy passes <paramref name="unattended"/>,
+    /// and the default matters more than the flag.</b> Pressing Deploy runs
+    /// the launcher through a pseudo-terminal, so a question from the
+    /// publishing step comes back to the app and becomes a dialog the teacher
+    /// answers — that is the feature, not a fault. The assistant is the same:
+    /// somebody is plainly there. Passing the flag from either of those would
+    /// turn a question a teacher is entitled to answer into a refusal.</para>
+    ///
+    /// <para><b>The flag goes here rather than being appended by the caller</b>,
+    /// which is where this app put it until 2026-09-09. Whether anybody is
+    /// there to answer is a fact about who is RUNNING, not about the course —
+    /// but its POSITION in the argument list is a fact about the launcher, and
+    /// a caller pasting it on the end was a second place that had to agree
+    /// with <c>app-rules.json</c> → <c>deployArguments</c>. It goes straight
+    /// after the course and section, before the destination, so every shape of
+    /// deploy carries it in the same place.</para>
+    /// </remarks>
     public static IReadOnlyList<string> Arguments(
         string courseCode,
         int sectionNumber,
         CourseConfiguration.DeployDestination destination,
-        string cloudflareAccountID = "")
+        string cloudflareAccountID = "",
+        bool unattended = false)
     {
         var args = new List<string> { courseCode, sectionNumber.ToString() };
+        if (unattended) args.Add("--non-interactive");
         if (destination.Type == "local_folder")
         {
             args.Add("--to-folder");
@@ -69,10 +93,11 @@ public static class DeployCommand
         string courseCode,
         int sectionNumber,
         CourseConfiguration configuration,
-        string cloudflareAccountID = "") =>
+        string cloudflareAccountID = "",
+        bool unattended = false) =>
         Arguments(courseCode, sectionNumber,
             new CourseConfiguration.DeployDestination(configuration.DeployTarget, configuration.DeployFolderPath),
-            cloudflareAccountID);
+            cloudflareAccountID, unattended);
 
     /// <summary>Where a destination deploys to, in the teacher's words.</summary>
     public static string DestinationDescription(CourseConfiguration.DeployDestination destination)

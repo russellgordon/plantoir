@@ -288,11 +288,11 @@ public static class TaskScheduling
                 // '.ps1' extension". Measured: exit -196608, no build, no
                 // findings, no deploy — every night, silently.
                 "  $buildArgs = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"' + " +
-                    $"{PsQuote(Path.Combine(workingFolder, "preview.ps1"))} + '\" \"' + {PsQuote(courseCode)} + '\" \"' + {PsQuote(section.ToString())} + '\" --build-only'",
+                    $"{PsQuote(Path.Combine(workingFolder, "preview.ps1"))} + '\" \"' + {PsQuote(courseCode)} + '\" \"' + {PsQuote(section.ToString())} + '\" --build-only --non-interactive'",
                 "  $proc = Start-Process -FilePath 'powershell.exe' -ArgumentList $buildArgs -Wait -PassThru -NoNewWindow -RedirectStandardOutput $buildLog -RedirectStandardError $buildErrLog",
                 "  $buildExitFromChild = $proc.ExitCode",
                 "} else {",
-                $"  & {PsQuote(Path.Combine(workingFolder, "preview.ps1"))} {PsQuote(courseCode)} {PsQuote(section.ToString())} --build-only",
+                $"  & {PsQuote(Path.Combine(workingFolder, "preview.ps1"))} {PsQuote(courseCode)} {PsQuote(section.ToString())} --build-only --non-interactive",
                 "  $buildExitFromChild = $null",
                 "}",
                 "# Saved AT ONCE. Everything below runs commands of its own, and the guard",
@@ -360,21 +360,23 @@ public static class TaskScheduling
 
             foreach (var destination in destinations)
             {
-                var arguments = DeployCommand.Arguments(courseCode, section, destination, cloudflareAccountID);
-                string quotedArgs = string.Join(" ", arguments.Select(PsQuote));
-
-                // --non-interactive is appended HERE rather than inside
-                // DeployCommand.Arguments, whose output is pinned by
-                // app-rules.json -> deployArguments: whether anybody is there to
-                // answer a question is a fact about who is RUNNING, not about
-                // the course's configuration, and the same arguments serve the
-                // Deploy button, where somebody plainly is.
+                // `unattended: true` is what puts --non-interactive on this
+                // line, and asking DeployCommand for it is the point: the flag
+                // used to be appended here as text, which made this a SECOND
+                // place that had to agree with app-rules.json ->
+                // deployArguments about where in the argument list it goes. The
+                // contract now carries the scheduled shape as its own cases,
+                // and one function answers them.
                 //
-                // Without it this line is the whole defect: deploy.py's
+                // Without the flag this line is the whole defect: deploy.py's
                 // site-name prompt either blocks for ever (measured at 45
                 // minutes) or takes its default silently and publishes the
                 // teacher's site to an address nobody chose.
-                lines.Add($"& {PsQuote(launcherPath)} {quotedArgs} --non-interactive");
+                var arguments = DeployCommand.Arguments(
+                    courseCode, section, destination, cloudflareAccountID, unattended: true);
+                string quotedArgs = string.Join(" ", arguments.Select(PsQuote));
+
+                lines.Add($"& {PsQuote(launcherPath)} {quotedArgs}");
 
                 // Exit 3 is deploy.py's NEEDS_AN_ANSWER and means that alone.
                 // Tested BEFORE the general non-zero branch, because it is also

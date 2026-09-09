@@ -211,9 +211,19 @@ public class ScheduledPublishQuestionTests : IDisposable
     /// Every deploy leg is passed the flag.
     /// </summary>
     /// <remarks>
-    /// This is the whole fix. Without it on the command line, the leg reaches
-    /// <c>deploy.py</c>'s site-name question and either blocks for ever or
-    /// takes its default and publishes somewhere nobody chose.
+    /// <para>This is the whole fix. Without it on the command line, the leg
+    /// reaches <c>deploy.py</c>'s site-name question and either blocks for ever
+    /// or takes its default and publishes somewhere nobody chose.</para>
+    ///
+    /// <para><b>Asserted by CONTAINMENT, not by position, and that changed on
+    /// 2026-09-09.</b> The flag used to be pasted on the end of the line by the
+    /// wrapper writer, so every leg ended with it; it now comes from
+    /// <c>DeployCommand.Arguments(unattended: true)</c>, which puts it straight
+    /// after the course and section — where <c>app-rules.json</c> →
+    /// <c>deployArguments</c> says it goes — so a Cloudflare or folder leg
+    /// carries destination flags after it. Where it sits in the line is the
+    /// contract's business; what this test is for is that no leg is missing
+    /// it.</para>
     /// </remarks>
     [Fact]
     public void EveryDeployLegIsToldNobodyIsThere()
@@ -229,7 +239,40 @@ public class ScheduledPublishQuestionTests : IDisposable
 
         Assert.Equal(2, legs.Count);
         foreach (string leg in legs)
-            Assert.EndsWith("--non-interactive", leg.TrimEnd());
+            Assert.Contains("--non-interactive", leg, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The BUILD leg is told too, which is the half that is easy to forget.
+    /// </summary>
+    /// <remarks>
+    /// <para>A scheduled publish builds before it publishes, and the build runs
+    /// <c>preview.ps1</c> — a launcher that asks two questions of its own. Told
+    /// nothing, a <c>Read-Host</c> at half six reads end of input and returns
+    /// empty, so the [Y/n] course-code guard takes its DEFAULT and the build
+    /// retargets a different course code. The publish that follows then
+    /// succeeds against the wrong course, which is worse than a refusal because
+    /// nothing looks wrong.</para>
+    ///
+    /// <para>Both branches are checked because there are two: the captured one
+    /// that runs the build through <c>Start-Process</c> to read its folder
+    /// findings, and the plain fallback for when the capture could not be set
+    /// up. The fallback is the one a change would forget.</para>
+    /// </remarks>
+    [Fact]
+    public void TheBuildLegIsToldNobodyIsThereToo()
+    {
+        string script = File.ReadAllText(
+            GenerateWrapper(new CourseConfiguration.DeployDestination("netlify", "")));
+
+        var buildLines = script.Split('\n')
+            .Where(line => line.Contains("preview.ps1", StringComparison.OrdinalIgnoreCase)
+                           && line.Contains("--build-only", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Equal(2, buildLines.Count);
+        foreach (string line in buildLines)
+            Assert.Contains("--non-interactive", line, StringComparison.Ordinal);
     }
 
     /// <summary>
