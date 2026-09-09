@@ -534,11 +534,19 @@ struct SidebarView: View {
         sectionNumber: Int,
         generation: Int
     ) -> ScheduledPublishOutcome.Stopped? {
-        return ScheduledPublishOutcome.stopped(
+        let outcome: ScheduledPublishOutcome.Stopped? = ScheduledPublishOutcome.stopped(
             inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
             course: courseCode,
             section: sectionNumber
         )
+        // Only a failure earns a badge. A success is news rather than a
+        // problem, and a badge beside every section that published fine
+        // overnight is a badge nobody reads by Wednesday. The sentence inside
+        // the section still says so.
+        guard let outcome, outcome.kind.needsAttention else {
+            return nil
+        }
+        return outcome
     }
 
     /// A section's row, wearing a clock when it is set to deploy on its own

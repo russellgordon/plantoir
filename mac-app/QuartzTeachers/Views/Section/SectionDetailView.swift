@@ -785,8 +785,10 @@ struct SectionDetailView: View {
     @ViewBuilder
     func stoppedPublishNotice(_ stopped: ScheduledPublishOutcome.Stopped) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+            Image(systemName: stopped.kind.needsAttention
+                  ? "exclamationmark.triangle.fill"
+                  : "checkmark.circle.fill")
+                .foregroundStyle(stopped.kind.needsAttention ? .orange : .green)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(ScheduledPublishOutcome.sentence(
@@ -821,7 +823,7 @@ struct SectionDetailView: View {
             .accessibilityIdentifier("dismissStoppedPublish")
         }
         .padding(12)
-        .background(Color.orange.opacity(0.12))
+        .background((stopped.kind.needsAttention ? Color.orange : Color.green).opacity(0.12))
         .accessibilityIdentifier("stoppedPublishNotice")
     }
 

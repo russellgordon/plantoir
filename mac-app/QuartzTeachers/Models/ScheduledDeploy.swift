@@ -627,7 +627,20 @@ enum ScheduledDeploy {
         // differs from Windows: clearing only on success leaves the message
         // standing after somebody has already fixed the problem by hand, and
         // the next scheduled run that would clear it could be a week away.
-        lines.append("if [ \"$ALL_OK\" = \"1\" ]; then /bin/rm -f \(shellQuoted(stoppedRecord)); fi")
+        // A run that got through records that it DID, rather than only
+        // deleting the evidence that it did not. Same reason as the failures:
+        // a scheduled publish leaving no trace cannot be told from one that
+        // never happened, so the trail could answer "why did my site not
+        // update?" and could not answer "did it?".
+        lines.append("if [ \"$ALL_OK\" = \"1\" ]; then")
+        lines.append("  /bin/mkdir -p \(shellQuoted(stoppedDirectory))")
+        lines.append("  /bin/echo \(shellQuoted(ScheduledPublishOutcome.Kind.succeeded.rawValue))"
+            + " > \(shellQuoted(stoppedRecord))")
+        lines.append("  /bin/echo " + shellQuoted(destinationDescriptions.isEmpty
+            ? destinationTypes.joined(separator: ", ")
+            : destinationDescriptions.joined(separator: ", "))
+            + " >> \(shellQuoted(stoppedRecord))")
+        lines.append("fi")
         // The sentinel carries WHERE it went, so the record a scheduled
         // publish leaves is the same shape as the button's.
         lines.append(

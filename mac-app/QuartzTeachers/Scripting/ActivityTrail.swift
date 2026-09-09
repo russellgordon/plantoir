@@ -156,6 +156,14 @@ nonisolated enum ActivityTrail {
         /// one run a teacher is trying to understand. Both are the same
         /// silence from the teacher's side; only one of them is a question.
         case scheduledPublishDidNotFinish = "scheduled publish did not finish"
+
+        /// A publish set to happen on its own went out.
+        ///
+        /// The positive case, and it is on the trail for the same reason the
+        /// failures are: a scheduled publish that leaves no trace cannot be
+        /// told from one that never happened. Without this line the trail can
+        /// answer "why did my site not update?" and cannot answer "did it?".
+        case scheduledPublishFinished = "scheduled publish finished"
         /// A folder or file was removed in Course Settings, excluding it
         /// from previews and deploys.
         case itemExcluded = "item excluded"

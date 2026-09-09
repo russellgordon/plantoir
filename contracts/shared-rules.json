@@ -212,6 +212,12 @@
         "why": "A rollover that cuts a section loose is the moment its published address changes, and nothing else on the trail records it. The same act turns off any publish that was set to happen on its own \u2014 a section with no agreed website and a scheduled run with nobody to ask would otherwise create a website nobody named \u2014 so a teacher whose overnight publish stops happening has one line explaining both."
       },
       {
+        "carries": "the course code, the section number, and where it published",
+        "event": "scheduled publish finished",
+        "why": "The positive case, and it is here for the same reason the two failures are, read the other way round: a scheduled publish that leaves NO trace cannot be told from one that never happened. Without this line the trail can answer \u201cwhy did my site not update?\u201d and cannot answer \u201cdid it?\u201d \u2014 and a teacher wondering whether last night's publish went out has nowhere to look. Added 2026-09-09 on Russell's instruction, after a real scheduled run showed the failures recorded and the successes silent.",
+        "appliesOnWhy": "Owed on both platforms for the same reason as the other two. Windows records neither today; see scheduledPublishStopped.platformDifferences and GitHub issue #130."
+      },
+      {
         "carries": "the course code, the section number, and which destination stopped",
         "event": "scheduled publish did not finish",
         "why": "The same silence as \u201cneeded an answer\u201d, from a different cause \u2014 a revoked token, a network that was down, a build that failed. It is a SEPARATE event because the other one's own wording says a question went unasked, and filing a revoked token under it would make the trail say something untrue about the one run a teacher is trying to understand. Both matter for the same reason: a scheduled publish that did not happen is invisible unless something writes it down.",
@@ -755,13 +761,16 @@
     "note": "What a teacher is told when a publish that was set to happen on its own did not get through. It runs at half six with the app closed, so the LAUNCHER writes a record and the APP reads it the next time it opens \u2014 that handover is the feature. Without it the run is indistinguishable from one that was never scheduled, which is exactly the shape of \"my site did not update on Tuesday and I do not know why\".",
     "kinds": {
       "neededAnAnswer": "The launcher exited 3: a question was put to nobody. deploy.py's NEEDS_AN_ANSWER, distinct from 1 precisely so a caller can tell the two apart and say something useful.",
-      "didNotFinish": "Any other non-zero exit \u2014 a revoked token, a network that was down, a build that failed."
+      "didNotFinish": "Any other non-zero exit \u2014 a revoked token, a network that was down, a build that failed.",
+      "succeeded": "It worked. Recorded for the same reason the failures are: a scheduled publish that leaves no trace cannot be told from one that never happened, so without it the trail can answer \u201cwhy did my site not update?\u201d and cannot answer \u201cdid it?\u201d"
     },
     "sentences": {
       "neededAnAnswer": "{course} Section {section} was set to publish on its own, and it stopped because publishing to {destination} needed an answer nobody was there to give. Publish this section once yourself, answer the question, and it can publish on its own after that.",
-      "didNotFinish": "{course} Section {section} was set to publish on its own, and it did not finish \u2014 publishing to {destination} stopped, so nothing went up there. Publish it yourself to see what happens."
+      "didNotFinish": "{course} Section {section} was set to publish on its own, and it did not finish \u2014 publishing to {destination} stopped, so nothing went up there. Publish it yourself to see what happens.",
+      "succeeded": "{course} Section {section} published on its own to {destination}. Your students have the new pages."
     },
     "firstDestinationWins": "The record is per SECTION and keeps the FIRST destination that stopped. A course can publish to several places and only one may have gone wrong, so \"it published to the folder and not to Netlify\" is the shape of the report; overwriting would tell the teacher about the last thing that went wrong rather than the first.",
+    "attention": "The two FAILURES ask for the teacher's attention and get a warning beside their section in the list as well as the sentence inside it \u2014 a teacher who does not know WHICH section failed cannot open the right one. A SUCCESS is news rather than a problem: it gets the sentence and no badge, because a badge on every section that published fine overnight is a badge nobody reads by Wednesday.",
     "clearedBy": "A scheduled run that got ALL the way through \u2014 every destination, exit zero \u2014 OR the teacher dismissing it. Both, and the second is a decision rather than a convenience: clearing only on a successful run leaves the message standing after somebody has already fixed the problem by hand, and the next scheduled run that would clear it could be a week away.",
     "trail": "One line on the breadcrumb trail, written by the RUN rather than by the app when a teacher opens the section \u2014 so it is written once because the run happens once, and a teacher who never opens that section still has it. An earlier draft had the app note it on opening and mark the record as noted; rewriting the record changed its modification date, which is what the notice shows, so the teacher saw the morning they opened it rather than the half six the run stopped at. Dated to when the RUN wrote its record, and dated to when the RUN wrote its record rather than when the app read it \u2014 or an overnight problem is filed under the morning somebody noticed it. It carries the course, the section and which destination stopped, and NEVER the question's own text: that comes from a launcher's console, and a line naming a credential prompt would put a teacher's own words on the trail. The event is activityTrail.mustRecord's \"scheduled publish needed an answer\".",
     "platformDifferences": {
