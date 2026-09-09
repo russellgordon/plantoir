@@ -2108,10 +2108,13 @@ to run in the background.
     first". Those are the two cases that reach the placeholder, by name. The
     numbers above hold.
 
-41. **Your MCP server serves 37 tools and the mac's serves 25 — and TWO
-    things now fall to you: a rollover that publishes over last year's
-    website (DECIDED 2026-09-08 — build it, do not re-open it), and seventeen
-    measured phrasings you do not have.**
+41. **Your MCP server serves 37 tools and the mac's serves 25 — and ONE thing
+    is still open: a rollover that publishes over last year's website
+    (DECIDED 2026-09-08 — build it, do not re-open it).** ~~And seventeen
+    measured phrasings you do not have.~~ ✅ The phrasings were done
+    2026-09-08 (branch `issue/41-teachers-say-phrasings`); see "Two of two"
+    below, which is kept because what it cost to do properly is the part
+    worth reading.
     Found 2026-09-06 by a mac audit asking whether the parity list was
     COMPLETE rather than whether it was correct. Full write-up: "The two MCP
     surfaces are not the same product" below, and the sorting of all twelve
@@ -2131,14 +2134,15 @@ to run in the background.
     the twelve are either the mac's to build or deliberately not the mac's.
     Nothing you serve is being taken away.
 
-    **You owe two things.**
+    **You owed two things; one is left.**
 
     **One of two, still open — a rollover publishes over LAST year's website
     on YOUR side too.**
     This is a real defect, not a mac gap. `AssistCardCommand.cs:50` matches
     "roll this section over to a new year" in code and routes it to
     `re_date_classes`; `re_date_classes` never calls `ReleaseSite` — only
-    `roll_over_section` does (`PlantoirTools.cs:911`). So the exact sentence a
+    `roll_over_section` does (`PlantoirTools.cs:920` — it was `:911` until the
+    phrasings below added nine lines above it). So the exact sentence a
     teacher says reaches the tool that does NOT cut the section loose from
     `.netlify_sites/section<N>.json`, and the first publish afterwards lands
     on last year's URL, which last year's students may still be reading. Your
@@ -2172,16 +2176,25 @@ to run in the background.
        It is the step easiest to leave out and the one that makes the other two
        matter.
 
-    **Two of two, still open — seventeen `TEACHERS SAY:` phrasings the mac
-    has and you do not.**
-    Checked clause by clause, every list in `toolSchemas.mcp` against every
+    ~~**Two of two, still open — seventeen `TEACHERS SAY:` phrasings the mac
+    has and you do not.**~~ **✅ Done 2026-09-08** (branch
+    `issue/41-teachers-say-phrasings`; `GUI-IMPROVEMENTS.md` row 451, numbers
+    in `research/ai-assist/teachers-say-results.txt`, full entry in
+    `MAC-HANDOFF.md`). All seventeen are in, copied verbatim from the contract
+    and re-verified afterwards: of the 25 shared tools, exactly ONE clause now
+    differs, `check_section`, and that one is the mac's debt. **What it cost to
+    do properly is below and is the part worth reading** — three of the four
+    traps were found by review, not by writing the code.
+
+    The description of the gap, as it stood:
+    checked clause by clause, every list in `toolSchemas.mcp` against every
     `[Description]` in `PlantoirTools.cs`. Five of the 25 shared tools differ,
     and **four of the five are yours**: `add_next_class` (mac has six
-    phrasings, you have no `TEACHERS SAY:` clause at all — `PlantoirTools.cs:553`),
-    `plan_add_next_class` (mac three, you none — `:533`),
-    `read_remembered_timetable` (mac four, you none — `:620`) and
-    `remember_timetable` (mac four, you none — `:767`). Not in your in-app
-    assistant either. Two of the seventeen DO appear in your code outside a
+    phrasings, you have no `TEACHERS SAY:` clause at all — `PlantoirTools.cs:553`,
+    now `:556`), `plan_add_next_class` (mac three, you none — `:533`, now
+    `:535`), `read_remembered_timetable` (mac four, you none — `:620`, now
+    `:627`) and `remember_timetable` (mac four, you none — `:767`, now `:776`).
+    Not in your in-app assistant either. Two of the seventeen DO appear in your code outside a
     `TEACHERS SAY:` clause, which is where `Briefly` cannot reach them: "add
     the next class" is an example inside `plan_add_next_class`' own description
     (`PlantoirTools.cs:536`) and in `AssistCardCommand.cs:31`, and "when does
@@ -2203,8 +2216,46 @@ to run in the background.
     on your side that is seventeen of them. Worth a measurement on your own
     backend before you copy them in: you have a Vulkan-accelerated
     `llama-server` and the mac cannot run your hardware, so this is one of the
-    things only you can settle. `research/ai-assist/tools-from-contract.py`
-    writes the surface the suites take as input.
+    things only you can settle. ~~`research/ai-assist/tools-from-contract.py`
+    writes the surface the suites take as input.~~ **That pointer was wrong for
+    this side and is corrected in the file itself:** the contract is generated
+    from the MAC, so starting a Windows measurement there scores the mac's
+    descriptions on Windows hardware. Dump the live surface with
+    `dump-tools.ps1` and narrow it with `narrow-tools.py` instead.
+
+    **What it measured, and the four traps.** The numbers are in
+    `research/ai-assist/teachers-say-results.txt` with the hardware they came
+    from; the short version is that the ten phrasings the local model can see
+    took the probes under test from **40/50 to 50/50**, with no control
+    regressing, and the two they fixed were both confident MISROUTES rather
+    than declines — "Set up next day's lesson" was reaching the deploy
+    scheduler five times out of five. The traps, because each one produces a
+    number that looks fine:
+
+    1. **The instrument was stale.** `narrow-tools.py` was right when committed
+       on 2026-08-14 and wrong from 2026-08-17 (4089c752), when
+       `ForTheLocalModel` went from fifteen names to thirteen. It was keeping
+       four `plan_` tools the app no longer shows and MISSING both tools under
+       test. A research script is run by hand months apart, so nothing could
+       catch it; `NarrowToolsMirrorTests` in your suite now does, and that is
+       the general lesson — a hand copy of a shipping list needs something that
+       runs on every commit.
+    2. **The dateline decides the answer.** `AssistAgent.Say` appends
+       `" (Today is YYYY-MM-DD, a Weekday.)"` to every message the model sees.
+       Measured without it, the same ten probes score 25/50 instead of 40/50 —
+       and the three the dateline fixes on its own would have been credited to
+       the phrasings, reporting five fixes where there are two.
+    3. **`AssistCardCommand` is not the only interception layer — there are
+       three.** `PreviewAskedForPlainly` (thirteen sentences), then
+       `AssistCardCommand.Matching`, then four inline regexes in `CardCommand`
+       itself. A probe suite that checks only the middle one measures the
+       router on sentences the app never routes; three controls were lost that
+       way in the first draft.
+    4. **Making a research script "stricter" can delete a control.** Requiring
+       the course code in `narrow-tools.py` looked like a tightening and would
+       have silently turned `trimmed-surface-suite.py --real-course` into a
+       no-op, destroying the A/B its own docstring rests on. It is optional,
+       un-substituted by default, and says why.
 
     The fifth difference is the mac's own and the mac owes it: you added a
     fourth `check_section` phrasing on 2026-08-17 — "what would students see in
