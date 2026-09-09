@@ -107,9 +107,12 @@ nonisolated enum ScheduledPublishOutcome {
     // MARK: - Stored properties
 
     /// The file's first line is the kind, the second the destination. A plain
-    /// text file rather than JSON because a shell wrapper writes it at half
-    /// six with no interpreter of ours running, and two `echo` lines cannot go
-    /// wrong the way a quoted JSON document can.
+    /// text file rather than JSON because a shell wrapper writes it, and two
+    /// `echo` lines cannot go wrong the way a quoted JSON document can.
+    ///
+    /// Not because nothing of ours is loaded — Plantoir runs the wrapper, and
+    /// writes the trail line itself the moment it returns. The record exists
+    /// because the APP the teacher opens is a different process, days later.
     static let recordSeparator: String = "\n"
 
     /// What the record calls the build, when the BUILD is what stopped.
@@ -240,7 +243,10 @@ nonisolated enum ScheduledPublishOutcome {
     /// rested on a false premise: that nothing of ours is loaded when the
     /// wrapper runs. Plantoir runs the wrapper.
     ///
-    /// The line carries the course, the section and which destination stopped.
+    /// The line carries the course, the section and which destination stopped
+    /// — or, when the BUILD stopped for a question, that it stopped before any
+    /// destination was reached, because none was.
+    ///
     /// NEVER the question's own text: that comes from a launcher's console,
     /// and a line naming a credential prompt would put a teacher's own words
     /// on the trail.

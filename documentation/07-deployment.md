@@ -773,17 +773,27 @@ visible as well as the code being 3 — and end to end only by
 `verify-deploy.sh`, which publishes to real Netlify.
 
 **One narrow path can still produce the sentence #132 removed**, and it is
-filed rather than fixed. If any page under the section's `public/` carries
-`ws://localhost:`, `deploy.sh` reruns `preview.sh --build-only` itself and
-passes its exit 3 straight through — a BUILD question the wrapper can only see
-as a destination's, because the exit code is the only thing it gets. Reaching it
-needs the wrapper to have skipped its own build, and the wrapper's staleness
-check is `BuildFreshness.needsRebuild` written out in shell: it looks at
-`index.html` **alone**, while `deploy.sh` greps the whole tree. A clean front
-page in front of a stale preview page is the gap. Closing it means changing
-`BuildFreshness` as well as the generated script, so it is its own piece of
-work; giving the rebuild its own exit code would be a launcher contract change
-Windows shares.
+filed as [issue #136](https://github.com/russellgordon/plantoir/issues/136)
+rather than fixed. **Publishing to a FOLDER, and only to a folder**, reruns the
+build itself: `deploy.sh` greps the section's whole `public/` tree for
+`ws://localhost:` and, finding it, runs `preview.sh --build-only` and passes its
+exit 3 straight through (`deploy.sh:472` opens the `TO_FOLDER` branch the rerun
+sits in). The wrapper can only see that as the folder's own question, because
+the exit code is the only thing it gets. Netlify and Cloudflare do not reach it
+at all — they go through `deploy.py`, whose `rebuild_for_production` runs
+`build_site.py` directly, asks nothing, and fails with 1, so those land in
+`didNotFinish` naming the destination, which is honest.
+
+Reaching even the folder case needs the wrapper to have skipped its own build,
+and that is possible because the wrapper's staleness check is
+`BuildFreshness.needsRebuild` written out in shell: it looks at `index.html`
+**alone**, while `deploy.sh` greps the tree. A clean front page in front of a
+stale preview page is the gap, and `deploy.sh`'s own comment records that the
+index-only check was found insufficient on 2026-09-05 — the launcher has been
+quietly compensating for the app's narrower one ever since. Closing it means
+changing `BuildFreshness`, which the Deploy button uses too, so it is its own
+piece of work with its own measurement; giving the rebuild its own exit code
+was rejected as a launcher contract change Windows shares.
 
 ---
 
