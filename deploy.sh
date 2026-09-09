@@ -665,8 +665,23 @@ if data.get("success"):
 # Only reached when the token cannot name its own account and nothing was
 # remembered. The app collects this in its own window instead, and passes
 # it as --account, because a GUI deploy has no console to answer on.
+#
+# EVERYTHING THIS FUNCTION SAYS TO THE TEACHER GOES TO STDERR, and that is
+# not tidiness. It is called as `CF_ACCOUNT="$(prompt_for_cf_account)"`, and
+# a command substitution is a subshell that captures stdout — so its stdout
+# is its RETURN VALUE and nothing else may go there. Measured 2026-09-09 by
+# driving the real script through a pseudo-terminal (issue #129): with these
+# on stdout the six-step "where to find your Account ID" block never
+# appeared, and a teacher who mistyped the ID saw NOTHING AT ALL before the
+# script exited 1 — they were asked to paste a code with no hint where it
+# lives, and told nothing when it was wrong. Same trap as the refusal that
+# issue #92 moved out to the call site; these two were left behind because
+# nobody had run the script this far. `read -rp` already writes its prompt
+# to stderr, so this puts the instructions where their own question is.
+#
+# deploy.ps1 never had this: its twin says both of these at top level.
 prompt_for_cf_account() {
-  cat <<'MSG'
+  cat >&2 <<'MSG'
 
 One more thing from Cloudflare.
 
@@ -684,7 +699,7 @@ MSG
   read -rp "Paste Cloudflare Account ID: " entered
   entered="$(printf '%s' "$entered" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
   if [[ ! "$entered" =~ ^[0-9a-f]{32}$ ]]; then
-    echo "❌ That doesn’t look like an Account ID (it should be 32 letters and digits)."
+    echo "❌ That doesn’t look like an Account ID (it should be 32 letters and digits)." >&2
     return 1
   fi
   printf '%s' "$entered"
