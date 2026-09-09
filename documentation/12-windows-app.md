@@ -243,6 +243,14 @@ problem — **nobody answers a question at 6 a.m.**
   other end. `prompt()` and the surname helper refuse too, as a backstop for
   any path nobody has walked.
 
+  **It stops at the deploy launcher.** `deploy` shells out to `preview.bat
+  --build-only` when the built site is stale, and neither `preview.ps1` nor
+  `preview.sh` takes the flag — so `preview.ps1`'s "Continue anyway?" can
+  still be asked of nobody, in the narrow case where a section has been
+  archived out of `course_config.json` while its scheduled deploy still exists.
+  `-NonInteractive` does not reach it either, because `preview.bat` starts a
+  new `powershell.exe`. GitHub issue #124.
+
   `ScheduledDeploy.Problem` already refuses to SCHEDULE a section that has
   never been deployed, so the commonest way into this is closed at the other
   end. What it cannot see is a site DELETED on Netlify after the schedule was

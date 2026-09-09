@@ -21,10 +21,27 @@ public class ScheduledPublishQuestionTests : IDisposable
     private readonly string _dir =
         Path.Combine(Path.GetTempPath(), $"plantoir-unanswered-{Guid.NewGuid():N}");
 
+    /// <summary>
+    /// Wrapper scripts these tests generated, so they can be swept.
+    /// </summary>
+    /// <remarks>
+    /// <b>Not tidiness.</b> <c>WriteWrapperScript</c> writes into
+    /// <c>ScheduledScriptsDirectory()</c>, which resolves through
+    /// <c>AppDataRoot</c> and is therefore the teacher's REAL
+    /// <c>%LOCALAPPDATA%\Plantoir\scheduled\</c> — the same folder their own
+    /// scheduled publishes live in. A first draft of this class left one
+    /// script per test per run there; twenty had accumulated beside a real
+    /// <c>Plantoir-deploy-ICD2O-section-1.ps1</c> before anybody looked.
+    /// <c>ScheduledHealthFindingsTests</c> deletes its own for the same reason.
+    /// </remarks>
+    private readonly List<string> _wrappers = new();
+
     public ScheduledPublishQuestionTests() => Directory.CreateDirectory(_dir);
 
     public void Dispose()
     {
+        foreach (string wrapper in _wrappers)
+            try { File.Delete(wrapper); } catch { }
         try { Directory.Delete(_dir, recursive: true); } catch { }
         GC.SuppressFinalize(this);
     }
@@ -154,6 +171,38 @@ public class ScheduledPublishQuestionTests : IDisposable
         foreach (string machinery in new[]
                  { "exit", "--non-interactive", "deploy.py", "deploy.ps1", "stdin", "code 3" })
             Assert.DoesNotContain(machinery, said, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// A record put back is readable again, and keeps its ORIGINAL moment.
+    /// </summary>
+    /// <remarks>
+    /// Consuming is not delivering: <see cref="ScheduledPublishQuestion.Take"/>
+    /// deletes as it reads, so a reader that then cannot get the sentence on
+    /// screen — WinUI allows one dialog at a time, and a folder-problem dialog
+    /// may already be up — has destroyed the only thing that would have told
+    /// the teacher tomorrow. The moment matters as much as the fact: the trail
+    /// line and the sentence are dated from it, so a record put back with
+    /// today's timestamp would file last night's problem under this morning.
+    /// </remarks>
+    [Fact]
+    public void ARecordPutBackKeepsItsOriginalMoment()
+    {
+        ScheduledPublishQuestion.Record(_dir, "ICS3U", 1, "Netlify");
+        var lastNight = DateTime.Now.AddHours(-9);
+        File.SetLastWriteTime(Path.Combine(_dir, TaskScheduling.HealthRecordName("ICS3U", 1)), lastNight);
+
+        var stopped = ScheduledPublishQuestion.TakeFrom(_dir, "ICS3U", 1);
+        Assert.NotNull(stopped);
+        Assert.Null(ScheduledPublishQuestion.TakeFrom(_dir, "ICS3U", 1));   // really consumed
+
+        ScheduledPublishQuestion.PutBackIn(_dir, "ICS3U", 1, stopped!);
+
+        var again = ScheduledPublishQuestion.TakeFrom(_dir, "ICS3U", 1);
+        Assert.NotNull(again);
+        Assert.Equal("Netlify", again!.Destination);
+        Assert.True((lastNight - again.When).Duration() < TimeSpan.FromSeconds(2),
+            $"Put back with {again.When}, which would file last night's problem under the wrong night.");
     }
 
     // ---- The wrapper the scheduler runs ----------------------------------
@@ -299,6 +348,48 @@ public class ScheduledPublishQuestionTests : IDisposable
         Assert.Null(ScheduledPublishQuestion.TakeFrom(_dir, "ICS3U", 1));
     }
 
+    /// <summary>
+    /// A run where a leg failed ORDINARILY does not clear last night's record.
+    /// </summary>
+    /// <remarks>
+    /// Found by review, and it is the same mistake as the loop one made
+    /// smaller. The clear used to be keyed on "nothing needed an answer",
+    /// which is true of a run where every leg failed with exit 1 — so Monday
+    /// stops for a question and leaves a note, Tuesday the token is revoked
+    /// and every leg fails, Monday's note is deleted, and since nothing yet
+    /// records an ordinary scheduled failure the teacher is told about neither
+    /// night. Keyed on <c>$allSucceeded</c> now, which is the condition every
+    /// sentence describing this already used.
+    ///
+    /// <para>Neither of the other two run tests can tell the two conditions
+    /// apart: <c>if ($allSucceeded)</c> and <c>if (-not $neededAnAnswer)</c>
+    /// both pass them.</para>
+    /// </remarks>
+    [Fact]
+    public void AnOrdinaryFailureDoesNotClearLastNightsRecord()
+    {
+        if (!PowerShellIsAvailable) return;
+
+        ScheduledPublishQuestion.Record(_dir, "ICS3U", 1, "Netlify");
+
+        string work = Path.Combine(_dir, "work failing");
+        Directory.CreateDirectory(work);
+        File.WriteAllText(Path.Combine(work, "preview.ps1"), "Write-Host 'built'\nexit 0");
+        // Exit 1, not 3: the token was revoked, the upload failed — an ordinary
+        // failure, with nothing to do with a question.
+        File.WriteAllText(Path.Combine(work, "deploy.ps1"), "Write-Host 'upload failed'\nexit 1");
+
+        string script = GenerateWrapper(work,
+            new CourseConfiguration.DeployDestination("local_folder", _dir));
+        string runnable = Path.Combine(_dir, "runnable-failing.ps1");
+        File.WriteAllText(runnable,
+            File.ReadAllText(script).Replace(ScheduledPublishQuestion.Directory(), _dir));
+
+        Run(runnable, work);
+
+        Assert.NotNull(ScheduledPublishQuestion.TakeFrom(_dir, "ICS3U", 1));
+    }
+
     // ---- Fixture ---------------------------------------------------------
 
     private static bool PowerShellIsAvailable =>
@@ -326,6 +417,7 @@ public class ScheduledPublishQuestionTests : IDisposable
             "ICS3U", 1, Path.Combine(folder, "courses", "ICS3U"),
             Array.Empty<string>(), destinations, "");
         Assert.NotNull(path);
+        _wrappers.Add(path!);
         return path!;
     }
 

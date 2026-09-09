@@ -669,7 +669,6 @@ This is the only time you will be asked for it.
      dash.cloudflare.com/.)
 
 MSG
-  assert_can_ask "Paste Cloudflare Account ID" "Add the Account ID in this course's settings in Plantoir, under Deploying."
   read -rp "Paste Cloudflare Account ID: " entered
   entered="$(printf '%s' "$entered" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
   if [[ ! "$entered" =~ ^[0-9a-f]{32}$ ]]; then
@@ -817,6 +816,15 @@ MSG
   if [[ -z "$CF_ACCOUNT" ]]; then CF_ACCOUNT="$(discover_cf_account "$CF_TOKEN")"; fi
   if [[ -z "$CF_ACCOUNT" ]]; then CF_ACCOUNT="$(get_cf_account_keychain)"; fi
   if [[ -z "$CF_ACCOUNT" ]]; then
+    # GUARDED HERE, not inside prompt_for_cf_account, and that is the whole
+    # point. The function's output is CAPTURED — `$( )` is a subshell — so a
+    # refusal printed in there goes into $CF_ACCOUNT instead of onto the
+    # screen, and its `exit 3` exits the subshell, leaving `|| exit 1` to
+    # report an ordinary failure. Nothing printed, wrong exit code, and the
+    # launchd wrapper the mac is being asked to build would read it as an
+    # ordinary failure and leave no note. Found by review; the other three
+    # guards in this file are at the top level and are unaffected.
+    assert_can_ask "Paste Cloudflare Account ID" "Add the Account ID in this course's settings in Plantoir, under Deploying."
     CF_ACCOUNT="$(prompt_for_cf_account)" || exit 1
     set_cf_account_keychain "$CF_ACCOUNT"
   fi
