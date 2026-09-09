@@ -1238,10 +1238,11 @@ final class AssistToolRunnerTests: XCTestCase {
         XCTAssertTrue(text(ofPage: "Unit 1, Day 1", in: made.course).contains("publish: false"))
     }
 
-    /// The older spelling means the OPPOSITE, is read correctly, and is written
-    /// back in the spelling the teacher used.
+    /// The older spelling means the OPPOSITE, is read correctly, and is
+    /// MIGRATED to the current key the first time the assistant changes what
+    /// the page says — end to end, through the tool a teacher actually reaches.
     @MainActor
-    func testTheOlderDraftSpellingIsReadAndKept() async throws {
+    func testTheOlderDraftSpellingIsReadAndMigrated() async throws {
         let made = try makeRunner()
         defer { try? FileManager.default.removeItem(at: made.root) }
 
@@ -1271,8 +1272,19 @@ final class AssistToolRunnerTests: XCTestCase {
         ))
         XCTAssertFalse(published.shouldContinue)
         let after: String = text(ofPage: "Unit 1, Day 1", in: made.course)
-        XCTAssertTrue(after.contains("draft: false"), "The teacher's own spelling is kept, inverted.")
-        XCTAssertFalse(after.contains("publish:"), "No second key is invented behind their back.")
+        // Asserted as the WHOLE file rather than as three `contains` checks,
+        // because the promise being made is about the shape of the diff: one
+        // line changed, in place, and nothing else touched. A `contains` pair
+        // passes just as happily on frontmatter that has been reordered.
+        XCTAssertEqual(after, """
+        ---
+        title: Unit 1, Day 1
+        publish: true
+        created: 2026-09-08T07:00:00.000-0400
+        ---
+
+        Loops.
+        """)
     }
 
     /// Choosing classes by date, so "hide everything from next Monday on" is
