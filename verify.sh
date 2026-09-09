@@ -156,6 +156,17 @@ else
   cat /tmp/verify_deploy_sh_questions_test.log
 fi
 
+# The same for preview.sh, which took --non-interactive on 2026-09-09 (GitHub
+# issue #124) because a scheduled publish BUILDS before it publishes. Its own
+# file rather than a class in the one above: this drives a different launcher,
+# and the twin's completeness test only ever asks about deploy.sh's questions.
+if (cd scripts && python3 test_preview_sh_questions.py) >/tmp/verify_preview_sh_questions_test.log 2>&1; then
+  pass "preview.sh: the one question it can ask refuses under the flag, and is still asked without it (scripts/test_preview_sh_questions.py)"
+else
+  fail "preview.sh: the one question it can ask refuses under the flag, and is still asked without it (scripts/test_preview_sh_questions.py)"
+  cat /tmp/verify_preview_sh_questions_test.log
+fi
+
 if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
   pass "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
 else
