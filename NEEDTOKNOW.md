@@ -289,7 +289,10 @@ Repairing the front page and previewing again fixes it.
 Cloudflare, runs all three primary+secondary pairings, previews it in serve
 mode, and checks the no-front-page refusal — then **fetches every published
 site back and reads it**, because a launcher's own output only proves the
-launcher is happy with itself. 42 checks.
+launcher is happy with itself. **44 checks; first run on the mac 2026-09-09,
+44 passed, 0 failed, 0 skipped** (issue #129). Count the cases in the script
+rather than trusting a number here — the Windows counterpart reports 36
+because the suites are not identical, not because anything was skipped.
 
 It is deliberately NOT part of `verify.sh`: it needs three credentials, the
 network, and it creates real sites on real accounts. Run it when the publishing

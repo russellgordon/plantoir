@@ -665,8 +665,32 @@ if data.get("success"):
 # Only reached when the token cannot name its own account and nothing was
 # remembered. The app collects this in its own window instead, and passes
 # it as --account, because a GUI deploy has no console to answer on.
+#
+# EVERYTHING THIS FUNCTION SAYS TO THE TEACHER GOES TO STDERR, and that is
+# not tidiness. It is called as `CF_ACCOUNT="$(prompt_for_cf_account)"`, and
+# a command substitution is a subshell that captures stdout — so its stdout
+# is its RETURN VALUE and nothing else may go there. Measured 2026-09-09 by
+# driving the real script through a pseudo-terminal (issue #129): with these
+# on stdout the six-step "where to find your Account ID" block never
+# appeared, and a teacher who mistyped the ID saw NOTHING AT ALL before the
+# script exited 1 — they were asked to paste a code with no hint where it
+# lives, and told nothing when it was wrong. Worse, on the SUCCESS path the
+# caller got the instructions AND the id — 519 characters (521 bytes) where
+# 32 were meant —
+# which was then saved to the Keychain and handed to wrangler. Same trap as
+# the refusal that issue #92 moved out to the call site; these two were left
+# behind because nobody had run the script this far. `read -rp` already
+# writes its prompt to stderr, so this puts the instructions where their own
+# question is.
+#
+# deploy.ps1 never had this, and reaches the same place a different way:
+# Read-CloudflareAccountId says both of these INSIDE the function too, but
+# pipes them to `Out-Host` / `Write-Host`, which bypass the success stream
+# that `$CF_ACCOUNT = Read-CloudflareAccountId` captures. PowerShell's host
+# stream is doing exactly the job stderr does here, so after this fix the two
+# launchers solve it the same way rather than differently.
 prompt_for_cf_account() {
-  cat <<'MSG'
+  cat >&2 <<'MSG'
 
 One more thing from Cloudflare.
 
@@ -684,7 +708,7 @@ MSG
   read -rp "Paste Cloudflare Account ID: " entered
   entered="$(printf '%s' "$entered" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
   if [[ ! "$entered" =~ ^[0-9a-f]{32}$ ]]; then
-    echo "❌ That doesn’t look like an Account ID (it should be 32 letters and digits)."
+    echo "❌ That doesn’t look like an Account ID (it should be 32 letters and digits)." >&2
     return 1
   fi
   printf '%s' "$entered"
@@ -826,7 +850,30 @@ MSG
     set_cf_account_keychain "$CF_ACCOUNT"
   fi
   if [[ -z "$CF_ACCOUNT" ]]; then CF_ACCOUNT="$(discover_cf_account "$CF_TOKEN")"; fi
-  if [[ -z "$CF_ACCOUNT" ]]; then CF_ACCOUNT="$(get_cf_account_keychain)"; fi
+  # What was remembered is CHECKED before it is trusted, and this is a repair
+  # rather than a belt-and-braces. Until 2026-09-09 prompt_for_cf_account
+  # printed its instructions to stdout while the call site captured stdout, so
+  # a teacher who answered correctly had the whole instruction block AND their
+  # id — 519 characters (521 bytes) where 32 were meant — written here by
+  # set_cf_account_keychain. Fixing the printing does not help them: this line
+  # would hand the same blob back on every later run, the question would never
+  # be asked again, and wrangler would keep being given nonsense. Two released
+  # versions (v1.0.0, v1.1.0) can have done this, so the entry has to be
+  # examined rather than assumed good.
+  #
+  # Anything that is not 32 hex characters is discarded and the entry removed,
+  # which drops through to asking the question again — the state the teacher
+  # would have been in had the bug never happened. Deliberately silent about
+  # the repair: "your saved Account ID was wrong" invites a support question
+  # about something already put right, and the next line asks for it anyway.
+  if [[ -z "$CF_ACCOUNT" ]]; then
+    _remembered="$(get_cf_account_keychain)"
+    if [[ "$_remembered" =~ ^[0-9a-f]{32}$ ]]; then
+      CF_ACCOUNT="$_remembered"
+    elif [[ -n "$_remembered" ]]; then
+      delete_cf_account_keychain
+    fi
+  fi
   if [[ -z "$CF_ACCOUNT" ]]; then
     # GUARDED HERE, not inside prompt_for_cf_account, and that is the whole
     # point. The function's output is CAPTURED — `$( )` is a subshell — so a
