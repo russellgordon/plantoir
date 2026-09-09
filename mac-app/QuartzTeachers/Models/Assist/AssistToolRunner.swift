@@ -2392,18 +2392,18 @@ final class AssistToolRunner {
         guard let answer = arguments["website"] as? String else {
             return false
         }
-        // **What this costs, kept rather than fixed.** The schema tells a
-        // caller to "leave empty otherwise", and a model told that will
-        // sometimes send a PLACEHOLDER instead — "none", "n/a" — which counts
-        // here, so an ordinary re-date picks up a website question it should
-        // never have been asked. That is the price of the rule above, and the
-        // rule is worth more: a real answer nobody recognised, silently read
-        // as an ordinary re-date, is the failure that has actually happened.
-        // The question changes nothing on its own and says so in as many
-        // words, and only Claude Code can put free text here, where a person
-        // reads every step. Windows has the identical property from the
-        // identical rule; a narrower list of words nobody means would drift
-        // apart on the two platforms within a release.
+        // **What this costs, kept rather than fixed.** A model told to leave
+        // the key out will sometimes send a PLACEHOLDER instead — "none",
+        // "n/a" — which counts here, so an ordinary re-date picks up a website
+        // question it should never have been asked, and reads two sentences
+        // that are untrue of a mid-semester section. Nothing on disk changes.
+        // The rule is still worth more: a real answer nobody recognised, read
+        // silently as an ordinary re-date, changes the WRONG THING quietly,
+        // which is the failure that has actually happened. The schema names
+        // the consequence to narrow it, and only Claude Code can put free text
+        // here, where a person reads every step. Windows has the identical
+        // property from the identical rule; a narrower list of words nobody
+        // means would drift apart on the two platforms within a release.
         return answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
 
