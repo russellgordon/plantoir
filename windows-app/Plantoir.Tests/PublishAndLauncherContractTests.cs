@@ -433,21 +433,41 @@ public class PublishAndLauncherContractTests
     /// first step — so every question this script asks at half six in the
     /// morning is put to nobody just as surely.</para>
     ///
-    /// <para>What happens then is worse than a hang. A <c>Read-Host</c> with no
-    /// console reads end of input and returns empty, and both questions here
-    /// have a DEFAULT: the course-code guard's is "yes, fix it", which
-    /// retargets the build at a DIFFERENT course code and announces it to
-    /// nobody — and the publish that follows then succeeds against the wrong
-    /// course, with nothing anywhere looking wrong.</para>
+    /// <para>What happens then, MEASURED on PowerShell 5.1.26100 rather than
+    /// assumed: the wrapper's build leg runs
+    /// <c>powershell -NonInteractive</c>, where an unanswered
+    /// <c>Read-Host</c> THROWS <c>PSInvalidOperationException</c> — and
+    /// <c>preview.ps1</c> opens with <c>$ErrorActionPreference = 'Stop'</c>, so
+    /// the script dies on the spot. Exit 1, no build, no publish, and nothing
+    /// anywhere saying why: the teacher's site is simply not updated in the
+    /// morning. Under a plain <c>-File</c> with stdin at end of input it
+    /// returns <c>$null</c> instead, so the [Y/n] default is NOT taken and the
+    /// typed code is kept.</para>
     ///
-    /// <para><b>This script asks TWO things and the shared contract lists
-    /// one.</b> <c>preview.sh</c> has only the course-code guard;
-    /// "Continue anyway?" — the warning when a section is not listed in
-    /// <c>course_config.json</c> — is this platform's alone, so
-    /// <c>app-rules.json</c> → <c>launcherFlags.nonInteractive.refusals</c>
-    /// does not name it. That file is GENERATED on the mac, so the entry was
-    /// asked for by issue rather than added here; this test is what holds the
-    /// behaviour in the meantime.</para>
+    /// <para><b>The "takes the default and builds a DIFFERENT course" story is
+    /// preview.sh's, not this one's</b>, and it was written here first by
+    /// copying that launcher's reasoning across. It is true there — no
+    /// <c>set -e</c>, and <c>${_ans:-Y}</c> really does default — and
+    /// <c>app-rules.json</c> under <c>nonInteractive</c> is where it belongs.
+    /// Corrected 2026-09-09 after review measured both shells.</para>
+    ///
+    /// <para><b>This script asks TWO things, and the second is this
+    /// platform's alone.</b> <c>preview.sh</c> has exactly one read prompt,
+    /// its course-code guard; "Continue anyway?" — the warning when a section
+    /// is not listed in <c>course_config.json</c> — has no counterpart there.
+    /// It is recorded in <c>app-rules.json</c> →
+    /// <c>launcherFlags.nonInteractive.refusals</c> with
+    /// <c>appliesOn: ["windows"]</c>, so the next person comparing the two
+    /// launchers reads a deliberate difference rather than drift.</para>
+    ///
+    /// <para><b>That entry was very nearly asked for by issue instead.</b>
+    /// This comment said <c>app-rules.json</c> is generated on the mac and
+    /// cannot be edited here — which is the mistake <c>CLAUDE.md</c> names by
+    /// date. <c>contracts/README.md</c> is explicit: only <c>milestones</c> and
+    /// <c>credentialRequests</c> are readouts; <c>launcherFlags</c>,
+    /// <c>deployArguments</c>, <c>markerOrigins</c>, <c>configurationRules</c>,
+    /// <c>previewPorts</c> and <c>credentialPrompts</c> are AUTHORED and
+    /// preserved by the generator. Caught by review, 2026-09-09.</para>
     /// </remarks>
     [Fact]
     public void EveryQuestionThePreviewLauncherAsksIsGuarded()
@@ -538,9 +558,20 @@ public class PublishAndLauncherContractTests
                     if (!word.StartsWith("--", StringComparison.Ordinal)) continue;
                     string flag = word.Trim();
                     string parser = launchers[which];
-                    bool accepted = parser.Contains($"'^{flag}$'", StringComparison.Ordinal)
-                                 || parser.Contains($"'^{flag}=", StringComparison.Ordinal)
-                                 || parser.Contains($"'{flag}'", StringComparison.Ordinal);
+                    // The two switch idioms the launchers use for a flag CASE,
+                    // and nothing looser. Plain containment of the quoted flag
+                    // was the first version and it is a false negative waiting
+                    // to happen: deploy.ps1 also contains the literal
+                    // '--non-interactive' where it FORWARDS the flag to the
+                    // Python, so that line alone would satisfy the check even
+                    // if the parser had stopped accepting it — which is exactly
+                    // the failure this test exists to catch.
+                    string quoted = Regex.Escape(flag);
+                    bool accepted =
+                        // deploy.ps1's idiom: switch -Regex, '^--flag$' { ... }
+                        Regex.IsMatch(parser, $@"'\^{quoted}[$=]")
+                        // preview.ps1's idiom: switch, '--flag' { ... }
+                        || Regex.IsMatch(parser, $@"'{quoted}'\s*\{{");
                     if (!accepted) unknown.Add($"{which} does not parse {flag}");
                 }
             }

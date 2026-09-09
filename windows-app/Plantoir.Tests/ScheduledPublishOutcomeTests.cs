@@ -333,7 +333,7 @@ public class ScheduledPublishOutcomeTests : IDisposable
     /// descriptive: a kind added on the mac fails here by name, and one dropped
     /// here fails too. <c>buildNeededAnAnswer</c> went the other way — proposed
     /// from this side on 2026-09-09, so the mac is red on it until they adopt
-    /// it (GitHub issue #133), which is the mechanism working.
+    /// it (GitHub issue #132), which is the mechanism working.
     /// </remarks>
     [Fact]
     public void TheKindsAreExactlyTheOnesTheContractNames()
@@ -462,11 +462,11 @@ public class ScheduledPublishOutcomeTests : IDisposable
     /// <remarks>
     /// <para>A scheduled publish builds before it publishes, and the build runs
     /// <c>preview.ps1</c> — a launcher that asks two questions of its own. Told
-    /// nothing, a <c>Read-Host</c> at half six reads end of input and returns
-    /// empty, so the [Y/n] course-code guard takes its DEFAULT and the build
-    /// retargets a different course code. The publish that follows then
-    /// succeeds against the wrong course, which is worse than a refusal because
-    /// nothing looks wrong.</para>
+    /// nothing, and running under the wrapper's <c>-NonInteractive</c>
+    /// PowerShell, an unanswered <c>Read-Host</c> THROWS, and that launcher's
+    /// <c>$ErrorActionPreference = 'Stop'</c> turns it into a bare exit 1 with
+    /// nothing said. The teacher's site is not updated and the trail is empty
+    /// — which is the original bug reached down a new path.</para>
     ///
     /// <para>Both branches are checked because there are two: the captured one
     /// that runs the build through <c>Start-Process</c> to read its folder

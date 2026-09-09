@@ -361,13 +361,17 @@ if ($TO_FOLDER) {
     Write-Host "This site was built by a preview, which bakes in a live-reload script"
     Write-Host "  that students' browsers would ask about. Rebuilding it for publishing..."
     # Forward the flag. Without it this rebuild is a SECOND way a scheduled
-    # publish can meet a question nobody is there to answer: preview.ps1 has
-    # its own course-code guard and its own section warning, and an unanswered
-    # Read-Host returns empty — so the [Y/n] guard takes its default and
-    # rebuilds a DIFFERENT course, which this script then publishes,
-    # successfully, against the wrong one. Mirrors deploy.sh, which has
-    # forwarded it since 2026-09-09; this side had not, and GitHub issue #124
-    # is where that gap was named.
+    # publish can meet a question nobody is there to answer: preview.ps1 asks
+    # about a course code ending in a zero, and about a section the
+    # configuration does not list. Under the wrapper's -NonInteractive
+    # PowerShell an unanswered Read-Host THROWS, and preview.ps1's
+    # $ErrorActionPreference = 'Stop' turns that into a bare exit 1 with
+    # nothing said — measured, not assumed; see the long note at the top of
+    # preview.ps1, which also says why the "takes the default and builds the
+    # WRONG course" story belongs to preview.sh and not here.
+    #
+    # Mirrors deploy.sh, which has forwarded it since 2026-09-09; this side had
+    # not, and GitHub issue #124 is where that gap was named.
     $previewExtra = @()
     if ($NON_INTERACTIVE) { $previewExtra += '--non-interactive' }
     & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only" @previewExtra
