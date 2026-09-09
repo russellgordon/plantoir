@@ -759,8 +759,23 @@
           "why" : "On Windows a batch of edits can be made with the preview suppressed and rebuilt once at the end. Here every change rebuilds, which is what the assistant's own system prompt promises a teacher, so there is nothing for the flag to mean."
         }
       ],
-      "howToReadThis" : "Each entry says a parameter is a string carrying a list, and on which surface. It does NOT say what the other platform does — the mac cannot check that. A suite that can see both should intersect this list with its own schemas: a parameter here that is an ARRAY there is a real type departure; one that is a string there with a different separator is a separator difference, which is worth knowing and is not the same thing.",
+      "advertisedNotAccepted" : "The separator is what the SCHEMA tells the model, not the only character the runner accepts. AssistToolRunner is deliberately forgiving and splits on several — pages on semicolon or newline, codes and dates on comma, semicolon, newline and more. So a difference recorded here is a difference in what each side TELLS the model, which is worth knowing; it is not necessarily an incompatibility, and a suite should not assert one from it.",
+      "howToReadThis" : "Each entry says a parameter is a string carrying a list, on which surfaces, and the separator this surface ADVERTISES to the model. It does NOT say what the other platform does — the mac cannot check that. A suite seeing both should intersect this list with its own schemas, and there are FOUR outcomes, not three: an ARRAY there is a real type departure; a string there with a DIFFERENT separator is a separator difference, worth asserting deliberately; a string there with the SAME separator is an agreement and nothing should be asserted about it; anything else is a real disagreement. Leaving the third case out turns a suite red for an agreement, which is how this note first read.",
       "listShapedStringParameters" : [
+        {
+          "parameter" : "add_curriculum_mentions.codes",
+          "separator" : ",",
+          "surfaces" : [
+            "mcp"
+          ]
+        },
+        {
+          "parameter" : "plan_curriculum_mentions.codes",
+          "separator" : ",",
+          "surfaces" : [
+            "mcp"
+          ]
+        },
         {
           "parameter" : "plan_publish_pages.pages",
           "separator" : ";",
@@ -814,8 +829,7 @@
         }
       ],
       "note" : "How this surface's schemas differ from the Windows server's. Emitted so that side can READ them instead of keeping a hand-written copy — the copy is what made the two surfaces drift in the first place.",
-      "notEnumeratedHere" : "Arguments the Windows server takes for tools or shapes the mac does not offer at all — its re_date_classes and read_remembered_timetable parameters among them. Those are not departures the mac chose, and it can neither test them nor notice when they change, so they stay in that platform's own list.",
-      "whyASeparatedString" : "This client's schema has strings, integers and booleans and no arrays at all. The separator is a SEMICOLON rather than a comma because \"Unit 2, Day 3\" is what nearly every class page in these courses is called, and a comma-separated list of those names is a list of nonsense."
+      "notEnumeratedHere" : "Arguments the Windows server takes that this surface does not DECLARE. Mostly extra parameters on tools BOTH platforms serve — re_date_classes and read_remembered_timetable are the clearest, with the same name and different parameters on the two servers (GUI-IMPROVEMENTS.md row 447). Said precisely because the first version of this key said they were tools the mac does not serve at all, which is false: it serves both. The reason they stay in that platform's own list is that the mac does not declare those arguments, so it can neither test them nor notice when they change."
     },
     "local" : [
       {

@@ -654,8 +654,12 @@ extension AssistToolRunner {
         kind: .string, description: "The page title, for example \"Movement Concepts\"."
     )
 
+    /// Commas, not semicolons, and deliberately: an expectation code has no
+    /// comma in it, and commas are what the Windows server's schema asks for.
+    /// The one separator the two surfaces AGREE on, which is why it is worth
+    /// recording rather than assuming.
     private static let codesHelp: AssistSchemaProperty = AssistSchemaProperty(
-        kind: .string,
+        kind: .separatedList(separator: ","),
         description: "The expectation codes to add, separated by commas — for example \"A1.1, A2.2\"."
     )
 

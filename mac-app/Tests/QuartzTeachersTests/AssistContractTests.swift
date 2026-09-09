@@ -217,6 +217,51 @@ final class AssistContractTests: XCTestCase {
                 found = true
             }
             XCTAssertTrue(found, "\(parameter) names a tool this surface does not have")
+
+            // `surfaces` is a field Windows scopes its own list by, and nothing
+            // read it until now: a bug in the bookkeeping would have been
+            // self-consistent between generator and contract, and invisible.
+            let surfaces: [String] = try XCTUnwrap(entry["surfaces"] as? [String])
+            var isLocal: Bool = false
+            for definition in AssistToolRunner.localTools where definition.name == toolName {
+                isLocal = true
+            }
+            let emittedAsLocal: Bool = surfaces.contains("local")
+            XCTAssertEqual(
+                emittedAsLocal, isLocal,
+                "\(parameter): the emitted surfaces say local=\(emittedAsLocal) and the local tool "
+                + "list says \(isLocal)."
+            )
+            XCTAssertTrue(surfaces.contains("mcp"), "\(parameter): every tool is on the mcp surface")
+        }
+    }
+
+    /// A parameter whose description says it is separated is DECLARED as a list.
+    ///
+    /// The other direction of the departures test, and the one that matters:
+    /// that test checks every emitted entry is real, and would have passed
+    /// while the emitted list was incomplete — which it was. `codes` is a
+    /// comma-separated list on both platforms, was declared a plain `.string`,
+    /// and so sat outside a record Windows is told is complete.
+    ///
+    /// This reads the DESCRIPTIONS, which the generator deliberately does not.
+    /// The objection to the generator reading them does not apply here: a
+    /// reworded description can only make this test DEMAND a declaration it
+    /// then fails to find. It can never silently drop one, which is exactly
+    /// what a generator matching prose would do.
+    func testEveryParameterThatSaysSeparatedByIsDeclaredAsAList() throws {
+        for definition in AssistToolRunner.mcpTools {
+            for (parameterName, property) in definition.parameters {
+                if property.description.contains("separated by") {
+                    XCTAssertNotNil(
+                        property.kind.listSeparator,
+                        "\(definition.name).\(parameterName) tells the model it is separated and is "
+                        + "declared as a plain string, so it is missing from "
+                        + "toolSchemas.departures.listShapedStringParameters — a record the other "
+                        + "platform is told is complete. Declare it .separatedList."
+                    )
+                }
+            }
         }
     }
 

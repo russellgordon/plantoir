@@ -184,22 +184,13 @@ enum AssistContract {
     /// array restating them — `AssertOnlyTheDeparturesWeHaveAgreed`, whose
     /// comment says in as many words that it is waiting for this key. Issue #83.
     ///
-    /// **Only what this side can PROVE is emitted, and that is the whole
-    /// design.** That a parameter is a list-shaped string is a fact about the
-    /// mac's own declaration. That Windows spells the same parameter as an
-    /// ARRAY is a fact about Windows, which this generator cannot check and
-    /// must not assert: written that way, three of the seven entries would be
-    /// false, because `remember_timetable.dates`, `plan_remember_timetable
-    /// .dates` and `plan_scheduled_deploy.classes` are strings on BOTH
-    /// platforms and merely split on different characters — semicolons here,
-    /// commas there. So this names the shape HERE and leaves the intersection
-    /// to the suite that can see both surfaces.
+    /// Only what this side can PROVE is emitted: the shape on its own surface,
+    /// never a claim about what Windows does. Derived from the DECLARATION
+    /// (`Kind.separatedList`), never by matching English in the descriptions.
     ///
-    /// Derived from the DECLARATION (`Kind.separatedList`), never by matching
-    /// English in the descriptions. The descriptions are measured artifacts
-    /// that must not be reworded casually, so a generator reading them would
-    /// depend on prose nobody is allowed to touch — and would silently drop a
-    /// new list parameter whose wording differed.
+    /// The reasoning, and the shape that was rejected, is in
+    /// `documentation/10-local-ai-assistant.md` → "Where the two surfaces'
+    /// SCHEMAS differ". Not repeated here.
     private static func departures() -> [String: Any] {
         var separators: [String: String] = [:]
         var surfaces: [String: [String]] = [:]
@@ -228,16 +219,22 @@ enum AssistContract {
                   + "side can READ them instead of keeping a hand-written copy — the copy is what "
                   + "made the two surfaces drift in the first place.",
             "listShapedStringParameters": listShaped,
-            "whyASeparatedString": "This client's schema has strings, integers and booleans and no "
-                  + "arrays at all. The separator is a SEMICOLON rather than a comma because "
-                  + "\"Unit 2, Day 3\" is what nearly every class page in these courses is called, "
-                  + "and a comma-separated list of those names is a list of nonsense.",
-            "howToReadThis": "Each entry says a parameter is a string carrying a list, and on which "
-                  + "surface. It does NOT say what the other platform does — the mac cannot check "
-                  + "that. A suite that can see both should intersect this list with its own "
-                  + "schemas: a parameter here that is an ARRAY there is a real type departure; one "
-                  + "that is a string there with a different separator is a separator difference, "
-                  + "which is worth knowing and is not the same thing.",
+            "howToReadThis": "Each entry says a parameter is a string carrying a list, on which "
+                  + "surfaces, and the separator this surface ADVERTISES to the model. It does NOT "
+                  + "say what the other platform does — the mac cannot check that. A suite seeing "
+                  + "both should intersect this list with its own schemas, and there are FOUR "
+                  + "outcomes, not three: an ARRAY there is a real type departure; a string there "
+                  + "with a DIFFERENT separator is a separator difference, worth asserting "
+                  + "deliberately; a string there with the SAME separator is an agreement and "
+                  + "nothing should be asserted about it; anything else is a real disagreement. "
+                  + "Leaving the third case out turns a suite red for an agreement, which is how "
+                  + "this note first read.",
+            "advertisedNotAccepted": "The separator is what the SCHEMA tells the model, not the only "
+                  + "character the runner accepts. AssistToolRunner is deliberately forgiving and "
+                  + "splits on several — pages on semicolon or newline, codes and dates on comma, "
+                  + "semicolon, newline and more. So a difference recorded here is a difference in "
+                  + "what each side TELLS the model, which is worth knowing; it is not necessarily "
+                  + "an incompatibility, and a suite should not assert one from it.",
             "absentHere": [
                 [
                     "parameter": "preview",
@@ -253,11 +250,14 @@ enum AssistContract {
                               + "once and tested.",
                 ],
             ],
-            "notEnumeratedHere": "Arguments the Windows server takes for tools or shapes the mac "
-                  + "does not offer at all — its re_date_classes and read_remembered_timetable "
-                  + "parameters among them. Those are not departures the mac chose, and it can "
-                  + "neither test them nor notice when they change, so they stay in that "
-                  + "platform's own list.",
+            "notEnumeratedHere": "Arguments the Windows server takes that this surface does not "
+                  + "DECLARE. Mostly extra parameters on tools BOTH platforms serve — re_date_classes "
+                  + "and read_remembered_timetable are the clearest, with the same name and different "
+                  + "parameters on the two servers (GUI-IMPROVEMENTS.md row 447). Said precisely "
+                  + "because the first version of this key said they were tools the mac does not "
+                  + "serve at all, which is false: it serves both. The reason they stay in that "
+                  + "platform's own list is that the mac does not declare those arguments, so it can "
+                  + "neither test them nor notice when they change.",
         ]
     }
 
