@@ -64,7 +64,7 @@ import deploy
 
 
 def _a_bash_that_can_run_deploy_sh():
-    """A `bash` that can actually run this repository's launcher, or None.
+    """An argv PREFIX for a bash that can really run this launcher, or None.
 
     THIS IS NOT PEDANTRY, and it cost a test run to find. Since 2026-09-07 the
     Windows app runs every `scripts/test_*.py` inside `dotnet test`
@@ -116,9 +116,34 @@ def _a_bash_that_can_run_deploy_sh():
                 continue
             # 7 rather than 0: a stub that fails to start also exits non-zero,
             # and a shell that ran nothing would exit 0.
-            if subprocess.run([str(resolved), "-c", "exit 7"],
-                              capture_output=True, timeout=60).returncode == 7:
-                return str(resolved)
+            # Two probes, and the second is the one that was missing.
+            #
+            # The shell must START (a .exe that exists and cannot run is
+            # exactly the WSL stub above), and it must be able to resolve
+            # `shasum`, which deploy.sh uses on its THIRTEENTH line to name the
+            # container. On Git for Windows shasum lives in
+            # /usr/bin/core_perl, and that directory is on PATH only for a
+            # LOGIN shell — so a non-login bash launched from a Windows process
+            # runs deploy.sh straight into "shasum: command not found".
+            #
+            # That is how this test came to pass when run from Git Bash and
+            # FAIL under `dotnet test`, which PowerShell starts: the same file,
+            # the same machine, a different answer depending on which shell was
+            # the grandparent. A gate whose result depends on that is not a
+            # gate. Found by review 2026-09-09.
+            #
+            # `-l` is tried only as a fallback, because a login shell sources
+            # the user's profile and that is somebody else's code running in
+            # the middle of a test.
+            for prefix in ([str(resolved)], [str(resolved), "-l"]):
+                if subprocess.run(prefix + ["-c", "exit 7"],
+                                  capture_output=True, timeout=60).returncode != 7:
+                    continue
+                found = subprocess.run(prefix + ["-c", "command -v shasum"],
+                                       capture_output=True, timeout=60,
+                                       encoding="utf-8", errors="replace")
+                if found.returncode == 0 and found.stdout.strip():
+                    return prefix
         except (OSError, subprocess.SubprocessError):
             continue
     return None
@@ -279,7 +304,7 @@ class TheFlagIsAccepted(unittest.TestCase):
             # errors="replace" for the same reason: this test reads the output
             # for two SENTENCES, and a stray byte must not be able to stop it.
             result = subprocess.run(
-                [shell, str(launcher), "ICS3U", "1", "--non-interactive"],
+                shell + [str(launcher), "ICS3U", "1", "--non-interactive"],
                 capture_output=True, timeout=120, stdin=subprocess.DEVNULL,
                 encoding="utf-8", errors="replace",
             )
@@ -346,27 +371,63 @@ class TheRebuildLegPassesItsRefusalOn(unittest.TestCase):
     reaching that branch needs a built site with a live-reload client in it.
     """
 
-    def test_the_exit_code_is_captured_from_the_command_not_from_the_if(self):
+    def test_the_exit_code_is_captured_in_a_way_that_survives_set_e(self):
+        """TWO wrong shapes have been shipped here, so both are refused.
+
+        `if ! CMD; then _rc=$?` makes $? the logical NOT, so the exit-3 branch
+        can never fire. Replacing it with a bare CMD followed by `_rc=$?` is
+        WORSE: deploy.sh runs under `set -euo pipefail`, so the script aborts
+        at CMD and the guard is never reached at all, printing nothing.
+
+        Only an `||` list is exempt from `set -e` while still leaving $?
+        readable.
+        """
         launcher = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
         self.assertNotIn(
             'if ! "${PREVIEW_CMD}"', launcher,
-            "`if ! cmd; then _rc=$?` makes $? the logical NOT, so the exit-3 "
-            "branch below it is unreachable. Run the command, then read $?.",
+            "`if ! cmd; then _rc=$?` makes $? the logical NOT.",
         )
-        self.assertIn('_rc=$?', launcher)
+        self.assertIn(
+            '--build-only "${_PREVIEW_EXTRA[@]+"${_PREVIEW_EXTRA[@]}"}" || _rc=$?', launcher,
+            "the rebuild's exit code must be captured with `|| _rc=$?`; a bare "
+            "command followed by `_rc=$?` is killed by set -e before the guard runs",
+        )
         self.assertIn('if [[ $_rc -eq 3 ]]; then', launcher)
 
-    def test_bash_really_does_swallow_the_code_that_way(self):
-        """The measurement the fix rests on, run rather than remembered."""
+    def test_bash_really_does_behave_the_way_the_fix_assumes(self):
+        """Both measurements the fix rests on, RUN rather than remembered.
+
+        Shape A is the bare command under `set -e`: it must not reach the guard
+        at all. Shape B is the `||` list: it must reach the guard with the real
+        code. If either of these ever changes, the comment in deploy.sh is
+        wrong and so is the code.
+        """
         shell = _a_bash_that_can_run_deploy_sh()
         if shell is None:
             self.skipTest("no usable bash on this machine")
-        result = subprocess.run(
-            [shell, "-c", 'f(){ return 3; }; if ! f; then echo "$?"; fi; f; echo "$?"'],
-            capture_output=True, timeout=60, encoding="utf-8", errors="replace",
-        )
-        self.assertEqual(["0", "3"], result.stdout.split(),
-                         "if this ever prints 3 first, the guard above was fine all along")
+
+        def run(script):
+            return subprocess.run(
+                shell + ["-c", script], capture_output=True, timeout=60,
+                encoding="utf-8", errors="replace",
+            )
+
+        # `if ! f` swallows the code.
+        swallowed = run('f(){ return 3; }; if ! f; then echo "$?"; fi')
+        self.assertEqual("0", swallowed.stdout.strip(),
+                         "if this prints 3, `if ! cmd` was fine all along")
+
+        # A bare command under set -e never reaches the next line.
+        aborted = run('set -euo pipefail; f(){ return 3; }; f; _rc=$?; echo "reached $_rc"')
+        self.assertEqual("", aborted.stdout.strip(),
+                         "set -e must abort before the guard; if this prints, the "
+                         "comment in deploy.sh about the second wrong shape is wrong")
+        self.assertEqual(3, aborted.returncode)
+
+        # An || list survives it and keeps the code.
+        captured = run('set -euo pipefail; f(){ return 3; }; _rc=0; f || _rc=$?; echo "reached $_rc"')
+        self.assertEqual("reached 3", captured.stdout.strip())
+        self.assertEqual(0, captured.returncode)
 
 
 
