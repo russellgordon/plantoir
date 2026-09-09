@@ -452,6 +452,29 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ## Open — what the mac still owes
 
+- **A rollover never asks about the website when the dates are already right,
+  under plan mode — the mac's own defect, now GitHub issue #120.** (Windows,
+  2026-09-08, branch `issue/66-rollover-website-question`, found by adversarial
+  review of the port rather than by testing.) `planReDateClasses`' guard is
+  `guard isRollover, websiteAnswer == "new" || "same" else { return .wrote(...) }`,
+  and `showPlan` returns early on anything that is not a plan — so a bare
+  "roll this section over to a new year" on a section already on its dates ends
+  the turn with *"Every page … is already on the day it should be."* and no
+  question at all. **It is the state a teacher reaches on their SECOND attempt**:
+  roll over, ignore the question, come back and ask again. With confirmation OFF
+  the same request DOES ask, so the question exists or not depending on a
+  setting.
+
+  It is the mirror of the trap row 451 already fixed — that one was the ANSWER
+  turn returning early, this is the ASKING turn returning early one branch
+  above it. Windows' fix, its reasoning and the test that mutation-checks it are
+  in the issue. Two smaller things ride along there: an unrecognised `website`
+  value ("a new one") is silently read as an ordinary re-date on both platforms,
+  and the two PLAN sentences are typed prose in both apps and in the wording
+  contract in neither — Windows has made its copies word-for-word identical to
+  the mac's rather than adding a second home for the strings, and having
+  `--write-contracts` emit them is the same request as issue #83.
+
 - **Nothing to implement, one thing to switch on: line endings are enforced
   now, and the enforcement reaches this clone only if hooks are enabled.**
   (Windows, 2026-09-08, branch `issue/gitattributes-line-endings`.) A session
@@ -2693,11 +2716,16 @@ rather than being deleted.
   ported almost line for line.
 
   **Two things the mac may want, neither of them owed.** (a) Windows'
-  `roll_over_section` — a tool the mac does not have — now says
-  `rolloverStartedANewWebsite` / `rolloverHadNoWebsiteYet` instead of prose of
-  its own, and turns off any scheduled publish for the same reason the re-date
-  path does; two sentences for one event was exactly the drift `AssistWording`
-  exists to stop. (b) Three phrasings were added to `nearMisses` — "a new
+  `roll_over_section` — a tool the mac does not have — now goes through the
+  SAME code path as the re-date rather than saying the same things in its own
+  words. The first cut gave it the contract's sentences and kept its own logic,
+  and review found what a copy always gets wrong: a marker that existed and
+  could NOT be moved produced "this section had not been published anywhere
+  yet" and "I could not move this section off …" one after the other, and then
+  a trail line saying the section had been rolled onto a new website while it
+  was still pinned to last year's. It also turned off the scheduled publish on
+  a release that had failed, leaving the teacher still pinned AND disarmed. One
+  path, two regression tests, both mutation-checked. (b) Three phrasings were added to `nearMisses` — "a new
   website", "new one please", "roll this section over onto a new site" — which
   **both apps already pass**, so nothing goes red. They record a KNOWN LIMIT:
   the reply offers two sentences word for word, those exact strings are the

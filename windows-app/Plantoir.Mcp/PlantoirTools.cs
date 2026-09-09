@@ -945,35 +945,24 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var result = workspace.ApplyReDate(plan);
 
             var found = workspace.Course(course);
-            var released = workspace.ReleaseSite(found, section);
 
-            // The contract's sentences, not this tool's own. Both said the same
-            // fact in different words until the rollover work gave that fact a
-            // shared home in assist-wording.json, and two sentences for one
-            // event is exactly the drift AssistWording exists to stop.
+            // ONE code path with re_date_classes, not a second one saying the
+            // same things in the same order. The first draft of this had its
+            // own copy and got it wrong in the way a copy does: a marker that
+            // existed and could NOT be moved produced "this section had not
+            // been published anywhere yet" and "I could not move this section
+            // off ..." one after the other - two sentences contradicting each
+            // other about the one fact the feature turns on - and then wrote a
+            // trail line saying the section had been rolled onto a new website
+            // while it was still pinned to last year's. Found by review, not by
+            // testing, because no test drove that branch of THIS tool.
+            //
+            // `website: "new"` because that is what this tool IS: its own
+            // description promises it cuts the section loose, and a Claude Code
+            // session calling it has chosen already. The QUESTION belongs to
+            // the card phrasing, which reaches re_date_classes instead.
             var text = new StringBuilder(result.Message);
-            text.Append("\n" + (released.ReleasedAnything
-                ? AssistWording.RolloverStartedANewWebsite(string.Join(", ", released.KeptFiles))
-                : AssistWording.RolloverHadNoWebsiteYet));
-            // A destination that could not be released is NOT the same as one
-            // that was never there, and saying so is the difference between a
-            // teacher knowing their site is still pinned and believing it is
-            // not.
-            if (released.SomethingIsStillPinned)
-                text.Append("\n" + AssistWording.RolloverCouldNotStartANewWebsite(
-                    string.Join(", ", released.StillPinned)));
-            // A section cut loose has no agreed website and a scheduled run
-            // has nobody to ask, so leaving one armed is worse than the defect
-            // being fixed. This tool always cuts loose, so it always checks.
-            switch (TurnOffAnyScheduledPublish(found.Code, section))
-            {
-                case ScheduledPublishOutcome.NoneWasSet: break;
-                case ScheduledPublishOutcome.TurnedOff:
-                    text.Append("\n" + AssistWording.RolloverTurnedOffTheScheduledPublish); break;
-                case ScheduledPublishOutcome.CouldNotTurnOff:
-                    text.Append("\n" + AssistWording.RolloverCouldNotTurnOffTheScheduledPublish); break;
-            }
-            NoteTheWebsiteOnTheTrail(released, found.Code, section);
+            text.Append("\n" + SettleTheWebsiteAfterARollover(found, section, "new", "yes"));
             text.Append("\n\nNothing was hidden. Preview the section and check the dates and structure look right, " +
                         "then decide what students should see.");
             if (plan.Problems.Count > 0)
@@ -1081,11 +1070,33 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 // default configuration that makes the release unreachable.
                 if (plan.ChangesNothing)
                 {
-                    if (!isRollover || !AnAnswerWasGiven(website)) return Answering(already);
+                    if (!isRollover) return Answering(already);
+                    // A ROLLOVER with no answer yet, on a section whose dates
+                    // are already right. Found by review, and it is the mirror
+                    // of the trap above: with confirmation ON - the default -
+                    // the plan twin is where the request STOPS, so a plan that
+                    // says nothing about the website means the question is
+                    // never asked at all. The teacher reads "everything is
+                    // already on the right day" and the section stays pinned to
+                    // last year's site. It is exactly the state a teacher
+                    // reaches on their SECOND attempt: roll over, ignore the
+                    // question, come back and ask again.
+                    //
+                    // Answered rather than proposed, because there is nothing
+                    // to say yes to: the dates need no change, and the website
+                    // is settled by saying one of the two sentences rather than
+                    // by pressing Go. The mac has this hole too - written up
+                    // for them rather than reached into from here.
+                    if (!AnAnswerWasGiven(website))
+                        return Answering(already + "\n\n" + AskingWhichWebsite(),
+                                         already + "\n\n" + AskingWhichWebsite());
                     return Proposing(already + "\n\n" + WhatSettlingTheWebsiteWouldDo(website));
                 }
-                return Proposing(isRollover && AnAnswerWasGiven(website)
-                    ? plan.Describe() + "\n\n" + WhatSettlingTheWebsiteWouldDo(website)
+                // Dates DO change, so Go is a real decision and the question
+                // arrives with the result afterwards - which is what the mac
+                // does, and why nothing is added here for the bare phrasing.
+                return Proposing(isRollover && WouldStartANewWebsite(website)
+                    ? plan.Describe() + "\n\nIt would also " + WhatStartingANewWebsiteDoes()
                     : plan.Describe());
             }
 
@@ -1149,19 +1160,51 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// mid-semester and abandon the address students are reading right now.
     /// </remarks>
     private static bool IsARollover(string website, string rollover) =>
-        string.Equals(rollover, "yes", StringComparison.OrdinalIgnoreCase) || AnAnswerWasGiven(website);
+        string.Equals(rollover, "yes", StringComparison.OrdinalIgnoreCase)
+        || !string.IsNullOrWhiteSpace(website);
 
     private static bool AnAnswerWasGiven(string website) =>
         string.Equals(website, "new", StringComparison.OrdinalIgnoreCase)
         || string.Equals(website, "same", StringComparison.OrdinalIgnoreCase);
 
+    private static bool WouldStartANewWebsite(string website) =>
+        string.Equals(website, "new", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The half-sentence the two plan wordings share.</summary>
+    /// <remarks>
+    /// Word for word the mac's, so a teacher reading a plan on either app
+    /// reads the same thing. NEITHER app's copy is in
+    /// <c>contracts/assist-wording.json</c> - the generator does not reach a
+    /// tool runner's plan prose - which is asked for in MAC-HANDOFF.md rather
+    /// than papered over with a second home for the string here.
+    /// </remarks>
+    private static string WhatStartingANewWebsiteDoes() =>
+        "start a new website for this section, so publishing it no longer replaces last year's. " +
+        "Last year's details are kept, and any publish set to happen on its own is turned off.";
+
     /// <summary>What a plan says the website half would do.</summary>
     private static string WhatSettlingTheWebsiteWouldDo(string website) =>
-        string.Equals(website, "new", StringComparison.OrdinalIgnoreCase)
-            ? "It would also start a new website for this section, so publishing it no longer " +
-              "replaces last year's. Last year's details are kept, and any publish set to happen " +
-              "on its own is turned off."
-            : "It would keep publishing this section to the same website as last year.";
+        WouldStartANewWebsite(website)
+            ? "Start a new website for this section, so publishing it no longer replaces last " +
+              "year's. Last year's details are kept, and any publish set to happen on its own " +
+              "is turned off."
+            : "Keep publishing this section to the same website as last year.";
+
+    /// <summary>
+    /// The question, the two sentences that answer it, and the plain statement
+    /// that nothing about the website has changed.
+    /// </summary>
+    /// <remarks>
+    /// One home, because it is said from TWO places: the plan twin, when the
+    /// dates are already right and the twin is where the request stops, and the
+    /// write itself. A second copy is the one that keeps saying the old words
+    /// after the product changes them.
+    /// </remarks>
+    private static string AskingWhichWebsite() =>
+        AssistWording.RolloverWebsiteQuestion + "\n\n"
+        + $"Say \u201c{AssistWording.RolloverSayToStartANewWebsite}\u201d or "
+        + $"\u201c{AssistWording.RolloverSayToKeepTheSameWebsite}\u201d.\n\n"
+        + AssistWording.RolloverWebsiteNotDecided;
 
     /// <summary>
     /// What a rollover says about the website, and what it does about it.
@@ -1192,14 +1235,18 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             return AssistWording.RolloverKeptTheSameWebsite;
         }
 
-        if (!string.Equals(website, "new", StringComparison.OrdinalIgnoreCase))
+        if (!WouldStartANewWebsite(website))
         {
             // Asked, and NOT acted on. The sentence says both halves: what was
             // not changed, and how to change it.
-            return AssistWording.RolloverWebsiteQuestion + "\n\n"
-                 + $"Say “{AssistWording.RolloverSayToStartANewWebsite}” or "
-                 + $"“{AssistWording.RolloverSayToKeepTheSameWebsite}”.\n\n"
-                 + AssistWording.RolloverWebsiteNotDecided;
+            //
+            // Reached by a bare rollover AND by a `website` value that is
+            // neither "new" nor "same" - a caller sending "a new one", which is
+            // an ordinary thing for a model to do, gets the question back
+            // rather than an ordinary re-date with the website silently
+            // untouched. That is the same silent-drop failure the schema
+            // argument above is about, one layer up. Shared with the mac.
+            return AskingWhichWebsite();
         }
 
         var released = workspace.ReleaseSite(course, sectionNumber);
