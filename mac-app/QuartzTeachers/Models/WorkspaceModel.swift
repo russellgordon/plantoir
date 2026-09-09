@@ -165,6 +165,17 @@ class WorkspaceModel {
     /// The active working folder, or nil before one has been chosen.
     var workspaceURL: URL?
 
+    /// Bumped whenever a stopped scheduled publish is dismissed or cleared.
+    ///
+    /// The sidebar's warning badge is read from disk during a row's render,
+    /// the same way the clock beside it is asked of launchd. A read alone does
+    /// not make the row re-render, though, and Dismiss happens in the SECTION
+    /// view — a different view with its own state — so without this the badge
+    /// stayed after the notice had gone. `scheduleGeneration` next to it
+    /// exists for exactly the same reason; this one lives on the model rather
+    /// than in the sidebar because the thing that changes it is elsewhere.
+    var stoppedPublishGeneration: Int = 0
+
     /// True while this window is still waiting to learn which restored
     /// folder is its own — the brief moment between launch and the claim
     /// resolving. While true, the window shows a quiet holding view

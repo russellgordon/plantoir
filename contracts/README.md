@@ -43,7 +43,8 @@ the boundary is a TOP-LEVEL key — the file names them under `generated.keys`:
 In `app-rules.json` the same split applies: `milestones` is a readout of
 `TaskMilestones` and `credentialRequests` a readout of `CredentialRequest` —
 both overwritten; `deployArguments`, `configurationRules`, `previewPorts`,
-`markerOrigins` and `credentialPrompts` are authored and preserved. The pair
+`markerOrigins`, `launcherFlags` and `credentialPrompts` are authored and
+preserved. The pair
 `credentialRequests` / `credentialPrompts` shows the split at its clearest: the
 first is the WORDING, carried so the other app can show the same sentences
 rather than invent its own, and the second is the BEHAVIOUR — which launcher
@@ -198,6 +199,8 @@ recounted 2026-09-07.
 | Tool lists, approvals, plan twins | `assist-cases.json` → `tools` | AssistToolRunner |
 | Arrow-key history | `assist-cases.json` → `promptHistory` | AssistPromptHistory (15) |
 | Launcher arguments | `app-rules.json` → `deployArguments` | CloudflareDeploy (13) |
+| What a publish with nobody at the computer must REFUSE | `app-rules.json` → `launcherFlags.nonInteractive` | `scripts/test_deploy_non_interactive.py` (13); the flag itself is asserted by AppRulesContractTests via `deployExtras` |
+| What a teacher is told when a publish set to happen on its own did not get through | `shared-rules.json` → `scheduledPublishStopped` | ScheduledPublishOutcome (12), SharedRulesContract (2) |
 | Validation messages | `app-rules.json` → `configurationRules` | CourseConfiguration (10), CustomDomain (4) |
 | Progress milestones and marker origins | `app-rules.json` → `milestones`, `markerOrigins` | TaskMilestone (12) |
 | Failure explanations | `app-rules.json` → `failureExplanations` | FailureExplainer (8) |

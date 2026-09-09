@@ -282,6 +282,32 @@ Recreating the container is cheap because all state lives in the bind mount.
     temp file (`umask 077`) and reading it inside the `docker exec` shell
     into the `NETLIFY_AUTH_TOKEN` environment variable — it never appears in
     a process argument list on the host.
+- **`--non-interactive`** says nobody is at the computer, which is what a
+  scheduled publish is. Every question the launcher can ask — the course-code
+  correction, the Cloudflare Account ID, and both token prompts — becomes a
+  refusal that names the question and exits **3**, a code meaning "a question
+  went unanswered" and nothing else, so a caller can tell it from an ordinary
+  failure. The flag is FORWARDED to `deploy.py`, which does the same for the
+  questions it owns — including the one that matters most, what the website
+  should be called. `deploy.sh` looks for the flag TWICE: once in a pre-scan
+  before the course-code guard, which runs before the option loop, and once in
+  the loop itself. `deploy.ps1` needs no pre-scan, parsing its flags first.
+  A saved credential that fails its check is KEPT rather than cleared under
+  this flag: the check is a network call, so an offline machine and a revoked
+  token look identical from here, and discarding a working credential only a
+  person can replace is the more expensive mistake. Only the app's SCHEDULED
+  deploy passes it — pressing Deploy runs this same launcher through a
+  pseudo-terminal so a question can come back as a dialog. What it refuses is
+  listed in `contracts/app-rules.json` → `launcherFlags.nonInteractive`, and
+  the flag itself is registered in `launcherFlags.deployExtras`.
+
+  **`preview.sh` takes it too**, and needs to: a scheduled publish BUILDS
+  before it publishes, the mac's launchd agent runs `preview.sh --build-only`
+  directly, and `deploy.sh` forwards the flag to its own rebuild. `preview.sh`
+  has no `set -e`, so without the flag its own course-code guard reads at end
+  of input, takes the `[Y/n]` DEFAULT, and rebuilds a DIFFERENT course — which
+  is then published successfully against the wrong one. A refusal is the
+  better failure. Registered in `launcherFlags.preview`.
 - Finally runs `deploy.py` inside the container
   (see [Deployment](07-deployment.md)).
 
