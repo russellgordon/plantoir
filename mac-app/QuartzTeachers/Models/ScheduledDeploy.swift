@@ -121,6 +121,26 @@ enum ScheduledDeploy {
         )
     }
 
+    /// Take the fired agent out of launchd, now that its work is finished.
+    ///
+    /// Best effort on purpose: the plist is already gone by this point, so an
+    /// agent left registered cannot fire again — it is untidy rather than
+    /// dangerous, and a failure here must not take a publish's own exit code
+    /// with it.
+    nonisolated static func bootOutAgent(courseCode: String?, sectionNumber: Int?) {
+        guard let courseCode, let sectionNumber else {
+            return
+        }
+        let label: String = agentLabel(courseCode: courseCode, sectionNumber: sectionNumber)
+        let process: Process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["bootout", "gui/\(getuid())/\(label)"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()
+    }
+
     /// The script a `--run-scheduled-deploy` invocation should run, or nil
     /// when this is an ordinary launch.
     nonisolated static func requestedScript(from arguments: [String]) -> String? {
@@ -615,9 +635,24 @@ enum ScheduledDeploy {
             + shellQuoted(destinationTypes.joined(separator: " "))
             + " > \(shellQuoted(sentinelPath)); fi"
         )
-        // Cleanup runs either way: a failed build must still leave nothing
-        // pending, or the agent fires again at the same time tomorrow.
-        lines.append("/bin/launchctl bootout gui/$(/usr/bin/id -u)/\(shellQuoted(label))")
+        // NO `launchctl bootout` here, and that is a fix rather than an
+        // omission. It used to be this script's last line, and it killed the
+        // publish's own parent: the agent runs THIS APP, which runs this
+        // script and then does its post-run work — recording the publish,
+        // reading folder problems out of the log, and writing the trail line
+        // for a run that stopped. Booting the job out from inside the script
+        // ends the job, and the app IS the job, so none of that work ever ran.
+        //
+        // Measured 2026-09-09 with a real scheduled deploy: the wrapper wrote
+        // its stopped record at 05:38:09 and the trail got nothing. Running
+        // the identical app arguments against a script that does NOT boot out
+        // wrote the line immediately, and dated it 05:38:09 — the run's own
+        // time, not the moment of reading.
+        //
+        // So the app boots the job out itself, after its work is done. The
+        // property the old line was protecting is kept: the PLIST is still
+        // removed first, so a Mac that restarts mid-deploy comes back with
+        // nothing pending, whatever happens to the job afterwards.
         return lines.joined(separator: "\n")
     }
 
@@ -779,6 +814,10 @@ enum ScheduledDeploy {
                     section: section.sectionNumber
                 )
             }
+            // LAST, once the work above is done. See the note in
+            // oneShotCommand: this used to be the wrapper's final line, which
+            // killed this process before any of the three calls above ran.
+            bootOutAgent(courseCode: section?.courseCode, sectionNumber: section?.sectionNumber)
             exit(process.terminationStatus)
         } catch {
             FileHandle.standardError.write(Data(

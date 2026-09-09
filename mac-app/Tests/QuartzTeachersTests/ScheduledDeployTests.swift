@@ -328,12 +328,24 @@ final class ScheduledDeployTests: XCTestCase {
 
         let removalIndex: String.Index = try XCTUnwrap(command.range(of: "/bin/rm -f '\(plistPath)'")?.lowerBound)
         let deployIndex: String.Index = try XCTUnwrap(command.range(of: "deploy.sh'")?.lowerBound)
-        let bootoutIndex: String.Index = try XCTUnwrap(command.range(of: "bootout gui/")?.lowerBound)
 
         XCTAssertTrue(removalIndex < deployIndex,
                       "The plist goes first, so a Mac restarting mid-deploy comes back with nothing pending")
-        XCTAssertTrue(deployIndex < bootoutIndex,
-                      "The agent boots itself out only once the deploy has finished")
+
+        // The SCRIPT must not boot the job out, and this is a fix rather than
+        // a relaxed assertion. The agent runs the APP, which runs this script
+        // and then records the publish, reads folder problems out of the log,
+        // and writes the trail line for a run that stopped. Booting out from
+        // inside the script ends the job — and the app IS the job — so none
+        // of that ever ran. Measured with a real scheduled deploy on
+        // 2026-09-09: the wrapper wrote its stopped record and the trail got
+        // nothing. The app boots the agent out itself now, once its work is
+        // done, in ScheduledDeploy.bootOutAgent.
+        XCTAssertFalse(
+            command.contains("bootout"),
+            "The generated script must not boot the job out: it would kill the app that is "
+            + "running it, before the app can record what happened."
+        )
         XCTAssertTrue(command.contains(label))
     }
 
@@ -625,15 +637,19 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertTrue(command.contains("READY=0"), "A failed build has to stop the deploy")
         XCTAssertTrue(command.contains("if [ \"$READY\" = \"1\" ]; then"))
 
-        // Cleanup sits outside the if: a failed build must still leave
-        // nothing pending, or the agent fires again at the same time
-        // tomorrow with nobody expecting it.
-        guard let bootoutAt = command.range(of: "bootout"),
-              let lastCloseAt = command.range(of: "fi", options: .backwards) else {
-            return XCTFail("The agent must boot itself out when it is done")
-        }
-        XCTAssertTrue(lastCloseAt.lowerBound < bootoutAt.lowerBound,
-                      "Cleanup runs whether or not the build worked")
+        // Nothing pending after a failed build either — but the plist is what
+        // guarantees that, and it is removed at the TOP, before anything runs.
+        // The job's own removal from launchd moved into the app (bootOutAgent)
+        // when a real scheduled run showed that booting out from the script
+        // killed the app before it could record anything.
+        XCTAssertFalse(command.contains("bootout"))
+        let plistRemoval: String = "/bin/rm -f '"
+            + ScheduledDeploy.plistURL(courseCode: "ICS3U", sectionNumber: 1).path + "'"
+        XCTAssertTrue(
+            command.contains(plistRemoval),
+            "A failed build must still leave nothing pending, or the agent fires again "
+            + "tomorrow with nobody expecting it."
+        )
 
         // A working folder with a space in its name is ordinary on a Mac —
         // "Class Websites" is what the documentation itself suggests.
