@@ -96,6 +96,29 @@ The website (`website/pages/index.html`) references evergreen download URLs:
 
 GitHub automatically resolves `releases/latest/download/<filename>` to the newest published release carrying that asset name.
 
+**The names are frozen, and renaming one breaks the site's download button
+silently** — the evergreen URL keeps resolving, to nothing. `Plantoir-macOS.dmg`
+and `PlantoirSetup.exe` are what the cards ask for; `Plantoir-win-x64.zip` is
+also published, as a portable alternative nothing links to by that URL.
+
+### Auto-update, when it arrives, needs both appcasts planned together
+
+Neither app updates itself today. Windows is expected to adopt **WinSparkle**,
+paired with the Inno Setup installer it already ships; the mac would adopt
+**Sparkle**. Decided 2026-08-12, before either was built, because the decision
+is cheap now and expensive later:
+
+- **Both appcasts live on plantoir.app**, in this repository's `website/`.
+- **Use per-platform file names from the very first one** —
+  `appcast-windows.xml` and `appcast-macos.xml`, never a single `appcast.xml`.
+  One shared feed would have each platform reading the other's releases, and
+  splitting it afterwards means every already-installed copy is pointed at a
+  URL that has stopped describing it.
+- **Add the appcast edit to the checklist in
+  [`RELEASING.md`](../RELEASING.md) when the first one lands.** A release that
+  publishes binaries without updating the feed ships an update nobody is
+  offered.
+
 ---
 
 ## 5. End-to-End Release Execution Workflow

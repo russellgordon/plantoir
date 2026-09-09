@@ -53,12 +53,12 @@ enum TaskMilestones {
         // "Launching Quartz preview" — build_site.py's own print — fires BEFORE
         // `quartz build --serve` even starts, so it used to complete every
         // milestone at once and pin the bar on this step for the whole real
-        // build (TODO.md item 1, found 2026-08-19). "Done processing" is
-        // patches/build.ts's own line, printed once the fresh site is actually
-        // written to disk — verified against a real `preview.ps1 --build-only`
-        // transcript on Windows 2026-08-23 ("Quartz v4.5.0" then "Done
-        // processing N files in Ns"). **This edit was authored on Windows and
-        // has NOT been built or tested on a mac — see MAC-HANDOFF.md.**
+        // build (found 2026-08-19). "Done processing" is patches/build.ts's own
+        // line, printed once the fresh site is actually written to disk —
+        // verified against a real `preview.ps1 --build-only` transcript on
+        // Windows 2026-08-23 ("Quartz v4.5.0" then "Done processing N files in
+        // Ns"). Authored on Windows; built, tested and regenerated into
+        // app-rules.json on the mac 2026-09-01 (13da5319).
         TaskMilestone(label: "Opening the preview…", marker: "Done processing"),
     ]
 

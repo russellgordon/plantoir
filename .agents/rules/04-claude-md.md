@@ -9,6 +9,17 @@ description: "Plantoir project rules, part 4 of 9 - Rules that override default 
 
 ## Rules that override default behaviour (continued)
 
+    ```bash
+    cd mac-app
+    xcodegen generate     # if files were added or removed, or project.yml changed
+    xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug build
+    ```
+
+    Then say plainly that it is ready. The cost of forgetting is not a wasted
+    rebuild: he launches from the Dock, tests the OLD binary, and reports
+    behaviour that was fixed an hour ago — which then gets investigated as a new
+    fault. A report of "done" that leaves a stale binary behind is not done.
+
     Three things make this go wrong quietly, all of them met in practice:
 
     - **`xcodebuild test` is not a build you can leave behind.** It rebuilds the

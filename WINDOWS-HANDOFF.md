@@ -52,12 +52,14 @@ a milestone says which release it is pinned to.
 (`CLAUDE.md` rule 3). A macOS session that creates work for Windows opens an
 issue labelled `windows`, in the same session, saying what the change is, what
 Windows inherits free, what they owe, and where the section explaining it is.
-The numbered list is gone rather than archived: every item on it was either
-struck through as done — and the shipped record of that is
-`GUI-IMPROVEMENTS.md` and
-[`WINDOWS-HANDOFF-COMPLETED.md`](WINDOWS-HANDOFF-COMPLETED.md) — or still open,
-in which case it is now issues #66 and #68–#70, plus #99 (which absorbed the
-old item 42).
+The numbered list is gone rather than archived. The five items still OPEN are
+now issues #66 and #68–#70, plus #99 (which absorbed the old item 42). The
+other forty-one were struck through as done, and **their write-ups went with
+the list** — nothing was copied into `WINDOWS-HANDOFF-COMPLETED.md`, which
+holds an earlier prune and was not touched. What survives of a struck item is
+whatever `GUI-IMPROVEMENTS.md` recorded on the day it shipped, plus the code
+and its tests; for most that is enough, and for the handful where it is not,
+`git log -- WINDOWS-HANDOFF.md` still has the prose.
 
 Everything below this point is reference material: it was never a task list,
 and it is what this file is for now.
@@ -1107,8 +1109,8 @@ it.
 ### The two MCP surfaces are not the same product
 
 Written 2026-09-06 after a mac audit asked whether the parity list was
-COMPLETE rather than whether it was correct. The numbered item is 41; this is
-the manual for it.
+COMPLETE rather than whether it was correct. The issue is #66; this is the
+manual for it.
 
 **The measurement.** `Plantoir.Mcp/PlantoirTools.cs` declares **37** distinct
 `[McpServerTool(Name = "…")]` names. `AssistToolSurface.swift` served **25**
@@ -1174,8 +1176,8 @@ platform, and cross the gap with the RESULT.**
 why" half of it is an unapproved product decision, and committing it would
 make that decision into the acceptance list both suites run. Windows' test
 carries the twelve names with no verdict attached, which is exactly the right
-amount to pin before Russell has chosen. The sorting is in `MAC-HANDOFF.md`
-under "Windows' MCP server has drifted a dozen tools ahead of the mac's".
+amount to pin before Russell has chosen. The sorting is in
+[issue #108](https://github.com/russellgordon/plantoir/issues/108).
 
 **What the sorting concluded, in one paragraph**, so this file is readable on
 its own: six of the twelve are product the mac should have — `list_courses`
@@ -4707,4 +4709,4 @@ Named here so it is not rediscovered as a puzzle, and NOT fixed by this piece:
   owned by its own piece of work.~~ — ✅ Done 2026-09-07, branch
   `issue/repair-results-keyed-by-name`. It returns `[Attempt]` now, one entry
   per finding, and the rule is contract data both suites can run
-  (`siteHealth.repair.reportedOncePerFinding`). See item 34 above.
+  (`siteHealth.repair.reportedOncePerFinding`).

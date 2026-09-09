@@ -115,9 +115,12 @@ event, rather than passing quietly.
 
 Two things make that failure read as a request instead of as damage:
 
-- **Name the case so it is obviously a proposal** and say in
-  [`MAC-HANDOFF.md`](../MAC-HANDOFF.md) that it is waiting — the ledger is
-  where the mac side looks for work that arrived from Windows.
+- **Name the case so it is obviously a proposal, and open a GitHub issue
+  labelled `mac`** saying which case you added and what the mac has to
+  implement to make it pass. That issue is where the mac side looks for work
+  that arrived from Windows, and it is what turns a red suite over there into a
+  request. (Until 2026-09-08 this said to write it into `MAC-HANDOFF.md` under
+  "Contract cases waiting on the mac"; that section no longer exists.)
 - **Do not touch the generated keys** (`cardPhrasings`, `tools`, `milestones`).
   Those are readouts of mac code; an edit there is overwritten on the next
   regeneration and the diff looks like vandalism.
@@ -219,15 +222,14 @@ recounted 2026-09-07.
 | Grade labels from a course code | `course-management.json` → `gradeLabels` | SectionAdder |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
 | Which folders count for marks | `shared-rules.json` → `gradedFolders` | `scripts/test_graded_folders.py` in the image; the mac reads the key but runs no case list yet |
-| Which folders the marks checklist OFFERS | `shared-rules.json` → `gradedFolders.choices` | Proposed from Windows 2026-09-06 and run there by `GradedFolderChoicesTests` (10 cases). **The mac has the behaviour and runs no case list**, so its suite does not go red for this one — see `MAC-HANDOFF.md`. |
+| Which folders the marks checklist OFFERS | `shared-rules.json` → `gradedFolders.choices` | Proposed from Windows 2026-09-06 and run there by `GradedFolderChoicesTests` (10 cases). **The mac has the behaviour and runs no case list**, so its suite does not go red for this one — [issue #112](https://github.com/russellgordon/plantoir/issues/112). |
 | What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (8), SiteHealthFinding (15), SiteHealthRepair (25), and `scripts/test_site_health.py` |
 
 ### Which of these the WINDOWS suite runs
 
 The table above says what the MAC draws on, and for a long time nothing said
 the same about Windows. That turned out to matter: an audit on 2026-09-06
-(WINDOWS-HANDOFF item 29) found **23 case lists the mac ran and the Windows
-gate did not read at all** — none of them unreachable, each simply a test
+found **23 case lists the mac ran and the Windows gate did not read at all** — none of them unreachable, each simply a test
 nobody had written. Wiring them found a divergence in how the two apps write
 teachers' frontmatter, four tool arguments that differ by design and were
 recorded only in a Swift comment, two shared markers classified by nobody, and
@@ -235,8 +237,8 @@ a launcher flag listed as shared that only one platform has.
 
 So the state is worth writing down rather than re-derived. Windows now runs
 every list that audit counted, plus three it missed (`linkRules.browserSafe`,
-`example-content.sentinels` and `linkRewriting`, the last wired on 2026-09-07
-as WINDOWS-HANDOFF item 31), through these classes in
+`example-content.sentinels` and `linkRewriting`, the last wired on 2026-09-07),
+through these classes in
 `windows-app/Plantoir.Tests/`:
 
 | What it runs | Class |
@@ -257,13 +259,12 @@ as WINDOWS-HANDOFF item 31), through these classes in
 two this note is about are the first and the `linkRewriting` one — because they
 are not part of the audit's
 count and reading them as though they were would mislead. The `specialNames`
-lists in the first were already being run — those test classes predate item 29
-— and were simply never written down here. `linkRewriting` is newer than the audit — it was added to
+lists in the first were already being run — those test classes predate that
+audit — and were simply never written down here. `linkRewriting` is newer than the audit — it was added to
 `shared-rules.json` on 2026-09-06, the same day, and fell outside the sweep; the
 row is here so it is not missed a second time. `FolderPathRewriterTests` has
-deserialised every case since 2026-09-07 (item 31 in
-[`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md), struck that day); before that it
-retyped five of its own.
+deserialised every case since 2026-09-07; before that it retyped five of its
+own.
 
 **One list was added after that audit and wired the same day it reached
 Windows.** `siteHealth.repair.reportedOncePerFinding` (mac, 2026-09-07) says a
@@ -271,7 +272,10 @@ repair reports one result per FINDING rather than one per check name, and
 names each thing once in the sentence however many findings produced it.
 Windows shipped that shape first and proved it with a hand-written test; on
 2026-09-07 the test was replaced by the contract's cases, so the rule has one
-home. `WINDOWS-HANDOFF.md` items 33 and 34 have the detail.
+home. `WINDOWS-HANDOFF.md` → "A folder named `index.md`, and why both apps
+refuse rather than clear the way" has the detail for the refusal; for the
+repair's own shape, the contract key and
+`windows-app/Plantoir.Tests` are now the record.
 
 **Three habits came out of that work and are worth copying on either side.**
 

@@ -50,6 +50,12 @@ Neither app contains toolchain logic of its own: they write the same
      coverage table says what the contract deliberately cannot carry; if your
      change is on that list, an issue is where it goes.
 
+     **An issue is an OBLIGATION**, so this fork is for things the other side
+     must DO. Something they only need to KNOW — a shared decision, a frozen
+     name, a trap — is not a third case slipping between the two: it goes in
+     the handoff's awareness section (rules 3 and 4), and an issue nobody can
+     close is the thing that arrangement avoids.
+
    The failure this prevents is the quiet one: a behaviour that exists in one
    app, is described nowhere the other app's tests can reach, and is discovered
    months later as a difference nobody chose. **It binds both ways** — see
@@ -113,6 +119,14 @@ Neither app contains toolchain logic of its own: they write the same
      must DO is an issue, opened in the same session. A change that creates an
      obligation for the other platform and opens no issue has, from their side,
      not been handed over at all.
+   - **The record of what LANDED is the closing comment on the issue**, not a
+     new entry in `MAC-HANDOFF.md`. That file's "Done — the ledger" is now
+     append-only history like `TODO.md`: it holds the reasoning behind work
+     finished while it was the ledger, and nothing new is written into it.
+     Said explicitly because the rule this replaced ended "entries are marked
+     `✅ DONE` in place rather than deleted", and dropping that sentence
+     without saying what took its place would have left the ledger being fed
+     by nothing while two other places still called it live.
    - **`GUI-IMPROVEMENTS.md` gets a row for anything a teacher can see**, so
      the log stays the record of the product rather than of one platform.
    - **anything measured is written with its NUMBERS and the hardware they
