@@ -142,7 +142,8 @@ public class AssistSurfaceContractTests
     /// deleted from here.</para>
     /// </summary>
     private static void AssertOnlyTheDeparturesWeHaveAgreed(
-        List<string> differing, List<string> onlyHere, IEnumerable<string> onThisSurface)
+        List<string> differing, List<string> onlyHere,
+        IReadOnlyDictionary<string, string> typesHere, IEnumerable<string> onThisSurface)
     {
         var tools = onThisSurface.ToHashSet(StringComparer.Ordinal);
 
@@ -220,15 +221,65 @@ public class AssistSurfaceContractTests
             "the contract now describes them: " + string.Join("; ", goneExtras) + ". Delete them " +
             "from the list.");
 
-        // Scoped to the surface being checked: the plan_ twins are MCP-only, so
-        // on the local surface they are not departures, they are simply absent.
-        var agreed = new[]
+        // READ from the contract now, rather than restated here. Asked for in
+        // issue #83, emitted by the mac on 2026-09-08, and consumed here for
+        // issue #122.
+        //
+        // toolSchemas.departures.listShapedStringParameters names every
+        // parameter that is a STRING carrying a list on that surface, with the
+        // separator it advertises. It deliberately says nothing about what this
+        // side does — the mac cannot check that — so the two are INTERSECTED,
+        // and there are FOUR outcomes rather than three:
+        //
+        //   1. an ARRAY here          -> a genuine type departure, expected
+        //   2. a string, different    -> a separator difference, asserted below
+        //      separator                 against its own list
+        //   3. a string, SAME         -> an agreement; assert NOTHING
+        //      separator
+        //   4. anything else          -> a real disagreement, and it fails
+        //
+        // Case 3 is the one the first version of #83 left out, and leaving it
+        // out turns this suite red for two apps AGREEING: `codes` is in it
+        // today. Cases 2 and 3 also produce no entry in `differing` at all —
+        // both sides say "string" — so neither may go in the list below, or
+        // `resolved` fails saying the departure has been resolved.
+        var departures = ContractLoader.LoadJson("assist-cases.json")
+            ["toolSchemas"]!["departures"]!["listShapedStringParameters"]!.AsArray();
+
+        var agreed = new List<string>();
+        var separatorDifferences = new List<string>();
+        foreach (var entry in departures)
         {
-            "publish_pages.pages (contract string, here array)",
-            "plan_publish_pages.pages (contract string, here array)",
-            "unpublish_pages.pages (contract string, here array)",
-            "plan_unpublish_pages.pages (contract string, here array)",
-        }.Where(d => tools.Contains(d[..d.IndexOf('.')])).ToList();
+            string parameter = entry!["parameter"]!.ToString();
+            string tool = parameter[..parameter.IndexOf('.')];
+            // Scoped to the surface being checked: the plan_ twins are MCP-only,
+            // so on the local surface they are not departures, they are simply
+            // absent.
+            if (!tools.Contains(tool)) continue;
+            if (!typesHere.TryGetValue(parameter, out string? here)) continue;
+
+            if (here == "array")
+            {
+                agreed.Add($"{parameter} (contract string, here array)");
+                continue;
+            }
+
+            Assert.True(here == "string",
+                $"The contract calls \"{parameter}\" a string carrying a list, and this server " +
+                $"declares it \"{here}\", which is neither that nor an array. That is a real " +
+                "disagreement rather than one of the two departures anybody has agreed.");
+
+            Assert.True(SeparatorHere.TryGetValue(parameter, out string? mine),
+                $"\"{parameter}\" is a list-shaped string on both surfaces and this suite does not " +
+                "know which character this server advertises for it. Add it to SeparatorHere — it " +
+                "cannot be read off the schema, because the separator lives in the runner's " +
+                "Split(...) and in the [Description] prose.");
+
+            if (mine != entry["separator"]!.ToString())
+                separatorDifferences.Add($"{parameter} (there {entry["separator"]}, here {mine})");
+        }
+
+        AssertOnlyTheSeparatorDifferencesWeHaveAgreed(separatorDifferences, tools);
 
         var unexpected = differing.Except(agreed).OrderBy(d => d, StringComparer.Ordinal).ToList();
         Assert.True(unexpected.Count == 0,
@@ -242,6 +293,99 @@ public class AssistSurfaceContractTests
             "These are recorded as deliberate departures and the two apps now agree about them: " +
             string.Join("; ", resolved) + ". Delete them from this list, so it keeps meaning " +
             "\"everything that differs\" rather than \"everything that once did\".");
+    }
+
+    /// <summary>
+    /// Which character this server ADVERTISES for each list-shaped string
+    /// parameter, since the schema does not say.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Hand-kept, and it is the half of #122 that could not be
+    /// removed.</b> The mac emits its separators because
+    /// <c>separatedList(separator:)</c> knows them; here the separator lives in
+    /// <c>AssistToolRunner</c>'s <c>Split(...)</c> and in the parameter's
+    /// <c>[Description]</c> prose, neither of which is reachable from a JSON
+    /// schema. So consuming the contract removed the SHARED copy — the list of
+    /// which parameters are list-shaped, and what the other side advertises —
+    /// and not this one.</para>
+    ///
+    /// <para><b>What is advertised, not what is accepted.</b>
+    /// <c>AssistToolRunner</c> is deliberately forgiving and splits on several
+    /// characters — so a comma-separated date list from this side is parsed
+    /// correctly by the mac today. A difference here is a difference in what
+    /// each side tells the MODEL, which is worth knowing; it is not an
+    /// incompatibility and nothing should assert one from it.</para>
+    ///
+    /// <para><b>Honest limit: only the LOCAL surface reaches this code today.</b>
+    /// All five entries below belong to MCP-only tools, and
+    /// <c>EveryToolTheContractsMcpSurfaceNamesIsServedTheSameWayHere</c> has
+    /// been failing on <c>dev</c> since before this was written — so it stops
+    /// at an earlier assertion and never gets here. Verified rather than
+    /// assumed, by clearing the blockers in a scratch copy and re-running:
+    /// there are at least THREE stacked divergences on that surface, each
+    /// hidden behind the one before it — <c>back_up_course</c> requiring
+    /// <c>section</c> there and not here, the same tool's <c>section</c>
+    /// property, and <c>add_classes.firstDay</c> / <c>plan_add_classes.firstDay</c>
+    /// being undeclared in the contract. They belong to GitHub issue #114 and
+    /// are none of #122's business, but the consequence is: this list is
+    /// COMPILED and not yet EXERCISED, and it starts being exercised the day
+    /// that test goes green.</para>
+    /// </remarks>
+    private static readonly Dictionary<string, string> SeparatorHere = new(StringComparer.Ordinal)
+    {
+        // "separated by commas", and Split(',') in the runner.
+        ["remember_timetable.dates"] = ",",
+        ["plan_remember_timetable.dates"] = ",",
+        ["plan_scheduled_deploy.classes"] = ",",
+        ["add_curriculum_mentions.codes"] = ",",
+        ["plan_curriculum_mentions.codes"] = ",",
+    };
+
+    /// <summary>
+    /// The parameters both surfaces carry as strings and describe with
+    /// DIFFERENT separators, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// <para>An exact set in both directions, like the type departures: a new
+    /// separator difference is a routing difference nobody chose, and a
+    /// resolved one left listed makes this a record of what once differed.</para>
+    ///
+    /// <para><b>Why the two that differ, differ.</b> The mac advertises
+    /// semicolons for anything that can carry a page or class TITLE, because
+    /// "Unit 2, Day 3" is the name nearly every class page in these courses
+    /// has and a comma-separated list would cut it in half. That reasoning
+    /// applies to <c>plan_scheduled_deploy.classes</c> here too and this side
+    /// says commas — worth revisiting, and NOT a fix to make silently, since
+    /// changing what a schema advertises is a routing change and the routing
+    /// suites are hand-run. <c>dates</c> are YYYY-MM-DD and can hold no comma,
+    /// so that one is cosmetic.</para>
+    /// </remarks>
+    private static void AssertOnlyTheSeparatorDifferencesWeHaveAgreed(
+        List<string> found, HashSet<string> onThisSurface)
+    {
+        // Scoped to the surface, exactly as the type departures are. All
+        // three of these are MCP-only tools, so on the LOCAL surface they
+        // produce no entries at all — and an unscoped list would then fail
+        // saying three differences had been resolved, which is the same
+        // mistake in the same shape as the third outcome #83 first left out.
+        var agreed = new[]
+        {
+            "remember_timetable.dates (there ;, here ,)",
+            "plan_remember_timetable.dates (there ;, here ,)",
+            "plan_scheduled_deploy.classes (there ;, here ,)",
+        }.Where(d => onThisSurface.Contains(d[..d.IndexOf('.')])).ToArray();
+
+        var unexpected = found.Except(agreed).OrderBy(d => d, StringComparer.Ordinal).ToList();
+        Assert.True(unexpected.Count == 0,
+            "The two surfaces now advertise different separators for arguments nobody has agreed " +
+            "to differ on: " + string.Join("; ", unexpected) + ". The model is told one thing here " +
+            "and another there. Either make them agree, or record it above with the reason.");
+
+        var resolved = agreed.Except(found).OrderBy(d => d, StringComparer.Ordinal).ToList();
+        Assert.True(resolved.Count == 0,
+            "These are recorded as separator differences and the two surfaces now advertise the " +
+            "same character: " + string.Join("; ", resolved) + ". Delete them, so this keeps " +
+            "meaning \"everything that differs\" rather than \"everything that once did\".");
     }
 
     // ---- What each client is shown ---------------------------------------
@@ -285,6 +429,11 @@ public class AssistSurfaceContractTests
 
         var differing = new List<string>();
         var onlyHere = new List<string>();
+        // What this server really declares each contract-known argument to be,
+        // keyed "tool.parameter". The departures check needs the TYPE, not just
+        // whether it differed: an entry the contract calls a list-shaped STRING
+        // is a type departure here only if this side declares an array.
+        var typesHere = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var tool in tools)
         {
@@ -312,6 +461,7 @@ public class AssistSurfaceContractTests
             {
                 Assert.True(types.TryGetValue(parameter, out string? actual),
                     $"\"{name}\" is documented as taking \"{parameter}\" and does not.");
+                typesHere[$"{name}.{parameter}"] = actual!;
                 if (type != actual) differing.Add($"{name}.{parameter} (contract {type}, here {actual})");
             }
 
@@ -324,7 +474,7 @@ public class AssistSurfaceContractTests
                 if (!expectedTypes.ContainsKey(parameter)) onlyHere.Add($"{name}.{parameter}");
         }
 
-        AssertOnlyTheDeparturesWeHaveAgreed(differing, onlyHere,
+        AssertOnlyTheDeparturesWeHaveAgreed(differing, onlyHere, typesHere,
             tools.Select(t => t!["function"]!["name"]!.ToString()));
     }
 
@@ -332,8 +482,10 @@ public class AssistSurfaceContractTests
     /// The contract's MCP surface is a SUBSET of what this app serves, not an
     /// equality — and the difference is a known one, not drift.
     ///
-    /// <para>The contract carries the mac's 25; <c>plantoir-mcp.exe</c> serves
-    /// 37. So the same question asked of Claude Code gets a different toolbox
+    /// <para>The contract carries the mac's 32 — counted, not remembered; this
+    /// said 25 until 2026-09-09, which was the number before the rollover
+    /// tools landed — and <c>plantoir-mcp.exe</c> serves 37. So the same
+    /// question asked of Claude Code gets a different toolbox
     /// depending on the machine, which is written up in documentation/10-local-ai-assistant.md and is
     /// the mac's to decide. What must hold either way is that every tool the
     /// contract DOES describe behaves the same here.</para>
@@ -352,6 +504,11 @@ public class AssistSurfaceContractTests
 
         var differing = new List<string>();
         var onlyHere = new List<string>();
+        // What this server really declares each contract-known argument to be,
+        // keyed "tool.parameter". The departures check needs the TYPE, not just
+        // whether it differed: an entry the contract calls a list-shaped STRING
+        // is a type departure here only if this side declares an array.
+        var typesHere = new Dictionary<string, string>(StringComparer.Ordinal);
         var missing = new List<string>();
         foreach (var tool in tools)
         {
@@ -376,6 +533,7 @@ public class AssistSurfaceContractTests
             {
                 Assert.True(types.TryGetValue(parameter, out string? actual),
                     $"\"{name}\" is documented as taking \"{parameter}\" and does not.");
+                typesHere[$"{name}.{parameter}"] = actual!;
                 if (type != actual) differing.Add($"{name}.{parameter} (contract {type}, here {actual})");
             }
 
@@ -393,7 +551,7 @@ public class AssistSurfaceContractTests
             string.Join(", ", missing) + ". A client told about a tool that is not there gets a " +
             "failure it cannot explain to the teacher.");
 
-        AssertOnlyTheDeparturesWeHaveAgreed(differing, onlyHere,
+        AssertOnlyTheDeparturesWeHaveAgreed(differing, onlyHere, typesHere,
             tools.Select(t => t!["function"]!["name"]!.ToString()));
     }
 

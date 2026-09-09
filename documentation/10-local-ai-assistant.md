@@ -1647,7 +1647,7 @@ rule with two homes, and this repository already knows how that ends.
 
 **The design decision worth keeping, because it was nearly made the other
 way.** The first plan had each entry say `{"here": "string", "windows":
-"array"}`. That would have shipped **three false statements**: of the seven,
+"array"}`. That would have shipped **three false statements**: of the nine,
 `remember_timetable.dates`, `plan_remember_timetable.dates` and
 `plan_scheduled_deploy.classes` are strings on BOTH platforms and merely split
 on different characters — semicolons here, commas there. Windows asserts its
@@ -1658,6 +1658,37 @@ So the mac emits only what the mac can PROVE — the shape on its own surface �
 and leaves the intersection to the suite that can see both. That also caught
 the semicolon-versus-comma difference on `dates`, which was real, unrecorded,
 and invisible to a type-only comparison.
+
+**Windows consumes it now (2026-09-09, issue #122), and the intersection has
+FOUR outcomes rather than three.** `AssistSurfaceContractTests` used to keep a
+hand-written four-entry array of the type departures; it reads
+`listShapedStringParameters` and intersects it with its own declared types
+instead. For each entry naming a tool that surface serves: an **array** there
+is a genuine type departure; a **string with a different separator** is a
+separator difference, asserted against its own exact set; a **string with the
+SAME separator is an agreement and nothing is asserted about it**; anything
+else fails. That third branch is the one the first plan omitted, and omitting
+it turns that suite red for two apps AGREEING — both `codes` parameters are in
+it today.
+
+**Two things about that are worth knowing here rather than being rediscovered.**
+Windows' `differing` list is built TYPE-only, so a separator difference
+produces no entry in it at all — which is why the separator cases needed their
+own assertion rather than a branch of the type one, and why putting one in the
+type list fails with "recorded as departures and the two apps now agree". And
+the separator table stays HAND-KEPT on that side: this surface can emit its
+separators because `separatedList(separator:)` knows them, where Windows keeps
+them in the runner's `Split(...)` and in `[Description]` prose, neither
+reachable from a schema. Consuming this key removed the SHARED copy, not that
+one.
+
+**And one difference that side flagged back, which is a decision rather than a
+defect.** `plan_scheduled_deploy.classes` advertises semicolons here and commas
+there. The reasoning for semicolons — that "Unit 2, Day 3" is what a class page
+is called, so a comma-separated list cuts it in half — applies to that surface
+identically. It has not been changed, because what a schema advertises is a
+routing change and the routing suites are hand-run. `dates` differs the same
+way and is cosmetic: a YYYY-MM-DD date holds no comma.
 
 **Not a routing change.** `separatedList` renders `"type": "string"`, so the
 emitted schemas are byte-identical: verified by diffing `toolSchemas.local`
