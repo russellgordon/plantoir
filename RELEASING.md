@@ -171,7 +171,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > ran here before. They need no Docker, so they cover the shared Python and
    > say nothing about the image. It DISCOVERS them rather than listing them,
    > so no number is kept in step by hand; this said "all fifteen" when there
-   > were fifteen, on 2026-09-07, and there are seventeen as of 2026-09-09.)
+   > were fifteen, on 2026-09-07, and there are eighteen as of 2026-09-09.)
 
    **If the release changes anything under `scripts/`, the Dockerfile or a
    launcher, run the publishing verifier rather than smoking it by hand** —

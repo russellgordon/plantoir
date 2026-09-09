@@ -13,10 +13,13 @@ set -euo pipefail
 # What it does, in order:
 #   0. Runs the shared scripts' pure-Python unit tests (no Docker needed) so a
 #      broken script fails in milliseconds rather than after a full image
-#      build. Step 0 also RUNS deploy.sh — hollowed out with --image and a
-#      Keychain user that does not exist, so it needs no container, no network
-#      and no credentials — because a launcher that is only ever read is a
-#      launcher nobody has started (GitHub issue #129).
+#      build. Step 0 also RUNS deploy.sh AND preview.sh — hollowed out with
+#      --image and a Keychain user that does not exist, so they need no
+#      container, no network and no credentials — because a launcher that is
+#      only ever read is a launcher nobody has started (GitHub issues #129 and
+#      #124). Note that these tests are a written LIST here, not a discovery:
+#      a new scripts/test_*.py must be added below or it runs on Windows (whose
+#      PythonToolchainTests does discover them) and nowhere on the mac.
 #   1. Ensures the container runtime is up (shares an already-running Colima;
 #      never stops it — safe to run alongside other Colima-based toolchains).
 #   2. docker build -t quartz-teacher:dev-test .
@@ -89,6 +92,13 @@ fi
 # Fast, dependency-free checks that don't need the image — run first so a
 # broken script.py change fails in milliseconds instead of after a full
 # Docker build.
+# No .pyc files. `scripts/` is a folder reference in the app's project, so
+# anything left in it is copied into the bundle, mirrored into every working
+# folder's `.toolchain/`, and hashed into the image tag — which means a test run
+# here would hand teachers a rebuild for bytecode. Windows' PythonToolchainTests
+# sets the same variable.
+export PYTHONDONTWRITEBYTECODE=1
+
 if (cd scripts && python3 test_site_health.py) >/tmp/verify_site_health_test.log 2>&1; then
   pass "site_health.py: the checks, and the words they say (scripts/test_site_health.py)"
 else
@@ -156,6 +166,17 @@ else
   cat /tmp/verify_deploy_sh_questions_test.log
 fi
 
+# The same for preview.sh, which took --non-interactive on 2026-09-09 (GitHub
+# issue #124) because a scheduled publish BUILDS before it publishes. Its own
+# file rather than a class in the one above: this drives a different launcher,
+# and the twin's completeness test only ever asks about deploy.sh's questions.
+if (cd scripts && python3 test_preview_sh_questions.py) >/tmp/verify_preview_sh_questions_test.log 2>&1; then
+  pass "preview.sh: the one question it can ask refuses under the flag, and is still asked without it (scripts/test_preview_sh_questions.py)"
+else
+  fail "preview.sh: the one question it can ask refuses under the flag, and is still asked without it (scripts/test_preview_sh_questions.py)"
+  cat /tmp/verify_preview_sh_questions_test.log
+fi
+
 if (cd scripts && python3 test_preflight_exclusions.py) >/tmp/verify_preflight_exclusions_test.log 2>&1; then
   pass "build_site.py: preflight excluded_items discovery skipping & index.md notes (scripts/test_preflight_exclusions.py)"
 else
@@ -217,6 +238,28 @@ if [ "$_folder_guard_ok" = true ]; then
   pass "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
 else
   fail "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
+fi
+
+# Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
+# the runs in THIS script, but `scripts/` is a folder reference in the app's
+# project — whatever sits in it is copied into the bundle, mirrored into every
+# working folder's `.toolchain/`, and hashed into the image tag. A `.pyc` there
+# hands teachers a rebuild for nothing, and `.gitignore` hides it from `git
+# status`, so a hand-run test that littered would never be noticed. Ten of them
+# were found in a working folder's `.toolchain/` on 2026-09-09, mirrored from a
+# bundle that had been carrying them for some time. The app's own
+# `copyToolchainFiles` removes extraneous files, so a clean bundle heals a
+# folder on the next touch; this keeps the bundle clean.
+if [ -z "$(find scripts -name '__pycache__' -print -quit 2>/dev/null)" ]; then
+  pass "no bytecode left in scripts/, which ships inside the app"
+else
+  fail "scripts/__pycache__ exists — it would be copied into the app bundle, mirrored into every working folder's .toolchain/, and change the image tag"
+  find scripts -name '__pycache__' -print
+  echo "   Remove it and run again:  rm -rf scripts/__pycache__"
+  echo "   It gets there from running a test file BY HAND — this script exports"
+  echo "   PYTHONDONTWRITEBYTECODE, a bare 'python3 scripts/test_x.py' does not,"
+  echo "   and importing the module under test is what writes the .pyc."
+
 fi
 
 # -------------------- 1. Container runtime (shared Colima) --------------------
