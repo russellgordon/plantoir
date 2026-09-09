@@ -1225,6 +1225,7 @@ final class SharedRulesContractTests: XCTestCase {
         let cases: [(ScheduledPublishOutcome.Kind, String)] = [
             (.neededAnAnswer, "neededAnAnswer"),
             (.didNotFinish, "didNotFinish"),
+            (.succeeded, "succeeded"),
         ]
         for (kind, key) in cases {
             let template: String = try XCTUnwrap(sentences[key] as? String)
@@ -1266,6 +1267,7 @@ final class SharedRulesContractTests: XCTestCase {
             switch kind {
             case .neededAnAnswer: built.append("neededAnAnswer")
             case .didNotFinish: built.append("didNotFinish")
+            case .succeeded: built.append("succeeded")
             }
         }
         built.sort()

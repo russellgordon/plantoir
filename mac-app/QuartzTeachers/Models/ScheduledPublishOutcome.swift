@@ -38,6 +38,30 @@ nonisolated enum ScheduledPublishOutcome {
 
         /// Any other non-zero exit.
         case didNotFinish = "did not finish"
+
+        /// It worked.
+        ///
+        /// Recorded for the same reason the failures are, and the reason is
+        /// the same sentence read the other way round: a scheduled publish
+        /// that leaves NO trace cannot be told from one that never happened.
+        /// A teacher who wonders whether last night's publish went out has
+        /// nowhere to look, and "it did" is an answer worth having.
+        case succeeded = "succeeded"
+
+        /// Whether this is something the teacher should be chased about.
+        ///
+        /// Both failures are; a success is news rather than a problem, so it
+        /// gets the sentence in the section and NOT a warning badge in the
+        /// sidebar. A badge on every section that published fine overnight is
+        /// a badge nobody reads by Wednesday.
+        var needsAttention: Bool {
+            switch self {
+            case .neededAnAnswer, .didNotFinish:
+                return true
+            case .succeeded:
+                return false
+            }
+        }
     }
 
     /// One stopped run, as it was written down.
@@ -187,16 +211,31 @@ nonisolated enum ScheduledPublishOutcome {
         guard let stopped = stopped(inHomeFolder: home, course: course, section: section) else {
             return false
         }
-        let event: ActivityTrail.Event = stopped.kind == .neededAnAnswer
-            ? .scheduledPublishNeededAnAnswer
-            : .scheduledPublishDidNotFinish
-        ActivityTrail.note(
-            event,
-            "a scheduled publish stopped, publishing to " + stopped.destination,
-            course: course,
-            section: section,
-            at: stopped.when
-        )
+        // One `ActivityTrail.note(.event, …)` per branch rather than a
+        // variable passed to a single call. ActivityTrailWiringTests scans
+        // product code for a visible call site — an event nothing can be seen
+        // to record is an event nothing DOES record — and a variable hides it.
+        // It also reads better: the branch and the sentence sit together.
+        switch stopped.kind {
+        case .neededAnAnswer:
+            ActivityTrail.note(
+                .scheduledPublishNeededAnAnswer,
+                "a scheduled publish stopped, publishing to " + stopped.destination,
+                course: course, section: section, at: stopped.when
+            )
+        case .didNotFinish:
+            ActivityTrail.note(
+                .scheduledPublishDidNotFinish,
+                "a scheduled publish stopped, publishing to " + stopped.destination,
+                course: course, section: section, at: stopped.when
+            )
+        case .succeeded:
+            ActivityTrail.note(
+                .scheduledPublishFinished,
+                "a scheduled publish finished, publishing to " + stopped.destination,
+                course: course, section: section, at: stopped.when
+            )
+        }
         return true
     }
 
@@ -218,6 +257,9 @@ nonisolated enum ScheduledPublishOutcome {
             return "\(course) Section \(section) was set to publish on its own, and it did not "
                  + "finish — publishing to \(stopped.destination) stopped, so nothing went up "
                  + "there. Publish it yourself to see what happens."
+        case .succeeded:
+            return "\(course) Section \(section) published on its own to "
+                 + "\(stopped.destination). Your students have the new pages."
         }
     }
 }

@@ -199,10 +199,16 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
             destinations: ["netlify"], descriptions: ["Netlify"]
         )
 
-        XCTAssertNil(
-            ScheduledPublishOutcome.stopped(inHomeFolder: home, course: "ZZQ4U", section: 1),
-            "A publish that got all the way through must clear the note, or a teacher is "
-            + "told about a failure that has since been fixed."
+        // It no longer merely CLEARS the failure — it replaces it with a
+        // success, so the teacher is told what happened rather than shown
+        // nothing. Either way the stale failure must not survive.
+        let outcome = ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQ4U", section: 1
+        )
+        XCTAssertEqual(
+            outcome?.kind, .succeeded,
+            "A publish that got all the way through must replace the earlier failure, or a "
+            + "teacher is told about one that has since been fixed."
         )
     }
 
@@ -294,6 +300,46 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         XCTAssertEqual(
             stopped?.destination, "your deploy folder",
             "tonight's destination, not last week's"
+        )
+    }
+
+    /// A run that got through records that it DID, not merely the absence of
+    /// a failure.
+    ///
+    /// The silence this closes is the mirror of the failure one: a scheduled
+    /// publish leaving no trace cannot be told from one that never happened,
+    /// so the trail could answer "why did my site not update?" and could not
+    /// answer "did it?".
+    func testARunThatGotThroughRecordsThatItSucceeded() throws {
+        try writeStubLaunchers(deployExit: 0)
+        try runWrapper(
+            course: "ZZQCU", section: 1,
+            destinations: ["netlify"], descriptions: ["Netlify"]
+        )
+        let outcome = ScheduledPublishOutcome.stopped(
+            inHomeFolder: home, course: "ZZQCU", section: 1
+        )
+        XCTAssertEqual(outcome?.kind, .succeeded)
+        XCTAssertEqual(outcome?.destination, "Netlify")
+        XCTAssertFalse(
+            try XCTUnwrap(outcome?.kind.needsAttention),
+            "A success is news, not a problem: it must not raise the sidebar's warning."
+        )
+    }
+
+    /// Every destination is named when a publish went to several.
+    func testASuccessNamesEveryDestination() throws {
+        try writeStubLaunchers(deployExit: 0)
+        try runWrapper(
+            course: "ZZQDU", section: 1,
+            destinations: ["netlify", "local_folder"],
+            descriptions: ["Netlify", "your deploy folder"]
+        )
+        XCTAssertEqual(
+            ScheduledPublishOutcome.stopped(
+                inHomeFolder: home, course: "ZZQDU", section: 1
+            )?.destination,
+            "Netlify, your deploy folder"
         )
     }
 
