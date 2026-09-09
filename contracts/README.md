@@ -213,7 +213,7 @@ recounted 2026-09-07.
 | The browser-safe address | `app-rules.json` → `linkRules` | BrowserSafeURL (2) |
 | Asking for a publishing credential | `app-rules.json` → `credentialRequests`, `credentialPrompts` | AppRulesContract (3) |
 | `course_config.json` keys, types, defaults | `file-formats.json` → `courseConfigKeys` | CourseConfiguration (10) |
-| Page visibility: `publish:`, legacy `draft:`, per-section keys | `file-formats.json` → `pageVisibility` | ~33 tests across the suite |
+| Page visibility: `publish:`, legacy `draft:`, per-section keys | `file-formats.json` → `pageVisibility` | ~33 tests across the suite. `readingCases` and `writingCases` are both RUN, by `FileFormatsContractTests` — the writing half only since 2026-09-09 (issue #107), and its absence is how the mac stayed green for two days against a rule it did not implement |
 | Image pins and the Quartz patches | `toolchain.json` | checked against `Dockerfile` and `patches/` |
 | Example-content payloads (all 38) | `example-content.json` | ExampleContent (10), and the payloads themselves |
 | Reading a teacher's date list | `schedule-rules.json` | SectionScheduleSource (23) |
@@ -260,7 +260,7 @@ through these classes in
 | What it runs | Class |
 |---|---|
 | `markerOrigins` both directions, and the shared steps of each `milestones` list | `MilestoneContractTests` |
-| `wizardAnswerKeys`, `firstDeployMarkers`, `sectionTimetable`, `pageVisibility.writingRules` | `FileFormatContractTests` |
+| `wizardAnswerKeys`, `firstDeployMarkers`, `sectionTimetable`, `pageVisibility.writingRules` (as hardcoded cases — `pageVisibility.writingCases`, added from the mac 2026-09-09, is the same list as data and is not deserialised here yet) | `FileFormatContractTests` |
 | `publishedFreshness`, `credentialPrompts.everyRequest`, `launcherFlags.deployExtras`, `previewPorts`, `linkRules.browserSafe` | `PublishAndLauncherContractTests` |
 | `toolSchemas` (names and arguments), `assistantModelChoice`, `modelTiers.requirements`, `promptHistory.passThroughWhen` | `AssistSurfaceContractTests` |
 | `renameEffects`, `problemReportDialog`, `ancestorPaths`, `pageNaming.theRule`, `buildOutputLocation.windowsLocation`, `example-content.rules`, `example-content.sentinels`, `recipeFolders`, `scheduledDeployRefusals.alsoSaid` | `SharedRuleContractTests` |

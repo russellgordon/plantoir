@@ -268,12 +268,80 @@
         "sectionLocal": false
       }
     ],
+    "writingCases": {
+      "note": "The runnable half of `writingRules` above — give `before` to the writer, ask it for `setVisible`, and expect `after` and `expectChanged` exactly. `before` and `after` are WHOLE files, newline for newline, not the frontmatter fragments `readingCases` uses. Deliberately inside the subset both apps handle identically: LF endings, no inline `# comment` after a value (macOS rewrites the line and drops one, Windows preserves it — a real difference, and not one this list is the place to settle), no indented keys, and no blank line before the opening fence.",
+      "cases": [
+        {
+          "after": "---\ntitle: Day one\npublishForSection1: true\n---\nBody.\n",
+          "before": "---\ntitle: Day one\ndraftSection1: true\n---\nBody.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": false,
+          "setVisible": true,
+          "why": "The per-section spelling on a course-level page: the new key takes the old key's own line, so the teacher's frontmatter keeps its order and the diff is one line."
+        },
+        {
+          "after": "---\ntitle: Day one\npublish: true\n---\nBody.\n",
+          "before": "---\ntitle: Day one\ndraft: true\n---\nBody.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": true,
+          "setVisible": true,
+          "why": "The plain spelling, on a page inside a section's own folder. Same migration, and note the polarity flips: `draft: true` and `publish: true` are opposites."
+        },
+        {
+          "after": "---\npublishForSection1: true\n---\nBody.\n",
+          "before": "---\npublishForSection1: false\ndraftSection1: true\n---\nBody.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": false,
+          "setVisible": true,
+          "why": "A page carrying BOTH spellings loses the legacy one. Leaving it would leave a line saying the opposite of the line above it, which the next reader — or the next build of an older toolchain — could believe."
+        },
+        {
+          "after": "---\npublishForSection1: true\n---\nBody.\n",
+          "before": "---\ndraftSection1: false\n---\nBody.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": false,
+          "setVisible": true,
+          "why": "Already saying the right thing, still spelled the old way: migrated anyway, once. This is the exception `migrationIsTheOneExceptionToRule4` describes — a page nobody ever flips is exactly the page that would keep its legacy key forever."
+        },
+        {
+          "after": "---\npublishForSection1: true\n---\nBody.\n",
+          "before": "---\npublishForSection1: true\n---\nBody.\n",
+          "expectChanged": false,
+          "section": 1,
+          "sectionLocal": false,
+          "setVisible": true,
+          "why": "And once migrated, rule 4 holds again: writing the value it already has changes nothing, so the file's modification time is left alone and the next build is not fooled into rebuilding it."
+        },
+        {
+          "after": "---\npublish: false\n---\nJust a page.\n",
+          "before": "Just a page.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": true,
+          "setVisible": false,
+          "why": "A page with no frontmatter at all gets a block of its own."
+        },
+        {
+          "after": "---\npublish: false\ntitle: Day one\n---\nBody.\n",
+          "before": "---\ntitle: Day one\n---\nBody.\n",
+          "expectChanged": true,
+          "section": 1,
+          "sectionLocal": true,
+          "setVisible": false,
+          "why": "A block with neither spelling in it: the key is inserted straight after the opening fence — ABOVE `title`, which is where the course installer puts it too and which can never land inside a nested list or a block scalar. A migration keeps its line; only a key being added for the first time moves to the top."
+        }
+      ]
+    },
     "writingRules": [
       {
         "detail": "Publishing a `draftSection1: true` page writes `publishForSection1: true` on the SAME line, and the `draftSection1` line is gone; a page carrying BOTH spellings loses the legacy one. The new key takes the old key's position, so a migrated page shows a one-line diff in Obsidian rather than reordered frontmatter.",
         "rule": "A page written in the old spelling is MIGRATED to the new key, and the legacy key removed, the first time something edits its visibility",
         "why": "Decided 2026-09-07 (Russell), replacing the rule this list carried since it was written — 'a page written in the old spelling KEEPS it, inverted' — which the mac implemented and Windows never did. Migration leaves a teacher's file in one current spelling rather than two competing ones, stops the old key accumulating forever, and is what documentation/04-course-setup.md and 08-course-config-reference.md have described all along. There is no flag day: the build reads both spellings, so a legacy course builds exactly as before and converts one page at a time. Rejected: keeping the old key inverted (the mac's behaviour until it adopts this) — it would make both documentation files wrong and leave teachers' pages carrying a legacy key indefinitely; and leaving the divergence recorded but unresolved, which is how a knownDivergence becomes permanent.",
-        "migrationIsTheOneExceptionToRule4": "A legacy page whose value is already right is still rewritten, once, to migrate the key — although 'writing the value it already has changes nothing' says a no-op write must not touch the file. Deliberate: the case is reachable only inside a batch that is changing OTHER pages (a plan in which nothing changes never writes), so the build that follows was happening anyway, and the cost — one page's modification time moves once — buys a course that converges on one spelling instead of carrying legacy keys on exactly the pages nobody ever flips. A rule that migrated only on a genuine change would leave those pages old forever."
+        "migrationIsTheOneExceptionToRule4": "A legacy page whose value is already right is still rewritten, once, to migrate the key — although 'writing the value it already has changes nothing' says a no-op write must not touch the file. Deliberate, and it is a property of the WRITER rather than something either app's plan produces today: both plan layers drop a page whose visibility already matches into their 'already right' list and never write it, so nothing currently asks for this write. It is pinned anyway because the day something does — a sweep, a repair, a tool that sets rather than toggles — the cost is one page's modification time moving once, and it buys a course that converges on one spelling instead of carrying legacy keys on exactly the pages nobody ever flips. A rule that migrated only on a genuine change would leave those pages old forever. (This sentence said 'reachable only inside a batch that is changing OTHER pages' until 2026-09-09, when implementing it on the mac showed that a batch skips such a page too — corrected rather than deleted, so nobody goes looking again for the code path it described.)"
       },
       {
         "rule": "Edit the LINE, never round-trip the YAML",
