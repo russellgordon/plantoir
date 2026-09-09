@@ -1,8 +1,12 @@
 import XCTest
 @testable import QuartzTeachers
 
-/// Runs `contracts/shared-rules.json` — five rule sets that both apps need and
+/// Runs `contracts/shared-rules.json` — the rule sets both apps need and
 /// neither platform owns.
+///
+/// Deliberately no count. This said "five" while the file held twenty, and the
+/// file's own note said "eight"; a number in prose beside a list that grows is
+/// a number that goes stale, and both of these proved it.
 ///
 /// Two of them sit on top of machinery that could not be less alike: launchd
 /// against Task Scheduler, AppKit against WinUI. That is the argument for
