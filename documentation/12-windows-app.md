@@ -220,11 +220,53 @@ problem — **nobody answers a question at 6 a.m.**
   could not ask, says what to do about it, and exits **3** — a code that
   means "a question went unanswered" and nothing else, so a caller can tell it
   from an ordinary failure. Every other exit in `deploy.py` and in both
-  launchers is 0 or 1. The wrapper reads it, writes a per-section note under
-  `scheduled\unanswered\`, and `SectionDetailView` tells the teacher the next
-  time that section is on screen — the same consume-on-read, clear-on-clean-run
-  shape the folder problems already use. Nothing changes when the flag is
+  launchers is 0 or 1. The wrapper reads it, writes a per-section record under
+  `scheduled\unanswered\`, and `SectionDetailView` shows the teacher an InfoBar
+  the next time that section is on screen. Nothing changes when the flag is
   absent: a teacher at a keyboard gets every prompt they got before.
+
+  **Three things about that record changed on 2026-09-09 (issue #130), and
+  each reverses something this page used to say.**
+
+  It records **four outcomes**, not one: a question went unanswered, the BUILD
+  asked a question, it did not finish for some other reason, and it WORKED.
+  The last is there for the same reason as the failures read backwards — a
+  scheduled publish that leaves no trace cannot be told from one that never
+  happened, so the trail could answer *"why did my site not update?"* and
+  could not answer *"did it?"*.
+
+  Reading it does **not consume** it, where this page previously described
+  "the same consume-on-read, clear-on-clean-run shape the folder problems
+  use". The record now stands until a run gets all the way through or the
+  teacher dismisses it, which is the only way Dismiss can exist at all — and
+  it closes a real hole, since consuming made "not shown" and "shown and read"
+  the same state, so a reader that could not get the sentence on screen had
+  already destroyed it. It is also read TWICE per launch now: the sidebar
+  reads it for the warning badge, the section for the sentence.
+
+  It is an **InfoBar, not a ContentDialog**. A dialog can only be
+  acknowledged, and WinUI allows one at a time — so an overnight run that
+  produced both a folder problem and a stopped publish told the teacher about
+  the first only.
+
+  The **folder keeps the name `unanswered`** though it now holds successes.
+  Renaming it was implemented and reverted: a task scheduled before that date
+  points at a wrapper `.ps1` already on disk that writes the old path, and
+  nothing rewrites that wrapper until the section is scheduled again — so a
+  rename costs a second directory read for ever, on pain of the first
+  overnight run after an update going silent. A one-line record from such a
+  wrapper is still read, as the question it was.
+
+  **The trail line is written by a startup sweep in `App.OnLaunched`**, not by
+  this view and not by the wrapper. The contract says the RUN writes it, and
+  here the run is PowerShell with nothing of ours alive — so the closest
+  honest thing is to sweep every record the moment the app opens, which keeps
+  the property that sentence is protecting: a teacher who never opens the
+  failed section still gets a line. Writing it from the wrapper was REJECTED:
+  it would put the trail line format in generated shell, where nothing tests
+  it and `LogRedactor` does not reach. Once per RUN rather than per launch,
+  via a `.noted` sidecar — a mark written INTO the record would change its
+  modification date, which is what the notice is dated from.
 
   Two things about the note that look like tidiness and are not. It is written
   only by the FIRST destination that stops, because there is one note per
