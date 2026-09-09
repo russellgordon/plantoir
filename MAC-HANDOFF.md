@@ -95,6 +95,43 @@ every destination has run — clearing inside the loop meant a course whose
 Netlify leg stopped and whose folder leg then succeeded had the note deleted by
 the second leg, and the teacher was never told why the first did not go out.
 
+**Three things a review of the finished thing found, all of which the mac will
+meet in the same shapes.** (a) **A guard inside a shell function whose output is
+CAPTURED does nothing.** `deploy.sh`'s Cloudflare Account ID guard was written
+inside `prompt_for_cf_account`, called as `CF_ACCOUNT="$(prompt_for_cf_account)"`
+— a subshell, so the refusal went into the variable rather than onto the
+screen and `exit 3` exited the subshell. Nothing printed, ordinary exit code,
+and a launchd wrapper reading exit 3 would have left no note. Reproduced before
+and after; the guard is at the call site now, and
+`PublishAndLauncherContractTests.EveryQuestionTheMacDeployLauncherAsksIsGuardedAtTheTopLevel`
+carries the rule with that one function recorded as a checked exception.
+(b) **Clearing the note on “nothing needed an answer” also clears it on an
+ORDINARY failure** — Monday stops for a question, Tuesday the token is revoked
+and every leg exits 1, and Monday's note is deleted; keyed on “every
+destination succeeded” now. (c) **Consuming the note is not delivering it**:
+one dialog at a time in WinUI, so a folder-problem dialog queued a moment
+earlier makes the second `ShowAsync` throw, and the note is already gone. It
+puts the note back, with its ORIGINAL moment so the next morning still dates it
+to the right night. Whatever the mac uses to show this will have the same
+property.
+
+**One more, found by checking rather than by the review**, and worth knowing
+because the mac's equivalent test would do it too: the new test class was
+leaving one generated wrapper script per run in the teacher's REAL
+`%LOCALAPPDATA%\Plantoir\scheduled\` — `WriteWrapperScript` resolves through
+`AppDataRoot`, and twenty had accumulated beside a genuine
+`Plantoir-deploy-ICD2O-section-1.ps1` before anyone looked. Swept, and the class
+deletes its own now, as `ScheduledHealthFindingsTests` already did.
+
+**Where the flag stops, and it is not the whole publishing path.** `deploy`
+shells out to `preview.bat --build-only` when the built site is stale, and
+neither `preview.ps1` nor `preview.sh` takes the flag — so `preview.ps1`'s
+“Continue anyway?” can still be asked of nobody, in the narrow case where a
+section has been archived out of `course_config.json` while its scheduled deploy
+still exists. Filed as GitHub issue #124 rather than widened into this change,
+because it makes `--non-interactive` a launcher flag generally rather than a
+`deploy` one.
+
 **Rejected, and logged so it is not retried.** (a) A `PLANTOIR_NEEDS_AN_ANSWER:`
 marker line on stdout, scanned from a captured log the way `PLANTOIR_HEALTH:`
 is. `TranscriptBuilder.CarriesTheHealthMarker` matches only the literal health

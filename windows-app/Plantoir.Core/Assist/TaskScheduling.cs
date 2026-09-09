@@ -345,6 +345,15 @@ public static class TaskScheduling
 
             // Where a stopped publish leaves its note, and where a publish that
             // got through clears one. Computed once, outside the loop.
+            //
+            // BAKED from AppDataRoot at write time, where $healthDir and
+            // $pendingDir in this same script resolve $env:LOCALAPPDATA at RUN
+            // time. Identical in production, and baking is the correct one of
+            // the two here: the app READS this folder through AppDataRoot, so a
+            // run started with --state-dir writes and reads the same place. The
+            // other two are the ones that would disagree with the app under
+            // that flag — a third shape of the leak AppDataRoot's own doc
+            // comment warns about, named here rather than quietly added to.
             string unansweredDir = ScheduledPublishQuestion.Directory();
             string unansweredRecord =
                 $"(Join-Path {PsQuote(unansweredDir)} {PsQuote(HealthRecordName(courseCode, section))})";
@@ -390,14 +399,23 @@ public static class TaskScheduling
                 lines.Add("}");
             }
 
-            // Cleared only when NOTHING needed an answer, and only AFTER every
-            // destination has run. Clearing inside the loop looked right and was
-            // wrong: a course publishing to two places whose Netlify leg stopped
-            // for a question and whose Cloudflare leg then succeeded would have
-            // had the note deleted by the second leg, and the teacher would
-            // never have been told why the first one did not go out.
+            // Cleared only by a run that GOT THROUGH — every destination, exit
+            // zero — and only AFTER every destination has run.
+            //
+            // Two things were wrong here in turn, and both were the same
+            // mistake made smaller. Clearing inside the LOOP meant a course
+            // publishing to two places whose Netlify leg stopped for a question
+            // and whose folder leg then succeeded had the note deleted by the
+            // second leg, and the teacher was never told why the first did not
+            // go out. Then clearing on `-not $neededAnAnswer` meant an ORDINARY
+            // failure cleared it too: Monday stops for a question and leaves a
+            // note, Tuesday the token is revoked and every leg exits 1, Monday's
+            // note is deleted — and since nothing yet records an ordinary
+            // scheduled failure, the teacher is told about neither night.
+            // $allSucceeded is the condition every sentence describing this
+            // already used; the code now agrees with them.
             lines.Add("");
-            lines.Add("if (-not $neededAnAnswer) {");
+            lines.Add("if ($allSucceeded) {");
             lines.Add("  try {");
             lines.Add($"    Remove-Item -LiteralPath {unansweredRecord} -Force -ErrorAction SilentlyContinue");
             lines.Add("  } catch { }");

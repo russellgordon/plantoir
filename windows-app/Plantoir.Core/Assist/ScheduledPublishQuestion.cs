@@ -122,6 +122,38 @@ public static class ScheduledPublishQuestion
     }
 
     /// <summary>
+    /// Write a consumed record back, for a reader that could not show it.
+    /// </summary>
+    /// <remarks>
+    /// <b>Consuming is not the same as delivering.</b> <see cref="Take"/>
+    /// deletes the record as it reads it, so a caller that then fails to get
+    /// the sentence on screen — a dialog refused because another one is already
+    /// open, a dispatcher shutting down — has destroyed the only thing that
+    /// would have told the teacher tomorrow. The folder-problem queue makes the
+    /// same move for the same reason. Costs one morning to put back; costs the
+    /// record for ever not to.
+    /// </remarks>
+    public static void PutBack(string courseCode, int sectionNumber, Unanswered stopped) =>
+        PutBackIn(Directory(), courseCode, sectionNumber, stopped);
+
+    /// <summary>The same, against an arbitrary directory — what the tests use.</summary>
+    public static void PutBackIn(
+        string directory, string courseCode, int sectionNumber, Unanswered stopped)
+    {
+        try
+        {
+            Record(directory, courseCode, sectionNumber, stopped.Destination);
+            // The MOMENT matters as much as the fact: the trail line and the
+            // sentence are dated from it, and a record put back with today's
+            // timestamp would file last night's problem under this morning.
+            File.SetLastWriteTime(
+                Path.Combine(directory, TaskScheduling.HealthRecordName(courseCode, sectionNumber)),
+                stopped.When);
+        }
+        catch { }
+    }
+
+    /// <summary>
     /// Throw away this section's record, for a run that got through.
     /// </summary>
     /// <remarks>

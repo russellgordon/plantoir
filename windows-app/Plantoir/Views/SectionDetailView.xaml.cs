@@ -401,6 +401,13 @@ public sealed partial class SectionDetailView : UserControl
     private void TakeAnythingTheScheduledDeployFound()
     {
         if (_healthDialogIsUp || _healthQueue.PendingCount > 0) return;
+        // BEFORE the folder problems are queued, not after. Both end up on the
+        // dispatcher and WinUI allows one ContentDialog at a time, so whichever
+        // is second is the one that cannot be shown — and this one is the more
+        // urgent of the two: a publish that did not happen beats a slightly
+        // inaccurate curriculum map. The put-back above covers the case where
+        // it loses the race anyway.
+        TakeAnyQuestionTheScheduledPublishCouldNotAsk();
         try
         {
             var waiting = ScheduledHealthFindings.Take(_course.Code, _sectionNumber);
@@ -410,7 +417,6 @@ public sealed partial class SectionDetailView : UserControl
         {
             App.LogDiagnostic($"TakeAnythingTheScheduledDeployFound exception: {ex}");
         }
-        TakeAnyQuestionTheScheduledPublishCouldNotAsk();
     }
 
     /// <summary>
@@ -449,17 +455,34 @@ public sealed partial class SectionDetailView : UserControl
         string said = ScheduledPublishQuestion.Sentence(_course.Code, _sectionNumber, stopped.Destination);
         bool queued = DispatcherQueue.TryEnqueue(async () =>
         {
-            await ShowDialogSafelyAsync(new ContentDialog
+            var shown = await ShowDialogSafelyAsync(new ContentDialog
             {
                 Title = "Your scheduled publish did not go out",
                 Content = said,
                 CloseButtonText = "OK",
             });
+            // NOT SHOWN MEANS NOT DELIVERED, and the record is already gone.
+            // WinUI allows one ContentDialog at a time, so a folder-problem
+            // dialog queued a moment earlier makes ShowAsync throw;
+            // ShowDialogSafelyAsync swallows it and answers null. Without this,
+            // an overnight run that produced BOTH a folder problem and a
+            // stopped publish told the teacher only about the first, for ever.
+            // The folder-problem queue puts its own batch back for the same
+            // reason. Put back with its original moment, so the next morning's
+            // reading still dates it to the night it happened.
+            if (shown is null)
+            {
+                ScheduledPublishQuestion.PutBack(_course.Code, _sectionNumber, stopped);
+                App.LogDiagnostic("Put the scheduled-publish question back: no dialog could be shown.");
+            }
         });
-        // A refused enqueue means the dispatcher is shutting down, and the
-        // record has already been consumed. The trail line above is then the
-        // only surviving account of it, which is exactly what the trail is for.
-        if (!queued) App.LogDiagnostic("Could not show the scheduled-publish question: " + said);
+        // A refused enqueue means the dispatcher is shutting down. Put it back
+        // here too — the callback above will never run to do it.
+        if (!queued)
+        {
+            ScheduledPublishQuestion.PutBack(_course.Code, _sectionNumber, stopped);
+            App.LogDiagnostic("Could not show the scheduled-publish question: " + said);
+        }
     }
 
     private void NoteHealthFindings(ScriptRunner? runner, bool cameFromPublishing = false)

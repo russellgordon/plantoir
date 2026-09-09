@@ -288,6 +288,17 @@ an item when it ships (finished behaviour is recorded in
   Not done now because neither half is reachable from the six tests that
   exist: they drive Course Settings, which starts nothing.
 
+- ✅ **Done 2026-09-08** — GitHub issue #92, branch
+  `issue/92-non-interactive-deploy`, `GUI-IMPROVEMENTS.md` row 459. The
+  `--non-interactive` flag this entry prescribes is built: `deploy.py` and both
+  launchers refuse rather than ask, exiting **3**, and the scheduled wrapper
+  leaves a per-section note the app reads out. **The open question below —
+  whether Task Scheduler gives the wrapper a console, and so which of the two
+  bad outcomes a teacher gets — is now MOOT rather than answered**: the
+  refusal happens before any `input()` is reached, so `isatty()` stopped being
+  load-bearing. Left in place, unedited below, as the record of what was true
+  on its day.
+
 - ⚠️ **A scheduled deploy has nobody to answer a question, and `deploy` still
   asks them — found on Windows, 2026-09-06, and it is the same shape on both
   platforms.** Not fixed, because the fix touches the launcher's argument
