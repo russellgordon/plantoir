@@ -6,7 +6,7 @@ import Foundation
 /// **Why a table rather than the sentences where they are used.** They were
 /// where they were used, and the same sentence existed four times: in the
 /// Swift that says it, in the Swift test that pins it, in `GUI-IMPROVEMENTS.md`
-/// where it is specified, and in `WINDOWS-HANDOFF.md` where Windows is told to
+/// where it is specified, and in documentation/10-local-ai-assistant.md where Windows is told to
 /// copy it. Three of those four were already drifting — "the output is in that
 /// section's console" against "…that section's window", the same failure told
 /// two ways depending on which of two functions ran it. A sentence a teacher

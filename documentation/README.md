@@ -1,6 +1,10 @@
 # Technical Documentation
 
-**Two things this folder does NOT hold.** What the two apps must AGREE on is data, in [`contracts/`](../contracts/README.md), because both test suites run it — the sentences the assistant says, the arguments the launchers get, the keys `course_config.json` carries, the image pins. And the reasoning behind decisions an implementer needs is in [`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md) and [`MAC-HANDOFF.md`](../MAC-HANDOFF.md). These pages explain how the toolchain WORKS; those say what must stay true.
+**Two things this folder does NOT hold.** What the two apps must AGREE on is data, in [`contracts/`](../contracts/README.md), because both test suites run it — the sentences the assistant says, the arguments the launchers get, the keys `course_config.json` carries, the image pins. And work still to do is in [GitHub issues](https://github.com/russellgordon/plantoir/issues), labelled `mac` / `windows` / `toolchain` / `assistant`.
+
+What these pages DO hold, as of 2026-09-08, is both halves: how the toolchain works, and WHY — what was chosen, what was rejected, what was measured. That second half arrived when the two handoff documents were absorbed into this folder and deleted, each of their sections landing in the page that owns its subject.
+
+**Work still to do is not here either.** It is in [GitHub issues](https://github.com/russellgordon/plantoir/issues), labelled `mac` / `windows` / `toolchain` / `assistant`. This folder absorbed the two handoff documents on 2026-09-08, and the to-do lists they carried went to issues rather than into these pages.
 
 **Audience:** computer science teachers who want to understand how this toolchain
 actually works under the hood — not just how to use it. (For usage instructions,
@@ -28,6 +32,7 @@ static-site generator.
 | 10 | [The Local AI Assistant](10-local-ai-assistant.md) | What the on-device model is and how it is configured, with enough background on language models to follow it — and how a typed sentence becomes a Swift function call |
 | 11 | [Release Strategy & Production Deployment](11-release-strategy.md) | The packaging, Developer ID code-signing, Apple Notarization, Azure Trusted Signing, Inno Setup, and cross-platform release pipeline |
 | 12 | [The Windows App — Plantoir](12-windows-app.md) | The WinUI 3 GUI (`windows-app/`), how it differs from the mac (no container, a native runtime, ConPTY, Credential Manager, Task Scheduler), where it keeps things, the flags it answers, and how its interface is driven by tests |
+| 13 | [Archive — the Windows port](13-windows-port-archive.md) | **History, not a specification.** Write-ups for Windows-port work verified shipped as of 2026-08-22, kept for the reasoning. Closed to new entries; where it and a contract disagree, the contract is true |
 
 ## The one-paragraph summary
 

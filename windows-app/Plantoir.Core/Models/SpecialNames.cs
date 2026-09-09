@@ -188,7 +188,7 @@ public static class SpecialNames
     /// platform's wording rather than a shared one — the same deliberate
     /// difference as "Setting up this Mac" against "Setting up this PC" in
     /// app-rules.json's markerOrigins. Said here as "on this PC". Flagged in
-    /// MAC-HANDOFF so the contract can mark it platform-specific, rather than
+    /// documentation/09-mac-app.md so the contract can mark it platform-specific, rather than
     /// leaving the next reader to conclude that Windows drifted.</para>
     /// </summary>
     public const string RenameExplanation =

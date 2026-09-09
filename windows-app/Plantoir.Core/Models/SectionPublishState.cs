@@ -10,7 +10,7 @@ namespace Plantoir.Core.Models;
 /// The " — Edited" title-bar marker: whether any page a section uses, or
 /// shares with other sections, has changed since that section last
 /// published. Ported from mac's <c>SectionPublishState.swift</c> — see
-/// WINDOWS-HANDOFF.md, "The ' — Edited' marker", and
+/// documentation/05-build-pipeline.md, "The ' — Edited' marker", and
 /// <c>contracts/app-rules.json</c> → <c>publishedFreshness</c>, which is the
 /// authoritative case list both platforms run.
 ///
@@ -290,7 +290,7 @@ public static class SectionPublishState
     /// junction). `.NET`'s directory enumeration neither follows a symlink
     /// nor reports it as a regular file, so this has to be checked by hand —
     /// same trap as `FileManager` on the mac, see "Symlinks" in
-    /// WINDOWS-HANDOFF.md.
+    /// documentation/05-build-pipeline.md.
     /// </summary>
     private static bool IsSymlink(string path)
     {

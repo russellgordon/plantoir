@@ -127,7 +127,7 @@ public sealed class ScheduledDeployTests : IDisposable
     [Fact]
     public void ASwitchedDestinationIsNotConsideredDeployedJustBecauseTheOldOneWas()
     {
-        // The divergence this regression-tests (WINDOWS-HANDOFF.md item 7,
+        // The divergence this regression-tests (documentation/07-deployment.md,
         // contracts/file-formats.json → firstDeployMarkers): a course
         // deployed to Netlify (leaving a .netlify_sites marker) and then
         // switched to Cloudflare has NEVER been deployed to Cloudflare, and

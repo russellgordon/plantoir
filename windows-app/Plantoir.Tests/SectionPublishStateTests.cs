@@ -9,7 +9,7 @@ namespace Plantoir.Tests;
 /// from <c>contracts/app-rules.json</c> → <c>publishedFreshness</c>, so
 /// both platforms are pinned against one specification rather than two
 /// hand-typed copies of it. See "The ' — Edited' marker" in
-/// WINDOWS-HANDOFF.md.
+/// documentation/05-build-pipeline.md.
 /// </summary>
 public class SectionPublishStateTests
 {

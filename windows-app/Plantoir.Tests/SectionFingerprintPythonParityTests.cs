@@ -13,7 +13,7 @@ namespace Plantoir.Tests;
 /// <c>scripts/section_fingerprint.py</c> — and this suite is what proves
 /// the two agree, rather than trusting a hand-read of both.
 ///
-/// See TaskScheduling.WriteWrapperScript and WINDOWS-HANDOFF.md, "A
+/// See TaskScheduling.WriteWrapperScript and documentation/05-build-pipeline.md, "A
 /// scheduled deploy needs its own path to the same record".
 /// </summary>
 public class SectionFingerprintPythonParityTests
