@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using System.Reflection;
+using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 
@@ -465,6 +466,100 @@ public class PublishAndLauncherContractTests
         Assert.Contains("'--non-interactive'               { $NON_INTERACTIVE = $true",
                         File.ReadAllText(Path.Combine(RepoRoot, "preview.ps1")),
                         StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Every flag the SCHEDULED wrapper hands a launcher is one that launcher
+    /// actually accepts.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>The gap this closes is a whole class, and it was nearly walked
+    /// into on 2026-09-09.</b> The wrapper is generated C# and the launchers
+    /// are hand-written PowerShell, and nothing joined the two: adding
+    /// <c>--non-interactive</c> to the wrapper's build leg without adding it to
+    /// <c>preview.ps1</c>'s parser would have made that launcher print
+    /// "Unknown option: --non-interactive" and exit 1 — whereupon the wrapper's
+    /// own <c>if ($buildExit -ne 0)</c> guard publishes nothing and says so to
+    /// a console nobody is watching. Every scheduled publish on this machine
+    /// would simply stop happening, silently, and every existing test would
+    /// stay green.</para>
+    ///
+    /// <para><c>AppRules_LauncherFlags_MatchesContract</c> checks
+    /// contract→script and never wrapper→script, which is the direction this
+    /// one runs. Both are needed: a flag can be in the contract and not the
+    /// wrapper, or in the wrapper and not the contract.</para>
+    ///
+    /// <para>Coupled to the <c>'^--flag$'</c> and <c>'--flag'</c> switch idioms
+    /// the two launchers use; a rewrite that changes the idiom should change
+    /// this with it.</para>
+    /// </remarks>
+    [Fact]
+    public void EveryFlagTheScheduledWrapperPassesIsOneTheLauncherAccepts()
+    {
+        string folder = Directory.CreateTempSubdirectory("plantoir-wrapper-flags").FullName;
+        string? wrapper = null;
+        try
+        {
+            File.WriteAllText(Path.Combine(folder, "deploy.ps1"), "# stub");
+            File.WriteAllText(Path.Combine(folder, "preview.ps1"), "# stub");
+
+            wrapper = TaskScheduling.WriteWrapperScript(
+                $"Plantoir-flagcheck-{Guid.NewGuid():N}", folder,
+                Path.Combine(folder, "deploy.ps1"), "ICS3U", 1,
+                Path.Combine(folder, "courses", "ICS3U"), Array.Empty<string>(),
+                new[]
+                {
+                    new CourseConfiguration.DeployDestination("cloudflare_pages", ""),
+                    new CourseConfiguration.DeployDestination("local_folder", folder),
+                },
+                "0123456789abcdef0123456789abcdef");
+            Assert.NotNull(wrapper);
+
+            var launchers = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["preview.ps1"] = File.ReadAllText(Path.Combine(RepoRoot, "preview.ps1")),
+                ["deploy.ps1"] = File.ReadAllText(Path.Combine(RepoRoot, "deploy.ps1")),
+            };
+
+            var unknown = new List<string>();
+            foreach (string line in File.ReadAllLines(wrapper!))
+            {
+                string which = line.Contains("preview.ps1", StringComparison.OrdinalIgnoreCase)
+                    ? "preview.ps1"
+                    : line.Contains("deploy.ps1", StringComparison.OrdinalIgnoreCase) ? "deploy.ps1" : "";
+                // Only the lines that RUN one. The generated script names both
+                // in comments and in the path it builds for Start-Process.
+                if (which.Length == 0) continue;
+                if (!line.TrimStart().StartsWith("& ", StringComparison.Ordinal)
+                    && !line.Contains("$buildArgs =", StringComparison.Ordinal)) continue;
+
+                foreach (string word in line.Split(' ', '\'', '"'))
+                {
+                    if (!word.StartsWith("--", StringComparison.Ordinal)) continue;
+                    string flag = word.Trim();
+                    string parser = launchers[which];
+                    bool accepted = parser.Contains($"'^{flag}$'", StringComparison.Ordinal)
+                                 || parser.Contains($"'^{flag}=", StringComparison.Ordinal)
+                                 || parser.Contains($"'{flag}'", StringComparison.Ordinal);
+                    if (!accepted) unknown.Add($"{which} does not parse {flag}");
+                }
+            }
+
+            // Distinct: the build leg appears twice in the wrapper (captured
+            // and fallback), so one missing flag would otherwise be reported
+            // twice in the same sentence.
+            unknown = unknown.Distinct(StringComparer.Ordinal).ToList();
+            Assert.True(unknown.Count == 0,
+                "The scheduled wrapper passes a flag its launcher would reject: " +
+                string.Join("; ", unknown) + ". That launcher prints \"Unknown option\" and exits, " +
+                "the wrapper publishes nothing, and nobody is awake to read either — so every " +
+                "scheduled publish stops happening and no test says so.");
+        }
+        finally
+        {
+            if (wrapper is not null) try { File.Delete(wrapper); } catch { }
+            try { Directory.Delete(folder, recursive: true); } catch { }
+        }
     }
 
     /// <summary>

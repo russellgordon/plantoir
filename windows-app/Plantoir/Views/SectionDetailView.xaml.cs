@@ -400,14 +400,11 @@ public sealed partial class SectionDetailView : UserControl
     /// </summary>
     private void TakeAnythingTheScheduledDeployFound()
     {
+        // No longer racing the folder-problem dialog for the one ContentDialog
+        // WinUI allows: the scheduled publish's outcome is an InfoBar in this
+        // view now, so the two can both be on screen and neither can lose.
+        ShowHowTheScheduledPublishTurnedOut();
         if (_healthDialogIsUp || _healthQueue.PendingCount > 0) return;
-        // BEFORE the folder problems are queued, not after. Both end up on the
-        // dispatcher and WinUI allows one ContentDialog at a time, so whichever
-        // is second is the one that cannot be shown — and this one is the more
-        // urgent of the two: a publish that did not happen beats a slightly
-        // inaccurate curriculum map. The put-back above covers the case where
-        // it loses the race anyway.
-        TakeAnyQuestionTheScheduledPublishCouldNotAsk();
         try
         {
             var waiting = ScheduledHealthFindings.Take(_course.Code, _sectionNumber);
@@ -420,70 +417,111 @@ public sealed partial class SectionDetailView : UserControl
     }
 
     /// <summary>
-    /// Tell the teacher their overnight publish stopped for a question nobody
-    /// was there to answer.
-    ///
+    /// Show the teacher how last night's scheduled publish turned out — it
+    /// stopped for a question, it did not finish, or it went out.
+    /// </summary>
+    /// <remarks>
     /// <para>Read here for the same reason the folder problems are: the run
     /// happened with the app closed, so this is the first moment there is
-    /// anybody to say it to. The record is CONSUMED as it is read, so it is
-    /// said once rather than every time the app opens, and a later run that
-    /// gets through clears it, so a question the teacher has since answered
-    /// stops being reported.</para>
+    /// anybody to say it to.</para>
     ///
-    /// <para>The TRAIL line is written here too, dated to when the RUN wrote
-    /// the record rather than to this morning — a trail that dated an overnight
-    /// problem to whenever somebody happened to open the app would file it
-    /// under the wrong night. Nothing else records it at all: the run happened
-    /// with the app closed.</para>
-    /// </summary>
-    private void TakeAnyQuestionTheScheduledPublishCouldNotAsk()
+    /// <para><b>Reading does not consume it, and the notice is not a
+    /// dialog.</b> Both changed on 2026-09-09 and they are the same change: the
+    /// record now stands until the teacher dismisses it or a run that gets all
+    /// the way through replaces it (shared-rules.json,
+    /// scheduledPublishStopped.clearedBy), which is only possible if it can be
+    /// shown more than once. It also removes a real hole — WinUI allows one
+    /// ContentDialog at a time, so an overnight run that produced BOTH a folder
+    /// problem and a stopped publish had already destroyed the second record by
+    /// the time it found it could not show it.</para>
+    ///
+    /// <para><b>The trail line is NOT written here.</b> It is written by the
+    /// startup sweep in App.OnLaunched, so a teacher who never opens this
+    /// section still gets one — and that teacher is precisely the one who
+    /// writes in to say their site did not update.</para>
+    /// </remarks>
+    private void ShowHowTheScheduledPublishTurnedOut()
     {
-        ScheduledPublishQuestion.Unanswered? stopped;
-        try { stopped = ScheduledPublishQuestion.Take(_course.Code, _sectionNumber); }
+        ScheduledPublishOutcome.Result? outcome;
+        try { outcome = ScheduledPublishOutcome.Read(_course.Code, _sectionNumber); }
         catch (Exception ex)
         {
-            App.LogDiagnostic($"TakeAnyQuestionTheScheduledPublishCouldNotAsk exception: {ex}");
+            App.LogDiagnostic($"ShowHowTheScheduledPublishTurnedOut exception: {ex}");
             return;
         }
-        if (stopped is null) return;
 
-        ActivityTrail.Note(
-            ActivityTrail.Event.ScheduledPublishNeededAnAnswer,
-            $"the publish set to happen on its own stopped — {stopped.Destination} needed an answer",
-            _course.Code, _sectionNumber, stopped.When);
+        if (outcome is null)
+        {
+            ScheduledPublishNotice.IsOpen = false;
+            return;
+        }
 
-        string said = ScheduledPublishQuestion.Sentence(_course.Code, _sectionNumber, stopped.Destination);
-        bool queued = DispatcherQueue.TryEnqueue(async () =>
+        // Green for the good news, orange for the two failures. The failures
+        // also get a warning beside their section in the list; a success does
+        // not, because a badge on every section that published fine overnight
+        // is a badge nobody reads by Wednesday (shared-rules.json,
+        // scheduledPublishStopped.attention).
+        bool wrong = ScheduledPublishOutcome.NeedsAttention(outcome.Outcome);
+        ScheduledPublishNotice.Severity = wrong ? InfoBarSeverity.Warning : InfoBarSeverity.Success;
+        ScheduledPublishNotice.Title = wrong
+            ? "Your scheduled publish did not go out"
+            : "Your scheduled publish went out";
+        ScheduledPublishNotice.Message =
+            ScheduledPublishOutcome.Sentence(_course.Code, _sectionNumber, outcome);
+        ScheduledPublishNotice.IsOpen = true;
+    }
+
+    /// <summary>
+    /// The teacher has finished with last night's news, so the record goes.
+    /// </summary>
+    /// <remarks>
+    /// A decision rather than a convenience: clearing only on a scheduled run
+    /// that got through leaves the message standing after somebody has already
+    /// put the problem right by hand, and the next run that would clear it
+    /// could be a week away.
+    /// </remarks>
+    private void ScheduledPublishNoticeDismiss_Click(object sender, RoutedEventArgs e)
+    {
+        DismissTheScheduledPublishNotice();
+        ScheduledPublishNotice.IsOpen = false;
+    }
+
+    /// <summary>
+    /// The bar's own close button means the same thing as Dismiss.
+    /// </summary>
+    /// <remarks>
+    /// Two ways to say "I have read this" that did different things would be
+    /// the worse kind of surprise: the X is the one most people reach for, and
+    /// a teacher who presses it and finds the same notice tomorrow morning
+    /// learns to distrust the notice.
+    /// </remarks>
+    private void ScheduledPublishNotice_Closed(InfoBar sender, InfoBarClosedEventArgs args) =>
+        DismissTheScheduledPublishNotice();
+
+    private void DismissTheScheduledPublishNotice()
+    {
+        try
         {
-            var shown = await ShowDialogSafelyAsync(new ContentDialog
-            {
-                Title = "Your scheduled publish did not go out",
-                Content = said,
-                CloseButtonText = "OK",
-            });
-            // NOT SHOWN MEANS NOT DELIVERED, and the record is already gone.
-            // WinUI allows one ContentDialog at a time, so a folder-problem
-            // dialog queued a moment earlier makes ShowAsync throw;
-            // ShowDialogSafelyAsync swallows it and answers null. Without this,
-            // an overnight run that produced BOTH a folder problem and a
-            // stopped publish told the teacher only about the first, for ever.
-            // The folder-problem queue puts its own batch back for the same
-            // reason. Put back with its original moment, so the next morning's
-            // reading still dates it to the night it happened.
-            if (shown is null)
-            {
-                ScheduledPublishQuestion.PutBack(_course.Code, _sectionNumber, stopped);
-                App.LogDiagnostic("Put the scheduled-publish question back: no dialog could be shown.");
-            }
-        });
-        // A refused enqueue means the dispatcher is shutting down. Put it back
-        // here too — the callback above will never run to do it.
-        if (!queued)
+            ScheduledPublishOutcome.Dismiss(_course.Code, _sectionNumber);
+            SectionOutcomeDismissed?.Invoke(_course.Code, _sectionNumber);
+        }
+        catch (Exception ex)
         {
-            ScheduledPublishQuestion.PutBack(_course.Code, _sectionNumber, stopped);
-            App.LogDiagnostic("Could not show the scheduled-publish question: " + said);
+            App.LogDiagnostic($"DismissTheScheduledPublishNotice exception: {ex}");
         }
     }
+
+    /// <summary>
+    /// Raised when a teacher clears a scheduled publish's notice, so the
+    /// sidebar can take the warning off that section at the same moment.
+    /// </summary>
+    /// <remarks>
+    /// An event rather than a direct call into the sidebar: this view is hosted
+    /// by the window and knows nothing about the tree beside it, and a badge
+    /// that stayed up after the notice was dismissed would say a section still
+    /// needs attention when nothing does.
+    /// </remarks>
+    public static event Action<string, int>? SectionOutcomeDismissed;
 
     private void NoteHealthFindings(ScriptRunner? runner, bool cameFromPublishing = false)
     {
