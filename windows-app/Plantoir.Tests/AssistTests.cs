@@ -1613,17 +1613,28 @@ public class AssistWorkspaceTests : IDisposable
     public void ReadRememberedTimetable_FormatsUpcomingClasses()
     {
         Page("ICS3U", "section1/All Classes/Unit 1, Day 1.md", draft: false);
-        var dates = new[] { new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 10), new DateOnly(2026, 9, 12) };
-        TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", new DateOnly(2026, 9, 1));
+
+        // RELATIVE to today, and that is the whole point of this change. The
+        // dates used to be written down — 2026-09-08, -10 and -12 — and
+        // "upcoming" means `date >= today` in PlantoirTools, so on the morning
+        // of 2026-09-09 the first of them stopped being upcoming and this test
+        // began failing for everybody, every run, having passed for a day. A
+        // fixture that names absolute days when the code under test compares
+        // against the clock has an expiry date baked into it, and the failure
+        // arrives looking exactly like a product fault.
+        //
+        // Starts at tomorrow rather than today so that a run crossing midnight
+        // cannot lose the first date either.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var dates = new[] { today.AddDays(1), today.AddDays(3), today.AddDays(5) };
+        TimetableMemory.Write(_folder, "ICS3U", 1, dates, "test sheet", today.AddDays(-7));
 
         var tools = new Plantoir.Mcp.PlantoirTools(Open());
         var answer = tools.ReadRememberedTimetable("ICS3U", 1);
         string detail = answer.Detail();
 
         Assert.Contains("ICS3U Section 1", detail);
-        Assert.Contains("2026-09-08", detail);
-        Assert.Contains("2026-09-10", detail);
-        Assert.Contains("2026-09-12", detail);
+        foreach (var date in dates) Assert.Contains(date.ToString("yyyy-MM-dd"), detail);
         Assert.Contains("Where they came from: test sheet", detail);
     }
 
