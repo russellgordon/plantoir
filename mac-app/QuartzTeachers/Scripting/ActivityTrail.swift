@@ -137,7 +137,12 @@ nonisolated enum ActivityTrail {
         /// Carries the course, the section and which DESTINATION stopped: a
         /// course can publish to several and only one may have needed
         /// anything, so "it published to the folder and not to Netlify" is the
-        /// report a teacher makes. Dated to when the RUN wrote its record,
+        /// report a teacher makes. When the BUILD is what stopped there is no
+        /// destination to carry, because none was reached, and the line says
+        /// that instead — `ScheduledPublishOutcome.Kind.buildNeededAnAnswer`
+        /// files here rather than under an event of its own, since a question
+        /// going unasked is what happened either way. Dated to when the RUN
+        /// wrote its record,
         /// never to when the app read it, or an overnight problem is filed
         /// under the wrong night.
         ///
