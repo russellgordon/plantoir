@@ -643,6 +643,28 @@ final class SharedRulesContractTests: XCTestCase {
         return store
     }
 
+    // MARK: - The New Course wizard's words
+
+    /// The button a teacher presses to make a course says what the contract says.
+    ///
+    /// AUTHORED rather than generated, deliberately. Were this key written by
+    /// `--write-contracts`, changing the button would rewrite the contract to
+    /// match it and this test could never fail — which is the difference
+    /// `AppRulesContract` draws between a readout and an expectation, and the
+    /// reason this one is written by hand.
+    func testTheWizardsCreateButtonIsTheOneInTheContract() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("wizard")
+
+        XCTAssertEqual(
+            WizardWording.createCourseButton,
+            section["createCourseButton"] as? String,
+            "The wizard's affirmative button and contracts/shared-rules.json → wizard "
+            + "disagree. Both apps show this button and have said the same word since "
+            + "the wizard existed; change it in the contract and in both apps, or not "
+            + "at all."
+        )
+    }
+
     // MARK: - The working-folder path bar
 
     /// Only the crumb LIST is testable here — the gestures and the menu live
