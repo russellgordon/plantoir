@@ -609,10 +609,13 @@ enum ScheduledDeploy {
         // refused is one the Publish button asks.
         //
         // ONE path through deploy.sh escapes that and is filed rather than
-        // fixed here. If any page under the section's `public/` carries
-        // `ws://localhost:`, deploy.sh reruns preview.sh --build-only itself
-        // and passes its exit 3 straight through — a BUILD question, reported
-        // from here as though a destination had asked it. It needs
+        // fixed here (GitHub issue #136). Publishing to a FOLDER — and only to
+        // a folder — reruns preview.sh --build-only itself when any page under
+        // the section's `public/` carries `ws://localhost:`, and passes its
+        // exit 3 straight through: a BUILD question, reported from here as
+        // though the folder had asked it. Netlify and Cloudflare go through
+        // deploy.py, whose rebuild runs build_site.py directly, asks nothing
+        // and fails with 1, so they land in `didNotFinish` honestly. It needs
         // NEEDS_BUILD=0 above, which is BuildFreshness.needsRebuild written
         // out in shell and looks at `index.html` ALONE, while deploy.sh greps
         // the whole tree. So a clean front page in front of a stale preview

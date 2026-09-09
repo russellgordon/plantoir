@@ -5,8 +5,8 @@ import XCTest
 /// these tests RUN THE GENERATED SHELL rather than reading it.
 ///
 /// That distinction is the point of the file. The wrapper is bash written by
-/// Swift and executed by launchd at half six with nothing of ours loaded, so a
-/// test that only asserts the generated TEXT proves the string is what we meant
+/// Swift and run at half six by an agent nobody is watching, so a test that
+/// only asserts the generated TEXT proves the string is what we meant
 /// to write and nothing about what bash does with it. These build a stub
 /// workspace, run the real script through `/bin/bash`, and look at the file it
 /// left.
