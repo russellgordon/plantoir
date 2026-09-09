@@ -6,6 +6,7 @@ using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Mcp;
 
@@ -882,8 +883,32 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The first day of class, as YYYY-MM-DD. Meetings before it are ignored — a block runs all year, a section does not. Leave empty to use the whole block.")]
         string firstDay = "",
         [Description("The calendar year the school year starts in. Leave empty to work it out from today's date.")]
-        int startYear = 0)
-        => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: false, firstDay, cancellation);
+        int startYear = 0,
+        [Description("Either \"new\" or \"same\", when a teacher rolling this section over to a new year has said which website they want. Leave empty otherwise.")]
+        string website = "",
+        // `rollover` is on THIS server's schema and not on the mac's, and the
+        // reason is a platform fact rather than a preference. Plantoir's own
+        // assistant window reaches these tools through this process over
+        // JSON-RPC (McpClient.CallTool sends AssistCardCommand.ToJsonObject
+        // verbatim), and an argument the tool does not DECLARE is dropped by
+        // the SDK's binder — measured against ModelContextProtocol 2.2.0 by
+        // sending a made-up key: the call completed, IsError false, the key
+        // gone. So leaving `rollover` off the schema here would make the
+        // rollover phrasing run as an ordinary re-date, with nothing anywhere
+        // reporting a fault. The mac's card and its runner share a process, so
+        // no binder stands between them and it can keep the key off.
+        //
+        // Not avoidable by folding it into `website` either: cardPhrasings in
+        // contracts/assist-cases.json pins {"rollover":"yes"} on all three
+        // phrasings and AssistCardCommandTests asserts every key and value.
+        //
+        // Costs no routing accuracy — re_date_classes and its twin are not in
+        // AssistAgent.ForTheLocalModel, so no local model reads either schema.
+        // Recorded in AssistSurfaceContractTests' agreed departures.
+        [Description("Pass \"yes\" when this is a rollover to a new year rather than an ordinary re-dating, so the teacher is asked which website it should publish to.")]
+        string rollover = "")
+        => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: false, firstDay,
+                  cancellation, website, rollover);
 
     [McpServerTool(Name = "roll_over_section", Title = "Roll a section over to a new year",
                    Destructive = false, Idempotent = false)]
@@ -920,13 +945,24 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var result = workspace.ApplyReDate(plan);
 
             var found = workspace.Course(course);
-            string? released = workspace.ReleaseSite(found, section);
 
+            // ONE code path with re_date_classes, not a second one saying the
+            // same things in the same order. The first draft of this had its
+            // own copy and got it wrong in the way a copy does: a marker that
+            // existed and could NOT be moved produced "this section had not
+            // been published anywhere yet" and "I could not move this section
+            // off ..." one after the other - two sentences contradicting each
+            // other about the one fact the feature turns on - and then wrote a
+            // trail line saying the section had been rolled onto a new website
+            // while it was still pinned to last year's. Found by review, not by
+            // testing, because no test drove that branch of THIS tool.
+            //
+            // `website: "new"` because that is what this tool IS: its own
+            // description promises it cuts the section loose, and a Claude Code
+            // session calling it has chosen already. The QUESTION belongs to
+            // the card phrasing, which reaches re_date_classes instead.
             var text = new StringBuilder(result.Message);
-            text.Append(released is null
-                ? "\nThis section had no website yet, so there was nothing to cut it loose from."
-                : $"\nCut loose from last year's website — the old details are kept at {released}. " +
-                  "Publishing this section from Plantoir will ask what to call the new site.");
+            text.Append("\n" + SettleTheWebsiteAfterARollover(found, section, "new", "yes"));
             text.Append("\n\nNothing was hidden. Preview the section and check the dates and structure look right, " +
                         "then decide what students should see.");
             if (plan.Problems.Count > 0)
@@ -946,7 +982,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "class dates on file, by POSITION — the first class takes the first date — and move " +
                  "the pages each class uses onto that class's day with it. Pages this section's Key " +
                  "Links points at move to the first day of class. Curriculum pages are left alone, " +
-                 "because Plantoir dates those itself on every build.")]
+                 "because Plantoir dates those itself on every build. " +
+                 "Set `website` when the teacher is rolling a section over to a NEW YEAR and has said " +
+                 "which website they want: \"new\" starts a fresh one, so publishing no longer replaces " +
+                 "last year's site, and \"same\" keeps last year's address. Ask them first — never choose " +
+                 "for them, and leave it out for an ordinary re-dating.")]
     public Task<CallToolResult> ReDateClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -960,12 +1000,37 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The first day of class, as YYYY-MM-DD. Meetings before it are ignored — a block runs all year, a section does not. Leave empty to use the whole block.")]
         string firstDay = "",
         [Description("The calendar year the school year starts in. Leave empty to work it out from today's date.")]
-        int startYear = 0)
-        => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: true, firstDay, cancellation);
+        int startYear = 0,
+        [Description("Either \"new\" or \"same\", when a teacher rolling this section over to a new year has said which website they want. Leave empty otherwise.")]
+        string website = "",
+        // `rollover` is on THIS server's schema and not on the mac's, and the
+        // reason is a platform fact rather than a preference. Plantoir's own
+        // assistant window reaches these tools through this process over
+        // JSON-RPC (McpClient.CallTool sends AssistCardCommand.ToJsonObject
+        // verbatim), and an argument the tool does not DECLARE is dropped by
+        // the SDK's binder — measured against ModelContextProtocol 2.2.0 by
+        // sending a made-up key: the call completed, IsError false, the key
+        // gone. So leaving `rollover` off the schema here would make the
+        // rollover phrasing run as an ordinary re-date, with nothing anywhere
+        // reporting a fault. The mac's card and its runner share a process, so
+        // no binder stands between them and it can keep the key off.
+        //
+        // Not avoidable by folding it into `website` either: cardPhrasings in
+        // contracts/assist-cases.json pins {"rollover":"yes"} on all three
+        // phrasings and AssistCardCommandTests asserts every key and value.
+        //
+        // Costs no routing accuracy — re_date_classes and its twin are not in
+        // AssistAgent.ForTheLocalModel, so no local model reads either schema.
+        // Recorded in AssistSurfaceContractTests' agreed departures.
+        [Description("Pass \"yes\" when this is a rollover to a new year rather than an ordinary re-dating, so the teacher is asked which website it should publish to.")]
+        string rollover = "")
+        => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: true, firstDay,
+                  cancellation, website, rollover);
 
     private async Task<CallToolResult> ReDate(string course, int section, string timetable, string block,
                                               string[]? pages, int[]? meetings, int startYear, bool apply,
-                                              string firstDay, CancellationToken cancellation)
+                                              string firstDay, CancellationToken cancellation,
+                                              string website = "", string rollover = "")
     {
         try
         {
@@ -990,20 +1055,66 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var plan = workspace.PlanReDate(course, section, parsed,
                 pages ?? Array.Empty<string>(), meetings ?? Array.Empty<int>());
 
+            bool isRollover = IsARollover(website, rollover);
+            string already = $"Every page in {found.Code} Section {number} is already on the day it should be.";
+
             if (!apply)
             {
+                // A ROLLOVER carrying an answer is still a PLAN even when the
+                // dates are already right, and this is what makes the answer
+                // turn work at all under plan mode — which is ON unless a
+                // teacher has turned it off. AssistAgent.ShowPlan returns early
+                // whenever the twin hands back something that is not a plan, so
+                // answering "already on the day it should be" here means the
+                // real call never runs and the website is never settled. In the
+                // default configuration that makes the release unreachable.
                 if (plan.ChangesNothing)
                 {
-                    string already = $"Every page in {found.Code} Section {number} is already on the day it should be.";
-                    return Answering(already);
+                    if (!isRollover) return Answering(already);
+                    // A ROLLOVER with no answer yet, on a section whose dates
+                    // are already right. Found by review, and it is the mirror
+                    // of the trap above: with confirmation ON - the default -
+                    // the plan twin is where the request STOPS, so a plan that
+                    // says nothing about the website means the question is
+                    // never asked at all. The teacher reads "everything is
+                    // already on the right day" and the section stays pinned to
+                    // last year's site. It is exactly the state a teacher
+                    // reaches on their SECOND attempt: roll over, ignore the
+                    // question, come back and ask again.
+                    //
+                    // Answered rather than proposed, because there is nothing
+                    // to say yes to: the dates need no change, and the website
+                    // is settled by saying one of the two sentences rather than
+                    // by pressing Go. The mac has this hole too - written up
+                    // for them rather than reached into from here.
+                    if (!AnAnswerWasGiven(website))
+                        return Answering(already + "\n\n" + AskingWhichWebsite(),
+                                         already + "\n\n" + AskingWhichWebsite());
+                    return Proposing(already + "\n\n" + WhatSettlingTheWebsiteWouldDo(website));
                 }
-                return Proposing(plan.Describe());
+                // Dates DO change, so Go is a real decision and the question
+                // arrives with the result afterwards - which is what the mac
+                // does, and why nothing is added here for the bare phrasing.
+                return Proposing(isRollover && WouldStartANewWebsite(website)
+                    ? plan.Describe() + "\n\nIt would also " + WhatStartingANewWebsiteDoes()
+                    : plan.Describe());
             }
 
             if (plan.ChangesNothing)
             {
-                string already = $"Every page in {found.Code} Section {number} is already on the day it should be.";
-                return Answering(already);
+                // The website is settled HERE TOO, and this is the SECOND TURN
+                // of the conversation. A teacher answers the website question by
+                // saying one of the two sentences, which comes back through this
+                // same tool — and by then the pages are already on their dates,
+                // so the plan changes nothing. Returning early made the answer a
+                // no-op: the reply talked about dates, never mentioned the
+                // website, and left the section pinned to last year's. An offer
+                // that looks like it worked is worse than no offer at all.
+                string aboutTheWebsiteOnly = SettleTheWebsiteAfterARollover(
+                    found, number, website, rollover);
+                if (aboutTheWebsiteOnly.Length == 0) return Answering(already);
+                string bothHalves = already + "\n\n" + aboutTheWebsiteOnly;
+                return Answering(bothHalves, bothHalves);
             }
 
             var result = workspace.ApplyReDate(plan);
@@ -1016,11 +1127,219 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                             $"\n\n{AssistWorkspace.BackedUpNote}" +
                             "\n\nNothing was published or hidden, so students see no change until you deploy.";
 
+            // The website goes in the SUMMARY as well as the detail: the
+            // summary is the one line the teacher reads in the chat window, and
+            // this is the part they have to answer. Put only in `detail` it
+            // would work over MCP and be invisible in the app.
+            string aboutTheWebsite = SettleTheWebsiteAfterARollover(found, number, website, rollover);
+            if (aboutTheWebsite.Length > 0)
+            {
+                summary += "\n\n" + aboutTheWebsite;
+                detail += "\n\n" + aboutTheWebsite;
+            }
+
             return Answering(summary, detail);
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (Plantoir.Core.Models.OutsideWorkspaceException refusal) { return Answering(refusal.Message); }
     }
+
+    // ---- The one question a rollover asks --------------------------------
+
+    /// <summary>
+    /// Whether this call is a rollover at all.
+    /// </summary>
+    /// <remarks>
+    /// Either the app's card phrasing said so, or a caller answered the
+    /// question outright. Over MCP there is no card, so <c>website</c> alone
+    /// has to be enough — otherwise the one surface that cannot show a sheet
+    /// also cannot roll a section over, which is the hole this design closes.
+    /// An ordinary re-date sets neither and is untouched: three of the four
+    /// phrasings reaching this tool are a snow day or a shifted timetable, and
+    /// asking THOSE about websites would let a teacher answer "a new website"
+    /// mid-semester and abandon the address students are reading right now.
+    /// </remarks>
+    private static bool IsARollover(string website, string rollover) =>
+        string.Equals(rollover, "yes", StringComparison.OrdinalIgnoreCase)
+        || !string.IsNullOrWhiteSpace(website);
+
+    private static bool AnAnswerWasGiven(string website) =>
+        string.Equals(website, "new", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(website, "same", StringComparison.OrdinalIgnoreCase);
+
+    private static bool WouldStartANewWebsite(string website) =>
+        string.Equals(website, "new", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The half-sentence the two plan wordings share.</summary>
+    /// <remarks>
+    /// Word for word the mac's, so a teacher reading a plan on either app
+    /// reads the same thing. NEITHER app's copy is in
+    /// <c>contracts/assist-wording.json</c> - the generator does not reach a
+    /// tool runner's plan prose - which is GitHub issue #127 rather than
+    /// papered over with a second home for the string here. (#83 landed the
+    /// generator change for tool SCHEMA departures; it does not reach this.)
+    /// </remarks>
+    private static string WhatStartingANewWebsiteDoes() =>
+        "start a new website for this section, so publishing it no longer replaces last year's. " +
+        "Last year's details are kept, and any publish set to happen on its own is turned off.";
+
+    /// <summary>What a plan says the website half would do.</summary>
+    private static string WhatSettlingTheWebsiteWouldDo(string website) =>
+        WouldStartANewWebsite(website)
+            ? "Start a new website for this section, so publishing it no longer replaces last " +
+              "year's. Last year's details are kept, and any publish set to happen on its own " +
+              "is turned off."
+            : "Keep publishing this section to the same website as last year.";
+
+    /// <summary>
+    /// The question, the two sentences that answer it, and the plain statement
+    /// that nothing about the website has changed.
+    /// </summary>
+    /// <remarks>
+    /// One home, because it is said from TWO places: the plan twin, when the
+    /// dates are already right and the twin is where the request stops, and the
+    /// write itself. A second copy is the one that keeps saying the old words
+    /// after the product changes them.
+    /// </remarks>
+    private static string AskingWhichWebsite() =>
+        AssistWording.RolloverWebsiteQuestion + "\n\n"
+        + $"Say \u201c{AssistWording.RolloverSayToStartANewWebsite}\u201d or "
+        + $"\u201c{AssistWording.RolloverSayToKeepTheSameWebsite}\u201d.\n\n"
+        + AssistWording.RolloverWebsiteNotDecided;
+
+    /// <summary>
+    /// What a rollover says about the website, and what it does about it.
+    /// Returns the empty string for an ORDINARY re-date, which must never be
+    /// asked.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>The question is answered by SAYING one of two things, not by a
+    /// dialog, and that is the whole design.</b> A dialog cannot appear for a
+    /// request arriving over MCP — and this server advertises the rollover
+    /// phrasing to Claude Code — so a dialog would leave that path silently
+    /// pinned to last year's site with the write already done. Answering in
+    /// words works identically in both clients, and the reply always states
+    /// which of the two happened, so a question nobody answers is visible
+    /// rather than silent.</para>
+    /// </remarks>
+    private string SettleTheWebsiteAfterARollover(
+        Course course, int sectionNumber, string website, string rollover)
+    {
+        if (!IsARollover(website, rollover)) return "";
+
+        if (string.Equals(website, "same", StringComparison.OrdinalIgnoreCase))
+        {
+            ActivityTrail.Note(
+                ActivityTrail.Event.SectionKeptItsWebsite,
+                "kept last year's website when rolling the section over",
+                course.Code, sectionNumber);
+            return AssistWording.RolloverKeptTheSameWebsite;
+        }
+
+        if (!WouldStartANewWebsite(website))
+        {
+            // Asked, and NOT acted on. The sentence says both halves: what was
+            // not changed, and how to change it.
+            //
+            // Reached by a bare rollover AND by a `website` value that is
+            // neither "new" nor "same" - a caller sending "a new one", which is
+            // an ordinary thing for a model to do, gets the question back
+            // rather than an ordinary re-date with the website silently
+            // untouched. That is the same silent-drop failure the schema
+            // argument above is about, one layer up. Shared with the mac.
+            return AskingWhichWebsite();
+        }
+
+        var released = workspace.ReleaseSite(course, sectionNumber);
+        if (!released.ReleasedAnything)
+        {
+            // Still pinned is NOT the same as never published, and telling a
+            // teacher the wrong one of those is telling them the opposite of
+            // the truth about the only fact this feature turns on.
+            if (released.SomethingIsStillPinned)
+                return AssistWording.RolloverCouldNotStartANewWebsite(
+                    string.Join(", ", released.StillPinned));
+
+            NoteTheWebsiteOnTheTrail(released, course.Code, sectionNumber);
+            return AssistWording.RolloverHadNoWebsiteYet;
+        }
+
+        string said = AssistWording.RolloverStartedANewWebsite(string.Join(", ", released.KeptFiles));
+        // Some destinations released and others not: say so, rather than
+        // letting the success sentence stand for the whole section.
+        if (released.SomethingIsStillPinned)
+            said += "\n\n" + AssistWording.RolloverCouldNotStartANewWebsite(
+                string.Join(", ", released.StillPinned));
+
+        switch (TurnOffAnyScheduledPublish(course.Code, sectionNumber))
+        {
+            case ScheduledPublishOutcome.NoneWasSet: break;
+            case ScheduledPublishOutcome.TurnedOff:
+                said += "\n\n" + AssistWording.RolloverTurnedOffTheScheduledPublish; break;
+            case ScheduledPublishOutcome.CouldNotTurnOff:
+                said += "\n\n" + AssistWording.RolloverCouldNotTurnOffTheScheduledPublish; break;
+        }
+
+        NoteTheWebsiteOnTheTrail(released, course.Code, sectionNumber);
+        return said;
+    }
+
+    /// <summary>
+    /// One trail line per rollover that started a new website, saying where
+    /// last year's details went — or that there were none.
+    /// </summary>
+    /// <remarks>
+    /// Recorded HERE rather than in the app, because this server is the single
+    /// place both Windows surfaces reach: Plantoir's own assistant window
+    /// drives it over stdio exactly as Claude Code does, so a line written in
+    /// the app would miss every request arriving from a terminal. (The mac
+    /// records the same two events from its own runner, which on that platform
+    /// IS the app.) This server already wrote the trail before these two
+    /// events — <c>LauncherRunner</c> does — so the known limit that comes
+    /// with it is pre-existing rather than introduced here:
+    /// <c>AppDataRoot</c> is per-process, so a run started with
+    /// <c>--state-dir</c> does not redirect this server's copy.
+    /// </remarks>
+    private static void NoteTheWebsiteOnTheTrail(
+        AssistWorkspace.SiteRelease released, string courseCode, int sectionNumber)
+    {
+        ActivityTrail.Note(
+            ActivityTrail.Event.SectionStartedANewWebsite,
+            released.ReleasedAnything
+                ? "rolled the section over onto a new website — last year's details kept at "
+                  + string.Join(", ", released.KeptFiles)
+                : "rolled the section over onto a new website — it had not been published anywhere yet",
+            courseCode, sectionNumber);
+    }
+
+    /// <summary>
+    /// Turn off a publish that was set to happen on its own, and say whether
+    /// there was one.
+    /// </summary>
+    /// <remarks>
+    /// <b>Not politeness — the alternative is a website nobody named going
+    /// live.</b> A section cut loose has no agreed website to publish TO, and a
+    /// scheduled run has nobody to ask: the wrapper re-checks nothing, and
+    /// <c>deploy.py</c>'s name prompt returns its DEFAULT when there is no
+    /// terminal rather than failing. So the overnight run would create
+    /// <c>&lt;code&gt;-s&lt;n&gt;-&lt;year&gt;-&lt;name&gt;</c> and publish there,
+    /// while the address the teacher's students actually read quietly stopped
+    /// updating.
+    /// </remarks>
+    private static ScheduledPublishOutcome TurnOffAnyScheduledPublish(string courseCode, int sectionNumber)
+    {
+        string taskName = TaskScheduling.NameFor(courseCode, sectionNumber);
+        if (!TaskScheduling.Exists(taskName)) return ScheduledPublishOutcome.NoneWasSet;
+        // The failure is REPORTED, never swallowed: a task left behind runs at
+        // its appointed time, with nobody to ask what the new website should be
+        // called — the whole thing turning it off exists to prevent.
+        return TaskScheduling.Cancel(taskName) is null
+            ? ScheduledPublishOutcome.TurnedOff
+            : ScheduledPublishOutcome.CouldNotTurnOff;
+    }
+
+    /// <summary>What became of a publish that was set to happen on its own.</summary>
+    private enum ScheduledPublishOutcome { NoneWasSet, TurnedOff, CouldNotTurnOff }
 
     private static async Task<Timetable> Load(string timetable, string block, int startYear,
                                               CancellationToken cancellation, string firstDay = "")

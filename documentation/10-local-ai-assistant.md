@@ -1680,6 +1680,73 @@ comma-separated date list is parsed correctly here today. A separator
 difference is a difference in what each side ADVERTISES, and a suite should
 not assert an incompatibility from it.
 
+## Rolling a section over: why `rollover` is on one surface's schema and not the other
+
+Written on Windows, 2026-09-08, porting the rollover's website question (issues
+#66 and #69). The design, the sentences and the marker rules all came from
+`contracts/`; what follows is the part a contract cannot carry.
+
+**The mac keeps `rollover` OFF its published schema. Windows cannot, and the
+reason is a platform fact rather than a preference.** On the mac, the card that
+matches "roll this section over to a new year" and the runner that carries it
+out share a process, so an argument set by one is simply read by the other.
+Plantoir's own assistant window on Windows reaches its tools **through**
+`plantoir-mcp` over JSON-RPC — `McpClient.CallTool` sends
+`AssistCardCommand.ToJsonObject` verbatim — and the SDK's binder **drops** an
+argument the method does not declare rather than refusing it. Measured against
+ModelContextProtocol 2.2.0 by sending a made-up key to a real server over
+stdio: the call completed, `IsError = false`, the key gone.
+
+So leaving `rollover` off the Windows schema would make the rollover phrasing
+run as an **ordinary re-date, with nothing anywhere reporting a fault** — the
+quietest possible version of the very defect the feature exists to fix. Both
+`re_date_classes` and its plan twin declare it there; plan mode is on by
+default, so the card's arguments reach the TWIN first, and a twin that cannot
+see them proposes an ordinary re-date and the answer is lost. All three are
+recorded in `AssistSurfaceContractTests`' agreed departures.
+
+It costs no routing accuracy on either side: `re_date_classes` is in neither
+platform's local-model list, so no local model ever reads either schema.
+
+**Rejected:** folding `rollover` into `website` (say, `website: "ask"`), which
+needs no new key at all — `contracts/assist-cases.json` → `cardPhrasings` pins
+`{"rollover": "yes"}` on all three phrasings and both suites assert every key
+and value, so the conclusion is forced rather than merely preferred.
+
+**A general lesson worth more than this one argument.** Every test on both
+platforms either builds tool arguments by hand or calls the method directly,
+which is exactly the gap a binder sits in.
+`AssistSurfaceContractTests.TheCardsArgumentsReachTheToolThatReadsThem` walks
+every phrasing in `cardPhrasings`, builds the JSON the app would really send,
+and asserts every key is one the tool declares. It found a live defect on its
+first run — the eight `publish_class_on` phrasings send `when` and the tool
+takes `date`, so "publish tomorrow's class" fails in the app (issue #116). The
+mac has no equivalent check and may want one.
+
+**The three traps the mac's own write-up named were all present on Windows
+too**, which means they belong to the design rather than to the Swift: the
+answer turn arrives once the dates are already right, so an early return there
+makes the answer a no-op; `ShowPlan` returns early whenever the plan twin hands
+back something that is not a plan, which can make the release unreachable in
+the default configuration; and the question has to go in the teacher's SUMMARY
+rather than the detail. A fourth was found on Windows and is the mac's too
+(issue #120): a bare rollover on a section whose dates are already right never
+asks the question at all under plan mode, so the question exists or not
+depending on a setting.
+
+**A known limit, recorded in `nearMisses` rather than fixed.** The reply offers
+two sentences word for word, and those exact strings are the only way back in.
+`re_date_classes` is shown to no local model, so a teacher who paraphrases —
+"a new website", "new one please" — matches nothing at all and is told nothing.
+Both apps already pass those cases, so nothing goes red; they are written down
+so the limit is visible, and so a future looser matcher has to change the list
+on purpose.
+
+**Where a released legacy marker lives differs by platform**, and getting it
+wrong is silent in both directions — see
+[`08-course-config-reference.md`](08-course-config-reference.md), which gives
+both spellings.
+
 ## Further reading in this repository
 
 - [`09-mac-app.md`](09-mac-app.md) — the app the assistant lives in
