@@ -11,10 +11,17 @@ import Foundation
 ///   carries `publishForSection<N>:` — one flag per section
 ///
 /// `draft:` and `draftSection<N>:` are the older spellings and mean the
-/// OPPOSITE: `draft: true` is a page students cannot see. Both are read, and a
-/// page written in the old spelling is written back in the old spelling,
-/// inverted — respelling a teacher's frontmatter behind their back is a diff
-/// nobody asked for, in a file Obsidian very likely has open.
+/// OPPOSITE: `draft: true` is a page students cannot see. Both are read, and
+/// the first time anything edits such a page's visibility the old key is
+/// MIGRATED: the new key takes the old key's own line and the old line is
+/// gone, so a teacher sees a one-line change in the file Obsidian has open
+/// rather than reordered frontmatter, and their course converges on one
+/// spelling instead of carrying two that mean opposite things.
+///
+/// Nothing converts a course in a sweep, and nothing needs to — the build
+/// reads both spellings, so a page nobody edits goes on working exactly as it
+/// did. The rule, and what was rejected, is in `contracts/file-formats.json`
+/// → `pageVisibility.writingRules`.
 ///
 /// A page that says nothing either way IS published. That is Quartz's own rule
 /// here — `patches/publish.ts` drops a page only when it says `publish: false`
@@ -32,19 +39,6 @@ enum AssistPageVisibility {
     /// The older key, which means the opposite.
     static func draftKey(forSection sectionNumber: Int, isSectionLocal: Bool) -> String {
         return isSectionLocal ? "draft" : "draftSection\(sectionNumber)"
-    }
-
-    /// The key this page actually uses, so a plan can name it to the teacher.
-    static func keyInUse(in pageText: String, forSection sectionNumber: Int, isSectionLocal: Bool) -> String {
-        let publish: String = publishKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
-        if PageFrontmatter.rawValue(forKey: publish, in: pageText) != nil {
-            return publish
-        }
-        let draft: String = draftKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
-        if PageFrontmatter.rawValue(forKey: draft, in: pageText) != nil {
-            return draft
-        }
-        return publish
     }
 
     /// Whether this section publishes this page, or nil when the page says
@@ -100,26 +94,35 @@ enum AssistPageVisibility {
     /// A line-level edit, for the reason `PageFrontmatter` gives: the
     /// teacher's frontmatter is theirs, and round-tripping it through a YAML
     /// library would reorder keys and strip their comments.
+    ///
+    /// This is where a legacy page is migrated, and it is the one place that
+    /// rewrites a page whose value is already right: a page spelled the old
+    /// way is converted once even when nothing about its visibility moves.
+    /// That is deliberate, and it is the single exception to "writing the
+    /// value it already has changes nothing" — a page nobody ever flips would
+    /// otherwise keep its legacy key forever, which is exactly the page the
+    /// old rule left behind.
     static func setting(
         published: Bool,
         in pageText: String,
         forSection sectionNumber: Int,
         isSectionLocal: Bool
     ) -> (text: String, changed: Bool) {
-        let key: String = keyInUse(
+        let key: String = publishKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
+        let legacy: String = draftKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
+        let carriesLegacyKey: Bool = PageFrontmatter.rawValue(forKey: legacy, in: pageText) != nil
+
+        // Already saying the right thing in the current spelling: leave the
+        // file alone, so its modification time does not move and the next
+        // build is not fooled into thinking the content changed.
+        let stated: Bool? = statedPublishing(
             in: pageText, forSection: sectionNumber, isSectionLocal: isSectionLocal
         )
-        // A page written in the old spelling keeps it, inverted: `draft` is
-        // "students cannot see this", so publishing means `draft: false`.
-        let isDraftKey: Bool = key == draftKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
-        let value: String = (isDraftKey ? !published : published) ? "true" : "false"
-
-        let existing: String? = PageFrontmatter.rawValue(forKey: key, in: pageText)
-        if let existing, existing == value {
+        if stated == published && !carriesLegacyKey {
             return (pageText, false)
         }
 
-        let line: String = key + ": " + value
+        let line: String = key + ": " + (published ? "true" : "false")
         guard let block = PageFrontmatter.block(in: pageText) else {
             // No frontmatter at all: give the page a block of its own, the
             // way `PageFrontmatter.settingCreated` does.
@@ -127,14 +130,34 @@ enum AssistPageVisibility {
         }
 
         var lines: [String] = pageText.components(separatedBy: "\n")
-        let prefix: String = key + ":"
+        var currentKeyIndex: Int? = nil
+        var legacyKeyIndex: Int? = nil
         for index in (block.openIndex + 1)..<block.closeIndex {
-            if PageFrontmatter.trimmingCarriageReturn(lines[index]).hasPrefix(prefix) {
-                lines[index] = line + (lines[index].hasSuffix("\r") ? "\r" : "")
-                return (lines.joined(separator: "\n"), true)
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            if currentKeyIndex == nil && bare.hasPrefix(key + ":") {
+                currentKeyIndex = index
+            }
+            if legacyKeyIndex == nil && bare.hasPrefix(legacy + ":") {
+                legacyKeyIndex = index
             }
         }
-        lines.insert(line, at: block.openIndex + 1)
+
+        if let index = currentKeyIndex {
+            lines[index] = line + (lines[index].hasSuffix("\r") ? "\r" : "")
+            // This page was migrated already, and a leftover legacy key now
+            // says the opposite of the line above it. It goes.
+            if let stale = legacyKeyIndex {
+                lines.remove(at: stale)
+            }
+        } else if let index = legacyKeyIndex {
+            // Migrating. The new key takes the old key's own line, so the
+            // teacher's frontmatter keeps its order — moving it to the top of
+            // the block would show up as a reordered diff in a file they very
+            // likely have open.
+            lines[index] = line + (lines[index].hasSuffix("\r") ? "\r" : "")
+        } else {
+            lines.insert(line, at: block.openIndex + 1)
+        }
         return (lines.joined(separator: "\n"), true)
     }
 

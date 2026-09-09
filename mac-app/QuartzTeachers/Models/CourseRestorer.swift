@@ -276,10 +276,13 @@ enum CourseRestorer {
     /// exactly as the backup had them, and every other byte left alone.
     ///
     /// The backup's LINES are carried across verbatim rather than its values
-    /// read and rewritten. That is what keeps a course written in the older
-    /// `draftSection<N>` spelling in that spelling — the same care
-    /// `AssistPageVisibility.setting` takes, arrived at more simply, because
-    /// here the right line already exists and only has to be copied.
+    /// read and rewritten, because a restore's whole job is to put back what
+    /// was there. A page the backup holds in the older `draftSection<N>`
+    /// spelling comes back in that spelling — a restore is not an edit of a
+    /// page's visibility, so it is not where migration happens
+    /// (`AssistPageVisibility.setting` is, the next time something changes
+    /// what the page says). Rewriting the key here would mean a restore
+    /// putting back something the backup never contained.
     ///
     /// Which lines count is asked of `SectionAdder.perSectionKeyNumber`, so
     /// this can never disagree with the code that writes them about what

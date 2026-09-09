@@ -7,8 +7,9 @@ struct AssistPublishChange {
 
     let page: AssistSectionPage
 
-    /// The frontmatter key that decides it — named in the plan so a teacher
-    /// reading the plan can go and look at the same line.
+    /// The frontmatter key that will decide it once the change is made —
+    /// always the current spelling, since a page still written the old way is
+    /// migrated as it is edited.
     let key: String
 
     let wasVisible: Bool
@@ -479,13 +480,16 @@ enum AssistPublishPlanner {
                 alreadyRight.append(page)
                 continue
             }
-            guard let text = try? String(contentsOf: page.fileURL, encoding: .utf8) else {
+            // A page that cannot be read cannot be changed either, and
+            // listing it would promise the teacher something the writing step
+            // then quietly skips.
+            guard (try? String(contentsOf: page.fileURL, encoding: .utf8)) != nil else {
                 continue
             }
             changes.append(AssistPublishChange(
                 page: page,
-                key: AssistPageVisibility.keyInUse(
-                    in: text, forSection: sectionNumber, isSectionLocal: page.isSectionLocal
+                key: AssistPageVisibility.publishKey(
+                    forSection: sectionNumber, isSectionLocal: page.isSectionLocal
                 ),
                 wasVisible: page.isVisibleToStudents,
                 willBeVisible: publishes,
