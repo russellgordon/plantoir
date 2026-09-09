@@ -253,24 +253,82 @@ public class SpecialFolderRenamerTests : IDisposable
         Assert.Equal(rename["doneRelinkedNone"]!.ToString(), SpecialNames.RenameRelinkedNone);
     }
 
-    [Fact]
-    public void TheTwoPlatformWordedSentencesSayThisPcRatherThanYourMac()
+    /// <summary>
+    /// Which sentences name the machine, read from the contract rather than
+    /// listed here.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Nothing may be added to this map without a matching key in the
+    /// contract, and nothing may be in the contract without an entry here.</b>
+    /// That pairing is the whole point of driving the test off
+    /// <c>platformWording.keys</c>: the mac already fails if a fourth
+    /// <c>specialNames</c> sentence contains its platform word and is not
+    /// recorded, which pins the RECORD — but until this map existed nothing on
+    /// this side READ the list, so a fourth sentence turned the mac red and
+    /// still left a Windows test to be written by hand (GitHub issue #118).
+    /// </para>
+    /// </remarks>
+    private static readonly Dictionary<string, string> PlatformWordedSentences = new()
     {
-        // Deliberate, and the same difference as "Setting up this Mac" against
-        // "Setting up this PC". Asserted so that a future sync of the contract
-        // cannot quietly put "your Mac" in front of a Windows teacher.
-        Assert.Contains("on this PC", SpecialNames.RenameExplanation);
-        Assert.DoesNotContain("your Mac", SpecialNames.RenameExplanation);
-        Assert.Contains("on this PC", SpecialNames.RenameNothingWasThere);
-        Assert.DoesNotContain("your Mac", SpecialNames.RenameNothingWasThere);
+        ["renameFolder.explanation"] = SpecialNames.RenameExplanation,
+        ["renameFolder.doneNothingWasThere"] = SpecialNames.RenameNothingWasThere,
+        ["removeLeavesTheFolderOnDisk.message"] = SpecialNames.RemoveLeavesTheFolderOnDisk,
+    };
 
-        // ...and otherwise word for word the contract's.
-        var rename = ContractLoader.LoadJson("shared-rules.json")
-            ["specialNames"]!["renameFolder"]!;
-        Assert.Equal(rename["explanation"]!.ToString().Replace("on your Mac", "on this PC"),
-                     SpecialNames.RenameExplanation);
-        Assert.Equal(rename["doneNothingWasThere"]!.ToString().Replace("on your Mac", "on this PC"),
-                     SpecialNames.RenameNothingWasThere);
+    /// <summary>
+    /// Every sentence the contract records as platform-worded says "on this
+    /// PC" here, and is otherwise word for word the contract's.
+    /// </summary>
+    /// <remarks>
+    /// <para>Deliberate, and the same difference as "Setting up this Mac"
+    /// against "Setting up this PC" — recorded in
+    /// <c>shared-rules.json</c> → <c>specialNames.platformWording</c>, shaped
+    /// after <c>app-rules.json</c> → <c>markerOrigins.knownDivergence</c>,
+    /// which <c>MilestoneContractTests</c> already reads the same way.</para>
+    ///
+    /// <para>A contract-driven test asserting the stored sentence VERBATIM
+    /// would put the word Mac in front of a Windows teacher — a test enforcing
+    /// a bug. So it compares everything except the platform word, and asserts
+    /// this platform's spelling separately.</para>
+    ///
+    /// <para><b>Driven off the list, not off three names typed here.</b> Both
+    /// directions are checked: a key added to the contract with no sentence on
+    /// this side fails by name, and a sentence left in this map after the
+    /// contract stopped recording it fails too — so the map cannot become a
+    /// record of what once differed.</para>
+    /// </remarks>
+    [Fact]
+    public void EverySentenceTheContractCallsPlatformWordedSaysThisPc()
+    {
+        var names = ContractLoader.LoadJson("shared-rules.json")["specialNames"]!;
+        var wording = names["platformWording"]!;
+        string macWord = wording["mac"]!.ToString();
+        string windowsWord = wording["windows"]!.ToString();
+
+        var recorded = wording["keys"]!.AsArray()
+            .Select(key => key!.ToString()).ToList();
+        Assert.NotEmpty(recorded);
+
+        Assert.Equal(
+            recorded.OrderBy(k => k, StringComparer.Ordinal).ToList(),
+            PlatformWordedSentences.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList());
+
+        foreach (string key in recorded)
+        {
+            // "renameFolder.explanation" walks two steps into specialNames;
+            // "removeLeavesTheFolderOnDisk.message" walks two as well. Walked
+            // rather than special-cased, so a three-part key added later needs
+            // no change here.
+            JsonNode? node = names;
+            foreach (string step in key.Split('.')) node = node![step];
+            string macSentence = node!.ToString();
+
+            string here = PlatformWordedSentences[key];
+
+            Assert.Contains(windowsWord, here);
+            Assert.DoesNotContain(macWord, here);
+            Assert.Equal(macSentence.Replace(macWord, windowsWord), here);
+        }
     }
 
     [Fact]
