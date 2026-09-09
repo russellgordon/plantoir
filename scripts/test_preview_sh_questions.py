@@ -306,11 +306,22 @@ class EveryQuestionPreviewShAsksIsGuarded(unittest.TestCase):
     Text-only and un-gated, so it runs on a machine with no usable bash too.
     """
 
-    # `read -rp`, `read -rsp`, `read -p` — a read that PROMPTS. The other
-    # `read -r`s in the launcher take their input from a here-string or a
-    # pipe and ask nobody anything.
-    A_PROMPTING_READ = re.compile(r"\bread\s+-[a-zA-Z]*p\b")
-    A_FUNCTION_OPENS = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\(\)\s*\{")
+    # ANY `read` that is not fed from somewhere, rather than only the ones
+    # spelled `read -rp`. Narrowing it to the `-p` form was the first version
+    # and it was too kind: `printf "Fix it? "; read -r _ans` asks exactly the
+    # same question of exactly the same nobody, and so does `read -r -p` with
+    # the options split. Windows' scanner matches every `Read-Host`, and this
+    # is the same width. Anything fed by a here-string, a process
+    # substitution, a pipe, or a `while`/`until` loop is reading DATA and asks
+    # nothing.
+    A_READ = re.compile(r"(?:^|[;&|]|\bthen\b|\bdo\b|\belse\b)\s*read\b")
+    IS_FED_INPUT = re.compile(r"<<<|<\(|\|\s*read\b|^\s*(?:while|until)\b|done\s*<")
+    # `name() {`, `name ()  {`, `function name {`, and the brace on the next
+    # line. Only at column 0, which is where every function in these launchers
+    # is defined.
+    A_FUNCTION_OPENS = re.compile(
+        r"^(?:function\s+([A-Za-z_][A-Za-z0-9_]*)\b|([A-Za-z_][A-Za-z0-9_]*)\s*\(\))"
+    )
 
     def setUp(self):
         self.lines = (REPOSITORY_ROOT / "preview.sh").read_text(
@@ -322,14 +333,21 @@ class EveryQuestionPreviewShAsksIsGuarded(unittest.TestCase):
         for line in self.lines[:index]:
             opened = self.A_FUNCTION_OPENS.match(line)
             if opened:
-                current = opened.group(1)
+                current = opened.group(1) or opened.group(2)
             elif line.startswith("}"):
                 current = None
         return current
 
+    def is_a_question(self, line: str) -> bool:
+        return bool(self.A_READ.search(line)) and not self.IS_FED_INPUT.search(line)
+
     def test_every_prompting_read_is_guarded(self):
-        prompts = [i for i, line in enumerate(self.lines)
-                   if self.A_PROMPTING_READ.search(line)]
+        prompts = []
+        for index, line in enumerate(self.lines):
+            if line.strip().startswith("#"):
+                continue
+            if self.is_a_question(line):
+                prompts.append(index)
         self.assertTrue(
             prompts,
             "No prompting `read` found in preview.sh at all. Either the guard's "
@@ -375,8 +393,11 @@ class EveryQuestionPreviewShAsksIsGuarded(unittest.TestCase):
             enclosing = self.enclosing_function(index)
             if enclosing is None:
                 continue          # top level: its output reaches the teacher
-            self.assertNotIn(
-                f"$({enclosing}", whole,
+            captured = re.search(
+                r"(?:\$\(|`)\s*" + re.escape(enclosing) + r"\b", whole
+            )
+            self.assertIsNone(
+                captured,
                 f"preview.sh line {index + 1} guards a question inside "
                 f"`{enclosing}`, whose output is captured somewhere in the same "
                 "file. The refusal would land in a variable and the exit 3 "

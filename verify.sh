@@ -240,6 +240,23 @@ else
   fail "publishing to a folder refuses a preview build (deploy.sh and deploy.ps1)"
 fi
 
+# Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
+# the runs in THIS script, but `scripts/` is a folder reference in the app's
+# project — whatever sits in it is copied into the bundle, mirrored into every
+# working folder's `.toolchain/`, and hashed into the image tag. A `.pyc` there
+# hands teachers a rebuild for nothing, and `.gitignore` hides it from `git
+# status`, so a hand-run test that littered would never be noticed. Ten of them
+# were found in a working folder's `.toolchain/` on 2026-09-09, mirrored from a
+# bundle that had been carrying them for some time. The app's own
+# `copyToolchainFiles` removes extraneous files, so a clean bundle heals a
+# folder on the next touch; this keeps the bundle clean.
+if [ -z "$(find scripts -name '__pycache__' -print -quit 2>/dev/null)" ]; then
+  pass "no bytecode left in scripts/, which ships inside the app"
+else
+  fail "scripts/__pycache__ exists — it would be copied into the app bundle, mirrored into every working folder's .toolchain/, and change the image tag"
+  find scripts -name '__pycache__' -print
+fi
+
 # -------------------- 1. Container runtime (shared Colima) --------------------
 # Maintainer variant: assumes Colima and the Docker CLI are installed (the
 # teacher-facing launchers handle installation). Never stops a running VM.
