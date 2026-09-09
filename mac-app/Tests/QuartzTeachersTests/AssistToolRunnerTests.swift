@@ -1272,12 +1272,19 @@ final class AssistToolRunnerTests: XCTestCase {
         ))
         XCTAssertFalse(published.shouldContinue)
         let after: String = text(ofPage: "Unit 1, Day 1", in: made.course)
-        XCTAssertTrue(after.contains("publish: true"),
-                      "The page is migrated to the current spelling: \(after)")
-        XCTAssertFalse(after.contains("draft:"),
-                       "The legacy key goes, or the page carries two lines that mean opposite things.")
-        XCTAssertTrue(after.contains("created: 2026-09-08T07:00:00.000-0400"),
-                      "Only the visibility line moves — every other line is the teacher's.")
+        // Asserted as the WHOLE file rather than as three `contains` checks,
+        // because the promise being made is about the shape of the diff: one
+        // line changed, in place, and nothing else touched. A `contains` pair
+        // passes just as happily on frontmatter that has been reordered.
+        XCTAssertEqual(after, """
+        ---
+        title: Unit 1, Day 1
+        publish: true
+        created: 2026-09-08T07:00:00.000-0400
+        ---
+
+        Loops.
+        """)
     }
 
     /// Choosing classes by date, so "hide everything from next Monday on" is
