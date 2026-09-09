@@ -300,7 +300,27 @@ Recreating the container is cheap because all state lives in the bind mount.
   token look identical from here, and discarding a working credential only a
   person can replace is the more expensive mistake. Only the app's SCHEDULED
   deploy passes it — pressing Deploy runs this same launcher through a
-  pseudo-terminal so a question can come back as a dialog. What it refuses is
+  pseudo-terminal so a question can come back as a dialog.
+
+  **It is a PREVIEW flag too, as of 2026-09-09 (issue #124).** A scheduled
+  publish BUILDS before it publishes, and the build runs `preview.sh` /
+  `preview.ps1` — which ask questions of their own, at half six, of nobody.
+  Both now take the flag and refuse with the same exit 3. `preview.sh` needs a
+  pre-scan for the same reason `deploy.sh` does, its course-code guard running
+  before the option loop; `preview.ps1` parses first and needs none.
+  `preview.ps1` also asks one thing `preview.sh` does not — *"Continue
+  anyway?"*, when a section is not listed in `course_config.json` — which is
+  recorded in `app-rules.json` with `appliesOn: ["windows"]` so it reads as a
+  deliberate difference rather than drift.
+
+  **And both deploy launchers FORWARD it to that rebuild**, the one they run
+  themselves when they find a preview-built site. `deploy.sh`'s pass-through
+  of exit 3 was dead code until 2026-09-09: it was written `if ! cmd; then
+  _rc=$?`, and with `!` in front of a pipeline `$?` is the logical NOT, so it
+  was always 0. Measured, fixed, and pinned by two tests in
+  `scripts/test_deploy_non_interactive.py`.
+
+  What it refuses is
   listed in `contracts/app-rules.json` → `launcherFlags.nonInteractive`, and
   the flag itself is registered in `launcherFlags.deployExtras`.
 

@@ -73,6 +73,24 @@ public partial class App : Application
         if (!string.IsNullOrEmpty(stateDir)) LogDiagnostic($"State redirected to {stateDir}");
 
         Plantoir.Core.Scripting.ActivityTrail.NoteLaunch();
+
+        // Say on the trail how every scheduled publish since the last launch
+        // turned out — the ones that stopped, and the ones that went out.
+        //
+        // HERE, and not in MainWindow or SectionDetailView, for two separate
+        // reasons. The contract asks for a line a teacher gets whether or not
+        // they open the section that failed, because that teacher is exactly
+        // the one who writes in to say their site did not update; and this runs
+        // ONCE per process, where RememberOpenWindows can restore several
+        // MainWindows and MainWindow already fires ConsumePending from two
+        // places, so a sweep hosted there would run N times a launch.
+        //
+        // After --state-dir has been applied, so a test run reads its own
+        // folder rather than the teacher's. Best-effort and silent: it writes
+        // trail lines and shows nothing.
+        try { Plantoir.Core.Assist.ScheduledPublishOutcome.NoteFinishedRunsOnTrail(); }
+        catch (Exception ex) { LogDiagnostic($"Scheduled-publish trail sweep failed: {ex}"); }
+
         try
         {
             Settings = AppSettings.Load();

@@ -54,4 +54,20 @@ public static class Glyphs
 
     /// <summary>A clock — a section with a deploy waiting to fire. Checked present in SegoeIcons.ttf.</summary>
     public const string Clock = "";
+
+    /// <summary>
+    /// A warning triangle — a section whose scheduled publish did not get
+    /// through.
+    /// </summary>
+    /// <remarks>
+    /// <para>Checked present on 2026-09-09, and by a better method than the
+    /// ink-pixel count this file used before. Counting ink cannot tell a glyph
+    /// from a MISSING one: a codepoint the font does not have draws the
+    /// .notdef box, which has plenty of ink — the known-absent U+E45E scores
+    /// 132 pixels against Cancel's 86, so the old test would have passed it.
+    /// Rendering two known-absent codepoints (U+E45E and U+E45C) instead gives
+    /// byte-identical bitmaps, which is the fallback box's signature; U+E7BA
+    /// renders something different from it, so the font really has it.</para>
+    /// </remarks>
+    public const string Warning = "";
 }
