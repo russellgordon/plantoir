@@ -244,8 +244,10 @@ Recreating the container is cheap because all state lives in the bind mount.
 - Takes `COURSE SECTION` as positional arguments, plus pass-through flags
   understood by `build_site.py`: `--include-social-media-previews`,
   `--force-npm-install`, `--full-rebuild`, `--build-only` — plus its own
-  `--port N` (container port 8081–8084), `--image REF`, and `--stop`, which
-  is handled entirely by the launcher and never reaches `build_site.py`.
+  `--port N` (container port 8081–8084), `--image REF`, `--non-interactive`
+  (nobody is watching this build; refuse rather than ask — see `deploy.sh`
+  below, where the flag is explained in full), and `--stop`, all of which are
+  handled entirely by the launcher and never reach `build_site.py`.
 - Checks host-side that the course is set up (`course_config.json` exists)
   and that the section folder is there. The `section_numbers` check itself
   runs in the container once it is up (`docker exec … python3 -`), so a typo
@@ -320,6 +322,21 @@ Recreating the container is cheap because all state lives in the bind mount.
   of input, takes the `[Y/n]` DEFAULT, and rebuilds a DIFFERENT course — which
   is then published successfully against the wrong one. A refusal is the
   better failure. Registered in `launcherFlags.preview`.
+
+  **And it is driven too**, by `scripts/test_preview_sh_questions.py` — added
+  2026-09-09, because a launcher that has only ever been READ under a new flag
+  is the state `deploy.sh` was in when running it found two bugs. It borrows
+  the twin's harness rather than copying it, and it pins four things reading
+  cannot: that the refusal exits 3 and says which question it could not ask;
+  that the command the launchd wrapper actually writes — flag LAST, after
+  `--build-only` — refuses the same way; that "Nothing was built" is TRUE,
+  by looking at the folder afterwards; and that the flag's parser arm does not
+  eat the argument following it, which it would if a `shift` were ever added
+  there (the loop shifts once at the bottom already). The measurement the
+  contract's reasoning rests on — that without the flag, at end of input, the
+  default is taken and the build retargets — is run rather than remembered,
+  because the Windows side found the equivalent claim about PowerShell was
+  false the day they measured it.
 - Finally runs `deploy.py` inside the container
   (see [Deployment](07-deployment.md)).
 
