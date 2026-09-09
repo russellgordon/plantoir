@@ -315,10 +315,23 @@ Recreating the container is cheap because all state lives in the bind mount.
 
   **And both deploy launchers FORWARD it to that rebuild**, the one they run
   themselves when they find a preview-built site. `deploy.sh`'s pass-through
-  of exit 3 was dead code until 2026-09-09: it was written `if ! cmd; then
-  _rc=$?`, and with `!` in front of a pipeline `$?` is the logical NOT, so it
-  was always 0. Measured, fixed, and pinned by two tests in
-  `scripts/test_deploy_non_interactive.py`.
+  of exit 3 was dead code until 2026-09-09, and **the line has now been got
+  wrong twice**, which is why the launcher carries both shapes in a comment
+  rather than just the right one:
+
+  - `if ! CMD; then _rc=$?` — with `!` in front of a pipeline the status is
+    the logical NOT, so `$?` is 0 and the `-eq 3` test could never fire.
+  - `CMD` then `_rc=$?` on the next line, which was the FIX for the first and
+    is worse: `deploy.sh` runs under `set -euo pipefail`, so the script aborts
+    at `CMD` and the guard never runs at all — printing nothing, where the
+    broken version at least printed "Could not rebuild this site for
+    publishing." It propagated 3 by accident, which reads as working.
+
+  `_rc=0; CMD || _rc=$?` is the shape that survives both: an `||` list is
+  exempt from `set -e` and leaves `$?` readable. Measured on bash 5.3.15 and
+  pinned by two tests in `scripts/test_deploy_non_interactive.py`, one of
+  which RUNS all three behaviours rather than asserting a shape — because the
+  test written for the first mistake passed against the second.
 
   What it refuses is
   listed in `contracts/app-rules.json` → `launcherFlags.nonInteractive`, and

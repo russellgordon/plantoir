@@ -64,7 +64,7 @@ import deploy
 
 
 def _a_bash_that_can_run_deploy_sh():
-    """A `bash` that can actually run this repository's launcher, or None.
+    """An argv PREFIX for a bash that can really run this launcher, or None.
 
     THIS IS NOT PEDANTRY, and it cost a test run to find. Since 2026-09-07 the
     Windows app runs every `scripts/test_*.py` inside `dotnet test`
@@ -116,9 +116,34 @@ def _a_bash_that_can_run_deploy_sh():
                 continue
             # 7 rather than 0: a stub that fails to start also exits non-zero,
             # and a shell that ran nothing would exit 0.
-            if subprocess.run([str(resolved), "-c", "exit 7"],
-                              capture_output=True, timeout=60).returncode == 7:
-                return str(resolved)
+            # Two probes, and the second is the one that was missing.
+            #
+            # The shell must START (a .exe that exists and cannot run is
+            # exactly the WSL stub above), and it must be able to resolve
+            # `shasum`, which deploy.sh uses on its THIRTEENTH line to name the
+            # container. On Git for Windows shasum lives in
+            # /usr/bin/core_perl, and that directory is on PATH only for a
+            # LOGIN shell — so a non-login bash launched from a Windows process
+            # runs deploy.sh straight into "shasum: command not found".
+            #
+            # That is how this test came to pass when run from Git Bash and
+            # FAIL under `dotnet test`, which PowerShell starts: the same file,
+            # the same machine, a different answer depending on which shell was
+            # the grandparent. A gate whose result depends on that is not a
+            # gate. Found by review 2026-09-09.
+            #
+            # `-l` is tried only as a fallback, because a login shell sources
+            # the user's profile and that is somebody else's code running in
+            # the middle of a test.
+            for prefix in ([str(resolved)], [str(resolved), "-l"]):
+                if subprocess.run(prefix + ["-c", "exit 7"],
+                                  capture_output=True, timeout=60).returncode != 7:
+                    continue
+                found = subprocess.run(prefix + ["-c", "command -v shasum"],
+                                       capture_output=True, timeout=60,
+                                       encoding="utf-8", errors="replace")
+                if found.returncode == 0 and found.stdout.strip():
+                    return prefix
         except (OSError, subprocess.SubprocessError):
             continue
     return None
@@ -279,7 +304,7 @@ class TheFlagIsAccepted(unittest.TestCase):
             # errors="replace" for the same reason: this test reads the output
             # for two SENTENCES, and a stray byte must not be able to stop it.
             result = subprocess.run(
-                [shell, str(launcher), "ICS3U", "1", "--non-interactive"],
+                shell + [str(launcher), "ICS3U", "1", "--non-interactive"],
                 capture_output=True, timeout=120, stdin=subprocess.DEVNULL,
                 encoding="utf-8", errors="replace",
             )
@@ -383,7 +408,7 @@ class TheRebuildLegPassesItsRefusalOn(unittest.TestCase):
 
         def run(script):
             return subprocess.run(
-                [shell, "-c", script], capture_output=True, timeout=60,
+                shell + ["-c", script], capture_output=True, timeout=60,
                 encoding="utf-8", errors="replace",
             )
 
