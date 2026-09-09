@@ -795,6 +795,28 @@
         "marker" : "PUBLISHED_FOLDER="
       }
     ],
+    "exampleCourse" : [
+      {
+        "label" : "Getting this Mac ready…",
+        "marker" : "Setting up this Mac"
+      },
+      {
+        "label" : "Building your website builder…",
+        "marker" : "Building your website builder"
+      },
+      {
+        "label" : "Getting things ready…",
+        "marker" : "Starting container if needed"
+      },
+      {
+        "label" : "Copying the example course…",
+        "marker" : "Example Course installed to"
+      },
+      {
+        "label" : "Finishing up…",
+        "marker" : "EXAMPLE_COURSE_CODE="
+      }
+    ],
     "note" : "label is what a teacher reads; marker is the text in the shared scripts' output that means the step has been reached. The marker is the load-bearing half — it is matched against output produced by shared Python, so both apps must match these strings exactly. A drifted marker does not crash anything: the progress bar simply stops moving, and neither app can tell.",
     "preview" : [
       {
