@@ -267,7 +267,7 @@ Split it in two:
 - **The shared Python IS gated here.** `dotnet test` runs every
   `scripts/test_*.py` through `PythonToolchainTests` — DISCOVERED rather than
   listed, so no count is kept in step by hand (fifteen when this was written on
-  2026-09-07, seventeen on 2026-09-09) — the same files `verify.sh` runs on the
+  2026-09-07, eighteen later the same week) — the same files `verify.sh` runs on the
   mac, in about eight seconds with no Docker, network or credentials. Until then this side ran none of them, so a shared
   file could be broken from this machine with every gate on it green.
 - **The IMAGE is not.** Nothing here builds the Docker image or checks the

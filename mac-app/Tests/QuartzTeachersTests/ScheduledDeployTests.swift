@@ -285,6 +285,22 @@ final class ScheduledDeployTests: XCTestCase {
             "The scheduled deploy must tell the launcher nobody can answer a question: \(written)"
         )
 
+        // The BUILD leg carries it too, in that order.
+        //
+        // The order is asserted, not just the presence, because it is what
+        // `scripts/test_preview_sh_questions.py` drives: that file runs the
+        // launcher with the flag LAST, after another flag, since that is the
+        // shape a parser bug would hide (the flag's `case` arm must not
+        // shift, or it eats what follows). Assert only that the flag appears
+        // somewhere and these two can drift apart in silence — the Python
+        // would go on testing a command line nothing writes any more.
+        XCTAssertTrue(
+            written.contains("--build-only --non-interactive"),
+            "The build leg must pass --build-only --non-interactive, in that "
+            + "order, which is the command line the launcher's own tests "
+            + "drive: \(written)"
+        )
+
         // And the button does not, so the dialog a teacher answers stays.
         let buttonArguments: [String] = DeployCommand.arguments(
             courseCode: course.code,

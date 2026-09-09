@@ -770,7 +770,10 @@ proved separately — by `scripts/test_deploy_non_interactive.py`, which reads t
 launcher, and since 2026-09-09 by `scripts/test_deploy_sh_questions.py`, which
 RUNS it to each of the four questions it can ask and checks the refusal is
 visible as well as the code being 3 — and end to end only by
-`verify-deploy.sh`, which publishes to real Netlify.
+`verify-deploy.sh`, which publishes to real Netlify. The BUILD leg's exit 3 is
+proved the same way from the same date, by
+`scripts/test_preview_sh_questions.py`, which runs `preview.sh` to its one
+question — including in the exact command shape the launchd wrapper writes.
 
 **One narrow path can still produce the sentence #132 removed**, and it is
 filed as [issue #136](https://github.com/russellgordon/plantoir/issues/136)
