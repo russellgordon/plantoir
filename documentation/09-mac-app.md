@@ -585,3 +585,79 @@ than a promise about always having a reader attached.
 ---
 
 [◀ Previous: course_config.json Reference](08-course-config-reference.md) · [Back to index](README.md) · [Next: The Local AI Assistant ▶](10-local-ai-assistant.md)
+
+## The first-publish path: what is checked, and what is checkable
+
+Written 2026-09-08 answering [issue #75](https://github.com/russellgordon/plantoir/issues/75),
+which asked whether `deploy.sh` validates the Netlify token before `deploy.py`
+starts. It does — and the interesting answer is the one underneath it, because
+Windows reached the opposite conclusion from the same question and the
+difference is a guard the mac has and that platform does not.
+
+### The two questions #75 actually asked
+
+**Does `deploy.sh` validate the token first? Yes.** `validate_token()`
+(`deploy.sh:557`) calls `https://api.netlify.com/api/v1/user`, the same
+endpoint Windows' `Test-TokenValid` uses, and it runs at `:799`, `:811`,
+`:824` and `:866` — all before `deploy.py` starts at `:1343`/`:1346`.
+
+**Can a test substitute a known-bad token? No.** `KEYCHAIN_SERVICE`
+(`deploy.sh:544`) is a bare literal with no environment override anywhere, and
+the two Cloudflare services beside it are the same. All three read
+`-a "$USER"`. A test wanting a bogus token would have to overwrite the
+teacher's real Keychain entry and put it back.
+
+On Windows those two facts settle it: a test there would either stop at the
+token dialog or **publish a real website**, depending on machine state, so the
+new-site dialog is a hand-driven procedure
+(`documentation/12-windows-app.md`).
+
+### The mac has a third route, and it is already the house pattern
+
+**A stubbed launcher survives here.** `WorkspaceModel.refreshLaunchersIfNeeded`
+replaces any launcher differing from the bundled copy — except under test:
+
+```swift
+// Test fixtures use stub launchers on purpose; leave them alone.
+if isUnderUITest || WorkspaceModel.isRunningTests {
+    return
+}
+```
+
+That guard is the whole difference. Windows' `ToolchainMirror.RefreshLaunchers`
+has none and runs on every `Reload()`, which is **reason 4** in that platform's
+write-up for why the dialog cannot be automated. `QuartzTeachersUITests`
+already relies on this — `writeStubPreviewScript(in:buildingInto:)` stands in
+for a real preview server.
+
+So a UI test can stub `deploy.sh` to print the prompts `deploy.py` prints and
+drive the dialog **with no credential, no network and no site created**. The
+Keychain never comes into it, because the real launcher never runs.
+
+### What that means for each layer
+
+| Layer | Covered? |
+|---|---|
+| The launcher's own prompts (surname, site name, the fallback when a saved site was deleted) | **Yes, today.** `verify-deploy.sh` drives every deploy through `expect` and answers by prompt TEXT (`:110-136`). Opt-in, real credentials, real sites — deliberately. |
+| The app's DIALOG — surname sheet once, address pre-filled, Cancel cancels, typed name is what is sent, trail records the ask | **Not covered, and automatable.** Needs a UI test with a stubbed `deploy.sh`. |
+| A publish with a genuinely invalid saved token | **Not covered and not automatable**, for the Keychain reason above. |
+
+Note the first row is the reverse of Windows: `verify-deploy.ps1` redirects
+stdin so `sys.stdin.isatty()` is false and `deploy.py` asks nothing, so that
+platform has no launcher-level coverage of first publish at all — raised as
+[#123](https://github.com/russellgordon/plantoir/issues/123).
+
+### Why this is written down rather than done
+
+The UI test is a real piece of work — a stub that prints the right prompts in
+the right order, and assertions about a dialog nobody has driven before — and
+it belongs in its own change with its own review. What #75 asked for was the
+CHECK, and this is it. The test is
+[#125](https://github.com/russellgordon/plantoir/issues/125).
+
+The thing worth not re-deriving: **two platforms answered "can this be
+automated?" differently, and the reason was neither the token nor the Keychain.
+It was a four-line guard in one app's launcher refresh.** Both write-ups spent
+most of their length on credentials, which turned out to be the part the two
+platforms agreed on.
+
