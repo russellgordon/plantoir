@@ -203,7 +203,12 @@ public sealed class NewCourseDialog : ContentDialog
         };
 
         Title = "New Course or Club";
-        PrimaryButtonText = "Create Course";
+        // From Plantoir.Core, not a literal, so an ordinary `dotnet test` run
+        // can compare it to shared-rules.json -> wizard.createCourseButton.
+        // This project is not reachable from Plantoir.Tests at all — different
+        // target framework, and a ContentDialog cannot be built off a XAML
+        // thread — so a string that must FAIL when it drifts has to live there.
+        PrimaryButtonText = WizardWording.CreateCourseButton;
         CloseButtonText = "Cancel";
         DefaultButton = ContentDialogButton.Primary;
         PrimaryButtonClick += OnPrimaryButton;

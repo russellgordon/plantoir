@@ -76,12 +76,16 @@ public class NewCourseWizardUiTests
 
         var create = app.Find("PrimaryButton", "the wizard's Create button");
         // Contract data since 2026-09-08: shared-rules.json -> wizard
-        // .createCourseButton, which the mac asserts in a gated test. This
-        // assertion is still worth keeping — it proves the button can be
-        // REACHED and reads correctly, which a contract test cannot — but it
-        // is no longer the only thing pinning the label, and it should compare
-        // against the contract rather than a literal. See issue #119.
-        Assert.Equal("Create Course", create.Name);
+        // .createCourseButton. This assertion earns its place for what it
+        // alone can see — that the button is REACHABLE and that the label is
+        // actually RENDERED, neither of which a contract test can — so it
+        // compares against the contract rather than against a literal, which
+        // is a copy that keeps passing after the product's words change.
+        //
+        // WizardWordingTests pins the same key in an ordinary [Fact], so the
+        // label now has a gate on this side; that one pins the CONSTANT, this
+        // one pins the button. See issue #119.
+        Assert.Equal(Plantoir.Core.Models.WizardWording.CreateCourseButton, create.Name);
         Assert.False(create.IsEnabled, "Create was available before a code had been typed");
 
         // And there is a way out that is not the Create button.
