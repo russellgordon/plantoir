@@ -718,6 +718,105 @@ final class SharedRulesContractTests: XCTestCase {
 
     // MARK: - Special names and folder protections
 
+    /// The record of platform-worded sentences is COMPLETE, not a snapshot.
+    ///
+    /// `platformWording.keys` names every `specialNames` sentence containing the
+    /// mac's platform word, so the other platform's suite can substitute its own
+    /// word rather than assert the mac's.
+    ///
+    /// It pins the RECORD, not the behaviour, and the difference is worth
+    /// stating: nothing on Windows reads `keys` today — its two tests name the
+    /// sentences one at a time — so a fourth sentence fails HERE and still
+    /// leaves a Windows test to be written by hand. What this buys is that the
+    /// list cannot silently fall behind the contract it describes.
+    ///
+    /// The provenance, because two passes at the surrounding note got it wrong
+    /// in opposite directions: issue #102 named two of the three, the mac's own
+    /// log had all three from 2026-09-01 (GUI-IMPROVEMENTS.md rows 388-389),
+    /// and Windows began substituting on the third on 2026-09-07. The list was
+    /// never wrong; one issue body was.
+    func testPlatformWordedKeysAreComplete() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
+        let platformWording: [String: Any] = try XCTUnwrap(section["platformWording"] as? [String: Any])
+        let macWord: String = try XCTUnwrap(platformWording["mac"] as? String)
+
+        var found: [String] = []
+        collectKeyPaths(saying: macWord, in: section, prefix: "", into: &found)
+        found.sort()
+
+        var recorded: [String] = try XCTUnwrap(platformWording["keys"] as? [String])
+        recorded.sort()
+
+        // Both empty is the one way this passes having checked nothing: an
+        // emptied `mac` matches nothing, and an emptied `keys` expects nothing.
+        // MilestoneContractTests guards its mirror of this the same way.
+        XCTAssertFalse(
+            found.isEmpty,
+            "No specialNames sentence contains the platform word \"\(macWord)\", so this "
+            + "test would pass against an empty record. Either the word changed or "
+            + "platformWording.mac is wrong."
+        )
+
+        XCTAssertEqual(
+            found,
+            recorded,
+            "The specialNames sentences containing \"\(macWord)\" are not the ones "
+            + "platformWording.keys names. Add the new sentence to that list — and note "
+            + "that doing so does not give it a Windows test, which still has to be "
+            + "written by hand, because nothing over there reads this list yet."
+        )
+    }
+
+    /// Every dotted key path under `node` whose string value contains `phrase`.
+    ///
+    /// `platformWording` itself is skipped: it QUOTES the platform word as its
+    /// own `mac` value and in its explanation, so walking it would make the
+    /// list contain itself and the test would pass by accident.
+    ///
+    /// ARRAYS are walked too. No array under `specialNames` carries a
+    /// platform-worded sentence today, but this contract's established shape
+    /// puts teacher sentences inside arrays of cases — `renameFolder`
+    /// .`linkRewriting`.`cases` and `curriculumFolderResolution`.`cases` are
+    /// both here already — so a fourth sentence added as a case would otherwise
+    /// be invisible to a test whose whole purpose is to notice a fourth
+    /// sentence.
+    private func collectKeyPaths(
+        saying phrase: String,
+        in node: [String: Any],
+        prefix: String,
+        into found: inout [String]
+    ) {
+        for (key, value) in node {
+            if prefix.isEmpty && key == "platformWording" {
+                continue
+            }
+            let path: String = prefix.isEmpty ? key : "\(prefix).\(key)"
+            collectKeyPaths(saying: phrase, inValue: value, path: path, into: &found)
+        }
+    }
+
+    /// One value of any shape, on the way to the strings inside it.
+    private func collectKeyPaths(
+        saying phrase: String,
+        inValue value: Any,
+        path: String,
+        into found: inout [String]
+    ) {
+        if let text = value as? String {
+            if text.contains(phrase) {
+                found.append(path)
+            }
+        } else if let child = value as? [String: Any] {
+            collectKeyPaths(saying: phrase, in: child, prefix: path, into: &found)
+        } else if let items = value as? [Any] {
+            var index: Int = 0
+            for item in items {
+                collectKeyPaths(saying: phrase, inValue: item, path: "\(path)[\(index)]", into: &found)
+                index += 1
+            }
+        }
+    }
+
     func testSpecialNamesSentencesMatchContract() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
 
