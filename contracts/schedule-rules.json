@@ -34,7 +34,7 @@
     ],
     "note": "A teacher pastes the address from their browser. The address that hands back CSV is a different one, derived so nobody has to know that. The published-sheet link is the single most likely thing to go wrong and has its own answer."
   },
-  "note": "How a teacher's own list of class dates is read — typed, pasted, from a CSV, from a calendar export, or from a Google Sheet. All of it is pure input to output, so all of it is portable. See contracts/README.md; the reasoning behind the rules is in WINDOWS-HANDOFF.md.",
+  "note": "How a teacher's own list of class dates is read — typed, pasted, from a CSV, from a calendar export, or from a Google Sheet. All of it is pure input to output, so all of it is portable. See contracts/README.md; the reasoning behind the rules is in documentation/.",
   "relativeDays": {
     "cases": [
       {

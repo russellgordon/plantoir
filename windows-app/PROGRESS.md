@@ -2,7 +2,7 @@
 
 What each project in the solution is, and what state the app is in. First take
 built overnight 2026-08-11 by Claude Code, per
-[`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md); the assist subsystems folded
+[`documentation/`](../documentation/README.md); the assist subsystems folded
 into `main` on 2026-08-14. Everything below was **verified live on the
 maintainer's Windows 11 machine** (WSL2 + Ubuntu-24.04 + Docker Engine 29, no
 Docker Desktop) unless marked otherwise.
@@ -21,7 +21,8 @@ Docker Desktop) unless marked otherwise.
 ## Where parity stands
 
 > **"item N" in this file means the retired numbered list.** Until 2026-09-08
-> outstanding work lived in a numbered list inside `WINDOWS-HANDOFF.md`, and
+> outstanding work lived in a numbered list inside `WINDOWS-HANDOFF.md` (a file
+> since deleted), and
 > prose written before then cites it by number. Those numbers no longer resolve
 > to anything: what was still open became [GitHub
 > issues](https://github.com/russellgordon/plantoir/issues), and what was done
@@ -32,7 +33,7 @@ Docker Desktop) unless marked otherwise.
 **The open work is in [GitHub
 issues](https://github.com/russellgordon/plantoir/issues?q=is%3Aopen+label%3Awindows),
 and this file no longer keeps a second copy of it.** Until 2026-09-08 it did —
-a table here mirroring `WINDOWS-HANDOFF.md`'s numbered list — and the two drifted
+a table here mirroring that numbered list — and the two drifted
 exactly as often as anybody edited one and not the other. The count in this
 section was wrong the last three times it was read, which is what settled the
 argument for having one home rather than two.
@@ -41,7 +42,7 @@ Five items were open when the cutover happened, and they are now issues #66
 and #68–#70 plus #99 (which absorbed the old item 42). Everything else on that
 list was struck through as done; the shipped record of it is
 `GUI-IMPROVEMENTS.md` and
-[`WINDOWS-HANDOFF-COMPLETED.md`](../WINDOWS-HANDOFF-COMPLETED.md).
+[`documentation/13-windows-port-archive.md`](../documentation/13-windows-port-archive.md).
 
 ```bash
 gh issue list --repo russellgordon/plantoir --label windows
@@ -67,7 +68,7 @@ Two more things worth knowing here:
   `dotnet test` — 156 tests in about eight seconds, no Docker, no network, no
   credentials. A rejected first design (a stamp file recording when
   `verify-deploy.ps1` last passed, with a unit test reddening when the
-  publishing files changed afterwards) is written up in `WINDOWS-HANDOFF.md`
+  publishing files changed afterwards) is written up in `documentation/07-deployment.md`
   item 36 with the measurements that killed it.
 - **The unit suite is green**: 911 passed, 0 failed at the time this section
   was written; 945 after the folder-problems front end, and 979 once
@@ -86,7 +87,7 @@ Two more things worth knowing here:
 
 ## Every contract case list is now RUN here (2026-09-06)
 
-WINDOWS-HANDOFF item 29. Twenty-three lists the mac suite ran and this one did
+the 2026-09-06 contract audit. Twenty-three lists the mac suite ran and this one did
 not read — none unreachable, each simply a test nobody had written.
 `contracts/README.md` now names which class runs which, so the audit does not
 have to be repeated.
@@ -285,10 +286,10 @@ a copy that goes stale — that count itself had been reading "179 rows" for
 days after the log passed 250.
 
 **What to do with that assessment** is the ordered list in
-[`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md) → "Where Windows actually
+[`documentation/12-windows-app.md`](../documentation/12-windows-app.md) → "Where Windows actually
 stands", written 2026-08-17 by reading this app's source from the mac. It was
 read rather than run — `dotnet` is not installed there — so treat it as a
-plan to start from, and report anything it gets wrong in `MAC-HANDOFF.md`.
+plan to start from, and report anything it gets wrong in a `mac` issue.
 
 ## Known rough edges for the next session
 

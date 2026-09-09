@@ -208,7 +208,7 @@ public sealed class PublishingChoiceView
         // ---- Also publish to, for redundancy — real redundancy needs a
         // second copy of the site ALREADY live, not a scramble to
         // reconfigure a new destination after the fact. See
-        // WINDOWS-HANDOFF.md entry 304.
+        // documentation/07-deployment.md.
         _additionalArea = new StackPanel { Spacing = 6, Margin = new Thickness(0, 12, 0, 0) };
         Root.Children.Add(_additionalArea);
 

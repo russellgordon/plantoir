@@ -150,7 +150,7 @@ public static class BuildOutputLocation
     /// the Python too (<c>toolchain_paths.merged_output_root</c> uses the
     /// course directory's name), but nothing DELETED by that path until now.
     /// Refusing here is the cheap half; the naming is recorded for the mac in
-    /// MAC-HANDOFF.</para>
+    /// documentation/05-build-pipeline.md.</para>
     /// </summary>
     private const string WorkspaceDirectoryName = "work";
 

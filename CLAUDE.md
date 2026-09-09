@@ -70,9 +70,12 @@ Neither app contains toolchain logic of its own: they write the same
      says something usable** — what to do differently, what is inherited
      unchanged, or the trap that would pass review. "Shared Python, nothing to
      mirror" is fine when true; an empty cell never is.
-   - **anything architectural also has a section in
-     [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md)**. A log row records a decision;
-     the handoff explains it well enough to implement.
+   - **anything architectural also has a section in the
+     [`documentation/`](documentation/README.md) page that owns its subject** —
+     the build pipeline in 05, publishing in 07, the assistant in 10, and so on.
+     A log row records a decision; the deep dive explains it well enough to
+     implement. Say what you measured and what you REJECTED: a behaviour can be
+     read off the code, the reason for it cannot.
    - **a GitHub issue is opened, labelled `windows`, in the same session** —
      one short paragraph naming what the change is, what Windows inherits free,
      what they owe, and a pointer to the section that explains it. Give it a
@@ -107,26 +110,25 @@ Neither app contains toolchain logic of its own: they write the same
    back to the app's own button was their design, and the mac ran its own
    invisible script runner for weeks afterwards because nobody wrote it down
    here. A change made on Windows is not finished until:
-   - **a GitHub issue is opened, labelled `mac`**, written to the template in
-     [`MAC-HANDOFF.md`](MAC-HANDOFF.md) → "How to write an issue for the mac":
-     what was done, what it fixed, and — the part that travels — WHY, including
-     what was rejected. **A proposed contract case is an issue too**, so a red
-     mac suite reads as a request rather than as damage; say in it which case
-     was added and what the mac has to implement to make it pass.
-   - **anything the MAC must merely KNOW, rather than do, goes in
-     `MAC-HANDOFF.md`'s "For awareness" section** — not an issue, because an
+   - **a GitHub issue is opened, labelled `mac`**, carrying: what was done,
+     what it fixed, and — the part that travels — WHY, including what was
+     rejected; numbers with the hardware they came from for anything measured;
+     the file and test names to look at, which outlast commit hashes; and
+     whether the mac must MATCH it or merely know. **A proposed contract case
+     is an issue too**, so a red mac suite reads as a request rather than as
+     damage; say in it which case was added and what the mac has to implement
+     to make it pass.
+   - **anything the MAC must merely KNOW, rather than do, goes in the
+     `documentation/` page that owns its subject** — not an issue, because an
      issue nobody can close is one everybody learns to scroll past. Anything it
      must DO is an issue, opened in the same session. A change that creates an
      obligation for the other platform and opens no issue has, from their side,
      not been handed over at all.
-   - **The record of what LANDED is the closing comment on the issue**, not a
-     new entry in `MAC-HANDOFF.md`. That file's "Done — the ledger" is now
-     append-only history like `TODO.md`: it holds the reasoning behind work
-     finished while it was the ledger, and nothing new is written into it.
-     Said explicitly because the rule this replaced ended "entries are marked
-     `✅ DONE` in place rather than deleted", and dropping that sentence
-     without saying what took its place would have left the ledger being fed
-     by nothing while two other places still called it live.
+   - **The record of what LANDED is the closing comment on the issue.** Said
+     explicitly because the rule this replaced ended "entries are marked
+     `✅ DONE` in place rather than deleted" in a ledger that no longer exists,
+     and dropping that sentence without saying what took its place would leave
+     nobody knowing where a finished piece gets written down.
    - **`GUI-IMPROVEMENTS.md` gets a row for anything a teacher can see**, so
      the log stays the record of the product rather than of one platform.
    - **anything measured is written with its NUMBERS and the hardware they
@@ -723,7 +725,7 @@ Four things that cost a day each if you do not know them:
   is shown 32 (`.mcpTools`, the 22 plus ten: three that ask for judgement about
   meaning). More choices is the classic way a router degrades. **Windows'
   `plantoir-mcp.exe` serves 37**, so the two MCP surfaces are no longer the
-  same product — see `MAC-HANDOFF.md`.
+  same product — see [issue #66](https://github.com/russellgordon/plantoir/issues/66).
 
 On the mac the MCP server IS the app: `Plantoir --mcp-stdio <working-folder>`
 serves the same tools to Claude Code, so there is no second binary to sign or
@@ -827,7 +829,7 @@ it rather than restating it:
 | What are the backup and archive files called, and what section number is offered next? | [`contracts/course-management.json`](contracts/course-management.json). |
 | What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, and **where a section's built website is kept — and what happens to a folder that already has one in the old place**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
 | What keys does `course_config.json` carry, and what decides whether students see a page? | [`contracts/file-formats.json`](contracts/file-formats.json) — a FORMAT rather than a behaviour, and the one both apps write and the Python reads. |
-| WHY is it that way, and what was rejected? | [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) for anything an implementer needs; a code comment for anything a reader of that file needs. |
+| WHY is it that way, and what was rejected? | The [`documentation/`](documentation/README.md) page that owns the subject, for anything an implementer needs; a code comment for anything a reader of the code needs. |
 | WHAT changed, WHEN, and what it cost | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — a dated log. **Append-only history, not a specification**: a row records what was true that day, and is not edited when the behaviour changes again. Never quote a row as the current wording. |
 | How does the whole feature work? | [`documentation/10-local-ai-assistant.md`](documentation/10-local-ai-assistant.md). |
 | What did we MEASURE? | [`research/`](research/README.md) — routing accuracy, model tiers, preview staleness. Never asserted in a test; each file states its own conditions. |
@@ -849,16 +851,25 @@ milestone pins it to a release. Start a session by reading the open issues for
 your platform. Nothing is tracked in a Markdown list any more, and adding one
 back is the thing this replaced.
 
-The two handoff documents remain, as REFERENCE rather than as to-do lists —
-they point in opposite directions:
+**The two handoff documents are gone**, and this is deliberate rather than
+lost. `WINDOWS-HANDOFF.md` and `MAC-HANDOFF.md` were deleted on 2026-09-08 and
+their reference material moved into
+[`documentation/`](documentation/README.md), each section landing in the page
+that owns its subject: the assistant's design in 10, folder problems and the
+build in 05, publishing races in 07, stopping a preview in 03, the config
+writers in 08, the WinUI and ConPTY mechanics in 12, and so on. Write-ups for
+work already shipped on the Windows port are archived in
+[`13-windows-port-archive.md`](documentation/13-windows-port-archive.md).
 
-- [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) — mac → Windows. Everything this
-  side learned, written for somebody who cannot read the Swift.
-- [`MAC-HANDOFF.md`](MAC-HANDOFF.md) — Windows → mac. Things the mac must
-  KNOW, and the ledger of what has already landed here and why.
+The reason they went: each had become three things at once — a to-do list, a
+changelog, and a manual — and only the third was worth keeping. The to-do list
+is now GitHub issues, the changelog is `GUI-IMPROVEMENTS.md`, and the manual is
+`documentation/`, where somebody looking up how a thing works will actually
+find it. **Do not recreate them.** A change written for the other platform goes
+in the documentation page that owns its subject, and the issue points at it.
 
-(The old `AI-ASSIST-HANDOFF.md` is gone: it was a record of how the assistant
-was built, and it now lives in
+(The old `AI-ASSIST-HANDOFF.md` went the same way earlier: it was a record of
+how the assistant was built, and it now lives in
 [`research/ai-assist/HISTORY.md`](research/ai-assist/HISTORY.md).)
 
 **Starting work on the macOS app? Open
@@ -874,17 +885,18 @@ the plan before implementing anything**, then work autonomously once it is
 agreed. What follows is the same reading order, in short:
 
 1. **This file**, for the rules that override default behaviour.
-2. **[`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md)** — architecture, the config
-   contract, and the reasoning behind the decisions. Long, and the section
-   headings are enough to navigate.
-3. **[`contracts/README.md`](contracts/README.md)**, then the JSON files — its coverage table says what is shared and what deliberately is not.
+2. **The open `windows` issues** — everything outstanding on that side.
+3. **[`documentation/`](documentation/README.md)** — architecture, the config
+   contract, and the reasoning behind the decisions, numbered 01–13. Read the
+   page an issue points at rather than all of them.
+4. **[`contracts/README.md`](contracts/README.md)**, then the JSON files — its coverage table says what is shared and what deliberately is not.
    These are the acceptance list: wire them into `Plantoir.Tests` and the
    assistant's behaviour is tested rather than eyeballed. **Do not retype the
    sentences or the scenarios into your test files** — deserialise them.
-4. **[`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md)**, newest rows first, for
+5. **[`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md)**, newest rows first, for
    what changed recently and why. Read it as history; where a row and the
    contract disagree, the contract is what is true now.
-5. **[`windows-app/PROGRESS.md`](windows-app/PROGRESS.md)** for where that app
+6. **[`windows-app/PROGRESS.md`](windows-app/PROGRESS.md)** for where that app
    actually stands.
 
 (The two contract cases once flagged here as known-failing — "deploy with a
@@ -901,9 +913,9 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
 | [GitHub issues](https://github.com/russellgordon/plantoir/issues) | **Everything still to do**, on either platform. Labelled `mac`, `windows`, `toolchain`, `assistant`, `decision`; milestones pin an issue to a release. |
-| [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) | Architecture, the config contract, platform notes, and the WSL2 background — the reference a Windows session reads second, and where architectural decisions are written. Reference only: what is outstanding is a `windows` issue, and write-ups of work that shipped are in [`WINDOWS-HANDOFF-COMPLETED.md`](WINDOWS-HANDOFF-COMPLETED.md). |
+| [`documentation/13-windows-port-archive.md`](documentation/13-windows-port-archive.md) | Write-ups for Windows-port work verified shipped as of 2026-08-22, kept for the reasoning. **History, not a specification** — where it and a contract disagree, the contract is true. Closed to new entries. |
 | [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Three of the ten files are generated from the macOS app by `Plantoir --write-contracts` and must never be hand-edited; the other seven — `shared-rules.json` among them — are AUTHORED, and can be proposed or corrected from either platform. `contracts/README.md` says which is which, and this line used to say "never hand-edited" of all ten, which sent a Windows session on 2026-09-08 to ask the mac for an edit it could make itself. Its coverage table says what is deliberately NOT shared, and why. |
-| [`MAC-HANDOFF.md`](MAC-HANDOFF.md) | The mirror: decisions that originated on Windows or in shared `scripts/`, written for the mac. Two sections — "For awareness" (things to KNOW, which are deliberately not issues) and the finished ledger. Work the mac still OWES is a `mac` issue. |
+
 | [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, and the frozen asset names both platforms depend on. |
 | [`website/`](website/README.md) | **plantoir.app.** The marketing site's SOURCES — a layout, a stylesheet, one file per page, and the screenshot harness. `python3 website/build.py` writes `site/`, and `--deploy` publishes it to Netlify — the site is not Git-connected, so nothing deploys on push. `site/` is a build output and hand-edits to it are overwritten. The release version line lives in `website/site.json`. Screenshots are captured from the real app and the real class sites by `website/shots/capture.py`, in both colour schemes. |
 | [`TODO.md`](TODO.md) | **Closed to new entries** since 2026-09-08 — deferred work is a GitHub issue now. What is left is append-only history like a `GUI-IMPROVEMENTS.md` row: an entry records what was true on its day and what the entry itself got wrong, and is not rewritten when the behaviour changes again. |

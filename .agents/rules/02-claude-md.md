@@ -55,9 +55,12 @@ description: "Plantoir project rules, part 2 of 9 - Rules that override default 
      says something usable** — what to do differently, what is inherited
      unchanged, or the trap that would pass review. "Shared Python, nothing to
      mirror" is fine when true; an empty cell never is.
-   - **anything architectural also has a section in
-     [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md)**. A log row records a decision;
-     the handoff explains it well enough to implement.
+   - **anything architectural also has a section in the
+     [`documentation/`](documentation/README.md) page that owns its subject** —
+     the build pipeline in 05, publishing in 07, the assistant in 10, and so on.
+     A log row records a decision; the deep dive explains it well enough to
+     implement. Say what you measured and what you REJECTED: a behaviour can be
+     read off the code, the reason for it cannot.
    - **a GitHub issue is opened, labelled `windows`, in the same session** —
      one short paragraph naming what the change is, what Windows inherits free,
      what they owe, and a pointer to the section that explains it. Give it a
@@ -92,26 +95,25 @@ description: "Plantoir project rules, part 2 of 9 - Rules that override default 
    back to the app's own button was their design, and the mac ran its own
    invisible script runner for weeks afterwards because nobody wrote it down
    here. A change made on Windows is not finished until:
-   - **a GitHub issue is opened, labelled `mac`**, written to the template in
-     [`MAC-HANDOFF.md`](MAC-HANDOFF.md) → "How to write an issue for the mac":
-     what was done, what it fixed, and — the part that travels — WHY, including
-     what was rejected. **A proposed contract case is an issue too**, so a red
-     mac suite reads as a request rather than as damage; say in it which case
-     was added and what the mac has to implement to make it pass.
-   - **anything the MAC must merely KNOW, rather than do, goes in
-     `MAC-HANDOFF.md`'s "For awareness" section** — not an issue, because an
+   - **a GitHub issue is opened, labelled `mac`**, carrying: what was done,
+     what it fixed, and — the part that travels — WHY, including what was
+     rejected; numbers with the hardware they came from for anything measured;
+     the file and test names to look at, which outlast commit hashes; and
+     whether the mac must MATCH it or merely know. **A proposed contract case
+     is an issue too**, so a red mac suite reads as a request rather than as
+     damage; say in it which case was added and what the mac has to implement
+     to make it pass.
+   - **anything the MAC must merely KNOW, rather than do, goes in the
+     `documentation/` page that owns its subject** — not an issue, because an
      issue nobody can close is one everybody learns to scroll past. Anything it
      must DO is an issue, opened in the same session. A change that creates an
      obligation for the other platform and opens no issue has, from their side,
      not been handed over at all.
-   - **The record of what LANDED is the closing comment on the issue**, not a
-     new entry in `MAC-HANDOFF.md`. That file's "Done — the ledger" is now
-     append-only history like `TODO.md`: it holds the reasoning behind work
-     finished while it was the ledger, and nothing new is written into it.
-     Said explicitly because the rule this replaced ended "entries are marked
-     `✅ DONE` in place rather than deleted", and dropping that sentence
-     without saying what took its place would have left the ledger being fed
-     by nothing while two other places still called it live.
+   - **The record of what LANDED is the closing comment on the issue.** Said
+     explicitly because the rule this replaced ended "entries are marked
+     `✅ DONE` in place rather than deleted" in a ledger that no longer exists,
+     and dropping that sentence without saying what took its place would leave
+     nobody knowing where a finished piece gets written down.
    - **`GUI-IMPROVEMENTS.md` gets a row for anything a teacher can see**, so
      the log stays the record of the product rather than of one platform.
    - **anything measured is written with its NUMBERS and the hardware they

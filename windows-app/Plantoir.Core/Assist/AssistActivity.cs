@@ -9,7 +9,7 @@ namespace Plantoir.Core.Assist;
 /// Mirrors the mac's `AssistActivity`, with one difference the mac does not
 /// have to make: the mac enforces one assistant window at a time, so it only
 /// ever needs a single active session. Windows does not (yet) have that
-/// limit — see WINDOWS-HANDOFF.md — so this tracks a SET of open sessions
+/// limit — see documentation/10-local-ai-assistant.md — so this tracks a SET of open sessions
 /// rather than one. What both sides need this for is narrower than the
 /// bigger "one at a time" feature: knowing whether ANY assistant window is
 /// open, so Settings can refuse to delete a model file out from under a

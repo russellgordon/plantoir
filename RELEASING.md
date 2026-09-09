@@ -49,7 +49,7 @@ sentences and rules regardless of their OS. Three consequences:
   **Worked example, 2026-08-20 — the gate this rule was written for, run.**
   The mac's list was: implement the teacher-made-link explainer case, retire
   the three obsolete WSL-setup cases, run `./verify.sh` against the changed
-  shared scripts, and do the two verifications `MAC-HANDOFF.md` listed. All
+  shared scripts, and do the two verifications Windows asked for. All
   four came back green and **none of them required a behaviour change**, so
   the DMG joined v1.1.0 rather than becoming 1.1.1. The verifications are
   the part worth copying: both were "prove it against the real app", and

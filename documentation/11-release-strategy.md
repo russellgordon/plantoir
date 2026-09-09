@@ -170,6 +170,15 @@ is cheap now and expensive later:
 3. In terminal / assistant: Ask Claude / Antigravity to **"Cut the release"**.
 4. The automated skill drafts teacher-friendly release notes, confirms SHA-256 hashes, creates the draft release, uploads both assets, publishes the release, updates `site.json`, redraws the social card, and pushes to `main`.
 
+## The Windows icon derives from `mac-app/Plantoir.icon`
+
+`windows-app/Plantoir/Assets/make-icon.ps1` turns a full-bleed 1024px
+Icon Composer export into the exe/.ico and About-panel assets, applying
+the macOS rounded-rect silhouette; `site/icon.png` on plantoir.app
+comes from the same export. If the icon art ever changes, tell the
+Windows side so those derived assets are regenerated — nothing updates
+them automatically.
+
 ---
 
 [◀ Previous: The Local AI Assistant](10-local-ai-assistant.md) · [Back to index](README.md) · [Next: The Windows App ▶](12-windows-app.md)

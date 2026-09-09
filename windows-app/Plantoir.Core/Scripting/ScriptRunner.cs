@@ -529,7 +529,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     /// reported them.
     ///
     /// <para><b>Nothing on Windows displays these yet</b> — there is no
-    /// findings dialog on this platform (see <c>MAC-HANDOFF.md</c>). What the
+    /// findings dialog on this platform (see <c>documentation/05-build-pipeline.md</c>). What the
     /// collection is for today is the "folder problem found" line each finding
     /// leaves on the activity trail; the property is the seam a dialog will
     /// attach to.</para>

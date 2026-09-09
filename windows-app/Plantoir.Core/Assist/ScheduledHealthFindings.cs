@@ -66,7 +66,7 @@ public static class ScheduledHealthFindings
     /// whenever somebody happened to open the app would file it under the wrong
     /// night. Nothing else records these at all: the run happened with the app
     /// closed. (The mac does not write this line; proposed back to it in
-    /// <c>MAC-HANDOFF.md</c>.)</para>
+    /// <c>documentation/07-deployment.md</c>.)</para>
     /// </summary>
     public static IReadOnlyList<SiteHealthFinding> Take(string courseCode, int sectionNumber) =>
         TakeFrom(Directory(), courseCode, sectionNumber);

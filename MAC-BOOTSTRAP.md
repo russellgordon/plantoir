@@ -44,7 +44,8 @@ places, and which one is a judgement about portability rather than effort:
   anything with platform mechanics (Colima, port leases, WebKit), anything
   measured rather than asserted. Write the INTENT and the reasoning, not just
   that it exists — and put the reasoning that an implementer will need to READ
-  in a [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) section the issue points at.
+  in the [`documentation/`](documentation/README.md) page that owns its subject,
+  which the issue points at.
   The issue is the index; the section is the manual.
 
 **Never neither.** The failure this prevents is the quiet one: a behaviour that
@@ -121,7 +122,8 @@ bundle from the Dock. Test, then build, then stop.
 - `GUI-IMPROVEMENTS.md` gets a row, with a **"Notes for Windows port"** cell
   that says something usable. Say what you measured, not only what you decided.
   Record the options REJECTED, or they get proposed again.
-- Anything architectural also gets a section in `WINDOWS-HANDOFF.md`, and any
+- Anything architectural also gets a section in the `documentation/` page that
+  owns its subject, and any
   guidance the change made WRONG is corrected there in the same breath. Stale
   advice is worse than none, because it gets followed.
 - **Anything WINDOWS must now do gets a GitHub issue labelled `windows`, in
@@ -178,7 +180,7 @@ Russell's call every time (`CLAUDE.md` rule 6).
 
 ## B. Bringing the mac up to speed with Windows work
 
-### 1. Read the open `mac` issues, then [`MAC-HANDOFF.md`](MAC-HANDOFF.md)
+### 1. Read the open `mac` issues
 
 ```bash
 GH_TOKEN=$(gh auth token --user russellgordon) \
@@ -188,12 +190,12 @@ GH_TOKEN=$(gh auth token --user russellgordon) \
 Pass `--limit`: `gh` shows 30 by default and silently hides the rest, which is
 the failure this whole arrangement was made to stop.
 
-That is what the mac still owes. `MAC-HANDOFF.md` is what it must KNOW: two
-sections, both readable top-down and abandonable at any point —
-
-1. **For awareness** — things to know, not to do. Deliberately not issues,
-   because an issue nobody can close is one everybody learns to scroll past.
-2. **Done — the ledger**, kept in full because the reasoning is the point.
+That is what the mac still owes, and it is the whole of it. Things the mac
+must merely KNOW are not issues — an issue nobody can close is one everybody
+learns to scroll past — so those live in the [`documentation/`](documentation/README.md)
+page that owns their subject, and
+[`13-windows-port-archive.md`](documentation/13-windows-port-archive.md) holds
+the reasoning behind Windows-port work that already shipped.
 
 ### 2. A red suite may be a REQUEST
 
@@ -212,6 +214,7 @@ instance of the same bug on this side.
 ### 4. Answer back
 
 If the mac's implementation makes their guidance wrong, correct
-`WINDOWS-HANDOFF.md` in the same change. If it settles a question they asked,
+the `documentation/` page that owns it, in the same change. If it settles a
+question they asked,
 say so where they will look. A handoff that only travels one way is a report,
 not a conversation.

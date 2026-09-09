@@ -25,7 +25,7 @@ it rather than restating it:
 | What are the backup and archive files called, and what section number is offered next? | [`contracts/course-management.json`](contracts/course-management.json). |
 | What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, and **where a section's built website is kept — and what happens to a folder that already has one in the old place**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
 | What keys does `course_config.json` carry, and what decides whether students see a page? | [`contracts/file-formats.json`](contracts/file-formats.json) — a FORMAT rather than a behaviour, and the one both apps write and the Python reads. |
-| WHY is it that way, and what was rejected? | [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) for anything an implementer needs; a code comment for anything a reader of that file needs. |
+| WHY is it that way, and what was rejected? | The [`documentation/`](documentation/README.md) page that owns the subject, for anything an implementer needs; a code comment for anything a reader of the code needs. |
 | WHAT changed, WHEN, and what it cost | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — a dated log. **Append-only history, not a specification**: a row records what was true that day, and is not edited when the behaviour changes again. Never quote a row as the current wording. |
 | How does the whole feature work? | [`documentation/10-local-ai-assistant.md`](documentation/10-local-ai-assistant.md). |
 | What did we MEASURE? | [`research/`](research/README.md) — routing accuracy, model tiers, preview staleness. Never asserted in a test; each file states its own conditions. |
@@ -47,16 +47,25 @@ milestone pins it to a release. Start a session by reading the open issues for
 your platform. Nothing is tracked in a Markdown list any more, and adding one
 back is the thing this replaced.
 
-The two handoff documents remain, as REFERENCE rather than as to-do lists —
-they point in opposite directions:
+**The two handoff documents are gone**, and this is deliberate rather than
+lost. `WINDOWS-HANDOFF.md` and `MAC-HANDOFF.md` were deleted on 2026-09-08 and
+their reference material moved into
+[`documentation/`](documentation/README.md), each section landing in the page
+that owns its subject: the assistant's design in 10, folder problems and the
+build in 05, publishing races in 07, stopping a preview in 03, the config
+writers in 08, the WinUI and ConPTY mechanics in 12, and so on. Write-ups for
+work already shipped on the Windows port are archived in
+[`13-windows-port-archive.md`](documentation/13-windows-port-archive.md).
 
-- [`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md) — mac → Windows. Everything this
-  side learned, written for somebody who cannot read the Swift.
-- [`MAC-HANDOFF.md`](MAC-HANDOFF.md) — Windows → mac. Things the mac must
-  KNOW, and the ledger of what has already landed here and why.
+The reason they went: each had become three things at once — a to-do list, a
+changelog, and a manual — and only the third was worth keeping. The to-do list
+is now GitHub issues, the changelog is `GUI-IMPROVEMENTS.md`, and the manual is
+`documentation/`, where somebody looking up how a thing works will actually
+find it. **Do not recreate them.** A change written for the other platform goes
+in the documentation page that owns its subject, and the issue points at it.
 
-(The old `AI-ASSIST-HANDOFF.md` is gone: it was a record of how the assistant
-was built, and it now lives in
+(The old `AI-ASSIST-HANDOFF.md` went the same way earlier: it was a record of
+how the assistant was built, and it now lives in
 [`research/ai-assist/HISTORY.md`](research/ai-assist/HISTORY.md).)
 
 **Starting work on the macOS app? Open
@@ -72,17 +81,18 @@ the plan before implementing anything**, then work autonomously once it is
 agreed. What follows is the same reading order, in short:
 
 1. **This file**, for the rules that override default behaviour.
-2. **[`WINDOWS-HANDOFF.md`](WINDOWS-HANDOFF.md)** — architecture, the config
-   contract, and the reasoning behind the decisions. Long, and the section
-   headings are enough to navigate.
-3. **[`contracts/README.md`](contracts/README.md)**, then the JSON files — its coverage table says what is shared and what deliberately is not.
+2. **The open `windows` issues** — everything outstanding on that side.
+3. **[`documentation/`](documentation/README.md)** — architecture, the config
+   contract, and the reasoning behind the decisions, numbered 01–13. Read the
+   page an issue points at rather than all of them.
+4. **[`contracts/README.md`](contracts/README.md)**, then the JSON files — its coverage table says what is shared and what deliberately is not.
    These are the acceptance list: wire them into `Plantoir.Tests` and the
    assistant's behaviour is tested rather than eyeballed. **Do not retype the
    sentences or the scenarios into your test files** — deserialise them.
-4. **[`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md)**, newest rows first, for
+5. **[`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md)**, newest rows first, for
    what changed recently and why. Read it as history; where a row and the
    contract disagree, the contract is what is true now.
-5. **[`windows-app/PROGRESS.md`](windows-app/PROGRESS.md)** for where that app
+6. **[`windows-app/PROGRESS.md`](windows-app/PROGRESS.md)** for where that app
    actually stands.
 
 (The two contract cases once flagged here as known-failing — "deploy with a

@@ -129,6 +129,146 @@ belong in the same mental model:
 | `excludeBacklinks: true` | any page | Hides the "When did we do this?" backlinks panel on that page ([D1](06-quartz-customizations.md#d1-patched-backlinkstsx-supportbacklinkstsx)). |
 | `transcludeTitleSize: h2` | a transcluded page | Heading level used for the page's title when embedded via `![[…]]` ([C1-10](06-quartz-customizations.md#c1-applied-on-first-build--full-rebuild)). |
 
+## `course_config.json` has two writers, and they can erase each other
+
+Fixed on the mac 2026-09-05; **half of it is shared Python both platforms inherit,
+and half is each app's own.**
+
+`preflight_update_course_config` reads the configuration, spends a while
+scanning the course's folders, and writes what it computed. The APP writes the
+same file inside that window — a folder rename does, and it writes at ONCE
+rather than at Save, because the folder has really moved and a Cancel could not
+undo it. Whoever wrote second won, and said nothing. The state that leaves is
+the dead end in the next section: folders moved, configuration naming the old
+name.
+
+- **The Python half is shared.** Preflight now re-reads the file
+  immediately before writing and, if it changed, redoes the whole discovery
+  against the new contents — bounded at three tries, then it carries on with
+  what is there rather than spinning. Redoing is safe because discovery is a
+  pure function of (what is on disk, what the config says). It is not add-only
+  — an `excluded_items` name is dropped from the copy lists (row 377) — but
+  that is a function of the same two inputs, so the argument is unaffected.
+  Corrected 2026-09-07; it said "and is add-only" until then.
+- **The other writer is the app's.** Whatever writes `course_config.json` from the
+  Windows app must do the same read-compare-write, or the race is only half
+  closed. The mac's is `CourseConfiguration.recordOnDisk`; Windows' is
+`CourseConfiguration.RecordOnDisk`. One
+  deliberate asymmetry to copy: preflight backs off, the APP ends by writing
+  anyway after three tries — a folder that has MOVED with a configuration that
+  does not say so is the worse of the two states, so the app finishes by
+  recording the truth rather than by giving up on it.
+
+`scripts/test_config_write_race.py` forces the race with a scan that mutates the
+file mid-flight, and it runs on both platforms — Windows reaches it through
+`PythonToolchainTests`.
+
+## A rename interrupted after the folders moved was a dead end
+
+**This is an app-level problem, not a toolchain one** — it exists wherever a
+rename moves folders before writing the configuration, which both apps do.
+
+The state: the folders are under the new name, the configuration still says the
+old one. The next build DISCOVERS the moved folder and appends it, so the list
+holds BOTH names — and retrying the rename is then refused as a clash. If the
+folder was the class folder it is unremovable as well, so there is no way out
+of Settings at all; the teacher has to hand-edit `course_config.json`.
+
+**The rule to copy is: RECORD the rename before moving.** The first version of
+this on the mac decided from the disk alone — old folder gone, new one present
+— and that was wrong in a way worth understanding, because it looks right. It
+is also the state of a configuration entry whose folder was never created (or
+was deleted in Obsidian) being renamed onto a genuine SECOND folder. Bypassing
+there hands the real folder the phantom entry's attributes, `hidden` among
+them, and takes its pages off the next publish with nobody told. The two cases
+are indistinguishable on disk, so the disk cannot be the evidence.
+
+So: write a small record before anything moves, delete it once the
+configuration has been written, and relax the clash check only when BOTH the
+record and the disk agree. The mac keeps it at
+`courses/.internal/renames/<CODE>.json` — the `.internal` convention both apps
+already share — and deliberately NOT as a `course_config.json` key, because the
+failure being handled is that the configuration write did not happen. Carry the
+TARGET in the record, not just a flag, so a teacher who opens the sheet and
+types something else gets the ordinary refusal back; filling the field in with
+it also makes finishing an interrupted rename one keypress.
+
+Two more details that are not optional:
+
+- **No section may still hold the old folder.** A per-section rename moves
+  every section's copy, so a mixture means something other than an interrupted
+  rename, and the ordinary refusal must stand.
+- **De-duplicate the list when one finishes.** The starting state holds both
+  names by definition, so a naive rename leaves the new name in twice — which
+  on the mac renders two rows with one identity, and which no later rename can
+  undo.
+
+**One more thing a config writer must not do**, learned the same day:
+when it loses the compare-and-swap race enough times to give up and write
+anyway, it must recompute from the FRESHEST bytes. The mac's first version fell
+through and wrote the computation derived from the read it had just proved
+stale, clobbering the other writer's keys — the exact failure the loop exists
+to stop.
+
+## Config is the contract
+
+`course_config.json` is shared between the app, the wizard, and the build.
+See [`documentation/08-course-config-reference.md`](documentation/08-course-config-reference.md).
+Keys the Windows settings UI must round-trip (per-section maps use
+`{"sections": {"sectionN": value}}`):
+
+- `course_code`, `course_name`, `locale`, `section_numbers`, `num_sections`
+- `emojis.sections` — header emoji per section (system emoji panel: Win+.)
+- `color_schemes` — flat map sectionN → scheme id (`support/colour_schemes.json`)
+- `fonts.sections` — header/body/code display names (files in `support/fonts/`,
+  name → file by stripping spaces; "Helvetica, Arial" means system default)
+- `show_section_marker.sections` — the "S1" in the site header
+- `show_grade_in_title.sections` — grade prefix on the landing title
+  (legacy: a single course-wide bool; honour it). LITERAL behaviour: the
+  switch alone decides; the UI shows an orange warning when the course
+  name already contains the grade label, and the teacher resolves it.
+- `custom_domains.sections` — the app swaps published-site links' host to
+  this domain (path kept, https); entries are normalized (scheme and path
+  stripped) on the way in
+- `shared_folders`, `shared_files`, `per_section_folders`,
+  `per_section_files`, `hidden`, `expandable`, `expandOnFolderClick`,
+  `show_reading_time`, `footer_html`
+- `deploy_target` ("netlify" default | "cloudflare_pages" | "local_folder") and
+  `deploy_folder_path` (entries 101–102) — folder deploys pass
+  `--to-folder <path>` to the launcher, which robocopy-mirrors each
+  section into `<path>\sectionN`; completion is announced by a
+  `PUBLISHED_FOLDER=` line the app turns into a Show-in-Explorer button.
+  The Publishing choice appears in BOTH the settings form and the
+  new-course wizard (share the control); an empty, missing, or
+  unwritable folder blocks save/create with an inline message and is
+  checked the moment a folder is chosen; folder-mode progress labels
+  never mention Netlify; and the completion adds a note that the pages
+  only render properly once uploaded to a web host
+- `prepopulate_example_content`, `include_curriculum_pages` (entries
+  92–93) — written by the new-course wizard, read by the shared Python
+  wizard as its defaults; both forced false when no example content
+  exists for the course code
+- `use_lcs_terminology` (entry 94) — whether the factory structure
+  defaults use LCS's own set-up; the two factory sets live as
+  `DEFAULT_*` vs `LCS_*` constants in `scripts/setup_course.py` and the
+  Windows equivalent of `WizardDefaults` must mirror them exactly
+- `custom_short_name` — the ≤12-character label shown beside the header
+  emoji instead of the course code, in club mode. Already implemented on
+  Windows (`CourseConfiguration.cs`); listed here because this table is the
+  contract and it was missing from it
+- `include_curriculum_coverage` and `include_coverage_notes` (entries 125,
+  130) — whether the generated `Curriculum Coverage` map page is produced, and
+  whether it carries its explanatory sections or the map alone. Read by
+  `build_site.py`, both defaulting true. **Implemented on Windows** (verified
+  2026-08-22): both keys are read and written in `CourseConfiguration.cs` and
+  surfaced as toggles in `NewCourseDialog.cs` and `CourseSettingsView.xaml.cs` —
+  this note used to say "not yet implemented" and was stale.
+- **Edit keys in place and preserve unknown keys** — the macOS app keeps
+  the decoded JSON as a dictionary precisely so future toolchain keys
+  survive a settings round-trip. The shared Python wizard does the same in
+  the other direction: it copies through every key it does not own, which is
+  what lets an app-written setting survive a wizard re-run.
+
 ---
 
 [◀ Previous: Deployment](07-deployment.md) · [Back to index](README.md) · [Next: The macOS App ▶](09-mac-app.md)
