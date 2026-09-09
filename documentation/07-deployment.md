@@ -622,26 +622,45 @@ own log and nowhere else, so it was indistinguishable from a run that was never
 scheduled. That is the shape of *"my site did not update on Tuesday and I do not
 know why"*, and it had no answer.
 
-**How the handover works.** The wrapper cannot write the breadcrumb trail: it
-runs with nothing of ours loaded. So it writes a small record instead, and the
-app picks it up the next time it opens.
+**How the handover works.** The wrapper writes a small record, and the app
+reads it the next time the teacher opens that section. The trail line is a
+separate matter and is written by the RUN — see below; this paragraph used to
+say the wrapper "runs with nothing of ours loaded", and that was never true on
+this side. **The launchd agent runs Plantoir**, which runs the wrapper and then
+does its own post-run work.
 
-- The launchd wrapper captures each destination's exit code. On a non-zero one
-  it writes `~/Library/Application Support/Plantoir/scheduled/stopped/
-  <CODE>-section<N>.txt` — first line the kind, second the destination.
+- The launchd wrapper captures the BUILD's exit code and then each
+  destination's. On a non-zero one it writes `~/Library/Application Support/
+  Plantoir/scheduled/stopped/<CODE>-section<N>.txt` — first line the kind,
+  second the destination.
 - **Exit 3 is tested before the general non-zero branch**, because it is also
   non-zero. Three means `NEEDS_AN_ANSWER` and nothing else; anything else is an
   ordinary failure.
+- **Which LEG stopped decides the kind, not just the code.** Exit 3 from the
+  build is `buildNeededAnAnswer`; exit 3 from a destination is
+  `neededAnAnswer`. See the section below.
 - The **first** destination that stopped is the one kept. A course can publish
   to several and only one may have gone wrong, so *"it published to the folder
   and not to Netlify"* is the report a teacher makes; overwriting would tell
   them about the last thing rather than the first.
 - The record is cleared by a run that got **all** the way through, or by the
   teacher dismissing it.
-- The app writes the trail line **once**, however often it looks, dated to when
-  the RUN wrote its record rather than when the app read it — otherwise an
-  overnight problem is filed under the morning somebody noticed it. A third
-  line on the record is the "noted" mark.
+- **The RUN writes the trail line, not the app, and the record carries no
+  "noted" mark at all.** `ScheduledDeploy.runScheduled` calls
+  `ScheduledPublishOutcome.noteOnTrail` as soon as the wrapper finishes, so the
+  line is written once because the run happens once, and it is dated to when
+  the run wrote its record rather than to when anybody read it — otherwise an
+  overnight problem is filed under the morning somebody noticed it.
+
+  An earlier draft did have the app note it on opening and mark the record as
+  noted, and it was wrong three ways: the mark had to be written back into the
+  record, which changed its modification date — the very date the notice shows;
+  a teacher who never opened that section, who is exactly the teacher who
+  reports that their site did not update, got no line at all; and its premise,
+  that nothing of ours is loaded when the wrapper runs, was false. **This page
+  described the withdrawn draft as though it were the code until 2026-09-09**,
+  which is how the Windows side came to design a `.noted` sidecar against a
+  mark this side does not keep.
 
 **Where a teacher meets it.** The sentence sits at the top of the section, above
 the console — a teacher opening a section after a failed overnight publish is
@@ -649,6 +668,54 @@ looking for why their site is out of date, and the console is about what they
 are doing now. A warning badge also appears beside that section in the sidebar,
 because **a teacher who does not know which section failed cannot open the right
 one**, and not knowing is the whole problem.
+
+### A build that stopped for a question is its own outcome
+
+Proposed from Windows as [issue
+#132](https://github.com/russellgordon/plantoir/issues/132) and adopted here on
+2026-09-09. **A scheduled publish builds before it publishes**, and since
+`--non-interactive` the build can refuse: `preview.sh` has one question of its
+own — the 'Open' course-code guard — and refuses it with the same exit 3
+`deploy.py` uses. Nothing has been contacted at that point.
+
+This side already recorded that run, and recorded it as the wrong thing. It was
+`neededAnAnswer` with `buildDestinationName` standing in for a destination, so
+the teacher read:
+
+> …it stopped because publishing to **your website (it could not be built)**
+> needed an answer nobody was there to give. **Publish** this section once
+> yourself…
+
+Both halves are wrong. It names a destination nothing had contacted, and it
+sends the teacher to the button that does not ask the question. The fourth kind
+says neither:
+
+> …it stopped **before it started**, because building the pages needed an
+> answer nobody was there to give. **Preview** this section once yourself,
+> answer the question, and it can publish on its own after that.
+
+**Rejected, and recorded so it is not proposed again:** filling the destination
+in with the section's first configured one. It reads correctly and it is false.
+
+**No fourth trail event.** It files under `scheduled publish needed an answer`,
+which is about a question going unasked — which is what happened. A fourth
+event would put a distinction on the trail that means nothing to the person
+reading it. The line names no destination, and
+`activityTrail.mustRecord` → that event's `carries` says so.
+
+**The record's second line is still written and never shown.** Every record has
+one shape — the kind, then a name — because it is a shell script writing two
+`echo` lines at half six, and `stopped(inHomeFolder:course:section:)` refuses a
+record whose second line is empty. A build that failed OUTRIGHT still puts that
+name in the teacher's sentence.
+
+**A section already scheduled keeps the wrapper it was scheduled with.**
+`oneShotCommand` is called from `scheduleDeploy` and nowhere else, and nothing
+rewrites an existing `<CODE>.section<N>.sh` on launch the way the app refreshes
+the launchers. So a teacher with a publish already pending when they update
+reads the old sentence once, for that run. Records already on disk stay
+readable — the old kind is still a kind — which is why the fix could be made
+without a migration.
 
 ### Two deliberate differences from Windows, both decided rather than drifted
 
@@ -670,15 +737,20 @@ Both are owed to Windows. They are divergences until that side catches up.
 
 ### What was rejected
 
-**Writing the trail from the wrapper.** It has nothing of ours loaded, and a
-shell script appending to the trail would have to reimplement `LogRedactor` —
-the one thing that must not be reimplemented, since it is what keeps a
-teacher's own words off the trail.
+**Writing the trail from the wrapper's own shell.** Not because nothing of
+ours is loaded — Plantoir runs the wrapper — but because a shell script
+appending to the trail would put the line's format in a second home, in
+generated bash, where nothing tests it and `LogRedactor` does not reach. That
+is the one thing that must not be reimplemented: it is what keeps a teacher's
+own words off the trail. The app writes the line itself the moment the wrapper
+returns, which has the same property the wrapper would have had — a teacher who
+never opens the section still gets it.
 
 **Naming the question on the trail.** The question's text comes from a
 launcher's console; a line naming a credential prompt would put a teacher's own
-words there. The trail carries the course, the section and the destination, and
-that is all.
+words there. The trail carries the course, the section and the destination that
+stopped — or, when the BUILD stopped, that it stopped before any destination
+was reached, because none was.
 
 **Clearing the record inside the destination loop.** A course publishing to two
 places whose Netlify leg stopped and whose folder leg succeeded would have had
@@ -699,6 +771,19 @@ launcher, and since 2026-09-09 by `scripts/test_deploy_sh_questions.py`, which
 RUNS it to each of the four questions it can ask and checks the refusal is
 visible as well as the code being 3 — and end to end only by
 `verify-deploy.sh`, which publishes to real Netlify.
+
+**One narrow path can still produce the sentence #132 removed**, and it is
+filed rather than fixed. If any page under the section's `public/` carries
+`ws://localhost:`, `deploy.sh` reruns `preview.sh --build-only` itself and
+passes its exit 3 straight through — a BUILD question the wrapper can only see
+as a destination's, because the exit code is the only thing it gets. Reaching it
+needs the wrapper to have skipped its own build, and the wrapper's staleness
+check is `BuildFreshness.needsRebuild` written out in shell: it looks at
+`index.html` **alone**, while `deploy.sh` greps the whole tree. A clean front
+page in front of a stale preview page is the gap. Closing it means changing
+`BuildFreshness` as well as the generated script, so it is its own piece of
+work; giving the rebuild its own exit code would be a launcher contract change
+Windows shares.
 
 ---
 

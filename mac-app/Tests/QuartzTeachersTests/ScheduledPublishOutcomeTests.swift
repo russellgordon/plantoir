@@ -423,10 +423,21 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
     /// Deliberate, and Windows' reasoning adopted: that event is about a
     /// question going unasked, which is what happened, and a fourth event
     /// would put a distinction on the trail that means nothing to the person
-    /// reading it. What this can prove without reading the trail file is that
-    /// the branch exists and notes something; `ActivityTrailWiringTests` is
-    /// what holds the event list and the code together.
+    /// reading it.
+    ///
+    /// This reads the trail FILE rather than trusting `noteOnTrail`'s return
+    /// value, which is `true` for any record it could parse — so a version of
+    /// this test that only checked the return would pass with the branch
+    /// filed under the wrong event, or writing the destination line that this
+    /// kind must never show. Both of those are what is asserted here.
+    /// `ActivityTrail.note` never writes the event's own name, so the
+    /// sentence is what there is to look for.
     func testABuildThatStoppedForAQuestionIsNotedOnTheTrail() throws {
+        let scratch: URL = home.appendingPathComponent("trail", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+
         ScheduledPublishOutcome.recordStopped(
             ScheduledPublishOutcome.Stopped(
                 kind: .buildNeededAnAnswer,
@@ -438,6 +449,16 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         XCTAssertTrue(ScheduledPublishOutcome.noteOnTrail(
             inHomeFolder: home, course: "ZZQCU", section: 1
         ))
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("building the pages needed an answer"),
+            "the line a teacher's problem report would carry: \(trail)"
+        )
+        XCTAssertFalse(
+            trail.contains(ScheduledPublishOutcome.buildDestinationName),
+            "no destination was reached, so the trail may not name one"
+        )
     }
 
     // MARK: - What a teacher reads
