@@ -24,6 +24,21 @@ public static class TaskMilestones
 
     public static readonly IReadOnlyList<TaskMilestone> ExampleCourse = new[]
     {
+        // A THIRD marker the mac's example-course list does not have, and it
+        // passes MilestoneContractTests.EveryTaskShowsTheSharedStepsTheMacShows
+        // by a margin nobody designed. That test compares only the markers
+        // classified in app-rules.json → markerOrigins.origins, and the key
+        // there is "Host timezone offset" — not this string — so this one
+        // filters out of BOTH sides before the comparison and the two lists
+        // agree about what is left.
+        //
+        // Which means: if anyone ever "tidies" that origins key to match the
+        // full text a launcher prints, this test starts failing, and the cause
+        // will look nothing like the change that caused it. The fix would then
+        // be a decision about whether the two example-course lists should show
+        // the same steps — not a change to the readout. Flagged from the mac in
+        // GitHub issue #121 and written down here, because a closed issue is
+        // not where somebody editing a marker string will look.
         new TaskMilestone("Getting things ready…", "Detected host timezone offset"),
         new TaskMilestone("Copying the example course…", "Example Course installed to"),
         new TaskMilestone("Finishing up…", "EXAMPLE_COURSE_CODE="),
