@@ -121,18 +121,27 @@ bundle from the Dock. Test, then build, then stop.
 - Anything architectural also gets a section in `WINDOWS-HANDOFF.md`, and any
   guidance the change made WRONG is corrected there in the same breath. Stale
   advice is worse than none, because it gets followed.
-- **Anything WINDOWS must now do gets a numbered item in that file's "What is
-  still genuinely outstanding", in the same session.** Standing instruction,
-  `CLAUDE.md` rule 3. The list is not a duplicate of the section: a Windows
-  session is told to read the list FIRST, so it is how they find out there is
-  work at all, while the section is the manual for doing it. Mark items done
-  where they stand — struck through, `✅ Done <date>` — rather than deleting
-  them. A change written up beautifully in a section nothing points at is, from
-  their side, a change nobody wrote up.
+- **Anything WINDOWS must now do gets a GitHub issue labelled `windows`, in
+  the same session.** Standing instruction, `CLAUDE.md` rule 3. The issue is
+  not a duplicate of the section: a Windows session is told to read its open
+  issues FIRST, so the issue is how they find out there is work at all, while
+  the handoff section is the manual for doing it. Give it a milestone if it is
+  pinned to a release, and `decision` as well if it needs Russell to choose.
+  A change written up beautifully in a section nothing points at is, from their
+  side, a change nobody wrote up.
+
+  ```bash
+  GH_TOKEN=$(gh auth token --user russellgordon) gh issue create \
+    --repo russellgordon/plantoir --label windows --milestone v1.2.0 \
+    --title "…" --body-file <file>
+  ```
+
+  **Per-command auth, never `gh auth switch`** — this machine has more than one
+  `gh` account and switching globally affects every other session on it.
 - **An affordance that lives only in a context menu is invisible to everyone
   else.** A right-click menu, a double-click, a hover, a keyboard shortcut —
-  each needs a handoff line even though nothing on screen changed. That is how
-  the path bar's menu went unnoticed for months.
+  each needs a write-up even though nothing on screen changed. That is how the
+  path bar's menu went unnoticed for months.
 - Commit code changes as they are made, not in one lump at the end.
 
 ### 7. Then update the documentation — the LAST thing before "it is ready"
@@ -166,22 +175,26 @@ Russell's call every time (`CLAUDE.md` rule 6).
 
 ## B. Bringing the mac up to speed with Windows work
 
-### 1. Read [`MAC-HANDOFF.md`](MAC-HANDOFF.md) top-down
+### 1. Read the open `mac` issues, then [`MAC-HANDOFF.md`](MAC-HANDOFF.md)
 
-It is ordered by status, so you can stop when you like:
+```bash
+GH_TOKEN=$(gh auth token --user russellgordon) \
+  gh issue list --repo russellgordon/plantoir --label mac
+```
 
-1. **Contract cases waiting on the mac** — read this FIRST. If the suite is
-   red, the explanation is probably here.
-2. **Open — what the mac still owes.**
-3. **For awareness** — things to know, not to do.
-4. **Done — the ledger**, kept in full because the reasoning is the point.
+That is what the mac still owes. `MAC-HANDOFF.md` is what it must KNOW: two
+sections, both readable top-down and abandonable at any point —
+
+1. **For awareness** — things to know, not to do. Deliberately not issues,
+   because an issue nobody can close is one everybody learns to scroll past.
+2. **Done — the ledger**, kept in full because the reasoning is the point.
 
 ### 2. A red suite may be a REQUEST
 
 The Windows side can propose a case in the authored half of a contract. When
 they do, the mac suite fails until this side implements it — that is the
-mechanism working, not a break. The failing case names itself, and
-`MAC-HANDOFF.md` should carry a line saying it is waiting.
+mechanism working, not a break. The failing case names itself, and there
+should be an open `mac` issue saying it is waiting.
 
 ### 3. Implement, then mark it DONE in place
 

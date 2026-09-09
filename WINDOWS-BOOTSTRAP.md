@@ -96,11 +96,14 @@ pure data and will show you the shape.
    before choosing, and measure on **integrated graphics**, not only on your
    own machine.
 
-Items 5 onwards — the 2026-08-16 assistant batch, re-dating's two
-corrections, the schedule prompt, course renaming, the assistant-choice
-panel, the token dialogs — are ordered with their reasoning in
-`WINDOWS-HANDOFF.md` → "Where Windows actually stands". Do not re-derive that
-order; it was chosen so each item makes the next one cheaper.
+Everything else that is outstanding is a **GitHub issue labelled `windows`** —
+that list replaced `WINDOWS-HANDOFF.md`'s numbered one on 2026-09-08. Read it
+first, with its milestones, and read the handoff section each issue points at
+for the reasoning behind it:
+
+```bash
+gh issue list --repo russellgordon/plantoir --label windows
+```
 
 ---
 
@@ -125,19 +128,20 @@ order; it was chosen so each item makes the next one cheaper.
 - **You MAY propose an authored case** (`scenarios`, `nearMisses`,
   `promptHistory`, and the case lists in the other files). Doing so will make
   the **mac** suite fail until they implement it — that is the mechanism
-  working. Name the case so it reads as a proposal and log it in
-  `MAC-HANDOFF.md` under "Contract cases waiting on the mac".
+  working. Name the case so it reads as a proposal and open a GitHub issue
+  labelled `mac` saying which case you added and what the mac has to implement
+  to make it pass — otherwise the red suite over there reads as damage.
 - **Do not run `--write-contracts`.** That is macOS-only.
-- **Anything the MAC must now do goes in `MAC-HANDOFF.md`'s "Open — what the
-  mac still owes", at the TOP of that section, in the same session.** Standing
-  instruction, `CLAUDE.md` rule 4. That section is the mac's to-do list from
-  you, exactly as `WINDOWS-HANDOFF.md`'s numbered list is yours from them —
-  both files are read top-down and abandoned partway, so an obligation that
-  lives only in prose lower down is one nobody picks up. Move it to the ledger
-  when it is done rather than deleting it.
-- **Write every change up before moving on**, to the template at the top of
-  `MAC-HANDOFF.md`: what changed, why, what you rejected, and — for anything
-  measured — the numbers **with the hardware they came from**. "The Vulkan
+- **Anything the MAC must now do is a GitHub issue labelled `mac`, opened in
+  the same session.** Standing instruction, `CLAUDE.md` rule 4. Those issues
+  are the mac's to-do list from you, exactly as the `windows` ones are yours
+  from them — an obligation that lives only in prose inside a long file is one
+  nobody picks up. Something the mac need only KNOW is not an issue; that goes
+  in `MAC-HANDOFF.md`'s "For awareness" section.
+- **Write every change up before moving on**, to the template in
+  `MAC-HANDOFF.md` → "How to write an issue for the mac": what changed, why,
+  what you rejected, and — for anything measured — the numbers **with the
+  hardware they came from**. "The Vulkan
   build was faster" cannot be acted on; "43 tok/s against 11 on CPU, Intel Iris
   Xe" can. Anything a teacher can see also gets a row in `GUI-IMPROVEMENTS.md`.
 - **An affordance that lives only in a context menu is invisible to everyone
