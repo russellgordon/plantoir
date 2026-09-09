@@ -360,7 +360,29 @@ if ($TO_FOLDER) {
   if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
     Write-Host "This site was built by a preview, which bakes in a live-reload script"
     Write-Host "  that students' browsers would ask about. Rebuilding it for publishing..."
-    & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only"
+    # Forward the flag. Without it this rebuild is a SECOND way a scheduled
+    # publish can meet a question nobody is there to answer: preview.ps1 asks
+    # about a course code ending in a zero, and about a section the
+    # configuration does not list. Under the wrapper's -NonInteractive
+    # PowerShell an unanswered Read-Host THROWS, and preview.ps1's
+    # $ErrorActionPreference = 'Stop' turns that into a bare exit 1 with
+    # nothing said — measured, not assumed; see the long note at the top of
+    # preview.ps1, which also says why the "takes the default and builds the
+    # WRONG course" story belongs to preview.sh and not here.
+    #
+    # Mirrors deploy.sh, which has forwarded it since 2026-09-09; this side had
+    # not, and GitHub issue #124 is where that gap was named.
+    $previewExtra = @()
+    if ($NON_INTERACTIVE) { $previewExtra += '--non-interactive' }
+    & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only" @previewExtra
+    if ($LASTEXITCODE -eq 3) {
+      # Passed straight through, because 3 means one thing: a question went
+      # unanswered. A caller that saw 1 here would tell the teacher their
+      # publish failed, when what it needs to say is which question nobody
+      # was there to answer.
+      Write-Host "Could not rebuild this site for publishing: it needed an answer."
+      exit 3
+    }
     if ($LASTEXITCODE -ne 0) {
       Write-Host "Could not rebuild this site for publishing."
       exit 1

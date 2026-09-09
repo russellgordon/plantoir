@@ -93,6 +93,48 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
         ? $"Deploying automatically at {when:h:mm tt} on {when:dddd d MMMM}. " +
           "Right-click to cancel. This computer must be on and awake."
         : "";
+
+    private DateTime? _publishStopped;
+    /// <summary>
+    /// When this section's scheduled publish did not get through, null
+    /// otherwise.
+    /// </summary>
+    /// <remarks>
+    /// <para>A teacher who does not know WHICH section failed cannot open the
+    /// right one, and not knowing is the whole problem — the run happened at
+    /// half six with the app closed. The sentence itself lives inside the
+    /// section; this is only what points at it.</para>
+    ///
+    /// <para><b>Failures only.</b> A scheduled publish that WORKED also leaves
+    /// a record and a notice inside the section, and deliberately no badge
+    /// here: one beside every section that published fine overnight is a badge
+    /// nobody reads by Wednesday
+    /// (contracts/shared-rules.json, scheduledPublishStopped.attention).</para>
+    ///
+    /// <para>Raises change notification for the two DERIVED properties the
+    /// badge binds to as well as this one, since <c>x:Bind</c> subscribes to
+    /// the property path it names.</para>
+    /// </remarks>
+    public DateTime? PublishStopped
+    {
+        get => _publishStopped;
+        set
+        {
+            if (_publishStopped == value) return;
+            _publishStopped = value;
+            Raise(nameof(PublishStopped));
+            Raise(nameof(WarningVisibility));
+            Raise(nameof(WarningTooltip));
+        }
+    }
+
+    public string WarningGlyph => Glyphs.Warning;
+    public Visibility WarningVisibility =>
+        PublishStopped is null ? Visibility.Collapsed : Visibility.Visible;
+    public string WarningTooltip => PublishStopped is { } when
+        ? $"The publish set to happen on its own did not go out on {when:dddd d MMMM}. " +
+          "Open this section to see why."
+        : "";
 }
 
 public sealed partial class SidebarPane : UserControl
@@ -335,6 +377,17 @@ public sealed partial class SidebarPane : UserControl
             // can delete the task themselves, and a badge promising a deploy
             // that will not happen is worse than no badge.
             row.ScheduledDeploy = TaskScheduling.NextRun(course.Code, number);
+            // Re-read on every pass for the same reason as the clock above, and
+            // read rather than remembered: the record is on disk, an overnight
+            // run writes it with nothing of ours alive, and the teacher can
+            // clear it from inside the section — so anything cached here would
+            // be wrong within a click. FAILURES only; a run that worked leaves a
+            // notice inside the section and no badge.
+            var outcome = ScheduledPublishOutcome.Read(course.Code, number);
+            row.PublishStopped =
+                outcome is { } result && ScheduledPublishOutcome.NeedsAttention(result.Outcome)
+                    ? result.When
+                    : null;
             desired.Add(row);
         }
         ApplyDesiredOrder(courseRow.Children, desired);

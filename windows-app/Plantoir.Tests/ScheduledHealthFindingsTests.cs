@@ -182,9 +182,24 @@ public class ScheduledHealthFindingsTests : IDisposable
         Assert.True(build >= 0, "the build is not run as a child process");
         Assert.True(settle > build, "the exit code is not settled after the build");
         Assert.True(settle < scan, "the exit code must be settled BEFORE the scan runs its own commands");
-        // And the guard must test the settled variable, never the live
-        // $LASTEXITCODE, which the scan's own commands have overwritten by then.
-        Assert.Contains("if ($buildExit -ne 0) {\n  Write-Host 'Could not build", script);
+        // And EVERY guard must test the settled variable, never the live
+        // $LASTEXITCODE, which the scan's own commands have overwritten by
+        // then. There are two branches as of 2026-09-09 — a build that stopped
+        // for a question exits 3 and is told apart from one that broke, because
+        // the two need different sentences — and the risk is the same for both:
+        // a branch reading $LASTEXITCODE here would decide whether to publish
+        // from whatever Select-String last returned.
+        Assert.Contains("if ($buildExit -eq 3) {", script);
+        Assert.Contains("} elseif ($buildExit -ne 0) {", script);
+        Assert.Contains("Write-Host 'Could not build this section, so nothing was published.'", script);
+
+        // A wider check — "nothing between the build and the deploy legs reads
+        // $LASTEXITCODE" — was written here and then removed. It cannot be
+        // stated as a substring: the settling line itself reads $LASTEXITCODE,
+        // which is the whole point of it, and the comment block above the build
+        // NAMES the variable while explaining why. It failed for prose, which
+        // is how a test earns being deleted rather than fixed. The two branch
+        // headers above are the property that matters and they say it exactly.
     }
 
     [Fact]
@@ -238,7 +253,14 @@ public class ScheduledHealthFindingsTests : IDisposable
 
         int captured = script.IndexOf("if ($buildLog) {", StringComparison.Ordinal);
         int fallback = script.IndexOf("} else {", captured, StringComparison.Ordinal);
-        int plainRun = script.IndexOf("preview.ps1' 'ICS3U' '1' --build-only\n", StringComparison.Ordinal);
+        // The whole invocation, flags included. Pinned as a literal on purpose
+        // — it is the fallback nobody exercises — but it must be the literal
+        // the writer actually emits: --non-interactive joined it on 2026-09-09
+        // and this said "the fallback branch does not run the launcher
+        // plainly", which is a true sentence about a test that was simply out
+        // of date.
+        int plainRun = script.IndexOf(
+            "preview.ps1' 'ICS3U' '1' --build-only --non-interactive\n", StringComparison.Ordinal);
 
         Assert.True(captured >= 0, "there is no captured branch");
         Assert.True(plainRun > fallback, "the fallback branch does not run the launcher plainly");

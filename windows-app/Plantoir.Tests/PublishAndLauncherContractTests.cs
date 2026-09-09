@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using System.Reflection;
+using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 
@@ -411,30 +412,228 @@ public class PublishAndLauncherContractTests
     [Fact]
     public void EveryQuestionTheDeployLauncherAsksIsGuarded()
     {
-        var lines = File.ReadAllLines(Path.Combine(RepoRoot, "deploy.ps1"));
-        var unguarded = new List<int>();
-
-        for (int i = 0; i < lines.Length; i++)
-        {
-            if (!lines[i].Contains("Read-Host", StringComparison.Ordinal)) continue;
-            // The guard sits on the line immediately above the question, which
-            // is the only placement that reads correctly: a guard further away
-            // is one somebody moves code past.
-            // TrimStart before the "#" test, and the "#" test at all, because
-            // the first version of this counted a COMMENTED-OUT guard as a
-            // guard — proved by commenting one out and watching the test still
-            // pass, which is the only way that kind of hole is ever found.
-            string above = i == 0 ? "" : lines[i - 1].TrimStart();
-            if (above.StartsWith("#", StringComparison.Ordinal)
-                || !above.Contains("Assert-CanAsk", StringComparison.Ordinal))
-                unguarded.Add(i + 1);
-        }
+        var unguarded = UnguardedQuestionLines("deploy.ps1");
 
         Assert.True(unguarded.Count == 0,
             "deploy.ps1 asks a question with no Assert-CanAsk above it, at line(s) " +
             string.Join(", ", unguarded) + ". Under --non-interactive that question is put to " +
             "nobody: the publish either waits for ever or takes a default and publishes the " +
             "teacher's site to an address they never chose.");
+    }
+
+    /// <summary>
+    /// Every question <c>preview.ps1</c> asks is guarded too, and the guard
+    /// comes BEFORE the question.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>A build launcher needs this as much as the publishing one, and
+    /// that is the part that is easy to miss.</b> A scheduled publish BUILDS
+    /// before it publishes — <c>TaskScheduling.WriteWrapperScript</c> runs
+    /// <c>preview.ps1 &lt;course&gt; &lt;section&gt; --build-only</c> as its
+    /// first step — so every question this script asks at half six in the
+    /// morning is put to nobody just as surely.</para>
+    ///
+    /// <para>What happens then, MEASURED on PowerShell 5.1.26100 rather than
+    /// assumed: the wrapper's build leg runs
+    /// <c>powershell -NonInteractive</c>, where an unanswered
+    /// <c>Read-Host</c> THROWS <c>PSInvalidOperationException</c> — and
+    /// <c>preview.ps1</c> opens with <c>$ErrorActionPreference = 'Stop'</c>, so
+    /// the script dies on the spot. Exit 1, no build, no publish, and nothing
+    /// anywhere saying why: the teacher's site is simply not updated in the
+    /// morning. Under a plain <c>-File</c> with stdin at end of input it
+    /// returns <c>$null</c> instead, so the [Y/n] default is NOT taken and the
+    /// typed code is kept.</para>
+    ///
+    /// <para><b>The "takes the default and builds a DIFFERENT course" story is
+    /// preview.sh's, not this one's</b>, and it was written here first by
+    /// copying that launcher's reasoning across. It is true there — no
+    /// <c>set -e</c>, and <c>${_ans:-Y}</c> really does default — and
+    /// <c>app-rules.json</c> under <c>nonInteractive</c> is where it belongs.
+    /// Corrected 2026-09-09 after review measured both shells.</para>
+    ///
+    /// <para><b>This script asks TWO things, and the second is this
+    /// platform's alone.</b> <c>preview.sh</c> has exactly one read prompt,
+    /// its course-code guard; "Continue anyway?" — the warning when a section
+    /// is not listed in <c>course_config.json</c> — has no counterpart there.
+    /// It is recorded in <c>app-rules.json</c> →
+    /// <c>launcherFlags.nonInteractive.refusals</c> with
+    /// <c>appliesOn: ["windows"]</c>, so the next person comparing the two
+    /// launchers reads a deliberate difference rather than drift.</para>
+    ///
+    /// <para><b>That entry was very nearly asked for by issue instead.</b>
+    /// This comment said <c>app-rules.json</c> is generated on the mac and
+    /// cannot be edited here — which is the mistake <c>CLAUDE.md</c> names by
+    /// date. <c>contracts/README.md</c> is explicit: only <c>milestones</c> and
+    /// <c>credentialRequests</c> are readouts; <c>launcherFlags</c>,
+    /// <c>deployArguments</c>, <c>markerOrigins</c>, <c>configurationRules</c>,
+    /// <c>previewPorts</c> and <c>credentialPrompts</c> are AUTHORED and
+    /// preserved by the generator. Caught by review, 2026-09-09.</para>
+    /// </remarks>
+    [Fact]
+    public void EveryQuestionThePreviewLauncherAsksIsGuarded()
+    {
+        var unguarded = UnguardedQuestionLines("preview.ps1");
+
+        Assert.True(unguarded.Count == 0,
+            "preview.ps1 asks a question with no Assert-CanAsk above it, at line(s) " +
+            string.Join(", ", unguarded) + ". A scheduled publish builds before it publishes, so " +
+            "that question is put to nobody — and an unanswered [Y/n] takes its default, which " +
+            "for the course-code guard means building a DIFFERENT course and publishing it.");
+
+        // And the flag is really parsed, not merely mentioned in the help text.
+        // A launcher that printed it and then said "Unknown option: " is, to a
+        // teacher, a scheduled publish that simply did not happen.
+        Assert.Contains("'--non-interactive'               { $NON_INTERACTIVE = $true",
+                        File.ReadAllText(Path.Combine(RepoRoot, "preview.ps1")),
+                        StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Every flag the SCHEDULED wrapper hands a launcher is one that launcher
+    /// actually accepts.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>The gap this closes is a whole class, and it was nearly walked
+    /// into on 2026-09-09.</b> The wrapper is generated C# and the launchers
+    /// are hand-written PowerShell, and nothing joined the two: adding
+    /// <c>--non-interactive</c> to the wrapper's build leg without adding it to
+    /// <c>preview.ps1</c>'s parser would have made that launcher print
+    /// "Unknown option: --non-interactive" and exit 1 — whereupon the wrapper's
+    /// own <c>if ($buildExit -ne 0)</c> guard publishes nothing and says so to
+    /// a console nobody is watching. Every scheduled publish on this machine
+    /// would simply stop happening, silently, and every existing test would
+    /// stay green.</para>
+    ///
+    /// <para><c>AppRules_LauncherFlags_MatchesContract</c> checks
+    /// contract→script and never wrapper→script, which is the direction this
+    /// one runs. Both are needed: a flag can be in the contract and not the
+    /// wrapper, or in the wrapper and not the contract.</para>
+    ///
+    /// <para>Coupled to the <c>'^--flag$'</c> and <c>'--flag'</c> switch idioms
+    /// the two launchers use; a rewrite that changes the idiom should change
+    /// this with it.</para>
+    /// </remarks>
+    [Fact]
+    public void EveryFlagTheScheduledWrapperPassesIsOneTheLauncherAccepts()
+    {
+        string folder = Directory.CreateTempSubdirectory("plantoir-wrapper-flags").FullName;
+        string? wrapper = null;
+        try
+        {
+            File.WriteAllText(Path.Combine(folder, "deploy.ps1"), "# stub");
+            File.WriteAllText(Path.Combine(folder, "preview.ps1"), "# stub");
+
+            wrapper = TaskScheduling.WriteWrapperScript(
+                $"Plantoir-flagcheck-{Guid.NewGuid():N}", folder,
+                Path.Combine(folder, "deploy.ps1"), "ICS3U", 1,
+                Path.Combine(folder, "courses", "ICS3U"), Array.Empty<string>(),
+                new[]
+                {
+                    new CourseConfiguration.DeployDestination("cloudflare_pages", ""),
+                    new CourseConfiguration.DeployDestination("local_folder", folder),
+                },
+                "0123456789abcdef0123456789abcdef");
+            Assert.NotNull(wrapper);
+
+            var launchers = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["preview.ps1"] = File.ReadAllText(Path.Combine(RepoRoot, "preview.ps1")),
+                ["deploy.ps1"] = File.ReadAllText(Path.Combine(RepoRoot, "deploy.ps1")),
+            };
+
+            var unknown = new List<string>();
+            foreach (string line in File.ReadAllLines(wrapper!))
+            {
+                string which = line.Contains("preview.ps1", StringComparison.OrdinalIgnoreCase)
+                    ? "preview.ps1"
+                    : line.Contains("deploy.ps1", StringComparison.OrdinalIgnoreCase) ? "deploy.ps1" : "";
+                // Only the lines that RUN one. The generated script names both
+                // in comments and in the path it builds for Start-Process.
+                if (which.Length == 0) continue;
+                if (!line.TrimStart().StartsWith("& ", StringComparison.Ordinal)
+                    && !line.Contains("$buildArgs =", StringComparison.Ordinal)) continue;
+
+                foreach (string word in line.Split(' ', '\'', '"'))
+                {
+                    if (!word.StartsWith("--", StringComparison.Ordinal)) continue;
+                    string flag = word.Trim();
+                    string parser = launchers[which];
+                    // The two switch idioms the launchers use for a flag CASE,
+                    // and nothing looser. Plain containment of the quoted flag
+                    // was the first version and it is a false negative waiting
+                    // to happen: deploy.ps1 also contains the literal
+                    // '--non-interactive' where it FORWARDS the flag to the
+                    // Python, so that line alone would satisfy the check even
+                    // if the parser had stopped accepting it — which is exactly
+                    // the failure this test exists to catch.
+                    string quoted = Regex.Escape(flag);
+                    bool accepted =
+                        // deploy.ps1's idiom: switch -Regex, '^--flag$' { ... }
+                        Regex.IsMatch(parser, $@"'\^{quoted}[$=]")
+                        // preview.ps1's idiom: switch, '--flag' { ... }
+                        || Regex.IsMatch(parser, $@"'{quoted}'\s*\{{");
+                    if (!accepted) unknown.Add($"{which} does not parse {flag}");
+                }
+            }
+
+            // Distinct: the build leg appears twice in the wrapper (captured
+            // and fallback), so one missing flag would otherwise be reported
+            // twice in the same sentence.
+            unknown = unknown.Distinct(StringComparer.Ordinal).ToList();
+            Assert.True(unknown.Count == 0,
+                "The scheduled wrapper passes a flag its launcher would reject: " +
+                string.Join("; ", unknown) + ". That launcher prints \"Unknown option\" and exits, " +
+                "the wrapper publishes nothing, and nobody is awake to read either — so every " +
+                "scheduled publish stops happening and no test says so.");
+        }
+        finally
+        {
+            if (wrapper is not null) try { File.Delete(wrapper); } catch { }
+            try { Directory.Delete(folder, recursive: true); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Which lines of a launcher ask a question with no <c>Assert-CanAsk</c>
+    /// directly above them. One scanner for both launchers, because the rule is
+    /// one rule.
+    /// </summary>
+    /// <remarks>
+    /// <para>Three properties, each of which was a hole first.</para>
+    ///
+    /// <para><b>The guard must be on the line IMMEDIATELY above the
+    /// question.</b> Anywhere else is a guard somebody moves code past.</para>
+    ///
+    /// <para><b>A COMMENTED-OUT guard is not a guard.</b> The first version of
+    /// this counted one — proved by commenting a real guard out and watching
+    /// the test stay green, which is the only way that kind of hole is ever
+    /// found.</para>
+    ///
+    /// <para><b>A COMMENT that merely mentions Read-Host is not a
+    /// question.</b> Found on 2026-09-09, the moment this scanner was pointed
+    /// at preview.ps1 — whose own explanation of why the flag exists says the
+    /// words "a Read-Host with no console reads end of input". The scan
+    /// reported two unguarded questions that do not exist. A test that fails
+    /// for prose is one somebody deletes.</para>
+    /// </remarks>
+    private static List<int> UnguardedQuestionLines(string launcherFileName)
+    {
+        var lines = File.ReadAllLines(Path.Combine(RepoRoot, launcherFileName));
+        var unguarded = new List<int>();
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i].TrimStart();
+            if (line.StartsWith("#", StringComparison.Ordinal)) continue;
+            if (!line.Contains("Read-Host", StringComparison.Ordinal)) continue;
+
+            string above = i == 0 ? "" : lines[i - 1].TrimStart();
+            if (above.StartsWith("#", StringComparison.Ordinal)
+                || !above.Contains("Assert-CanAsk", StringComparison.Ordinal))
+                unguarded.Add(i + 1);
+        }
+
+        return unguarded;
     }
 
     /// <summary>
