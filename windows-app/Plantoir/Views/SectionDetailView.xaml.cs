@@ -490,13 +490,26 @@ public sealed partial class SectionDetailView : UserControl
     /// The bar's own close button means the same thing as Dismiss.
     /// </summary>
     /// <remarks>
-    /// Two ways to say "I have read this" that did different things would be
-    /// the worse kind of surprise: the X is the one most people reach for, and
-    /// a teacher who presses it and finds the same notice tomorrow morning
-    /// learns to distrust the notice.
+    /// <para>Two ways to say "I have read this" that did different things
+    /// would be the worse kind of surprise: the X is the one most people reach
+    /// for, and a teacher who presses it and finds the same notice tomorrow
+    /// morning learns to distrust the notice.</para>
+    ///
+    /// <para><b>Only a real close, though.</b> InfoBar raises Closed for a
+    /// PROGRAMMATIC close as well as a clicked one, and this view closes the
+    /// bar itself twice — once in the Dismiss handler above, and once when a
+    /// section is opened that has no record waiting. Without the reason check
+    /// the first fired the dismissal twice and the second fired one for a
+    /// teacher who had done nothing, which raises SectionOutcomeDismissed and
+    /// makes the sidebar rebuild for no reason. Found by review before either
+    /// could be noticed, because the second delete is a no-op on a file that
+    /// is already gone.</para>
     /// </remarks>
-    private void ScheduledPublishNotice_Closed(InfoBar sender, InfoBarClosedEventArgs args) =>
+    private void ScheduledPublishNotice_Closed(InfoBar sender, InfoBarClosedEventArgs args)
+    {
+        if (args.Reason != InfoBarCloseReason.CloseButton) return;
         DismissTheScheduledPublishNotice();
+    }
 
     private void DismissTheScheduledPublishNotice()
     {

@@ -88,12 +88,34 @@ $OVERRIDE_IMAGE    = $null
 # This script publishes nothing, so it is easy to think it does not need the
 # flag. It does: a SCHEDULED publish builds before it publishes, and the
 # wrapper Task Scheduler runs calls `preview.ps1 <course> <section>
-# --build-only` first. Without the flag the two questions below are put to
-# nobody at half six in the morning, and a Read-Host with no console reads end
-# of input — so the answer is empty and the DEFAULT is taken. For the
-# course-code guard that default is "yes, fix it", which retargets the build at
-# a DIFFERENT course and then publishes successfully against the wrong one.
-# That is worse than a refusal, because nothing looks wrong.
+# --build-only` first, so both questions below are put to nobody at half six in
+# the morning.
+#
+# WHAT ACTUALLY HAPPENS THEN, measured on this machine (PowerShell 5.1.26100,
+# script stdin at end of input) rather than assumed — and it is NOT what
+# preview.sh does, so do not copy that file's reasoning across:
+#
+#   powershell -File x.ps1 < NUL          Read-Host returns $null, not "".
+#   (what preview.bat starts)             ($ans -eq '') is FALSE, so the [Y/n]
+#                                         default is NOT taken and the code is
+#                                         kept as typed. The script carries on.
+#
+#   powershell -NonInteractive -File      Read-Host THROWS
+#   (the scheduled wrapper's build leg)   PSInvalidOperationException, and
+#                                         $ErrorActionPreference = 'Stop' at the
+#                                         top of this file kills the script.
+#                                         Exit 1, no build, nothing said.
+#
+# The second is the one that matters, and it is the whole justification: a
+# scheduled publish dies at a question, mid-sentence, and the teacher's site is
+# simply not updated in the morning with nothing anywhere saying why. The flag
+# turns that into exit 3 and a sentence naming the question, which the wrapper
+# records and the app shows.
+#
+# (The "takes the DEFAULT and builds a DIFFERENT course" failure is real, but
+# it belongs to preview.sh: that script has no `set -e` and `${_ans:-Y}` really
+# does default. It is written down in app-rules.json under nonInteractive,
+# where it is true of the launcher it describes.)
 $NON_INTERACTIVE   = $false
 
 if ($Flags) {

@@ -86,7 +86,26 @@ public class ScheduledWrapperRunTests : IDisposable
             UseShellExecute = false,
             WorkingDirectory = work,
         };
-        foreach (string a in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script! })
+        // The wrapper is RUN, so it writes wherever it was told to write — and
+        // WriteWrapperScript bakes AppDataRoot's real path in, which in a test
+        // process is the teacher's own %LOCALAPPDATA%\Plantoir. Before the
+        // scheduled outcome record existed this was harmless here, because the
+        // wrapper only wrote one on exit 3 and nothing in this class produces
+        // one. It now writes a record on EVERY path, so an unsubstituted run
+        // leaves "succeeded / <a temp folder> / ICS3U / 1" in the teacher's
+        // state — and the next time Plantoir opens, the startup sweep puts a
+        // trail line about a publish that never happened in front of them and
+        // ICS3U section 1 shows a green notice saying last night went out.
+        //
+        // Substituting the one baked literal is what ScheduledPublishOutcomeTests
+        // does and for the same reason. AppDataRoot.RedirectTo is NOT the
+        // answer: it is process-wide with no way back, so it would point every
+        // later test in this process at a scratch folder.
+        string runnable = Path.Combine(_root, Path.GetFileName(script!));
+        File.WriteAllText(runnable,
+            File.ReadAllText(script!).Replace(ScheduledPublishOutcome.Directory(), _root));
+
+        foreach (string a in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", runnable })
             info.ArgumentList.Add(a);
 
         using var process = Process.Start(info)!;
