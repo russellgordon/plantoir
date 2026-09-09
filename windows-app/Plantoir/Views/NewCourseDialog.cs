@@ -32,7 +32,7 @@ public sealed class NewCourseDialog : ContentDialog
 
     // A searchable picker, not a plain field: matches the mac wizard's own
     // course-code combo box (contracts don't cover this — it's visual, see
-    // WINDOWS-HANDOFF.md "The course-code picker is a hand-built combo box").
+    // documentation/12-windows-app.md "The course-code picker is a hand-built combo box").
     // WinUI's AutoSuggestBox draws a rich per-row template natively, which is
     // exactly the thing the mac had to hand-build NSComboBox's replacement
     // for — so the real control is used here rather than a custom flyout.
@@ -893,7 +893,7 @@ public sealed class NewCourseDialog : ContentDialog
         // "alphabetically first name containing curriculum" branch. A skeleton
         // family whose folder is called something else — "Expectations" — is
         // protected on the mac and NOT protected here. A KNOWN GAP, written
-        // down in MAC-HANDOFF.md rather than left for somebody to rediscover;
+        // down in documentation/12-windows-app.md rather than left for somebody to rediscover;
         // it protects too little, never the wrong folder.
         ResolvedCurriculumFolder: CurriculumFolderRule.Resolve(null, _sharedFolders),
         GradedFolders: CurrentGradedFolders(),
@@ -909,7 +909,7 @@ public sealed class NewCourseDialog : ContentDialog
     /// what the wizard's own label says — so the label and the sentence always
     /// agree, which is the property that matters here. The mac derives it from
     /// the course CODE instead, so an Ontario-selected teacher typing a BC code
-    /// sees a different sentence on each platform. Noted in MAC-HANDOFF.md.</para>
+    /// sees a different sentence on each platform. Noted in documentation/12-windows-app.md.</para>
     /// </summary>
     private string JurisdictionForCode() =>
         _province == "BC" ? "British Columbia" : SpecialNames.DefaultJurisdiction;

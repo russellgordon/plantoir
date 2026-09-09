@@ -19,7 +19,7 @@ namespace Plantoir.Views;
 /// the three lines of a row are weighted against each other.</para>
 ///
 /// <para>The scroller needs no trailing gutter, and that is a deliberate check
-/// rather than an omission: the rule in <c>WINDOWS-HANDOFF.md</c> ("WinUI
+/// rather than an omission: the rule in <c>documentation/12-windows-app.md</c> ("WinUI
 /// scroll bars overlay content") applies to a <c>ScrollViewer</c> whose content
 /// docks an interactive control to the trailing edge. These rows are text
 /// only, so the overlay has nothing to sit on top of.</para>

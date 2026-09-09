@@ -353,7 +353,7 @@ enum SiteHealthRepair {
     /// written down nowhere: the next caller — the assistant, a second window,
     /// a whole-course fix — would have met it as a wrong report rather than as
     /// a compile error. Windows found it by porting this file line by line
-    /// (`MAC-HANDOFF.md`, 2026-09-06) and shipped this shape first; the mac is
+    /// (documentation/04-course-setup.md, 2026-09-06) and shipped this shape first; the mac is
     /// catching up to it rather than inventing it.
     ///
     /// One thing it does NOT fix, deliberately. Section 1 restored and section
@@ -363,9 +363,12 @@ enum SiteHealthRepair {
     /// Windows reads the same way. Inventing wording for it was rejected: it
     /// is as unreachable as the collapse was, and a sentence nobody has
     /// weighed is harder to take back than a paragraph of explanation. The
-    /// blocked case does not have the problem HERE — its own sentence names
-    /// the section folder — but Windows has no blocked case yet, so over there
-    /// it reads namelessly too until `WINDOWS-HANDOFF.md` item 33 lands.
+    /// blocked case does not have the problem on EITHER platform — its own
+    /// sentence names the section folder. Windows adopted the named refusal on
+    /// 2026-09-07; until then a blocked section there fell into `failed` and
+    /// read namelessly too, which is what this comment used to describe. Pinned
+    /// over there by SiteHealthRepairTests
+    /// .TwoRefusedSectionsAreTwoSentencesBecauseEachNamesItsOwnFolder.
     struct Attempt: Equatable {
 
         // MARK: - Stored properties

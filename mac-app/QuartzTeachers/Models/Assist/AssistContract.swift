@@ -173,7 +173,114 @@ enum AssistContract {
                   + "Claude Code sees. Point a routing measurement at these rather than at a copy.",
             "local": schemas(for: AssistToolRunner.localTools),
             "mcp": schemas(for: AssistToolRunner.mcpTools),
+            "departures": departures(),
         ]
+    }
+
+    /// Where this surface departs from the Windows server's, and why.
+    ///
+    /// Until 2026-09-08 the only record of these was a doc comment on
+    /// `AssistToolSurface`, so Windows' own contract test kept a hand-written
+    /// array restating them — `AssertOnlyTheDeparturesWeHaveAgreed`, whose
+    /// comment says in as many words that it is waiting for this key. Issue #83.
+    ///
+    /// Only what this side can PROVE is emitted: the shape on its own surface,
+    /// never a claim about what Windows does. Derived from the DECLARATION
+    /// (`Kind.separatedList`), never by matching English in the descriptions.
+    ///
+    /// The reasoning, and the shape that was rejected, is in
+    /// `documentation/10-local-ai-assistant.md` → "Where the two surfaces'
+    /// SCHEMAS differ". Not repeated here.
+    private static func departures() -> [String: Any] {
+        var separators: [String: String] = [:]
+        var surfaces: [String: [String]] = [:]
+        collectListShaped(from: AssistToolRunner.localTools, surface: "local",
+                          separators: &separators, surfaces: &surfaces)
+        collectListShaped(from: AssistToolRunner.mcpTools, surface: "mcp",
+                          separators: &separators, surfaces: &surfaces)
+
+        var names: [String] = []
+        for (name, _) in separators {
+            names.append(name)
+        }
+        names.sort()
+
+        var listShaped: [[String: Any]] = []
+        for name in names {
+            listShaped.append([
+                "parameter": name,
+                "separator": separators[name] ?? "",
+                "surfaces": surfaces[name] ?? [],
+            ])
+        }
+
+        return [
+            "note": "How this surface's schemas differ from the Windows server's. Emitted so that "
+                  + "side can READ them instead of keeping a hand-written copy — the copy is what "
+                  + "made the two surfaces drift in the first place.",
+            "listShapedStringParameters": listShaped,
+            "howToReadThis": "Each entry says a parameter is a string carrying a list, on which "
+                  + "surfaces, and the separator this surface ADVERTISES to the model. It does NOT "
+                  + "say what the other platform does — the mac cannot check that. A suite seeing "
+                  + "both should intersect this list with its own schemas, and there are FOUR "
+                  + "outcomes, not three: an ARRAY there is a real type departure; a string there "
+                  + "with a DIFFERENT separator is a separator difference, worth asserting "
+                  + "deliberately; a string there with the SAME separator is an agreement and "
+                  + "nothing should be asserted about it; anything else is a real disagreement. "
+                  + "Leaving the third case out turns a suite red for an agreement, which is how "
+                  + "this note first read.",
+            "advertisedNotAccepted": "The separator is what the SCHEMA tells the model, not the only "
+                  + "character the runner accepts. AssistToolRunner is deliberately forgiving and "
+                  + "splits on several — pages on semicolon or newline, codes and dates on comma, "
+                  + "semicolon, newline and more. So a difference recorded here is a difference in "
+                  + "what each side TELLS the model, which is worth knowing; it is not necessarily "
+                  + "an incompatibility, and a suite should not assert one from it.",
+            "absentHere": [
+                [
+                    "parameter": "preview",
+                    "why": "On Windows a batch of edits can be made with the preview suppressed and "
+                         + "rebuilt once at the end. Here every change rebuilds, which is what the "
+                         + "assistant's own system prompt promises a teacher, so there is nothing "
+                         + "for the flag to mean.",
+                    "rejected": "Adding it for symmetry. There is no boolean anywhere on this "
+                              + "surface at all; the last was includeLinked, which asked the MODEL "
+                              + "how far a publish or an unpublish should reach — the exact "
+                              + "reasoning this design exists to keep out of a router. The rules "
+                              + "live in AssistPublishPlanner instead, where they are written down "
+                              + "once and tested.",
+                ],
+            ],
+            "notEnumeratedHere": "Arguments the Windows server takes that this surface does not "
+                  + "DECLARE. Mostly extra parameters on tools BOTH platforms serve — re_date_classes "
+                  + "and read_remembered_timetable are the clearest, with the same name and different "
+                  + "parameters on the two servers (GUI-IMPROVEMENTS.md row 447). Said precisely "
+                  + "because the first version of this key said they were tools the mac does not "
+                  + "serve at all, which is false: it serves both. The reason they stay in that "
+                  + "platform's own list is that the mac does not declare those arguments, so it can "
+                  + "neither test them nor notice when they change.",
+        ]
+    }
+
+    /// Every list-shaped string parameter on one surface, by `tool.parameter`.
+    private static func collectListShaped(
+        from definitions: [AssistToolDefinition],
+        surface: String,
+        separators: inout [String: String],
+        surfaces: inout [String: [String]]
+    ) {
+        for definition in definitions {
+            for (parameterName, property) in definition.parameters {
+                if let separator = property.kind.listSeparator {
+                    let key: String = "\(definition.name).\(parameterName)"
+                    separators[key] = separator
+                    var seenOn: [String] = surfaces[key] ?? []
+                    if !seenOn.contains(surface) {
+                        seenOn.append(surface)
+                    }
+                    surfaces[key] = seenOn
+                }
+            }
+        }
     }
 
     private static func schemas(for definitions: [AssistToolDefinition]) -> [[String: Any]] {

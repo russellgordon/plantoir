@@ -75,8 +75,12 @@ public class NewCourseWizardUiTests
         OpenWizard(app);
 
         var create = app.Find("PrimaryButton", "the wizard's Create button");
-        // The label is pinned by nothing else — it is the wizard's own, not
-        // contract data — so this test is where it lives.
+        // Contract data since 2026-09-08: shared-rules.json -> wizard
+        // .createCourseButton, which the mac asserts in a gated test. This
+        // assertion is still worth keeping — it proves the button can be
+        // REACHED and reads correctly, which a contract test cannot — but it
+        // is no longer the only thing pinning the label, and it should compare
+        // against the contract rather than a literal. See issue #119.
         Assert.Equal("Create Course", create.Name);
         Assert.False(create.IsEnabled, "Create was available before a code had been typed");
 
