@@ -1845,6 +1845,16 @@ non-text guard above, and it was weighed rather than missed:
   placeholder case and cannot close it, because a model can send whatever it
   likes. **Windows may copy the sentence and owes nothing if it does not.**
 
+  **And it owes no re-measurement**, which is worth saying plainly beside
+  "what a schema advertises is a routing change" earlier on this page (issue
+  #122, the same day). That rule is about the surface a LOCAL model reads, and
+  `re_date_classes` is in `hiddenFromTheLocalModel`: the small model never sees
+  this schema at all, only Claude Code does, and a person is reading each step
+  there. Editing this particular description is one of the few schema changes
+  that costs no routing accuracy — which is exactly why it was the repair worth
+  making, and why the same edit to a tool the local model DOES see would need
+  the hand-run suites first.
+
 **Say what the placeholder case actually looks like, rather than calling it
 harmless.** Nothing on disk changes, which is the part that matters. But a
 mid-semester section that gets the question reads two sentences that are simply
