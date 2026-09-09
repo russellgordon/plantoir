@@ -1293,7 +1293,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// drives it over stdio exactly as Claude Code does, so a line written in
     /// the app would miss every request arriving from a terminal. (The mac
     /// records the same two events from its own runner, which on that platform
-    /// IS the app.) Known limit, and pre-existing rather than introduced here:
+    /// IS the app.) This server already wrote the trail before these two
+    /// events — <c>LauncherRunner</c> does — so the known limit that comes
+    /// with it is pre-existing rather than introduced here:
     /// <c>AppDataRoot</c> is per-process, so a run started with
     /// <c>--state-dir</c> does not redirect this server's copy.
     /// </remarks>
