@@ -452,6 +452,42 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
 
 ## Open — what the mac still owes
 
+- **One `TEACHERS SAY:` phrasing, and it is now the ONLY difference between
+  the two MCP surfaces' wording: `check_section` on the mac is missing "what
+  would students see in this section right now?".** (Windows, 2026-09-08,
+  branch `issue/41-teachers-say-phrasings`.) Windows wrote that fourth
+  phrasing on 2026-08-17, two days after the mac wrote its three, and it never
+  came back. It has been sitting in prose in this file's ledger since
+  2026-09-06 with nothing pointing at it, which is exactly the failure CLAUDE.md
+  rule 4 exists to prevent, so it is here at the top now.
+
+  **Measured, not assumed.** After Windows closed its own half — the
+  seventeen phrasings, item 41 — the clause of all 25 shared tools was
+  compared character for character between `contracts/assist-cases.json` →
+  `toolSchemas.mcp` and Windows' live `tools/list`. Exactly one differs, and
+  it is this one. Everything else now matches.
+
+  **What the mac owes:** add the phrasing to `check_section` in
+  `AssistToolSurface.swift`, keeping the clause WHOLE, then re-run
+  `Plantoir --write-contracts` so `toolSchemas` carries it. **And measure
+  first**, on the mac's own hardware — `check_section` IS in the local
+  model's set on both platforms, so this is a routing change, not a comment.
+  Windows' own before/after is in `research/ai-assist/teachers-say-results.txt`
+  and `teachers-say-suite.py` is written to be re-pointed at the mac's surface;
+  the mac cannot inherit the numbers, because they were taken on an Intel UHD
+  620 with Vulkan and a 1.5B model.
+
+  **One trap Windows paid for, so the mac does not have to.** A probe suite
+  that measures the ROUTER must use sentences the app actually routes.
+  `AssistAgent.Say` has THREE interception layers before the model is asked —
+  the plain-preview sentences, `AssistCardCommand` (`FixedShapes` plus its
+  three parsers), and four inline regexes in `CardCommand` itself — and the
+  first draft of Windows' suite checked only the middle one, losing three
+  controls to the other two. The mac's `AssistCardCommand.swift` has the same
+  shape. Check all three, and append the dateline: `Say` puts
+  `" (Today is YYYY-MM-DD, a Weekday.)"` on every message the model sees, and
+  `trimmed-surface-results.txt` records that line being worth fifteen points.
+
 - **Nothing to implement, one thing to switch on: line endings are enforced
   now, and the enforcement reaches this clone only if hooks are enabled.**
   (Windows, 2026-09-08, branch `issue/gitattributes-line-endings`.) A session
@@ -908,9 +944,11 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   and records `re_date_classes`' extra arguments as agreed departures. The
   paragraphs below are corrected in place rather than deleted, because the
   reasoning that was rejected on the way is still worth having. What is left
-  for Windows is the rollover decision and the seventeen phrasings; what is
-  left for the MAC is Russell's yes on the sorting, the one `check_section`
-  phrasing, and the generator change Windows asked for in this same file.
+  for Windows is the rollover decision — ~~and the seventeen phrasings~~,
+  which Windows did on 2026-09-08 (branch `issue/41-teachers-say-phrasings`;
+  ledger entry below); what is left for the MAC is Russell's yes on the
+  sorting, the one `check_section` phrasing, and the generator change Windows
+  asked for in this same file.
 
   The twelve, verified by set difference rather than read off a list: exactly
   twelve Windows-only, **zero mac-only**, and **zero hits for any of the twelve
@@ -1207,10 +1245,19 @@ the failure the v1.1.0 cut sheet above sat in for seventeen days.)
   change nobody chose. The rule for copying a Windows description is to keep
   the clause WHOLE, and `check_section` is the one place the mac did not.
 
-  **Nothing is fixed here on either side**, because adding a phrasing IS a
+  ~~**Nothing is fixed here on either side**, because adding a phrasing IS a
   routing change and routing is measured by hand against a local
-  `llama-server`, which an unattended session cannot do. The mac owes itself
-  one phrasing; Windows owes itself seventeen, and item 41 tells them so.
+  `llama-server`, which an unattended session cannot do.~~ **✅ Windows' half
+  is done, 2026-09-08** — all seventeen are in, measured before and after on
+  Windows' own `llama-server` rather than reasoned about (branch
+  `issue/41-teachers-say-phrasings`, ledger entry below). The four rows above
+  that say "Windows has none" describe the state up to that date and are left
+  as they were. **The mac's half is not**: `check_section`'s fourth phrasing
+  is still Windows-only, it is now the ONLY difference of the 25 — re-measured
+  clause by clause after the change, not assumed — and it is listed at the top
+  of "Open — what the mac still owes" so it is somewhere the mac will actually
+  find it. Prose here was not enough: it sat in this paragraph for two days
+  and nothing pointed at it.
   (An earlier draft of this entry claimed the `check_section` case was the only
   difference of the 25 — that was a script that only looked in one direction,
   and it is exactly the failure this whole entry is about.)
@@ -4238,6 +4285,101 @@ is what happened to the test-race item, sitting here for three days with
 
 
 ## Done — the ledger
+
+- **Windows has the seventeen `TEACHERS SAY:` phrasings now, measured rather
+  than copied on faith — item 41, half two** (Windows, 2026-09-08, branch
+  `issue/41-teachers-say-phrasings`; `GUI-IMPROVEMENTS.md` row 451; numbers in
+  `research/ai-assist/teachers-say-results.txt`). **The mac is expected to
+  KNOW, and owes ONE thing**, listed at the top of "Open — what the mac still
+  owes": `check_section`'s fourth phrasing, which is now the only wording
+  difference left between the two MCP surfaces. ✅ DONE on this side.
+
+  **What it fixed.** `PlantoirTools.cs` had no `TEACHERS SAY:` clause at all on
+  `add_next_class`, `plan_add_next_class`, `read_remembered_timetable` and
+  `remember_timetable`. All four now carry the mac's clause verbatim. Verified
+  afterwards by comparing the clause of all 25 shared tools character for
+  character between `contracts/assist-cases.json` → `toolSchemas.mcp` and
+  Windows' live `tools/list`: exactly one still differs, and it is the mac's.
+
+  **Why it was measured, and why only ten of the seventeen.**
+  `AssistAgent.ForTheLocalModel` holds thirteen names.
+  `read_remembered_timetable` and `add_next_class` are in it,
+  `plan_add_next_class` and `remember_timetable` are not — so ten of the
+  seventeen change what the local ROUTER reads and seven only reach Claude
+  Code. Item 41 asked for the measurement and said only this side could take
+  it; the mac cannot run this hardware.
+
+  **Numbers, with the hardware.** Intel Core i5-8365U (4 cores / 8 logical),
+  15.7 GB RAM — which picks the SMALL tier, the 16 GiB Large threshold being
+  just out of reach — Intel UHD Graphics 620 over Vulkan with
+  `--n-gpu-layers 999`, qwen2.5-1.5b-instruct-q4_k_m, llama.cpp build 10435,
+  the exact arguments `LocalModel.BuildArguments` produces. 25 probes × 5
+  trials, temperature 0. **Under test 40/50 → 50/50; controls 55/75 → 60/75,
+  nothing regressed; overall 95/125 (76%) → 110/125 (88%).** Median call 7.9 s
+  before, 6.9 s after. Every probe scored 5/5 or 0/5 in every run — at
+  temperature 0 this model is deterministic on this surface, so the trials
+  confirm stability rather than average noise, and a flake rarer than one in
+  five stays invisible. Server resident cost: 1,494 MB.
+
+  **The two probes the phrasings fixed were MISROUTES, not declines** —
+  "Set up next day's lesson" was reaching `schedule_deploy` five times out of
+  five, and "When does this class meet?" was reaching `check_section`. A
+  sentence about writing a page answered by the tool that puts work in front of
+  students is the expensive kind of wrong.
+
+  **Four traps, each of which produces a number that looks fine. This is the
+  part that travels, and the mac will meet three of them when it does
+  `check_section`.**
+
+  1. **The instrument was stale, and nothing could have caught it.**
+     `research/ai-assist/narrow-tools.py` hand-copies `ForTheLocalModel`. It
+     was right when committed 2026-08-14 and wrong from 2026-08-17
+     (4089c752), when the set went from fifteen names to thirteen: it was
+     still keeping four `plan_` tools the app no longer shows and MISSING both
+     tools under test. A research script is run by hand, months apart, so no
+     suite ever exercised it. `NarrowToolsMirrorTests` now fails on drift.
+     REJECTED: leaving it and adjusting by hand at measurement time — that is
+     precisely the arrangement that had just failed. The three results files
+     measured inside that three-day window are sound and are named in the
+     script, so nobody discards them on the strength of this.
+  2. **The dateline decides the answer.** `Say` appends
+     `" (Today is YYYY-MM-DD, a Weekday.)"` to every message the model sees.
+     A first pair of runs omitted it and was thrown away — but the ten test
+     probes were identical, so it left one clean comparison: **25/50 without
+     the dateline against 40/50 with it**, and the three probes it fixes on its
+     own would have been credited to the phrasings. The discarded run said
+     five fixes where the truth is two. `trimmed-surface-results.txt` had
+     already recorded the same line being worth fifteen points when prepended
+     instead; this is the second time it has decided a measurement.
+  3. **There are THREE interception layers before the model, not one.**
+     `PreviewAskedForPlainly` (thirteen exact sentences), then
+     `AssistCardCommand.Matching` (`FixedShapes` plus its three parsers), then
+     four inline regexes in `AssistAgent.CardCommand` itself. The first draft
+     checked only the middle one and lost three controls to the other two —
+     they were being answered without the model at all, so they measured
+     nothing. The mac's `AssistCardCommand.swift` has the same shape.
+  4. **Making a research script stricter can delete a control.** Requiring the
+     course code in `narrow-tools.py` read as a tightening and would have
+     silently turned `trimmed-surface-suite.py --real-course` into a no-op,
+     destroying the A/B its own docstring rests on. It is optional now,
+     un-substituted by default, with the reason written down.
+
+  **Also corrected, because it would have sent the next Windows session
+  wrong:** `tools-from-contract.py` and `routing-suite.py` both told a reader
+  to start a measurement from the contract. On Windows that measures the MAC's
+  descriptions on Windows hardware, since the contract is generated there.
+  Both now say so and point at `dump-tools.ps1` + `narrow-tools.py`.
+
+  **Still wrong on both platforms, recorded rather than fixed:** "Put it online
+  tomorrow morning at 6:30" routes to `deploy_section` rather than
+  `schedule_deploy` 5/5 (fails safe — deploying is gated by the button, but the
+  teacher is asked to deploy NOW); "Don't send it in the morning after all"
+  declines 5/5; and "Delete the Unit 1 folder" still picks a tool instead of
+  declining, which `AssistAgent`'s own comment already names as unsolved.
+
+  Reference: `windows-app/Plantoir.Mcp/PlantoirTools.cs`,
+  `windows-app/Plantoir.Tests/NarrowToolsMirrorTests.cs`,
+  `research/ai-assist/teachers-say-suite.py`.
 
 - **The folders-help row check runs the contract's own case list — item 40**
   (Windows, 2026-09-08, branch `issue/folders-help-row-check-cases`;

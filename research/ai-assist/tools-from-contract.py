@@ -18,6 +18,16 @@ are measured artifacts — one added sentence in `publish_pages` took the
 promise-card score from 110/110 to 90/110 — so a measurement is only about the
 shipping surface if the descriptions are the shipping ones too.
 
+**On WINDOWS this file is the wrong starting point, and that is not obvious.**
+The contract is generated from the MAC, so what it holds is the mac's
+descriptions. The two servers' wording is close but not identical — five of the
+25 shared tools differed on 2026-09-08 and one still does — so a Windows
+measurement taken from here scores the mac's surface on Windows hardware and
+reads as evidence about neither. On Windows, dump the live surface instead:
+
+    research/ai-assist/dump-tools.ps1 -Exe …\plantoir-mcp.exe -Folder … -Course … -Out tools.json
+    python research/ai-assist/narrow-tools.py tools.json narrowed.json <COURSE>
+
     python3 research/ai-assist/tools-from-contract.py [local|mcp] > /tmp/real-tools.json
     python3 research/ai-assist/shipped-surface-suite.py 8099 10 /tmp/real-tools.json
 

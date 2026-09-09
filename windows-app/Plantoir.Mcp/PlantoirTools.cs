@@ -532,7 +532,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "plan_add_next_class", Title = "Plan adding the next class",
                    ReadOnly = true, Destructive = false)]
-    [Description("Work out what the next class page would be called and what date it would land on, " +
+    [Description("TEACHERS SAY: \"what would the next class page be?\", \"which day comes next?\", " +
+                 "\"show me before you add it\". " +
+                 "Work out what the next class page would be called and what date it would land on, " +
                  "changing nothing. Use this for \"add the next class\" or \"start a new unit for the next class\". " +
                  "The title continues the highest unit's count; the date is the next unused day in the section's timetable.")]
     public CallToolResult PlanAddNextClass(
@@ -551,7 +553,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         });
 
     [McpServerTool(Name = "add_next_class", Title = "Add the next class page", Destructive = false, Idempotent = false)]
-    [Description("Create the next class page, dated to the day the section next meets. " +
+    [Description("TEACHERS SAY: \"add an entry for the next class\", \"add tomorrow's class page\", " +
+                 "\"start the next class\", \"add the next class\", \"make a page for our next class\", " +
+                 "\"set up next day's lesson\". " +
+                 "Create the next class page, dated to the day the section next meets. " +
                  "Call plan_add_next_class FIRST and show the teacher what it said. " +
                  "The page starts UNPUBLISHED — an empty skeleton for the teacher to write, which stays out of the site " +
                  "until they publish it. An existing page is never written over.")]
@@ -619,7 +624,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "read_remembered_timetable", Title = "What dates this section meets",
                    ReadOnly = true, Destructive = false)]
-    [Description("Read the class meeting dates Plantoir already knows for a section, changing nothing. " +
+    [Description("TEACHERS SAY: \"when does this class meet?\", \"what dates do you have for us?\", " +
+                 "\"do you know our timetable?\", \"how many class days are left?\". " +
+                 "Read the class meeting dates Plantoir already knows for a section, changing nothing. " +
                  "CALL THIS FIRST whenever you need to know when a section's classes fall — before asking the " +
                  "teacher for a timetable, and before any tool that needs dates. It is remembered from the last " +
                  "time they gave one.")]
@@ -766,7 +773,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "remember_timetable", Title = "Remember when a section meets",
                    Destructive = false, Idempotent = true)]
-    [Description("Write down the dates a section's classes fall on, so nobody has to ask again. Call this as soon " +
+    [Description("TEACHERS SAY: \"here are the days we meet\", \"remember our timetable\", " +
+                 "\"these are our class dates\", \"save these dates\". " +
+                 "Write down the dates a section's classes fall on, so nobody has to ask again. Call this as soon " +
                  "as a teacher tells you when their class meets, however they say it. Replaces anything recorded " +
                  "before, so send the WHOLE list every time, not just new dates. Dates are YYYY-MM-DD, separated " +
                  "by commas or spaces.")]

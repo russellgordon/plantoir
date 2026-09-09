@@ -46,10 +46,26 @@ vetoed and for what, and what the flags cost.
 
 **The harnesses** — `shelf-phrasings-suite.py` (the shelf, with the app's own system prompt AND its dateline), `trimmed-surface-suite.py` (the 29-probe suite the
 Windows-comparable numbers come from), `shipped-surface-suite.py`,
-`routing-suite.py`, `adversarial-suite.py`, `narrow-tools.py` (the real
-narrowing code, so a surface under test is the shipped one), and two
+`teachers-say-suite.py` (**Windows**, 25 probes: what the `TEACHERS SAY:`
+clauses on two tools are worth, before and after, with fifteen controls for
+the collateral damage a description change has caused before),
+`routing-suite.py`, `adversarial-suite.py`, `narrow-tools.py` (a hand copy of
+the real narrowing code, so a surface under test is the shipped one), and two
 PowerShell helpers for dumping a live tool list. The 42-probe suite that
 produced the newest results file was not committed; its results were.
+
+**`narrow-tools.py` was a hand copy that silently went stale, and now is not.**
+It was right when committed on 2026-08-14 and wrong from 2026-08-17, when
+`AssistAgent.ForTheLocalModel` went from fifteen names to thirteen and the
+Python was not followed through — so it kept narrowing to four `plan_` tools
+the app no longer shows and missing the two it had gained. Nothing could
+catch that: a research script is run by hand, months apart. Since 2026-09-08
+`NarrowToolsMirrorTests` in the Windows suite fails when the two lists differ,
+which is the only way a file like this stays honest. The three results files
+measured in that three-day window are sound; anything else taken through it
+between those dates is not. **The general lesson, for any harness here:** a
+number is only as good as the surface it was taken against, and a hand copy of
+a shipping list needs something that runs on every commit to hold it in place.
 
 **To re-run any of it**: start `llama-server` by hand with the flags in the
 results file's header, point the suite at it, and compare like for like — the
