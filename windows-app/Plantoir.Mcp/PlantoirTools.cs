@@ -1175,8 +1175,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// Word for word the mac's, so a teacher reading a plan on either app
     /// reads the same thing. NEITHER app's copy is in
     /// <c>contracts/assist-wording.json</c> - the generator does not reach a
-    /// tool runner's plan prose - which is asked for in MAC-HANDOFF.md rather
-    /// than papered over with a second home for the string here.
+    /// tool runner's plan prose - which is GitHub issue #127 rather than
+    /// papered over with a second home for the string here. (#83 landed the
+    /// generator change for tool SCHEMA departures; it does not reach this.)
     /// </remarks>
     private static string WhatStartingANewWebsiteDoes() =>
         "start a new website for this section, so publishing it no longer replaces last year's. " +
