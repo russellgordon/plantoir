@@ -37,7 +37,12 @@ import Foundation
 /// somebody else already paid for.
 ///
 /// Two deliberate departures from the Windows schema, both forced by the shape
-/// of the tool surface here:
+/// of the tool surface here. **Since 2026-09-08 this comment is no longer the
+/// only record of them**: `--write-contracts` emits them into
+/// `contracts/assist-cases.json` → `toolSchemas.departures`, derived from the
+/// declarations rather than from this prose, so Windows reads them instead of
+/// keeping a hand-written copy (issue #83). Kept here because a reader of this
+/// file needs the reasoning; the contract is what a TEST should read.
 ///
 /// * Lists of page names are semicolon-separated strings. The schema this
 ///   client speaks has strings, integers and booleans and no arrays — and a
@@ -203,7 +208,7 @@ extension AssistToolRunner {
     /// list of those names is a list of nonsense.
     private static func pagesHelp(_ verb: String) -> AssistSchemaProperty {
         return AssistSchemaProperty(
-            kind: .string,
+            kind: .separatedList(separator: ";"),
             description: "The page titles to \(verb), separated by semicolons — for example "
                        + "\"Unit 2, Day 3; Unit 2, Day 4\". May be empty if you give dates instead."
         )
@@ -437,7 +442,7 @@ extension AssistToolRunner {
             "section": sectionHelp,
             "when": whenHelp,
             "classes": AssistSchemaProperty(
-                kind: .string,
+                kind: .separatedList(separator: ";"),
                 description: "The class pages this deploy is meant to publish, separated by semicolons. "
                            + "Checked for whether they are published yet."
             ),
@@ -502,7 +507,7 @@ extension AssistToolRunner {
     /// Semicolons for the same reason the page lists use them, and because one
     /// separator on this surface is easier to get right than two.
     private static let datesHelp: AssistSchemaProperty = AssistSchemaProperty(
-        kind: .string,
+        kind: .separatedList(separator: ";"),
         description: "Every day this class meets, as YYYY-MM-DD, separated by semicolons — for example "
                    + "\"2026-09-08; 2026-09-10; 2026-09-14\". Give the dates themselves; this tool does not "
                    + "open timetable files or work dates out from a pattern."
