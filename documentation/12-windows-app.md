@@ -1,6 +1,6 @@
 # 12. The Windows App — Plantoir
 
-[◀ Previous: Release Strategy](11-release-strategy.md) · [Back to index](README.md)
+[◀ Previous: Release Strategy](11-release-strategy.md) · [Back to index](README.md) · [Next: Archive — the Windows port ▶](13-windows-port-archive.md)
 
 `windows-app/` contains **Plantoir** for Windows: the same product as
 [the macOS app](09-mac-app.md), built by somebody who cannot read the Swift,
@@ -12,8 +12,7 @@ deploys, a New Course wizard, and the same on-device assistant.
 **This page is architecture and platform difference.** For what is BUILT and
 what is still missing, read [`windows-app/PROGRESS.md`](../windows-app/PROGRESS.md),
 which carries the live parity table; for the reasoning behind decisions,
-[`WINDOWS-HANDOFF.md`](../WINDOWS-HANDOFF.md) and
-[`MAC-HANDOFF.md`](../MAC-HANDOFF.md). Those three are maintained as work
+the rest of this folder. Those are maintained as work
 happens. This page is not a status report and should not be read as one.
 
 ---
@@ -197,7 +196,7 @@ What it registers is the SHELL: `schtasks /TR` gets
 "<wrapper>"`. (The mac's equivalent lesson — register the job as the APP, or
 the operating system announces that "bash" wants to run in the background —
 belongs to macOS Background Items and has no counterpart here. It is recorded
-in `WINDOWS-HANDOFF.md` as something to weigh, not as something this code
+as something to weigh, not as something this code
 does; do not go looking for app-registration code.)
 
 Two rules learned the hard way, and they cover different halves of the same
@@ -384,8 +383,8 @@ events, three different responses, one exit code — and the middle one is the
 expensive one, because it does not look like an infrastructure problem. A test
 is NAMED, so the name gets investigated; re-running it passes, so it gets filed
 as flaky. On the mac that mistake rejected 3 of 7 pieces of correct work in a
-single overnight batch and was raised in `TODO.md` twice, a fortnight apart,
-before anybody noticed the two entries were one defect.
+single overnight batch and was raised twice, a fortnight apart, before
+anybody noticed the two reports were one defect.
 
 **The honest signal is the TOTALS line, never the exit code.** Measured
 2026-09-08 on this machine (Lenovo 20QES70500, Intel Core i5-8365U @ 1.60 GHz,
@@ -541,12 +540,13 @@ this section said the opposite — that any console broke it — which is why th
 experiment above is written down rather than the conclusion alone.
 `Plantoir.UiTests` is the case that meets it in practice, and `DrivenApp`
 launches with `UseShellExecute = true` for exactly this reason. Whether
-`ConPtyProcess.Start` should defend itself is in [`TODO.md`](../TODO.md).
+`ConPtyProcess.Start` should defend itself is
+[issue #89](https://github.com/russellgordon/plantoir/issues/89).
 
 ### The new-site dialog: a hand-driven check
 
 One first-run path cannot be a `[UiFact]`, and it is the other half of what
-handoff item 35 asked for: the dialog a BRAND-NEW section's first publish
+the first-run UI checks asked for: the dialog a BRAND-NEW section's first publish
 raises, where a teacher chooses their website address. Everything verified
 until now has been a REPEAT publish to a site that already existed, so this
 dialog has never been seen by anybody checking that it works.
@@ -620,7 +620,7 @@ And delete the site on Netlify, since it is a real one and the address is
 globally unique.
 
 **Whether this joins the release cut — answered 2026-09-07, and the answer is
-no.** It was left open as the same question as handoff item 36; item 36 is now
+no.** It was left open as the same question as the publishing-gate work, which is now
 settled, so this one is too, and separately from it. `RELEASING.md` requires
 `verify-deploy.ps1` with nothing skipped for a release that changes the
 publishing path, and that script deliberately cannot reach this dialog: it
@@ -630,6 +630,48 @@ unique Netlify site that nothing deletes, on top of the ones the verifier
 already makes, to check five things that change about once a year. Do it when
 the new-site path itself changes — the five checks above say what to look at —
 and not on a schedule.
+
+## `x:Bind` freezes a row that is reconciled rather than recreated
+
+Worth knowing before any WinUI work here, not only the case it was found in.
+The sidebar's scheduled-deploy badge never appeared when a deploy was scheduled
+in an already-open window, and the right-click menu never offered Cancel or
+Change either (2026-08-23, `GUI-IMPROVEMENTS.md` row 326). **Two compounding
+bugs, and fixing the obvious one alone would have changed nothing on screen.**
+
+1. `ReconcileSections` read the current schedule into `SidebarRow` only when
+   CREATING a row. An existing row — the normal case, the window being already
+   open — kept whatever had been true the moment it was first shown, forever.
+2. Even with that fixed, nothing would have appeared. **`x:Bind` defaults to
+   `Mode=OneTime`**, unlike classic `Binding`: it evaluates once when the
+   container is created and never again. `SidebarRow` raised no change
+   notification and none of the affected bindings asked for `Mode=OneWay`, so
+   `Visibility` and `ContextFlyout` were frozen at container-creation time.
+
+**The general rule.** A row or item object that is RECONCILED rather than
+recreated needs both halves, every time:
+
+- `Mode=OneWay` in the XAML on every binding whose value can change after the
+  container is built, and
+- `INotifyPropertyChanged` raised for **the exact property name the binding
+  names** — including any DERIVED property XAML binds to directly. `x:Bind`
+  subscribes to the literal property path in the binding, not to whatever that
+  property is computed from, so here `ScheduledDeploy` changing had to raise
+  `BadgeVisibility` and `BadgeTooltip` as well.
+
+`MainWindow`'s `Activated` handler also calls `Sidebar.Refresh()`, so a deploy
+scheduled by the assistant or from another window is picked up when this window
+next comes to the front — the same refresh-on-activation shape the " — Edited"
+marker uses.
+
+**There is no equivalent trap on the mac.** SwiftUI's `@Observable` re-renders
+any view that read a changed property, so the "silently stale until the
+container happens to be recreated" failure mode does not exist there. Do not go
+looking for it in the Swift.
+
+Reference: `Plantoir/Views/SidebarPane.xaml.cs` (`SidebarRow`,
+`ReconcileSections`), `Plantoir/Views/SidebarPane.xaml` (the three `Mode=OneWay`
+bindings), `Plantoir/MainWindow.xaml.cs`.
 
 ## What this page does not cover
 
@@ -648,9 +690,613 @@ as work happens:
 - **Window and state restoration**, archived courses, problem reporting, and
   the `WorkLease` protocol that keeps two windows from building the same
   section at once.
-- **What is built and what is missing.** `PROGRESS.md` carries the parity
-  table; `WINDOWS-HANDOFF.md` carries the numbered list of outstanding work
-  and the reasoning behind past decisions.
+- **What is built and what is missing.** Outstanding work is in [GitHub
+  issues](https://github.com/russellgordon/plantoir/issues) labelled `windows`;
+  the rest of this folder carries the reasoning behind past decisions.
+
+## Nothing here runs in a container
+
+**Read this before the architecture sections below.** Windows dropped Docker,
+WSL2 and the whole image/container model on 2026-08-19 (`GUI-IMPROVEMENTS.md`
+entry 290) in favour of a **native runtime**: `windows-app/Vendor/fetch-runtime.ps1`
+fetches pinned, portable pieces — Node 20 (zip, no installer), Python 3.11
+(the embeddable distribution plus `python-frontmatter` and `Pillow`), a clone
+of Quartz v4.5.0 with this repo's `patches/` applied, wrangler, and the Noto
+emoji font — into `windows-app/Vendor/runtime/`, which the app then ships
+inside its own bundle the same way it ships the assistant's `llama/` engine.
+`setup.ps1` / `preview.ps1` / `deploy.ps1` **do still live at the repository
+root** (an earlier draft of this note said otherwise; that was wrong) and are
+mirrored into a working folder exactly as before, but their bodies changed:
+each now calls `Enter-NativeRuntime`, which points a shared set of
+`PLANTOIR_*` environment variables at the bundled runtime and the working
+folder, then runs `scripts/setup_course.py` / `build_site.py` / `deploy.py`
+directly with the runtime's own `python.exe` — no `docker`, no `wsl`, no
+image build, no administrator rights, and no one-time "Setting up this PC"
+wait. If a copy is missing its bundled runtime the launcher fails outright
+("This copy of Plantoir is missing its website builder... Reinstall
+Plantoir") rather than falling back to a container path, because there no
+longer is one.
+
+What replaces the old container concepts:
+
+- **No image, no tag, no registry.** There is nothing to hash into a
+  `teaching-quartz:src-<hash>` tag any more, and `Get-ToolchainHash` /
+  `Get-BuildContext` / `Ensure-ContainerRuntime` do not exist in the current
+  `.ps1` files — do not port them, and do not go looking for the batching fix
+  described further down this file (below, under "The recipe hash is on the
+  hot path") as if it still applies; it was superseded by removing the image
+  entirely, not fixed further.
+- **Isolation between working folders is a hashed *working-folder ID*, not a
+  container name.** All three launchers still compute `$WORKDIR_ID` — the
+  first 8 hex characters of SHA-256 over the folder's physical path (via
+  `GetFinalPathNameByHandleW`, the same Win32 call as before) plus a
+  newline, matching the mac's `pwd -P | shasum -a 256` derivation. A
+  `$CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"` variable is still
+  assigned in each script for parity with the mac's naming scheme, but
+  nothing native reads it — the real use of `$WORKDIR_ID` today is naming a
+  per-folder build directory, `%LOCALAPPDATA%\Plantoir\builds\<WORKDIR_ID>`,
+  so two working folders' builds never collide, and it moves build output
+  entirely **out of the working folder**, because teachers keep working
+  folders in OneDrive and a build's thousands of small files would sync and
+  lock in place there.
+- **Concurrent previews are still isolated by port, exactly as before.**
+  `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
+  base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
+  websocket) and prints the exact "Preview will be available at:" line the
+  app watches for. What changed is only what is listening on that port: a
+  Node process running directly on the PC, bound to `127.0.0.1` (patched at
+  runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
+  entry below), not a container's forwarded port.
+- **`preview.ps1 CODE N --stop` reclaims native processes, not a
+  container.** It matches processes by command line
+  (`build_site.py --course=/--section=` for the build, the section's own
+  build-root path for the server) and walks parent/child links to catch
+  descendants, then kills them with `Stop-Process`. No container, no `docker
+  exec`, no engine to stop. It narrowed those matches to `node.exe` /
+  `python.exe` until 2026-09-05; **that filter is gone**, because it refused
+  most of the contract's own fixtures (`python3`, `npm`, `esbuild`, `sh`) and
+  a `cmd.exe` running `npm.cmd` with the section's folder on its command
+  line. `preview.ps1` now applies no filter on process NAME at all, because
+  the shared rule has none — see the comment above
+  `Get-SectionProcessesToStop`.
+
+`GUI-IMPROVEMENTS.md` entries 290 and 292 are the log rows for this change;
+Its origin and reasoning are written up in full above.
+The sections below that still described the old Docker/WSL2 container
+architecture as current have been corrected to match the above — where the
+old material is useful as history (why containers were tried, what WSL2 and
+Colima-parity cost, lessons that still generalize), it is kept but labelled
+as history, not as what Windows does today.
+
+## The architecture the app reproduces
+
+- **Working folders**: a folder holding `courses/`, the three launchers,
+  and `.toolchain/` (a mirror of `scripts/`, `support/` and the launchers
+  themselves, refreshed by the app from its own bundled copy whenever a
+  launcher/script file differs — a much smaller mirror than before, now
+  that there is no image recipe to carry). The bundled **native runtime**
+  (Node, Python, patched Quartz, wrangler, the emoji font — see
+  `Vendor/fetch-runtime.ps1`) is separate again: it lives once per Plantoir
+  install, not per working folder, and every working folder's launchers
+  point at the same copy via `PLANTOIR_RUNTIME`.
+- **No image, no tag, no registry.** There is nothing to build or cache
+  locally any more — `Get-ToolchainHash` does not exist in the current
+  `.ps1` files, and there is no equivalent to reproduce. (History: the old
+  container path hashed every file in the build context and tagged
+  `teaching-quartz:src-<hash8>`, rebuilding only when the recipe changed —
+  see "The recipe hash is on the hot path" below for why that mattered
+  while it existed, and note that it no longer does.)
+- **Isolation between working folders is a hashed working-folder ID, not a
+  container name.** Each launcher computes `$WORKDIR_ID` — the first 8 hex
+  characters of SHA-256 over the folder's physical path (via
+  `GetFinalPathNameByHandleW`) plus a newline — and uses it to name a
+  per-folder build directory, `%LOCALAPPDATA%\Plantoir\builds\<WORKDIR_ID>`,
+  outside the working folder entirely (so a working folder kept in OneDrive
+  never has its build output synced and locked). A `$CONTAINER_NAME =
+  "teaching-quartz-$WORKDIR_ID"` variable is still assigned in each script,
+  matching the mac's naming scheme, but nothing native reads it today —
+  don't build app logic around a container name existing.
+- **Port blocks**: `preview.ps1` still probes a free host port block
+  (bases 8081, 8091, 8101, 8111, 8121, 8131): base..base+3 for the preview
+  site (four concurrent previews per folder) and base+1000..+1003 for
+  Quartz's live-reload websockets. What is listening on those ports is now
+  a native Node process bound to `127.0.0.1`, not a container's forwarded
+  port. The app leases ports per folder (`PreviewLeases` in the macOS app),
+  parses the announced "Preview will be available at:" address rather than
+  assuming it, and refuses a duplicate preview of the same section in the
+  same folder.
+- **Course activity registry** (entry 104): one cross-window record of
+  which courses are previewing (the port leases already know) or
+  publishing (begin/end records around the publish flow, ended on EVERY
+  exit path). "Add Section…" declines while its course is active, with a
+  short line naming the blocker ("Available once preview completed").
+  Staleness lesson: read the enabled state when the menu OPENS, or make
+  registry changes re-render whatever hosts the menu — a state captured
+  at an earlier render shows yesterday's answer.
+- **Stopping a preview reclaims native processes** (entry 105): killing
+  the host-side launcher orphans the build or server process it started
+  (an orphaned build burns real CPU). `preview.ps1 CODE N --stop` matches
+  that section's processes by COMMAND LINE — never the working
+  directory, which `Win32_Process` does not expose at all — walks their
+  descendants, and `Stop-Process`es them, and never starts anything
+  itself. (Corrected 2026-09-05, and this passage needed correcting
+  TWICE over: it said "command line and working directory" for months,
+  which is the mac's mechanism rather than this one, and it went on
+  naming a `node.exe` / `python.exe` filter that was removed the same
+  day — for refusing most of the contract's own fixtures. Fixing half a
+  stale sentence and leaving the other half is how a passage keeps
+  being believed. The rule both platforms must agree on is written down
+  once, in `contracts/shared-rules.json` → `stopPreview`.) Call it
+  fire-and-forget — output discarded — wherever a preview ends: stop
+  button, navigating away, window close. (History: this used to reclaim
+  the container-side processes an orphaned host script would otherwise
+  leave running inside Docker; the mechanism moved, the reason for having
+  it did not.)
+- **Backups and archives** (entry 106): three zip kinds share
+  `courses/_backups/<CODE>/`, told apart ONLY by name —
+  `<CODE>_backup_<timestamp>.zip` (teacher-made backups),
+  `<CODE>_<timestamp>.zip` / `<CODE>-sectionN_<timestamp>.zip`
+  (archives from removals), `<timestamp>.zip` (the wizard's automatic
+  zips, never listed). Backups get their own sidebar group above
+  Archived. Restoring a backup archives the current course FIRST, then
+  replaces the course folder's CONTENTS in place — never the folder
+  itself (see the Obsidian note below) — and keeps the zip. Deleting a
+  backup or an archive is the app's only true deletion; the archive
+  confirmation states a FACT about what remains (live course / other
+  copies / only remaining copy — a whole-course archive covers a
+  section archive, never the reverse).
+- **No engine to bootstrap.** `fetch-runtime.ps1` downloads pinned, portable
+  Node/Python/Quartz/wrangler binaries once (run before building the
+  Windows app, or shipped inside its bundle to a teacher) — there is no
+  WSL2, no Docker Engine, and nothing for the app to start, poll, or stop
+  at quit. (History: earlier Windows builds provisioned Docker Engine
+  inside WSL2 automatically, mirroring the mac's Colima bootstrap — see the
+  appendix at the end of this file. That entire path is gone; do not build
+  toward it.)
+- **BuildKit, the image tag, and "the legacy builder corrupts a layer" are
+  mac-only facts now** — Colima still needs them; native Windows has no
+  image and no builder of any kind.
+
+## Behaviours with platform-specific mechanics
+
+- **Obsidian integration** (entry 80): `obsidian://open?path=…` only works
+  for vaults REGISTERED in Obsidian's registry — on Windows,
+  `%APPDATA%/obsidian/obsidian.json`, same JSON shape. Port the whole
+  dance: quit Obsidian if running (its in-memory vault list ignores
+  registry edits), seed `support/obsidian_defaults/.obsidian` if the
+  course has none, write the registry entry, then open the URI. Sections
+  open at their `index.md` (Obsidian opens files, not folders). Enable
+  the File Explorer's auto-reveal by patching the vault's
+  `workspace.json` whenever Obsidian is closed (a pre-seeded layout is
+  discarded on a vault's first open — verified). One more watcher
+  lesson (entry 106): Obsidian's file watcher is anchored to the vault
+  FOLDER's identity — replace the folder and an open vault shows stale
+  files until reopened; replace only its contents and Obsidian
+  refreshes itself. Any feature that rewrites a course wholesale (like
+  restoring a backup) must swap contents, never the folder.
+- **Window restoration** (entries 64–65, 98–99, 106): keep per-window
+  state in the app's own store, keyed by something the platform restores
+  faithfully. Each entry now carries, beside the folder: the expanded
+  course codes, whether the Archived and Backups groups are open, and
+  the sidebar selection (`course|CODE`, `section|CODE|N`, `archived|ID`,
+  `backup|ID`) — restore all of it when a window claims its entry. Two rules learned the hard
+  way: resolve claims on the platform's restoration-complete signal
+  rather than polling, and while a claim may still arrive show a quiet
+  loading state, never the folder picker the claim is about to replace.
+  The scenario test suite in the macOS app is the porting spec.
+- **New windows** (entry 84): inherit the folder of the window that was
+  key when the command ran; with no windows open, show the folder picker.
+  Decide the folder BEFORE first paint or the picker flashes.
+- **Updates**: WinSparkle, with its own feed at `site/appcast-windows.xml`
+  alongside the mac's `site/appcast-macos.xml` — **per-platform file names from
+  the start**, so the two update feeds can never collide. (An earlier draft of
+  this line said the two would share one appcast; that is exactly the collision
+  the mac side asked to avoid. Deferred on both platforms until the first
+  release.)
+- **Stable code signing** (entry from the signing fix): sign dev builds
+  with a stable identity or Windows will re-prompt for permissions —
+  same class of problem as macOS ad-hoc signing.
+- **Social cards & OpenGraph preview metadata** (entries 88, 268): nothing to do in C# — `scripts/social_card.py`
+  draws the 1200×630 card on every build (inside the container on macOS,
+  natively on Windows — see the note above), `patches/Head.tsx`
+  wires OpenGraph and Twitter card metadata, and `scripts/build_site.py` / `scripts/deploy.py`
+  sync the live site domain into Quartz's `baseUrl` (falling back to `undefined` when unpublished).
+  Because the entire flow lives in the shared Python scripts, Windows inherits it automatically
+  regardless of which runtime carries them.
+- **HISTORY — the recipe hash used to be on the hot path** (entry 118).
+  This entry describes a bug that existed only in the old container/image
+  architecture and **no longer applies**: Windows dropped the image tag
+  entirely on 2026-08-19 (see the note at the top of this file), and
+  `Get-ToolchainHash` does not exist in the current `.ps1` files. Kept here
+  because the underlying lesson generalises — **keep per-file work out of a
+  per-invocation loop** — and because the mac side still hashes something
+  comparable for its own image tag. What it used to say: the image tag was
+  a SHA-256 over every file in `.toolchain/`, which by 2026-08-15 carried
+  **11,378 files** across the example-content payloads and subject
+  skeletons; the `.sh` launchers originally spawned one `shasum` process
+  per file (36s of a 36.75s preview startup on an M4 Pro) before being
+  batched to `find -print0 | sort -z | xargs -0 shasum` (0.16s), and
+  `Get-ToolchainHash` in the old `.ps1` files had the same bug in its
+  PowerShell dialect — `$combined += (Get-FileHash …).Hash` inside a loop,
+  reallocating an immutable string thousands of times — fixed the same way
+  by collecting into an array and joining once. If a future Windows change
+  reintroduces any per-folder hash (for a future runtime version check, say),
+  re-learn this lesson rather than re-discovering it.
+
+## WinUI scroll bars overlay content — always reserve a trailing gutter
+
+Found 2026-08-22, testing the model-in-use guard written up in
+(`GUI-IMPROVEMENTS.md` row 421):
+`AssistantSettingsDialog`'s
+"On this PC" housekeeping rows put a Stop/Remove/Download button flush against
+the `ScrollViewer`'s right edge, and the vertical scroll bar drew right over
+top of it — reported directly: "the scroll bar goes over the buttons — that
+seems a poor UI choice? […] scroll bars should never occlude content on a
+lower layer."
+
+**Why it happens.** WinUI's default `ScrollBar` visual (`MouseIndicator` mode)
+is an OVERLAY — it takes no layout space of its own and floats over whatever
+the `ScrollViewer`'s content places at its trailing edge. A `ScrollViewer`
+with no padding gives the scroll bar nothing to float over except the
+content itself, so anything docked to that edge — here, a button in the
+right-hand column of a two-column `Grid` — sits directly underneath it.
+
+**The fix, and the convention going forward**: give the `ScrollViewer` extra
+padding on the trailing side specifically — `Padding = new Thickness(0, 0, 20, 0)`
+in `AssistantSettingsDialog.cs`, 20px being enough to clear the thumb's hit
+target with room to spare. Not a fix specific to Settings: **any `ScrollViewer`
+whose content places an interactive control (a button, a toggle, a link)
+flush against the trailing edge needs the same trailing gutter**, checked at
+the point that content is designed, not discovered by a teacher clicking
+through a scrolled-down dialog. `SectionDetailView.xaml.cs`'s own
+`ScrollViewer` already does this by convention (`Padding="36,28,48,28"` —
+more on the right than the left), which is what made this fixable by pattern-
+matching rather than by inventing a number from nothing.
+
+**Swept the rest of the app for the same shape and found nothing else
+wrong**: `NewCourseDialog`'s form scroller and `CourseSettingsView`'s have no
+buttons docked to their trailing edge (toggles and text fields, not a
+two-column button row), and `AssistWindow`'s transcript scroller holds chat
+bubbles, not edge-docked controls. The housekeeping rows were the only place
+in the app with this exact shape today — but the rule is the general one
+above, not "fix this one dialog."
+
+**For the mac**: SwiftUI's `ScrollView` on macOS behaves differently — its
+system scroll bar is also typically an overlay, but AppKit's own controls
+already carry enough of their own trailing inset in most list/form contexts
+that this specific defect has not been reported there. Worth a quick look if
+a similar "button under the scroll bar" report ever comes in on that side,
+but this is not a ported behaviour — it is a Windows-specific rendering fact
+(the `MouseIndicator` overlay model) with no mac equivalent bug to fix in
+lockstep.
+
+## The course-code picker is a hand-built combo box — and probably should not be
+
+`GUI-IMPROVEMENTS.md` rows 333–338 describe the new-course wizard's course-code
+field being rebuilt over two days: a searchable field with a rich two-line
+flyout, a chevron that toggles it, arrow-key navigation, and geometry matched
+to a real `NSComboBox` to the pixel. **Read this section before you copy any of
+it**, because the central decision does not transfer and following the rows
+alone means re-deriving a lot of behaviour that comes for free.
+
+Nothing here is a contract case. Every part of it is either visual, measured,
+or built out of platform focus-and-key mechanics — the categories rule 2 sends
+to a handoff rather than to `contracts/`.
+
+### Why the mac hand-built it, and why that reason does not apply here
+
+A real `NSComboBox` was tried first and reverted twice in one session
+(2026-08-22). The blocking reason was **its popup can only display plain
+strings**. The flyout has to show, per row, the course code, its formal name on
+a second line, and an "Example content" badge for codes that ship with a
+ready-made course — and `NSComboBox` simply cannot draw that. A secondary
+reason: correcting its auto-widened popup frame proved unreliable two different
+ways (deferred a runloop turn it flashed the wrong frame first; made
+synchronous it missed the "click the arrow with an empty field" case, because
+the popup's child window does not exist yet when `comboBoxWillPopUp` fires).
+
+**WinUI does not have that limitation.** An editable `ComboBox`, or an
+`AutoSuggestBox`, takes an `ItemTemplate` and will happily render a two-line
+row with a badge in it. If that holds up when you try it — check before
+committing, this is written by somebody who cannot run WinUI — then use the
+real control, which gives, at no cost, everything the rows below describe
+the mac writing by hand: the dropdown affordance and its toggle, up/down
+navigation, Return to commit, Escape to dismiss, scroll-into-view for the
+highlighted row, the focus ring, and correct metrics. Do not hand-build a
+control to solve a problem you do not have.
+
+The rest of this section is what to know **if** the real control turns out not
+to work for you.
+
+### Metrics: measure the platform's control, do not match it by eye
+
+The mac's numbers came from rendering a real `NSComboBox` offscreen at 2x in
+both appearances and reading the PNG back pixel by pixel. The harness and the
+full findings table are in `research/native-control-metrics/`. The numbers
+themselves are Apple's and are useless to you; the **method** is the part worth
+copying, and three findings generalise:
+
+- **A framework's "native-style" control is not the native control's
+  metrics.** SwiftUI's `.textFieldStyle(.roundedBorder)` renders **26pt** tall
+  where the `NSTextField` it stands in for reports **24**. Check what your
+  `TextBox` actually measures against the WinUI control it imitates before
+  assuming they agree.
+- **Constraining the frame does not change what a control draws.**
+  `.frame(height: 24)` left the field measuring 26 and merely overflowing its
+  box. Getting 24 meant drawing the bezel ourselves.
+- **A cell's text rect is not where glyphs land.** `titleRect` reported x=4,
+  actual glyphs started at ~5.7pt; the text system adds its own padding inside.
+  Measure rendered glyphs, not the API's rectangle, when matching text
+  position.
+
+There is also a **corner-radius trap that cost real time**: the radius was
+already correct and only *read* wrong because the field was 30pt tall instead of
+24. The same radius on a taller box looks squarer. Check the box before you
+change the radius.
+
+### If you do hand-build one: four things learned the hard way
+
+1. **One piece of state for "is the flyout showing."** The toggle, the drawing,
+   and the animation must all read the same value. Three separate conditions
+   let the toggle disagree with what is on screen, and the arrow then needs
+   pressing twice.
+2. **Key handlers must DECLINE, not swallow.** Up/down/Return are handled only
+   when there is a flyout to act on; otherwise they fall through. Swallow them
+   unconditionally and you break the arrow keys for someone editing text and the
+   default button for someone who typed a code and just wants to press Enter.
+3. **Store the highlighted row by its CODE, not its index.** The list re-filters
+   on every keystroke, so an index quietly comes to mean a different course.
+   Clamp movement at the ends rather than wrapping — a wrap turns one key too
+   many into a jump from the bottom of a 40-row list back to the top, which
+   reads as the list having moved somewhere else entirely. And make Down with
+   the flyout CLOSED reopen it on the first row, or Escape strands a keyboard
+   user at the mouse.
+4. **Re-check every badge and secondary colour that can land on a highlighted
+   row.** The "Example content" badge is an accent-coloured capsule; on an
+   accent-filled highlighted row it vanished completely the moment keyboard
+   highlighting existed. It now inverts to a white capsule with accent text.
+   A passing test did not catch this — looking at a screenshot did.
+
+### The chrome is shared, and that was a trade
+
+All three fields in the wizard's Basics section (course code, course name,
+timetable section numbers) now wear one `WizardFieldChrome` modifier, so they
+cannot drift apart. The cost, stated rather than buried: two fields that wore a
+real AppKit bezel now wear an imitation of one, because that was the only way to
+get them to the native 24pt. The imitation is measured against the real control
+rather than eyeballed. The alternative — wrapping a real `NSTextField` in an
+`NSViewRepresentable` for all three — buys genuine native chrome at the price of
+hand-managing first responder and binding updates, and remains open if the
+imitation ever starts costing more than it saves.
+
+**If WinUI's own field is already the right height, none of this applies to you
+— keep the real control.** The mac ended up here because it had already been
+forced off the native control for the flyout's sake; do not inherit that
+position by accident.
+
+## Two macOS mechanics NOT to port
+
+Do not port entry 142 (Colima sizing) or entries 244–245 (`launchd`). They are
+macOS mechanics. The transferable half of 244–245 is a single lesson worth
+having before you touch `TaskScheduling.cs`: register a scheduled job as the
+APP, not as the shell it happens to run, or the operating system tells the
+teacher that "bash" — or, on the second attempt here, a person's name — wants
+to run in the background.
+
+## Two testing rules that cost time to learn
+
+Windows found the gap (2026-08-19): three trail events sat
+in `ActivityTrail.Event`, the contract test compared the enum against
+`shared-rules.json` → `activityTrail.mustRecord` and passed — and nothing
+ever CALLED them, so a release smoke left zero lines for a course creation,
+a preview and a deploy. A list-against-list pin structurally cannot catch a
+declared-but-never-called event. The mac now has a second pin, and Windows
+should mirror it:
+
+- **A source scan**
+  (`mac-app/Tests/QuartzTeachersTests/ActivityTrailWiringTests.swift`):
+  for every `Event` case, fail unless `.caseName` is referenced somewhere in
+  product source outside the enum's own declaration and outside comments.
+  The C# mirror is the same idea over `windows-app/` product sources for
+  each `ActivityTrail.Event` member (locate the source tree from the test
+  assembly the way the mac test uses `#filePath`). Include a guard that the
+  scan actually found a plausible number of source files, so a moved folder
+  fails loudly instead of passing vacuously.
+- **Its honest limit, so nobody oversells it**: the scan proves a call site
+  EXISTS, not that it is reached. The mac additionally runs `noteLaunch()`
+  against a scratch store and counts its three lines. Full runtime coverage
+  of every event would mean driving every feature in unit tests; REJECTED as
+  disproportionate — the failure Windows actually shipped was
+  zero-references, which the scan catches outright.
+- **The suite-pollution fix differs by platform for a reason.** Windows'
+  `[ModuleInitializer]` redirect (`TestTrailRedirect.cs`) is right for xUnit,
+  where tests run in their own process. The mac CANNOT use that shape: its
+  test target is app-hosted (`TEST_HOST`), so the host app writes its launch
+  lines before any test-bundle code loads. Instead the redirect lives in the
+  product (`ProblemReportStore.standard` returns a throwaway folder when
+  `XCTestConfigurationFilePath` is in the environment), and
+  `testTheSuiteWritesToAThrowawayTrail` pins it so a refactor cannot lose it
+  silently. Worth a matching pin on Windows: one test asserting the trail
+  path is the redirected one, so the module initializer's presence is itself
+  under test. Verified on the mac empirically: `activity.txt` byte-identical
+  (same SHA-1) before and after a full suite run.
+
+### A stub launcher must answer every mode the app calls, and must not name a port (mac, 2026-08-23)
+
+The mac's one end-to-end preview test drives the real app against a fake
+`preview.sh` that serves a one-page site. It had been failing for days with
+`OSError: [Errno 48] Address already in use`, and it leaked an orphan server
+that held port 8081 overnight — a leftover once made a REAL preview fail, which
+reads like a broken toolchain rather than like test litter. Three separate
+faults, and the interesting part is that only the third was the actual cause.
+Windows has the same shape of test to write (`preview.ps1` driven by the app),
+so all three are worth having before you write it.
+
+- **The stub never implemented `--stop`, and that was the real bug.** Ending a
+  preview runs `preview.sh <course> <section> --stop` and the app WAITS for
+  that to finish before the next preview starts (mac: `PreviewStopper`). The
+  stub ignored its arguments, so `--stop` fell through to "start a server" —
+  which never exits. The restart then waited forever on a stop that could not
+  complete, and the second server's attempt to bind the port the first one
+  still held produced the `Address already in use` line everybody was chasing.
+  **The error message named the symptom and hid the cause.** A stub stands in
+  for a launcher, so it owes every mode the app invokes; answering only the
+  happy path buys a failure that looks like a port problem.
+- **A hard-coded port is a test that asserts ownership of a shared machine.**
+  The stub asked for 8081. Anything else holding it fails the run for reasons
+  that look like a product bug — and on this Mac something did: an unrelated
+  `ssh -L` tunnel of Russell's, listening on 8081 all along. The fix costs
+  nothing, because the app already scrapes the port out of the launcher's own
+  output (`Preview will be available at: http://localhost:<port>/`). The stub
+  now binds port 0, lets the kernel choose, and announces what it got — bind
+  BEFORE announcing, so there is no window in which the announced port is not
+  yet taken. Two runs can now overlap, and a teacher's real preview can be up
+  at the same time. **Windows: do not let a stub name 8081**; read the port
+  back from the announcement the same way.
+- **A sandboxed UI-test runner cannot spawn a process, and fails silently at
+  it.** The mac's first attempt at cleanup put `pkill` in `tearDown` behind a
+  `try?`. It never ran — XCUITest's runner has no permission to spawn a child
+  at all — and the swallowed error made dead code look like working cleanup
+  for days. Proved by having it write a marker file that never appeared. The
+  reaper is now a raw `kill()` on a pid the stub records before `exec` (which
+  preserves the id). Check whether your Windows UI-test host has the same
+  restriction before trusting a `Process.Start`-based teardown, and prefer
+  `Process.GetProcessById` + `Kill()` on a recorded id, which needs no spawn.
+- **Do not oversell the teardown reaper — it does NOT cover an interrupted
+  run**, which is the case that actually hurt. An adversarial review caught
+  this claim being made here in its first draft. Teardown does not execute
+  when a run is killed, and the mac's recorded pid is stranded in a
+  per-run `cq4t-fixture-<UUID>` folder that is never handed out again, so no
+  later run can find it. **The port change is what makes an interrupted run
+  harmless**, because the orphan then holds a kernel-assigned port nobody is
+  waiting for rather than the one a real preview needs. The reaper earns its
+  place on a narrower case: a server that outlived the test BODY, because the
+  test failed before it could stop the preview. If Windows wants genuine
+  interrupted-run cleanup, it has to come from outside the run — a known
+  fixed pid-file location, or a verify step — not from teardown.
+- **Record the pid BEFORE anything slow.** The mac's stub first wrote its pid
+  after two `sleep 1` calls, which left a two-second window where a test that
+  finished quickly tore down, found no pid file, and leaked the orphan anyway
+  — the same review found it. The shell's `$$` is the same value at the top of
+  the script as at the bottom, and `exec` preserves it, so there is no reason
+  to wait.
+- **If the stub kills by pid in more than one place, name-check in ALL of
+  them.** The mac's Swift reaper checked the process name and its own shell
+  `--stop` path did not, which is the stated invariant broken in one of the
+  two places that needed it. Note the two need different matching: the kernel
+  reports the short name (`Python`) while `ps -o comm=` reports a full path,
+  so one wants a prefix test and the other a substring test.
+- **Never reap by process NAME alone.** A pid is reused once its owner is
+  reaped, so "something answers to this number" does not justify a kill — that
+  is how a test murders an unrelated program of the teacher's. The mac scopes
+  the kill to a pid the stub itself wrote, and additionally checks the running
+  process's name before signalling. That check has one trap worth stealing:
+  Homebrew's `python3` runs through a `Python.app` framework stub, so the
+  kernel reports `Python` with a capital P, while `/usr/bin/python3` reports
+  `python3` — a case-SENSITIVE test passes on one machine and silently reaps
+  nothing on the other. Compare lowercased.
+- **What was rejected.** Cleaning up from outside the test run (a wrapper
+  script, or a `verify.sh` step) was rejected: it fixes the litter but leaves
+  the test itself failing on any busy machine, and it puts the cleanup
+  somewhere nobody reads when the test breaks. Keeping a fixed port and simply
+  killing whatever holds it first was rejected outright — on a developer's own
+  machine that is someone else's process.
+
+One more thing the mac learned here that is NOT about stubs. The app will not
+show a preview until the section's built `index.html` has CHANGED, and it
+waits up to 120 seconds for that (mac: `waitForPreviewServer` phase 2). A stub
+that serves a site from anywhere other than the folder a real build writes into
+never trips the check, so the preview arrives two minutes late and the test
+times out first — which looks like the server never came up. The stub must
+BUILD INTO the watched folder. Whatever Windows' equivalent staleness check
+is, its stub owes it the same honesty.
+
+One consequence to know rather than fix: the app still takes a lease from
+8081–8084 and still passes `--port <n>`, and the stub now ignores that flag in
+favour of what the kernel gives it. That is deliberate — the announcement line
+is the contract, and a launcher that could not honour `--port` would still
+work — but it does mean this test no longer proves anything about a launcher
+HONOURING `--port`, and nothing else covers it on either platform. Do not read
+the flag as dead; read it as untested.
+
+## Measured: Edge does not need the `127.0.0.1` rewrite
+
+Measured on Windows, 2026-08-23. The rewrite itself (`OutputParsers.cs`,
+`SectionDetailView.xaml.cs`) was applied earlier on the mac's "browsers try
+IPv6 first" rationale, without a Windows-side test to back it. Tested by
+hand against a real running preview (port 8081, confirmed via `netstat`):
+loading `http://localhost:8081` directly in Edge was indistinguishable from
+loading `http://127.0.0.1:8081` — both rendered immediately, no perceptible
+delay, repeated more than once. No IPv6-first stall observed. Conclusion:
+the rewrite is a harmless no-op on Windows as currently shipped, not a fix
+for an observed Edge problem — kept in place rather than removed, since it
+costs nothing and matches the mac's own defensive posture, but it should no
+longer be treated as an open question. No mac change; nothing to port.
+
+- **Windows caught up to the mac's working-folder path bar gestures**
+(Windows, 2026-08-23, `GUI-IMPROVEMENTS.md` row 328, closing
+reported from Windows). No mac change — the mac's own path bar is
+
+## The assistant said "deployed" before the deploy finished
+
+Fixed on Windows 2026-08-19; the mac was already correct, so there was
+nothing to port. Kept because the REJECTED first fix is a general trap.
+
+The old `TODO.md` entry read: *"Assistant
+replies 'deployed' before the deploy finishes (Windows)."* Windows'
+`MainWindow.DeployForAsync` used to resolve the instant the click was
+dispatched to the UI thread, not when the deploy actually finished, so the
+in-app assistant said "is deployed. Students can reach it now." after
+every `deploy_section` call regardless of outcome. Fixed by having
+`SectionDetailView.Deploy_Click`'s body (now `DeployAsync()`, an
+`async Task<string?>`) RETURN the true outcome sentence on every exit path
+— success/partial/all-failed via the existing
+`MultiDestinationDeployRunner.Result(...)`, `AssistWording.DeployDidNotFinish`
+on every early return and the catch block — threaded back through
+`MainWindow.DeployForAsync` → `AssistWindow.StartDeployInAppAsync` →
+`AssistAgent.RunTool`. Full write-up: `GUI-IMPROVEMENTS.md` row 383.
+
+The mac's `deployAndWait()` already awaits the real result and words it
+correctly — this only brought Windows to parity, so there is nothing to
+port. Two things worth a mac session's attention, not required, not
+blocking anything: (1) whether an equivalent "second deploy request
+arrives while one is already running" path exists in
+`SectionDetailView.swift`, and if so whether it shares mutable state across
+the two in-flight calls the way the first (rejected) fix here did before an
+adversarial review caught it — see the "rejected" note in
+`GUI-IMPROVEMENTS.md` row 383 for the exact shape of that bug, since it is
+a general trap (a single-slot completion field shared across concurrent
+callers) worth checking for rather than re-discovering; (2) the Windows
+scenario test fixture (`AssistScenarioTests.cs`) never wired
+`StartDeployInAppAsync` at all before this — worth checking whether the
+mac's own scenario tests exercise the equivalent async production seam or
+only a sync stand-in.
+
+## Two testing lessons that recur, and both cost a red branch
+
+**A test proving a date was FRESHENED must compare against a date in the PAST.**
+`windows-app/Plantoir.Tests/ModelTests.cs` asserts
+`Assert.DoesNotContain("2025-01-01", index)`, and the date being safely in the
+past is what makes that a real assertion. The mac's twin used a date that was
+"today" when it was written, and on **2026-09-08 the clock reached it**: the
+correctly-freshened value became the very string the test checked for the
+absence of, so a passing behaviour failed its own test. `dev` was red that
+morning for every branch, on a test nobody had touched in three weeks. Fixed on
+the mac by moving the fixture to 2020-01-15 (`SectionAdderTests.swift`).
+**Do not "modernise" a fixture date to something recent** — the whole point of
+that literal is that the clock can never catch up with it, and `2025-01-01` is
+already inside the range somebody would be tempted to refresh.
+
+**Cleanup that fails must not fail a test that passed.** An intermittent failure
+that never reproduced (Windows, 2026-08-14, `0479d44`) turned out to be 23 tests
+ending with a bare `finally { Directory.Delete(root, recursive: true); }`. On
+Windows that throws whenever anything still holds a handle in the folder —
+Defender scanning the files the test just wrote, or the Search Indexer. Every
+assertion had passed; the test failed on housekeeping. Deleting a temp folder is
+housekeeping: when it does not work, the operating system will get to it. **The
+same shape is available on the mac** with Spotlight indexing, and whether the
+mac's suites have it has never been checked.
+
 
 ---
 

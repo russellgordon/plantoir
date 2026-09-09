@@ -6,7 +6,7 @@ namespace Plantoir.Tests;
 
 /// <summary>
 /// A course can publish to more than one destination now (redundancy
-/// against one host having a bad day) — see WINDOWS-HANDOFF.md entry 304.
+/// against one host having a bad day) — see documentation/07-deployment.md.
 /// Mirrors the mac's AdditionalDeployTargetsTests.swift.
 /// </summary>
 public class AdditionalDeployTargetsTests

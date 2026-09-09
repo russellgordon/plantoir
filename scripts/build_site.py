@@ -1053,7 +1053,7 @@ def stop_preview_serving(output_dir: Path) -> int:
     completed, reported success, and put the PREVIEW online, live-reload
     client and all. `stop_preview.read_snapshot()` now asks the platform for
     its own process list, so the rule reaches every caller on both platforms;
-    see WINDOWS-HANDOFF item 20.
+    see documentation/03-launcher-scripts.md.
     """
     snapshot = stop_preview.read_snapshot()
     if not snapshot:

@@ -299,6 +299,21 @@ final class QuartzTeachersUITests: XCTestCase {
         saveScreenshot(named: "03-after-save", of: application)
     }
 
+    /// The wizard's affirmative button, as `contracts/shared-rules.json` spells
+    /// it. Read rather than retyped: a copy of a contract sentence in a test is
+    /// the copy that keeps passing after the product's words change.
+    private func createCourseButtonLabel() throws -> String {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let wizard: [String: Any] = try XCTUnwrap(all["wizard"] as? [String: Any])
+        return try XCTUnwrap(wizard["createCourseButton"] as? String)
+    }
+
     func testWizardSuggestsCourseNameFromCode() throws {
         let application: XCUIApplication = try launchApp()
 
@@ -318,6 +333,20 @@ final class QuartzTeachersUITests: XCTestCase {
         let expectation: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: autoFilled, object: nameField)
         let waitResult: XCTWaiter.Result = XCTWaiter().wait(for: [expectation], timeout: 5)
         XCTAssertEqual(waitResult, .completed, "The course name should auto-fill from the code; value was: \(String(describing: nameField.value))")
+
+        // The RENDERED affirmative button says what the contract says.
+        //
+        // The gated test in QuartzTeachersTests compares WizardWording to the
+        // contract, which pins the CONSTANT: it stays green if this view stops
+        // using it and goes back to a literal. Only a run of the real app can
+        // see the button, so the assertion belongs here even though this target
+        // is outside the documented gate.
+        let createButton: XCUIElement = application.buttons[try createCourseButtonLabel()]
+        XCTAssertTrue(
+            createButton.waitForExistence(timeout: 5),
+            "The wizard's affirmative button is not labelled the way "
+            + "contracts/shared-rules.json → wizard.createCourseButton spells it."
+        )
 
         // The formal-name suggestion button should switch the name.
         let formalNameButton: XCUIElement = application.buttons["suggestedFormalNameButton"]

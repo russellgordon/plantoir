@@ -9,6 +9,17 @@ description: "Plantoir project rules, part 4 of 9 - Rules that override default 
 
 ## Rules that override default behaviour (continued)
 
+    ```bash
+    cd mac-app
+    xcodegen generate     # if files were added or removed, or project.yml changed
+    xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug build
+    ```
+
+    Then say plainly that it is ready. The cost of forgetting is not a wasted
+    rebuild: he launches from the Dock, tests the OLD binary, and reports
+    behaviour that was fixed an hour ago — which then gets investigated as a new
+    fault. A report of "done" that leaves a stale binary behind is not done.
+
     Three things make this go wrong quietly, all of them met in practice:
 
     - **`xcodebuild test` is not a build you can leave behind.** It rebuilds the
@@ -88,16 +99,16 @@ description: "Plantoir project rules, part 4 of 9 - Rules that override default 
     - **Write it up for the other platform AS YOU GO, not at the end.** This
       is rule 3 (and rule 4 pointing the other way); it is named here because
       it belongs to the rhythm of the work rather than to its ending. A
-      handoff written at the end is written from memory, and the reasons —
-      which is the part that travels — are what memory loses first.
+      write-up made at the end is made from memory, and the reasons — which is
+      the part that travels — are what memory loses first.
     - **ALWAYS end with a documentation update, BEFORE asking to merge** —
       after the rebuild rule 10 asks for, since a documentation pass needs no
       further build. The last act before "this is ready" is to go looking for
       every place that describes what you changed, and fix the ones the change
       made wrong. Start with `documentation/`, which is the one most easily forgotten
-      because nothing in the daily rhythm points at it: the handoffs and
-      `GUI-IMPROVEMENTS.md` get written because rules 3 to 5 demand them, and
-      the deep dives get written because somebody remembers. On the session
+      because nothing in the daily rhythm points at it: an issue and a
+      `GUI-IMPROVEMENTS.md` row get written because rules 3 to 5 demand them,
+      and the deep dive gets written because somebody remembers. On the session
       this rule came from, four places in `documentation/` described the rule
       that had just been replaced, three of them wrongly, and one of them did
       not document a launcher flag the app has been calling for weeks.

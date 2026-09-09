@@ -248,7 +248,7 @@ $CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"
 # Python copy would mean depending on the bundled interpreter at the
 # moment a teacher is closing a window. What keeps the two from drifting
 # is not that they share source - they cannot - but that they answer the
-# SAME 23 cases. See MAC-HANDOFF.md for the --match-stdin decision.
+# SAME 23 cases. See documentation/03-launcher-scripts.md for the --match-stdin decision.
 #
 #   * three kinds of evidence, any one of which is enough - the process
 #     sits in the section's build folder (never visible here:

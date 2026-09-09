@@ -11,7 +11,7 @@ namespace Plantoir.Tests;
 /// launcher's extra flags — plus the preview's ports.
 ///
 /// <para><b>Mirroring by hand is not the same as running the list, and the
-/// difference is the whole of WINDOWS-HANDOFF item 29.</b> A hand-written test
+/// difference is the whole point of the 2026-09-06 contract audit.</b> A hand-written test
 /// answers the cases that existed on the day somebody read the contract. It
 /// cannot notice a case the mac ADDS, because nothing compares the two
 /// collections — so the gap is invisible from both sides until a teacher finds
@@ -539,7 +539,7 @@ public class PublishAndLauncherContractTests
     /// contract's own note asks each side to check whether ITS default browser
     /// needs it: measured here on 2026-08-23 against a real preview, Edge was
     /// indistinguishable either way, so the rewrite is a harmless no-op rather
-    /// than a fix for an observed problem (MAC-HANDOFF.md). Kept, because it
+    /// than a fix for an observed problem (contracts/README.md). Kept, because it
     /// costs nothing — and pinned here, because a no-op nobody tests is a
     /// no-op somebody eventually deletes.</para>
     /// </summary>
